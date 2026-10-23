@@ -100,13 +100,14 @@ if [[ -n "$PLATFORM_ARCHIVE" ]]; then
   : "${AURA_CI_DATASET_INPUTS:?original dataset receipt required for platform reuse}"
 fi
 WEB_PLATFORM_ARCHIVE="${AURA_PRODUCT_WEB_PLATFORM_ARCHIVE:-}"
-WEB_PLATFORM_SOURCE="${AURA_PRODUCT_WEB_PLATFORM_SOURCE:-}"
+WEB_PLATFORM_SELECTION="${AURA_PRODUCT_WEB_PLATFORM_SELECTION:-}"
 CORE_WEB_ARGS=()
-if [[ -n "$WEB_PLATFORM_ARCHIVE" || -n "$WEB_PLATFORM_SOURCE" ]]; then
-  [[ -z "$PLATFORM_ARCHIVE" && "$WEB_PLATFORM_ARCHIVE" == /* && "$WEB_PLATFORM_SOURCE" =~ ^[a-f0-9]{40}$ ]] \
-    || fatal 'Web reuse requires an absolute archive and original Core SHA; full-platform selection is mutually exclusive'
+[[ -z "${AURA_PRODUCT_WEB_PLATFORM_SOURCE:-}" ]] || fatal 'Managed Web reuse requires a frozen selection record, not an ambient source override'
+if [[ -n "$WEB_PLATFORM_ARCHIVE" || -n "$WEB_PLATFORM_SELECTION" ]]; then
+  [[ -z "$PLATFORM_ARCHIVE" && "$WEB_PLATFORM_ARCHIVE" == /* && "$WEB_PLATFORM_SELECTION" == /* ]] \
+    || fatal 'Web reuse requires absolute archive/selection inputs; full-platform selection is mutually exclusive'
   : "${AURA_CI_DATASET_INPUTS:?original dataset receipt required for Web reuse}"
-  CORE_WEB_ARGS=(--web-platform-archive "$WEB_PLATFORM_ARCHIVE" --web-platform-source "$WEB_PLATFORM_SOURCE")
+  CORE_WEB_ARGS=(--web-platform-archive "$WEB_PLATFORM_ARCHIVE" --web-platform-selection "$WEB_PLATFORM_SELECTION")
 fi
 case "$MUTATION" in
   ''|locked-plugin-byte) ;;

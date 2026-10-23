@@ -16,13 +16,24 @@ AURA_CI_DATASET_INPUTS=/absolute/frozen/dataset-inputs.json \
 node scripts/application/stage-core-only-artifacts.mjs \
   --repo-root /absolute/current/core --output /absolute/fresh/output \
   --web-platform-archive /absolute/selected/platform-artifacts.tar \
-  --web-platform-source ORIGINAL_CORE_COMMIT
+  --web-platform-selection /absolute/selected/core-web-selection.json
 ```
 
 The existing Linux product image runner forwards `AURA_PRODUCT_WEB_PLATFORM_ARCHIVE`
-and `AURA_PRODUCT_WEB_PLATFORM_SOURCE` to this operation. Whole-platform selection
+and `AURA_PRODUCT_WEB_PLATFORM_SELECTION` to this operation. Whole-platform selection
 and Web-only selection are mutually exclusive. These are builder inputs, not a new
 Jenkins job, deployment operation or authorization.
+
+The managed selection is an immutable second dataset emitted from a completed
+original native producer. It binds that attempt, qualification, job, original
+source and lock, archive bytes, effective inputs and component digest. Both files
+must occur exactly once in the original frozen dataset receipt. Canonical selection
+bytes and all bindings are checked before backend compilation; both hashes are
+checked again before output completion. The new receipt retains the selection
+and its original byte hash for native qualification. Arbitrary ambient source
+overrides are rejected by the managed runner. The lower-level stager retains
+`--web-platform-source` for direct inspection, but this alone does not satisfy
+managed Web dependency qualification.
 
 New native Core builds record a `webComponent` in their original release receipt.
 Its input identity includes tracked file contents and modes for the actual shell

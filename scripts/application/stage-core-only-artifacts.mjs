@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {
   copyFileSync,
   cpSync,
@@ -22,11 +23,12 @@ import {
   sha256Path,
   validateManifest,
   verifyArtifacts,
+  canonicalJson,
 } from './application-contract.mjs';
 import { createOciImageLayout, prepareRootfs } from './oci-layout.mjs';
 import {consumePlatformArtifacts} from './platform-artifact-package.mjs';
 import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,
-  coreWebShellEntries,isWebShellPublishableSource} from './core-web-component.mjs';
+  coreWebShellEntries,isWebShellPublishableSource,readCoreWebSelection} from './core-web-component.mjs';
 
 const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
@@ -41,11 +43,13 @@ function parseArgs(argv) {
     else if (argument === '--web-only') options.webOnly = true;
     else if (argument === '--web-platform-archive') options.webArchive = resolve(argv[++index]);
     else if (argument === '--web-platform-source') options.webSource = argv[++index];
+    else if (argument === '--web-platform-selection') options.webSelection = resolve(argv[++index]);
     else throw new Error(`unknown argument: ${argument}`);
   }
   if (!options.output) throw new Error('--output is required');
-  if(options.webArchive||options.webSource) {
-    if(!options.webArchive||!/^[a-f0-9]{40}$/.test(options.webSource||'')||options.webOnly
+  if(options.webArchive||options.webSource||options.webSelection) {
+    if(!options.webArchive||Boolean(options.webSource)===Boolean(options.webSelection)||options.webOnly
+      ||(options.webSource&&!/^[a-f0-9]{40}$/.test(options.webSource))
       ||!process.env.AURA_CI_DATASET_INPUTS)throw new Error('Explicit Web archive, original source and frozen dataset receipt required');
   }
   return options;
@@ -436,12 +440,22 @@ async function main() {
     try {
       const original=resolve(selectedRoot,'platform');
       const datasetReceiptSha256=sha256Path(process.env.AURA_CI_DATASET_INPUTS).slice(7);
+      const selected=options.webSelection?readCoreWebSelection({archive:options.webArchive,
+        selection:options.webSelection,inputs:process.env.AURA_CI_DATASET_INPUTS}):null;
+      if(selected)options.webSource=selected.document.source.commit;
       const consumption=await consumePlatformArtifacts({archive:options.webArchive,inputs:process.env.AURA_CI_DATASET_INPUTS,
         destination:original,coreCommit:options.webSource});
       selectedWeb={root:original,consumption,
         receipt:JSON.parse(readFileSync(resolve(original,'release-receipt.json'),'utf8')),
         catalog:JSON.parse(readFileSync(resolve(original,'artifact-catalog.json'),'utf8')),
-        datasetReceiptSha256};
+        datasetReceiptSha256,...(selected?{selectionSha256:selected.selectionSha256,selection:selected.document}:{})};
+      if(selected&&(selected.document.lockIdentity!==consumption.lockIdentity
+        ||canonicalJson(selected.document.source)!==canonicalJson(consumption.source)
+        ||canonicalJson(selected.document.source)!==canonicalJson(selectedWeb.receipt.webComponent?.source)
+        ||selected.document.inputDigest!==selectedWeb.receipt.webComponent?.inputDigest
+        ||selected.document.componentDigest!=='sha256:'+createHash('sha256')
+          .update(canonicalJson(selectedWeb.receipt.webComponent)).digest('hex')))
+        throw new Error('Frozen Web selection differs from the original platform component');
       if(datasetReceiptSha256!==sha256Path(process.env.AURA_CI_DATASET_INPUTS).slice(7))
         throw new Error('Frozen Web dataset receipt changed during consumption');
       // Reject an unusable selection before compiling any backend.
@@ -606,7 +620,8 @@ async function main() {
   const webAfter=captureCoreWebInputs(repoRoot);
   if(JSON.stringify(webBefore)!==JSON.stringify(webAfter))throw new Error('Core Web inputs changed during staging');
   if(selectedWeb&&(selectedWeb.datasetReceiptSha256!==sha256Path(process.env.AURA_CI_DATASET_INPUTS).slice(7)
-    ||selectedWeb.consumption.archive.sha256!==sha256Path(options.webArchive).slice(7)))
+    ||selectedWeb.consumption.archive.sha256!==sha256Path(options.webArchive).slice(7)
+    ||(options.webSelection&&selectedWeb.selectionSha256!==sha256Path(options.webSelection).slice(7))))
     throw new Error('Frozen Web selection changed during staging');
   const webProof=webSelection||{webComponent:createCoreWebComponent({root:output,catalog,before:webBefore,after:webAfter})};
   writeFileSync(resolve(output, 'artifact-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);

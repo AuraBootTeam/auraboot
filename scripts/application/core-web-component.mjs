@@ -23,6 +23,36 @@ const exact=(value,keys)=>need(value&&typeof value==='object'&&!Array.isArray(va
 const source=value=>need(value&&typeof value.repository==='string'&&value.repository.length>0
   &&/^[a-f0-9]{40}$/.test(value.commit),'Immutable Web producer source required');
 const hash=value=>/^sha256:[a-f0-9]{64}$/.test(value);
+function validateSelection(selection) {
+  exact(selection,['schemaVersion','kind','producer','source','lockIdentity','archiveSha256','inputDigest','componentDigest']);
+  exact(selection.producer,['attemptId','candidateDigest','qualificationDigest','job']);source(selection.source);
+  need(selection.schemaVersion===1&&selection.kind==='native-core-web-selection'
+    &&hash(selection.lockIdentity)&&hash(selection.inputDigest)&&hash(selection.componentDigest)
+    &&/^[a-f0-9]{64}$/.test(selection.archiveSha256),'Exact native Core Web selection required');
+  const producer=selection.producer;
+  need(['candidateDigest','qualificationDigest'].every(key=>/^[a-f0-9]{64}$/.test(producer[key]))
+    &&['attemptId','job'].every(key=>typeof producer[key]==='string'&&/^[A-Za-z0-9._:-]{1,160}$/.test(producer[key])),
+    'Original native Web producer identity required');
+}
+
+export function readCoreWebSelection({archive,selection,inputs}) {
+  need([archive,selection,inputs].every(file=>path.isAbsolute(file)&&lstatSync(file).isFile()),
+    'Regular absolute frozen Web inputs required');
+  need(lstatSync(selection).size<=1024*1024,'Bounded native Web selection required');
+  const before=sha256Path(inputs),dataset=JSON.parse(readFileSync(inputs,'utf8'));
+  need(Array.isArray(dataset.files),'Original frozen Web dataset required');
+  const bind=file=>{
+    const selected=dataset.files.filter(item=>item.file===file),actual=sha256Path(file).slice(7);
+    need(selected.length===1&&selected[0].sha256===actual,'Web input differs from frozen dataset');return actual;
+  };
+  const archiveSha256=bind(archive),selectionSha256=bind(selection),bytes=readFileSync(selection,'utf8');
+  const document=JSON.parse(bytes);validateSelection(document);
+  need(bytes===JSON.stringify(document,null,2)+'\n'&&document.archiveSha256===archiveSha256,
+    'Native Web selection bytes or archive binding differ');
+  need(sha256Path(inputs)===before&&sha256Path(selection).slice(7)===selectionSha256,
+    'Frozen Web dataset changed while reading');
+  return {document,selectionSha256};
+}
 function within(root,relative) {
   need(typeof relative==='string'&&!path.isAbsolute(relative)&&!relative.includes('\\')
     &&relative.split('/').every(part=>part&&part!=='.'&&part!=='..'),'Safe Web component path required');
@@ -178,17 +208,29 @@ export function verifyCoreWebComponent({root,catalog,receipt}) {
     need(canonicalJson(component.source)===canonicalJson(receipt.source),'Web producer differs without consumption proof');
   } else {
     const consumed=receipt.webConsumption;
-    exact(consumed,['schemaVersion','source','lockIdentity','archiveSha256','datasetReceiptSha256','componentDigest']);
+    const managed=consumed.selectionSha256!==undefined||consumed.selection!==undefined;
+    exact(consumed,['schemaVersion','source','lockIdentity','archiveSha256','datasetReceiptSha256','componentDigest',
+      ...(managed?['selectionSha256','selection']:[])]);
     source(consumed.source);
     need(consumed.source.repository===receipt.source.repository&&consumed.schemaVersion===1
       &&hash(consumed.lockIdentity)&&/^[a-f0-9]{64}$/.test(consumed.archiveSha256)
       &&/^[a-f0-9]{64}$/.test(consumed.datasetReceiptSha256)
       &&consumed.componentDigest===digest(canonicalJson(component)),'Original Web consumption provenance differs');
+    if(managed) {
+      validateSelection(consumed.selection);
+      need(consumed.selectionSha256===digest(JSON.stringify(consumed.selection,null,2)+'\n').slice(7)
+        &&canonicalJson(consumed.selection.source)===canonicalJson(consumed.source)
+        &&canonicalJson(consumed.selection.source)===canonicalJson(component.source)
+        &&consumed.selection.lockIdentity===consumed.lockIdentity
+        &&consumed.selection.archiveSha256===consumed.archiveSha256
+        &&consumed.selection.componentDigest===consumed.componentDigest
+        &&consumed.selection.inputDigest===component.inputDigest,'Frozen Web selection receipt differs');
+    }
   }
   return component;
 }
 
-export function copyCoreWebComponent({root,destination,catalog,receipt,current,consumption,datasetReceiptSha256}) {
+export function copyCoreWebComponent({root,destination,catalog,receipt,current,consumption,datasetReceiptSha256,selectionSha256,selection}) {
   const component=verifyCoreWebComponent({root,catalog,receipt});
   need(component,'Historical Core build has no Web input proof; no reuse');
   need(component.inputDigest===current.inputDigest&&canonicalJson(component.inputs)===canonicalJson(current.inputs),
@@ -209,7 +251,8 @@ export function copyCoreWebComponent({root,destination,catalog,receipt,current,c
   for(const relative of paths)cpSync(within(root,relative),within(destination,relative),
     {recursive:true,force:false,errorOnExist:true});
   const webConsumption={schemaVersion:1,source:receipt.source,lockIdentity:receipt.lockIdentity,
-    archiveSha256:consumption.archive.sha256,datasetReceiptSha256,componentDigest:digest(canonicalJson(component))};
+    archiveSha256:consumption.archive.sha256,datasetReceiptSha256,componentDigest:digest(canonicalJson(component)),
+    ...(selectionSha256!==undefined?{selectionSha256,selection}:{})};
   verifyCoreWebComponent({root:destination,catalog:{artifacts:component.artifacts},
     receipt:{source:current.source,webComponent:component,webConsumption}});
   return {webComponent:component,webConsumption};

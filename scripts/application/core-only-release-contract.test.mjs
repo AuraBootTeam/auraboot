@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {exportProductImage,unpackOciArchive,verifyOciLayout} from './export-product-image.mjs';
 import {exportPlatformArtifacts,unpackPlatformArtifacts,verifyPlatformArtifacts,consumePlatformArtifacts} from './platform-artifact-package.mjs';
-import {readStructuredFile,resolveApplication,sha256Path} from './application-contract.mjs';
-import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,verifyCoreWebComponent}
+import {canonicalJson,readStructuredFile,resolveApplication,sha256Path} from './application-contract.mjs';
+import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,verifyCoreWebComponent,readCoreWebSelection}
   from './core-web-component.mjs';
 import test from 'node:test';
 
@@ -390,16 +390,32 @@ function webComponentFixture(t) {
   return {...f,coreCommit:before.source.commit,repo,put,commit,before,catalog};
 }
 
+function frozenWebSelection(f,exported) {
+  const selection=join(f.directory,'core-web-selection.json'),inputs=join(f.directory,'dataset.json');
+  const document={schemaVersion:1,kind:'native-core-web-selection',
+    producer:{attemptId:'original-attempt',candidateDigest:'a'.repeat(64),qualificationDigest:'b'.repeat(64),job:'original-job'},
+    source:f.receipt.source,lockIdentity:f.receipt.lockIdentity,archiveSha256:exported.archive.sha256,
+    inputDigest:f.receipt.webComponent.inputDigest,
+    componentDigest:'sha256:'+createHash('sha256').update(canonicalJson(f.receipt.webComponent)).digest('hex')};
+  const write=()=>{
+    writeFileSync(selection,JSON.stringify(document,null,2)+'\n');
+    writeFileSync(inputs,JSON.stringify({files:[f.archive,selection].map(file=>({file,sha256:sha256Path(file).slice(7)}))}));
+  };
+  write();return {selection,inputs,document,write};
+}
+
 test('Web component input identity ignores only backend source and preserves original producer bytes',async t=>{
   const f=webComponentFixture(t),selected=await exportPlatformArtifacts(f);
-  const inputs=join(f.directory,'dataset.json');writeFileSync(inputs,JSON.stringify({files:[{file:f.archive,sha256:selected.archive.sha256}]}));
+  const frozen=frozenWebSelection(f,selected),{inputs}=frozen;
+  const managed=readCoreWebSelection({archive:f.archive,...frozen});
   const original=join(f.directory,'selected'),consumption=await consumePlatformArtifacts({...f,inputs,destination:original});
   f.put('platform/Backend.java','corrected backend\n');const current=f.commit();
   assert.notEqual(current.source.commit,f.before.source.commit);assert.equal(current.inputDigest,f.before.inputDigest);
   const destination=join(f.directory,'new-platform');mkdirSync(destination);
   const proof=copyCoreWebComponent({root:original,destination,catalog:f.catalog,receipt:f.receipt,current,
-    consumption,datasetReceiptSha256:sha256Path(inputs).slice(7)});
+    consumption,datasetReceiptSha256:sha256Path(inputs).slice(7),selection:managed.document,selectionSha256:managed.selectionSha256});
   assert.deepEqual(proof.webComponent.source,f.before.source);
+  assert.deepEqual(proof.webConsumption.selection,frozen.document);
   assert.equal(sha256Path(join(destination,'web')),f.receipt.web.digest);
   for(const artifact of f.catalog.artifacts.filter(item=>item.type==='npm'))
     assert.equal(sha256Path(join(destination,artifact.localPath)),artifact.digest);
@@ -415,6 +431,28 @@ test('Web component input identity ignores only backend source and preserves ori
   assert.equal(verifyCoreWebComponent({root:destination,catalog,receipt}).source.commit,f.before.source.commit);
   delete receipt.webConsumption;writeFileSync(join(destination,'release-receipt.json'),JSON.stringify(receipt));
   await assert.rejects(verifyPlatformArtifacts({root:destination,coreCommit:current.source.commit}),/without consumption proof/);
+});
+
+test('managed Web selection rejects unbound, duplicate, linked and changed evidence before consumption',async t=>{
+  const f=webComponentFixture(t),exported=await exportPlatformArtifacts(f),frozen=frozenWebSelection(f,exported);
+  const read=()=>readCoreWebSelection({archive:f.archive,...frozen});
+  assert.equal(read().document.source.commit,f.coreCommit);
+  for(const mutate of [
+    ()=>writeFileSync(frozen.inputs,JSON.stringify({files:[]})),
+    ()=>{const value=JSON.parse(readFileSync(frozen.inputs));value.files.push(value.files[1]);writeFileSync(frozen.inputs,JSON.stringify(value));},
+    ()=>{const value=JSON.parse(readFileSync(frozen.inputs));value.files[1].sha256='f'.repeat(64);writeFileSync(frozen.inputs,JSON.stringify(value));},
+    ()=>{frozen.document.archiveSha256='f'.repeat(64);frozen.write();},
+    ()=>{frozen.document.producer.job='';frozen.write();},
+    ()=>{frozen.document.extra='unreviewed';frozen.write();},
+    ()=>{writeFileSync(frozen.selection,JSON.stringify(frozen.document));
+      const value=JSON.parse(readFileSync(frozen.inputs));value.files[1].sha256=sha256Path(frozen.selection).slice(7);writeFileSync(frozen.inputs,JSON.stringify(value));},
+  ]) {
+    const original=structuredClone(frozen.document);mutate();assert.throws(read);
+    for(const key of Object.keys(frozen.document))delete frozen.document[key];Object.assign(frozen.document,original);frozen.write();
+  }
+  const linked=join(f.directory,'linked-selection.json');symlinkSync(frozen.selection,linked);
+  assert.throws(()=>readCoreWebSelection({archive:f.archive,selection:linked,inputs:frozen.inputs}),/Regular absolute/);
+  assert.equal(read().document.source.commit,f.coreCommit,'restored original bytes remain consumable');
 });
 
 test('changed Web source, lock, recipe, mode and toolchain reject selection without writing output',t=>{
@@ -469,22 +507,29 @@ test('declared Web environment drops ambient public values and credentials and g
 });
 
 test('public Core stager rejects missing Web proof before backend work and cleans selected bytes on compile failure',async t=>{
-  for(const legacy of [true,false]) {
+  for(const mode of ['legacy','raw','managed','changed-selection']) {
+    const legacy=mode==='legacy';
     const f=webComponentFixture(t),marker=join(f.directory,'backend-invoked');
     // Failure-only tripwire: no successful Java build or Linux evidence is simulated.
     f.put('platform/gradlew',`#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)},'invoked');process.exit(99);\n`);
     execFileSync('chmod',['+x',join(f.repo,'platform/gradlew')]);const current=f.commit();
     if(legacy){delete f.receipt.webComponent;f.write('release-receipt.json',f.receipt);}
     const selected=await exportPlatformArtifacts(f),inputs=join(f.directory,'dataset.json');
-    writeFileSync(inputs,JSON.stringify({files:[{file:f.archive,sha256:selected.archive.sha256}]}));
+    let selectionArgs=['--web-platform-source',f.coreCommit];
+    if(mode==='managed'||mode==='changed-selection') {
+      const frozen=frozenWebSelection(f,selected);
+      if(mode==='changed-selection'){frozen.document.componentDigest='sha256:'+'f'.repeat(64);frozen.write();}
+      selectionArgs=['--web-platform-selection',frozen.selection];
+    } else writeFileSync(inputs,JSON.stringify({files:[{file:f.archive,sha256:selected.archive.sha256}]}));
     const output=join(f.directory,'output');
     const before=new Set(readdirSync(tmpdir()).filter(name=>name.startsWith('auraboot-selected-web-')));
     const result=spawnSync(process.execPath,[join(root,'scripts/application/stage-core-only-artifacts.mjs'),
-      '--repo-root',f.repo,'--output',output,'--web-platform-archive',f.archive,'--web-platform-source',f.coreCommit],
+      '--repo-root',f.repo,'--output',output,'--web-platform-archive',f.archive,...selectionArgs],
       {encoding:'utf8',env:{...process.env,AURA_CI_DATASET_INPUTS:inputs}});
     assert.equal(result.status,1,result.stderr);
-    assert.match(result.stderr,legacy ? /Web effective inputs differ or are missing/ : /gradlew.*failed/);
-    assert.equal(existsSync(marker),!legacy);assert.equal(existsSync(output),false);
+    assert.match(result.stderr,legacy ? /Web effective inputs differ or are missing/ : mode==='changed-selection'
+      ? /Frozen Web selection differs/ : /gradlew.*failed/);
+    assert.equal(existsSync(marker),!legacy&&mode!=='changed-selection');assert.equal(existsSync(output),false);
     assert.deepEqual(new Set(readdirSync(tmpdir()).filter(name=>name.startsWith('auraboot-selected-web-'))),before);
     assert.equal(current.inputDigest,f.before.inputDigest);
   }
