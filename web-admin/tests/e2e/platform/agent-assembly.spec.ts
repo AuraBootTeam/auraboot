@@ -257,6 +257,7 @@ test('provider names have one input and create/edit round trips preserve the lat
   await expect(page.getByTestId('field-displayName')).toHaveCount(0);
   await page.getByTestId('custom-display-name').fill(name);
   await page.getByTestId('field-apiKey').fill('fixture-not-a-real-model-key');
+  await capture(page, info, 'PROVIDER-CUSTOM-CREATE');
   const create = page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
   await page.getByTestId('panel-save-btn').click();
   const created = await create;

@@ -17,13 +17,15 @@ RUNTIME="${AURA_RUNTIME_NAME:-de-capability-eval}"
 SLOT="${SLOT:-83}"
 PROFILE=full
 KEEP=0
+source_specs=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --runtime) RUNTIME="$2"; shift 2 ;;
     --slot) SLOT="$2"; shift 2 ;;
     --profile) PROFILE="$2"; shift 2 ;;
+    --source) source_specs+=(--source "$2"); shift 2 ;;
     --keep) KEEP=1; shift ;;
-    --help|-h) echo 'Usage: digital-employee-capability-eval-run.sh [--runtime NAME] [--slot N] [--profile full|focused|deterministic] [--keep]'; exit 0 ;;
+    --help|-h) echo 'Usage: digital-employee-capability-eval-run.sh [--runtime NAME] [--slot N] [--profile full|focused|deterministic] [--source key=path] [--keep]'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -58,9 +60,17 @@ cleanup() {
 }
 trap cleanup EXIT
 AURA_WORKSPACE_ROOT="$WORKSPACE_ROOT" "$REPO_ROOT/scripts/oss-golden-stack.sh" up "$RUNTIME" --slot "$SLOT" \
-  --isolated-redis-port "${AURA_EVAL_REDIS_PORT:-$((16400 + SLOT))}" --plugin-profile default --no-frontend --no-warm >>"$LOG" 2>&1
+  --isolated-redis-port "${AURA_EVAL_REDIS_PORT:-$((16400 + SLOT))}" --plugin-profile default --no-frontend --no-warm ${source_specs[@]+"${source_specs[@]}"} >>"$LOG" 2>&1
 "$WORKSPACE_ROOT/aura" runtime verify "$RUNTIME" >>"$LOG" 2>&1
 mkdir -p "$RUN_DIR/native"
+node --input-type=module - "$RUN_DIR" "$PROFILE" "$RUNTIME" <<'JS'
+import fs from 'node:fs';
+fs.writeFileSync(process.argv[2] + '/run-context.json', JSON.stringify({
+  startedAt: new Date().toISOString(), profile: process.argv[3], runtime: process.argv[4],
+  provider: process.env.AURA_LIVE_LLM_PROVIDER ?? null, model: process.env.AURA_LIVE_LLM_MODEL ?? null,
+  credential: process.env.AURA_LIVE_LLM_API_KEY_ENV && process.env[process.env.AURA_LIVE_LLM_API_KEY_ENV] ? 'SET' : 'UNSET',
+}, null, 2) + '\n');
+JS
 rc=0
 for module in platform-app platform-agent; do
   selectors=()
