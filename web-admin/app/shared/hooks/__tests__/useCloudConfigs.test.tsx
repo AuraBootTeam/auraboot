@@ -70,7 +70,7 @@ describe('cloud configuration save readback', () => {
 
 describe('cloud configuration read permission preflight', () => {
   it('does not issue a protected read or duplicate error feedback while disabled', async () => {
-    const { result, rerender } = renderHook(({ enabled }) => useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: 'tenant', enabled }), { initialProps: { enabled: false } });
+    const { result, rerender } = renderHook(({ enabled }: { enabled: boolean }) => useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: 'tenant', enabled }), { initialProps: { enabled: false } });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(http.get).not.toHaveBeenCalled();
     expect(http.error).not.toHaveBeenCalled();
