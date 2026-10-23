@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   REQUIRED_SUITES,
+  profileSuites,
   summarizeCapabilityEvalResults,
 } from './capability-eval-junit.mjs';
 
@@ -42,11 +43,11 @@ function javaFiles(root) {
 
 test('explicit inventory contains every agent-eval-live source suite', () => {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-  const testRoot = path.join(repoRoot, 'platform/src/test/java');
-  const discovered = javaFiles(testRoot)
+  const roots = ['platform/src/test/java', 'platform/platform-agent/src/test/java', 'platform/platform-app/src/test/java'].map(dir => path.join(repoRoot, dir));
+  const discovered = roots.flatMap(testRoot => javaFiles(testRoot)
     .filter((file) => fs.readFileSync(file, 'utf8').split('\n')
       .some((line) => /^\s*@Tag\("agent-eval-live"\)\s*$/.test(line)))
-    .map((file) => path.relative(testRoot, file).replace(/\.java$/, '').split(path.sep).join('.'))
+    .map((file) => path.relative(testRoot, file).replace(/\.java$/, '').split(path.sep).join('.')))
     .sort();
   const inventoried = REQUIRED_SUITES
     .map(([, className]) => className)
@@ -105,4 +106,22 @@ test('rejects a missing required suite instead of trusting a broad XML glob', ()
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+
+test('focused and deterministic profiles have an explicit disjoint inventory, never label themselves full', () => {
+  assert.equal(profileSuites('focused').length, 3);
+  assert.equal(profileSuites('deterministic').length, 3);
+  assert.throws(() => profileSuites('typo'), /Unknown capability profile/);
+  const root = fixture();
+  try {
+    const report = summarizeCapabilityEvalResults(root, () => {}, 'focused');
+    assert.equal(report.profile, 'focused');
+    assert.equal(report.requiredSuites, 3);
+    assert.equal(report.totals.suites, 3);
+    assert.equal(report.ok, true);
+    const [task, name] = profileSuites('focused')[0];
+    fs.unlinkSync(path.join(root, task, `TEST-${name}.xml`));
+    assert.equal(summarizeCapabilityEvalResults(root, () => {}, 'focused').ok, false);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

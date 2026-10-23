@@ -2987,3 +2987,6 @@ application.agent.member: "AI 成员"
 
 application.agent.permissionTitle: "无权访问"
 application.agent.providerPermission: "你没有管理模型服务的权限，请联系管理员。"
+
+im.conversation.memberCount.one: "{count} 位成员"
+im.conversation.memberCount.other: "{count} 位成员"

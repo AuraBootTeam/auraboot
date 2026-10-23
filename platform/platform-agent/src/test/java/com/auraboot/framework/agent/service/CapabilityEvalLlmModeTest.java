@@ -91,6 +91,7 @@ class CapabilityEvalLlmModeTest {
         assertThat(report.get("hallucinationRate")).isEqualTo(1.0); // 1 of 1 cases hallucinated
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> cases = (List<Map<String, Object>>) report.get("cases");
+        assertThat(((Number) cases.get(0).get("selectionDurationMs")).doubleValue()).isGreaterThanOrEqualTo(0.0);
         assertThat(cases.get(0).get("hallucinatedTools")).isEqualTo(List.of("cmd_ghost"));
     }
 

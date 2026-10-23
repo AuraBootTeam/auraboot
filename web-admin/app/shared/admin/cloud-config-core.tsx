@@ -596,8 +596,9 @@ export interface UseCloudConfigsReturn {
   }) => Promise<boolean>;
 }
 
-export function useCloudConfigs(options: { apiBase?: string; initialLevel?: ConfigLevel } = {}): UseCloudConfigsReturn {
+export function useCloudConfigs(options: { apiBase?: string; initialLevel?: ConfigLevel; enabled?: boolean } = {}): UseCloudConfigsReturn {
   const apiBase = options.apiBase ?? '/api/admin/cloud-config';
+  const enabled = options.enabled ?? true;
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { t } = useI18n();
   const st = useSmartText();
@@ -611,6 +612,10 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
   const pendingSave = useRef<{ level: ConfigLevel; updated: boolean } | null>(null);
 
   const readConfigs = useCallback(async (requestedLevel: ConfigLevel = level) => {
+    if (!enabled) {
+      setLoading(false);
+      return false;
+    }
     setLoading(true);
     try {
       const result = await get<CloudConfig[]>(apiBase, { level: requestedLevel });
@@ -632,7 +637,7 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
       setLoading(false);
     }
     return false;
-  }, [apiBase, level, showErrorToast]);
+  }, [apiBase, level, showErrorToast, enabled]);
 
   const loadConfigs = useCallback(async () => { await readConfigs(); }, [readConfigs]);
 
@@ -649,8 +654,9 @@ export function useCloudConfigs(options: { apiBase?: string; initialLevel?: Conf
   };
 
   useEffect(() => {
+    if (!enabled) setConfigs([]);
     loadConfigs();
-  }, [loadConfigs]);
+  }, [loadConfigs, enabled]);
 
   const handleCreate = () => {
     setEditingConfig(null);

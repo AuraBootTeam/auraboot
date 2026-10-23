@@ -85,7 +85,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
 | `db/check-schema-drift.sh` | 1 | 2026-06-22 | Regenerate the schema snapshot from Flyway and diff it against the committed |
 | `db/test-stage-pre1900-core-migrations.sh` | 0 | 2026-09-25 | Verify deterministic staging of immutable pre-#1900 Core migration bytes. |
-| `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Self-contained capability-eval runner for the digital-employee agent line. |
+| `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Managed capability-eval runner; full/focused/deterministic module-owned catalogs, native receipts and retained runtime. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
 | `provider-neutral-architecture-gate.sh` | 0 | 2026-07-31 | Fail closed when agent/runtime fixtures or goldens hard-code a model provider. |
 | `permission-sql-registrations.mjs` | 0 | 2026-10-20 | Resolve permission registrations from migration SQL for permission validation. |

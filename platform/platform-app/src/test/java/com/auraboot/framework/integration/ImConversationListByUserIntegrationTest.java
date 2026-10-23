@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Real-DB regression for the batched {@code listByUser} (deep-review DR-20260701 W2-perf-002):
  * verifies the four batched queries (selectBatchIds + findMembersByConversationIds +
- * findLastMessagesByConversationIds〔DISTINCT ON〕 + countHumanMembersByConversationIds) assemble the
+ * findLastMessagesByConversationIds〔DISTINCT ON〕 + countMembersByConversationIds) assemble the
  * conversation list correctly, replacing the previous 1+4N loop. @Transactional rolls the seeds back;
  * assertions are scoped to the seeded conversations so they are robust to pre-existing data.
  */
@@ -105,4 +105,29 @@ class ImConversationListByUserIntegrationTest extends BaseIntegrationTest {
         assertThat(i2.getUnreadCount()).isEqualTo(0L);  // 3 - 3
         assertThat(i2.getMemberCount()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("mixed membership counts all retained identities, scoped to the current tenant")
+    void mixedMembersCountMatchesDetailAndPreservesUnavailableAgents() {
+        Long conversationId = seedConversation("Mixed", 0L);
+        seedMembership(conversationId, 0L);
+        ImConversationMember agent = new ImConversationMember();
+        agent.setConversationId(conversationId);
+        agent.setTenantId(testTenant.getId());
+        agent.setMemberType("agent");
+        agent.setMemberId(991337L);
+        agent.setLastReadSeq(0L);
+        agent.setJoinedAt(Instant.now());
+        memberMapper.insert(agent);
+        // The count belongs to core membership, without resolving an optional agent record.
+        var counts = memberMapper.countMembersByConversationIds(testTenant.getId(), List.of(conversationId));
+        assertThat(counts).hasSize(1);
+        assertThat(counts.getFirst().getMemberCount()).isEqualTo(2L);
+        assertThat(memberMapper.countMembersByConversationIds(testTenant.getId() + 100000L, List.of(conversationId))).isEmpty();
+        ConversationListItem item = conversationService.listByUser(testUser.getId(), testTenant.getId()).stream()
+                .filter(row -> row.getConversationId().equals(conversationId)).findFirst().orElseThrow();
+        assertThat(item.getMemberCount()).isEqualTo(2);
+        assertThat(conversationService.getByIdAsListItem(conversationId, testUser.getId(), testTenant.getId()).getMemberCount()).isEqualTo(2);
+    }
+
 }

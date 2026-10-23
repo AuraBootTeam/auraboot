@@ -92,8 +92,8 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
                                                             @Param("conversationIds") List<Long> conversationIds);
 
     /**
-     * Batch variant of {@link #findHumanMemberIds} for the conversation-list endpoint: one grouped
-     * query returns the human-member count per conversation, replacing the per-conversation
+     * Total membership for the conversation-list endpoint: one tenant-scoped grouped
+     * query counts human and agent identities per conversation, replacing the per-conversation
      * findHumanMemberIds N+1.
      */
     @Select("""
@@ -101,13 +101,12 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
         SELECT conversation_id AS conversationId, COUNT(*) AS memberCount
         FROM ab_im_conversation_member
         WHERE tenant_id = #{tenantId}
-          AND member_type = 'human'
           AND conversation_id IN
           <foreach item='id' collection='conversationIds' open='(' separator=',' close=')'>#{id}</foreach>
         GROUP BY conversation_id
         </script>
         """)
-    List<ConversationMemberCountRow> countHumanMembersByConversationIds(@Param("tenantId") Long tenantId,
+    List<ConversationMemberCountRow> countMembersByConversationIds(@Param("tenantId") Long tenantId,
                                                                         @Param("conversationIds") List<Long> conversationIds);
 
     @Update("""
