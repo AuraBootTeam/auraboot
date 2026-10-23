@@ -11,7 +11,7 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/** Named-query delegation preserves filter shape, sorting and display enrichment. */
+/** Listing preserves named-query delegation and stable physical pagination. */
 class DynamicDataListingSupportTest {
     @BeforeEach void context() { MetaContext.setContext(42L,43L,"u-43","tester"); }
     @AfterEach void clear() { MetaContext.clear(); }
@@ -51,5 +51,44 @@ class DynamicDataListingSupportTest {
         var ext=new ExtensionBean(); ext.setDynamicProperty("namedQuery","  invoice_summary "); model.setExtension(ext);
         assertThat(support.resolveViewNamedQueryCode("invoice")).isEqualTo("invoice_summary");
         ext.setDynamicProperty("namedQuery"," "); assertThat(support.resolveViewNamedQueryCode("invoice")).isEqualTo("invoice");
+    }
+
+    private DynamicDataListingSupport physicalListing(QueryBuilderService builder) {
+        return new DynamicDataListingSupport(builder,queries,mock(SecureSqlRewriter.class),
+                mock(DynamicDataMapper.class),mock(DataPermissionEngine.class),mock(FieldMaskService.class),
+                mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m -> null);
+    }
+
+    private ModelDefinition physicalModel() {
+        return ModelDefinition.builder().code("ledger_sort").tableName("mt_ledger_sort")
+                .primaryKey("publicKey").fields(List.of(
+                        FieldDefinition.builder().code("publicKey").columnName("public_ref").dataType("string").build(),
+                        FieldDefinition.builder().code("amount").columnName("stored_amount").dataType("integer").build()))
+                .build();
+    }
+
+    @Test void defaultPhysicalPagingKeepsUpdatedOrderAndAddsUniqueRecordIdentity() {
+        var builder=new QueryBuilderServiceImpl(mock(DynamicDataMapper.class));
+        var model=physicalModel();model.setPrimaryKey(null);
+        var query=builder.buildConditionQuery(model,List.of());
+        query=physicalListing(builder).applyStableListSort(query,model,null);
+        assertThat(query.getSql()).containsIgnoringCase("ORDER BY updated_at DESC, pid ASC");
+    }
+
+    @Test void physicalPagingPreservesRequestedPriorityAndMapsDeclaredIdentityToItsColumn() {
+        var builder=new QueryBuilderServiceImpl(mock(DynamicDataMapper.class));
+        var model=physicalModel();
+        var requested=List.of(SortField.builder().fieldName("amount").direction(SortField.SortDirection.DESC).build());
+        var query=physicalListing(builder).applyStableListSort(builder.buildConditionQuery(model,List.of()),model,requested);
+        assertThat(query.getSql()).containsIgnoringCase("ORDER BY stored_amount DESC, public_ref ASC");
+        assertThat(requested).extracting(SortField::getFieldName).containsExactly("amount");
+    }
+
+    @Test void physicalPagingPreservesExplicitUniqueIdentityDirectionWithoutAddingConflictingOrder() {
+        var builder=new QueryBuilderServiceImpl(mock(DynamicDataMapper.class));
+        var model=physicalModel();
+        var requested=List.of(SortField.builder().fieldName("publicKey").direction(SortField.SortDirection.DESC).build());
+        var query=physicalListing(builder).applyStableListSort(builder.buildConditionQuery(model,List.of()),model,requested);
+        assertThat(query.getSql()).endsWith("ORDER BY public_ref DESC");
     }
 }
