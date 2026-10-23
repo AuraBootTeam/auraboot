@@ -35,7 +35,11 @@ public final class RegisteredSourcePollingAdapter {
     private ScheduledFuture<?> scheduled;
 
     public enum Status { DISABLED, BUSY, SUCCEEDED, FAILED }
-    public record Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType) {}
+    public record Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType, SourceFailureCode code) {
+        public Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType) {
+            this(tenantId, bindingCode, sourcePid, exceptionType, SourceFailureCode.PROCESSING_FAILED);
+        }
+    }
     public record TickResult(Status status, int bindingsAttempted, int processedPlans, long matchedSources, int selectedSources, List<Failure> failures) {
         public TickResult {
             failures = List.copyOf(failures);
@@ -127,10 +131,10 @@ public final class RegisteredSourcePollingAdapter {
                     matched += result.matchedSources();
                     selected += result.selectedSources();
                     for (var failure : result.failures()) {
-                        failures.add(new Failure(binding.tenantId(), binding.code(), failure.sourcePid(), failure.exceptionType()));
+                        failures.add(new Failure(binding.tenantId(), binding.code(), failure.sourcePid(), failure.exceptionType(), failure.code()));
                     }
                 } catch (RuntimeException failure) {
-                    failures.add(new Failure(binding.tenantId(), binding.code(), null, failure.getClass().getName()));
+                    failures.add(new Failure(binding.tenantId(), binding.code(), null, failure.getClass().getName(), SourceFailureCode.classify(failure)));
                 }
             }
             return new TickResult(failures.isEmpty() ? Status.SUCCEEDED : Status.FAILED,

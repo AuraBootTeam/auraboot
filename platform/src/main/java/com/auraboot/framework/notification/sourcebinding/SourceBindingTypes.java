@@ -41,7 +41,8 @@ public final class SourceBindingTypes {
             code(modelCode);
             sha(shapeSha256);
             owners = List.copyOf(owners);
-            nativeFieldPids = nativeFieldPids == null ? Set.of() : Set.copyOf(nativeFieldPids);
+            nativeFieldPids = java.util.Collections.unmodifiableSortedSet(
+                    new java.util.TreeSet<>(nativeFieldPids == null ? Set.of() : nativeFieldPids));
             require(!owners.isEmpty() && owners.size() <= 16);
             require(owners.stream().map(Owner::pid).distinct().count() == owners.size());
             nativeFieldPids.forEach(SourceBindingTypes::pid);
