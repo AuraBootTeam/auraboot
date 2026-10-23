@@ -1,3 +1,4 @@
+import { agentFetch } from '~/shared/services/application-capabilities';
 import React, { useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import {
@@ -62,7 +63,7 @@ export function GovernedAiPatchProposalDialog({
     setError(null);
     try {
       const systemPrompt = buildGovernedAiPatchPrompt({ document, capabilities });
-      const response = await fetch('/api/agent/nl-modeling/generate-page', {
+      const response = await agentFetch('/api/agent/nl-modeling/generate-page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ systemPrompt, message: description.trim() }),

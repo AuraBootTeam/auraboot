@@ -20,5 +20,8 @@
     "conflictStrategy": "overwrite",
     "validateReferences": false,
     "createResourcePermissions": false
-  }
+  },
+  "applicationModules": [
+    "agent"
+  ]
 }

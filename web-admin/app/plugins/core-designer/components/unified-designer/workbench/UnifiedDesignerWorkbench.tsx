@@ -1,3 +1,4 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 import React, { useMemo, useRef, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
@@ -268,6 +269,7 @@ export function UnifiedDesignerWorkbench({
     selectFromMarquee: handleMarqueeSelect,
     clearMultiSelection,
   } = useDesignerSelection();
+  const { agent } = useApplicationCapabilities();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const contextualRestricted = contextualEditablePropertyPaths !== undefined;
@@ -1423,7 +1425,7 @@ export function UnifiedDesignerWorkbench({
   const governedAiCopilotEnabled = Boolean(
     governedAiCopilot && contextualRestricted && !contextualReadOnly,
   );
-  const aiCopilotEnabled = legacyAiCopilotEnabled || governedAiCopilotEnabled;
+  const aiCopilotEnabled = agent === 'installed' && (legacyAiCopilotEnabled || governedAiCopilotEnabled);
   const aiDomainGuidance =
     typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
   const aiKindPolicy = getKindPolicy(document.kind);

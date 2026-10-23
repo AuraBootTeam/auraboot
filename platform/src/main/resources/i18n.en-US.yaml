@@ -2784,3 +2784,11 @@ session_security:
 "permission.capability.preset.admin": "Administrator"
 
 "about.menuLabel": "About {productName}"
+
+# Optional application assembly feedback
+application.agent.loading: "Checking AI availability…"
+application.agent.not_installed: "AI is not installed in this application"
+application.agent.unknown: "AI availability could not be verified"
+application.agent.guidance: "Your other workspace features remain available. Retry discovery or return home."
+application.agent.retry: "Retry"
+application.agent.home: "Back to home"

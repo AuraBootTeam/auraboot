@@ -1,3 +1,4 @@
+import { requireAgent } from '../client/agent-capabilities.js';
 import chalk from 'chalk';
 import { ApiClient, EXIT } from '../client/api-client.js';
 import { resolveOutputOptions, printDetail } from '../output/formatter.js';
@@ -12,6 +13,7 @@ interface RunOptions {
 export async function runCommand(target: string, options: RunOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const opts = resolveOutputOptions(options);
 
@@ -41,6 +43,7 @@ export async function runCommand(target: string, options: RunOptions): Promise<v
 export async function runShowCommand(runPid: string, options: RunOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const opts = resolveOutputOptions(options);
 

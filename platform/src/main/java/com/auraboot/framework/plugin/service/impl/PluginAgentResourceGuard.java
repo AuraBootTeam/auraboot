@@ -14,6 +14,12 @@ final class PluginAgentResourceGuard {
     private PluginAgentResourceGuard() {}
 
     static void requireManifest(PluginManifestExtended manifest, @Nullable AgentDefinitionResourceLifecycle adapter) {
+        if (manifest.getApplicationModules() != null) {
+            for (String module : manifest.getApplicationModules()) {
+                if (!"agent".equals(module)) throw new PluginException("Unknown required application module: " + module);
+                requireInstalled(adapter);
+            }
+        }
         if (manifest.getAgentDefinitions() != null && !manifest.getAgentDefinitions().isEmpty()) {
             requireInstalled(adapter);
         }

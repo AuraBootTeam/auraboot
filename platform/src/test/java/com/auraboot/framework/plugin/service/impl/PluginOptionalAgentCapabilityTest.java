@@ -48,6 +48,34 @@ class PluginOptionalAgentCapabilityTest {
     }
 
     @Test
+    void navigationOnlyPluginWithRequiredAgentRejectsBeforeAnyResourceWrites() {
+        var service = mock(PluginImportServiceImpl.class, CALLS_REAL_METHODS);
+        var history = mock(PluginImportHistoryMapper.class);
+        var resources = mock(PluginResourceImporter.class);
+        ReflectionTestUtils.setField(service, "importHistoryMapper", history);
+        ReflectionTestUtils.setField(service, "resourceImporter", resources);
+        var manifest = new PluginManifestExtended();
+        manifest.setPluginId("com.auraboot.core-aurabot");
+        manifest.setNamespace("core-aurabot");
+        manifest.setVersion("1.0.0");
+        manifest.setApplicationModules(List.of("agent"));
+        assertMissing(() -> service.executeFromManifest(manifest, new ImportRequest()));
+        verifyNoInteractions(history, resources);
+    }
+
+    @Test
+    void installedModuleDoesNotRejectOrdinaryOrRequiredAgentManifests() {
+        var adapter = mock(com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle.class);
+        var manifest = new PluginManifestExtended();
+        PluginAgentResourceGuard.requireManifest(manifest, null);
+        manifest.setApplicationModules(List.of("agent"));
+        PluginAgentResourceGuard.requireManifest(manifest, adapter);
+        manifest.setApplicationModules(List.of("unknown"));
+        assertThatThrownBy(() -> PluginAgentResourceGuard.requireManifest(manifest, adapter))
+                .isInstanceOf(PluginException.class).hasMessageContaining("Unknown required application module");
+    }
+
+    @Test
     void cachedApplyRejectsBeforeStaleImportCleanupOrDistributedLock() throws Exception {
         var service = mock(PluginImportServiceImpl.class, CALLS_REAL_METHODS);
         var history = mock(PluginImportHistoryMapper.class);

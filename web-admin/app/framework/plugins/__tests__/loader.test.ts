@@ -231,3 +231,33 @@ describe('PluginLoader', () => {
     expect(await loader.invoke('demo.add', 2, 3)).toBe(5)
   })
 })
+
+
+describe('verified application modules', () => {
+  it('keeps ordinary plugins active and AI fail-closed until discovery succeeds', async () => {
+    const loader = makeLoader();
+    const aiSetup = vi.fn();
+    loader.install(stubPlugin('ordinary'));
+    loader.install(definePlugin({ manifest: { code: 'ai', name: 'AI', version: '1.0.0', kind: 'oss', applicationModules: ['agent'] }, setup: aiSetup }));
+    loader.enable('ordinary');
+    loader.enable('ai');
+    expect(await loader.activateAll()).toEqual(['ordinary']);
+    expect(aiSetup).not.toHaveBeenCalled();
+    loader.setApplicationModuleGate(module => module === 'agent');
+    expect(await loader.activateAll()).toEqual(['ai']);
+    expect(aiSetup).toHaveBeenCalledTimes(1);
+    loader.setApplicationModuleGate(() => false);
+    expect(loader.list().find(record => record.definition.manifest.code === 'ai')?.state).toBe('enabled');
+    expect(loader.list().find(record => record.definition.manifest.code === 'ordinary')?.state).toBe('active');
+  });
+  it('does not grant a missing commercial feature just because agent is installed', async () => {
+    const loader = makeLoader();
+    loader.setApplicationModuleGate(() => true);
+    const setup = vi.fn();
+    const plugin = stubPlugin('commercial-ai', { features: ['paid-ai'], setup });
+    plugin.manifest.applicationModules = ['agent'];
+    loader.install(plugin); loader.enable('commercial-ai');
+    expect(await loader.activateAll()).toEqual([]);
+    expect(setup).not.toHaveBeenCalled();
+  });
+});

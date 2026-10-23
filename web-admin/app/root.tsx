@@ -1,3 +1,4 @@
+import { ApplicationCapabilitiesProvider, AgentRouteBoundary, useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 import {
   Outlet,
   Links,
@@ -431,13 +432,14 @@ function AppDirectionSync({ locale }: { locale: string }) {
  */
 function CorePluginBootstrap({ enabled }: { enabled: boolean }) {
   const { ready, hasFeatureKey } = useEntitlement();
+  const { agent, loading } = useApplicationCapabilities();
 
   useEffect(() => {
-    if (!enabled || !ready) return;
+    if (!enabled || !ready || loading) return;
     void import('~/framework/boot-plugins').then(({ bootCorePlugins }) =>
-      bootCorePlugins({ hasFeature: hasFeatureKey }),
+      bootCorePlugins({ hasFeature: hasFeatureKey, agentState: agent }),
     );
-  }, [enabled, hasFeatureKey, ready]);
+  }, [enabled, hasFeatureKey, ready, agent, loading]);
 
   return null;
 }
@@ -532,7 +534,7 @@ export default function App() {
         <BootstrapBanner status={data.bootstrapStatus} />
       )}
       <div className={data.bootstrapStatus && !data.bootstrapStatus.initialized ? 'pt-10' : ''}>
-        <Outlet />
+        <AgentRouteBoundary><Outlet /></AgentRouteBoundary>
       </div>
     </>
   );
@@ -574,10 +576,10 @@ export default function App() {
                 onRejected={onRejected}
                 onError={onError}
               />
-              <EntitlementProvider>
+              <ApplicationCapabilitiesProvider><EntitlementProvider>
                 <CorePluginBootstrap enabled={bootCoreRuntime} />
                 <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
-              </EntitlementProvider>
+              </EntitlementProvider></ApplicationCapabilitiesProvider>
             </AuthProvider>
           ) : (
             sharedProviders

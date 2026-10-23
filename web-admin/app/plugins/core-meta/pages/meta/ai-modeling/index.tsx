@@ -1,3 +1,4 @@
+import { agentFetch } from '~/shared/services/application-capabilities';
 /**
  * AI Natural Language Modeling Wizard
  *
@@ -83,7 +84,7 @@ async function apiGenerate(
   description: string,
   options: GenerateOptions,
 ): Promise<GenerateResponse> {
-  const resp = await fetch('/api/agent/nl-modeling/generate', {
+  const resp = await agentFetch('/api/agent/nl-modeling/generate', {
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ description, options }),
@@ -97,7 +98,7 @@ async function apiRefine(
   instruction: string,
   currentResources: Resources,
 ): Promise<GenerateResponse> {
-  const resp = await fetch('/api/agent/nl-modeling/refine', {
+  const resp = await agentFetch('/api/agent/nl-modeling/refine', {
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId, instruction, currentResources }),
@@ -107,7 +108,7 @@ async function apiRefine(
 }
 
 async function apiApply(pluginCode: string, resources: Resources): Promise<any> {
-  const resp = await fetch('/api/agent/nl-modeling/apply', {
+  const resp = await agentFetch('/api/agent/nl-modeling/apply', {
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pluginCode, resources }),

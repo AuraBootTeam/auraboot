@@ -1,3 +1,5 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
+import { filterAgentMenus } from '~/shared/services/agent-surfaces';
 /**
  * Global Command Palette (Cmd+K / Ctrl+K)
  *
@@ -154,9 +156,10 @@ export function CommandPalette() {
 
   const navigate = useNavigate();
   const rootData = useRootLoaderData();
+  const { agent } = useApplicationCapabilities();
   const { t: rawT } = useI18n();
   const isHydrated = useHydrated();
-  const menus = useMemo(() => rootData?.menus ?? [], [rootData?.menus]);
+  const menus = useMemo(() => filterAgentMenus(rootData?.menus ?? [], agent === 'installed'), [rootData?.menus, agent]);
 
   // t() with fallback (I18nContext returns key if missing, so we detect and use fallback)
   const t = useCallback(

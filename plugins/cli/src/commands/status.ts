@@ -1,3 +1,5 @@
+import { ApiClient } from '../client/api-client.js';
+import { discoverAgent, type AgentState } from '../client/agent-capabilities.js';
 import chalk from 'chalk';
 import { resolveBaseUrl, loadCredentials, loadConfig, resolveToken } from '../client/auth.js';
 import { resolveOutputOptions, type OutputOptions } from '../output/formatter.js';
@@ -12,7 +14,8 @@ interface StatusOptions {
 interface ServiceStatus {
   name: string;
   url: string;
-  status: 'up' | 'down' | 'unknown';
+  status: 'up' | 'down' | 'unknown' | 'not_installed';
+  installationState?: AgentState;
   latencyMs?: number;
   detail?: string;
 }
@@ -49,8 +52,16 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   // Check agent subsystem
   if (token) {
-    const agentStatus = await checkService('Agent (ACP)', `${baseUrl}/api/agent/status`, token);
-    services.push(agentStatus);
+    const discovery = await discoverAgent(new ApiClient({ token, env, interactive: false }));
+    if (discovery.state === 'installed') {
+      const agentStatus = await checkService('Agent (ACP)', `${baseUrl}/api/agent/status`, token);
+      services.push({ ...agentStatus, installationState: discovery.state });
+    } else {
+      services.push({ name: 'Agent (ACP)', url: `${baseUrl}/api/application/capabilities`,
+        status: discovery.state === 'not_installed' ? 'not_installed' : 'unknown',
+        installationState: discovery.state, detail: discovery.state === 'not_installed'
+          ? 'Optional module not installed' : discovery.detail });
+    }
   }
 
   if (opts.format === 'json' || opts.agentMode) {
@@ -73,11 +84,11 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   console.log();
 
-  const allUp = services.every(s => s.status === 'up');
+  const allUp = services.every(s => s.status === 'up' || s.status === 'not_installed');
   if (allUp) {
     console.log(chalk.green('  All services operational'));
   } else {
-    const downCount = services.filter(s => s.status !== 'up').length;
+    const downCount = services.filter(s => s.status !== 'up' && s.status !== 'not_installed').length;
     console.log(chalk.yellow(`  ${downCount} service(s) need attention`));
   }
   console.log();

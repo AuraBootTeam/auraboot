@@ -1,3 +1,4 @@
+import { requireAgentApplication } from '~/shared/services/application-capabilities';
 /**
  * Agent Runs admin API client.
  *
@@ -209,6 +210,7 @@ function buildRuntimeOpsQuery(runId: string | null | undefined, limit: number): 
 }
 
 export async function listAgentRuns(params: AgentRunsListParams = {}): Promise<AgentRunPage> {
+  await requireAgentApplication();
   const r = await get(`/api/admin/agent-runs${buildQuery(params)}`);
   if (!ResultHelper.isSuccess(r)) {
     throw new Error((r as { message?: string }).message ?? 'Failed to load agent runs');
@@ -217,6 +219,7 @@ export async function listAgentRuns(params: AgentRunsListParams = {}): Promise<A
 }
 
 export async function getAgentRunDetail(runId: string): Promise<AgentRunDetail> {
+  await requireAgentApplication();
   const r = await get(`/api/admin/agent-runs/${encodeURIComponent(runId)}`);
   if (!ResultHelper.isSuccess(r)) {
     throw new Error((r as { message?: string }).message ?? 'Failed to load agent run detail');
@@ -229,6 +232,7 @@ export async function getAgentRunRuntimeOps(
   limit = 20,
 ): Promise<AgentRuntimeOps> {
   const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
+  await requireAgentApplication();
   const r = await get(`/api/admin/agent-runs/runtime-ops${buildRuntimeOpsQuery(runId, safeLimit)}`);
   if (!ResultHelper.isSuccess(r)) {
     throw new Error((r as { message?: string }).message ?? 'Failed to load runtime diagnostics');

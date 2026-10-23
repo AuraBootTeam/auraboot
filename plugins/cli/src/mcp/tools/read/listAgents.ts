@@ -1,3 +1,4 @@
+import { requireAgent } from '../../../client/agent-capabilities.js';
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
 import { queryNamedQuery } from '../../../client/dynamic-query.js';
@@ -16,6 +17,7 @@ export function listAgentsTool(client: ApiClient): Tool<Params> {
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     handler: async () => {
       try {
+        await requireAgent(client);
         const records = await queryNamedQuery(client, 'acp_agent_stats');
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(records, null, 2) }],

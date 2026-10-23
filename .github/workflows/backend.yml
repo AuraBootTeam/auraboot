@@ -98,6 +98,7 @@ jobs:
         run: >-
           ./gradlew --no-daemon :test
           --tests com.auraboot.framework.architecture.CoreAgentBoundaryTest
+          --tests com.auraboot.framework.plugin.service.impl.PluginOptionalAgentCapabilityTest
           --max-workers=2 -PauraTestMaxHeap=2g -PauraTestMinHeap=256m
 
       - name: Upload core agent boundary results

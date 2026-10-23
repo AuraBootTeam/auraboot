@@ -1,3 +1,4 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import Header from '~/routes/Header';
@@ -39,7 +40,8 @@ function AdminLayoutContent() {
   const workspace = usePagePresentation()?.mode === 'workspace';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { state } = useAuraBot();
-  const aiPanelOpen = state.panelState === 'expanded';
+  const { agent } = useApplicationCapabilities();
+  const aiPanelOpen = agent === 'installed' && state.panelState === 'expanded';
   const location = useLocation();
 
   // One-time tracker init: register click-capture and flush-on-hide/pagehide listeners.
@@ -81,7 +83,7 @@ function AdminLayoutContent() {
         </div>
 
         <div className={aiPanelOpen ? `flex min-h-0 shrink-0 ${workspace ? 'pt-14' : ''}` : 'hidden'} data-testid="ai-panel-dock">
-          <AuraBotPanel />
+          {agent === 'installed' && <AuraBotPanel />}
         </div>
       </div>
 

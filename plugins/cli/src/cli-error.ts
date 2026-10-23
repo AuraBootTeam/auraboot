@@ -1,3 +1,4 @@
+import { AgentUnavailableError } from './client/agent-capabilities.js';
 import chalk from 'chalk';
 import { EXIT } from './client/api-client.js';
 import { QueryFailedError } from './client/dynamic-query.js';
@@ -7,7 +8,7 @@ import { QueryFailedError } from './client/dynamic-query.js';
  * message written for a human, so printing a stack trace alongside it would be
  * noise.
  */
-const EXPECTED_ERRORS = [QueryFailedError];
+const EXPECTED_ERRORS = [QueryFailedError, AgentUnavailableError];
 
 export interface CliErrorReport {
   message: string;

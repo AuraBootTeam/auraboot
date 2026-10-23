@@ -287,7 +287,7 @@ test('OSS golden stack stages manifest-declared backend jars from explicit roots
   assert.match(golden, /--wrapper "\$REPO_ROOT\/platform\/gradlew" -- clean jar/);
   assert.match(golden, /platform-plugin-api\/build\/libs\/platform-plugin-api-1\.0\.0\.jar/);
   assert.match(golden, /"-PplatformPluginApiJar=\$platform_plugin_api_jar"/);
-  assert.match(golden, /"-PplatformRuntimeJar=\$REPO_ROOT\/platform\/build\/libs\/AuraBoot-1\.0\.0-boot\.jar"/,
+  assert.match(golden, /"-PplatformRuntimeJar=\$platform_runtime_jar"/,
     'external hybrid plugins require the exact Core runtime artifact as well as the plugin API');
   assert.ok(
     golden.indexOf('platform_plugin_api_jar=') <
@@ -367,7 +367,7 @@ test('OSS golden stack applies explicit product migrations only to a fresh datab
   assert.match(stack, /product-migrations\.tsv/);
   assert.ok(
     stack.indexOf('2.5/9 apply product-owned migrations')
-      < stack.indexOf('4/9 build bootJar'),
+      < stack.indexOf('4/9 build $agent_mode backend'),
     'product migrations must finish before backend startup and plugin import',
   );
 });

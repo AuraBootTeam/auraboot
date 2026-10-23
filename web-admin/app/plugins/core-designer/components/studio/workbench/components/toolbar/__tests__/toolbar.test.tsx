@@ -42,6 +42,7 @@ vi.mock('~/contexts/AuthContext', () => ({
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({
     locale: mockLocale,
+    t: (key: string) => key,
   }),
 }));
 
