@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 // Targeted real-stack suite. Run once per independently selected packaged assembly.
 // Missing prerequisites fail; no test is silently skipped and no token enters evidence.
@@ -12,7 +13,7 @@ assert.ok(['installed', 'not_installed'].includes(expectedState), 'Supply the in
 assert.ok(process.env.AURA_TEST_EMAIL && process.env.AURA_TEST_PASSWORD, 'Explicit AURA_TEST_EMAIL and AURA_TEST_PASSWORD required');
 fs.mkdirSync(evidence, { recursive: false });
 const endpoint = `${origin}/api/application/capabilities`;
-const names = ['unauthenticated-denied', 'invalid-token-denied', 'authenticated-installation', 'conditional-request-refetches', 'unrelated-provider-query-cannot-select-assembly'];
+const names = ['unauthenticated-denied', 'invalid-token-denied', 'authenticated-installation', 'conditional-request-refetches', 'unrelated-provider-query-cannot-select-assembly', 'member-without-ai-or-admin-permissions'];
 const report = { schemaVersion: 1, claim: 'targeted-packaged-http', origin, expectedState, registered: names,
   executed: [], verdict: 'fail', skipped: 0 };
 const request = (target, options = {}) => fetch(target, { ...options, redirect: 'error', signal: AbortSignal.timeout(30_000) });
@@ -39,7 +40,7 @@ try {
     body: JSON.stringify({ email: process.env.AURA_TEST_EMAIL, password: process.env.AURA_TEST_PASSWORD }) });
   assert.equal(login.status, 200, 'Real login HTTP contract failed');
   const session = await login.json();
-  assert.equal(session.success, true, 'Real login was denied');
+  assert.equal(session.code, '0', 'Real login was denied');
   assert.ok(session.data?.jwt, 'Login did not issue a session');
   const headers = { Authorization: `Bearer ${session.data.jwt}`, Accept: 'application/json' };
   for (const [name, suffix, extra] of [[names[2], '', {}], [names[3], '', { 'If-None-Match': '*' }],
@@ -56,6 +57,38 @@ try {
       installation(result.body);
     });
   }
+  await run(names[5], async result => {
+    const email = `capabilities-${randomUUID()}@example.com`;
+    const password = `Discovery-${randomUUID()}xA9!`;
+    const provision = await request(`${origin}/api/admin/users`, { method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, displayName: 'Capability discovery member', initialPassword: password,
+        roleAssignmentMode: 'NONE', roleCodes: [], sendInviteEmail: false }) });
+    assert.equal(provision.status, 200, 'Owned member fixture provisioning failed');
+    const created = await provision.json();
+    assert.equal(created.code, '0', 'Owned member fixture provisioning was denied');
+    assert.deepEqual(created.data.assignedRoles, [], 'Fixture must not receive a default role');
+    const signedIn = await request(`${origin}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }) });
+    assert.equal(signedIn.status, 200);
+    const memberSession = await signedIn.json();
+    assert.equal(memberSession.code, '0');
+    assert.ok(memberSession.data?.jwt);
+    const memberHeaders = { Authorization: `Bearer ${memberSession.data.jwt}`, Accept: 'application/json' };
+    const me = await request(`${origin}/api/auth/me`, { headers: memberHeaders });
+    assert.equal(me.status, 200);
+    const identity = await me.json();
+    assert.equal(identity.code, '0');
+    assert.deepEqual(identity.data.permissions.roles, []);
+    assert.deepEqual(identity.data.permissions.permissionCodes, []);
+    const response = await request(endpoint, { headers: memberHeaders });
+    result.status = response.status;
+    result.cacheControl = response.headers.get('cache-control');
+    assert.equal(response.status, 200);
+    assert.equal(result.cacheControl, 'no-store');
+    result.body = await response.json();
+    installation(result.body);
+  });
   assert.deepEqual(report.executed.map(row => row.name), names, 'Suite denominator changed or was not fully executed');
   assert.ok(report.executed.every(row => row.verdict === 'pass'));
   report.verdict = 'pass';
