@@ -129,7 +129,7 @@ test.describe('optional application assembly', () => {
   test('ordinary designer and its AI action follow the same verified assembly', async ({ page }, info) => {
     await login(page);
     await expectAssemblyToggle(page);
-    await page.getByRole('link', { name: '页面配置', exact: true }).click();
+    await page.getByTestId('sidebar').getByRole('link', { name: '页面配置', exact: true }).click();
     await page.getByTestId('list-search-input').fill('auth_appearance');
     await page.getByTestId('list-search-input').press('Enter');
     const row = page.getByRole('row').filter({ hasText: 'auth_appearance' });

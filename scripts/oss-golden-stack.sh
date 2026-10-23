@@ -797,10 +797,10 @@ XML
     # a lazily optimized react-router chunk from different generations to coexist, producing an
     # Invalid hook call in otherwise valid components. The runtime is exclusively owned here, so
     # rebuild this exact slot cache as part of every fresh stack lifecycle.
-    local vite_cache_dir="$REPO_ROOT/web-admin/.vite/$vite_port"
+    local vite_cache_dir="${AURA_VITE_CACHE_DIR:-$REPO_ROOT/web-admin/.vite/$vite_port}"
     case "$vite_cache_dir" in
       "$REPO_ROOT/web-admin/.vite/"*) rm -rf "$vite_cache_dir" ;;
-      *) die "refusing to clear unexpected Vite cache path: $vite_cache_dir" ;;
+      *) [ -n "${AURA_WEB_COMPOSITION_ROOT:-}" ] || die "external Vite cache requires an explicit thin composition" ;;
     esac
     if [ "$web_mode" = production ]; then
       log "    build production client and SSR from the frozen checkout"
@@ -808,7 +808,7 @@ XML
         || die "production Web build failed — see $sd/logs/web-build.log"
     fi
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/logs/frontend.log" \
-      env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="$REPO_ROOT/web-admin/.vite/$vite_port" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
+      env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="${AURA_VITE_CACHE_DIR:-$REPO_ROOT/web-admin/.vite/$vite_port}" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
       BFF_INTERNAL_URL="http://127.0.0.1:$server_port" AURA_WEB_MODE="$web_mode" SESSION_SECRET_FILE="${SESSION_SECRET_FILE:-}" \
       bash "$SCRIPT_DIR/dev/start-web-stack.sh" fresh
     node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
@@ -1132,7 +1132,7 @@ cmd_resume_retained() {
     || die "resumed backend listener identity mismatch"
   # Execute the existing frontend commands directly; dev:full would sync/generate plugins.
   spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
-    env ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="$REPO_ROOT/web-admin/.vite/$vite_port" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 \
+    env ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="${AURA_VITE_CACHE_DIR:-$REPO_ROOT/web-admin/.vite/$vite_port}" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 \
       SPRING_BOOT_URL="http://127.0.0.1:$server_port" BFF_INTERNAL_URL="http://127.0.0.1:$server_port" \
       bash "$SCRIPT_DIR/dev/start-web-stack.sh" retained
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
