@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -146,7 +146,15 @@ test('receipt tool seals the frozen source set, archive and control bundle', (t)
   assert.equal(created.status, 0, created.stderr);
 
   const receiptPath = join(directory, 'release-archive-receipt.json');
-  const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+  const descriptor = openSync(receiptPath, 'r');
+  let receiptBytes, receiptMode;
+  try {
+    receiptBytes = readFileSync(descriptor);
+    receiptMode = fstatSync(descriptor).mode;
+  } finally {
+    closeSync(descriptor);
+  }
+  const receipt = JSON.parse(receiptBytes);
   assert.equal(receipt.schemaVersion, 3);
   assert.equal(receipt.kind, 'aura-bpm-release-image-receipt');
   assert.equal(receipt.releaseId, 'aura-bpm-contract-v1');
@@ -165,14 +173,14 @@ test('receipt tool seals the frozen source set, archive and control bundle', (t)
   assert.equal(receipt.artifacts.controlBundle.fileName, 'control-bundle.tar.gz');
 
   // The receipt is create-once and read-only.
-  assert.equal(statSync(receiptPath).mode & 0o777, 0o444);
+  assert.equal(receiptMode & 0o777, 0o444);
 
   const verified = spawnSync('python3', [
     receiptTool, 'verify',
     '--ci-job-id', 'job-archive-contract',
     '--product', 'aura-bpm',
     '--file', receiptPath,
-    '--expected-sha256', sha64(readFileSync(receiptPath)),
+    '--expected-sha256', sha64(receiptBytes),
     '--release-id', 'aura-bpm-contract-v1',
     '--artifact-dir', join(directory, 'artifacts'),
     '--source', `core=${join(directory, 'core')}`,
