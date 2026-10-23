@@ -6,13 +6,11 @@ import { ProfileProvider } from '@auraboot/runtime-kernel';
 import { adminProfile } from '~/framework/meta/profiles/admin';
 import { DetailPageContent, assertStrictDetailRefreshParent } from '../DetailPageContent';
 import { actionRegistry } from '../../../runtime/actions/ActionRegistry';
-const owned = vi.hoisted(() => {
-  let releaseFormButtons!: () => void;
-  const formButtonsReady = new Promise<void>((resolve) => {
-    releaseFormButtons = resolve;
-  });
-  return { transport: vi.fn(), toast: vi.fn(), formButtonsReady, releaseFormButtons };
-});
+const owned = vi.hoisted(() => ({
+  transport: vi.fn(),
+  toast: vi.fn(),
+  formButtonsReady: undefined as Promise<void> | undefined,
+}));
 vi.mock('~/framework/meta/rendering/blocks/FormButtonsBlockRenderer', async () => {
   await owned.formButtonsReady;
   return vi.importActual<any>('~/framework/meta/rendering/blocks/FormButtonsBlockRenderer');
@@ -66,6 +64,10 @@ vi.mock('../../components/ComponentLoader', () => ({
 }));
 describe('Actual Detail parent loader through FormButtons and registered flow', () => {
   it('save refreshes the real parent snapshot once and the second submit uses its current version', async () => {
+    let releaseFormButtons!: () => void;
+    owned.formButtonsReady = new Promise<void>((resolve) => {
+      releaseFormButtons = resolve;
+    });
     let version = 1;
     owned.transport.mockReset().mockImplementation(async (endpoint: string) => {
       if (endpoint === '/api/example/parent')
@@ -154,7 +156,7 @@ describe('Actual Detail parent loader through FormButtons and registered flow', 
     ).toHaveLength(1);
     // Parent data can arrive before the independently lazy-loaded action block.
     expect(screen.queryByTestId('form-btn-save')).not.toBeInTheDocument();
-    owned.releaseFormButtons();
+    releaseFormButtons();
     fireEvent.click(await screen.findByTestId('form-btn-save'));
     await waitFor(() =>
       expect(screen.getByTestId('record-inspector').querySelector('dd')).toHaveTextContent(/^2$/),
