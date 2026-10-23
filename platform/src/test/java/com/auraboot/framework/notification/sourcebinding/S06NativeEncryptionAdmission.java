@@ -157,17 +157,23 @@ public final class S06NativeEncryptionAdmission {
                 && proof.path("keySource").asText().equals("private-additional-properties"), "S06_PRIVATE_SOURCE_PROOF_INVALID");
         var sourceFields = new java.util.HashSet<String>();
         source.fieldNames().forEachRemaining(sourceFields::add);
-        require(source.isObject() && sourceFields.equals(PRIVATE_SOURCE_FIELDS) && source.path("schemaVersion").isInt() && source.path("schemaVersion").intValue() == 1
-                && source.path("kind").asText().equals("procurement-private-additional-properties-evidence-v1")
+        boolean roster = source.path("schemaVersion").isInt() && source.path("schemaVersion").intValue() == 2;
+        var expectedFields = new java.util.HashSet<>(PRIVATE_SOURCE_FIELDS);
+        if (roster) expectedFields.add("additionalLocations");
+        require(source.isObject() && sourceFields.equals(expectedFields)
+                && source.path("schemaVersion").isInt() && source.path("schemaVersion").intValue() == (roster ? 2 : 1)
+                && source.path("kind").asText().equals("procurement-private-additional-properties-evidence-v" + (roster ? "2" : "1"))
                 && source.path("runtime").asText().equals(RUNTIME)
                 && source.path("backendPid").isIntegralNumber() && source.path("backendPid").equals(proof.path("backendPid"))
                 && source.path("environmentKeyState").asText().equals("UNSET")
                 && source.path("effectiveKeyState").asText().equals("SET")
-                && source.path("additionalLocationCount").isInt() && source.path("additionalLocationCount").intValue() == 1
+                && source.path("additionalLocationCount").isInt() && source.path("additionalLocationCount").intValue() >= 1
+                && source.path("additionalLocationCount").intValue() <= 16
+                && (roster || source.path("additionalLocationCount").intValue() == 1)
                 && source.path("propertiesPath").isTextual()
                 && source.path("propertiesPath").textValue().equals(fixedTarget.toString())
                 && source.path("additionalLocation").isTextual()
-                && source.path("additionalLocation").textValue().equals("file:" + fixedTarget)
+                && (roster || source.path("additionalLocation").textValue().equals("file:" + fixedTarget))
                 && source.path("propertiesSha256").isTextual()
                 && source.path("propertiesSha256").textValue().matches("[a-f0-9]{64}"), "S06_PRIVATE_SOURCE_EVIDENCE_INVALID");
         JsonNode overrides = source.path("overridesAbsent");
@@ -178,6 +184,7 @@ public final class S06NativeEncryptionAdmission {
                 "S06_PRIVATE_SOURCE_OVERRIDE_CONFLICT");
         require(fixedTarget.isAbsolute() && fixedTarget.normalize().equals(fixedTarget)
                 && fixedTarget.toRealPath().equals(fixedTarget), "S06_PRIVATE_SOURCE_PATH_INVALID");
+        if (roster) validatePrivateRoster(source, fixedTarget);
         ownedPrivateFile(fixedTarget);
         require(Files.size(fixedTarget) <= 65536, "S06_PRIVATE_SOURCE_FILE_INVALID");
         byte[] bytes = Files.readAllBytes(fixedTarget);
@@ -196,6 +203,42 @@ public final class S06NativeEncryptionAdmission {
         require(MessageDigest.isEqual(key.getBytes(StandardCharsets.UTF_8),
                 properties.getProperty("security.field-encryption.key").getBytes(StandardCharsets.UTF_8)),
                 "S06_PRIVATE_SOURCE_KEY_MISMATCH");
+    }
+
+    /** Explicit ordered roster: every additional file is owned, sealed and unable to shadow the key. */
+    private static void validatePrivateRoster(JsonNode source, Path fixedTarget) throws Exception {
+        JsonNode locations = source.path("additionalLocations");
+        require(locations.isArray() && locations.size() == source.path("additionalLocationCount").intValue(),
+                "S06_PRIVATE_SOURCE_EVIDENCE_INVALID");
+        var paths = new java.util.HashSet<Path>();
+        var uris = new java.util.ArrayList<String>();
+        for (JsonNode location : locations) {
+            var fields = new java.util.HashSet<String>();
+            location.fieldNames().forEachRemaining(fields::add);
+            require(location.isObject() && fields.equals(Set.of("path", "sha256"))
+                    && location.path("path").isTextual() && location.path("sha256").isTextual()
+                    && location.path("sha256").asText().matches("[a-f0-9]{64}"), "S06_PRIVATE_SOURCE_EVIDENCE_INVALID");
+            Path path = Path.of(location.path("path").textValue());
+            require(path.isAbsolute() && path.normalize().equals(path) && path.toRealPath().equals(path)
+                    && path.getParent().equals(fixedTarget.getParent()) && paths.add(path)
+                    && path.getFileName().toString().endsWith(".properties"), "S06_PRIVATE_SOURCE_PATH_INVALID");
+            ownedPrivateFile(path);
+            require(Files.size(path) <= 65536, "S06_PRIVATE_SOURCE_FILE_INVALID");
+            require(hash(path).equals(location.path("sha256").textValue()), "S06_PRIVATE_SOURCE_FILE_DRIFT");
+            uris.add(path.toUri().toString());
+            if (!path.equals(fixedTarget)) {
+                Properties other = new Properties();
+                other.load(new StringReader(Files.readString(path, StandardCharsets.UTF_8)));
+                for (String name : other.stringPropertyNames()) {
+                    String normalized = name.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+                    require(!normalized.equals("securityfieldencryptionkey") && !normalized.equals("fieldencryptionkey")
+                            && !normalized.startsWith("springconfig") && !normalized.startsWith("springprofiles"),
+                            "S06_PRIVATE_SOURCE_OVERRIDE_CONFLICT");
+                }
+            }
+        }
+        require(paths.contains(fixedTarget) && String.join(",", uris).equals(source.path("additionalLocation").textValue()),
+                "S06_PRIVATE_SOURCE_EVIDENCE_INVALID");
     }
 
     private static void ownedPrivateFile(Path path) throws Exception {
