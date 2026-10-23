@@ -30,6 +30,7 @@ public final class RegisteredSourcePollingAdapter {
     private final Map<ScopeKey, Integer> cursors = new HashMap<>();
     private ThreadPoolTaskScheduler scheduler;
     private final AtomicBoolean polling = new AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicReference<Long> progressAt = new java.util.concurrent.atomic.AtomicReference<>();
     private Settings settings;
     private List<SourceBindingTypes.Binding> scope = List.of();
     private ScheduledFuture<?> scheduled;
@@ -144,8 +145,18 @@ public final class RegisteredSourcePollingAdapter {
         }
     }
 
+    boolean shouldReportProgress(TickResult result,long nowNanos) {
+        if(result.status()!=Status.SUCCEEDED || result.selectedSources()==0)return false;
+        Long previous=progressAt.get();
+        if(previous!=null && nowNanos-previous<java.util.concurrent.TimeUnit.MINUTES.toNanos(1))return false;
+        return progressAt.compareAndSet(previous,nowNanos);
+    }
+
     void poll() {
         TickResult result = tick();
+        if(shouldReportProgress(result,System.nanoTime()))
+            LOG.info("Registered notification source progress: bindings={}, selected={}, matched={}, plans={}",
+                    result.bindingsAttempted(),result.selectedSources(),result.matchedSources(),result.processedPlans());
         if (result.status() == Status.FAILED) {
             LOG.error("Registered notification source poll failed: {}", result.failures());
             throw new IllegalStateException("NOTIFICATION_SOURCE_POLL_FAILED");
