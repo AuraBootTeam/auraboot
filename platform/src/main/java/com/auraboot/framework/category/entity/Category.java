@@ -2,6 +2,8 @@ package com.auraboot.framework.category.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 
@@ -9,7 +11,7 @@ import java.time.Instant;
  * General-purpose category tree node.
  */
 @Data
-@TableName("ab_category")
+@TableName(value = "ab_category", autoResultMap = true)
 public class Category {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -38,10 +40,13 @@ public class Category {
     private boolean leaf = false;     // 是否叶子节点
 
     private String description;         // 描述
+    @TableField(typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String extra;               // JSON扩展字段
     private String materializedPath;    // Cached path like /root/child
     private Integer maxDescendantsDepth; // Cached descendant depth, maintained by future rebuild jobs
+    @TableField(typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String i18nName;            // JSON name translations
+    @TableField(typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String externalTaxonomy;    // JSON external taxonomy mappings
 
     @TableLogic

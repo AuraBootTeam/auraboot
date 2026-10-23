@@ -264,7 +264,8 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         }
 
         category.setUpdatedAt(Instant.now());
-        boolean moved = updateById(category);
+        boolean moved = categoryMapper.updatePlacement(category.getId(), category.getParentId(),
+                category.getLevel(), category.getMaterializedPath(), category.getUpdatedAt()) > 0;
         if (moved) {
             refreshDescendantMetadata(category);
         }
