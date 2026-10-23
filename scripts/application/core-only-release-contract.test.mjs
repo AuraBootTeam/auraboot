@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
@@ -8,6 +8,8 @@ import {fileURLToPath} from 'node:url';
 import {exportProductImage,unpackOciArchive,verifyOciLayout} from './export-product-image.mjs';
 import {exportPlatformArtifacts,unpackPlatformArtifacts,verifyPlatformArtifacts,consumePlatformArtifacts} from './platform-artifact-package.mjs';
 import {readStructuredFile,resolveApplication,sha256Path} from './application-contract.mjs';
+import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,verifyCoreWebComponent}
+  from './core-web-component.mjs';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -362,6 +364,131 @@ function platformFixture(t) {
   mkdirSync(join(staged,'empty-directory'));
   return {root:staged,coreCommit:source.commit,archive:join(directory,'platform.tar'),directory,receipt,write};
 }
+
+function webComponentFixture(t) {
+  const f=platformFixture(t),repo=join(f.directory,'source');mkdirSync(repo);
+  const put=(name,body)=>{mkdirSync(path.dirname(join(repo,name)),{recursive:true});writeFileSync(join(repo,name),body);};
+  for(const name of ['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
+    'web-admin/package.json','web-admin/app/view.ts','packages/sdk/package.json',
+    'scripts/application/stage-core-only-artifacts.mjs','scripts/application/core-web-component.mjs',
+    'scripts/application/application-contract.mjs','distribution/application/manifest.json','platform/Backend.java'])put(name,name+'\n');
+  for(const name of ['package.json','web-admin/package.json','packages/sdk/package.json'])put(name,'{}\n');
+  put('pnpm-workspace.yaml','packages: []\n');
+  put('VERSION',readFileSync(join(root,'VERSION')));
+  put('distribution/application/examples/core-only/app.yaml',readFileSync(join(root,'distribution/application/examples/core-only/app.yaml')));
+  const git=args=>execFileSync('git',args,{cwd:repo,encoding:'utf8'}).trim();
+  git(['init','-q']);git(['config','user.name','Fixture']);git(['config','user.email','fixture@example.invalid']);
+  git(['remote','add','origin','git@github.com:AuraBootTeam/auraboot.git']);
+  const commit=()=>{git(['add','.']);git(['commit','-qm','fixture source']);return captureCoreWebInputs(repo);};
+  const before=commit(),catalog=JSON.parse(readFileSync(join(f.root,'artifact-catalog.json')));
+  for(const artifact of catalog.artifacts)artifact.source=before.source;
+  rmSync(join(f.root,'web'));mkdirSync(join(f.root,'web'));writeFileSync(join(f.root,'web/app.js'),'compiled fixture Web bytes\n');
+  const lock=resolveApplication(readStructuredFile(join(root,'distribution/application/examples/core-only/app.yaml')),catalog);
+  Object.assign(f.receipt,{source:before.source,lockIdentity:lock.identity,graphDigest:lock.composition.graphDigest,
+    web:{path:'web',digest:sha256Path(join(f.root,'web'))},webComponent:createCoreWebComponent({root:f.root,catalog,before,after:before})});
+  f.write('artifact-catalog.json',catalog);f.write('application.lock',lock);f.write('release-receipt.json',f.receipt);
+  return {...f,coreCommit:before.source.commit,repo,put,commit,before,catalog};
+}
+
+test('Web component input identity ignores only backend source and preserves original producer bytes',async t=>{
+  const f=webComponentFixture(t),selected=await exportPlatformArtifacts(f);
+  const inputs=join(f.directory,'dataset.json');writeFileSync(inputs,JSON.stringify({files:[{file:f.archive,sha256:selected.archive.sha256}]}));
+  const original=join(f.directory,'selected'),consumption=await consumePlatformArtifacts({...f,inputs,destination:original});
+  f.put('platform/Backend.java','corrected backend\n');const current=f.commit();
+  assert.notEqual(current.source.commit,f.before.source.commit);assert.equal(current.inputDigest,f.before.inputDigest);
+  const destination=join(f.directory,'new-platform');mkdirSync(destination);
+  const proof=copyCoreWebComponent({root:original,destination,catalog:f.catalog,receipt:f.receipt,current,
+    consumption,datasetReceiptSha256:sha256Path(inputs).slice(7)});
+  assert.deepEqual(proof.webComponent.source,f.before.source);
+  assert.equal(sha256Path(join(destination,'web')),f.receipt.web.digest);
+  for(const artifact of f.catalog.artifacts.filter(item=>item.type==='npm'))
+    assert.equal(sha256Path(join(destination,artifact.localPath)),artifact.digest);
+  // Complete the next native metadata fixture with the new backend origin.
+  cpSync(original,destination,{recursive:true,force:false});
+  const catalog=structuredClone(f.catalog);
+  for(const artifact of catalog.artifacts)if(artifact.type!=='npm')artifact.source=current.source;
+  const lock=resolveApplication(readStructuredFile(join(root,'distribution/application/examples/core-only/app.yaml')),catalog);
+  const receipt={...f.receipt,...proof,source:current.source,lockIdentity:lock.identity,graphDigest:lock.composition.graphDigest};
+  for(const [name,value] of Object.entries({'artifact-catalog.json':catalog,'application.lock':lock,'release-receipt.json':receipt}))
+    writeFileSync(join(destination,name),JSON.stringify(value));
+  await verifyPlatformArtifacts({root:destination,coreCommit:current.source.commit});
+  assert.equal(verifyCoreWebComponent({root:destination,catalog,receipt}).source.commit,f.before.source.commit);
+  delete receipt.webConsumption;writeFileSync(join(destination,'release-receipt.json'),JSON.stringify(receipt));
+  await assert.rejects(verifyPlatformArtifacts({root:destination,coreCommit:current.source.commit}),/without consumption proof/);
+});
+
+test('changed Web source, lock, recipe, mode and toolchain reject selection without writing output',t=>{
+  for(const mode of ['source','lock','recipe','mode','toolchain','environment','denominator']) {
+    const f=webComponentFixture(t);
+    if(mode==='source')f.put('web-admin/app/view.ts','changed Web\n');
+    if(mode==='lock')f.put('pnpm-lock.yaml','changed locked dependency\n');
+    if(mode==='recipe')f.put('scripts/application/stage-core-only-artifacts.mjs','changed recipe\n');
+    if(mode==='mode')execFileSync('chmod',['+x',join(f.repo,'web-admin/app/view.ts')]);
+    let current=['toolchain','environment','denominator'].includes(mode)?structuredClone(f.before):f.commit();
+    if(mode==='toolchain')current.inputs.toolchain.pnpm='99.0.0';
+    if(mode==='environment')current.inputs.environment.AURA_COMPOSITION_KEY='sha256:'+'e'.repeat(64);
+    if(mode==='denominator')current.inputs.files.pop();
+    const destination=join(f.directory,'refused');mkdirSync(destination);
+    assert.throws(()=>copyCoreWebComponent({root:f.root,destination,catalog:f.catalog,receipt:f.receipt,current,
+      consumption:{source:f.receipt.source,lockIdentity:f.receipt.lockIdentity,archive:{sha256:'a'.repeat(64)}},
+      datasetReceiptSha256:'b'.repeat(64)}),/effective inputs/);
+    assert.equal(existsSync(join(destination,'web')),false);
+  }
+});
+
+test('Web proof rejects output tampering, missing historical proof, unsafe inputs and incomplete provenance',t=>{
+  for(const mode of ['web','output-mode','npm','history','consumption','link']) {
+    const f=webComponentFixture(t);
+    if(mode==='web')writeFileSync(join(f.root,'web/app.js'),'changed bytes');
+    if(mode==='output-mode')execFileSync('chmod',['+x',join(f.root,'web/app.js')]);
+    if(mode==='npm')writeFileSync(join(f.root,f.receipt.webComponent.artifacts[0].localPath),'changed npm');
+    if(mode==='history')delete f.receipt.webComponent;
+    if(mode==='consumption')f.receipt.webConsumption={schemaVersion:1};
+    if(mode==='link'){rmSync(join(f.root,'web/app.js'));symlinkSync('/tmp',join(f.root,'web/app.js'));}
+    const destination=join(f.directory,'refused');mkdirSync(destination);
+    assert.throws(()=>copyCoreWebComponent({root:f.root,destination,catalog:f.catalog,receipt:f.receipt,current:f.before,
+      consumption:{source:f.receipt.source,lockIdentity:f.receipt.lockIdentity,archive:{sha256:'a'.repeat(64)}},
+      datasetReceiptSha256:'b'.repeat(64)}));assert.equal(existsSync(join(destination,'web')),false);
+  }
+  const f=webComponentFixture(t);f.put('.gitignore','web-admin/app/.env.local\n');f.commit();
+  f.put('web-admin/app/.env.local','SECRET=not-a-build-input\n');
+  assert.throws(()=>captureCoreWebInputs(f.repo),/Untracked or ignored/);
+});
+
+test('declared Web environment drops ambient public values and credentials and guards public stage wiring',()=>{
+  const environment=coreWebEnvironment({PATH:'/usr/bin',HOME:'/fixture',
+    VITE_SECRET:'not-forwarded',GITHUB_TOKEN:'not-forwarded'});
+  assert.equal(environment.NODE_OPTIONS,undefined);assert.equal(environment.VITE_SECRET,undefined);
+  assert.equal(environment.GITHUB_TOKEN,undefined);assert.equal(environment.NPM_CONFIG_USERCONFIG,'/dev/null');
+  assert.throws(()=>coreWebEnvironment({NPM_CONFIG_REGISTRY:'https://user:secret@example.invalid'}),/Credential-free/);
+  assert.throws(()=>coreWebEnvironment({AURA_COMPOSITION_KEY:'latest'}),/composition key/);
+  assert.throws(()=>coreWebEnvironment({NODE_OPTIONS:'--require malicious'}),/bounded Web heap/);
+  assert.equal(coreWebEnvironment({NODE_OPTIONS:'--max-old-space-size=4096'}).NODE_OPTIONS,'--max-old-space-size=4096');
+  assert.match(stage,/consumePlatformArtifacts/);assert.match(stage,/copyCoreWebComponent/);
+  assert.match(stage,/createCoreWebComponent/);assert.match(stage,/if\(!selectedWeb\)materializeAndBuildCoreWeb/);
+});
+
+test('public Core stager rejects missing Web proof before backend work and cleans selected bytes on compile failure',async t=>{
+  for(const legacy of [true,false]) {
+    const f=webComponentFixture(t),marker=join(f.directory,'backend-invoked');
+    // Failure-only tripwire: no successful Java build or Linux evidence is simulated.
+    f.put('platform/gradlew',`#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)},'invoked');process.exit(99);\n`);
+    execFileSync('chmod',['+x',join(f.repo,'platform/gradlew')]);const current=f.commit();
+    if(legacy){delete f.receipt.webComponent;f.write('release-receipt.json',f.receipt);}
+    const selected=await exportPlatformArtifacts(f),inputs=join(f.directory,'dataset.json');
+    writeFileSync(inputs,JSON.stringify({files:[{file:f.archive,sha256:selected.archive.sha256}]}));
+    const output=join(f.directory,'output');
+    const before=new Set(readdirSync(tmpdir()).filter(name=>name.startsWith('auraboot-selected-web-')));
+    const result=spawnSync(process.execPath,[join(root,'scripts/application/stage-core-only-artifacts.mjs'),
+      '--repo-root',f.repo,'--output',output,'--web-platform-archive',f.archive,'--web-platform-source',f.coreCommit],
+      {encoding:'utf8',env:{...process.env,AURA_CI_DATASET_INPUTS:inputs}});
+    assert.equal(result.status,1,result.stderr);
+    assert.match(result.stderr,legacy ? /Web effective inputs differ or are missing/ : /gradlew.*failed/);
+    assert.equal(existsSync(marker),!legacy);assert.equal(existsSync(output),false);
+    assert.deepEqual(new Set(readdirSync(tmpdir()).filter(name=>name.startsWith('auraboot-selected-web-'))),before);
+    assert.equal(current.inputDigest,f.before.inputDigest);
+  }
+});
 
 test('native platform package preserves original catalog, lock and full files without recompilation',async t=>{
   const f=platformFixture(t),before=await verifyPlatformArtifacts(f),selected=await exportPlatformArtifacts(f);

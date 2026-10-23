@@ -9,6 +9,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {canonicalJson,verifyArtifacts,sha256Path} from './application-contract.mjs';
 import {verifyOciLayout} from './export-product-image.mjs';
+import {verifyCoreWebComponent} from './core-web-component.mjs';
 
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
 const read=async file=>JSON.parse(await readFile(file,'utf8'));
@@ -50,13 +51,15 @@ export async function verifyPlatformArtifacts({root,coreCommit}) {
     &&receipt.graphDigest===lock.composition.graphDigest
     &&canonicalJson(receipt.application)===canonicalJson(lock.application),'Core receipt and lock differ');
   need(catalog.schemaVersion===1&&Array.isArray(catalog.artifacts)&&catalog.artifacts.length>0,'native platform catalog required');
+  const webComponent=verifyCoreWebComponent({root,catalog,receipt});
   const keys=new Set();
   for(const artifact of catalog.artifacts) {
     const key=`${artifact.type}:${artifact.id}`;
     need(!keys.has(key),'duplicate native platform coordinate');keys.add(key);
     need(typeof artifact.version==='string'&&/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(artifact.version)
       && !/(snapshot|latest|workspace|branch)/i.test(artifact.version),'immutable platform version required');
-    need(artifact.source?.commit===coreCommit&&artifact.source?.repository===receipt.source.repository,
+    const selectedWeb=artifact.type==='npm'&&webComponent?.artifacts.some(item=>canonicalJson(item)===canonicalJson(artifact));
+    need(selectedWeb||(artifact.source?.commit===coreCommit&&artifact.source?.repository===receipt.source.repository),
       'platform catalog source differs');
     need(sha256Path(within(root,artifact.localPath))===artifact.digest,'platform catalog checksum differs');
   }

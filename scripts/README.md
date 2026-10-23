@@ -173,6 +173,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
 | `application/export-product-image.mjs` | 1 | 2026-10-22 | Export the tested OCI graph before native gate cleanup; checksum-bound strict archive consumption; immutable transport only. |
 | `application/platform-artifact-package.mjs` | 1 | 2026-10-23 | Export/consume an explicitly selected native Core artifact package; original catalog/lock/source/OCI checks, no compilation or qualification. |
+| `application/core-web-component.mjs` | 1 | 2026-10-24 | Capture declared Core Web inputs and verify/copy original Web/npm bytes with immutable producer provenance; no qualification. |
 
 ## pipeline/lib (12)
 
