@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const script = readFileSync(join(root, 'scripts/dev/run-agent-runtime-backend-gate.sh'), 'utf8');
@@ -49,4 +50,14 @@ test('the established runtime catalog targets every current test source owner', 
     assert.ok(matched.length > 0, `Unowned selector: ${selector}`);
     assert.deepEqual([...actual].sort(), [...new Set(matched.map(item => item.task))].sort(), selector);
   }
+});
+
+
+test('the runtime gate refuses missing public approval fixtures before Gradle', () => {
+  const env = { ...process.env };
+  delete env.AURA_APPROVAL_ROLLBACK_FIXTURES;
+  const result = spawnSync('bash', [join(root, 'scripts/dev/run-agent-runtime-backend-gate.sh')], { env, encoding: 'utf8' });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /AURA_APPROVAL_ROLLBACK_FIXTURES must name/);
+  assert.doesNotMatch(result.stdout, /Gradle|Task :/);
 });
