@@ -70,4 +70,48 @@ class TurnRegistryTest {
         assertThat(h.getCancelled().get()).isTrue();
         assertThat(h.getStatus()).isEqualTo(TurnStatus.CANCELLED);
     }
+    @Test
+    void cancellationCannotBeOverwrittenByLateCompletionOrFailure() {
+        TurnRegistry registry = new TurnRegistry();
+        TurnHandle handle = registry.register("cancelled", 88L, 100L, "A", 11L, null);
+        registry.markCancelled("cancelled");
+        registry.markCompleted("cancelled");
+        registry.markFailed("cancelled");
+        assertThat(handle.getStatus()).isEqualTo(TurnStatus.CANCELLED);
+        assertThat(handle.getCancelled()).isTrue();
+    }
+
+    @Test
+    void lateCancellationDoesNotRewriteAnAlreadyCompletedOrFailedTurn() {
+        TurnRegistry registry = new TurnRegistry();
+        for (boolean completed : new boolean[] {true, false}) {
+            String id = "terminal-" + completed;
+            TurnHandle handle = registry.register(id, 88L, 100L, "A", 11L, null);
+            if (completed) registry.markCompleted(id); else registry.markFailed(id);
+            registry.markCancelled(id);
+            assertThat(handle.getStatus()).isEqualTo(completed ? TurnStatus.COMPLETED : TurnStatus.FAILED);
+            assertThat(handle.getCancelled()).isFalse();
+        }
+    }
+
+    @Test
+    void concurrentTerminalSignalsHaveOneStableWinner() throws Exception {
+        TurnRegistry registry = new TurnRegistry();
+        TurnHandle handle = registry.register("race", 88L, 100L, "A", 11L, null);
+        var barrier = new java.util.concurrent.CyclicBarrier(3);
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var completed = executor.submit(() -> { barrier.await(); registry.markCompleted("race"); return null; });
+            var cancelled = executor.submit(() -> { barrier.await(); registry.markCancelled("race"); return null; });
+            barrier.await(5, java.util.concurrent.TimeUnit.SECONDS);
+            completed.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            cancelled.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        TurnStatus winner = handle.getStatus();
+        assertThat(winner).isIn(TurnStatus.COMPLETED, TurnStatus.CANCELLED);
+        registry.markFailed("race");
+        assertThat(handle.getStatus()).isEqualTo(winner);
+        assertThat(handle.getCancelled().get()).isEqualTo(winner == TurnStatus.CANCELLED);
+        assertThat(registry.getActiveByConversation(88L)).isEmpty();
+    }
+
 }

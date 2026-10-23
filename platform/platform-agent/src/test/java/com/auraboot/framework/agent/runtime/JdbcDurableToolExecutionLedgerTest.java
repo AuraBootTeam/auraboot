@@ -134,7 +134,10 @@ class JdbcDurableToolExecutionLedgerTest {
         assertThat(sql.getValue())
                 .contains("status = 'RUNNING'")
                 .contains("status = 'FAILED'")
-                .contains("client_request_id = ?");
+                .contains("client_request_id = ?")
+                .contains("outcome = ?::jsonb")
+                .contains("expires_at > NOW()")
+                .contains("nextRetryAt");
     }
 
     @Test

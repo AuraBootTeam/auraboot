@@ -28,19 +28,18 @@ public class TurnRegistry {
 
     public void markCompleted(String turnId) {
         TurnHandle h = turns.get(turnId);
-        if (h != null) h.setStatus(TurnStatus.COMPLETED);
+        if (h != null) h.finish(TurnStatus.COMPLETED);
     }
 
     public void markFailed(String turnId) {
         TurnHandle h = turns.get(turnId);
-        if (h != null) h.setStatus(TurnStatus.FAILED);
+        if (h != null) h.finish(TurnStatus.FAILED);
     }
 
     public void markCancelled(String turnId) {
         TurnHandle h = turns.get(turnId);
         if (h != null) {
-            h.getCancelled().set(true);
-            h.setStatus(TurnStatus.CANCELLED);
+            h.finish(TurnStatus.CANCELLED);
         }
     }
 

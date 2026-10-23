@@ -25,6 +25,12 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.service.AgentApprovalGateServiceConcurrencyTest' \
   --tests 'com.auraboot.framework.agentchat.handoff.HandoffPermissionPolicyTest' \
   --tests 'com.auraboot.framework.agentchat.reply.AgentReplyTaskChokepointTest' \
+  --tests 'com.auraboot.framework.conversation.turn.*' \
+  --tests 'com.auraboot.framework.agent.identity.*' \
+  --tests 'com.auraboot.framework.agent.service.InterruptDispatcherTenantScopeTest' \
+  --tests 'com.auraboot.framework.agent.service.RunLifecycleServiceTest' \
+  --tests 'com.auraboot.framework.agent.service.AgentRunTerminalStoreTest' \
+  --tests 'com.auraboot.framework.agent.service.AgentResumeGrantTest' \
   --tests 'com.auraboot.framework.conversation.AssistantModelFallbackTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplNamedAgentTaskTest' \
   --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' \
@@ -56,8 +62,18 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.SkillEngineWiredExecutionIT' \
   --tests 'com.auraboot.framework.agent.AgentLifecycleSuspendIT' \
   --tests 'com.auraboot.framework.agent.MemorySecretWritebackIT' \
+  --tests 'com.auraboot.framework.agent.AgentMemoryIntegrationTest' \
+  --tests 'com.auraboot.framework.agent.AgentResumeRetryIntegrationTest' \
+  --tests 'com.auraboot.framework.agent.AgentApprovalTimeoutEnforcementIT' \
+  --tests 'com.auraboot.framework.agent.memory.MemoryL1L2Phase4IntegrationTest' \
   --tests 'com.auraboot.framework.agent.StaleRunRecoveryIT' \
   --tests 'com.auraboot.framework.agent.service.ActionIdentityAuditIT' \
   --tests 'com.auraboot.framework.agent.service.RunDeadlineEnforcementIT' \
   --tests 'com.auraboot.framework.agent.service.AgentLoopCostLimitIT' \
+  --no-daemon
+
+./gradlew :platform-app:integrationTest \
+  --tests 'com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT' \
+  --tests 'com.auraboot.framework.agent.service.AgentRunTerminalStoreIT' \
+  --tests 'com.auraboot.framework.agent.service.AgentApprovalRollbackIT' \
   --no-daemon

@@ -35,7 +35,15 @@ public class TurnHandle {
     public Long getReplyToMessageId() { return replyToMessageId; }
     public Instant getStartedAt() { return startedAt; }
     public TurnStatus getStatus() { return status.get(); }
-    void setStatus(TurnStatus s) { status.set(s); }
+    void finish(TurnStatus terminalStatus) {
+        if (terminalStatus == TurnStatus.ACTIVE) {
+            throw new IllegalArgumentException("A terminal turn status is required");
+        }
+        if (status.compareAndSet(TurnStatus.ACTIVE, terminalStatus)
+                && terminalStatus == TurnStatus.CANCELLED) {
+            cancelled.set(true);
+        }
+    }
     public AtomicBoolean getCancelled() { return cancelled; }
 
     public synchronized void appendCumulative(String chunk) {
