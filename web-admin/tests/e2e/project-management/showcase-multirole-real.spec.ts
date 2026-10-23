@@ -1,8 +1,9 @@
-import {test, expect, type Page, type Locator, type Response, type APIResponse} from '@playwright/test';
+import {test, expect, type Page, type Response, type APIResponse} from '@playwright/test';
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {loginDeliveryMember} from '../../helpers/delivery-session';
+import {dashboardRow} from '../../helpers/delivery-dashboard';
 import {completeDeliveryApproval} from '../../helpers/delivery-approval';
 
 const evidence=process.env.AURA_EVIDENCE_DIR!;
@@ -17,22 +18,11 @@ async function open(page:Page,menuName:string,name:string) {
   await menu(page,menuName);const row=page.getByRole('row').filter({hasText:name});await expect(row).toHaveCount(1);
   await row.getByRole('button',{name:/查看|详情/}).click();await expect(page.getByRole('heading',{name,exact:true})).toBeVisible();await expect(page.getByRole('main')).toContainText(name);
 }
-async function dashboardRow(block:Locator,name:string) {
-  // Follow the actual configured pagination; unrelated retained deliveries may precede this batch.
-  for(let visited=0;visited<100;visited++) {
-    await expect(block.getByRole('cell').first()).toBeVisible();
-    const row=block.getByRole('row').filter({hasText:name});
-    if(await row.count()) {await expect(row).toHaveCount(1);return row;}
-    const next=block.getByRole('button',{name:'下一页',exact:true});
-    await expect(next).toBeEnabled();
-    const before=await block.innerText();await next.click();
-    await expect.poll(()=>block.innerText()).not.toBe(before);
-  }
-  throw Error(`Delivery was not found within 100 dashboard pages: ${name}`);
-}
 async function shot(page:Page,id:string) {
   await mkdir(join(evidence,'screenshots'),{recursive:true});
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
+  // Dynamic detail blocks load independently of the persistent object header.
+  await expect(page.getByRole('main').getByText(/^(加载中(?:\.{3}|…)|加载活动记录)$/)).toHaveCount(0);
   await page.screenshot({path:join(evidence,'screenshots',id+'.png'),fullPage:true});
 }
 async function command(page:Page,code:string,trigger:()=>Promise<unknown>) {

@@ -209,6 +209,40 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
     }
   }
 
+  // Reference resolution exposes the business label; storage identity remains diagnostic.
+  if (
+    ['platform.resolve_reference', 'platform_resolve_reference'].includes(contract.skillCode || '') &&
+    contract.status === 'success'
+  ) {
+    const label = contract.data?.displayValue;
+    if (typeof label !== 'string' || !label.trim()) {
+      return (
+        <div role="alert">
+          {text({
+            'zh-CN': '关联对象结果不完整，请重新查询。',
+            'en-US': 'The reference result is incomplete. Run the query again.',
+          })}
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm" data-testid="reference-resolution-result">
+        <div className="flex items-center gap-2">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <span>{text({ 'zh-CN': '已确认关联对象', 'en-US': 'Reference confirmed' })}</span>
+          <strong className="break-words">{label}</strong>
+        </div>
+        <details className="mt-2 text-xs text-gray-500" data-testid="reference-resolution-details">
+          <summary className="cursor-pointer">
+            {text({ 'zh-CN': '匹配详情', 'en-US': 'Match details' })}
+          </summary>
+          <div className="mt-2"><CardView contract={contract} /></div>
+          <code>{contract.skillCode}</code>
+        </details>
+      </div>
+    );
+  }
+
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
   const { color, Icon } = statusStyle;
   const metric = contractMetric(contract);

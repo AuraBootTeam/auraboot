@@ -72,7 +72,7 @@ export function DesignerToolbar({
       {/* Left: Title + Subtitle + Status + Dirty indicator */}
       <div className="flex min-w-0 basis-80 grow items-center gap-3">
         {titleElement || (
-          <h1 className="shrink-0 whitespace-nowrap text-xl font-semibold text-gray-900">{title}</h1>
+          <h1 className="min-w-0 truncate text-xl font-semibold text-gray-900" title={title}>{title}</h1>
         )}
         {subtitle && (
           <span className="min-w-0 truncate text-sm text-gray-600" title={subtitle}>

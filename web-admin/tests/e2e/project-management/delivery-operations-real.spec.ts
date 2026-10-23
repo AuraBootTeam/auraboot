@@ -1,3 +1,4 @@
+import {dashboardRow} from '../../helpers/delivery-dashboard';
 import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
@@ -116,7 +117,12 @@ test('OP source grants independently protect native SLA and verification facts i
    const queries:Promise<any>[]=[];const observe=(r:Response)=>{if(new URL(r.url()).pathname==='/api/meta/chart-data'&&r.request().postDataJSON()?.queryCode?.startsWith('tdo_'))queries.push(r.finished().then(()=>({status:r.status()})));};actor.on('response',observe);
    await actor.getByRole('navigation').getByRole('link',{name:'交付经营看板',exact:true}).click();await expect.poll(()=>queries.length).toBeGreaterThanOrEqual(7);const outcomes=await Promise.all(queries);actor.off('response',observe);
    for(const result of outcomes)expect(result.status).toBe(missing?403:200);
-   if(missing){await expect(actor.getByTestId('dashboard-block-delivery-actions').getByRole('alert')).toContainText('无权读取数据');await expect(actor.getByTestId('dashboard-block-pending_count').getByRole('alert')).toContainText('请联系管理员');await expect(actor.getByRole('main')).not.toContainText('Access forbidden');}else await expect(actor.getByTestId('dashboard-block-delivery-actions')).toContainText(receipt.factRows[0].acceptance_name);
+   if(missing){await expect(actor.getByTestId('dashboard-block-delivery-actions').getByRole('alert')).toContainText('无权读取数据');await expect(actor.getByTestId('dashboard-block-pending_count').getByRole('alert')).toContainText('请联系管理员');await expect(actor.getByRole('main')).not.toContainText('Access forbidden');}else {
+    const target=receipt.factRows[0];
+    const row=await dashboardRow(actor.getByTestId('dashboard-block-delivery-actions'),target.acceptance_name);
+    await expect(row).toContainText(target.acceptance_label);
+    await expect(row).toContainText(Number(target.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}));
+   }
    await shot(actor,missing==='bpm.monitor.read'?'OP05':'OP05-verification-'+(missing?'denied':'allowed'));
    for(const format of ['markdown','html','pdf']){const r=await actor.request.post(`/api/reports/export/${format}`,{data:{reportPid}});expect(r.status(),`${missing}: ${format}`).toBe(missing?403:200);if(missing)expect(await r.text()).not.toContain(receipt.factRows[0].acceptance_name);}
    if(missing){

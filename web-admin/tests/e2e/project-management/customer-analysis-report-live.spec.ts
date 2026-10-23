@@ -349,6 +349,15 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await expect(card).toHaveCount(1);
   await expect(card).toHaveAttribute('data-row-count', String(expected.size));
   await expect(card).toBeVisible();
+  await expect.poll(() => card.innerText()).not.toMatch(/\btpm_[a-z_]+\b/);
+  if (referenceLookup) {
+    const resolution = panel.getByTestId('reference-resolution-result');
+    await expect(resolution).toContainText(customer);
+    await expect(resolution.getByTestId('reference-resolution-details')).not.toHaveAttribute('open');
+    await expect.poll(() => resolution.innerText()).not.toMatch(/storedValue|targetModel|modelCode/);
+  }
+  await card.scrollIntoViewIfNeeded();
+  await expect(card).toBeInViewport({ratio: 1});
   await page.screenshot({
     path: join(evidence!, 'SC06-report-01-real-analysis.png'),
     fullPage: true,
