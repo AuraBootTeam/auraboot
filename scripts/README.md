@@ -286,6 +286,7 @@ Quickstart signing-key regression: `node --test scripts/quickstart-signing-key.t
 
 | script | purpose |
 |---|---|
+| `application/verify-agent-capabilities-http.mjs` | Targeted api / real-stack / http suite: run with explicit origin, installed/not_installed expectation, fresh evidence directory, and AURA_TEST_EMAIL/AURA_TEST_PASSWORD. Verifies auth denials, installation and no-store; missing prerequisites or a missing case fail. |
 | `quickstart-signing-key.test.mjs` | Hermetic key transport, private generation, no overwrite and no shared default contracts. |
 
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
