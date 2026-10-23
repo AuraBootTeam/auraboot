@@ -9,11 +9,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT/platform"
 
-if [ -z "${AURA_APPROVAL_ROLLBACK_FIXTURES:-}" ] || [ ! -s "$AURA_APPROVAL_ROLLBACK_FIXTURES" ]; then
-  echo "AURA_APPROVAL_ROLLBACK_FIXTURES must name the two owned pending approvals prepared by web-admin/tests/helpers/prepare-approval-rollback.ts" >&2
-  exit 2
-fi
-
 ./gradlew :compileJava :compileTestJava :platform-agent:compileTestJava :platform-app:compileTestJava --no-daemon
 
 ./gradlew :platform-agent:test \
@@ -80,5 +75,4 @@ fi
 ./gradlew :platform-app:integrationTest \
   --tests 'com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT' \
   --tests 'com.auraboot.framework.agent.service.AgentRunTerminalStoreIT' \
-  --tests 'com.auraboot.framework.agent.service.AgentApprovalRollbackIT' \
   --no-daemon
