@@ -21,6 +21,13 @@
     "refType": "field"
   },
   {
+    "key": "model.tpm_project.tpm_pj_budget.label",
+    "zh-CN": "项目预算",
+    "en-US": "Project budget",
+    "source": "import",
+    "refType": "field"
+  },
+  {
     "key": "model.tpm_project.tpm_pj_description.label",
     "zh-CN": "交付目标",
     "en-US": "Delivery outcome",

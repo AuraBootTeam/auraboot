@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 import { ResultContractView } from '../ResultContractView';
 import type { ResultContract } from '../../types/ResultContract';
@@ -209,4 +209,29 @@ it('renders analytics payloads through the chart card even when the query is emp
   );
   expect(screen.getByTestId('chatbi-result-card')).toBeInTheDocument();
   expect(screen.queryByTestId('rc-card')).not.toBeInTheDocument();
+});
+
+
+describe('reference lookup presentation', () => {
+  it.each(['platform.resolve_reference', 'platform_resolve_reference'])(
+    'shows the matched business label and keeps %s protocol fields in collapsed details', (skillCode) => {
+      render(<ResultContractView contract={{...baseContract,skillCode,renderHint:'card',data:{
+        success:true,displayValue:'Huachen Manufacturing',storedValue:'01CUSTOMER',
+        modelCode:'projects',targetModel:'customers',fieldCode:'customer_id',durationMs:5,
+      }}} />);
+      expect(screen.getByTestId('reference-resolution-result')).toHaveTextContent('Huachen Manufacturing');
+      expect(screen.getByText('storedValue')).not.toBeVisible();
+      expect(screen.getByText('01CUSTOMER')).not.toBeVisible();
+      const details=screen.getByTestId('reference-resolution-details');
+      expect(details).not.toHaveAttribute('open');
+      fireEvent.click(details.querySelector('summary')!);
+      expect(details).toHaveAttribute('open');
+      expect(screen.getByText('01CUSTOMER')).toBeVisible();
+    },
+  );
+  it('does not certify an incomplete reference result or expose its internal identifier', () => {
+    render(<ResultContractView contract={{...baseContract,skillCode:'platform.resolve_reference',renderHint:'card',data:{storedValue:'01CUSTOMER'}}} />);
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.queryByText('01CUSTOMER')).not.toBeInTheDocument();
+  });
 });
