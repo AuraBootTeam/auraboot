@@ -44,6 +44,12 @@ public class BusinessException extends RootUnCheckedException {
         initCause(cause);
     }
 
+    /** Preserve translated plugin rejection arguments at the HTTP response boundary. */
+    public BusinessException(ResponseCode responseCode, String message, Throwable cause, Object[] args) {
+        this(responseCode, message, cause);
+        this.i18nArgs = args == null ? null : args.clone();
+    }
+
     /**
      * Parameterized i18n business error. The message is stored as {@code $i18n:<key>} and the
      * args are carried for {@code {0}}-style substitution at the response boundary

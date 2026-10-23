@@ -112,6 +112,9 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private AsyncTaskServiceImpl asyncTaskService;
 
+    @Autowired
+    private com.auraboot.framework.i18n.util.I18nLocaleResolver i18nLocaleResolver;
+
     @Autowired(required = false)
     private StorageProvider storageProvider;
 
@@ -789,7 +792,7 @@ public class HandlerPhase implements CommandPhase {
                 ResponseCode responseCode = switch (rejection.code()) {
                     case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
                 };
-                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection);
+                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection, rejection.messageArgs());
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {
@@ -818,6 +821,13 @@ public class HandlerPhase implements CommandPhase {
                                           String clientRequestId, Integer clientExpectedVersion) {
         Map<String, Object> input = new HashMap<>();
         input.put("handlerCode", handlerCode);
+        // Locale must survive thread hand-off and recovery, rather than use the worker default.
+        org.springframework.web.context.request.RequestAttributes attributes =
+                org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        String taskLocale = attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servlet
+                ? i18nLocaleResolver.resolveLocale(servlet.getRequest())
+                : org.springframework.context.i18n.LocaleContextHolder.getLocale().toLanguageTag();
+        input.put("locale", taskLocale);
         input.put("commandCode", commandCode);
         input.put("tenantId", tenantId);
         input.put("userId", userId);

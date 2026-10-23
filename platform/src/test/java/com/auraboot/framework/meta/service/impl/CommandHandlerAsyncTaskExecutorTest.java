@@ -205,6 +205,28 @@ class CommandHandlerAsyncTaskExecutorTest {
                 org.mockito.ArgumentMatchers.anyLong(), eq("async_handler"), eq(Map.of()));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"zh-CN", "en-US"})
+    void translatesBusinessRejectionWithArgumentsInThePersistedLocale(String locale) throws Exception {
+        var translations = mock(com.auraboot.framework.i18n.service.I18nService.class);
+        ReflectionTestUtils.setField(executor, "i18nService", translations);
+        var rejection = new com.auraboot.framework.plugin.extension.PluginCommandRejectionException(
+                com.auraboot.framework.plugin.extension.PluginCommandRejectionException.Code.BUSINESS_RULE_BLOCKED,
+                "test.duplicate", "D51GT01067100");
+        var handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenThrow(rejection);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        String expected = "zh-CN".equals(locale) ? "重复物料编码：D51GT01067100" : "Duplicate material code: D51GT01067100";
+        when(translations.getMessage(locale, "test.duplicate", "D51GT01067100")).thenReturn(expected);
+        ObjectNode input = params("bom:import_material_library");
+        input.put("locale", locale);
+        var result = executor.execute(input, noop);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.isRetryable()).isFalse();
+        assertThat(result.getErrorMessage()).isEqualTo(expected).doesNotContain("$i18n:");
+        verify(translations).getMessage(locale, "test.duplicate", "D51GT01067100");
+    }
+
     @Test
     void failed_async_handler_writes_failure_audit() throws Exception {
         CommandEffectExecutor effects = mock(CommandEffectExecutor.class);
