@@ -1,3 +1,4 @@
+import { AgentRouteBoundary } from '~/contexts/ApplicationCapabilitiesContext';
 import { Outlet } from 'react-router';
 
 export default function PageContent() {
@@ -7,7 +8,7 @@ export default function PageContent() {
       data-aura-scroll-container="page-content"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        <Outlet />
+        <AgentRouteBoundary><Outlet /></AgentRouteBoundary>
       </div>
     </main>
   );

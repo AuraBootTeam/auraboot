@@ -46,7 +46,7 @@ export function AgentRouteBoundary({ children }: { children: ReactNode }) {
   const { agent, loading, refresh } = useApplicationCapabilities();
   const { t } = useI18n();
   if (!requiresAgentPath(pathname)) return children;
-  if (agent === 'installed') return <div className="relative" aria-busy={loading}>
+  if (agent === 'installed') return <div className="relative flex min-h-0 flex-1 flex-col" aria-busy={loading}>
     <div inert={loading || undefined}>{children}</div>
     {loading && <div role="status" data-testid="agent-rediscovery" className="absolute inset-0 z-50 flex items-start justify-center bg-white/70 pt-8 dark:bg-gray-900/70">
       <p className="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-800">{t('application.agent.loading')}</p>

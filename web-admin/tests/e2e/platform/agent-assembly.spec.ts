@@ -84,6 +84,8 @@ test.describe('optional application assembly', () => {
       await page.goto('/aurabot/providers');
       await expect(page.getByTestId('agent-availability')).toHaveAttribute('data-state', 'not_installed');
       await expect(page.getByRole('heading', { name: '此应用未安装 AI 模块' })).toBeVisible();
+      await expect(page.getByTestId('sidebar').getByRole('link', { name: '模型管理', exact: true })).toBeVisible();
+      await expect(page.getByTestId('sidebar').locator('xpath=ancestor-or-self::*[@inert]')).toHaveCount(0);
       await expect(page.getByRole('button', { name: '添加提供商', exact: true })).toHaveCount(0);
     }
     await capture(page, info, expected === 'installed' ? 'WEB-FULL-AI' : 'WEB-BASE-DEEP');
@@ -118,6 +120,8 @@ test.describe('optional application assembly', () => {
       await expect(page.getByTestId('agent-rediscovery')).toBeVisible();
       await expect(draft).toHaveValue('Unsaved assembly verification draft');
       await expect(draft.locator('xpath=ancestor::*[@inert]')).toHaveCount(1);
+      await expect(page.getByTestId('sidebar').getByRole('link', { name: '模型管理', exact: true })).toBeVisible();
+      await expect(page.getByTestId('sidebar').locator('xpath=ancestor-or-self::*[@inert]')).toHaveCount(0);
       await capture(page, info, 'WEB-FULL-REDISCOVERY');
     } finally { await discovery.release(); }
     await expect(page.getByTestId('agent-rediscovery')).toHaveCount(0);

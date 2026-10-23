@@ -1,4 +1,4 @@
-import { ApplicationCapabilitiesProvider, AgentRouteBoundary, useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
+import { ApplicationCapabilitiesProvider, useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 import {
   Outlet,
   Links,
@@ -534,7 +534,7 @@ export default function App() {
         <BootstrapBanner status={data.bootstrapStatus} />
       )}
       <div className={data.bootstrapStatus && !data.bootstrapStatus.initialized ? 'pt-10' : ''}>
-        <AgentRouteBoundary><Outlet /></AgentRouteBoundary>
+        <Outlet />
       </div>
     </>
   );
