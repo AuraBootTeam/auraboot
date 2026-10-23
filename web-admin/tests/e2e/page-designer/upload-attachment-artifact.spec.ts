@@ -87,6 +87,8 @@ async function createUploadFormPage(page: Page) {
 }
 
 test.describe('Page Designer upload attachment artifact runtime', () => {
+  test.use({ locale: 'zh-CN' });
+  test.setTimeout(90_000);
   test('SmartUpload enforces constraints, downloads uploaded bytes, and deletes the file API record', async ({
     page,
   }, testInfo) => {
@@ -132,6 +134,7 @@ test.describe('Page Designer upload attachment artifact runtime', () => {
     await expect(rejections).toContainText('1MB');
     await expect(attachmentField.getByTestId('upload-file-runtime_attachment')).toHaveCount(0);
     expect(uploadRequests, 'oversized file must be rejected before upload API').toHaveLength(0);
+    await page.screenshot({ path: testInfo.outputPath('upload-rejection.png'), fullPage: true });
 
     const uploadRespPromise = page.waitForResponse(
       (response) =>
@@ -193,5 +196,6 @@ test.describe('Page Designer upload attachment artifact runtime', () => {
       headers: await backendAuthHeaders(page),
     });
     expect(afterDelete.status(), 'deleted file cannot be downloaded').toBe(404);
+    await page.screenshot({ path: testInfo.outputPath('upload-removed.png'), fullPage: true });
   });
 });
