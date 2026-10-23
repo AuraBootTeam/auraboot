@@ -818,6 +818,10 @@ describe('ExecutionLogTraceBlock', () => {
   });
 
   it('links direct EventPolicy action evidence back to policy detail and designer pages', async () => {
+    let releaseActionLogs!: () => void;
+    const actionLogsReady = new Promise<void>((resolve) => {
+      releaseActionLogs = resolve;
+    });
     http.get.mockImplementation((endpoint: string, params?: Record<string, unknown>) => {
       if (endpoint === '/decision/logs/recent') {
         return Promise.resolve({
@@ -831,7 +835,7 @@ describe('ExecutionLogTraceBlock', () => {
         });
       }
       if (endpoint === '/event-policy/action-logs') {
-        return Promise.resolve({
+        return actionLogsReady.then(() => ({
           data: [
             {
               pid: 'event-policy-action-log-1',
@@ -850,7 +854,7 @@ describe('ExecutionLogTraceBlock', () => {
               },
             },
           ],
-        });
+        }));
       }
       return Promise.resolve({ data: {} });
     });
@@ -865,7 +869,11 @@ describe('ExecutionLogTraceBlock', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByTestId('elta-linked-action-evidence')).toHaveTextContent('R-1');
+    const evidence = await screen.findByTestId('elta-linked-action-evidence');
+    expect(evidence).toHaveTextContent('加载中...');
+    expect(evidence).not.toHaveTextContent('R-1');
+    releaseActionLogs();
+    await waitFor(() => expect(evidence).toHaveTextContent('R-1'));
     expect(screen.getByTestId('elta-empty')).toHaveTextContent('无匹配日志');
     expect(screen.getByTestId('elta-open-event-policy-detail')).toHaveAttribute(
       'href',
