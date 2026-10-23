@@ -62,6 +62,7 @@ public class LoadPhase implements CommandPhase {
 
         // Parse executionConfig
         ctx.setExecConfig(parseExecutionConfig(command));
+        com.auraboot.framework.meta.transaction.CommandTransactionIsolationPolicy.assertActive(ctx.getExecConfig());
 
         // A CREATE command never operates on an existing command target. Callers such as
         // automation legitimately carry the triggering record pid in the payload, but may also
