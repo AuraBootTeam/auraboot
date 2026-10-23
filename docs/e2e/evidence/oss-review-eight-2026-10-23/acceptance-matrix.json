@@ -1,0 +1,35 @@
+[
+  {
+    "id": "F1",
+    "feature": "Attachment",
+    "action": "Reject oversized ZIP before request",
+    "branch": "sad",
+    "expectation": "Inline 1MB error; no upload request",
+    "driver": "upload-attachment-artifact.spec.ts",
+    "screenshotId": "upload-rejection",
+    "status": "captured",
+    "screenshot": "screenshots/upload-rejection.png"
+  },
+  {
+    "id": "F2",
+    "feature": "Attachment",
+    "action": "Upload and open preview through sidebar",
+    "branch": "happy",
+    "expectation": "Filename and Download action; metadata and list contain PID",
+    "driver": "upload-attachment-artifact.spec.ts",
+    "screenshotId": "upload-preview-before-download",
+    "status": "captured",
+    "screenshot": "screenshots/upload-preview-before-download.png"
+  },
+  {
+    "id": "F3",
+    "feature": "Attachment",
+    "action": "Download bytes then remove attachment",
+    "branch": "happy",
+    "expectation": "Exact bytes; removed file GET returns 404",
+    "driver": "upload-attachment-artifact.spec.ts",
+    "screenshotId": "upload-removed",
+    "status": "captured",
+    "screenshot": "screenshots/upload-removed.png"
+  }
+]

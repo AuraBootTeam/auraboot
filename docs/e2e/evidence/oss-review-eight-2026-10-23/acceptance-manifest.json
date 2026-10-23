@@ -1,0 +1,159 @@
+{
+  "run": {
+    "id": "oss-review-eight-2026-10-23",
+    "target": "Eight reviewed OSS defects",
+    "sourceCommit": "1d79315dbababeefaae5f5478d7836dd2f3f367a",
+    "claim_level": "targeted-tested"
+  },
+  "groups": [
+    {
+      "id": "regressions",
+      "title": "Eight fixes and attachment journey",
+      "rows": [
+        {
+          "id": "R1",
+          "action": "Schedule reads enforce model, field and self row scope",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.integration.OssReviewRegressionIT.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "Schedule reads enforce model, field and self row scope",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "R2",
+          "action": "Member removal revokes signed sessions; inactive membership is rejected",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.integration.OssReviewRegressionIT.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "Member removal revokes signed sessions; inactive membership is rejected",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "R3",
+          "action": "Subscription and delivery recheck current record authority",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.integration.OssReviewRegressionIT.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "Subscription and delivery recheck current record authority",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "R4",
+          "action": "Batch query worker retains caller identity and tenant",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.integration.OssReviewRegressionIT.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "Batch query worker retains caller identity and tenant",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "R5",
+          "action": "Successful uploads appear in the current tenant file list",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.integration.OssReviewRegressionIT.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "Successful uploads appear in the current tenant file list",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "R6",
+          "action": "File metadata uses the canonical download URL and exact bytes",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.integration.OssReviewRegressionIT.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "File metadata uses the canonical download URL and exact bytes",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "R7",
+          "action": "Abandoned running executions require reconciliation and fence late completion",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "Abandoned running executions require reconciliation and fence late completion",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "R8",
+          "action": "Terminal turn metadata expires, is bounded, and releases accumulated text",
+          "surface": "pure-logic",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "recorded",
+          "evidence": [
+            "junit/TEST-com.auraboot.framework.conversation.turn.TurnRegistryTest.xml",
+            "exit:gradle",
+            "mutation-results.json"
+          ],
+          "assertion": "Terminal turn metadata expires, is bounded, and releases accumulated text",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "F1-F3",
+          "action": "Use sidebar, reject oversized upload, preview, download and delete attachment",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "playwright:upload-attachment-artifact.spec.ts::SmartUpload enforces constraints, downloads uploaded bytes, and deletes the file API record",
+            "exit:browser"
+          ],
+          "assertion": "No oversized POST; uploaded PID appears in list; canonical metadata URL; downloaded bytes match; deleted artifact returns 404",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="TenantMemberApplicationServiceImpl" tests="30" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:32:06.816Z" hostname="Mac" time="0.413">
+  <testcase name="offboardingImpactRejectsAnUnreadableTargetEvenWithTheAction()" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.278" />
+  <testcase name="batchRemoveMembers fails atomically before deleting when any member is invalid" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.003" />
+  <testcase name="offboardingPreflightCannotCrossTenantBoundaries()" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="approveMember approve sets ACTIVE" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="getMemberTeams throws when member missing" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="getMemberById throws when not found" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="offboardingImpactChecksTheRealModelMapWithTheMemberSubject()" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="updateMemberStatus dispatches to activate/deactivate/suspend" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.008" />
+  <testcase name="approveMember invalid action throws" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="member search preserves null usernames for email-only identities" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.013" />
+  <testcase name="searchMembers paginates and converts to response" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.013" />
+  <testcase name="removeMember succeeds for another user" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="approveMember reject persists rejection reason in extensions" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="getMemberById denies cross-tenant access" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="offboardingCandidatesRequireTheActualRemovalAction()" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="getMemberTeams returns teams for member's user" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="updateMemberStatus invalid status throws" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.001" />
+  <testcase name="resetMemberPasswordByAdmin retries until temporary password satisfies policy" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="offboardingLegacyAdministratorRetainsTenantWidePreflight()" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.001" />
+  <testcase name="sendPasswordResetEmail succeeds when user email present" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="removeMember refuses self-removal" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.001" />
+  <testcase name="searchMembers throws when no tenant context and no membership" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.001" />
+  <testcase name="getMemberById returns response when authorized" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.016" />
+  <testcase name="sendPasswordResetEmail throws when user has no email" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="offboardingImpactRejectsCallerWithoutTheRequestedAction()" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.001" />
+  <testcase name="leave member marks employee resigned by member pid when no employee id" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="batchRemoveMembers no-op for empty input" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="approveMember cross-tenant denied" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="offboardingCandidatesFilterRecordsOutsideTheReadScope()" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+  <testcase name="sendPasswordResetEmail throws when target user missing" classname="com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest" time="0.002" />
+</testsuite>
