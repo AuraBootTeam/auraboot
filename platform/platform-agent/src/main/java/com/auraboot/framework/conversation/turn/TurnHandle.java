@@ -35,19 +35,20 @@ public class TurnHandle {
     public Long getReplyToMessageId() { return replyToMessageId; }
     public Instant getStartedAt() { return startedAt; }
     public TurnStatus getStatus() { return status.get(); }
-    void finish(TurnStatus terminalStatus) {
+    synchronized void finish(TurnStatus terminalStatus) {
         if (terminalStatus == TurnStatus.ACTIVE) {
             throw new IllegalArgumentException("A terminal turn status is required");
         }
-        if (status.compareAndSet(TurnStatus.ACTIVE, terminalStatus)
-                && terminalStatus == TurnStatus.CANCELLED) {
-            cancelled.set(true);
+        if (status.compareAndSet(TurnStatus.ACTIVE, terminalStatus)) {
+            if (terminalStatus == TurnStatus.CANCELLED) cancelled.set(true);
+            cumulative.setLength(0);
+            cumulative.trimToSize();
         }
     }
     public AtomicBoolean getCancelled() { return cancelled; }
 
     public synchronized void appendCumulative(String chunk) {
-        cumulative.append(chunk);
+        if (status.get() == TurnStatus.ACTIVE) cumulative.append(chunk);
     }
 
     public synchronized String getCumulative() {

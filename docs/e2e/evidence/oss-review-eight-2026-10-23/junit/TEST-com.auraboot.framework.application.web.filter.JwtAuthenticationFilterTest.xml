@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" tests="29" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:32:04.135Z" hostname="Mac" time="1.479">
+  <testcase name="securityVersionMismatch_rejects()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="1.133" />
+  <testcase name="shouldNotFilter_optionsMethodSkips()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.011" />
+  <testcase name="validToken_setsAuthentication_andChainsForward()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.023" />
+  <testcase name="appearanceAssetsAreAnonymousButManagementAndSiblingPathsRequireJwt()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.004" />
+  <testcase name="validToken_putsTenantAndUserIntoMdc_andClearsAfter()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.007" />
+  <testcase name="onboardingStageCannotReachOrdinaryBusinessApi()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.006" />
+  <testcase name="sessionInvalid_rejects()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.02" />
+  <testcase name="unrelatedPublicHealthRequest_preservesItsAuthenticationBypass()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.019" />
+  <testcase name="shouldNotFilter_pluginPublicSubpathSkipsJwtAuth_butNonPublicDoesNot()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.007" />
+  <testcase name="languagePackRejectsMalformedCredentialsInsteadOfReturningAnonymousData()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.003" />
+  <testcase name="invalidJwt_returns401()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.016" />
+  <testcase name="sessionCheckThrows_failsClosed()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.005" />
+  <testcase name="rbacLookupFailure_doesNotPropagate()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.004" />
+  <testcase name="languagePacksAllowAnonymousRequestsButValidateSuppliedCredentials()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.006" />
+  <testcase name="shouldNotFilter_automationWebhookSkipsJwtAuth_butOtherAutomationRoutesDoNot()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.002" />
+  <testcase name="shouldNotFilter_goodsTicketMobileApiSkipsJwtAuth()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.002" />
+  <testcase name="anonymousI18nRemainsPublicWithoutInventingTenantContext()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.003" />
+  <testcase name="anonymousI18nRequests_remainPublicWithoutTenantContext()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.003" />
+  <testcase name="tokenForDeletedUser_returns401_notA500()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.003" />
+  <testcase name="partyTokenRevalidatesMembershipAndAddsOnlyPartyScopedRoles()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.006" />
+  <testcase name="invalidI18nCredentialsCannotFallBackToAnonymousSuccess()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.003" />
+  <testcase name="invalidI18nBearer_isRejectedBeforeDictionaryAccess()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.003" />
+  <testcase name="validI18nTokenBindsItsTenantBeforeLoadingTranslations()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.005" />
+  <testcase name="i18nWithCredentialsMustRunJwtValidation()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.002" />
+  <testcase name="expiredJwt_returns401()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.002" />
+  <testcase name="onboardingStage_reachesLegacyBindSchoolCompatibilityRoute()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.004" />
+  <testcase name="missingAuthorizationHeader_returns401AndDoesNotChain()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.004" />
+  <testcase name="authenticatedI18nRequest_exposesVerifiedTenantOnlyInsideTheChain()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.005" />
+  <testcase name="onboardingStage_reachesTenantInvitationAcceptance()" classname="com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest" time="0.004" />
+</testsuite>

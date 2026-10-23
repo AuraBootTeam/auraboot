@@ -49,13 +49,17 @@ public class DurableToolExecutionRecoveryService {
     @Value("${agent.tool-execution.recovery.batch-size:50}")
     private int batchSize = 50;
 
+    @Value("${agent.tool-execution.running-lease-ms:900000}")
+    private long runningLeaseMillis = 900000L;
+
     @Scheduled(cron = "${agent.tool-execution.recovery.cron:0 * * * * *}")
     public int processDue() {
         return processDue(batchSize);
     }
 
     int processDue(int limit) {
-        int processed = 0;
+        if (runningLeaseMillis <= 0) throw new IllegalStateException("Execution lease must be positive");
+        int processed = ledger.markAbandonedExecutions(System.currentTimeMillis() - runningLeaseMillis);
         for (DurableToolExecutionRecord record : ledger.findRecoverable(limit)) {
             if (recover(record)) {
                 processed++;

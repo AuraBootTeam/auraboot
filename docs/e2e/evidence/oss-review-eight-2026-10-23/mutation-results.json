@@ -1,0 +1,70 @@
+{
+  "exitCode": 1,
+  "failures": [
+    {
+      "class": "com.auraboot.framework.meta.controller.BatchQueryControllerTest",
+      "test": "workersReceiveIdentityAndEnvironmentAndKeepFailuresIsolated()",
+      "message": "java.lang.ClassCastException: class java.util.ImmutableCollections$Map1 cannot be cast to class com.auraboot.framework.meta.dto.PaginationResult (java.util.ImmutableCollections$Map1 is in module java.base of loader 'bootstrap'; com.auraboot.framework"
+    },
+    {
+      "class": "com.auraboot.framework.meta.service.impl.CriticalPathServiceTest",
+      "test": "deniedModelNeverLoadsRecords()",
+      "message": "org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <org.springframework.security.access.AccessDeniedException> but was: <java.lang.NullPointerException>"
+    },
+    {
+      "class": "com.auraboot.framework.meta.service.impl.CriticalPathServiceTest",
+      "test": "hiddenFieldNeverLoadsRecords()",
+      "message": "org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <org.springframework.security.access.AccessDeniedException> but was: <java.lang.NullPointerException>"
+    },
+    {
+      "class": "com.auraboot.framework.file.controller.FileUploadControllerTest",
+      "test": "getFile_ownerReceivesMetadataWithoutServerStoragePath()",
+      "message": "java.lang.AssertionError: JSON path \"$.data.url\" expected:</api/file/download/file-pid> but was:</download/null>"
+    },
+    {
+      "class": "TenantMemberApplicationServiceImpl",
+      "test": "removeMember succeeds for another user",
+      "message": "Wanted but not invoked:\nsessionManagementService.revokeAllSessions(\n    5L\n);\n-> at com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest.removeOk(TenantMemberApplicationServiceImplTest.java:440)\nActually, there were zero "
+    },
+    {
+      "class": "com.auraboot.framework.conversation.turn.TurnRegistryTest",
+      "test": "terminalRetentionIsBoundedAndNeverEvictsActiveTurns()",
+      "message": "java.lang.AssertionError: \nExpecting actual:\n  8L\nto be less than or equal to:\n  2L "
+    },
+    {
+      "class": "com.auraboot.framework.integration.OssReviewRegressionIT",
+      "test": "schedulesEnforceModelAndFieldPermissionBeforeReturningRealValues()",
+      "message": "java.lang.AssertionError: \nExpecting code to raise a throwable."
+    },
+    {
+      "class": "com.auraboot.framework.integration.OssReviewRegressionIT",
+      "test": "batchQueryUsesRealNamedQueryOnWorkerWithCallerTenant()",
+      "message": "java.lang.AssertionError: \nExpecting actual:\n  {\"error\"=\"Tenant context is required but not found\"}\nto be an instance of:\n  com.auraboot.framework.meta.dto.PaginationResult\nbut was instance of:\n  java.util.ImmutableCollections.Map1"
+    },
+    {
+      "class": "com.auraboot.framework.integration.OssReviewRegressionIT",
+      "test": "uploadedFileIsListedAndMetadataUrlDownloadsExactBytes()",
+      "message": "java.lang.AssertionError: \nExpecting ArrayList:\n  []\nto contain:\n  [\"01M5MEV7YWXQ3YPR2WHFSKZQQH\"]\nbut could not find the following element(s):\n  [\"01M5MEV7YWXQ3YPR2WHFSKZQQH\"]\n"
+    },
+    {
+      "class": "com.auraboot.framework.integration.OssReviewRegressionIT",
+      "test": "[1] batchRemoval=false",
+      "message": "org.opentest4j.AssertionFailedError: \nExpecting value to be false but was true"
+    },
+    {
+      "class": "com.auraboot.framework.integration.OssReviewRegressionIT",
+      "test": "[2] batchRemoval=true",
+      "message": "org.opentest4j.AssertionFailedError: \nExpecting value to be false but was true"
+    },
+    {
+      "class": "com.auraboot.framework.integration.OssReviewRegressionIT",
+      "test": "subscriptionAndDeliveryRecheckCurrentRecordAuthority()",
+      "message": "java.lang.AssertionError: \nExpecting code to raise a throwable."
+    },
+    {
+      "class": "com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT",
+      "test": "crashedWorkerIsFencedIntoReconciliationWithoutRepeatingItsExternalEffect()",
+      "message": "org.opentest4j.AssertionFailedError: \nexpected: COMPENSATION_REQUIRED\n but was: RUNNING"
+    }
+  ]
+}

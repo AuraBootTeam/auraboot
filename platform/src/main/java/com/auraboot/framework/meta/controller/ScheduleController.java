@@ -1,7 +1,6 @@
 package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
-import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CriticalPathService;
 import com.auraboot.framework.meta.service.impl.CriticalPathService.CriticalPathResult;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
@@ -19,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 public class ScheduleController {
 
     private final CriticalPathService criticalPathService;
-    private final MetaModelService metaModelService;
 
     /**
      * Compute critical path for a project's WBS structure.
@@ -38,13 +36,8 @@ public class ScheduleController {
             @RequestParam(defaultValue = "pm_wbs_duration_days") String durationField,
             @RequestParam(defaultValue = "pm_wbs_project_id") String projectIdField) {
 
-        String tableName = metaModelService.getTableName(modelCode);
-        if (tableName == null) {
-            return ApiResponse.error("Model not found: " + modelCode);
-        }
-
         CriticalPathResult result = criticalPathService.compute(
-                tableName, projectIdField, projectId, durationField, dependencyField
+                modelCode, projectIdField, projectId, durationField, dependencyField
         );
 
         if (result.error() != null) {

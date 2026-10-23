@@ -1,6 +1,11 @@
 package com.auraboot.framework.meta.service.impl;
 
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.QueryCondition;
+import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.application.tenant.MetaContext;
+import org.springframework.security.access.AccessDeniedException;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +30,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CriticalPathService {
 
-    private final DynamicDataMapper dynamicDataMapper;
+    private final DynamicDataService dynamicDataService;
+    private final PermissionFacade permissionFacade;
 
     /**
      * Compute critical path for a given model filtered by project ID.
      *
-     * @param tableName       dynamic table name (e.g. "mt_pm_wbs_node")
+     * @param modelCode       registered model code
      * @param projectIdField  field storing the project FK (e.g. "pm_wbs_project_id")
      * @param projectId       the project record ID to filter by
      * @param durationField   field storing task duration in days (e.g. "pm_wbs_duration_days")
@@ -38,36 +44,51 @@ public class CriticalPathService {
      * @return critical path result
      */
     public CriticalPathResult compute(
-            String tableName,
+            String modelCode,
             String projectIdField,
             String projectId,
             String durationField,
             String dependencyField) {
 
-        // These arrive from @RequestParam (ScheduleController) and are used as column
-        // identifiers — projectIdField flows into a WHERE clause, duration/dependency are
-        // row-key lookups. A value quote-escape does NOT protect an identifier position, so
-        // validate against the identifier whitelist before use (rejects boolean/expression
-        // injection such as "1=1 OR pm_wbs_project_id").
+        // Only registered, readable fields may shape the analysis. The model data service
+        // applies row scope, data domains and masking before any values enter the graph.
         SqlSafetyUtils.validateIdentifier(projectIdField, "critical-path projectIdField");
         SqlSafetyUtils.validateIdentifier(durationField, "critical-path durationField");
         SqlSafetyUtils.validateIdentifier(dependencyField, "critical-path dependencyField");
 
-        // 1. Fetch all WBS nodes for the project
-        String whereClause = projectId != null && !projectId.isEmpty()
-                ? projectIdField + " = '" + projectId.replace("'", "''") + "'"
-                : null;
-        List<Map<String, Object>> nodes = dynamicDataMapper.queryList(
-                tableName, null, whereClause, null, null, null
-        );
+        if (!permissionFacade.canAction(MetaContext.getCurrentMemberId(), modelCode, "read")) {
+            throw new AccessDeniedException("Model read permission is required for schedule analysis");
+        }
+        var fields = permissionFacade.getFieldPermissions(MetaContext.getCurrentMemberId(), modelCode);
+        if (fields == null || !fields.viewableFields().containsAll(
+                Set.of(projectIdField, durationField, dependencyField))) {
+            throw new AccessDeniedException("Schedule fields are not readable");
+        }
+        if (!StringUtils.hasText(projectId)) {
+            throw new IllegalArgumentException("projectId is required");
+        }
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        for (int page = 1; ; page++) {
+            var result = dynamicDataService.list(modelCode, DynamicQueryRequest.builder()
+                    .pageNum(page).pageSize(500)
+                    .sortFields(List.of(com.auraboot.framework.meta.dto.SortField.builder().fieldName("pid").build()))
+                    .conditions(List.of(QueryCondition.builder().fieldName(projectIdField)
+                            .operator(QueryCondition.Operator.EQ).value(projectId).build()))
+                    .build());
+            nodes.addAll(result.getRecords());
+            if (result.getRecords().isEmpty() || nodes.size() >= result.getTotal()) break;
+        }
 
-        if (nodes == null || nodes.isEmpty()) {
+        if (nodes.isEmpty()) {
             return CriticalPathResult.empty();
         }
 
         // 2. Build node map and adjacency
         Map<String, TaskNode> nodeMap = new LinkedHashMap<>();
         for (Map<String, Object> row : nodes) {
+            if (!row.containsKey(durationField) || !row.containsKey(dependencyField)) {
+                throw new AccessDeniedException("Schedule fields are not readable");
+            }
             String id = String.valueOf(row.get("id"));
             int duration = parseDuration(row.get(durationField));
             List<String> deps = parseDependencies(row.get(dependencyField));

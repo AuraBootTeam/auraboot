@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="com.auraboot.framework.file.controller.FileUploadControllerTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:32:05.618Z" hostname="Mac" time="1.065">
+  <testcase name="downloadFile_pdf_returnsInlineDispositionForBrowserPreview()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.783" />
+  <testcase name="endpoints_declare_separate_leastPrivilegeFileCapabilities()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.067" />
+  <testcase name="getFile_ownerReceivesMetadataWithoutServerStoragePath()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.061" />
+  <testcase name="downloadFile_legacyMojibakeChineseName_recoversUtf8Filename()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.016" />
+  <testcase name="downloadFile_linkedRecordIsReauthorizedOnEveryRequest()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.012" />
+  <testcase name="getFile_unrelatedUploaderCannotReadUnlinkedFileByPid()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.018" />
+  <testcase name="downloadFile_absentFromTenantDoesNotReadStorage()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.027" />
+  <testcase name="getFile_absentFromTenantReturnsSafeNotFoundWithoutReadingStorage()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.013" />
+  <testcase name="downloadFile_chineseName_usesUtf8FilenameStar()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.009" />
+  <testcase name="downloadFile_linkedRecordDenialStopsBeforeReadingBytes()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.01" />
+  <testcase name="downloadFile_svgImage_returnsInlineSvgResponse()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.011" />
+  <testcase name="createRelation_authorizesTheTargetRecordBeforeWriting()" classname="com.auraboot.framework.file.controller.FileUploadControllerTest" time="0.017" />
+</testsuite>

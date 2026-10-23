@@ -15,6 +15,8 @@ public interface DurableToolExecutionLedger {
 
     List<DurableToolExecutionRecord> findRecoverable(int limit);
 
+    int markAbandonedExecutions(long staleBeforeEpochMillis);
+
     boolean claimRetry(DurableToolExecutionRecord record);
 
     void markCompensationRequired(DurableToolExecutionRecord record, String reason);

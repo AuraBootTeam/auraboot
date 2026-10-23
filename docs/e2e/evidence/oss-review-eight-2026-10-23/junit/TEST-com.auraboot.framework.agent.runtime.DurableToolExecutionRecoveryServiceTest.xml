@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="DurableToolExecutionRecoveryService" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:31:56.358Z" hostname="Mac" time="1.614">
+  <testcase name="processDue marks non-retryable records as compensation-required without provider dispatch" classname="com.auraboot.framework.agent.runtime.DurableToolExecutionRecoveryServiceTest" time="1.353" />
+  <testcase name="processDue skips records when another worker already claimed the retry" classname="com.auraboot.framework.agent.runtime.DurableToolExecutionRecoveryServiceTest" time="0.003" />
+  <testcase name="processDue retries recoverable provider failures through the provider registry" classname="com.auraboot.framework.agent.runtime.DurableToolExecutionRecoveryServiceTest" time="0.165" />
+  <testcase name="missingSourceCannotDispatchOrBorrowSchedulerIdentity()" classname="com.auraboot.framework.agent.runtime.DurableToolExecutionRecoveryServiceTest" time="0.004" />
+</testsuite>

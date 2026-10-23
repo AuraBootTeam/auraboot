@@ -185,7 +185,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                 }
 
-                Long memberId = jwtUtil.extractMemberId(jwt);
+                Long memberId = positiveOrNull(jwtUtil.extractMemberId(jwt));
+                String sessionStage = jwtUtil.extractSessionStage(jwt);
+                if (tenantId != null && tenantId > 0 && !isRestrictedStage(sessionStage)) {
+                    TenantMember currentMember = tenantMemberService == null ? null
+                            : tenantMemberService.findByTenantIdAndUserId(tenantId, userDetails.getUserId());
+                    if (currentMember == null || (memberId != null && !memberId.equals(currentMember.getId()))
+                            || Boolean.TRUE.equals(currentMember.getDeletedFlag())
+                            || !"active".equalsIgnoreCase(currentMember.getStatus())) {
+                        reject(request, response, ApiResponse.errorWithContext(
+                                ResponseCode.Unauthorized, request.getRequestURI()));
+                        return;
+                    }
+                    memberId = currentMember.getId();
+                }
                 if (jwtUtil.extractImpersonation(jwt)) {
                     Long operatorUserId = jwtUtil.extractOperatorUserId(jwt);
                     User operator = operatorUserId == null ? null : userService.findByUserId(operatorUserId);
@@ -208,7 +221,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String executionScope = jwtUtil.extractExecutionScope(jwt);
                 Long actorPartyId = positiveOrNull(jwtUtil.extractActorPartyId(jwt));
                 Long partyMembershipId = positiveOrNull(jwtUtil.extractPartyMembershipId(jwt));
-                String sessionStage = jwtUtil.extractSessionStage(jwt);
                 long contextVersion = jwtUtil.extractContextVersion(jwt);
                 if (isRestrictedStage(sessionStage)
                         && !isAllowedForRestrictedStage(request.getRequestURI())) {
