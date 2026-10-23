@@ -8,6 +8,8 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 const expected = process.env.AURA_TEST_AGENT_STATE ?? 'installed';
 if (!['installed', 'not_installed'].includes(expected)) throw new Error('Invalid AURA_TEST_AGENT_STATE');
 const mode = expected === 'installed' ? 'FULL' : 'BASE';
+const providerMode = process.env.AURA_TEST_AGENT_PROVIDER_MODE;
+if (providerMode && providerMode !== 'stub') throw new Error('Unsupported AURA_TEST_AGENT_PROVIDER_MODE');
 test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
 
 async function login(page: Page, email = DEFAULT_TEST_ACCOUNT.email, password = DEFAULT_TEST_ACCOUNT.password) {
@@ -147,30 +149,33 @@ test.describe('optional application assembly', () => {
       await ai.click();
       await expect(page.getByTestId('ai-page-panel')).toBeVisible();
       await expect(page.getByTestId('ai-panel-input')).toBeEditable();
-      // This isolated bootstrap has no model credentials; prove the real UI request
-      // reaches the original installed endpoint and shows its configuration refusal.
-      for (const level of ['tenant', 'platform']) {
-        const configs = await page.request.get(`/api/llm-config?level=${level}`);
-        expect(configs.status()).toBe(200);
-        const body = await configs.json();
-        expect(String(body.code)).toBe('0');
-        expect(Array.isArray(body.data)).toBe(true);
-        expect(body.data.length).toBe(0);
+      if (providerMode === 'stub') {
+        // Explicit provider fixture: real UI/backend transport, deterministic local LLM.
+        // Disabled provider presets are retained; no real provider is enabled.
+        for (const level of ['tenant', 'platform']) {
+          const configs = await page.request.get(`/api/llm-config?level=${level}`);
+          expect(configs.status()).toBe(200);
+          const body = await configs.json();
+          expect(String(body.code)).toBe('0');
+          expect(Array.isArray(body.data)).toBe(true);
+          expect(body.data.filter((config: { enabled: boolean }) => config.enabled).length).toBe(0);
+        }
+        const instruction = 'Add a summary card without saving the current page';
+        const generated = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agent/nl-modeling/generate-page' && response.request().method() === 'POST');
+        await page.getByTestId('ai-panel-input').fill(instruction);
+        await page.getByTestId('ai-panel-send').click();
+        const response = await generated;
+        expect(response.request().postDataJSON().message).toBe(instruction);
+        expect(response.request().postDataJSON().systemPrompt.length).toBeGreaterThan(0);
+        expect(response.status()).toBe(200);
+        const result = await response.json();
+        expect(result.content).toBe('[stub response]');
+        await expect(page.getByTestId('ai-msg-user')).toHaveText(instruction);
+        await expect(page.getByTestId('ai-msg-assistant')).toHaveText(result.content);
+        await expect(page.getByTestId('ai-panel-input')).toBeEditable();
+        await expect(page.getByTestId('toolbar-save')).toBeDisabled();
+        await capture(page, info, 'WEB-FULL-DESIGNER-REQUEST');
       }
-      const instruction = 'Add a summary card without saving the current page';
-      const generated = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agent/nl-modeling/generate-page' && response.request().method() === 'POST');
-      await page.getByTestId('ai-panel-input').fill(instruction);
-      await page.getByTestId('ai-panel-send').click();
-      const response = await generated;
-      expect(response.request().postDataJSON().message).toBe(instruction);
-      expect(response.request().postDataJSON().systemPrompt.length).toBeGreaterThan(0);
-      expect(response.status()).toBe(400);
-      const result = await response.json();
-      expect(result.error).toBe('LLM provider not configured or returned no content');
-      await expect(page.getByTestId('ai-msg-user')).toHaveText(instruction);
-      await expect(page.getByTestId('ai-msg-assistant')).toHaveText(result.error);
-      await expect(page.getByTestId('ai-panel-input')).toBeEditable();
-      await capture(page, info, 'WEB-FULL-DESIGNER-REQUEST');
 
     } else {
       await expect(ai).toBeDisabled();
@@ -219,7 +224,10 @@ test.describe('optional application assembly', () => {
     await capture(page, info, `WEB-${mode}-ERROR`);
     await page.unroute('**/api/application/capabilities');
     await page.getByRole('button', { name: '重试', exact: true }).click();
-    if (expected === 'installed') await expect(page.getByRole('heading', { name: '模型服务', exact: true })).toBeVisible();
+    if (expected === 'installed') {
+      await expect(page.getByRole('heading', { name: '模型服务', exact: true })).toBeVisible();
+      await expect(page.getByText('暂无已配置的模型提供商', { exact: true })).toBeVisible();
+    }
     else await expect(page.getByTestId('agent-availability')).toHaveAttribute('data-state', 'not_installed');
     await capture(page, info, `WEB-${mode}-RECOVERED`);
   });

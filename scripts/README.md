@@ -374,3 +374,11 @@ The independent published-library consumer in [fixtures/agent-artifact-consumer]
 | `dev/plugin-assembly.mjs` | Shared plugin profile assembly decision: accept only verified v1 agent installation, omit declared optional AI resources from base profiles, and reject explicit/unknown required-module imports before any selected plugin writes. |
 
 | `application/verify-agent-im-history.mjs` | Real-backend retained mixed IM fixture: create under full, verify under base, then restore full against the same database. Checks member identities, nullable legacy availability, all prior human messages and a new persisted human message in each phase. Requires bootstrap credentials and a known owned-tenant agent ID for creation. |
+
+The targeted `web-admin/tests/e2e/platform/agent-assembly.spec.ts` suite uses the
+isolated bootstrap with no enabled tenant or platform LLM provider. Pin
+`AURA_TEST_AGENT_STATE=installed|not_installed` to the selected backend assembly.
+`AURA_TEST_AGENT_PROVIDER_MODE=stub` additionally verifies the designer send
+button against the original backend and its explicitly enabled local LLM stub;
+this is transport/assembly evidence, not live-provider or generated-DSL quality.
+The base run reports the full-only draft case as not applicable.
