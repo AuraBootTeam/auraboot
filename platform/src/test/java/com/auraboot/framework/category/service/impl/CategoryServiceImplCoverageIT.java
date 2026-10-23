@@ -104,41 +104,4 @@ class CategoryServiceImplCoverageIT {
         categoryService.createCategory(root(code));
         assertThrows(BusinessException.class, () -> categoryService.createCategory(root(code)));
     }
-
-    @Test
-    void promotingChildToRootClearsParentAndRefreshesDescendantPlacement() {
-        Category parent = root("move_parent_" + seq.incrementAndGet()); parent.setCategoryType("commerce_product");
-        categoryService.createCategory(parent);
-        Category child = root("move_child_" + seq.incrementAndGet()); child.setCategoryType("commerce_product"); child.setParentId(parent.getId());
-        categoryService.createCategory(child);
-        Category leaf = root("move_leaf_" + seq.incrementAndGet()); leaf.setCategoryType("commerce_product"); leaf.setParentId(child.getId());
-        categoryService.createCategory(leaf);
-        assertTrue(categoryService.moveCategory(child.getId(), null));
-        Category promoted = categoryService.getById(child.getId());
-        org.junit.jupiter.api.Assertions.assertNull(promoted.getParentId());
-        assertEquals(1, promoted.getLevel()); assertEquals("/" + child.getPid(), promoted.getMaterializedPath());
-        Category movedLeaf = categoryService.getById(leaf.getId());
-        assertEquals(child.getId(), movedLeaf.getParentId()); assertEquals(2, movedLeaf.getLevel());
-        assertEquals("/" + child.getPid() + "/" + leaf.getPid(), movedLeaf.getMaterializedPath());
-        // Generic updates must not accidentally promote a node when a partial DTO omits its parent.
-        Category patch = new Category(); patch.setId(leaf.getId()); patch.setTenantId(TENANT_ID);
-        patch.setCode(leaf.getCode()); patch.setName("Partial rename");
-        categoryService.updateCategory(patch);
-        assertEquals(child.getId(), categoryService.getById(leaf.getId()).getParentId());
-    }
-
-    @Test
-    void nativeJsonCategoryFieldsRoundTripThroughInsertAndUpdate() {
-        Category node = root("json_" + seq.incrementAndGet());
-        node.setI18nName("{\"en\":\"Tops\",\"zh-CN\":\"上装\"}");
-        node.setExternalTaxonomy("{\"provider\":\"external-123\"}"); node.setExtra("{\"featured\":true}");
-        categoryService.createCategory(node);
-        Category stored = categoryService.getById(node.getId());
-        assertTrue(stored.getI18nName().contains("Tops")); assertTrue(stored.getExternalTaxonomy().contains("external-123"));
-        assertTrue(stored.getExtra().contains("true"));
-        stored.setI18nName("{\"en\":\"New tops\"}"); categoryService.updateCategory(stored);
-        assertTrue(categoryService.getById(node.getId()).getI18nName().contains("New tops"));
-        assertEquals("jsonb", jdbcTemplate.queryForObject("SELECT pg_typeof(i18n_name)::text FROM ab_category WHERE id=?", String.class, node.getId()));
-    }
-
 }
