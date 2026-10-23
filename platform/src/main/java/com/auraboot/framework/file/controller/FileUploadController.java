@@ -7,7 +7,6 @@ import com.auraboot.framework.audit.entity.AdminEventLog;
 import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.BusinessException;
-import com.auraboot.framework.file.constant.StorageType;
 import com.auraboot.framework.file.dto.FileInfoRequestDTO;
 import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
@@ -314,7 +313,7 @@ private FileUploadResponseDTO buildUploadResponse(FileEntity fileEntity) {
     response.setUploadTime(com.auraboot.framework.common.util.DateUtil.toUtcLocalDateTime(fileEntity.getCreatedTime()));
     
     // 生成下载URL
-    String downloadUrl = getFileDownloadUrl(fileEntity);
+    String downloadUrl = fileService.getFileDownloadUrl(fileEntity.getPid());
     response.setUrl(downloadUrl);
     
     return response;
@@ -324,14 +323,4 @@ private FileUploadResponseDTO toDto(FileEntity fileEntity) {
     return buildUploadResponse(fileEntity);
 }
 
-/**
- * 获取文件下载URL
- */
-private String getFileDownloadUrl(FileEntity fileEntity) {
-    if (fileEntity.getStorageType() == StorageType.LOCAL) {
-        return "/download/" + fileEntity.getId();
-    } else {
-        return fileEntity.getCloudPath();
-    }
-}
 }

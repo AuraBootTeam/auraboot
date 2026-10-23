@@ -190,6 +190,26 @@ class DurableToolExecutionRecoveryIT {
         assertRejectedWithoutDispatch();
     }
 
+    @Test
+    void crashedWorkerIsFencedIntoReconciliationWithoutRepeatingItsExternalEffect() {
+        var request = request(tenant);
+        assertThat(ledger.claim(request).acquired()).isTrue();
+        ledger.markAbandonedExecutions(System.currentTimeMillis() - 900000);
+        assertThat(current().status()).isEqualTo(DurableToolExecutionStatus.RUNNING);
+        jdbc.update("UPDATE ab_idempotency_record SET outcome=jsonb_set(outcome, '{updatedAt}', '1') WHERE tenant_id=? AND client_request_id=?",
+                tenant, request.executionKey());
+        recovery.processDue();
+        assertThat(current().status()).isEqualTo(DurableToolExecutionStatus.COMPENSATION_REQUIRED);
+        assertThat(current().compensationReason()).contains("lease expired");
+        verifyNoInteractions(provider);
+        assertThatThrownBy(() -> ledger.complete(request, request.executionKey(), "{}"))
+                .isInstanceOf(IllegalStateException.class);
+        long fencedAt = current().updatedAt();
+        ledger.markAbandonedExecutions(System.currentTimeMillis() - 900000);
+        assertThat(current().updatedAt()).isEqualTo(fencedAt);
+        assertThat(current().request().input()).containsEntry("idempotencyKey", "external-" + run);
+    }
+
     private void assertRejectedWithoutDispatch() {
         recovery.processDue();
         verifyNoInteractions(provider);

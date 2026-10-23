@@ -1,52 +1,69 @@
 package com.auraboot.framework.conversation.turn;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Ticker;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * In-memory registry of AI turns. Single-node only — G1 accepts that cancel requests
- * arriving on the wrong node return 200 idempotent no-op (clustered Redis variant deferred).
- */
+/** Single-node active turns and bounded terminal metadata for idempotent cancellation. */
 @Component
 public class TurnRegistry {
+    private final ConcurrentHashMap<String, TurnHandle> active = new ConcurrentHashMap<>();
+    private final Cache<String, TurnHandle> terminal;
 
-    private final ConcurrentHashMap<String, TurnHandle> turns = new ConcurrentHashMap<>();
+    public TurnRegistry() { this(600000L, 1000L); }
 
-    public TurnHandle register(String turnId, Long conversationId, Long agentId, String agentName,
+    @Autowired
+    public TurnRegistry(@Value("${agent.turn.terminal-retention-ms:600000}") long retentionMillis,
+                        @Value("${agent.turn.terminal-max-size:1000}") long maxSize) {
+        this(retentionMillis, maxSize, Ticker.systemTicker());
+    }
+
+    TurnRegistry(long retentionMillis, long maxSize, Ticker ticker) {
+        if (retentionMillis <= 0 || maxSize <= 0) throw new IllegalArgumentException("Positive retention bounds required");
+        terminal = Caffeine.newBuilder().expireAfterWrite(Duration.ofMillis(retentionMillis))
+                .maximumSize(maxSize).ticker(ticker).build();
+    }
+
+    public synchronized TurnHandle register(String turnId, Long conversationId, Long agentId, String agentName,
                                 Long initiatorUserId, Long replyToMessageId) {
         TurnHandle h = new TurnHandle(turnId, conversationId, agentId, agentName, initiatorUserId, replyToMessageId);
-        turns.put(turnId, h);
+        terminal.invalidate(turnId);
+        active.put(turnId, h);
         return h;
     }
 
-    public Optional<TurnHandle> get(String turnId) {
-        return Optional.ofNullable(turns.get(turnId));
+    public synchronized Optional<TurnHandle> get(String turnId) {
+        TurnHandle h = active.get(turnId);
+        return Optional.ofNullable(h == null ? terminal.getIfPresent(turnId) : h);
     }
 
-    public void markCompleted(String turnId) {
-        TurnHandle h = turns.get(turnId);
-        if (h != null) h.finish(TurnStatus.COMPLETED);
-    }
+    public void markCompleted(String turnId) { finish(turnId, TurnStatus.COMPLETED); }
+    public void markFailed(String turnId) { finish(turnId, TurnStatus.FAILED); }
+    public void markCancelled(String turnId) { finish(turnId, TurnStatus.CANCELLED); }
 
-    public void markFailed(String turnId) {
-        TurnHandle h = turns.get(turnId);
-        if (h != null) h.finish(TurnStatus.FAILED);
-    }
-
-    public void markCancelled(String turnId) {
-        TurnHandle h = turns.get(turnId);
+    private synchronized void finish(String turnId, TurnStatus status) {
+        TurnHandle h = active.remove(turnId);
         if (h != null) {
-            h.finish(TurnStatus.CANCELLED);
+            h.finish(status);
+            terminal.put(turnId, h);
         }
     }
 
+    @Scheduled(fixedDelay = 60000)
+    public void cleanup() { terminal.cleanUp(); }
+
     public List<TurnHandle> getActiveByConversation(Long conversationId) {
-        return turns.values().stream()
+        return active.values().stream()
                 .filter(h -> h.getConversationId().equals(conversationId))
-                .filter(h -> h.getStatus() == TurnStatus.ACTIVE)
-                .toList();
+                .filter(h -> h.getStatus() == TurnStatus.ACTIVE).toList();
     }
 }

@@ -114,4 +114,27 @@ class TurnRegistryTest {
         assertThat(registry.getActiveByConversation(88L)).isEmpty();
     }
 
+
+    @Test void terminalRetentionIsBoundedAndNeverEvictsActiveTurns() {
+        var nanos = new java.util.concurrent.atomic.AtomicLong();
+        var registry = new TurnRegistry(1000, 2, nanos::get);
+        var active = registry.register("active", 88L, 1L, "A", 1L, null);
+        for (int i = 0; i < 8; i++) {
+            var handle = registry.register("terminal-" + i, 88L, 1L, "A", 1L, null);
+            handle.appendCumulative("sensitive generated text");
+            registry.markCompleted(handle.getTurnId());
+            handle.appendCumulative("late chunk");
+            assertThat(handle.getCumulative()).isEmpty();
+        }
+        registry.cleanup();
+        long retained = java.util.stream.IntStream.range(0, 8)
+                .filter(i -> registry.get("terminal-" + i).isPresent()).count();
+        assertThat(retained).isLessThanOrEqualTo(2);
+        nanos.set(java.time.Duration.ofSeconds(2).toNanos());
+        registry.cleanup();
+        assertThat(java.util.stream.IntStream.range(0, 8)
+                .filter(i -> registry.get("terminal-" + i).isPresent()).count()).isZero();
+        assertThat(registry.get("active")).contains(active);
+        assertThat(registry.getActiveByConversation(88L)).containsExactly(active);
+    }
 }

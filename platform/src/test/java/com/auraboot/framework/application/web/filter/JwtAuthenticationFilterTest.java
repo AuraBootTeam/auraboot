@@ -67,6 +67,12 @@ class JwtAuthenticationFilterTest {
         ReflectionTestUtils.setField(filter, "userRoleService", userRoleService);
         ReflectionTestUtils.setField(filter, "partyAuthorizationService", partyAuthorizationService);
         ReflectionTestUtils.setField(filter, "activeProfile", "");
+        when(tenantMemberService.findByTenantIdAndUserId(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong())).thenAnswer(inv -> {
+            var member = new com.auraboot.framework.tenant.dao.entity.TenantMember();
+            member.setId(inv.getArgument(0, Long.class) == 10L ? 99L : 55L);
+            member.setStatus("active");
+            return member;
+        });
         SecurityContextHolder.clearContext();
     }
 

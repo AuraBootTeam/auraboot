@@ -83,6 +83,25 @@ public class JdbcDurableToolExecutionLedger implements DurableToolExecutionLedge
     }
 
     @Override
+    @Transactional
+    public int markAbandonedExecutions(long staleBeforeEpochMillis) {
+        // A lost worker may have committed an external effect. Fence its completion and require
+        // reconciliation instead of automatically dispatching that effect a second time.
+        return jdbcTemplate.update("""
+                UPDATE ab_idempotency_record
+                   SET status = 'COMPENSATION_REQUIRED',
+                       outcome = outcome || jsonb_build_object(
+                           'status', 'COMPENSATION_REQUIRED',
+                           'compensationReason', 'Execution lease expired; external outcome requires reconciliation',
+                           'updatedAt', ?::bigint),
+                       expires_at = GREATEST(expires_at, NOW() + INTERVAL '24 hours')
+                 WHERE command_code LIKE ? AND status = 'RUNNING'
+                   AND COALESCE((outcome->>'updatedAt')::bigint,
+                       (EXTRACT(EPOCH FROM created_at) * 1000)::bigint) < ?
+                """, System.currentTimeMillis(), COMMAND_CODE_PREFIX + "%", staleBeforeEpochMillis);
+    }
+
+    @Override
     public List<DurableToolExecutionRecord> findRecoverable(int limit) {
         long now = System.currentTimeMillis();
         int effectiveLimit = limit <= 0 ? 50 : Math.min(limit, 500);
