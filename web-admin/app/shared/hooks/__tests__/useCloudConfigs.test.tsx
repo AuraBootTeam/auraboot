@@ -66,3 +66,19 @@ describe('cloud configuration save readback', () => {
     expect(result.current.showEditor).toBe(false);
   });
 });
+
+
+describe('cloud configuration read permission preflight', () => {
+  it('does not issue a protected read or duplicate error feedback while disabled', async () => {
+    const { result, rerender } = renderHook(({ enabled }: { enabled: boolean }) => useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: 'tenant', enabled }), { initialProps: { enabled: false } });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(http.get).not.toHaveBeenCalled();
+    expect(http.error).not.toHaveBeenCalled();
+    rerender({ enabled: true });
+    await waitFor(() => expect(http.get).toHaveBeenCalledOnce());
+    expect(http.get).toHaveBeenCalledWith('/api/llm-config', { level: 'tenant' });
+    rerender({ enabled: false });
+    await waitFor(() => expect(result.current.configs).toEqual([]));
+    expect(http.get).toHaveBeenCalledOnce();
+  });
+});

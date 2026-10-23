@@ -203,11 +203,15 @@ test.describe('optional application assembly', () => {
       const member = await context.newPage();
       await login(member, email);
       // An intentionally retained deep link must enforce permission after installation discovery.
+      const protectedReads: string[] = [];
+      member.on('request', request => { if (new URL(request.url()).pathname === '/api/llm-config') protectedReads.push(request.url()); });
       await member.goto('/aurabot/providers');
       await expectAssemblyToggle(member);
       await expect(member.getByTestId('add-provider-btn')).toHaveCount(0);
       if (expected === 'installed') {
         await expect(member.getByText('你没有管理模型服务的权限，请联系管理员。', { exact: true })).toBeVisible();
+        expect(protectedReads).toEqual([]);
+        await expect(member.getByText('Access forbidden', { exact: true })).toHaveCount(0);
         const response = await member.request.get('/api/llm-config?level=tenant');
         expect(response.status()).toBe(403);
       } else await expect(member.getByTestId('agent-availability')).toHaveAttribute('data-state', 'not_installed');
@@ -233,4 +237,51 @@ test.describe('optional application assembly', () => {
     else await expect(page.getByTestId('agent-availability')).toHaveAttribute('data-state', 'not_installed');
     await capture(page, info, `WEB-${mode}-RECOVERED`);
   });
+});
+
+
+test('provider names have one input and create/edit round trips preserve the latest display name', async ({ page }, info) => {
+  test.skip(expected !== 'installed', 'Provider configuration requires the installed AI module');
+  await login(page);
+  await page.getByRole('link', { name: 'LLM 供应商', exact: true }).click();
+  await page.getByTestId('add-provider-btn').click();
+  await page.getByTestId('picker-preset-openai').click();
+  await expect(page.getByTestId('field-displayName')).toHaveCount(1);
+  await capture(page, info, 'PROVIDER-PRESET');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByTestId('add-provider-btn').click();
+  await page.getByTestId('picker-preset-custom').click();
+  const name = `Quality ${randomUUID().slice(0, 8)}`;
+  const code = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  await expect(page.getByTestId('custom-display-name')).toHaveCount(1);
+  await expect(page.getByTestId('field-displayName')).toHaveCount(0);
+  await page.getByTestId('custom-display-name').fill(name);
+  await page.getByTestId('field-apiKey').fill('fixture-not-a-real-model-key');
+  await capture(page, info, 'PROVIDER-CUSTOM-CREATE');
+  const create = page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
+  await page.getByTestId('panel-save-btn').click();
+  const created = await create;
+  expect(created.status()).toBe(200);
+  expect(String((await created.json()).code)).toBe('0');
+  expect(created.request().postDataJSON()).toMatchObject({ providerCode: code, enabled: false });
+  const createdConfig = created.request().postDataJSON().config;
+  expect(typeof createdConfig === 'string' ? JSON.parse(createdConfig) : createdConfig).toMatchObject({ displayName: name });
+  await expect(page.getByTestId('provider-edit-panel')).toHaveCount(0);
+  await page.reload();
+  await page.getByTestId(`provider-edit-${code}`).click();
+  await expect(page.getByTestId('field-displayName')).toHaveCount(1);
+  const renamed = `${name} renamed`;
+  await page.getByTestId('field-displayName').fill(renamed);
+  const update = page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'POST');
+  await page.getByTestId('panel-save-btn').click();
+  const updated = await update;
+  expect(updated.status()).toBe(200);
+  expect(String((await updated.json()).code)).toBe('0');
+  expect(updated.request().postDataJSON()).toMatchObject({ providerCode: code, enabled: false });
+  await expect(page.getByTestId('provider-edit-panel')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId(`provider-card-${code}`)).toContainText(renamed);
+  await page.getByTestId(`provider-edit-${code}`).click();
+  await expect(page.getByTestId('field-displayName')).toHaveValue(renamed);
+  await capture(page, info, 'PROVIDER-CUSTOM');
 });

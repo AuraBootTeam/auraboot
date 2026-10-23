@@ -155,7 +155,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                                 .build(),
                         (a, b) -> a));
         Map<Long, Long> memberCountByConv = memberMapper
-                .countHumanMembersByConversationIds(tenantId, conversationIds).stream()
+                .countMembersByConversationIds(tenantId, conversationIds).stream()
                 .collect(Collectors.toMap(ConversationMemberCountRow::getConversationId,
                         ConversationMemberCountRow::getMemberCount, (a, b) -> a));
 
@@ -205,12 +205,12 @@ public class ImConversationServiceImpl implements ImConversationService {
         ImConversation conv = create(request, userId, tenantId);
         // Count the members that were actually just created rather than assuming the
         // creator is alone: a group created with memberIds/agentIds reported "1 member"
-        // no matter how many people were in it. Uses the same human-member definition
+        // no matter how many people were in it. Uses the same total-membership definition
         // listByUser uses, so the number does not change when the list refreshes.
         int memberCount = 1;
         if (conv.getId() != null) {
             memberCount = memberMapper
-                    .countHumanMembersByConversationIds(tenantId, List.of(conv.getId())).stream()
+                    .countMembersByConversationIds(tenantId, List.of(conv.getId())).stream()
                     .findFirst()
                     .map(row -> row.getMemberCount().intValue())
                     .orElse(1);
@@ -260,7 +260,8 @@ public class ImConversationServiceImpl implements ImConversationService {
                     .build();
         }
 
-        List<Long> members = memberMapper.findHumanMemberIds(conversationId, tenantId);
+        int memberCount = memberMapper.countMembersByConversationIds(tenantId, List.of(conversationId)).stream()
+                .findFirst().map(row -> row.getMemberCount().intValue()).orElse(0);
         return ConversationListItem.builder()
                 .conversationId(conv.getId())
                 .type(conv.getType())
@@ -275,7 +276,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .unreadCount(unread)
                 .pinned(membership != null ? membership.getPinned() : false)
                 .muted(membership != null ? membership.getMuted() : false)
-                .memberCount(members.size())
+                .memberCount(memberCount)
                 .announcement(parseAnnouncement(conv.getMetadata()))
                 .build();
     }

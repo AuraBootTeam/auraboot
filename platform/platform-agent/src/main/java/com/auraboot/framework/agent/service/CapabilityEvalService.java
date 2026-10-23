@@ -264,6 +264,7 @@ public class CapabilityEvalService {
                 continue;
             }
 
+            long selectionStartedAt = System.nanoTime();
             totalCases++; // only scoreable cases increment the denominator
 
             List<String> selectedTools;
@@ -294,6 +295,7 @@ public class CapabilityEvalService {
             if (llmError != null) {
                 caseResult.put("llmError", llmError);
             }
+            caseResult.put("selectionDurationMs", (System.nanoTime() - selectionStartedAt) / 1_000_000.0);
             caseResult.put("caseId", evalCase.getCaseId());
             caseResult.put("category", evalCase.getCategory());
             caseResult.put("taskDescription", evalCase.getTaskDescription());

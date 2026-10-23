@@ -224,7 +224,7 @@ class ImConversationServiceImplTest {
                                 .createdAt(Instant.now().minusSeconds(10)).build(),
                         ConversationLastMessageRow.builder().conversationId(2L).content("b").messageType("text")
                                 .createdAt(Instant.now()).build()));
-        when(memberMapper.countHumanMembersByConversationIds(TENANT_ID, List.of(1L, 2L)))
+        when(memberMapper.countMembersByConversationIds(TENANT_ID, List.of(1L, 2L)))
                 .thenReturn(List.of(
                         ConversationMemberCountRow.builder().conversationId(1L).memberCount(1L).build(),
                         ConversationMemberCountRow.builder().conversationId(2L).memberCount(1L).build()));
@@ -282,7 +282,8 @@ class ImConversationServiceImplTest {
         when(memberMapper.findMember(CONV_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
                 .thenReturn(mem);
         when(messageMapper.findBeforeSeq(eq(CONV_ID), anyLong(), anyLong(), anyInt())).thenReturn(List.of());
-        when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID)).thenReturn(List.of(USER_ID, OTHER_ID));
+        when(memberMapper.countMembersByConversationIds(TENANT_ID, List.of(CONV_ID))).thenReturn(
+                List.of(ConversationMemberCountRow.builder().conversationId(CONV_ID).memberCount(2L).build()));
 
         ConversationListItem item = service.getByIdAsListItem(CONV_ID, USER_ID, TENANT_ID);
         assertThat(item.getUnreadCount()).isEqualTo(3L);
@@ -819,7 +820,7 @@ class ImConversationServiceImplTest {
             return 1;
         }).when(conversationMapper).insert(any(ImConversation.class));
 
-        when(memberMapper.countHumanMembersByConversationIds(eq(TENANT_ID), eq(List.of(4242L))))
+        when(memberMapper.countMembersByConversationIds(eq(TENANT_ID), eq(List.of(4242L))))
                 .thenReturn(List.of(
                         ConversationMemberCountRow.builder().conversationId(4242L).memberCount(3L).build()));
 
