@@ -93,7 +93,10 @@ try {
     const identity = await me.json();
     assert.equal(identity.code, '0');
     assert.deepEqual(identity.data.permissions.roles, []);
-    assert.deepEqual(identity.data.permissions.permissionCodes, []);
+    // The bootstrap tenant_member baseline is implicit even with no assigned role.
+    // Pin its ordinary read-only codes; neither AI authority nor an admin wildcard is allowed.
+    assert.deepEqual([...identity.data.permissions.permissionCodes].sort(),
+      ['dashboard.saved_view.read', 'meta.model.read', 'notification.view', 'page.page.read', 'party.party.read']);
     const response = await request(endpoint, { headers: memberHeaders });
     result.status = response.status;
     result.cacheControl = response.headers.get('cache-control');
