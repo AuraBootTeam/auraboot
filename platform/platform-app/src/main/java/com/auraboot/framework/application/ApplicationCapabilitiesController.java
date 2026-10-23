@@ -43,7 +43,7 @@ public final class ApplicationCapabilitiesController {
     }
 
     public record ApplicationCapabilities(
-            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = "1") int schemaVersion,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, minimum = "1", maximum = "1") int schemaVersion,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) AgentCapability agent) { }
 
     public record AgentCapability(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) InstallationState state) { }

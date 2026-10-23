@@ -26,6 +26,31 @@ async function run(name, body) {
 function installation(body) {
   assert.deepEqual(body, { schemaVersion: 1, agent: { state: expectedState } });
 }
+async function businessSession(email, password) {
+  const login = await request(`${origin}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }) });
+  assert.equal(login.status, 200, 'Real login HTTP contract failed');
+  const session = await login.json();
+  assert.equal(session.code, '0', 'Real login was denied');
+  assert.ok(session.data?.jwt, 'Login did not issue a session');
+  const loginHeaders = { Authorization: `Bearer ${session.data.jwt}`, Accept: 'application/json' };
+  const spaces = await request(`${origin}/api/tenant-selection/my-spaces`, { headers: loginHeaders });
+  assert.equal(spaces.status, 200);
+  const memberships = await spaces.json();
+  assert.equal(memberships.code, '0');
+  const business = memberships.data.filter(space => space.spaceType === 'business');
+  assert.equal(business.length, 1, 'Suite requires the isolated single-business-tenant bootstrap fixture');
+  assert.equal(typeof business[0].tenantId, 'string', 'Keep public tenant identity lossless');
+  const selected = await request(`${origin}/api/tenant-selection/process`, { method: 'POST',
+    headers: { ...loginHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'select', tenantId: business[0].tenantId }) });
+  assert.equal(selected.status, 200);
+  const ready = await selected.json();
+  assert.equal(ready.code, '0');
+  assert.equal(ready.data.status, 'success');
+  assert.ok(ready.data.jwt, 'Space selection did not issue a tenant-scoped session');
+  return { Authorization: `Bearer ${ready.data.jwt}`, Accept: 'application/json' };
+}
 try {
   for (const [name, authorization] of [[names[0], null], [names[1], 'Bearer invalid-discovery-token']]) {
     await run(name, async result => {
@@ -36,13 +61,7 @@ try {
       assert.ok(!body.includes('schemaVersion') && !body.includes('not_installed') && !body.includes('"installed"'), 'Denial must not disclose installation facts');
     });
   }
-  const login = await request(`${origin}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: process.env.AURA_TEST_EMAIL, password: process.env.AURA_TEST_PASSWORD }) });
-  assert.equal(login.status, 200, 'Real login HTTP contract failed');
-  const session = await login.json();
-  assert.equal(session.code, '0', 'Real login was denied');
-  assert.ok(session.data?.jwt, 'Login did not issue a session');
-  const headers = { Authorization: `Bearer ${session.data.jwt}`, Accept: 'application/json' };
+  const headers = await businessSession(process.env.AURA_TEST_EMAIL, process.env.AURA_TEST_PASSWORD);
   for (const [name, suffix, extra] of [[names[2], '', {}], [names[3], '', { 'If-None-Match': '*' }],
     [names[4], '?agent=false&provider=missing&entitlement=false', {}]]) {
     await run(name, async result => {
@@ -68,13 +87,7 @@ try {
     const created = await provision.json();
     assert.equal(created.code, '0', 'Owned member fixture provisioning was denied');
     assert.deepEqual(created.data.assignedRoles, [], 'Fixture must not receive a default role');
-    const signedIn = await request(`${origin}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }) });
-    assert.equal(signedIn.status, 200);
-    const memberSession = await signedIn.json();
-    assert.equal(memberSession.code, '0');
-    assert.ok(memberSession.data?.jwt);
-    const memberHeaders = { Authorization: `Bearer ${memberSession.data.jwt}`, Accept: 'application/json' };
+    const memberHeaders = await businessSession(email, password);
     const me = await request(`${origin}/api/auth/me`, { headers: memberHeaders });
     assert.equal(me.status, 200);
     const identity = await me.json();

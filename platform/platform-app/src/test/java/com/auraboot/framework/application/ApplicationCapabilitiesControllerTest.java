@@ -1,12 +1,15 @@
 package com.auraboot.framework.application;
 
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import io.swagger.v3.core.converter.AnnotatedType;
+import io.swagger.v3.core.converter.ModelConverters;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Optional;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -47,5 +50,19 @@ class ApplicationCapabilitiesControllerTest {
     void endpointExplicitlyDeclaresItsAuthenticationOnlyBoundary() throws Exception {
         assertThat(ApplicationCapabilitiesController.class.getMethod("capabilities")
                 .getAnnotation(AuthenticatedAccess.class)).isNotNull();
+    }
+
+    @Test
+    void openApiVersionRemainsNumericAndInstallationFieldsAreRequired() {
+        var model = ModelConverters.getInstance().resolveAsResolvedSchema(
+                new AnnotatedType(ApplicationCapabilitiesController.ApplicationCapabilities.class));
+        io.swagger.v3.oas.models.media.Schema<?> capabilities = model.schema;
+        assertThat(capabilities.getRequired()).containsExactlyInAnyOrder("agent", "schemaVersion");
+        var version = capabilities.getProperties().get("schemaVersion");
+        assertThat(version.getType()).isEqualTo("integer");
+        assertThat(version.getEnum()).isNull();
+        assertThat(version.getMinimum()).isEqualTo(BigDecimal.ONE);
+        assertThat(version.getMaximum()).isEqualTo(BigDecimal.ONE);
+        assertThat(model.referencedSchemas.get("AgentCapability").getRequired()).containsExactly("state");
     }
 }
