@@ -147,6 +147,31 @@ test.describe('optional application assembly', () => {
       await ai.click();
       await expect(page.getByTestId('ai-page-panel')).toBeVisible();
       await expect(page.getByTestId('ai-panel-input')).toBeEditable();
+      // This isolated bootstrap has no model credentials; prove the real UI request
+      // reaches the original installed endpoint and shows its configuration refusal.
+      for (const level of ['tenant', 'platform']) {
+        const configs = await page.request.get(`/api/llm-config?level=${level}`);
+        expect(configs.status()).toBe(200);
+        const body = await configs.json();
+        expect(String(body.code)).toBe('0');
+        expect(Array.isArray(body.data)).toBe(true);
+        expect(body.data.length).toBe(0);
+      }
+      const instruction = 'Add a summary card without saving the current page';
+      const generated = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agent/nl-modeling/generate-page' && response.request().method() === 'POST');
+      await page.getByTestId('ai-panel-input').fill(instruction);
+      await page.getByTestId('ai-panel-send').click();
+      const response = await generated;
+      expect(response.request().postDataJSON().message).toBe(instruction);
+      expect(response.request().postDataJSON().systemPrompt.length).toBeGreaterThan(0);
+      expect(response.status()).toBe(400);
+      const result = await response.json();
+      expect(result.error).toBe('LLM provider not configured or returned no content');
+      await expect(page.getByTestId('ai-msg-user')).toHaveText(instruction);
+      await expect(page.getByTestId('ai-msg-assistant')).toHaveText(result.error);
+      await expect(page.getByTestId('ai-panel-input')).toBeEditable();
+      await capture(page, info, 'WEB-FULL-DESIGNER-REQUEST');
+
     } else {
       await expect(ai).toBeDisabled();
       await expect(page.getByTestId('ai-page-panel')).toHaveCount(0);
