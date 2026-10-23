@@ -6,7 +6,17 @@ import { ProfileProvider } from '@auraboot/runtime-kernel';
 import { adminProfile } from '~/framework/meta/profiles/admin';
 import { DetailPageContent, assertStrictDetailRefreshParent } from '../DetailPageContent';
 import { actionRegistry } from '../../../runtime/actions/ActionRegistry';
-const owned = vi.hoisted(() => ({ transport: vi.fn(), toast: vi.fn() }));
+const owned = vi.hoisted(() => {
+  let releaseFormButtons!: () => void;
+  const formButtonsReady = new Promise<void>((resolve) => {
+    releaseFormButtons = resolve;
+  });
+  return { transport: vi.fn(), toast: vi.fn(), formButtonsReady, releaseFormButtons };
+});
+vi.mock('~/framework/meta/rendering/blocks/FormButtonsBlockRenderer', async () => {
+  await owned.formButtonsReady;
+  return vi.importActual<any>('~/framework/meta/rendering/blocks/FormButtonsBlockRenderer');
+});
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: any[]) => owned.transport(...args),
 }));
@@ -142,14 +152,17 @@ describe('Actual Detail parent loader through FormButtons and registered flow', 
     expect(
       owned.transport.mock.calls.filter((call) => call[0] === '/api/example/parent'),
     ).toHaveLength(1);
-    fireEvent.click(screen.getByTestId('form-btn-save'));
+    // Parent data can arrive before the independently lazy-loaded action block.
+    expect(screen.queryByTestId('form-btn-save')).not.toBeInTheDocument();
+    owned.releaseFormButtons();
+    fireEvent.click(await screen.findByTestId('form-btn-save'));
     await waitFor(() =>
       expect(screen.getByTestId('record-inspector').querySelector('dd')).toHaveTextContent(/^2$/),
     );
     expect(
       owned.transport.mock.calls.filter((call) => call[0] === '/api/example/parent'),
     ).toHaveLength(2);
-    fireEvent.click(screen.getByTestId('form-btn-save'));
+    fireEvent.click(await screen.findByTestId('form-btn-save'));
     await waitFor(() =>
       expect(screen.getByTestId('record-inspector').querySelector('dd')).toHaveTextContent(/^3$/),
     );
