@@ -78,3 +78,10 @@ regexes = ['''security\.field-encryption\.key\s*=''']
 [[allowlists]]
 description = "BFF proxy log-redaction unit test: the dummy session token is built by repeating a literal 'test-session-token-' filler (no credential). Historical commits keep the long literal form."
 paths = ['''^web-admin/app/server/services/__tests__/BffProxyService\.test\.ts$''']
+
+[[allowlists]]
+description = "Verified SHA-256 of RecordReadAccess.java in the eight-defect mutation restoration evidence; not a credential."
+condition = "AND"
+paths = ['''^docs/e2e/evidence/oss-review-eight-2026-10-23/mutation-restored-sha256\.json$''']
+regexTarget = "secret"
+regexes = ['''^ca56e054c561d39554c83ad30a719e10d2126521e5775d4a577088bfde9c8144$''']
