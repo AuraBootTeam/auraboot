@@ -17,9 +17,9 @@ test('the established runtime catalog targets every current test source owner', 
       bindings.get(match[1]).add(task);
     }
   }
-  assert.equal(bindings.size, 45);
+  assert.equal(bindings.size, 57);
   const fingerprint = createHash('sha256').update([...bindings.keys()].sort().join('\n') + '\n').digest('hex');
-  assert.equal(fingerprint, '72afdb154a9a013dd53221292d82e861fae94420f0fa09109240e00ee89429f7');
+  assert.equal(fingerprint, '06d74a203d1023bac6cb776a9eddf34ef4ab98113c840cb6f907f6132062a3b3');
   const classes = [];
   const visit = (directory, task) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {

@@ -34,6 +34,11 @@ class DurableToolExecutionRecoveryServiceTest {
     @Mock private ToolProviderRegistry toolProviderRegistry;
     @Mock private ActionRecorder actionRecorder;
 
+    @Mock private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Mock private com.auraboot.framework.agent.service.ToolAclChecker acl;
+    private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+    private final com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory factory =
+            new com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory();
     private DurableToolExecutionRecoveryService service;
 
     @BeforeEach
@@ -41,8 +46,8 @@ class DurableToolExecutionRecoveryServiceTest {
         service = new DurableToolExecutionRecoveryService(
                 ledger,
                 toolProviderRegistry,
-                new ObjectMapper(),
-                actionRecorder);
+                mapper,
+                actionRecorder, jdbc, factory, acl);
     }
 
     @Test
@@ -57,18 +62,26 @@ class DurableToolExecutionRecoveryServiceTest {
                 .withRecovery(request, 1, 3, 0L, true, null);
         when(ledger.findRecoverable(50)).thenReturn(java.util.List.of(record));
         when(ledger.claimRetry(record)).thenReturn(true);
+        allowRecoveryContext();
         when(toolProviderRegistry.execute(eq(1L), eq("custom:close_ticket"), eq(request.input())))
-                .thenReturn(ProviderExecutionResult.builder()
+                .thenAnswer(invocation -> {
+                    assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(1L);
+                    assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.requireCurrent().actorUserId()).isEqualTo(91L);
+                    assertThat(com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current()).isPresent();
+                    return ProviderExecutionResult.builder()
                         .success(true)
                         .data(Map.of("success", true, "externalId", "T-100"))
                         .durationMs(12L)
-                        .build());
+                        .build();
+                });
 
         int processed = service.processDue();
 
         assertThat(processed).isEqualTo(1);
         verify(toolProviderRegistry).execute(eq(1L), eq("custom:close_ticket"), eq(request.input()));
         verify(ledger).complete(eq(request), eq(request.executionKey()), contains("\"externalId\":\"T-100\""));
+        assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current()).isEmpty();
+        assertThat(com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current()).isEmpty();
         verify(actionRecorder).recordProviderAction(
                 eq(1L), eq("run-1"), eq("custom:close_ticket"), any(), eq(request.input()), anyMap(), isNull(),
                 eq(Set.of(EffectClass.EXTERNAL_NETWORK, EffectClass.WRITE_PLATFORM_STATE)));
@@ -105,6 +118,35 @@ class DurableToolExecutionRecoveryServiceTest {
         assertThat(processed).isZero();
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
         verify(ledger, never()).complete(any(), anyString(), anyString());
+    }
+
+    private void allowRecoveryContext() {
+        var principal = new com.auraboot.framework.agent.identity.ExecutionPrincipal(
+                1L, 91L, 92L, "actor", "agent", 93L, "employee",
+                com.auraboot.framework.agent.identity.Initiator.human(11L, 12L, "web"),
+                com.auraboot.framework.agent.identity.DelegationGrant.employeeAutonomous(),
+                "agent", "release", "deployment", "release-hash", "web",
+                com.auraboot.framework.agent.identity.ExecutionPrincipal.Type.DIGITAL_EMPLOYEE, Set.of(7L));
+        var envelope = factory.compile(new com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory.CompileRequest(
+                "turn", principal, "web", "profile", "session", 9L, "ACP_RUN", Set.of(),
+                java.util.List.of(), Map.of(), "en", "UTC", java.time.Instant.now()));
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenAnswer(invocation -> java.util.List.of(Map.of(
+                "run_status", "failed", "context_envelope", mapper.writeValueAsString(envelope),
+                "context_envelope_hash", envelope.envelopeHash(), "actor_user_id", 91L, "actor_member_id", 92L)));
+        when(acl.check(1L, "profile", "web", "interactive", "custom:close_ticket"))
+                .thenReturn(com.auraboot.framework.agent.service.ToolAclChecker.Decision.builder().allowed(true).build());
+    }
+
+    @Test
+    void missingSourceCannotDispatchOrBorrowSchedulerIdentity() {
+        var request = request(Map.of("idempotencyKey", "key"));
+        var record = DurableToolExecutionRecord.failed(request.executionKey(), "{}", Map.of(), "timeout")
+                .withRecovery(request, 1, 3, 0L, true, null);
+        when(ledger.findRecoverable(50)).thenReturn(java.util.List.of(record));
+        when(ledger.claimRetry(record)).thenReturn(true);
+        assertThat(service.processDue()).isEqualTo(1);
+        verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
+        verify(ledger).markCompensationRequired(eq(record), contains("Recovery context rejected"));
     }
 
     private DurableToolExecutionRequest request(Map<String, Object> input) {

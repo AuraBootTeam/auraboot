@@ -66,6 +66,7 @@ test.describe('optional application assembly', () => {
     await login(page);
     await expectAssemblyToggle(page);
     await page.getByRole('link', { name: '模型管理', exact: true }).click();
+    await page.getByRole('textbox', { name: '搜索...', exact: true }).fill('org_department');
     await expect(page.getByRole('link', { name: 'org_department', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '新建模型', exact: true })).toBeEnabled();
     const aiLink = page.getByRole('link', { name: 'LLM 供应商', exact: true });
@@ -97,6 +98,7 @@ test.describe('optional application assembly', () => {
     await login(page);
     await expectAssemblyToggle(page);
     await page.getByRole('link', { name: '模型管理', exact: true }).click();
+    await page.getByRole('textbox', { name: '搜索...', exact: true }).fill('org_department');
     await expect(page.getByRole('link', { name: 'org_department', exact: true })).toBeVisible();
     const discovery = await holdRediscovery(page);
     try {

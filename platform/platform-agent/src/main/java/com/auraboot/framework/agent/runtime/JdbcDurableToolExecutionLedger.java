@@ -117,11 +117,19 @@ public class JdbcDurableToolExecutionLedger implements DurableToolExecutionLedge
                  WHERE tenant_id = ?
                    AND client_request_id = ?
                    AND status = 'FAILED'
+                   AND expires_at > NOW()
+                   AND outcome = ?::jsonb
+                   AND COALESCE((outcome->>'retryable')::boolean, false) = true
+                   AND COALESCE((outcome->>'attemptCount')::int, 0)
+                       < COALESCE((outcome->>'maxAttempts')::int, 3)
+                   AND COALESCE((outcome->>'nextRetryAt')::bigint, 0) <= ?
                 """,
                 serialize(retrying),
                 String.valueOf(EXPIRY_SECONDS),
                 record.request().tenantId(),
-                record.executionKey());
+                record.executionKey(),
+                serialize(record),
+                System.currentTimeMillis());
         return updated == 1;
     }
 
@@ -167,6 +175,12 @@ public class JdbcDurableToolExecutionLedger implements DurableToolExecutionLedge
         if (request == null || request.tenantId() == null) {
             throw new IllegalArgumentException("tenantId is required for durable tool execution");
         }
+        String allowedStates = switch (record.status()) {
+            case SUCCEEDED, FAILED -> "'RUNNING'";
+            case COMPENSATION_REQUIRED -> "'RUNNING', 'FAILED'";
+            case COMPENSATED -> "'COMPENSATION_REQUIRED'";
+            default -> throw new IllegalArgumentException("A terminal execution state is required");
+        };
         int updated = jdbcTemplate.update("""
                 UPDATE ab_idempotency_record
                    SET outcome = ?::jsonb,
@@ -174,14 +188,22 @@ public class JdbcDurableToolExecutionLedger implements DurableToolExecutionLedge
                        expires_at = GREATEST(expires_at, NOW() + (? || ' seconds')::interval)
                  WHERE tenant_id = ?
                    AND client_request_id = ?
-                """,
+                   AND status IN (%s)
+                """.formatted(allowedStates),
                 serialize(record),
                 record.status().name(),
                 String.valueOf(EXPIRY_SECONDS),
                 request.tenantId(),
                 executionKey);
         if (updated == 0) {
-            throw new IllegalStateException("Durable tool execution record missing for key " + executionKey);
+            DurableToolExecutionRecord existing = loadRecord(request.tenantId(), executionKey);
+            if (existing.status() == record.status()
+                    || existing.status() == DurableToolExecutionStatus.SUCCEEDED
+                    || existing.status() == DurableToolExecutionStatus.COMPENSATED) {
+                return;
+            }
+            throw new IllegalStateException("Durable tool execution transition rejected: "
+                    + existing.status() + " -> " + record.status());
         }
     }
 
