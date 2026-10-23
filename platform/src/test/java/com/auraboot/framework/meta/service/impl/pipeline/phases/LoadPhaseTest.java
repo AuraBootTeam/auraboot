@@ -28,6 +28,25 @@ class LoadPhaseTest {
     private final LoadPhase phase = new LoadPhase(metadata, commandService, new ObjectMapper());
 
     @Test
+    void lateSerializablePolicyCannotBypassTheTransactionAdmission() {
+        stubCommand("qa:confirm", "{\"handlerParams\":{\"transactionIsolation\":\"serializable\"}}");
+        var context=context("qa:confirm",request("order-a"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->phase.execute(context))
+                .isInstanceOf(IllegalStateException.class).hasMessage("COMMAND_SERIALIZABLE_TRANSACTION_REQUIRED");
+    }
+
+    @Test
+    void serializablePolicyCanLoadInsideTheVerifiedExistingTransaction() {
+        stubCommand("qa:confirm", "{\"handlerParams\":{\"transactionIsolation\":\"serializable\"}}");
+        var context=context("qa:confirm",request("order-a"));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(
+                org.springframework.transaction.TransactionDefinition.ISOLATION_SERIALIZABLE);
+        try { phase.execute(context);assertThat(context.getCommand().getCode()).isEqualTo("qa:confirm"); }
+        finally { org.springframework.transaction.support.TransactionSynchronizationManager.clear(); }
+    }
+
+    @Test
     void releaseCommand_executesWithoutTenantLocalCommandRows() {
         CommandExecuteRequest request = request("source-record-pid");
         CommandPipelineContext context = context("xy:create_gp", request);

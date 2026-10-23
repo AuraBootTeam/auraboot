@@ -30,12 +30,17 @@ public final class RegisteredSourcePollingAdapter {
     private final Map<ScopeKey, Integer> cursors = new HashMap<>();
     private ThreadPoolTaskScheduler scheduler;
     private final AtomicBoolean polling = new AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicReference<Long> progressAt = new java.util.concurrent.atomic.AtomicReference<>();
     private Settings settings;
     private List<SourceBindingTypes.Binding> scope = List.of();
     private ScheduledFuture<?> scheduled;
 
     public enum Status { DISABLED, BUSY, SUCCEEDED, FAILED }
-    public record Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType) {}
+    public record Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType, SourceFailureCode code) {
+        public Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType) {
+            this(tenantId, bindingCode, sourcePid, exceptionType, SourceFailureCode.PROCESSING_FAILED);
+        }
+    }
     public record TickResult(Status status, int bindingsAttempted, int processedPlans, long matchedSources, int selectedSources, List<Failure> failures) {
         public TickResult {
             failures = List.copyOf(failures);
@@ -127,10 +132,10 @@ public final class RegisteredSourcePollingAdapter {
                     matched += result.matchedSources();
                     selected += result.selectedSources();
                     for (var failure : result.failures()) {
-                        failures.add(new Failure(binding.tenantId(), binding.code(), failure.sourcePid(), failure.exceptionType()));
+                        failures.add(new Failure(binding.tenantId(), binding.code(), failure.sourcePid(), failure.exceptionType(), failure.code()));
                     }
                 } catch (RuntimeException failure) {
-                    failures.add(new Failure(binding.tenantId(), binding.code(), null, failure.getClass().getName()));
+                    failures.add(new Failure(binding.tenantId(), binding.code(), null, failure.getClass().getName(), SourceFailureCode.classify(failure)));
                 }
             }
             return new TickResult(failures.isEmpty() ? Status.SUCCEEDED : Status.FAILED,
@@ -140,8 +145,18 @@ public final class RegisteredSourcePollingAdapter {
         }
     }
 
+    boolean shouldReportProgress(TickResult result,long nowNanos) {
+        if(result.status()!=Status.SUCCEEDED || result.selectedSources()==0)return false;
+        Long previous=progressAt.get();
+        if(previous!=null && nowNanos-previous<java.util.concurrent.TimeUnit.MINUTES.toNanos(1))return false;
+        return progressAt.compareAndSet(previous,nowNanos);
+    }
+
     void poll() {
         TickResult result = tick();
+        if(shouldReportProgress(result,System.nanoTime()))
+            LOG.info("Registered notification source progress: bindings={}, selected={}, matched={}, plans={}",
+                    result.bindingsAttempted(),result.selectedSources(),result.matchedSources(),result.processedPlans());
         if (result.status() == Status.FAILED) {
             LOG.error("Registered notification source poll failed: {}", result.failures());
             throw new IllegalStateException("NOTIFICATION_SOURCE_POLL_FAILED");
