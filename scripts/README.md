@@ -372,3 +372,5 @@ The independent published-library consumer in [fixtures/agent-artifact-consumer]
 
 | `application/verify-agent-cli-mcp.mjs` | Real-backend CLI/MCP acceptance: explicit CLI root, origin, installed/not_installed expectation, fresh evidence directory and bootstrap credentials. Runs status plus stdio and Streamable HTTP profile discovery and ordinary model queries; base also refuses direct AI actions. Registered/executed counts must match. |
 | `dev/plugin-assembly.mjs` | Shared plugin profile assembly decision: accept only verified v1 agent installation, omit declared optional AI resources from base profiles, and reject explicit/unknown required-module imports before any selected plugin writes. |
+
+| `application/verify-agent-im-history.mjs` | Real-backend retained mixed IM fixture: create under full, verify under base, then restore full against the same database. Checks member identities, nullable legacy availability, all prior human messages and a new persisted human message in each phase. Requires bootstrap credentials and a known owned-tenant agent ID for creation. |

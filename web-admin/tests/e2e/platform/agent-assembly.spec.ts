@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
-import { test, expect, type Page, type TestInfo } from '@playwright/test';
+import { test, expect, type Page, type TestInfo, type Route } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
@@ -31,6 +31,31 @@ async function capture(page: Page, info: TestInfo, id: string) {
 async function expectAssemblyToggle(page: Page) {
   if (expected === 'installed') await expect(page.getByTestId('ai-panel-toggle')).toBeEnabled();
   else await expect(page.getByTestId('ai-panel-toggle')).toHaveAttribute('title', '此应用未安装 AI 模块');
+}
+
+async function holdRediscovery(page: Page) {
+  let release!: () => void;
+  let intercepted!: () => void;
+  let completed!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const received = new Promise<void>(resolve => { intercepted = resolve; });
+  const handled = new Promise<void>(resolve => { completed = resolve; });
+  let failure: unknown;
+  const handler = async (route: Route) => {
+    intercepted();
+    try { await pending; await route.continue(); }
+    catch (error) { failure = error; }
+    finally { completed(); }
+  };
+  await page.route('**/api/application/capabilities', handler, { times: 1 });
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await received;
+  return { release: async () => {
+    release();
+    await handled;
+    await page.unroute('**/api/application/capabilities', handler);
+    if (failure) throw failure;
+  } };
 }
 
 test.describe('optional application assembly', () => {
@@ -64,19 +89,40 @@ test.describe('optional application assembly', () => {
   });
 
   test('pending discovery preserves ordinary navigation and refuses AI activation', async ({ page }, info) => {
-    let release!: () => void;
-    const pending = new Promise<void>(resolve => { release = resolve; });
-    await page.route('**/api/application/capabilities', async route => { await pending; await route.continue(); });
+    await login(page);
+    await expectAssemblyToggle(page);
+    await page.getByRole('link', { name: '模型管理', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'org_department', exact: true })).toBeVisible();
+    const discovery = await holdRediscovery(page);
     try {
-      await login(page);
       await expect(page.getByTestId('ai-panel-toggle')).toBeDisabled();
       await expect(page.getByTestId('ai-panel-toggle')).toHaveAttribute('title', '正在检查 AI 可用性…');
-      await page.getByRole('link', { name: '模型管理', exact: true }).click();
-      await expect(page.getByRole('link', { name: 'org_department', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: '新建模型', exact: true })).toBeEnabled();
       await capture(page, info, `WEB-${mode}-LOADING`);
-      release();
-      await expectAssemblyToggle(page);
-    } finally { release(); await page.unroute('**/api/application/capabilities'); }
+    } finally { await discovery.release(); }
+    await expectAssemblyToggle(page);
+  });
+
+  test('same-session rediscovery preserves an unsaved provider draft', async ({ page }, info) => {
+    test.skip(expected !== 'installed', 'Provider drafts require the installed AI module');
+    await login(page);
+    await expectAssemblyToggle(page);
+    await page.getByRole('link', { name: 'LLM 供应商', exact: true }).click();
+    await page.getByTestId('add-provider-btn').click();
+    await page.getByTestId('picker-preset-custom').click();
+    const draft = page.getByTestId('custom-display-name');
+    await draft.fill('Unsaved assembly verification draft');
+    const discovery = await holdRediscovery(page);
+    try {
+      await expect(page.getByTestId('agent-rediscovery')).toBeVisible();
+      await expect(draft).toHaveValue('Unsaved assembly verification draft');
+      await expect(draft.locator('xpath=ancestor::*[@inert]')).toHaveCount(1);
+      await capture(page, info, 'WEB-FULL-REDISCOVERY');
+    } finally { await discovery.release(); }
+    await expect(page.getByTestId('agent-rediscovery')).toHaveCount(0);
+    await expect(draft).toHaveValue('Unsaved assembly verification draft');
+    await expect(draft).toBeEditable();
+    await capture(page, info, 'WEB-FULL-DRAFT-RESTORED');
   });
 
   test('failed discovery stays unknown and retries against the real backend', async ({ page }, info) => {
