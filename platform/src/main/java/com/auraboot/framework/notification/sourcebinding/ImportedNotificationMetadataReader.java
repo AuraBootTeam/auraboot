@@ -51,12 +51,17 @@ final class ImportedNotificationMetadataReader implements SourceBindingReader {
             tracking.addAll(rows("SELECT to_jsonb(r)::text FROM ab_plugin_resource r WHERE tenant_id=? AND resource_type='model_field_binding' AND resource_pid=? ORDER BY id FOR SHARE", tenant, binding.path("pid").textValue()));
         }
         for (var owner : approval.owners()) plugins.add(one(rows("SELECT to_jsonb(p)::text FROM ab_plugin p WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE FOR SHARE", tenant, owner.pid())));
-        // Whole raw rows retain unknown security extensions; only non-semantic audit timestamps are excluded.
-        return SourceBindingCanonical.tree(Map.of("model", withoutTimes(model), "bindings", bindings.stream().map(this::withoutTimes).toList(), "fields", fields.stream().map(this::withoutTimes).toList(), "tracking", tracking.stream().map(this::withoutTimes).toList(), "plugins", plugins.stream().map(this::withoutTimes).toList()));
+        // Raw security facts remain approved. Import execution identity and activation time are operational history, not shape.
+        return SourceBindingCanonical.tree(Map.of("model", withoutTimes(model), "bindings", bindings.stream().map(this::withoutTimes).toList(), "fields", fields.stream().map(this::withoutTimes).toList(), "tracking", tracking.stream().map(row -> withoutOperationalField(row, "import_id")).toList(), "plugins", plugins.stream().map(row -> withoutOperationalField(row, "enabled_at")).toList()));
     }
     private JsonNode withoutTimes(JsonNode row) {
         var result = row.deepCopy();
         if (result instanceof com.fasterxml.jackson.databind.node.ObjectNode o) o.remove(List.of("created_at", "updated_at", "imported_at", "last_synced_at", "user_modified_at"));
+        return result;
+    }
+    private JsonNode withoutOperationalField(JsonNode row, String field) {
+        var result = withoutTimes(row);
+        if (result instanceof com.fasterxml.jackson.databind.node.ObjectNode object) object.remove(field);
         return result;
     }
     private void allowed(SourceBindingTypes.Binding b, String model) {
