@@ -6,6 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [cliRoot, origin, expected, output] = process.argv.slice(2);
 assert.ok(['installed', 'not_installed'].includes(expected));
+assert.ok(process.env.AURA_TEST_EMAIL && process.env.AURA_TEST_PASSWORD, 'Explicit bootstrap credentials required');
 mkdirSync(output, { recursive: false });
 const require = createRequire(path.join(cliRoot, 'package.json'));
 const { Client } = await import(pathToFileURL(require.resolve('@modelcontextprotocol/sdk/client/index.js')));
@@ -40,7 +41,7 @@ assert.equal(statusJson.services.find(service => service.name === 'Agent (ACP)')
 if (expected === 'not_installed') assert.equal(statusJson.services.find(service => service.name === 'Agent (ACP)').status, 'not_installed');
 cases.push({ id: 'CLI-STATUS', verdict: 'pass', services: statusJson.services });
 if (expected === 'not_installed') {
-  for (const [id, args] of [['CLI-ASK-ABSENT', ['--agent-mode', 'ask', 'assembly verification']], ['CLI-DISPATCH-ABSENT', ['--agent-mode', 'run', 'retained-task']]]) {
+  for (const [id, args] of [['CLI-ASK-ABSENT', ['--agent-mode', 'ask', 'assembly verification']], ['CLI-DISPATCH-ABSENT', ['--agent-mode', 'run', 'dispatch', 'retained-task']]]) {
     const result = cli(args);
     assert.equal(result.status, 1, id);
     assert.match(result.stderr, /Agent module is not installed/);

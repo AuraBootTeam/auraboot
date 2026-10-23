@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { test, expect, type Page, type TestInfo, type Route } from '@playwright/test';
 import { LoginPage } from '../../pages/LoginPage';
@@ -9,12 +10,12 @@ if (!['installed', 'not_installed'].includes(expected)) throw new Error('Invalid
 const mode = expected === 'installed' ? 'FULL' : 'BASE';
 test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
 
-async function login(page: Page) {
+async function login(page: Page, email = DEFAULT_TEST_ACCOUNT.email, password = DEFAULT_TEST_ACCOUNT.password) {
   const form = new LoginPage(page);
   await form.goto();
   await form.waitForFormReady();
-  await form.emailInput.fill(DEFAULT_TEST_ACCOUNT.email);
-  await form.passwordInput.fill(DEFAULT_TEST_ACCOUNT.password);
+  await form.emailInput.fill(email);
+  await form.passwordInput.fill(password);
   await form.submitButton.click();
   await expect(page.getByTestId('ai-panel-toggle')).toBeVisible();
   const response = await page.request.get('/api/application/capabilities');
@@ -123,6 +124,58 @@ test.describe('optional application assembly', () => {
     await expect(draft).toHaveValue('Unsaved assembly verification draft');
     await expect(draft).toBeEditable();
     await capture(page, info, 'WEB-FULL-DRAFT-RESTORED');
+  });
+
+  test('ordinary designer and its AI action follow the same verified assembly', async ({ page }, info) => {
+    await login(page);
+    await expectAssemblyToggle(page);
+    await page.getByRole('link', { name: '页面配置', exact: true }).click();
+    await page.getByTestId('list-search-input').fill('auth_appearance');
+    await page.getByTestId('list-search-input').press('Enter');
+    const row = page.getByRole('row').filter({ hasText: 'auth_appearance' });
+    await expect(row).toHaveCount(1);
+    await row.getByText('旧页面设计器', { exact: true }).click();
+    await expect(page.getByTestId('toolbar-save')).toBeVisible();
+    const ai = page.getByTestId('toolbar-ai-generate');
+    if (expected === 'installed') {
+      await expect(ai).toBeEnabled();
+      await ai.click();
+      await expect(page.getByTestId('ai-page-panel')).toBeVisible();
+      await expect(page.getByTestId('ai-panel-input')).toBeEditable();
+    } else {
+      await expect(ai).toBeDisabled();
+      await expect(page.getByTestId('ai-page-panel')).toHaveCount(0);
+    }
+    await capture(page, info, `WEB-DESIGNER-${mode}`);
+  });
+
+  test('installation discovery does not grant a restricted member AI permission', async ({ page, browser, baseURL }, info) => {
+    await login(page);
+    const email = `agent-boundary-${randomUUID()}@e2e.local`;
+    const created = await page.request.post('/api/admin/users', {
+      headers: { Origin: baseURL! },
+      data: { email, displayName: 'Assembly restricted member', initialPassword: DEFAULT_TEST_ACCOUNT.password,
+        roleCodes: [], roleAssignmentMode: 'NONE', sendInviteEmail: false },
+    });
+    expect(created.status()).toBe(200);
+    const account = await created.json();
+    expect(String(account.code)).toBe('0');
+    expect(account.data.assignedRoles).toEqual([]);
+    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
+    try {
+      const member = await context.newPage();
+      await login(member, email);
+      // An intentionally retained deep link must enforce permission after installation discovery.
+      await member.goto('/aurabot/providers');
+      await expectAssemblyToggle(member);
+      await expect(member.getByTestId('add-provider-btn')).toHaveCount(0);
+      if (expected === 'installed') {
+        await expect(member.getByText('Access denied: LLM provider settings require permission ai_center', { exact: true })).toBeVisible();
+        const response = await member.request.get('/api/llm-config?level=tenant');
+        expect(response.status()).toBe(403);
+      } else await expect(member.getByTestId('agent-availability')).toHaveAttribute('data-state', 'not_installed');
+      await capture(member, info, `WEB-PERMISSION-${mode}`);
+    } finally { await context.close(); }
   });
 
   test('failed discovery stays unknown and retries against the real backend', async ({ page }, info) => {

@@ -5,6 +5,7 @@ import path from 'node:path';
 const [origin, phase, fixtureFile, output] = process.argv.slice(2);
 assert.ok(origin && fixtureFile && output, 'Usage: <origin> create|base|restored <fixture.json> <fresh-output>');
 assert.ok(['create', 'base', 'restored'].includes(phase));
+assert.ok(process.env.AURA_TEST_EMAIL && process.env.AURA_TEST_PASSWORD, 'Explicit bootstrap credentials required');
 mkdirSync(output, { recursive: false });
 async function request(endpoint, token, body) {
   const response = await fetch(new URL(endpoint, origin), { method: body ? 'POST' : 'GET', signal: AbortSignal.timeout(15000),
