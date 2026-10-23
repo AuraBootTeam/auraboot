@@ -3,6 +3,7 @@ package com.auraboot.framework.behavior.controller;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
+import com.auraboot.framework.auth.service.UnifiedUserDetailsService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
@@ -22,7 +23,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -57,7 +57,7 @@ class BehaviorCollectControllerIT {
     private JwtUtil jwtUtil;
 
     @MockitoBean
-    private UserDetailsService userDetailsService;
+    private UnifiedUserDetailsService userDetailsService;
     @MockitoBean
     private UserService userService;
     @MockitoBean
@@ -152,7 +152,7 @@ class BehaviorCollectControllerIT {
         user.setPid(USER_PID);
         user.setUserName(USERNAME);
         user.setSecurityVersion(0);
-        when(userDetailsService.loadUserByUsername(USER_PID)).thenReturn(userDetails);
+        when(userDetailsService.loadUserByPid(USER_PID)).thenReturn(userDetails);
         when(userService.findByPid(USER_PID)).thenReturn(user);
         when(sessionManagementService.isSessionValid(anyString())).thenReturn(true);
     }
@@ -171,7 +171,7 @@ class BehaviorCollectControllerIT {
     void authenticatedCollect_persistsResolvedTenantAndUser() {
         ResponseEntity<String> resp = postCollect(body("auth-e-1", "page_view", "auth-anon-1"));
 
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getStatusCode()).as("collect response: %s", resp.getBody()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).contains("\"accepted\":1");
         assertThat(jdbc.queryForObject(
                 "SELECT tenant_id FROM ab_behavior_event WHERE event_id='auth-e-1'",
@@ -190,7 +190,7 @@ class BehaviorCollectControllerIT {
         ResponseEntity<String> first = postCollect(body("auth-dup-1", "page_view", "auth-anon-dup"));
         ResponseEntity<String> second = postCollect(body("auth-dup-1", "page_view", "auth-anon-dup"));
 
-        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(first.getStatusCode()).as("collect response: %s", first.getBody()).isEqualTo(HttpStatus.OK);
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(first.getBody()).contains("\"accepted\":1");
         assertThat(second.getBody()).contains("\"accepted\":1");
@@ -202,7 +202,7 @@ class BehaviorCollectControllerIT {
     void authenticatedCollect_malformedQuarantinedWithUser() {
         ResponseEntity<String> resp = postCollect("{\"events\":[{\"schemaVersion\":\"1\",\"eventName\":\"page_view\",\"anonId\":\"auth-bad\"}]}");
 
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getStatusCode()).as("collect response: %s", resp.getBody()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).contains("\"accepted\":1");
         assertThat(jdbc.queryForObject(
                 "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND anon_id='auth-bad'",

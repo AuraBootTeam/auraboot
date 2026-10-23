@@ -765,7 +765,7 @@ class AgentRuntimeArchitectureTest {
                 .exists();
         assertThat(text)
                 .contains("private final AgentChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;")
-                .contains("toolRuntimeAdapterFactory.callbacks(this, contextBlocks)")
+                .contains("toolRuntimeAdapterFactory.callbacks(this, contextBlocks, scopedQueryAllowlist)")
                 .doesNotContain(
                         "agentChatToolLoopCallbacks(",
                         "new ChatTurnRuntime.ChatToolLoopCallbacks()");

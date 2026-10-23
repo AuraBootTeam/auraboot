@@ -23,7 +23,7 @@ public class ToolMetadataRegistry {
             throw new IllegalArgumentException("Tool definition is required");
         }
         String toolName = firstNonBlank(definition.getToolCode(), definition.getToolName(), definition.getSourceCode());
-        ToolEffectType effectType = inferEffectType(toolName, definition.getToolType());
+        ToolEffectType effectType = inferEffectType(toolName, definition.getToolType(), definition.getSourceCode());
         ToolMetadataTrustLevel effectiveTrust = trustLevel != null ? trustLevel : ToolMetadataTrustLevel.INFERRED;
         boolean external = effectType == ToolEffectType.EXTERNAL_ACTION;
         ApprovalRequirement approval = inferApprovalRequirement(
@@ -55,7 +55,7 @@ public class ToolMetadataRegistry {
         if (definition == null) {
             throw new IllegalArgumentException("Agent tool definition is required");
         }
-        ToolEffectType effectType = inferEffectType(definition.getName(), definition.getToolType());
+        ToolEffectType effectType = inferEffectType(definition.getName(), definition.getToolType(), definition.getSourceCode());
         ToolMetadataTrustLevel effectiveTrust = trustLevel != null ? trustLevel : ToolMetadataTrustLevel.INFERRED;
         boolean external = effectType == ToolEffectType.EXTERNAL_ACTION;
         ApprovalRequirement approval = inferApprovalRequirement(
@@ -83,7 +83,7 @@ public class ToolMetadataRegistry {
                 .build();
     }
 
-    private ToolEffectType inferEffectType(String toolName, String toolType) {
+    private ToolEffectType inferEffectType(String toolName, String toolType, String sourceCode) {
         String name = lower(toolName);
         String type = lower(toolType);
         // This platform primitive only returns proposed fields. Business writes
@@ -107,6 +107,13 @@ public class ToolMetadataRegistry {
             return ToolEffectType.INTERNAL_WRITE;
         }
         if (startsWithAny(name, "mcp:", "mcp_", "api:", "api_")) return ToolEffectType.EXTERNAL_ACTION;
+        // Built-in routing retains its canonical provider code after wire-name sanitization.
+        // The wire name alone cannot turn a command or an unknown built-in into a query.
+        if ("built_in".equals(type)) {
+            String source = lower(sourceCode);
+            if (startsWithAny(source, "mcp:", "api:")) return ToolEffectType.EXTERNAL_ACTION;
+            if (startsWithAny(source, "nq:", "list:", "get:")) return ToolEffectType.INTERNAL_READ;
+        }
         if (type.isBlank() && startsWithAny(name, "nq:", "nq_", "list:", "list_", "get:", "get_")) {
             return ToolEffectType.INTERNAL_READ;
         }
