@@ -67,10 +67,26 @@ const modelContainerFields: PropertySchema<string>[] = [
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
+const formPresentationFields: PropertySchema<string>[] = [
+  ...modelContainerFields,
+  ...[
+    ['width', 'Form width', ['comfortable', 'wide', 'full']],
+    ['surface', 'Section surface', ['card', 'plain']],
+    ['density', 'Field density', ['comfortable', 'compact']],
+    ['actions', 'Action bar', ['sticky', 'inline', 'fixed']],
+    ['guidance', 'Guidance placement', ['none', 'aside']],
+  ].map(([key, label, values]) => ({
+    key: `extension.formPresentation.${key}`, label: label as string, type: 'select' as const,
+    options: (values as string[]).map(value => ({ label: value, value })),
+  })),
+  { key: 'extension.formPresentation.columns', label: 'Form columns', type: 'number', min: 1, max: 3 },
+];
+
 const formSectionFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'props.description', label: 'Description', type: 'text' },
   { key: 'props.collapsible', label: 'Collapsible', type: 'boolean' },
+  { key: 'props.defaultCollapsed', label: 'Default collapsed', type: 'boolean' },
   { key: 'props.visibleWhen', label: 'Visible when JSON', type: 'json' },
   { key: 'layout.columns', label: 'Columns', type: 'number' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
@@ -1078,7 +1094,7 @@ const gerberViewerFields: PropertySchema<string>[] = [
 export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry {
   const registry = new InspectorSchemaRegistry(defaultFields);
   registry.registerAll({
-    form: modelContainerFields,
+    form: formPresentationFields,
     'form-section': formSectionFields,
     detail: modelContainerFields,
     'detail-section': formSectionFields,

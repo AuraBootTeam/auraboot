@@ -1551,6 +1551,12 @@ describe('Inspector schema registry', () => {
       'title',
       'dataSource.model',
       'layout.span',
+      'extension.formPresentation.width',
+      'extension.formPresentation.surface',
+      'extension.formPresentation.density',
+      'extension.formPresentation.actions',
+      'extension.formPresentation.guidance',
+      'extension.formPresentation.columns',
     ]);
     expect(listSchema.map((field) => field.key)).toContain('dataSource.model');
     expect(listSchema.map((field) => field.key)).toContain('props.selectionMode');

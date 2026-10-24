@@ -392,6 +392,13 @@ export interface CrudTemplateConfig {
   enableImport: boolean;
   listColumns?: string[];
   formFields?: string[];
+  formPresentation?: import('~/framework/meta/rendering/pages/formPage/formPresentation').FormPresentation;
+  formGroups?: Array<{
+    title: string;
+    fields: string[];
+    collapsible?: boolean;
+    defaultCollapsed?: boolean;
+  }>;
   detailFields?: string[];
 }
 
