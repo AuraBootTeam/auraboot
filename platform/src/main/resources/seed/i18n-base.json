@@ -6446,5 +6446,15 @@
     "key": "workbench.inbox.queueAcknowledgementsDescription",
     "zh-CN": "打开准确版本的公告，阅读后确认已知悉。",
     "en-US": "Open the exact announcement version and acknowledge after reading."
+  },
+  {
+    "key": "export.artifact_unavailable",
+    "zh-CN": "导出文件不可用或已过期，请重新导出。",
+    "en-US": "The export file is unavailable or expired. Create a new export."
+  },
+  {
+    "key": "export.artifact_integrity",
+    "zh-CN": "导出文件校验失败，下载已拒绝，请重新导出。",
+    "en-US": "Export file integrity verification failed. Download was denied; create a new export."
   }
 ]

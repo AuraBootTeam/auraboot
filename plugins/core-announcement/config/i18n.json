@@ -327,5 +327,243 @@
     "en-US": "This version exceeds the configured statistics capacity. Contact an administrator.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.title",
+    "zh-CN": "公告标题",
+    "en-US": "Announcement title",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.version",
+    "zh-CN": "版本号",
+    "en-US": "Version",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.published",
+    "zh-CN": "发布时间",
+    "en-US": "Published at",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.recipient",
+    "zh-CN": "接收者",
+    "en-US": "Recipient",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.departments",
+    "zh-CN": "发布时部门",
+    "en-US": "Departments at publication",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.roles",
+    "zh-CN": "匹配角色",
+    "en-US": "Matched roles",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.readState",
+    "zh-CN": "阅读状态",
+    "en-US": "Read status",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.firstRead",
+    "zh-CN": "首次阅读时间",
+    "en-US": "First read at",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackRequired",
+    "zh-CN": "要求知悉",
+    "en-US": "Acknowledgement required",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackDeadline",
+    "zh-CN": "知悉截止时间",
+    "en-US": "Acknowledgement deadline",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackState",
+    "zh-CN": "知悉状态",
+    "en-US": "Acknowledgement status",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackAt",
+    "zh-CN": "确认时间",
+    "en-US": "Acknowledged at",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.late",
+    "zh-CN": "逾期确认",
+    "en-US": "Late acknowledgement",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.membership",
+    "zh-CN": "快照时成员资格",
+    "en-US": "Membership at capture",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.notification",
+    "zh-CN": "发布站内通知状态",
+    "en-US": "Publication notification status",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.yes",
+    "zh-CN": "是",
+    "en-US": "Yes",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.no",
+    "zh-CN": "否",
+    "en-US": "No",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.none",
+    "zh-CN": "无",
+    "en-US": "None",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.hidden",
+    "zh-CN": "未获展示授权",
+    "en-US": "Not authorized for display",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.unknown",
+    "zh-CN": "历史未知",
+    "en-US": "Historical value unknown",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_applicable",
+    "zh-CN": "不适用",
+    "en-US": "Not applicable",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_yet",
+    "zh-CN": "尚未发生",
+    "en-US": "Not yet",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.unread",
+    "zh-CN": "未读",
+    "en-US": "Unread",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.read",
+    "zh-CN": "已读",
+    "en-US": "Read",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.read_after_migration",
+    "zh-CN": "迁移后已读",
+    "en-US": "Read after migration",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_required",
+    "zh-CN": "无需确认",
+    "en-US": "Not required",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.pending_ack",
+    "zh-CN": "待确认",
+    "en-US": "Pending acknowledgement",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.completed",
+    "zh-CN": "已完成",
+    "en-US": "Completed",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.active",
+    "zh-CN": "有效",
+    "en-US": "Active",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.inactive",
+    "zh-CN": "已失效",
+    "en-US": "Inactive",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_generated",
+    "zh-CN": "未生成通知",
+    "en-US": "Notification not generated",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.queued",
+    "zh-CN": "待发送",
+    "en-US": "Queued",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.failed",
+    "zh-CN": "发送失败",
+    "en-US": "Failed",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.canceled",
+    "zh-CN": "已取消",
+    "en-US": "Canceled",
+    "source": "import",
+    "refType": "message"
   }
 ]

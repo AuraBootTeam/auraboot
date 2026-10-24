@@ -81,6 +81,13 @@ public interface AnnouncementStatisticsMapper {
         """)
     List<String> page(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("size") int size,@Param("offset") int offset);
 
+    @Select("""
+        SELECT view_payload::text AS view_payload,organization_snapshot::text AS organization_snapshot,display_proof::text AS display_proof
+        FROM ab_announcement_statistics_row
+        WHERE tenant_id=#{tenant} AND snapshot_pid=#{pid} AND matches_filters=TRUE ORDER BY user_pid LIMIT #{size} OFFSET #{offset}
+        """)
+    List<Map<String,Object>> exportPage(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("size") int size,@Param("offset") int offset);
+
     @Delete("DELETE FROM ab_announcement_statistics_snapshot WHERE retained_until<=clock_timestamp()")
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine="true")
     int deleteExpired();

@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service;
 import com.auraboot.framework.meta.dto.ExportResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Objects;
+import java.nio.file.Path;
 
 /** Host business adapters supply immutable data and current authorization to the shared export lifecycle. */
 public interface DomainExportSource {
@@ -21,6 +22,7 @@ public interface DomainExportSource {
     }
     Prepared prepare(String reference);
     void authorize(Prepared prepared);
+    void authorizeForOwner(Prepared prepared,Owner owner);
     boolean visible(Prepared prepared);
-    ExportResult generate(Prepared prepared,Owner owner,AsyncTaskExecutor.ProgressCallback progress);
+    ExportResult generate(Prepared prepared,Owner owner,Path output,AsyncTaskExecutor.ProgressCallback progress);
 }
