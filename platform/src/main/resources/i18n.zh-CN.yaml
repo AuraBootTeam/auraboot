@@ -3007,3 +3007,8 @@ im.sender.user: "用户"
 im.sender.system: "系统"
 im.agent.type.reactive: "按需响应"
 im.agent.type.proactive: "主动履职"
+
+im.agent.welcome: "我是{name}，{role}。@我开始协作。"
+im.agent.role.employee: "AI 员工"
+im.agent.role.assistant: "AI 助手"
+im.agent.replyFailed: "AI 回复未能完成，请重试或联系管理员。"
