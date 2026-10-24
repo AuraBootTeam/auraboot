@@ -42,4 +42,11 @@ public class ApprovalSubmissionAccessorImpl implements ApprovalSubmissionAccesso
         return binding.isPresent() && sources().stream().filter(source->source.businessType().equals(binding.get().businessRef().type()))
             .anyMatch(source->source.canStart(tenant,actor,submissionId));
     }
+    public Optional<ApprovalContract.BusinessPreview> preview(long tenant,long actor,String submissionId) {
+        if(!Objects.equals(MetaContext.getCurrentTenantId(),tenant) || !Objects.equals(MetaContext.getCurrentUserId(),actor))
+            throw new SecurityException("Approval preview requires the trusted tenant and actor");
+        var results=sources().stream().map(source->source.preview(tenant,actor,submissionId)).flatMap(Optional::stream).toList();
+        if(results.size()>1) throw new IllegalStateException("Approval preview has multiple business owners");
+        return results.stream().findFirst();
+    }
 }

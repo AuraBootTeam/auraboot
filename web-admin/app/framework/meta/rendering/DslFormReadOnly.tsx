@@ -13,9 +13,11 @@ export interface DslFormReadOnlyOptions {
   record: Record<string, any>;
   excludeFields?: string[];
   asideBlockIds?: string[];
+  /** An authorized frozen projection must not fetch live model metadata. */
+  fieldMetadata?: any[];
 }
 
-export function DslFormReadOnly({ form, record, excludeFields = [], asideBlockIds = [] }: DslFormReadOnlyOptions & { form: UseDslFormReturn }) {
+export function DslFormReadOnly({ form, record, excludeFields = [], asideBlockIds = [], fieldMetadata }: DslFormReadOnlyOptions & { form: UseDslFormReturn }) {
   const { t, locale } = useI18n();
   const { timezone } = useTimezone();
   const { hasPermission } = useAuth();
@@ -26,13 +28,14 @@ export function DslFormReadOnly({ form, record, excludeFields = [], asideBlockId
   useEffect(() => {
     let current = true;
     setMetadata(null); setError(false);
+    if (fieldMetadata) { setMetadata(fieldMetadata); return () => { current = false; }; }
     fetchResult<any[]>(`/api/dynamic/${model}/field-meta`, { method: 'get', token }).then(result => {
       if (!current) return;
       if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data)) { setError(true); return; }
       setMetadata(result.data);
     }).catch(() => { if (current) setError(true); });
     return () => { current = false; };
-  }, [model, token]);
+  }, [model, token, fieldMetadata]);
   const sections = useMemo(() => (form.schema?.blocks || []).filter((block: any) =>
     block.blockType === 'form-section' && (!block.permissionCode || hasPermission(block.permissionCode)) &&
     evaluateDetailVisibleWhen(block.visibleWhen, record)

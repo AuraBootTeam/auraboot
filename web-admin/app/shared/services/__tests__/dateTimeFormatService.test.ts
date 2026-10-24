@@ -54,6 +54,11 @@ describe('formatInTimezone', () => {
 
 
 describe('business timestamp classification', () => {
+  it.each(['date', 'datetime', 'time'])('treats %s as a semantic alias instead of a date template', (alias) => {
+    expect(resolveTemporalFormat('datetime', { datetime: 'DD/MM/YYYY HH:mm' }, alias)).toBe('DD/MM/YYYY HH:mm');
+    expect(formatInTimezone('2026-06-03T03:08:00Z', resolveTemporalFormat('datetime', undefined, alias), 'Asia/Shanghai'))
+      .toBe('2026-06-03 11:08:00');
+  });
   it('retains the business date for timestamp values whose field name ends in time', () => {
     const value = '2026-08-12T00:00:00Z';
     const type = resolveTemporalType('mes_report_time', undefined, value);

@@ -10,8 +10,9 @@ public final class ApprovalContract {
     public static final String START="approval.start.v1";
     public static final String STATUS="approval.status.v1";
     public static final String WITHDRAW="approval.withdraw.v1";
+    public static final String VIEWER="approval.viewer.v1";
     public static final String TERMINAL_EVENT="workflow.approval.terminal.v1";
-    public static final Set<String> OPERATIONS=Set.of(READINESS,START,STATUS,WITHDRAW);
+    public static final Set<String> OPERATIONS=Set.of(READINESS,START,STATUS,WITHDRAW,VIEWER);
     public static final Set<String> TERMINAL_STATES=Set.of("approved","rejected","withdrawn","failed");
 
     public record BusinessRef(String type,String recordPid,String versionPid) {
@@ -34,6 +35,14 @@ public final class ApprovalContract {
             text(submissionId);text(idempotencyKey);Objects.requireNonNull(businessRef);text(snapshotRef);digest(snapshotHash);
             text(snapshotSchema);Objects.requireNonNull(definition);Objects.requireNonNull(strictPolicy);
             text(applicantUserPid);text(businessCaption);Objects.requireNonNull(acceptedAt);
+        }
+    }
+    /** An owner-authored read-only DSL projection of the immutable submitted version. */
+    public record BusinessPreview(String submissionId,String snapshotHash,Map<String,Object> schema,
+            Map<String,Object> values,List<Map<String,Object>> fieldMetadata) {
+        public BusinessPreview {
+            text(submissionId);digest(snapshotHash);schema=Map.copyOf(schema);
+            values=Collections.unmodifiableMap(new LinkedHashMap<>(values));fieldMetadata=List.copyOf(fieldMetadata);
         }
     }
     public record TerminalResult(String submissionId,BusinessRef businessRef,String snapshotHash,

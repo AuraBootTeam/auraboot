@@ -21,7 +21,7 @@ import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers
 import { OwnerCell } from '~/framework/meta/runtime/renderers/OwnerCell';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
-import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
+import { formatInTimezone, resolveTemporalFormat } from '~/shared/services/dateTimeFormatService';
 
 /**
  * 单元格渲染上下文
@@ -143,34 +143,13 @@ class CellRendererRegistry {
 // 导出单例
 export const cellRendererRegistry = new CellRendererRegistry();
 
-const DEFAULT_TEMPORAL_FORMATS = {
-  date: 'YYYY-MM-DD',
-  datetime: 'YYYY-MM-DD HH:mm:ss',
-  time: 'HH:mm:ss',
-} as const;
-
-function resolveTemporalFormat(
-  type: 'date' | 'datetime' | 'time',
-  column: Record<string, any> | undefined,
-): string {
-  const explicitFormat = typeof column?.format === 'string' ? column.format : null;
-  if (explicitFormat && /Y{2,4}|M{1,4}|D{1,4}|H{1,2}|m{1,2}|s{1,2}/.test(explicitFormat)) {
-    return explicitFormat;
-  }
-  const preferred = column?.dateTimeFormats?.[type];
-  if (typeof preferred === 'string' && preferred.trim()) {
-    return preferred.trim();
-  }
-  return DEFAULT_TEMPORAL_FORMATS[type];
-}
-
 function formatTemporalValue(
   value: any,
   type: 'date' | 'datetime' | 'time',
   locale?: string,
   column?: Record<string, any>,
 ): string {
-  const format = resolveTemporalFormat(type, column);
+  const format = resolveTemporalFormat(type, column?.dateTimeFormats, typeof column?.format === 'string' ? column.format : undefined);
   // Backend emits UTC; convert to the effective display timezone carried on the
   // column (injected by the page renderer from TimezoneContext). Falls back to
   // UTC when no timezone is provided.

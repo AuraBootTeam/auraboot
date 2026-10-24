@@ -591,6 +591,7 @@ test('immediate exempt publication seals the real tenant audience and dispatches
     expect(own).toMatchObject({ title: draft.title, readState: 'unread', acknowledgementState: 'pending', first_read_at: null });
     const receiverRow = await findRowByContent(page, draft.title);
     await expect(receiverRow).toContainText('未读');
+    await expect(receiverRow).toContainText(/2026[-/]\d{2}[-/]\d{2} \d{2}:\d{2}/);
     await page.screenshot({ path: test.info().outputPath('recipient-unread-list.png'), animations: 'disabled', fullPage: true });
     const readRequest = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/read`));
     await receiverRow.getByRole('button', { name: '查看公告', exact: true }).click();

@@ -8,6 +8,12 @@ vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showErrorT
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'en' }) }));
 vi.mock('react-router', () => ({ Link: ({ to, children }: any) => <a href={to}>{children}</a> }));
 describe('Referenced business facts', () => {
+  it('renders submitted rich text as sanitized content instead of exposing markup', () => {
+    const { container } = render(<WorkspaceRecordSection block={{ id: 'snapshot', title: 'Submission' }} fields={[{ field: 'content', label: 'Content', component: 'richtext', colSpan: 12 }]} record={{ content: '<p><strong>Frozen policy</strong></p><script>alert(1)</script><img src=x onerror="alert(1)">' }} locale="en" t={(key: string) => key} getDictItems={() => []} />);
+    expect(screen.getByTestId('readonly-richtext-content').querySelector('strong')).toHaveTextContent('Frozen policy');
+    expect(container.querySelector('script')).toBeNull();expect(container.querySelector('[onerror]')).toBeNull();
+    expect(screen.queryByText(/<p>/)).not.toBeInTheDocument();
+  });
   it('loads the declared attribute using canonical targetEntity metadata and the actual public PID', async () => {
     request.mockResolvedValue({ code: '0', desc: 'OK', data: { customer_contact: 'Taylor · Procurement' } });
     render(<WorkspaceRecordSection block={{ id: 'facts', title: 'Information' }} fields={[{ field: 'customer', label: 'Contact', dataType: 'reference', refTarget: { targetEntity: 'customers' }, referenceDisplayField: 'customer_contact' }]} record={{ customer: 'customer-1' }} locale="en" t={(key: string) => key} getDictItems={() => []} />);

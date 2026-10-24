@@ -100,7 +100,7 @@ export function resolveTemporalFormat(
   formats?: Partial<DateTimeFormatPreferences>,
   explicitFormat?: string,
 ): string {
-  if (explicitFormat && /Y{2,4}|M{1,4}|D{1,4}|H{1,2}|m{1,2}|s{1,2}/.test(explicitFormat)) {
+  if (explicitFormat && !['date', 'datetime', 'time'].includes(explicitFormat.toLowerCase()) && /Y{2,4}|M{1,4}|D{1,4}|H{1,2}|m{1,2}|s{1,2}/.test(explicitFormat)) {
     return explicitFormat;
   }
   return formats?.[type] || DEFAULT_DATE_TIME_FORMATS[type];

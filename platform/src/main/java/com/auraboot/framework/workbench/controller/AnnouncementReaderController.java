@@ -23,6 +23,7 @@ public class AnnouncementReaderController {
     private final FileService files;
     private final StorageProvider storage;
     private final com.auraboot.framework.audit.service.AdminEventLogService audit;
+    private final com.auraboot.framework.workbench.service.AnnouncementApprovalSource approvalSource;
 
     @GetMapping("/received")
     public ApiResponse<Map<String,Object>> list(@RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="all") String filter,
@@ -39,6 +40,18 @@ public class AnnouncementReaderController {
     @GetMapping("/versions/{version}/attachments/{file}")
     public ResponseEntity<Resource> attachment(@PathVariable String version,@PathVariable String file) {
         if(!readers.attachmentAllowed(version,file)) throw new org.springframework.security.access.AccessDeniedException("File is outside this frozen announcement");
+        return download(version,file,"Authorized frozen recipient attachment");
+    }
+    @GetMapping("/approvals/{submission}/attachments/{file}")
+    public ResponseEntity<Resource> approvalAttachment(@PathVariable String submission,@PathVariable String file) {
+        var preview=approvalSource.preview(MetaContext.getCurrentTenantId(),MetaContext.getCurrentUserId(),submission)
+            .orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Approval submission is unavailable"));
+        if(!(preview.values().get("attachments") instanceof java.util.List<?> attachments)
+            || attachments.stream().noneMatch(item->item instanceof Map<?,?> metadata && file.equals(metadata.get("fileId"))))
+            throw new org.springframework.security.access.AccessDeniedException("File is outside this frozen approval");
+        return download(submission,file,"Authorized frozen approval participant attachment");
+    }
+    private ResponseEntity<Resource> download(String version,String file,String reason) {
         var metadata=files.getFileById(file);
         if(metadata==null || Boolean.TRUE.equals(metadata.getDeletedFlag()) || !"success".equals(metadata.getStatus())) return ResponseEntity.notFound().build();
         String key=metadata.getLocalPath();if(key==null || key.isBlank()) key=metadata.getCloudKey();
@@ -46,7 +59,7 @@ public class AnnouncementReaderController {
         Resource body=new InputStreamResource(storage.download(key));
         audit.record(com.auraboot.framework.audit.entity.AdminEventLog.builder().actorUserId(MetaContext.getCurrentUserId())
             .actionType("announcement.attachment.download").resourceType("announcement_version").resourcePid(version)
-            .success(true).reason("Authorized frozen recipient attachment").build());
+            .success(true).reason(reason).build());
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
             .header(HttpHeaders.CACHE_CONTROL,"private, no-store")
             .header("X-Content-Type-Options","nosniff")

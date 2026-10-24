@@ -6,6 +6,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 import { WorkspaceCell } from '~/framework/meta/runtime/renderers/WorkspaceCells';
 import { FileAttachmentField } from '~/ui/smart/display/FileAttachmentField';
+import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 
 /** Read-only business facts, including declared attributes of referenced objects. */
 export function WorkspaceRecordSection({ block, fields, record, token, locale, timezone, t, getDictItems }: any) {
@@ -28,6 +29,8 @@ export function WorkspaceRecordSection({ block, fields, record, token, locale, t
   const display = (field: any) => {
     const value = field.referenceDisplayField ? references[field.field]?.[field.referenceDisplayField] : record[`${field.field}_display`] ?? record[field.field];
     if (value == null || value === '') return '—';
+    if (String(field.component).toLowerCase() === 'richtext' || field.dataType === 'richtext')
+      return <div className="prose prose-sm max-w-none break-words dark:prose-invert" data-testid={`readonly-richtext-${field.field}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(value)) }} />;
     if (field.dictCode) {
       const item = (getDictItems(field.dictCode) || []).find((item: any) => String(item.value) === String(value));
       return item ? getLocalizedText(item.label, locale, t) : '—';
