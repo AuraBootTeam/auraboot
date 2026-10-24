@@ -516,6 +516,8 @@ test('scheduled audience settings preserve important acknowledgement and cancell
     let dialog = await openNotificationSettings(page, draft.title);
     await expect(dialog.getByLabel('要求确认已知悉', { exact: true })).toBeChecked();
     await dialog.getByTestId('form-dialog-field-audience_users').getByRole('checkbox', { name: recipientName, exact: true }).check();
+    await dialog.getByTestId('form-dialog-field-audience_kind').scrollIntoViewIfNeeded();
+    await dialog.screenshot({ path: test.info().outputPath('notification-settings-recipient.png'), animations: 'disabled' });
     await dialog.getByLabel('免审原因', { exact: true }).fill('Scheduled maintenance approved by the tenant.');
     await dialog.getByLabel('预约发布时间', { exact: true }).fill(dateOffsetStr(2) + 'T12:00');
     await dialog.screenshot({ path: test.info().outputPath('notification-settings-audience.png'), animations: 'disabled' });
@@ -551,7 +553,7 @@ test('immediate exempt publication seals the real tenant audience and dispatches
   const draft = await setupPublicationDraft(page, 'Immediate audience');
   await navigateToAnnouncementList(page);
   const dialog = await openNotificationSettings(page, draft.title);
-  await dialog.getByLabel('通知范围', { exact: true }).selectOption('all');
+  await dialog.getByRole('combobox', { name: '通知范围*', exact: true }).selectOption('all');
   await expect(dialog.getByTestId('form-dialog-field-audience_users')).toHaveCount(0);
   await dialog.getByLabel('免审原因', { exact: true }).fill('Authorized tenant-wide policy announcement.');
   const savedResponse = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/meta/commands/execute/announcement:update_announcement'));
