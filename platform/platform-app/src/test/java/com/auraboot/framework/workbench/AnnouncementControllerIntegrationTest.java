@@ -307,8 +307,10 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         assertEquals("canceled",jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,getTestTenant().getId(),accepted.get("versionPid")));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Integer.class,getTestTenant().getId(),accepted.get("versionPid")));
     }
-    @Test void publicAsyncSubmissionCannotSelectACommandHandlerExecutionIdentity() throws Exception {
-        var input=Map.of("taskType","command-handler","taskName","Protected announcement dispatch",
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"command-handler","export"})
+    void publicAsyncSubmissionCannotSelectACommandHandlerExecutionIdentity(String taskType) throws Exception {
+        var input=Map.of("taskType",taskType,"taskName","Protected announcement dispatch",
             "inputParams",Map.of("handlerCode","announcement:publish","tenantId",getTestTenant().getId(),"userId",getTestUser().getId()));
         mockMvc.perform(post("/api/async-tasks").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(input)))
             .andExpect(status().isForbidden());
@@ -321,10 +323,16 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         task.setTaskType("command-handler");task.setTaskName("Private owned work");task.setStatus("completed");task.setProgress(100);
         task.setCreatedAt(java.time.Instant.now());task.setCompletedAt(java.time.Instant.now());
         task.setInputParams(objectMapper.valueToTree(Map.of("privatePayload","Private business source")));asyncTasks.insert(task);
-        mockMvc.perform(get("/api/async-tasks/"+task.getTaskCode())).andExpect(status().isForbidden());
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/async-tasks/"+task.getTaskCode()))
+        String foreignCode=task.getTaskCode();
+        assertEquals(other.getId(),jdbc.queryForObject("SELECT created_by FROM ab_async_task WHERE tenant_id=? AND task_code=?",Long.class,getTestTenant().getId(),foreignCode));
+        task.setId(null);task.setTaskCode(UniqueIdGenerator.generate());task.setCreatedBy(getTestUser().getId());asyncTasks.insert(task);
+        mockMvc.perform(get("/api/async-tasks/"+task.getTaskCode())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.taskCode").value(task.getTaskCode()));
+        mockMvc.perform(get("/api/async-tasks/"+foreignCode)).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/async-tasks/"+foreignCode+"/cancel")).andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/async-tasks/"+foreignCode))
             .andExpect(status().isForbidden());
-        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_async_task WHERE tenant_id=? AND task_code=?",Integer.class,getTestTenant().getId(),task.getTaskCode()));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_async_task WHERE tenant_id=? AND task_code=?",Integer.class,getTestTenant().getId(),foreignCode));
     }
 
 }
