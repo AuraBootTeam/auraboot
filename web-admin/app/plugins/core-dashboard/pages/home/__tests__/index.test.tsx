@@ -6,9 +6,13 @@ import { MemoryRouter } from 'react-router';
 import WorkbenchPage, { loader } from '../index';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 
+const loaderData = vi.hoisted(() => ({ current: { dashboard: { id: 'wb', widgets: [{ id: 'w1' }] } as unknown, loadError: null as string | null, accessDenied: false } }));
+
+vi.mock('~/utils/i18n', () => ({ useSmartText: () => (value: { zh: string; en: string }) => value.zh }));
+
 vi.mock('react-router', async importOriginal => ({
   ...(await importOriginal<typeof import('react-router')>()),
-  useLoaderData: () => ({ dashboard: { id: 'wb', widgets: [{ id: 'w1' }] }, loadError: null }),
+  useLoaderData: () => loaderData.current,
 }));
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
@@ -84,6 +88,7 @@ function renderPage() {
 describe('WorkbenchPage header', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    loaderData.current = { dashboard: { id: 'wb', widgets: [{ id: 'w1' }] }, loadError: null, accessDenied: false };
   });
 
   it('renders the loader workbench immediately without a second browser request', async () => {
@@ -187,4 +192,30 @@ describe('WorkbenchPage header', () => {
     createSpy.mockRestore();
     clickSpy.mockRestore();
   });
+});
+
+
+it('distinguishes a forbidden workbench from a service failure', async () => {
+  const { fetchResult } = await import('~/shared/services/http-client');
+  vi.mocked(fetchResult).mockResolvedValueOnce({ code: '40300', message: 'Forbidden', httpStatus: 403 } as never);
+  const result = await loader({ request: new Request('http://localhost/home') } as never);
+  expect(result).toMatchObject({ dashboard: null, accessDenied: true });
+});
+
+it('keeps server failures visible and retryable', async () => {
+  const { fetchResult } = await import('~/shared/services/http-client');
+  vi.mocked(fetchResult).mockResolvedValueOnce({ code: '500', message: 'Unavailable', httpStatus: 500 } as never);
+  const result = await loader({ request: new Request('http://localhost/home') } as never);
+  expect(result).toMatchObject({ dashboard: null, accessDenied: false, loadError: 'Unavailable' });
+});
+
+it('guides a viewer to permitted navigation without exposing workbench actions', async () => {
+  loaderData.current = { dashboard: null, loadError: 'Forbidden', accessDenied: true };
+  renderPage();
+  expect(screen.getByText('当前账号未开通个人工作台')).toBeInTheDocument();
+  expect(screen.getByText('请从左侧菜单访问已授权的业务功能。如需个人工作台，请联系管理员。')).toBeInTheDocument();
+  expect(screen.queryByTestId('workbench-open-in-dashboard')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('workbench-export')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /workbench\.new/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'common.retry' })).not.toBeInTheDocument();
 });
