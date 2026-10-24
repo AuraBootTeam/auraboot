@@ -1381,7 +1381,7 @@
             },
             "action": {
               "type": "navigate",
-              "to": "/p/announcement_reader/view/${record.pid}"
+              "to": "/p/announcement_reader/view/{pid}"
             }
           }
         ]

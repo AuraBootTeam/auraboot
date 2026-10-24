@@ -120,7 +120,8 @@
     "tests/e2e/aurabot/**",
     "tests/e2e/ai/**",
     "tests/e2e/agent-control-plane/**",
-    "tests/e2e/showcase/**"
+    "tests/e2e/showcase/**",
+    "tests/e2e/announcement/**"
   ],
   "test_excludes": [
     "tests/e2e/dashboard/dashboard-designer.spec.ts",
