@@ -11,6 +11,15 @@ import java.util.Map;
 /** Tenant-explicit persistence for the announcement aggregate's sole writer. */
 @Mapper
 public interface AnnouncementLifecycleMapper {
+    @Select("SELECT EXISTS(SELECT 1 FROM ab_file WHERE tenant_id=#{tenant} AND pid=#{pid} AND status='success' AND deleted_flag=FALSE)")
+    boolean finalizedFileInTenant(@Param("tenant") Long tenant, @Param("pid") String pid);
+
+    @Select("SELECT draft_settings::text FROM ab_announcement WHERE tenant_id=#{tenant} AND pid=#{pid}")
+    String draftSettings(@Param("tenant") Long tenant, @Param("pid") String pid);
+
+    @Update("UPDATE ab_announcement SET draft_settings=CAST(#{settings} AS jsonb) WHERE tenant_id=#{tenant} AND pid=#{pid} AND status='draft' AND deleted_flag=FALSE")
+    int saveSettings(@Param("tenant") Long tenant, @Param("pid") String pid, @Param("settings") String settings);
+
     @Select(
             "SELECT EXISTS(SELECT 1 FROM ab_user WHERE id=#{actor} AND pid=#{userPid} AND"
                 + " is_enabled=TRUE AND deleted_flag=FALSE)")

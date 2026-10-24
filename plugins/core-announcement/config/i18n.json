@@ -103,5 +103,68 @@
     "en-US": "Use an authorized announcement command to make changes.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.error.attachment_unavailable",
+    "zh-CN": "附件不可用，请确认已上传完成且属于当前租户。",
+    "en-US": "The attachment is unavailable. Check that its upload is finalized in this tenant.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.exemption_required",
+    "zh-CN": "免审发布需要选择免审模式并填写免审原因。",
+    "en-US": "Choose exemption mode and provide an exemption reason.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.content_required",
+    "zh-CN": "发布前请补全公告标题和正文。",
+    "en-US": "Complete the announcement title and content before publication.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.schedule_invalid",
+    "zh-CN": "预约时间必须晚于当前时间，请重新选择。",
+    "en-US": "Choose a scheduled time in the future.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.expiry_invalid",
+    "zh-CN": "有效期不能早于发布时间或知悉截止时间，请调整。",
+    "en-US": "The expiry must cover publication and the acknowledgement deadline.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.audience_empty",
+    "zh-CN": "没有符合授权规则的接收人，请调整通知对象。",
+    "en-US": "No authorized recipients matched. Update the audience.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_not_ready",
+    "zh-CN": "审批依据尚未就绪，请核对审批进展。",
+    "en-US": "Approval authority is not ready. Check approval progress.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.authorization_changed",
+    "zh-CN": "发布授权已变化，请重新核对范围并提交。",
+    "en-US": "Publication authorization changed. Review the audience and submit again.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.delivery_disabled",
+    "zh-CN": "通知桥接尚未启用，请联系租户管理员完成配置后再发布。",
+    "en-US": "The notification bridge is disabled. Ask the tenant administrator to enable it before publication.",
+    "source": "import",
+    "refType": "message"
   }
 ]

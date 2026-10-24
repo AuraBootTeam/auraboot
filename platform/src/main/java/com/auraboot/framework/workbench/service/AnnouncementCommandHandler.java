@@ -18,6 +18,7 @@ import java.util.Map;
 public class AnnouncementCommandHandler
         implements CommandHandler, com.auraboot.framework.meta.service.CommandTargetAuthorizer {
     private final AnnouncementLifecycleService lifecycle;
+    private final AnnouncementReleaseService releases;
 
     @Override
     public String getHandlerName() {
@@ -32,11 +33,18 @@ public class AnnouncementCommandHandler
 
     @Override
     public long authorizeTarget(CommandHandlerContext context) {
+        if (isRelease(context.getCommandCode())) return releases.authorizeTarget(context.getTargetRecordId());
         return lifecycle.authorizeTarget(context.getCommandCode(), context.getTargetRecordId());
+    }
+
+    private static boolean isRelease(String code) {
+        return AnnouncementReleaseService.PUBLISH.equals(code) || AnnouncementReleaseService.CANCEL.equals(code);
     }
 
     @Override
     public Map<String, Object> execute(CommandHandlerContext context) {
+        if (isRelease(context.getCommandCode())) return releases.execute(context.getCommandCode(),context.getTargetRecordId(),
+                context.getPayload(),context.getClientRequestId(),context.getExpectedVersion());
         return lifecycle.execute(
                 context.getCommandCode(),
                 context.getTargetRecordId(),

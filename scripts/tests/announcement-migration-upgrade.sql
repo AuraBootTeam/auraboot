@@ -24,6 +24,7 @@ VALUES(1,NULL,1,'Legacy draft','draft','normal',1,NULL,NULL),
     (3,'old-withdrawn',1,'Legacy withdrawn','archived','high',1,1,now()),
     (4,'other-tenant',2,'Other tenant','published','normal',2,2,now());
 \ir ../../platform/src/main/resources/db/migration/core/V20261024190000__announcement_controlled_lifecycle.sql
+\ir ../../platform/src/main/resources/db/migration/core/V20261024210000__announcement_release_execution.sql
 DO $$
 DECLARE v VARCHAR(36); failed BOOLEAN;
 BEGIN

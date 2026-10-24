@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = TestApplication.class)
+@SpringBootTest(classes = TestApplication.class, properties={"aura.notification.plugin-delivery.enabled=true","auraboot.announcement.worker-enabled=false"})
 @ActiveProfiles("integration-test")
 @DisplayName("AnnouncementController - Integration Tests")
 @Transactional
@@ -106,7 +106,7 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void grantAnnouncementManageToTestRole() {
-        for(String action : List.of("edit","delete","withdraw")) {
+        for(String action : List.of("edit","delete","withdraw","publish","publish_all","exempt")) {
             grantCommittedPermissionToTestRole("announcement.announcement."+action,
                 "announcement","announcement:announcement",action,"Announcement "+action);
         }
@@ -166,5 +166,72 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         for(JsonNode record:objectMapper.readTree(result.getResponse().getContentAsString()).path("data")) {
             org.junit.jupiter.api.Assertions.assertNotEquals(title,record.path("title").asText());
         }
+    }
+
+    @Autowired private com.auraboot.framework.workbench.service.AnnouncementAudienceService audiences;
+    @Autowired private com.auraboot.framework.workbench.service.AnnouncementReleaseService releaseService;
+    @Autowired private com.auraboot.framework.workbench.mapper.AnnouncementReleaseMapper releaseMapper;
+    @Autowired private com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer deliveryConsumer;
+    @Autowired private com.auraboot.framework.workbench.service.AnnouncementCodec announcementCodec;
+
+    @Test
+    void frozenExemptionPublishesToRealMembersAndProjectsSeparateNotificationAndAcknowledgement() {
+        identity();
+        String operation=UniqueIdGenerator.generate();
+        var policy=Map.of("audience",Map.of("kind","all"),"exemptionReason","Tenant policy update", "acknowledgementRequired",true);
+        var created=lifecycle.execute("announcement:create_announcement",null,
+            Map.of("title","Policy "+operation,"content","Read the updated tenant policy.","policy",policy),operation,null);
+        String pid=(String)created.get("pid");
+        var accepted=releaseService.execute("announcement:publish",pid,Map.of(),operation+"-publish",1);
+        assertEquals(accepted,releaseService.execute("announcement:publish",pid,Map.of(),operation+"-publish",1));
+        String version=(String)accepted.get("versionPid");
+        assertEquals("unpublished",accepted.get("status"));
+        Map<String,Object> claim=releaseService.claim();
+        assertNotNull(claim);
+        assertEquals(version,claim.get("version_pid"));
+        releaseService.perform(claim);
+        identity();
+        assertEquals("published",jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=? AND user_pid=? AND member_pid=?",Integer.class,
+            getTestTenant().getId(),version,getTestUser().getPid(),getTestTenantMember().getPid()));
+        String frozen=jdbc.queryForObject("SELECT snapshot::text FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
+        assertEquals("Read the updated tenant policy.",announcementCodec.object(frozen).get("content"));
+        String batch=(String)accepted.get("releaseAttemptPid");
+        var root=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0",batch,
+            com.auraboot.framework.workbench.service.AnnouncementReleaseService.RELEASED_EVENT,"auraboot.announcement",version,
+            java.time.Instant.now(),getTestTenant().getId(),batch,null,"announcement:"+version,1,
+            Map.of("versionPid",version,"batchPid",batch),Map.of());
+        deliveryConsumer.consume(root);
+        var payload=Map.<String,Object>of("versionPid",version,"batchPid",batch,"userPid",getTestUser().getPid());
+        // Projection is an independent event and can complete before notification persistence.
+        var ack=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0","ack:"+batch,
+            com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer.ACK,"auraboot.announcement",version,
+            root.occurredAt(),getTestTenant().getId(),batch,batch,"ack:"+version,1,payload,Map.of());
+        deliveryConsumer.consume(ack);
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=? AND user_id=? AND source_id=? AND item_type='announcement_ack' AND status='pending'",Integer.class,
+            getTestTenant().getId(),getTestUser().getId(),version));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND source_id=?",Integer.class,getTestTenant().getId(),version));
+        var delivery=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0",batch+":"+getTestUser().getPid(),
+            com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer.DELIVER,"auraboot.announcement",version,
+            root.occurredAt(),getTestTenant().getId(),batch,batch,"delivery:"+version,1,payload,Map.of());
+        deliveryConsumer.consume(delivery);deliveryConsumer.consume(delivery);
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND source_id=? AND user_id=?",Integer.class,
+            getTestTenant().getId(),version,getTestUser().getId()));
+        assertEquals("completed",jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
+            getTestTenant().getId(),batch,getTestUser().getPid()));
+    }
+
+    @Test
+    void futureReleaseCancellationRetainsVersionButCannotPublish() {
+        identity();
+        String operation=UniqueIdGenerator.generate();
+        var created=lifecycle.execute("announcement:create_announcement",null,Map.of("title","Scheduled "+operation,"content","Scheduled content",
+            "policy",Map.of("audience",Map.of("kind","all"),"exemptionReason","Scheduled policy","scheduledAt",java.time.Instant.now().plusSeconds(86400).toString())),operation,null);
+        String pid=(String)created.get("pid");
+        var accepted=releaseService.execute("announcement:publish",pid,Map.of(),operation+"-release",1);
+        var canceled=releaseService.execute("announcement:cancel_schedule",pid,Map.of(),operation+"-cancel",2);
+        assertEquals("withdrawn",canceled.get("status"));
+        assertEquals("canceled",jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,getTestTenant().getId(),accepted.get("versionPid")));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Integer.class,getTestTenant().getId(),accepted.get("versionPid")));
     }
 }

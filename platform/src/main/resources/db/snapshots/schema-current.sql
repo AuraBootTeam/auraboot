@@ -3650,6 +3650,17 @@ CREATE TABLE public.ab_announcement (
     current_version_pid character varying(36),
     active_version_pid character varying(36),
     draft_settings jsonb DEFAULT '{}'::jsonb NOT NULL,
+    audience_kind text GENERATED ALWAYS AS (COALESCE(((draft_settings -> 'audience'::text) ->> 'kind'::text), 'selected'::text)) STORED,
+    audience_users jsonb GENERATED ALWAYS AS (COALESCE(((draft_settings -> 'audience'::text) -> 'userPids'::text), '[]'::jsonb)) STORED,
+    audience_departments jsonb GENERATED ALWAYS AS (COALESCE(((draft_settings -> 'audience'::text) -> 'departmentPids'::text), '[]'::jsonb)) STORED,
+    audience_roles jsonb GENERATED ALWAYS AS (COALESCE(((draft_settings -> 'audience'::text) -> 'rolePids'::text), '[]'::jsonb)) STORED,
+    ack_required boolean GENERATED ALWAYS AS (((draft_settings ->> 'acknowledgementRequired'::text))::boolean) STORED,
+    ack_days integer GENERATED ALWAYS AS (COALESCE(((draft_settings ->> 'acknowledgementDays'::text))::integer, 7)) STORED,
+    approval_mode text GENERATED ALWAYS AS (COALESCE((draft_settings ->> 'approvalMode'::text), 'exempt'::text)) STORED,
+    approval_definition text GENERATED ALWAYS AS ((draft_settings ->> 'definitionPid'::text)) STORED,
+    scheduled_at text GENERATED ALWAYS AS ((draft_settings ->> 'scheduledAt'::text)) STORED,
+    exemption_reason text GENERATED ALWAYS AS ((draft_settings ->> 'exemptionReason'::text)) STORED,
+    attachments jsonb GENERATED ALWAYS AS (COALESCE((draft_settings -> 'attachmentPids'::text), '[]'::jsonb)) STORED,
     CONSTRAINT chk_announcement_revisions CHECK (((row_version > 0) AND (editor_revision > 0) AND (lifecycle_revision > 0))),
     CONSTRAINT chk_announcement_state CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'unpublished'::character varying, 'scheduled'::character varying, 'missed'::character varying, 'published'::character varying, 'withdrawn'::character varying, 'expired'::character varying])::text[])))
 );
@@ -3677,6 +3688,25 @@ CREATE TABLE public.ab_announcement_audit (
     previous_revision integer,
     resulting_revision integer NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: ab_announcement_delivery; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_delivery (
+    tenant_id bigint NOT NULL,
+    batch_pid character varying(36) NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    user_pid character varying(36) NOT NULL,
+    channel character varying(32) NOT NULL,
+    kind character varying(24) NOT NULL,
+    status character varying(24) DEFAULT 'queued'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    delivered_at timestamp with time zone,
+    error_code character varying(100),
+    CONSTRAINT ab_announcement_delivery_status_check CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'completed'::character varying, 'skipped'::character varying, 'failed'::character varying, 'canceled'::character varying])::text[])))
 );
 
 
@@ -3741,6 +3771,34 @@ CREATE TABLE public.ab_announcement_recipient_snapshot (
     sealed boolean DEFAULT false NOT NULL,
     CONSTRAINT ab_announcement_recipient_snapshot_origin_check CHECK (((origin)::text = ANY ((ARRAY['publication'::character varying, 'migration_cohort'::character varying])::text[]))),
     CONSTRAINT ab_announcement_recipient_snapshot_recipient_count_check CHECK ((recipient_count >= 0))
+);
+
+
+--
+-- Name: ab_announcement_release; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_release (
+    tenant_id bigint NOT NULL,
+    pid character varying(36) NOT NULL,
+    announcement_pid character varying(36) NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    actor_user_id bigint NOT NULL,
+    actor_member_pid character varying(36) NOT NULL,
+    authorization_hash character varying(64) NOT NULL,
+    status character varying(24) DEFAULT 'queued'::character varying NOT NULL,
+    accepted_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    scheduled_at timestamp with time zone NOT NULL,
+    latest_allowed_at timestamp with time zone NOT NULL,
+    timezone character varying(100) NOT NULL,
+    lease_until timestamp with time zone,
+    fencing_token bigint DEFAULT 0 NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    next_attempt_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    error_code character varying(100),
+    finished_at timestamp with time zone,
+    CONSTRAINT ab_announcement_release_check CHECK ((latest_allowed_at >= scheduled_at)),
+    CONSTRAINT ab_announcement_release_status_check CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying, 'succeeded'::character varying, 'retryable_failed'::character varying, 'blocked'::character varying, 'canceled'::character varying, 'missed'::character varying])::text[])))
 );
 
 
@@ -19778,6 +19836,14 @@ ALTER TABLE ONLY public.ab_announcement_audit
 
 
 --
+-- Name: ab_announcement_delivery ab_announcement_delivery_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_delivery
+    ADD CONSTRAINT ab_announcement_delivery_pkey PRIMARY KEY (tenant_id, batch_pid, user_pid, channel);
+
+
+--
 -- Name: ab_announcement_operation ab_announcement_operation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -19815,6 +19881,22 @@ ALTER TABLE ONLY public.ab_announcement_recipient_snapshot
 
 ALTER TABLE ONLY public.ab_announcement_recipient_snapshot
     ADD CONSTRAINT ab_announcement_recipient_snapshot_tenant_id_version_pid_key UNIQUE (tenant_id, version_pid);
+
+
+--
+-- Name: ab_announcement_release ab_announcement_release_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_release
+    ADD CONSTRAINT ab_announcement_release_pkey PRIMARY KEY (tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_release ab_announcement_release_tenant_id_version_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_release
+    ADD CONSTRAINT ab_announcement_release_tenant_id_version_pid_key UNIQUE (tenant_id, version_pid);
 
 
 --
@@ -26337,6 +26419,13 @@ CREATE INDEX idx_announcement_recipient_user ON public.ab_announcement_recipient
 
 
 --
+-- Name: idx_announcement_release_claim; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_announcement_release_claim ON public.ab_announcement_release USING btree (scheduled_at, next_attempt_at) WHERE ((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying, 'retryable_failed'::character varying])::text[]));
+
+
+--
 -- Name: idx_announcement_tenant_status; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -31170,6 +31259,14 @@ ALTER TABLE ONLY public.ab_announcement_audit
 
 
 --
+-- Name: ab_announcement_delivery ab_announcement_delivery_tenant_id_version_pid_user_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_delivery
+    ADD CONSTRAINT ab_announcement_delivery_tenant_id_version_pid_user_pid_fkey FOREIGN KEY (tenant_id, version_pid, user_pid) REFERENCES public.ab_announcement_recipient(tenant_id, version_pid, user_pid);
+
+
+--
 -- Name: ab_announcement_recipient_snapshot ab_announcement_recipient_snapshot_tenant_id_version_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -31183,6 +31280,14 @@ ALTER TABLE ONLY public.ab_announcement_recipient_snapshot
 
 ALTER TABLE ONLY public.ab_announcement_recipient
     ADD CONSTRAINT ab_announcement_recipient_tenant_id_version_pid_fkey FOREIGN KEY (tenant_id, version_pid) REFERENCES public.ab_announcement_recipient_snapshot(tenant_id, version_pid);
+
+
+--
+-- Name: ab_announcement_release ab_announcement_release_tenant_id_announcement_pid_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_release
+    ADD CONSTRAINT ab_announcement_release_tenant_id_announcement_pid_version_fkey FOREIGN KEY (tenant_id, announcement_pid, version_pid) REFERENCES public.ab_announcement_version(tenant_id, announcement_pid, pid);
 
 
 --

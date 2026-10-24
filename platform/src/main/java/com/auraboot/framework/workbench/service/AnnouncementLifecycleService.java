@@ -34,7 +34,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AnnouncementLifecycleService {
     private static final Set<String> EDITABLE =
-            Set.of("title", "content", "announcement_priority", "pinned", "expires_at");
+            Set.of("title", "content", "announcement_priority", "pinned", "expires_at", "policy");
     private static final String CREATE = "announcement:create_announcement";
     private static final String UPDATE = "announcement:update_announcement";
     private static final String REVISE = "announcement:republish";
@@ -44,6 +44,7 @@ public class AnnouncementLifecycleService {
     private final UserPermissionService permissions;
     private final IdentityDirectoryAccessor identities;
     private final ObjectMapper objectMapper;
+    private final AnnouncementPolicyService policies;
 
     @Transactional(readOnly = true)
     public long authorizeTarget(String command, String pid) {
@@ -86,7 +87,7 @@ public class AnnouncementLifecycleService {
         if (operationId == null || operationId.isBlank() || operationId.length() > 100)
             throw BusinessException.i18n("announcement.error.operation_required");
         for (String field : payload.keySet())
-            if (!EDITABLE.contains(field))
+            if (!EDITABLE.contains(field) && !AnnouncementPolicyService.FORM_FIELDS.containsKey(field))
                 throw BusinessException.i18n("announcement.error.protected_input");
         if (!Set.of(CREATE, UPDATE, DELETE, REVISE, WITHDRAW).contains(command))
             throw BusinessException.i18n("announcement.error.publication_unavailable");
@@ -111,6 +112,7 @@ public class AnnouncementLifecycleService {
                 throw new ConflictException("Operation has no committed result");
             return deserialize(prior.get("result").toString());
         }
+        String policyJson = policies.fromForm(payload, target);
         String pid;
         Integer before = null;
         int after;
@@ -186,6 +188,8 @@ public class AnnouncementLifecycleService {
             }
             after = before + 1;
         }
+        if (policyJson != null && mapper.saveSettings(tenant, pid, policyJson) != 1)
+            throw new IllegalStateException("Announcement policy was not persisted");
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("pid", pid);
         result.put("recordPid", pid);

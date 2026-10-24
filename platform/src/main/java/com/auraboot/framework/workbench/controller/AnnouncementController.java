@@ -27,6 +27,22 @@ import java.util.*;
 public class AnnouncementController {
     private final AnnouncementService announcementService;
     private final CommandExecutor commandExecutor;
+    private final com.auraboot.framework.workbench.service.AnnouncementAudienceService audiences;
+    private final com.auraboot.framework.workbench.service.AnnouncementAccessService access;
+    private final com.auraboot.framework.workbench.service.AnnouncementPolicyService policies;
+
+    public record AudiencePreviewRequest(String recordPid,
+            com.auraboot.framework.workbench.service.AnnouncementAudienceService.Rule audience) {}
+
+    @PostMapping("/audience-preview")
+    @RequirePermission("announcement.announcement.publish")
+    public ApiResponse<com.auraboot.framework.workbench.service.AnnouncementAudienceService.Resolution> preview(
+            @RequestBody AudiencePreviewRequest request) {
+        access.manage(request.recordPid(), "publish", false);
+        var rule = request.audience() == null ? policies.load(request.recordPid()).audience() : request.audience();
+        return ApiResponse.success(audiences.resolve(rule));
+    }
+
 
     @GetMapping
     public ApiResponse<List<AnnouncementDTO>> list(@RequestParam(defaultValue = "20") int limit) {
