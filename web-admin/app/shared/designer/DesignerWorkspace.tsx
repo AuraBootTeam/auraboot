@@ -222,7 +222,7 @@ export function DesignerWorkspace({
       )}
 
       <div
-        className="flex min-w-0 flex-1 overflow-hidden"
+        className={cn('flex min-w-0 flex-1 overflow-hidden', isCompact && 'pt-14')}
         data-testid={`${testIdPrefix}-canvas-shell`}
       >
         {canvas}

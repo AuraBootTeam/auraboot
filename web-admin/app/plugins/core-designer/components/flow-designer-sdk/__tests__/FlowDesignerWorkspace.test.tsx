@@ -179,6 +179,7 @@ describe('shared Report/Dashboard workspace contract', () => {
     mockResizeObserver(width);
     const view = renderWorkspace({ compactWidth: 900, testIdPrefix: 'report', propertyPanel: <input aria-label="Draft title" defaultValue="Original" /> });
     expect(screen.getByTestId('report-designer-workspace')).toHaveAttribute('data-layout', 'compact');
+    expect(screen.getByTestId('report-canvas-shell')).toHaveClass('pt-14');
     expect(screen.getByTestId('report-palette-shell')).toHaveAttribute('data-open', 'false');
     fireEvent.click(screen.getByTestId('report-toggle-inspector'));
     const input = screen.getByRole('textbox', { name: 'Draft title' });
@@ -196,6 +197,7 @@ describe('shared Report/Dashboard workspace contract', () => {
     mockResizeObserver(1184);
     renderWorkspace({ compactWidth: 900, testIdPrefix: 'dashboard' });
     expect(screen.getByTestId('dashboard-designer-workspace')).toHaveAttribute('data-layout', 'wide');
+    expect(screen.getByTestId('dashboard-canvas-shell')).not.toHaveClass('pt-14');
     expect(screen.getByTestId('dashboard-inspector-shell')).toHaveAttribute('data-open', 'true');
     expect(screen.getByTestId('dashboard-palette-shell')).toHaveAttribute('data-open', 'true');
   });
