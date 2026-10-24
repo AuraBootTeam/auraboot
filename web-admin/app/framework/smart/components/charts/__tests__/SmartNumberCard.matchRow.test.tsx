@@ -110,3 +110,31 @@ describe('SmartNumberCard matchRow selection', () => {
     expect(screen.getByText('Total').parentElement?.textContent).toContain('11');
   });
 });
+
+
+describe('SmartNumberCard atomic metric values', () => {
+  it.each([
+    { amount: 36000, format: 'currency' as const, precision: 2, expected: '¥36,000.00' },
+    { amount: -123456789.12, format: 'currency' as const, precision: 2, expected: '-¥123,456,789.12' },
+    { amount: 0.6825, format: 'percent' as const, precision: 2, expected: '68.25%' },
+  ])('keeps $expected readable as one complete metric', ({ amount, format, precision, expected }) => {
+    mockUseChartData.mockReturnValue({ data: { rows: [{ amount }], meta: { metrics: ['amount'] } }, loading: false, error: null });
+    const view = render(<SmartNumberCard title="Delivery" dataSource={nqSource} format={format} precision={precision} />);
+    const value = screen.getByText(expected);
+    expect(value).toHaveAttribute('title', expected);
+    expect(value).toHaveStyle({ whiteSpace: 'nowrap', overflowX: 'auto' });
+    expect(value.style.overflowWrap).not.toBe('anywhere');
+    view.unmount();
+  });
+  it('keeps multi-card currency intact without losing each card drill-down', () => {
+    mockUseChartData.mockReturnValue({ data: { rows: [{ amount: 36000 }], meta: { metrics: ['amount'] } }, loading: false, error: null });
+    const onDrillDown = vi.fn();
+    render(<SmartNumberCard title="Delivery" dataSource={nqSource} precision={2} cards={[{ field: 'amount', label: 'Accepted', format: 'currency', drillDown: { enabled: true, action: 'navigate', targetPage: '/p/delivery' } }]} onDrillDown={onDrillDown} />);
+    const value = screen.getByText('¥36,000.00');
+    expect(value).toHaveStyle({ whiteSpace: 'nowrap', overflowX: 'auto' });
+    expect(value).toHaveAttribute('title', '¥36,000.00');
+    screen.getByTestId('number-card-amount-drilldown').click();
+    expect(onDrillDown).toHaveBeenCalledOnce();
+  });
+
+});
