@@ -62,7 +62,8 @@ public final class AnnouncementStatistics {
                 if(!(value instanceof Map<?,?> department) || !(department.get("pid") instanceof String pid)
                     || !(department.get("label") instanceof String label))
                     throw new IllegalStateException("Invalid frozen department classification");
-                if(ALL.equals(scope.type()) || "self".equals(scope.type()) || scope.unitPids().contains(pid)) {
+                if(ALL.equals(scope.type()) || "self".equals(scope.type())
+                    || (Set.of("dept","dept_and_sub").contains(scope.type()) && scope.unitPids().contains(pid))) {
                     departments.add(label);departmentPids.add(pid);
                 }
             }

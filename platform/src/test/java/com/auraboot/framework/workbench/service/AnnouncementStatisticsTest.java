@@ -46,6 +46,14 @@ class AnnouncementStatisticsTest {
         assertThat(json).doesNotContain("Private classification","departmentPids","memberPid","organization","displayedDepartmentPids","reviewers");
         assertThat(json).contains("Selected reviewer role");
     }
+    @Test void aTeamIdentifierCannotGrantDepartmentLabelsEvenWhenTheirPublicIdsCoincide() {
+        var organization=new HashMap<>(ORGANIZATION);organization.put("teamPids",List.of("sales"));
+        var row=new AnnouncementStatistics.Fact("team-member","original-member","Team member",organization,null,null,true,"completed");
+        var scope=new AnnouncementManagementScope("team","actor",Set.of("sales"),Set.of("team-member"));
+        var result=AnnouncementStatistics.capture(List.of(row),"publication",false,null,true,DUE,scope,AnnouncementStatistics.Filters.all());
+        assertThat(result.rows()).hasSize(1);assertThat(result.rows().getFirst().departments()).isEmpty();
+        assertThat(result.rows().getFirst().displayedDepartmentPids()).isEmpty();
+    }
     @Test void exactDeadlineIsNotLateAndInactiveVersionsCannotBeReminded() {
         var result=AnnouncementStatistics.capture(List.of(fact("one",DUE.minusSeconds(1),DUE,true),fact("two",null,null,true)),"publication",true,DUE,false,DUE,ALL,AnnouncementStatistics.Filters.all());
         assertThat(result.summary().overdueUnacknowledged()).isZero();assertThat(result.summary().lateCompleted()).isZero();

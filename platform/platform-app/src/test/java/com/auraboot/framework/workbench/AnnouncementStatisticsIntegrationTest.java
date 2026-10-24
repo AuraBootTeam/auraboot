@@ -109,10 +109,11 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
                 state.setRollbackOnly();
                 jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
                     getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.stats");
-                permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+                permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+                assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.stats")).isFalse();
                 statistics.authorizeExport(token,false);
             })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-        } finally {permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());}
+        } finally {permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());}
         assertThat(statistics.summary(token).get("snapshotToken")).isEqualTo(token);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_statistics_row WHERE tenant_id=? AND snapshot_pid=?",Integer.class,getTestTenant().getId(),token)).isEqualTo(1);
     }
