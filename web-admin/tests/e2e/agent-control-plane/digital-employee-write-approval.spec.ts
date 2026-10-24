@@ -197,7 +197,7 @@ if (approvalFixture) {
       await login.passwordInput.fill(DEFAULT_TEST_ACCOUNT.password);
       await login.submitButton.click();
       await expect(page.getByTestId('ai-panel-toggle')).toBeVisible();
-      await page.getByRole('link', { name: fixture.menuName, exact: true }).click();
+      await page.getByTestId('sidebar').getByRole('link', { name: fixture.menuName, exact: true }).click();
       await expect(page.getByTestId('agent-colleagues-grid')).toBeVisible();
       const agentCard = page.getByTestId(`agent-card-${fixture.agentCode}`);
       await expect(agentCard).toContainText(fixture.agentName);
