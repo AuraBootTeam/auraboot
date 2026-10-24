@@ -207,6 +207,8 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
                     .thenReturn(Map.of(
                             "handled", true,
                             "success", true,
+                            "conversationId", 77L,
+                            "agentCode", "approval-writer",
                             "toolName", "platform.create_model",
                             "result", Map.of("success", true, "data", Map.of("pid", "model-1"))));
 
@@ -223,6 +225,9 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
                     .executeApprovedPendingTool(eq(tenantId), eq(approvalPid));
             verify(agentRunService, never())
                     .executeTaskSync(anyLong(), anyString(), anyString(), anyString());
+            verify(persistence).persistOutbound(argThat(ctx -> Long.valueOf(77L).equals(ctx.conversationId())
+                    && "approval-writer".equals(ctx.agentCode()) && tenantId.equals(ctx.tenantId())),
+                    any(TurnOutcome.class), any(TurnArtifacts.class));
             verify(sink, times(1)).onDone(contains("Approved tool executed"), any());
         });
     }

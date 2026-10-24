@@ -716,6 +716,17 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                             ? agentChatPort.executeApprovedPendingTool(tenantId, approvalPid)
                             : Map.of("handled", false);
                     if (Boolean.TRUE.equals(chatToolResult.get("handled"))) {
+                        // Approval rows have no conversation. The consumed server-side tool snapshot does.
+                        // Restore routing for the existing finalizer without changing the approver or execution.
+                        if (chatToolResult.get("conversationId") instanceof Number conversationId) {
+                            String agentCode = chatToolResult.get("agentCode") instanceof String code
+                                    && !code.isBlank() ? code : ctx.agentCode();
+                            ctx = new TurnContext(ctx.turnId(), ctx.tenantId(), ctx.userId(), ctx.humanMemberId(),
+                                    ctx.agentId(), agentCode, ctx.channel(), ctx.profileId(), ctx.channelSessionId(),
+                                    conversationId.longValue(), ctx.inboundMessageId(), ctx.triageBucket(),
+                                    ctx.allowedReadOnlyTools(), ctx.traceId(), ctx.taskPid(), ctx.beginAt(),
+                                    ctx.executionPrincipal(), ctx.contextEnvelope());
+                        }
                         yield mapApprovedChatToolOutcome(approvalPid, chatToolResult, capturingSink);
                     }
                     yield syncResumeAcpRun(ctx, taskPid, runPid, capturingSink);

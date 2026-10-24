@@ -271,6 +271,15 @@ if (approvalFixture) {
       expect(approved).toHaveLength(1);
       expect(approved[0].approval_status).toBe('approved');
       expect(approved[0].consumed_at).not.toBeNull();
+      const conversationId = await page.evaluate(() => localStorage.getItem('aurabot.lastConversationId'));
+      expect(conversationId).toMatch(/^\d+$/);
+      const outboundRows = async () => (await db.query(
+        "SELECT id,sender_id,content FROM ab_im_message WHERE tenant_id=$1 AND conversation_id=$2 AND sender_type='agent' AND content='Approved tool executed.'",
+        [fixture.tenantId, conversationId],
+      )).rows;
+      await expect.poll(outboundRows, { timeout: 15_000 }).toHaveLength(1);
+      const outbound = await outboundRows();
+      expect(String(outbound[0].sender_id)).toBe(String(fixture.agentId));
       const persisted = await recordRows();
       expect(persisted[0].marker).toBe(marker);
       await page.screenshot({ path: `${output}/APPROVAL-COMPLETED.png`, fullPage: true });
@@ -293,6 +302,8 @@ if (approvalFixture) {
       await info.attach('approval-journey-identities', {
         body: JSON.stringify({
           marker,
+          conversationId,
+          outbound,
           pending,
           approved,
           persisted,
