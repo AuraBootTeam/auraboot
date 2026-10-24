@@ -906,6 +906,8 @@ BPM禁用/卸载必须显式preflight：存在运行中申请/待处理任务/�
 | `announcement:republish` | edit + 管理归属 + withdrawn/expired + currentVersion + expectedVersion；空 payload | 基于历史内容建立 draft，保留历史版本，不直接发布；row/editor/lifecycle revision +1 |
 | `announcement:publish` | S1 不开放 | 明确业务拒绝；无状态、版本、收件或通知变化 |
 
+兼容投影的 published_by/published_at 表示最近一次实际发布，修订草稿仍保留历史；页面明确标注“上次发布人/上次发布时间”，不能把它误读为新草稿已发布。
+
 普通编辑者只能修改本人主体；`announcement.announcement.manage` 可扩展为当前租户全部记录的管理范围，但每个写动作仍需独立 edit/delete/withdraw。旧 manage 不自动授予任何新动作。`publish_all` 只扩大将来发布受众，不能代替记录管理范围，更不能代替 edit/exempt。普通接收者通过专门接收接口授权；`model.ab_announcement.read` 是管理模型读取能力，应只授予管理/观察角色，不能因授予业务 read 就自动授予该管理能力。
 
 `ModelMutationGuard` 新增模型级 `extension.commandWriters`，create/update/delete 三组准确命令白名单同时保护动态 CRUD、批量、导入和递增入口；避免在全局共享的 title/content/status 字段上设置公告专用写白名单而误伤其他模型。仅有 CommandPermit 或管理员身份不能绕过该守卫。

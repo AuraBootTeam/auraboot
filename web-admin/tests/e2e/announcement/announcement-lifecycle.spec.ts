@@ -221,6 +221,10 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
   await page.getByTestId('form-field-announcement_priority').getByRole('combobox').click();
   await page.getByRole('option', { name: '重要', exact: true }).click();
   await page.getByTestId('form-field-pinned').getByRole('switch').click();
+  await expect(page.getByTestId('form-field-pinned').getByRole('switch')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
   await page.screenshot({ path: test.info().outputPath('edit-form-values.png'), fullPage: true });
   const responsePromise = page.waitForResponse(
     (response) =>
@@ -285,6 +289,7 @@ test('delete draft through its protected command', async ({ page }) => {
   await navigateToAnnouncementList(page);
   await clickRowAction(page, TITLE, '删除', 'announcement:delete_announcement');
   await expect(page.locator('table tbody tr').filter({ hasText: TITLE })).toHaveCount(0);
+  await expect(page.getByText('没有匹配的公告', { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('deleted-draft.png'), fullPage: true });
 });
 

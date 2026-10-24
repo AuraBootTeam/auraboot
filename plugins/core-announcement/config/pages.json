@@ -93,7 +93,11 @@
           {
             "field": "published_at",
             "width": 160,
-            "format": "YYYY-MM-DD HH:mm"
+            "format": "YYYY-MM-DD HH:mm",
+            "label": {
+              "zh-CN": "上次发布时间",
+              "en-US": "Last published at"
+            }
           },
           {
             "field": "expires_at",
@@ -351,11 +355,19 @@
           },
           {
             "field": "published_by",
-            "colSpan": 6
+            "colSpan": 6,
+            "label": {
+              "zh-CN": "上次发布人",
+              "en-US": "Last publisher"
+            }
           },
           {
             "field": "published_at",
-            "colSpan": 6
+            "colSpan": 6,
+            "label": {
+              "zh-CN": "上次发布时间",
+              "en-US": "Last published at"
+            }
           },
           {
             "field": "expires_at",
