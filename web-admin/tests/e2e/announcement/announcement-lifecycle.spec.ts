@@ -6,7 +6,7 @@
  *   D2  List Rendering — table with columns, data visible
  *   D4  Create (Full Form) — fill title, content, priority, pinned, expires_at
  *   D6  Create Verification — new record in list with status=draft
- *   D9  State Transitions — draft→published→archived→published
+ *   D9  S1 draft edits, protected writes and unavailable publication
  *   D10 Invalid Transitions — reject publish on published record
  *   D11 Delete — confirm dialog, record removed
  *   D14 Toast / Feedback — mutation shows success toast
@@ -19,6 +19,10 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
+import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
+import { PG_CONN } from '../../helpers/environments';
+import { authenticateBffSession } from '../../helpers/bff-auth-session';
 import {
   uniqueId,
   dateOffsetStr,
@@ -27,6 +31,7 @@ import {
   extractRecordId,
 } from '../helpers/index';
 
+test.use({ locale: 'zh-CN' });
 test.describe.configure({ mode: 'serial' });
 
 const UID = uniqueId('ANN');
@@ -47,42 +52,58 @@ async function navigateToAnnouncementList(page: Page): Promise<void> {
 
   const parentBtn = nav.locator('text="公告管理"').first();
   await parentBtn.waitFor({ state: 'visible', timeout: 5_000 });
-  await parentBtn.evaluate((el: HTMLElement) => el.click());
+  await parentBtn.click();
 
   const leafLink = nav.locator('a[href*="ab_announcement"]').first();
   await leafLink.waitFor({ state: 'visible', timeout: 5_000 });
-  await leafLink.evaluate((el: HTMLElement) => el.click());
+  await leafLink.click();
 
   await waitForDynamicPageLoad(page);
 }
 
 /** Drive the scoped portaled menu and verify the command's actual response. */
-async function clickRowAction(page: Page, title: string | RegExp, actionLabel: string | RegExp, commandCode: string): Promise<void> {
+async function clickRowAction(
+  page: Page,
+  title: string | RegExp,
+  actionLabel: string | RegExp,
+  commandCode: string,
+  targetPid = recordPid,
+): Promise<void> {
   const row = await findRowByContent(page, title);
   await row.getByTestId('row-action-more').click();
   const menu = page.getByTestId('row-action-dropdown');
   await expect(menu).toBeVisible();
   const action = menu.getByRole('menuitem', { name: actionLabel, exact: true });
   await expect(action).toBeVisible();
-  await menu.screenshot({ path: test.info().outputPath(`menu-${String(actionLabel).replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.png`) });
+  await menu.screenshot({
+    animations: 'disabled',
+    path: test
+      .info()
+      .outputPath(`menu-${String(actionLabel).replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.png`),
+  });
   await action.click();
   const dialog = page.getByTestId('confirm-dialog');
   await expect(dialog).toBeVisible();
   const confirmationText: Record<string, string> = {
     'announcement:publish': '发布后该公告将对读者可见，确定发布吗？',
     'announcement:archive': '撤回后该公告将不再对读者展示，可稍后重新发布。确定撤回吗？',
-    'announcement:republish': '重新发布后该公告将再次对读者可见，确定重新发布吗？',
+    'announcement:republish': '将基于历史版本建立可编辑草稿，保存不会直接发布。确定建立吗？',
     'announcement:delete_announcement': '确定要删除选中的记录吗？此操作不可恢复。',
   };
   await expect(dialog).toContainText(confirmationText[commandCode]);
-  await dialog.screenshot({ path: test.info().outputPath(`confirm-${commandCode.replace(':', '-')}.png`) });
-  const responsePromise = page.waitForResponse((response) =>
-    response.request().method() === 'POST' &&
-    response.url().endsWith(`/api/meta/commands/execute/${commandCode}`));
+  await dialog.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath(`confirm-${commandCode.replace(':', '-')}.png`),
+  });
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/meta/commands/execute/${commandCode}`),
+  );
   await page.getByTestId('confirm-ok').click();
   const response = await responsePromise;
   expect(response.ok()).toBe(true);
-  expect(response.request().postDataJSON().targetRecordPid).toBe(recordPid);
+  expect(response.request().postDataJSON().targetRecordPid).toBe(targetPid);
   expect(String((await response.json()).code)).toBe('0');
   await expect(dialog).toBeHidden();
 }
@@ -90,8 +111,9 @@ async function clickRowAction(page: Page, title: string | RegExp, actionLabel: s
 /** Wait for a row's status cell to show the expected status */
 async function expectRowStatus(page: Page, title: string, status: RegExp): Promise<void> {
   const row = page.locator('table tbody tr').filter({ hasText: title }).first();
-  await expect(row.locator('td').filter({ hasText: status }).first())
-    .toBeVisible({ timeout: 5_000 });
+  await expect(row.locator('td').filter({ hasText: status }).first()).toBeVisible({
+    timeout: 5_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -106,19 +128,34 @@ test('create announcement in draft status', async ({ page }) => {
   const content = page.getByTestId('form-field-content').locator('textarea');
   await expect(title).toHaveAttribute('placeholder', '例如：10 月 12 日系统维护通知');
   await expect(content).toHaveAttribute('placeholder', '说明适用对象、具体事项和生效时间');
-  await expect(page.getByText('用简明标题说明事项，最多 256 个字符；保存后为草稿，发布后读者才可见。', { exact: true })).toBeVisible();
-  await expect(page.getByText('补充影响范围、时间安排和需要读者采取的行动。', { exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('create-form-guidance.png'), fullPage: true });
+  await expect(
+    page.getByText('可先保存未完成的草稿；发布能力将在受众与分发接入后启用。', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('补充影响范围、时间安排和需要读者采取的行动。', { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('create-form-guidance.png'),
+    fullPage: true,
+  });
+  await expect(
+    page.getByTestId('form-field-announcement_priority').getByRole('combobox'),
+  ).toContainText('普通');
   await title.fill(TITLE);
   await content.fill(CONTENT);
   await page.getByTestId('form-field-expires_at').locator('input').fill(EXPIRES.slice(0, 16));
-  const responsePromise = page.waitForResponse((response) =>
-    response.request().method() === 'POST' &&
-    response.url().endsWith('/api/meta/commands/execute/announcement:create_announcement'));
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/meta/commands/execute/announcement:create_announcement'),
+  );
   await page.getByRole('button', { name: '保存', exact: true }).click();
   const response = await responsePromise;
   expect(response.ok()).toBe(true);
   const request = response.request().postDataJSON();
+  expect(request.clientRequestId).toBeTruthy();
+  expect(request.expectedVersion).toBeUndefined();
   expect(request.payload.title).toBe(TITLE);
   expect(request.payload.content).toBe(CONTENT);
   const body = await response.json();
@@ -155,115 +192,282 @@ test('list page shows created announcement with draft status', async ({ page }) 
   const filterArea = page.getByTestId('search-area');
   const titleFilter = filterArea.getByPlaceholder('例如：周末系统维护', { exact: true });
   await expect(titleFilter).toBeVisible();
-  await expect(filterArea.getByText('按公告标题关键词查找；清除关键词可查看全部公告。', { exact: true })).toBeVisible();
-  await filterArea.screenshot({ path: test.info().outputPath('title-filter-guidance.png') });
+  await expect(
+    filterArea.getByText('按公告标题关键词查找；清除关键词可查看全部公告。', { exact: true }),
+  ).toBeVisible();
+  await filterArea.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('title-filter-guidance.png'),
+  });
   await titleFilter.fill(`${TITLE}-no-match`);
   await page.getByTestId('filter-search').click();
   await expect(page.getByText('没有匹配的公告', { exact: true })).toBeVisible();
-  await expect(page.getByText('选择“新建公告”创建草稿，或清除筛选条件查看已有公告。', { exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('filtered-empty-recovery.png'), fullPage: true });
+  await expect(
+    page.getByText('选择“新建公告”创建草稿，或清除筛选条件查看已有公告。', { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('filtered-empty-recovery.png'),
+    fullPage: true,
+  });
   await page.getByTestId('filter-reset').click();
   await expect(await findRowByContent(page, TITLE)).toBeVisible();
   await page.getByTestId('filters-toggle').click();
 });
 
-// ---------------------------------------------------------------------------
-// D9 — State Transition: draft → published (via row action)
-// ---------------------------------------------------------------------------
-
-test('publish announcement from draft to published', async ({ page }) => {
+test('edit draft through the menu and retain the observed revision', async ({ page }) => {
   await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '发布', 'announcement:publish');
-  await expectRowStatus(page, TITLE, /published|已发布/i);
-});
-
-// ---------------------------------------------------------------------------
-// D9 — Verify conditional row actions for published status
-// ---------------------------------------------------------------------------
-
-test('published record shows archive action, hides edit and publish', async ({ page }) => {
-  await navigateToAnnouncementList(page);
-
   const row = await findRowByContent(page, TITLE);
-  const moreBtn = row.getByTestId('row-action-more');
-  await moreBtn.click();
-
-  const menu = page.getByTestId('row-action-dropdown');
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: '撤回', exact: true })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: /^(edit|编辑|发布|publish)$/i })).toHaveCount(0);
-  await menu.screenshot({ path: test.info().outputPath('published-actions.png') });
-});
-
-// ---------------------------------------------------------------------------
-// D9 — State Transition: published → archived
-// ---------------------------------------------------------------------------
-
-test('archive announcement from published to archived', async ({ page }) => {
-  await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '撤回', 'announcement:archive');
-  await expectRowStatus(page, TITLE, /archived|已撤回/i);
-});
-
-// ---------------------------------------------------------------------------
-// D9 — State Transition: archived → published (republish)
-// ---------------------------------------------------------------------------
-
-test('republish announcement from archived to published', async ({ page }) => {
-  await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '重新发布', 'announcement:republish');
-  await expectRowStatus(page, TITLE, /published|已发布/i);
-});
-
-// ---------------------------------------------------------------------------
-// D10 — Invalid Transition: publish on already-published (API guard)
-// ---------------------------------------------------------------------------
-
-test('reject publish on already-published record via API', async ({ page }) => {
-  expect(recordPid).toBeTruthy();
-
-  const before = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
-  expect(before.ok()).toBe(true);
-  const beforeBody = await before.json();
-  expect(String(beforeBody.code)).toBe('0');
-  expect(beforeBody.data.status).toBe('published');
-  const response = await page.request.post('/api/meta/commands/execute/announcement:publish', {
-    data: { targetRecordPid: recordPid, expectedVersion: beforeBody.data.row_version, payload: {} },
+  await row.getByTestId('row-action-more').click();
+  await page
+    .getByTestId('row-action-dropdown')
+    .getByRole('menuitem', { name: '编辑', exact: true })
+    .click();
+  await expect(page.getByTestId('form-field-title').locator('input')).toHaveValue(TITLE);
+  await page.getByTestId('form-field-content').locator('textarea').fill(`${CONTENT} edited`);
+  await page.getByTestId('form-field-announcement_priority').getByRole('combobox').click();
+  await page.getByRole('option', { name: '重要', exact: true }).click();
+  await page.getByTestId('form-field-pinned').getByRole('switch').click();
+  await expect(page.getByTestId('form-field-pinned').getByRole('switch')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('edit-form-values.png'),
+    fullPage: true,
   });
-  const body = await response.json();
-  expect(response.status()).toBe(422);
-  expect(String(body.code)).not.toBe('0');
-  expect(JSON.stringify(body)).toContain('published');
-  expect(JSON.stringify(body)).toContain('allowed states');
-  const after = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
-  expect(after.ok()).toBe(true);
-  const afterBody = await after.json();
-  expect(String(afterBody.code)).toBe('0');
-  expect(afterBody.data.status).toBe('published');
-  expect(afterBody.data.row_version).toBe(beforeBody.data.row_version);
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/meta/commands/execute/announcement:update_announcement'),
+  );
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  const response = await responsePromise;
+  expect(response.status(), await response.text()).toBe(200);
+  const input = response.request().postDataJSON();
+  expect(input.expectedVersion).toBe(1);
+  expect(input.payload.announcement_priority).toBe('important');
+  expect(input.payload.pinned).toBe(true);
+  expect(input.clientRequestId).toBeTruthy();
+  expect(Object.keys(input.payload).sort()).toEqual([
+    'announcement_priority',
+    'content',
+    'expires_at',
+    'pinned',
+    'title',
+  ]);
+  expect((await response.json()).data.data.row_version).toBe(2);
+  await navigateToAnnouncementList(page);
+  const editedRow = await findRowByContent(page, TITLE);
+  await editedRow.getByTestId('row-action-view').click();
+  await expect(page.getByText(`${CONTENT} edited`, { exact: true })).toBeVisible();
+  await expect(page.getByText('重要', { exact: true })).toBeVisible();
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('draft-detail.png'),
+    fullPage: true,
+  });
 });
 
-// ---------------------------------------------------------------------------
-// D9 + D11 — Archive then Delete
-// ---------------------------------------------------------------------------
-
-test('archive and delete announcement', async ({ page }) => {
-  // Archive first (published → archived) so delete becomes available
+test('publication reports unavailable and leaves the draft intact', async ({ page }) => {
   await navigateToAnnouncementList(page);
-  await clickRowAction(page, TITLE, '撤回', 'announcement:archive');
-  await expectRowStatus(page, TITLE, /archived|已撤回/i);
+  const row = await findRowByContent(page, TITLE);
+  await row.getByTestId('row-action-more').click();
+  await page
+    .getByTestId('row-action-dropdown')
+    .getByRole('menuitem', { name: '发布（暂未启用）', exact: true })
+    .click();
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/meta/commands/execute/announcement:publish'),
+  );
+  await page.getByTestId('confirm-ok').click();
+  const response = await responsePromise;
+  expect(response.status()).toBe(422);
+  expect(response.request().postDataJSON().payload).toEqual({});
+  await expect(
+    page
+      .getByTestId('ab:list:ab_announcement:action-error')
+      .getByText('公告发布尚未启用：需要先完成受众授权与可靠分发接入。', { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('publication-unavailable.png'),
+    fullPage: true,
+  });
+  await navigateToAnnouncementList(page);
+  await expectRowStatus(page, TITLE, /draft|草稿/i);
+});
 
-  // Delete
-  await clickRowAction(page, TITLE, /delete|删除/i, 'announcement:delete_announcement');
+test('delete draft through its protected command', async ({ page }) => {
+  await navigateToAnnouncementList(page);
+  await clickRowAction(page, TITLE, '删除', 'announcement:delete_announcement');
+  await expect(page.locator('table tbody tr').filter({ hasText: TITLE })).toHaveCount(0);
+  await expect(page.getByText('没有匹配的公告', { exact: true })).toBeVisible();
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('deleted-draft.png'),
+    fullPage: true,
+  });
+});
 
-  // Verify record is gone
-  const gone = page.locator('table').getByText(TITLE);
-  await expect(gone).toHaveCount(0, { timeout: 5_000 });
-  await page.reload();
-  await waitForDynamicPageLoad(page);
-  await expect(page.getByText(/^(加载中\.\.\.|Loading\.\.\.)$/)).toBeHidden();
-  await expect(page.locator('table').getByText(TITLE)).toHaveCount(0);
-  const deleted = await page.request.get(`/api/dynamic/ab_announcement/${recordPid}`);
-  expect(deleted.status()).toBe(404);
-  await page.screenshot({ path: test.info().outputPath('deleted-after-reload.png'), fullPage: true });
+test('withdraw legacy content and create a revision without mutating its frozen version', async ({
+  page,
+}) => {
+  const pid = randomUUID();
+  const versionPid = randomUUID();
+  const title = `Historical ${TITLE}`;
+  const db = new Client(PG_CONN);
+  await db.connect();
+  try {
+    await db.query('BEGIN');
+    await db.query(
+      `INSERT INTO ab_announcement(pid,tenant_id,owner_user_id,title,content,status,created_by,published_by,published_at)
+      SELECT $1,tenant_id,owner_user_id,$2,$3,'published',created_by,created_by,now()
+      FROM ab_announcement WHERE pid=$4`,
+      [pid, title, CONTENT, recordPid],
+    );
+    await db.query(
+      `INSERT INTO ab_announcement_version(pid,tenant_id,announcement_pid,version_no,source_editor_revision,
+      snapshot_schema,snapshot_hash,snapshot,created_by)
+      SELECT $1,tenant_id,pid,1,1,'legacy-v1',encode(sha256(convert_to(jsonb_build_object('title',title,'content',content)::text,'UTF8')),'hex'),
+      jsonb_build_object('title',title,'content',content),created_by FROM ab_announcement WHERE pid=$2`,
+      [versionPid, pid],
+    );
+    await db.query(
+      `INSERT INTO ab_announcement_version_control(tenant_id,version_pid,publication_state,authorization_basis)
+      SELECT tenant_id,$1,'published','legacy_existing_content' FROM ab_announcement WHERE pid=$2`,
+      [versionPid, pid],
+    );
+    await db.query(
+      'UPDATE ab_announcement SET current_version_pid=$1,active_version_pid=$1 WHERE pid=$2',
+      [versionPid, pid],
+    );
+    await db.query(
+      `INSERT INTO ab_announcement_recipient_snapshot(tenant_id,pid,version_pid,origin,recipient_count,sealed)
+      SELECT tenant_id,$1,$2,'migration_cohort',1,TRUE FROM ab_announcement WHERE pid=$3`,
+      [randomUUID(), versionPid, pid],
+    );
+    await db.query(
+      `INSERT INTO ab_announcement_recipient(tenant_id,version_pid,user_pid,member_pid,display_name_snapshot)
+      SELECT a.tenant_id,$1,u.pid,m.pid,u.user_name FROM ab_announcement a
+      JOIN ab_user u ON u.id=a.owner_user_id JOIN ab_tenant_member m ON m.tenant_id=a.tenant_id AND m.user_id=u.id
+      WHERE a.pid=$2 AND m.status='active' AND m.deleted_flag=FALSE`,
+      [versionPid, pid],
+    );
+    await db.query('COMMIT');
+    const visible = await page.request.get('/api/announcements?limit=100');
+    expect(visible.status()).toBe(200);
+    expect(
+      (await visible.json()).data.find((row: { pid: string }) => row.pid === pid),
+    ).toMatchObject({ title, content: CONTENT, status: 'published' });
+    await navigateToAnnouncementList(page);
+    await clickRowAction(page, title, '撤回', 'announcement:archive', pid);
+    await expectRowStatus(page, title, /withdrawn|已撤回/i);
+    const withdrawn = await page.request.get('/api/announcements?limit=100');
+    expect((await withdrawn.json()).data.some((row: { pid: string }) => row.pid === pid)).toBe(
+      false,
+    );
+    await clickRowAction(page, title, '建立修订草稿', 'announcement:republish', pid);
+    await expectRowStatus(page, title, /draft|草稿/i);
+    const row = await findRowByContent(page, title);
+    await row.getByTestId('row-action-more').click();
+    await expect(
+      page.getByTestId('row-action-dropdown').getByRole('menuitem', { name: '删除', exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      animations: 'disabled',
+      path: test.info().outputPath('legacy-revision.png'),
+      fullPage: true,
+    });
+    const frozen = await db.query(
+      'SELECT snapshot->>$$title$$ AS title FROM ab_announcement_version WHERE pid=$1',
+      [versionPid],
+    );
+    expect(frozen.rows).toEqual([{ title }]);
+    const state = await db.query(
+      'SELECT status,row_version,active_version_pid FROM ab_announcement WHERE pid=$1',
+      [pid],
+    );
+    expect(state.rows).toEqual([{ status: 'draft', row_version: 3, active_version_pid: null }]);
+  } finally {
+    await db.end();
+  }
+});
+
+test('read-only manager cannot create or modify notices', async ({ page, browser, baseURL }) => {
+  expect(baseURL).toBeTruthy();
+  const code = `notice_reader_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
+  const createdRole = await page.request.post('/api/roles', {
+    data: {
+      code,
+      name: 'Announcement read-only observer',
+      type: 'custom',
+      status: 'active',
+      scopeType: 'tenant',
+      defaultDataScopeType: 'all',
+    },
+  });
+  expect(createdRole.status(), await createdRole.text()).toBe(200);
+  const rolePid = (await createdRole.json()).data.pid;
+  const db = new Client(PG_CONN);
+  await db.connect();
+  let permissions;
+  try {
+    permissions = (
+      await db.query(
+        "SELECT id FROM ab_permission WHERE code IN ('announcement.announcement.read','model.ab_announcement.read') AND deleted_flag=FALSE",
+      )
+    ).rows;
+    expect(permissions).toHaveLength(2);
+  } finally {
+    await db.end();
+  }
+  const grant = await page.request.put(`/api/permissions/matrix/${rolePid}/batch`, {
+    data: permissions.map((row) => ({ permissionId: row.id, granted: true })),
+  });
+  expect(grant.status(), await grant.text()).toBe(200);
+  const email = `${code}@example.com`;
+  const user = await page.request.post('/api/admin/users', {
+    data: {
+      email,
+      displayName: 'Announcement observer',
+      initialPassword: 'Test2026x',
+      roleCodes: [code],
+      sendInviteEmail: false,
+    },
+  });
+  expect(user.status(), await user.text()).toBe(200);
+  const context = await browser.newContext({
+    baseURL,
+    locale: 'zh-CN',
+    storageState: { cookies: [], origins: [] },
+  });
+  try {
+    await authenticateBffSession(context.request, baseURL!, email, 'Test2026x');
+    const reader = await context.newPage();
+    await navigateToAnnouncementList(reader);
+    await expect(reader.getByRole('button', { name: '新建公告', exact: true })).toHaveCount(0);
+    const denied = await context.request.post(
+      '/api/meta/commands/execute/announcement:create_announcement',
+      {
+        headers: { Referer: baseURL! + '/' },
+        data: {
+          clientRequestId: randomUUID(),
+          operationType: 'CREATE',
+          payload: { title: 'Unauthorized' },
+        },
+      },
+    );
+    expect(denied.status(), await denied.text()).toBe(403);
+    await reader.screenshot({
+      animations: 'disabled',
+      path: test.info().outputPath('permission-denied.png'),
+      fullPage: true,
+    });
+  } finally {
+    await context.close();
+  }
 });

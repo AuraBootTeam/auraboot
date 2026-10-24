@@ -2403,8 +2403,10 @@
             "type": "string"
           },
           "id": {
-            "format": "int64",
-            "type": "integer"
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
           },
           "pinned": {
             "type": "boolean"
@@ -2417,8 +2419,7 @@
             "type": "string"
           },
           "publishedBy": {
-            "format": "int64",
-            "type": "integer"
+            "type": "string"
           },
           "publishedByName": {
             "type": "string"
@@ -2430,34 +2431,6 @@
             "type": "string"
           }
         },
-        "type": "object"
-      },
-      "AnnouncementRequest": {
-        "properties": {
-          "content": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "pinned": {
-            "type": "boolean"
-          },
-          "priority": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "title": {
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "required": [
-          "title"
-        ],
         "type": "object"
       },
       "ApiConnector": {
@@ -3016,32 +2989,6 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AnalyticsRetention"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "message": {
-            "type": "string"
-          },
-          "timestamp": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "ApiResponseAnnouncementDTO": {
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "context": {},
-          "data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnnouncementDTO"
               },
               {
                 "type": "null"
@@ -60133,7 +60080,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnnouncementRequest"
+                "additionalProperties": {},
+                "type": "object"
               }
             }
           },
@@ -60144,7 +60092,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAnnouncementDTO"
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -60156,16 +60104,32 @@
         ]
       }
     },
-    "/api/announcements/{id}": {
+    "/api/announcements/{pid}": {
       "delete": {
         "operationId": "delete_23",
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "pid",
             "required": true,
             "schema": {
-              "format": "int64",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "format": "int32",
               "type": "integer"
             }
           }
@@ -60175,7 +60139,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -60191,11 +60155,10 @@
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "pid",
             "required": true,
             "schema": {
-              "format": "int64",
-              "type": "integer"
+              "type": "string"
             }
           }
         ],
@@ -60203,7 +60166,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnnouncementRequest"
+                "additionalProperties": {},
+                "type": "object"
               }
             }
           },
@@ -60214,7 +60178,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAnnouncementDTO"
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -108959,6 +108923,10 @@
       "name": "模型管理"
     },
     {
+      "description": "Tenant announcements",
+      "name": "Announcements"
+    },
+    {
       "description": "Command definition management and command execution APIs",
       "name": "Commands"
     },
@@ -109057,10 +109025,6 @@
     {
       "description": "Meta平台性能指标监控接口",
       "name": "Meta性能监控"
-    },
-    {
-      "description": "Workbench announcement management",
-      "name": "Announcements"
     },
     {
       "description": "Decision definition management and runtime evaluation",

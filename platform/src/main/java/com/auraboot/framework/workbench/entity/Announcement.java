@@ -20,6 +20,16 @@ public class Announcement {
     @TableField("tenant_id")
     private Long tenantId;
 
+    private String pid;
+    private Long ownerUserId;
+    private Integer rowVersion;
+    private Integer editorRevision;
+    private Integer lifecycleRevision;
+    private String currentVersionPid;
+    private String activeVersionPid;
+    private Long createdBy;
+    private Long updatedBy;
+
     @TableField("title")
     private String title;
 

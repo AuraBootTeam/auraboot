@@ -133,4 +133,33 @@ class ModelMutationGuardTest {
                 .doesNotThrowAnyException();
         MetaContext.clear();
     }
+
+    @Test
+    void exactWritersRejectGenericAndUnrelatedCommands() {
+        ModelDefinition model=ModelDefinition.builder().code("ab_announcement").extension(Map.of(
+            "commandWriters", Map.of("create",java.util.List.of("notice:create"),
+                "update",java.util.List.of("notice:save"),"delete",java.util.List.of("notice:delete")))).build();
+        assertThatThrownBy(()->ModelMutationGuard.assertCreateAllowed(model)).isInstanceOf(MetaServiceException.class);
+        try {
+            MetaContext.runWithCommandPermitPlan("ALL",null,"ab_announcement","n-1",()-> {
+                MetaContext.runWithAuthorizedCommandCode("other:save",()-> {
+                    assertThatThrownBy(()->ModelMutationGuard.assertMutable(model,"updated"))
+                        .isInstanceOf(MetaServiceException.class);
+                });
+                MetaContext.runWithAuthorizedCommandCode("notice:save",()-> {
+                    assertThatCode(()->ModelMutationGuard.assertMutable(model,"updated")).doesNotThrowAnyException();
+                    assertThatThrownBy(()->ModelMutationGuard.assertDeleteAllowed(model))
+                        .isInstanceOf(MetaServiceException.class);
+                });
+            });
+        } finally { MetaContext.clear(); }
+    }
+
+    @Test
+    void malformedWriterPolicyFailsClosed() {
+        ModelDefinition model=ModelDefinition.builder().code("ab_announcement")
+            .extension(Map.of("commandWriters",Map.of("update",java.util.List.of("save")))).build();
+        assertThatThrownBy(()->ModelMutationGuard.assertMutable(model,"updated"))
+            .isInstanceOf(MetaServiceException.class).hasMessageContaining("Invalid");
+    }
 }

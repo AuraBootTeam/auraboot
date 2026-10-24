@@ -15,14 +15,15 @@ import java.time.Instant;
 public class AnnouncementDTO {
 
     @JsonSerialize(using = ToStringSerializer.class)
-    private Long id;
+    private String id;
+    private String pid;
     private String title;
     private String content;
     private String priority;
     private String status;
     private Boolean pinned;
     @JsonSerialize(using = ToStringSerializer.class)
-    private Long publishedBy;
+    private String publishedBy;
     private String publishedByName;
     private Instant publishedAt;
     private Instant expiresAt;

@@ -14,6 +14,12 @@ This directory holds engineering-facing material that ships with the repository.
 | [`assets/`](./assets/) | Images used by the documentation (screenshots, diagrams). |
 | [`api-fixtures/`](./api-fixtures/) | Shared fixtures referenced by API contract tests. |
 
+## Feature requirements and target contracts
+
+| Topic | Reference | Status |
+| --- | --- | --- |
+| Announcement management | [Requirements, UX, permissions, BPM composition and phased implementation](./system-reference/announcement-management.md) | S1 controlled drafts and historical lifecycle verified; [acceptance evidence](./system-reference/2026-10-24-announcement-s1-testing-gate-acceptance-report.md). Later slices remain design contracts |
+
 ## Conventions
 
 - Architecture overview: start at [ARCHITECTURE.md](../ARCHITECTURE.md) (repo root), then dive into `system-reference/` for operational detail.

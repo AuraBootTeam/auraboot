@@ -1,0 +1,22 @@
+{
+  "com/auraboot/framework/meta/service/impl/ModelMutationGuard": {
+    "type": "LINE",
+    "missed": "6",
+    "covered": "59"
+  },
+  "com/auraboot/framework/workbench/service/AnnouncementLifecycleService": {
+    "type": "LINE",
+    "missed": "23",
+    "covered": "145"
+  },
+  "com/auraboot/framework/meta/service/impl/pipeline/phases/CommandTargetScopePhase": {
+    "type": "LINE",
+    "missed": "20",
+    "covered": "145"
+  },
+  "com/auraboot/framework/meta/service/impl/pipeline/phases/HandlerPhase": {
+    "type": "LINE",
+    "missed": "93",
+    "covered": "393"
+  }
+}

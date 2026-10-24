@@ -1,0 +1,230 @@
+{
+  "suites": [
+    {
+      "title": "e2e/announcement/announcement-lifecycle.spec.ts",
+      "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+      "line": 0,
+      "column": 0,
+      "specs": [
+        {
+          "title": "create announcement in draft status",
+          "ok": true,
+          "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+          "line": 123,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 4544,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "list page shows created announcement with draft status",
+          "ok": true,
+          "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+          "line": 181,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 1811,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "edit draft through the menu and retain the observed revision",
+          "ok": true,
+          "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+          "line": 218,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 4580,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "publication reports unavailable and leaves the draft intact",
+          "ok": true,
+          "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+          "line": 273,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 2754,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "delete draft through its protected command",
+          "ok": true,
+          "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+          "line": 304,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 1636,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "withdraw legacy content and create a revision without mutating its frozen version",
+          "ok": true,
+          "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+          "line": 316,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 1879,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "read-only manager cannot create or modify notices",
+          "ok": true,
+          "file": "e2e/announcement/announcement-lifecycle.spec.ts",
+          "line": 400,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "chromium",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 1791,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "api/announcement-controlled-writes.spec.ts",
+      "file": "api/announcement-controlled-writes.spec.ts",
+      "line": 0,
+      "column": 0,
+      "specs": [
+        {
+          "title": "draft commands enforce replay, revision, protected fields and audit atomicity",
+          "ok": true,
+          "file": "api/announcement-controlled-writes.spec.ts",
+          "line": 12,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "api",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 379,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "concurrent edits admit one observed revision and preserve the winner",
+          "ok": true,
+          "file": "api/announcement-controlled-writes.spec.ts",
+          "line": 138,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "api",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 98,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "REST compatibility writes delegate to the same operation and revision contract",
+          "ok": true,
+          "file": "api/announcement-controlled-writes.spec.ts",
+          "line": 173,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "api",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 148,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

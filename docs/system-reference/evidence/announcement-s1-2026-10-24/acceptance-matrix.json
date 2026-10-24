@@ -1,0 +1,110 @@
+[
+  {
+    "id": "S1-UI-01",
+    "action": "新建草稿",
+    "state": "form/happy",
+    "expectation": "创建表单和引导；提交仅业务字段",
+    "screenshot": "shots/create-form-guidance.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-02",
+    "action": "列表筛选",
+    "state": "empty/recovery",
+    "expectation": "关键词空结果后重置恢复",
+    "screenshot": "shots/filtered-empty-recovery.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-03",
+    "action": "草稿编辑",
+    "state": "detail/happy",
+    "expectation": "observed revision=1；编辑持久化并详情回显",
+    "screenshot": "shots/draft-detail.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-04",
+    "action": "发布拦截",
+    "state": "sad",
+    "expectation": "明确尚未启用；状态仍为草稿",
+    "screenshot": "shots/publication-unavailable.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-05",
+    "action": "删除草稿",
+    "state": "confirm",
+    "expectation": "确认后受控删除；列表消失",
+    "screenshot": "shots/confirm-announcement-delete_announcement.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-06",
+    "action": "删除结果",
+    "state": "happy",
+    "expectation": "刷新无已删除草稿",
+    "screenshot": "shots/deleted-draft.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-07",
+    "action": "普通成员权限",
+    "state": "权限",
+    "expectation": "无编辑权时隐藏入口；后端拒绝且无写入",
+    "screenshot": "shots/permission-denied.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-08",
+    "action": "历史公告撤回修订",
+    "state": "edge",
+    "expectation": "已发布撤回、基于历史建立草稿，版本不可变",
+    "screenshot": "shots/legacy-revision.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  },
+  {
+    "id": "S1-UI-09",
+    "action": "全字段草稿编辑",
+    "state": "form/happy",
+    "expectation": "重要程度与置顶显式编辑；标题、正文、时限保留；CAS观察版本",
+    "screenshot": "shots/edit-form-values.png",
+    "status": "captured",
+    "functional": "pass",
+    "visual": "pass",
+    "judge": "agent-vision",
+    "issues": []
+  }
+]

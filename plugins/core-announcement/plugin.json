@@ -20,7 +20,8 @@
     "permissions": "config/permissions.json",
     "menus": "config/menus.json",
     "pages": "config/pages.json",
-    "i18n": "config/i18n.json"
+    "i18n": "config/i18n.json",
+    "bindingRules": "config/bindingRules.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

@@ -19,6 +19,7 @@ public interface CommandHandler {
     /**
      * Whether FIELD_MAP should persist before this handler executes. Return false
      * only when the handler owns the complete mutation, including dependent data.
+     * Handler-owned mutations also skip computed-field and result writeback.
      * Authorization and declarative state checks still run before the handler.
      * Existing handlers retain DSL persistence unless they explicitly opt out.
      */

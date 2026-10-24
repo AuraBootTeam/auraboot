@@ -32,7 +32,7 @@ class AnnouncementControllerAuthzTest {
             Method m = findMethod(name);
             RequirePermission rp = m.getAnnotation(RequirePermission.class);
             assertNotNull(rp, "endpoint '" + name + "' must declare @RequirePermission");
-            assertEquals(MetaPermission.ANNOUNCEMENT_MANAGE, rp.value(),
+            assertEquals("announcement.announcement." + (name.equals("delete") ? "delete" : "edit"), rp.value(),
                     "endpoint '" + name + "' must require ANNOUNCEMENT_MANAGE");
         }
     }

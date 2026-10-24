@@ -19,6 +19,9 @@ public class CommandHandlerContext {
     private String modelCode;
     private Map<String, Object> payload;
     private String operationType;
+    /** Original client intent identity; never synthesized from mutable business fields. */
+    private String clientRequestId;
+    private Integer expectedVersion;
     private String targetRecordId;
     private Long tenantId;
     private Long userId;
