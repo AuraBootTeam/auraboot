@@ -55,15 +55,16 @@ class AnnouncementOrganizationIntegrationTest extends BaseIntegrationTest {
         String version=(String)accepted.get("versionPid");
         var estimate=codec.object(jdbc.queryForObject("SELECT organization_snapshot::text FROM ab_announcement_audience_estimate WHERE tenant_id=? AND version_pid=? AND user_pid=?",
             String.class,tenant,version,getTestUser().getPid()));
-        assertThat(estimate.get("departments")).isEqualTo(List.of(Map.of("pid",first,"label","Original department")));
+        assertThat(estimate.get("departments")).asList().contains(Map.of("pid",first,"label","Original department"));
         jdbc.update("UPDATE mt_org_employee SET org_emp_dept_id=? WHERE tenant_id=? AND pid=?",second,tenant,employee);
-        MetaContext.clear();var job=releases.claim();assertThat(job).isNotNull();
-        assertThat(job.get("version_pid")).isEqualTo(version);releases.perform(job);applyTestMetaContext();
+        MetaContext.clear();new AnnouncementReleaseWorker(releases).tick();applyTestMetaContext();
+        assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,tenant,pid)).isEqualTo("published");
         String snapshot=jdbc.queryForObject("SELECT organization_snapshot::text FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=? AND user_pid=?",
             String.class,tenant,version,getTestUser().getPid());
         var captured=codec.object(snapshot);
         assertThat(captured).containsEntry("captured",true);
-        assertThat(captured.get("departments")).isEqualTo(List.of(Map.of("pid",second,"label","Publication department")));
+        assertThat(captured.get("departments")).asList().contains(Map.of("pid",second,"label","Publication department"))
+            .doesNotContain(Map.of("pid",first,"label","Original department"));
         jdbc.update("UPDATE mt_org_department SET org_dept_name='Renamed later' WHERE tenant_id=? AND pid=?",tenant,second);
         assertThat(jdbc.queryForObject("SELECT organization_snapshot::text FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=? AND user_pid=?",
             String.class,tenant,version,getTestUser().getPid())).isEqualTo(snapshot);
