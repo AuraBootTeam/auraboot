@@ -282,8 +282,12 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional
     public boolean createFileRelation(FileRelationRequestDTO request, Long userId) {
-        removeFileRelation(request.getEntityType(), request.getEntityId(), request.getFieldName());
-
+        // The controller authorizes the exact target record. A later editor may
+        // retain its existing attachments, but may not copy another user's file
+        // to a different record or field. Resolve before replacing any relations.
+        List<Long> existing = fileRelationMapper.findFileIdsByEntityAndField(
+                request.getEntityType(), request.getEntityId(), request.getFieldName());
+        List<FileEntity> files = new ArrayList<>();
         for (int i = 0; i < request.getFileIds().length; i++) {
             String publicFileId = request.getFileIds()[i];
             FileEntity file = findByPid(publicFileId);
@@ -292,9 +296,17 @@ public class FileServiceImpl implements FileService {
                     || UploadStatus.DELETED.getCode().equalsIgnoreCase(file.getStatus())) {
                 throw new BusinessException("Active public file not found: " + publicFileId);
             }
-            if (file.getCreatedBy() == null || !file.getCreatedBy().equals(userId)) {
+            boolean retained = MetaContext.exists() && userId != null
+                    && userId.equals(MetaContext.getCurrentUserId())
+                    && existing.contains(file.getId());
+            if (!retained && (file.getCreatedBy() == null || !file.getCreatedBy().equals(userId))) {
                 throw new BusinessException("Only the file owner can create a relation");
             }
+            files.add(file);
+        }
+        removeFileRelation(request.getEntityType(), request.getEntityId(), request.getFieldName());
+        for (int i = 0; i < files.size(); i++) {
+            FileEntity file = files.get(i);
             FileRelationEntity relation = new FileRelationEntity();
             relation.setFileId(String.valueOf(file.getId()));
             relation.setEntityType(request.getEntityType());

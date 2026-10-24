@@ -167,6 +167,7 @@ const source = z
     type: z.enum(['model', 'namedQuery', 'api', 'static', 'aggregate']),
     modelCode: nonempty.optional(),
     queryCode: nonempty.optional(),
+    params: z.record(z.string(), z.union([z.string(), finite, z.boolean(), z.null()])).optional(),
     url: nonempty.optional(),
     aggregateQuery: z.record(z.string(), z.unknown()).optional(),
     data: z.array(z.record(z.string(), z.unknown())).optional(),

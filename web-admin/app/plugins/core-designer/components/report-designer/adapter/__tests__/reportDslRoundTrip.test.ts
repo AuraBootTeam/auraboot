@@ -75,7 +75,7 @@ describe('blockTreeToReportDsl round-trip (dsl → tree → dsl === dsl)', () =>
       ...base,
       title: 'P',
       page: { ...DEFAULT_PAGE_CONFIG },
-      dataSources: { s: { type: 'namedQuery', queryCode: 'q' } },
+      dataSources: { s: { type: 'namedQuery', queryCode: 'q', params: { projectPid: 'project-a' } } },
       body: [
         {
           id: 'c1',

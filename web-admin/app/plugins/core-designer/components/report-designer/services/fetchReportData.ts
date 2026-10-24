@@ -66,6 +66,16 @@ async function fetchNamedQueryData(ds: ReportDataSource): Promise<Record<string,
     maxItems: '500',
   });
 
+  const controlKeys = new Set([
+    'datasourceId', 'format', 'maxItems', 'valueField', 'labelField',
+    'searchField', 'keyword', 'page', 'size', 'reportingCurrency',
+  ]);
+  for (const [key, value] of Object.entries(ds.params ?? {})) {
+    if (controlKeys.has(key) || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key))
+      throw new Error('Invalid named query parameter');
+    if (value !== null) params.set(key, String(value));
+  }
+
   const response = await fetch(`/api/datasource/list?${params.toString()}`);
   requireReportResponse(response);
 
