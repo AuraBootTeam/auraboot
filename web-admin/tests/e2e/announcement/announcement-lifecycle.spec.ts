@@ -136,6 +136,9 @@ test('create announcement in draft status', async ({ page }) => {
     path: test.info().outputPath('create-form-guidance.png'),
     fullPage: true,
   });
+  await expect(
+    page.getByTestId('form-field-announcement_priority').getByRole('combobox'),
+  ).toContainText('普通');
   await title.fill(TITLE);
   await content.fill(CONTENT);
   await page.getByTestId('form-field-expires_at').locator('input').fill(EXPIRES.slice(0, 16));
@@ -215,6 +218,10 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
     .click();
   await expect(page.getByTestId('form-field-title').locator('input')).toHaveValue(TITLE);
   await page.getByTestId('form-field-content').locator('textarea').fill(`${CONTENT} edited`);
+  await page.getByTestId('form-field-announcement_priority').getByRole('combobox').click();
+  await page.getByRole('option', { name: '重要', exact: true }).click();
+  await page.getByTestId('form-field-pinned').getByRole('switch').click();
+  await page.screenshot({ path: test.info().outputPath('edit-form-values.png'), fullPage: true });
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
@@ -225,6 +232,8 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
   expect(response.status(), await response.text()).toBe(200);
   const input = response.request().postDataJSON();
   expect(input.expectedVersion).toBe(1);
+  expect(input.payload.announcement_priority).toBe('important');
+  expect(input.payload.pinned).toBe(true);
   expect(input.clientRequestId).toBeTruthy();
   expect(Object.keys(input.payload).sort()).toEqual([
     'announcement_priority',
@@ -238,6 +247,7 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
   const editedRow = await findRowByContent(page, TITLE);
   await editedRow.getByTestId('row-action-view').click();
   await expect(page.getByText(`${CONTENT} edited`, { exact: true })).toBeVisible();
+  await expect(page.getByText('重要', { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('draft-detail.png'), fullPage: true });
 });
 
@@ -259,7 +269,9 @@ test('publication reports unavailable and leaves the draft intact', async ({ pag
   expect(response.status()).toBe(422);
   expect(response.request().postDataJSON().payload).toEqual({});
   await expect(
-    page.getByText('公告发布尚未启用：需要先完成受众授权与可靠分发接入。', { exact: false }),
+    page
+      .getByTestId('ab:list:ab_announcement:action-error')
+      .getByText('公告发布尚未启用：需要先完成受众授权与可靠分发接入。', { exact: true }),
   ).toBeVisible();
   await page.screenshot({
     path: test.info().outputPath('publication-unavailable.png'),

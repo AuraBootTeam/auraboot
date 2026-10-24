@@ -243,11 +243,13 @@
           },
           {
             "field": "announcement_priority",
-            "colSpan": 6
+            "colSpan": 6,
+            "defaultValue": "normal"
           },
           {
             "field": "pinned",
-            "colSpan": 6
+            "colSpan": 6,
+            "defaultValue": false
           },
           {
             "field": "expires_at",
