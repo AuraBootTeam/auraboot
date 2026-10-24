@@ -223,7 +223,7 @@ mkdir -p "$ARTIFACTS/logs" "$ARTIFACTS/e2e"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
 mkdir -p "$WORK_PARENT"
 WORK_ROOT="$WORK_PARENT/${AURA_CI_JOB_ID}-${AURA_PRODUCT_ID}"
-[[ ! -e "$WORK_ROOT" ]] || rm -rf "$WORK_ROOT"  # same-job retry: clean-recreate instead of fatal
+[[ ! -e "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || fatal 'existing product work root must be inspected; explicit recovery required'
 mkdir "$WORK_ROOT"
 CORE_RELEASE="$WORK_ROOT/core-release"
 PRODUCT_RELEASE="$WORK_ROOT/product-release"
@@ -246,6 +246,7 @@ FLYWAY_IMAGE="${AURA_CI_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
 
 cleanup() {
   local status=$?
+  trap - EXIT INT TERM
   # Preserve the final application log even when the runtime became healthy and
   # failed later during browser acceptance. The earlier runtime snapshot is
   # intentionally retained as startup evidence; this file captures shutdown-time
@@ -271,8 +272,13 @@ cleanup() {
     exit "$status"
   fi
   if [[ -x "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" ]]; then
-    AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
-      "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >/dev/null 2>&1 || true
+    if ! (umask 077; AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
+      "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >"$ARTIFACTS/logs/product-stop.log" 2>&1); then
+      printf 'job=%s\nexit_code=%s\nwork_root=%s\ncleanup=product-stop-failed\n' \
+        "$AURA_CI_JOB_ID" "$status" "$WORK_ROOT" >"$ARTIFACTS/runtime-retained.txt"
+      [[ "$status" != 0 ]] || status=2
+      exit "$status"
+    fi
   fi
   docker rm -f "$PLAYWRIGHT_CONTAINER" "$APP_CONTAINER" "$PUBLISH_CONTAINER" "$PAYLOAD_CONTAINER" "$PG_CONTAINER" "$BUILD_PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
@@ -286,7 +292,9 @@ cleanup() {
   [[ ! -d "$WORK_ROOT" ]] || find "$WORK_ROOT" -depth -delete
   exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 CI=1 pnpm --dir "$CORE_ROOT" install --frozen-lockfile --ignore-scripts \
   >"$ARTIFACTS/logs/core-pnpm-install.log" 2>&1 \

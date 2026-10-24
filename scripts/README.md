@@ -31,6 +31,17 @@ Use Workspace `runtime suspend` / `runtime resume` for whole-stack lifecycle.
 Direct supervisor termination stops only its authenticated frontend tree and
 prevents further child restarts; runtime databases and evidence remain retained.
 
+### Product image gate ownership preservation
+
+`application/run-product-release-image-gate.sh` refuses an existing work root,
+including a symlink; recovery never implicitly removes the previous generation.
+On explicit non-retained cleanup, a failed product lifecycle stop preserves the
+work root and records `runtime-retained.txt` plus private `logs/product-stop.log`.
+No container, image, network or work-root removal follows that failure. A prior
+failure remains failed; otherwise cleanup failure returns environment exit2.
+INT/TERM enter EXIT cleanup once and preserve130/143. Retained environments keep
+the original review behavior; pause idle services through their product owner.
+
 ## gate (44)
 
 | script | refs | updated | purpose |

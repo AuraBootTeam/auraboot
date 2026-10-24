@@ -23,6 +23,72 @@ const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-sc
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
 
+test('product image reentry preserves the existing work root and refuses implicit replacement', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'product-work-root-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const script = productImageGate.slice(productImageGate.indexOf('WORK_ROOT="$WORK_PARENT/'), productImageGate.indexOf('CORE_RELEASE="$WORK_ROOT/'));
+  const existing = join(directory, 'owned-edu'); mkdirSync(existing);
+  writeFileSync(join(existing, 'ownership-proof'), 'preserve');
+  const run = () => spawnSync('bash', ['-c', `fatal() { echo "$*" >&2; exit 2; }\n${script}`], {
+    env: { ...process.env, WORK_PARENT: directory, AURA_CI_JOB_ID: 'owned', AURA_PRODUCT_ID: 'edu' }, encoding: 'utf8',
+  });
+  assert.equal(run().status, 2);
+  assert.equal(readFileSync(join(existing, 'ownership-proof'), 'utf8'), 'preserve');
+  rmSync(existing, { recursive: true });
+  symlinkSync(directory, existing, 'dir');
+  assert.equal(run().status, 2);
+  rmSync(existing);
+  assert.equal(run().status, 0);
+  assert.ok(statSync(existing).isDirectory());
+});
+
+function productCleanupFixture(t, { keep = '0', stopStatus = 0, action = 'exit 0' } = {}) {
+  const directory = mkdtempSync(join(tmpdir(), 'product-cleanup-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const work = join(directory, 'work'), artifacts = join(directory, 'artifacts'), calls = join(directory, 'calls');
+  mkdirSync(join(work, 'release'), { recursive: true }); mkdirSync(join(artifacts, 'logs'), { recursive: true });
+  writeFileSync(join(work, 'ownership-proof'), 'preserve');
+  writeFileSync(join(work, 'release/lifecycle'), `#!/bin/bash\necho stop >> "$CALLS"\nexit ${stopStatus}\n`, { mode: 0o755 });
+  const cleanup = productImageGate.match(/cleanup\(\) \{[\s\S]*?\n\}/)?.[0]; assert.ok(cleanup);
+  const traps = productImageGate.slice(productImageGate.indexOf('\ntrap cleanup EXIT'), productImageGate.indexOf('\nCI=1 pnpm'));
+  const script = `set -Eeuo pipefail
+docker() { echo "docker $*" >> "$CALLS"; [[ "$1" != inspect ]]; }
+info() { echo info >> "$CALLS"; }
+${cleanup}
+${traps}
+${action}`;
+  const run = spawnSync('bash', ['-c', script], { encoding: 'utf8', env: { ...process.env,
+    CALLS: calls, ARTIFACTS: artifacts, KEEP_RUNTIME: keep, AURA_CI_JOB_ID: 'owned', NETWORK: 'owned-network',
+    WORK_ROOT: work, STATE_ROOT: work, PRODUCT_RELEASE: join(work, 'release'), AURA_PRODUCT_LIFECYCLE: 'lifecycle',
+    APP_CONTAINER: 'owned-app', PUBLISH_CONTAINER: 'owned-publisher', PLAYWRIGHT_CONTAINER: 'owned-playwright',
+    PAYLOAD_CONTAINER: 'owned-payload', PG_CONTAINER: 'owned-pg', BUILD_PG_CONTAINER: 'owned-build-pg',
+    REGISTRY_IMAGE: '', REGISTRY_DIGEST_REF: '', IMAGE_REF: '', IMAGE_ID: '', DOCKER_CONFIG_ROOT: join(work, 'docker-config'),
+  } });
+  return { run, work, artifacts, calls: readFileSync(calls, 'utf8') };
+}
+
+test('product cleanup preserves ownership and data on stop failure without hiding the original verdict', t => {
+  for (const initial of [0, 1]) {
+    const f = productCleanupFixture(t, { stopStatus: 7, action: `exit ${initial}` });
+    assert.equal(f.run.status, initial || 2, f.run.stderr);
+    assert.equal(readFileSync(join(f.work, 'ownership-proof'), 'utf8'), 'preserve');
+    assert.doesNotMatch(f.calls, /docker (rm|network rm|image rm)/);
+    assert.equal(f.calls.split('\n').filter(v => v === 'stop').length, 1);
+    assert.match(readFileSync(join(f.artifacts, 'runtime-retained.txt'), 'utf8'), /cleanup=product-stop-failed/);
+  }
+  const succeeded = productCleanupFixture(t);
+  assert.equal(succeeded.run.status, 0, succeeded.run.stderr);
+  assert.equal(existsSync(succeeded.work), false);
+});
+
+test('product signal exit retains its nonzero status and executes cleanup once', t => {
+  const f = productCleanupFixture(t, { keep: '1', action: 'kill -TERM $$' });
+  assert.equal(f.run.status, 143, f.run.stderr);
+  assert.equal(f.calls.split('\n').filter(v => v === 'info').length, 1);
+  assert.match(readFileSync(join(f.artifacts, 'runtime-retained.txt'), 'utf8'), /exit_code=143/);
+  assert.equal(readFileSync(join(f.work, 'ownership-proof'), 'utf8'), 'preserve');
+});
+
 test('product runtime argument guard accepts role lists and rejects shell syntax', () => {
   const guard = productImageGate.split('\n').find(line => line.includes('[[ "$runtime_arg" =~'));
   assert.ok(guard);
