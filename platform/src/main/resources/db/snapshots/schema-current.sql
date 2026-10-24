@@ -268,6 +268,52 @@ END $$;
 
 
 --
+-- Name: ab_announcement_guard_statistics_row(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_announcement_guard_statistics_row() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE header_sealed BOOLEAN; retention TIMESTAMPTZ;
+BEGIN
+ IF TG_OP='UPDATE' THEN RAISE EXCEPTION 'Announcement statistics rows are immutable'; END IF;
+ IF TG_OP='DELETE' THEN
+  SELECT retained_until INTO retention FROM ab_announcement_statistics_snapshot WHERE tenant_id=OLD.tenant_id AND pid=OLD.snapshot_pid;
+  IF retention>clock_timestamp() THEN RAISE EXCEPTION 'Announcement statistics retention has not elapsed'; END IF;
+  RETURN OLD;
+ END IF;
+ SELECT sealed INTO header_sealed FROM ab_announcement_statistics_snapshot WHERE tenant_id=NEW.tenant_id AND pid=NEW.snapshot_pid FOR UPDATE;
+ IF NOT FOUND OR header_sealed THEN RAISE EXCEPTION 'Announcement statistics snapshot is missing or sealed'; END IF;
+ RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_announcement_guard_statistics_snapshot(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_announcement_guard_statistics_snapshot() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  IF NEW.sealed THEN RAISE EXCEPTION 'Announcement statistics must be sealed after its rows'; END IF;
+  RETURN NEW;
+ END IF;
+ IF TG_OP='DELETE' THEN
+  IF OLD.retained_until>clock_timestamp() THEN RAISE EXCEPTION 'Announcement statistics retention has not elapsed'; END IF;
+  RETURN OLD;
+ END IF;
+ IF OLD.sealed OR NOT NEW.sealed OR (to_jsonb(NEW)-'sealed') IS DISTINCT FROM (to_jsonb(OLD)-'sealed')
+ THEN RAISE EXCEPTION 'Announcement statistics snapshot is immutable'; END IF;
+ IF NEW.row_count<>(SELECT count(*) FROM ab_announcement_statistics_row WHERE tenant_id=NEW.tenant_id AND snapshot_pid=NEW.pid)
+    OR NEW.filtered_count<>(SELECT count(*) FROM ab_announcement_statistics_row WHERE tenant_id=NEW.tenant_id AND snapshot_pid=NEW.pid AND matches_filters)
+ THEN RAISE EXCEPTION 'Announcement statistics row counts do not match'; END IF;
+ RETURN NEW;
+END $$;
+
+
+--
 -- Name: ab_announcement_reject_estimate_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3980,6 +4026,53 @@ CREATE TABLE public.ab_announcement_release (
     finished_at timestamp with time zone,
     CONSTRAINT ab_announcement_release_check CHECK ((latest_allowed_at >= scheduled_at)),
     CONSTRAINT ab_announcement_release_status_check CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying, 'succeeded'::character varying, 'retryable_failed'::character varying, 'blocked'::character varying, 'canceled'::character varying, 'missed'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_announcement_statistics_row; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_statistics_row (
+    tenant_id bigint NOT NULL,
+    snapshot_pid character varying(36) NOT NULL,
+    user_pid character varying(36) NOT NULL,
+    member_pid character varying(36) NOT NULL,
+    organization_snapshot jsonb NOT NULL,
+    display_proof jsonb NOT NULL,
+    view_payload jsonb NOT NULL,
+    matches_filters boolean NOT NULL
+);
+
+
+--
+-- Name: ab_announcement_statistics_snapshot; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_statistics_snapshot (
+    tenant_id bigint NOT NULL,
+    pid character varying(36) NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    owner_user_id bigint NOT NULL,
+    owner_member_pid character varying(36) NOT NULL,
+    snapshot_schema character varying(40) NOT NULL,
+    as_of timestamp with time zone NOT NULL,
+    view_expires_at timestamp with time zone NOT NULL,
+    retained_until timestamp with time zone NOT NULL,
+    metadata jsonb NOT NULL,
+    summary jsonb NOT NULL,
+    filters jsonb NOT NULL,
+    row_count bigint NOT NULL,
+    filtered_count bigint NOT NULL,
+    sealed boolean DEFAULT false NOT NULL,
+    CONSTRAINT ab_announcement_statistics_snapshot_check CHECK (((filtered_count >= 0) AND (filtered_count <= row_count))),
+    CONSTRAINT ab_announcement_statistics_snapshot_check1 CHECK ((view_expires_at = (as_of + '00:30:00'::interval))),
+    CONSTRAINT ab_announcement_statistics_snapshot_check2 CHECK ((retained_until = (as_of + '25:00:00'::interval))),
+    CONSTRAINT ab_announcement_statistics_snapshot_filters_check CHECK ((jsonb_typeof(filters) = 'object'::text)),
+    CONSTRAINT ab_announcement_statistics_snapshot_metadata_check CHECK ((jsonb_typeof(metadata) = 'object'::text)),
+    CONSTRAINT ab_announcement_statistics_snapshot_row_count_check CHECK ((row_count >= 0)),
+    CONSTRAINT ab_announcement_statistics_snapshot_snapshot_schema_check CHECK (((snapshot_schema)::text = 'announcement.statistics.v1'::text)),
+    CONSTRAINT ab_announcement_statistics_snapshot_summary_check CHECK ((jsonb_typeof(summary) = 'object'::text))
 );
 
 
@@ -20164,6 +20257,22 @@ ALTER TABLE ONLY public.ab_announcement_release
 
 
 --
+-- Name: ab_announcement_statistics_row ab_announcement_statistics_row_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_statistics_row
+    ADD CONSTRAINT ab_announcement_statistics_row_pkey PRIMARY KEY (tenant_id, snapshot_pid, user_pid);
+
+
+--
+-- Name: ab_announcement_statistics_snapshot ab_announcement_statistics_snapshot_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_statistics_snapshot
+    ADD CONSTRAINT ab_announcement_statistics_snapshot_pkey PRIMARY KEY (tenant_id, pid);
+
+
+--
 -- Name: ab_announcement_tenant_policy ab_announcement_tenant_policy_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -26705,6 +26814,20 @@ CREATE INDEX idx_announcement_release_claim ON public.ab_announcement_release US
 
 
 --
+-- Name: idx_announcement_statistics_page; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_announcement_statistics_page ON public.ab_announcement_statistics_row USING btree (tenant_id, snapshot_pid, user_pid) WHERE matches_filters;
+
+
+--
+-- Name: idx_announcement_statistics_retention; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_announcement_statistics_retention ON public.ab_announcement_statistics_snapshot USING btree (retained_until);
+
+
+--
 -- Name: idx_announcement_tenant_status; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -31255,6 +31378,20 @@ CREATE TRIGGER ab_announcement_sealed_audience_guard BEFORE DELETE OR UPDATE ON 
 
 
 --
+-- Name: ab_announcement_statistics_row ab_announcement_statistics_row_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_statistics_row_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_announcement_statistics_row FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_guard_statistics_row();
+
+
+--
+-- Name: ab_announcement_statistics_snapshot ab_announcement_statistics_snapshot_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_statistics_snapshot_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_announcement_statistics_snapshot FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_guard_statistics_snapshot();
+
+
+--
 -- Name: ab_application_release ab_application_release_require_actor; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -31640,6 +31777,22 @@ ALTER TABLE ONLY public.ab_announcement_recipient
 
 ALTER TABLE ONLY public.ab_announcement_release
     ADD CONSTRAINT ab_announcement_release_tenant_id_announcement_pid_version_fkey FOREIGN KEY (tenant_id, announcement_pid, version_pid) REFERENCES public.ab_announcement_version(tenant_id, announcement_pid, pid);
+
+
+--
+-- Name: ab_announcement_statistics_row ab_announcement_statistics_row_tenant_id_snapshot_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_statistics_row
+    ADD CONSTRAINT ab_announcement_statistics_row_tenant_id_snapshot_pid_fkey FOREIGN KEY (tenant_id, snapshot_pid) REFERENCES public.ab_announcement_statistics_snapshot(tenant_id, pid) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_announcement_statistics_snapshot ab_announcement_statistics_snapshot_tenant_id_version_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_statistics_snapshot
+    ADD CONSTRAINT ab_announcement_statistics_snapshot_tenant_id_version_pid_fkey FOREIGN KEY (tenant_id, version_pid) REFERENCES public.ab_announcement_version(tenant_id, pid);
 
 
 --
