@@ -15,7 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.test.context.TestComponent;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,28 +91,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Commit
 @Transactional(propagation = Propagation.NEVER)
 @DisplayName("A.1 — SubAgentRunner async terminal wiring (CountDownLatch + ChildRunCompletedEvent)")
+@Import(SubAgentRunnerExecutionIntegrationTest.LatchedChildRunCompletedListener.class)
 class SubAgentRunnerExecutionIntegrationTest extends BaseIntegrationTest {
 
-    /**
-     * Test-scoped {@link ChildRunCompletedEvent} sink. Picked up by Spring's
-     * {@code @ComponentScan(basePackages = "com.auraboot.framework")} on
-     * {@code TestApplication} (the parent class for {@code @SpringBootTest}),
-     * because this nested class lives under {@code com.auraboot.framework.*}.
-     * Mirrors the pattern in
-     * {@code SchemaPublishedEventIntegrationTest.TestSchemaPublishedEventListener}.
-     *
-     * <p>Default Spring event semantics apply: the listener fires synchronously
-     * because {@link ChildRunCompletedEvent} is not configured for the async
-     * executor.
-     *
-     * <p>Stateful — must be {@link #reset()} between tests so a previous test's
-     * latched events don't leak. The listener bean is shared across all tests
-     * in the same Spring context, but only this test wires it up — other tests
-     * never publish {@link ChildRunCompletedEvent} during their bodies (the
-     * production path runs through async channels not exercised by their
-     * fixtures), so cross-test interference is not observed in practice.
-     */
-    @Component
+    /** Test-owned event sink registered explicitly for this integration context. */
+    @TestComponent
     public static class LatchedChildRunCompletedListener {
         private final CopyOnWriteArrayList<ChildRunCompletedEvent> events = new CopyOnWriteArrayList<>();
         private volatile CountDownLatch latch = new CountDownLatch(1);

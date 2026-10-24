@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration-test")
+@org.springframework.context.annotation.Import(ScopeRestrictionFilterIntegrationTest.TestScopePolicy.class)
 class ScopeRestrictionFilterIntegrationTest {
 
     private static final String VISITOR_SCOPE = "visitor";

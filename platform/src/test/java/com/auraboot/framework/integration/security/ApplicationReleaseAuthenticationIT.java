@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 /** Real JWT validation, session lookup, database roles, MVC and registration persistence. */
 @org.springframework.test.context.TestPropertySource(properties = "aura.security.authz.unannotated-mode=deny")
+@org.springframework.context.annotation.Import(ApplicationReleaseAuthenticationIT.RegistryTestConnection.class)
 class ApplicationReleaseAuthenticationIT extends BaseIntegrationTest {
     @org.springframework.boot.test.context.TestConfiguration
     static class RegistryTestConnection {

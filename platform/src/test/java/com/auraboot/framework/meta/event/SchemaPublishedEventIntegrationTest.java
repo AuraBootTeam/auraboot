@@ -9,7 +9,8 @@ import com.auraboot.framework.meta.service.PageSchemaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.test.context.TestComponent;
+import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration test verifying that SchemaPublishedEvent is emitted when a page schema is published.
  */
+@Import(SchemaPublishedEventIntegrationTest.TestSchemaPublishedEventListener.class)
 class SchemaPublishedEventIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -79,7 +81,7 @@ class SchemaPublishedEventIntegrationTest extends BaseIntegrationTest {
     /**
      * Test listener that captures SchemaPublishedEvent instances.
      */
-    @Component
+    @TestComponent
     static class TestSchemaPublishedEventListener {
 
         private final CopyOnWriteArrayList<SchemaPublishedEvent> events = new CopyOnWriteArrayList<>();

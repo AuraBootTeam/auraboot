@@ -34,6 +34,7 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
 @DisplayName("The real IM-backed group-chat port wins over the NoOp fallback, even under ambiguity")
+@org.springframework.context.annotation.Import(GroupChatMessagePortWiringIT.SecondPortConfig.class)
 class GroupChatMessagePortWiringIT {
 
     /** A second GroupChatMessagePort bean, so the context has two candidates (adapter + this). */

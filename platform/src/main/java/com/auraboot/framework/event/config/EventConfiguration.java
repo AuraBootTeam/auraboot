@@ -103,9 +103,11 @@ public class EventConfiguration {
      *
      * <p>Lease renewal is fencing infrastructure. It must not share Spring's default
      * scheduler with application jobs, because one slow scheduled job can otherwise
-     * delay every heartbeat past the 90-second lease and invalidate healthy workers.</p>
+     * delay every heartbeat past the 90-second lease and invalidate healthy workers.
+     * Keeping it outside default candidate selection also preserves Boot's separately
+     * configured application scheduler; lease renewal selects this bean by name.</p>
      */
-    @Bean("asyncTaskLeaseScheduler")
+    @Bean(value = "asyncTaskLeaseScheduler", defaultCandidate = false)
     public ThreadPoolTaskScheduler asyncTaskLeaseScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(1);
