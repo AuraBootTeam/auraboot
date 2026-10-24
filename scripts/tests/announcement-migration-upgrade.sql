@@ -6,7 +6,7 @@ SET LOCAL search_path=announcement_migration_test;
 CREATE TABLE ab_announcement (
     id BIGINT PRIMARY KEY,pid VARCHAR(36),tenant_id BIGINT NOT NULL,title VARCHAR(256) NOT NULL,
     content TEXT,announcement_priority VARCHAR(32) NOT NULL DEFAULT 'normal',priority VARCHAR(32) DEFAULT 'normal',
-    status VARCHAR(24) NOT NULL,pinned BOOLEAN DEFAULT FALSE,published_by BIGINT,published_at TIMESTAMPTZ,
+    status VARCHAR(16) NOT NULL,pinned BOOLEAN DEFAULT FALSE,published_by BIGINT,published_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,created_by BIGINT,updated_by BIGINT,created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),deleted_flag BOOLEAN DEFAULT FALSE
 );
@@ -46,6 +46,10 @@ BEGIN
         OR EXISTS(SELECT 1 FROM ab_announcement_recipient_snapshot WHERE origin<>'migration_cohort' OR NOT sealed OR recipient_count<>1)
         OR EXISTS(SELECT 1 FROM ab_announcement_recipient WHERE user_pid='u-disabled') THEN
         RAISE EXCEPTION 'Migration cohort provenance or eligibility failed';
+    END IF;
+    UPDATE ab_announcement SET status='approval_withdrawn' WHERE id=1;
+    IF (SELECT status FROM ab_announcement WHERE id=1)<>'approval_withdrawn' THEN
+        RAISE EXCEPTION 'Expanded approval state cannot be persisted';
     END IF;
     SELECT current_version_pid INTO v FROM ab_announcement WHERE id=2;
     failed=FALSE;
