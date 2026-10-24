@@ -14,6 +14,8 @@ import java.util.List;
 @Mapper
 public interface NotificationMapper extends BaseMapper<Notification> {
 
+    String VISIBLE=com.auraboot.framework.workbench.mapper.AnnouncementProjectionVisibility.NOTIFICATION;
+
     /** Explicit tenant membership and current account validity; never accept global numeric IDs. */
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
     @Select("""
@@ -29,6 +31,8 @@ public interface NotificationMapper extends BaseMapper<Notification> {
     @Select("""
         SELECT * FROM ab_notification
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
+        AND
+        """ + VISIBLE + "\n" + """
         ORDER BY created_at DESC
         LIMIT #{limit} OFFSET #{offset}
         """)
@@ -40,6 +44,8 @@ public interface NotificationMapper extends BaseMapper<Notification> {
     @Select("""
         SELECT * FROM ab_notification
         WHERE tenant_id = #{tenantId} AND user_id = #{userId} AND is_read = FALSE
+        AND
+        """ + VISIBLE + "\n" + """
         ORDER BY created_at DESC
         LIMIT #{limit} OFFSET #{offset}
         """)
@@ -51,30 +57,35 @@ public interface NotificationMapper extends BaseMapper<Notification> {
     @Select("""
         SELECT COUNT(*) FROM ab_notification
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
-        """)
+        AND
+        """ + VISIBLE)
     long countByUser(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Select("""
         SELECT COUNT(*) FROM ab_notification
         WHERE tenant_id = #{tenantId} AND user_id = #{userId} AND is_read = FALSE
-        """)
+        AND
+        """ + VISIBLE)
     int countUnread(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Update("""
         UPDATE ab_notification SET is_read = TRUE, read_at = now()
         WHERE tenant_id = #{tenantId} AND id = #{id} AND user_id = #{userId}
-        """)
+        AND
+        """ + VISIBLE)
     int markAsRead(@Param("tenantId") Long tenantId, @Param("id") Long id, @Param("userId") Long userId);
 
     @Update("""
         UPDATE ab_notification SET is_read = TRUE, read_at = now()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId} AND is_read = FALSE
-        """)
+        AND
+        """ + VISIBLE)
     int markAllAsRead(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Select("""
         SELECT user_id FROM ab_notification
         WHERE tenant_id = #{tenantId} AND id = #{id}
-        """)
+        AND
+        """ + VISIBLE)
     Long findUserIdById(@Param("tenantId") Long tenantId, @Param("id") Long id);
 }

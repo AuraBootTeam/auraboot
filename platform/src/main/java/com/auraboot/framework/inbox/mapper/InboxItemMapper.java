@@ -14,6 +14,8 @@ import org.apache.ibatis.annotations.Update;
  */
 public interface InboxItemMapper extends BaseMapper<InboxItem> {
 
+    String VISIBLE_ACK=com.auraboot.framework.workbench.mapper.AnnouncementProjectionVisibility.INBOX;
+
     String ACTIVE_ACK = """
         (item_type != 'announcement_ack' OR EXISTS (
           SELECT 1 FROM ab_announcement_recipient ar
@@ -33,14 +35,16 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND status = 'pending' AND is_read = FALSE
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countUnread(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Select("""
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND status = 'pending' AND is_read = FALSE AND item_type = #{itemType}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countUnreadByType(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                           @Param("itemType") String itemType);
 
@@ -48,7 +52,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         UPDATE ab_inbox_item SET is_read = TRUE, read_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND is_read = FALSE
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int markAllRead(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Update("""
@@ -95,6 +100,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         UPDATE ab_inbox_item SET is_read = TRUE, read_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND is_read = FALSE
+        AND
+        """ + VISIBLE_ACK + "\n" + """
           AND id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}
@@ -145,7 +152,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND status = 'pending' AND item_type = #{itemType}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countPendingByType(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                             @Param("itemType") String itemType);
 
@@ -158,7 +166,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND item_type = #{itemType}
           AND created_at >= #{startTime} AND created_at < #{endTime}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countByTypeInDateRange(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                                @Param("itemType") String itemType,
                                @Param("startTime") java.time.Instant startTime,
@@ -172,7 +181,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND created_at >= #{startTime} AND created_at < #{endTime}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countAllInDateRange(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                             @Param("startTime") java.time.Instant startTime,
                             @Param("endTime") java.time.Instant endTime);

@@ -48,6 +48,7 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
         LambdaQueryWrapper<Notification> filter = new LambdaQueryWrapper<Notification>()
                 .eq(Notification::getTenantId, tenantId)
                 .eq(Notification::getUserId, userId)
+                .apply(NotificationMapper.VISIBLE)
                 .eq(request.getIsRead() != null, Notification::getIsRead, request.getIsRead())
                 .apply(hasCategory, "LOWER(category) = {0}", normalizedCategory);
 
@@ -109,6 +110,7 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
         int deleted = notificationMapper.delete(new LambdaQueryWrapper<Notification>()
                 .eq(Notification::getTenantId, tenantId)
                 .eq(Notification::getUserId, userId)
+                .apply(NotificationMapper.VISIBLE)
                 .in(Notification::getId, ids));
 
         if (deleted > 0) {

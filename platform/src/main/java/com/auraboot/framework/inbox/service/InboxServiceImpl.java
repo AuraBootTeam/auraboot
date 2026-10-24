@@ -70,6 +70,9 @@ public class InboxServiceImpl implements InboxService {
      * Delegates to {@link InboxRealtimePushPort} when enterprise-comm is present.
      */
     private void pushToUser(InboxItem item) {
+        // Protected announcement hints are resolved by the authenticated list/count polls.
+        // Do not broadcast their titles through a pre-commit generic WebSocket payload.
+        if ("announcement_ack".equals(item.getItemType())) return;
         if (realtimePushPort == null) {
             log.debug("No InboxRealtimePushPort available, skipping real-time push for userId={}", item.getUserId());
             return;
@@ -85,11 +88,10 @@ public class InboxServiceImpl implements InboxService {
 
     @Override
     public InboxItem getItem(Long id, Long userId, Long tenantId) {
-        InboxItem item = inboxItemMapper.selectById(id);
-        if (item == null || !item.getTenantId().equals(tenantId) || !item.getUserId().equals(userId)) {
-            return null;
-        }
-        return item;
+        if(id==null || userId==null || tenantId==null) return null;
+        return inboxItemMapper.selectOne(new LambdaQueryWrapper<InboxItem>()
+            .eq(InboxItem::getId,id).eq(InboxItem::getTenantId,tenantId).eq(InboxItem::getUserId,userId)
+            .apply(InboxItemMapper.VISIBLE_ACK));
     }
 
     @Override
@@ -107,9 +109,10 @@ public class InboxServiceImpl implements InboxService {
             // historically passed the Javadoc's uppercase form and silently
             // matched 0 rows (see TestFixtureController inbox_empty incident).
             wrapper.eq(InboxItem::getStatus, status.trim().toLowerCase());
-            if ("pending".equalsIgnoreCase(status.trim())) wrapper.apply(InboxItemMapper.ACTIVE_ACK);
         }
 
+        wrapper.apply("pending".equalsIgnoreCase(status==null ? "" : status.trim())
+            ? InboxItemMapper.ACTIVE_ACK : InboxItemMapper.VISIBLE_ACK);
         wrapper.orderByDesc(InboxItem::getCreatedAt);
 
         return inboxItemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
@@ -130,9 +133,10 @@ public class InboxServiceImpl implements InboxService {
             // historically passed the Javadoc's uppercase form and silently
             // matched 0 rows (see TestFixtureController inbox_empty incident).
             wrapper.eq(InboxItem::getStatus, status.trim().toLowerCase());
-            if ("pending".equalsIgnoreCase(status.trim())) wrapper.apply(InboxItemMapper.ACTIVE_ACK);
         }
 
+        wrapper.apply("pending".equalsIgnoreCase(status==null ? "" : status.trim())
+            ? InboxItemMapper.ACTIVE_ACK : InboxItemMapper.VISIBLE_ACK);
         wrapper.orderByDesc(InboxItem::getCreatedAt);
 
         return inboxItemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
@@ -165,6 +169,7 @@ public class InboxServiceImpl implements InboxService {
         wrapper.eq(InboxItem::getId, id)
                .eq(InboxItem::getTenantId, tenantId)
                .eq(InboxItem::getUserId, userId)
+               .apply(InboxItemMapper.VISIBLE_ACK)
                .eq(InboxItem::getIsRead, false)
                .set(InboxItem::getIsRead, true)
                .set(InboxItem::getReadAt, Instant.now());

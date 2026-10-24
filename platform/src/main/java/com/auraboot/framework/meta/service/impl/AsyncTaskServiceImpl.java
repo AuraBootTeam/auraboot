@@ -115,6 +115,34 @@ public class AsyncTaskServiceImpl {
      * @param userId     current user ID
      * @return DTO with the task code for tracking
      */
+    public AsyncTaskDTO submitPublicTask(AsyncTaskSubmitRequest request, Long tenantId, Long userId) {
+        AsyncTaskExecutor executor=executorRegistry.get(request.getTaskType());
+        if(tenantId==null || userId==null || !java.util.Objects.equals(tenantId,MetaContext.getCurrentTenantId())
+                || !java.util.Objects.equals(userId,MetaContext.getCurrentUserId())
+                || executor==null || !executor.supportsPublicSubmission()) {
+            throw new org.springframework.security.access.AccessDeniedException("Submit background work through an authorized business command");
+        }
+        return submitTask(request,tenantId,userId);
+    }
+
+    public AsyncTaskDTO getOwnedTask(String taskCode) {
+        return toDTO(requireOwnedTask(taskCode));
+    }
+
+    public void requireCurrentOwner(String taskCode) {
+        requireOwnedTask(taskCode);
+    }
+
+    private AsyncTask requireOwnedTask(String taskCode) {
+        AsyncTask task=asyncTaskMapper.findByTaskCode(taskCode);
+        if(MetaContext.getCurrentTenantId()==null || MetaContext.getCurrentUserId()==null || task==null
+                || !java.util.Objects.equals(task.getTenantId(),MetaContext.getCurrentTenantId())
+                || !java.util.Objects.equals(task.getCreatedBy(),MetaContext.getCurrentUserId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Async task is unavailable to the current owner");
+        }
+        return task;
+    }
+
     public AsyncTaskDTO submitTask(AsyncTaskSubmitRequest request, Long tenantId, Long userId) {
         // Validate executor exists
         if (!executorRegistry.containsKey(request.getTaskType())) {
