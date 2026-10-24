@@ -17,12 +17,16 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": { "zh-CN": "新建公告", "en-US": "Create Announcement" },
+            "label": {
+              "zh-CN": "新建公告",
+              "en-US": "Create Announcement"
+            },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_form",
               "command": "announcement:create_announcement"
-            }
+            },
+            "permissionCode": "announcement.announcement.edit"
           }
         ]
       },
@@ -30,17 +34,39 @@
         "id": "filters",
         "blockType": "filters",
         "fields": [
-          {"field": "title", "props": {"placeholder": {"zh-CN": "例如：周末系统维护", "en-US": "e.g. Scheduled weekend maintenance"}}, "helpText": {"zh-CN": "按公告标题关键词查找；清除关键词可查看全部公告。", "en-US": "Search by announcement title keywords. Clear the keywords to show all announcements."}},
-          { "field": "status" },
-          { "field": "announcement_priority" }
+          {
+            "field": "title",
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如：周末系统维护",
+                "en-US": "e.g. Scheduled weekend maintenance"
+              }
+            },
+            "helpText": {
+              "zh-CN": "按公告标题关键词查找；清除关键词可查看全部公告。",
+              "en-US": "Search by announcement title keywords. Clear the keywords to show all announcements."
+            }
+          },
+          {
+            "field": "status"
+          },
+          {
+            "field": "announcement_priority"
+          }
         ]
       },
       {
         "id": "table",
         "blockType": "table",
         "empty": {
-          "title": { "zh-CN": "没有匹配的公告", "en-US": "No matching announcements" },
-          "description": { "zh-CN": "选择“新建公告”创建草稿，或清除筛选条件查看已有公告。", "en-US": "Choose Create Announcement to draft a notice, or clear the filters to view existing announcements." }
+          "title": {
+            "zh-CN": "没有匹配的公告",
+            "en-US": "No matching announcements"
+          },
+          "description": {
+            "zh-CN": "选择“新建公告”创建草稿，或清除筛选条件查看已有公告。",
+            "en-US": "Choose Create Announcement to draft a notice, or clear the filters to view existing announcements."
+          }
         },
         "columns": [
           {
@@ -78,64 +104,92 @@
         "rowActions": [
           {
             "code": "view",
-            "label": { "zh-CN": "查看", "en-US": "View" },
+            "label": {
+              "zh-CN": "查看",
+              "en-US": "View"
+            },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_detail"
-            }
+            },
+            "permissionCode": "announcement.announcement.read"
           },
           {
             "code": "edit",
-            "label": { "zh-CN": "编辑", "en-US": "Edit" },
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_form",
               "command": "announcement:update_announcement"
             },
-            "visibleWhen": "record.status === 'draft'"
+            "visibleWhen": "record.status === 'draft'",
+            "permissionCode": "announcement.announcement.edit"
           },
           {
             "code": "publish",
-            "label": { "zh-CN": "发布", "en": "Publish" },
+            "label": {
+              "zh-CN": "发布（暂未启用）",
+              "en-US": "Publish (not enabled yet)"
+            },
             "variant": "primary",
             "confirm": "announcement.publish.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:publish"
+              "command": "announcement:publish",
+              "operationType": "UPDATE"
             },
-            "visibleWhen": "record.status === 'draft'"
+            "visibleWhen": "record.status === 'draft'",
+            "permissionCode": "announcement.announcement.publish"
           },
           {
             "code": "archive",
-            "label": { "zh-CN": "撤回", "en": "Archive" },
+            "label": {
+              "zh-CN": "撤回",
+              "en": "Archive"
+            },
             "confirm": "announcement.archive.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:archive"
+              "command": "announcement:archive",
+              "operationType": "UPDATE"
             },
-            "visibleWhen": "record.status === 'published'"
+            "visibleWhen": "record.status === 'published'",
+            "permissionCode": "announcement.announcement.withdraw"
           },
           {
             "code": "republish",
-            "label": { "zh-CN": "重新发布", "en": "Republish" },
+            "label": {
+              "zh-CN": "建立修订草稿",
+              "en-US": "Create revision draft"
+            },
             "variant": "primary",
             "confirm": "announcement.republish.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:republish"
+              "command": "announcement:republish",
+              "operationType": "UPDATE"
             },
-            "visibleWhen": "record.status === 'archived'"
+            "visibleWhen": "record.status === 'withdrawn' || record.status === 'expired'",
+            "permissionCode": "announcement.announcement.edit"
           },
           {
             "code": "delete",
             "variant": "danger",
-            "label": { "zh-CN": "删除", "en-US": "Delete" },
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:delete_announcement"
+              "command": "announcement:delete_announcement",
+              "operationType": "DELETE"
             },
-            "visibleWhen": "record.status === 'draft' || record.status === 'archived'"
+            "visibleWhen": "record.status === 'draft' && !record.current_version_pid",
+            "permissionCode": "announcement.announcement.delete"
           }
         ],
         "defaultSort": {
@@ -143,7 +197,14 @@
           "order": "desc"
         }
       }
-    ]
+    ],
+    "extension": {
+      "commandRequest": {
+        "idempotent": true,
+        "versionField": "row_version",
+        "payloadFields": []
+      }
+    }
   },
   {
     "pageKey": "ab_announcement_form",
@@ -165,11 +226,47 @@
           "en-US": "Announcement Content"
         },
         "fields": [
-          {"field": "title", "colSpan": 12, "required": true, "props": {"placeholder": {"zh-CN": "例如：10 月 12 日系统维护通知", "en-US": "e.g. System maintenance on October 12"}}, "helpText": {"zh-CN": "用简明标题说明事项，最多 256 个字符；保存后为草稿，发布后读者才可见。", "en-US": "Summarize the subject in up to 256 characters. Saving creates a draft; readers see it after publication."}},
-          { "field": "announcement_priority", "colSpan": 6 },
-          { "field": "pinned", "colSpan": 6 },
-          { "field": "expires_at", "colSpan": 6 },
-          {"field": "content", "colSpan": 12, "props": {"placeholder": {"zh-CN": "说明适用对象、具体事项和生效时间", "en-US": "Describe the audience, details and effective time"}}, "helpText": {"zh-CN": "补充影响范围、时间安排和需要读者采取的行动。", "en-US": "Explain the impact, schedule and any action readers should take."}}
+          {
+            "field": "title",
+            "colSpan": 12,
+            "required": false,
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如：10 月 12 日系统维护通知",
+                "en-US": "e.g. System maintenance on October 12"
+              }
+            },
+            "helpText": {
+              "zh-CN": "可先保存未完成的草稿；发布能力将在受众与分发接入后启用。",
+              "en-US": "Save an incomplete draft. Publication becomes available after audience and delivery integration."
+            }
+          },
+          {
+            "field": "announcement_priority",
+            "colSpan": 6
+          },
+          {
+            "field": "pinned",
+            "colSpan": 6
+          },
+          {
+            "field": "expires_at",
+            "colSpan": 6
+          },
+          {
+            "field": "content",
+            "colSpan": 12,
+            "props": {
+              "placeholder": {
+                "zh-CN": "说明适用对象、具体事项和生效时间",
+                "en-US": "Describe the audience, details and effective time"
+              }
+            },
+            "helpText": {
+              "zh-CN": "补充影响范围、时间安排和需要读者采取的行动。",
+              "en-US": "Explain the impact, schedule and any action readers should take."
+            }
+          }
         ]
       },
       {
@@ -179,19 +276,39 @@
           {
             "code": "submit",
             "primary": true,
-            "label": { "zh-CN": "保存", "en-US": "Save" },
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "announcement:update_announcement"
-            }
+            },
+            "permissionCode": "announcement.announcement.edit"
           },
           {
             "code": "cancel",
-            "label": { "zh-CN": "取消", "en-US": "Cancel" }
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
-    ]
+    ],
+    "extension": {
+      "commandRequest": {
+        "idempotent": true,
+        "versionField": "row_version",
+        "payloadFields": [
+          "title",
+          "content",
+          "announcement_priority",
+          "pinned",
+          "expires_at"
+        ]
+      }
+    }
   },
   {
     "pageKey": "ab_announcement_detail",
@@ -214,16 +331,47 @@
         },
         "readOnly": true,
         "fields": [
-          { "field": "title", "colSpan": 12 },
-          { "field": "announcement_priority", "colSpan": 4 },
-          { "field": "status", "colSpan": 4 },
-          { "field": "pinned", "colSpan": 4 },
-          { "field": "published_by", "colSpan": 6 },
-          { "field": "published_at", "colSpan": 6 },
-          { "field": "expires_at", "colSpan": 6 },
-          { "field": "content", "colSpan": 12 }
+          {
+            "field": "title",
+            "colSpan": 12
+          },
+          {
+            "field": "announcement_priority",
+            "colSpan": 4
+          },
+          {
+            "field": "status",
+            "colSpan": 4
+          },
+          {
+            "field": "pinned",
+            "colSpan": 4
+          },
+          {
+            "field": "published_by",
+            "colSpan": 6
+          },
+          {
+            "field": "published_at",
+            "colSpan": 6
+          },
+          {
+            "field": "expires_at",
+            "colSpan": 6
+          },
+          {
+            "field": "content",
+            "colSpan": 12
+          }
         ]
       }
-    ]
+    ],
+    "extension": {
+      "commandRequest": {
+        "idempotent": true,
+        "versionField": "row_version",
+        "payloadFields": []
+      }
+    }
   }
 ]

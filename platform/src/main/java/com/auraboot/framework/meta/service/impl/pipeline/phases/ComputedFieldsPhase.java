@@ -46,8 +46,10 @@ public class ComputedFieldsPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        executeComputedFieldsPhase(ctx.getExecConfig(), ctx.getPayload(),
-                ctx.getTenantId(), ctx.getCommand(), ctx.getRequest(), ctx.getFieldMapResults());
+        if (!ctx.isHandlerOwnedMutation()) {
+            executeComputedFieldsPhase(ctx.getExecConfig(), ctx.getPayload(),
+                    ctx.getTenantId(), ctx.getCommand(), ctx.getRequest(), ctx.getFieldMapResults());
+        }
         recordChangeTracking(ctx.getCommand(), ctx.getRequest(),
                 ctx.getTenantId(), ctx.getUserId(), ctx.getBeforeSnapshot());
     }

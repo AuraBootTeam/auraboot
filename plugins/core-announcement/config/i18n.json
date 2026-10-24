@@ -29,16 +29,79 @@
   },
   {
     "key": "message.announcement.republish.confirm.title",
-    "zh-CN": "确认重新发布",
-    "en-US": "Confirm republication",
+    "zh-CN": "建立修订草稿",
+    "en-US": "Create revision draft",
     "source": "import",
     "refType": "action"
   },
   {
     "key": "message.announcement.republish.confirm.content",
-    "zh-CN": "重新发布后该公告将再次对读者可见，确定重新发布吗？",
-    "en-US": "Republishing will make this announcement visible to readers again. Republish it?",
+    "zh-CN": "将基于历史版本建立可编辑草稿，保存不会直接发布。确定建立吗？",
+    "en-US": "Create an editable draft from the historical version? Saving does not publish it.",
     "source": "import",
     "refType": "action"
+  },
+  {
+    "key": "announcement.error.operation_required",
+    "zh-CN": "请刷新后重试，操作标识缺失。",
+    "en-US": "Refresh and retry: the operation identity is missing.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.protected_input",
+    "zh-CN": "包含不可直接修改的公告字段，请刷新后重试。",
+    "en-US": "Protected announcement fields cannot be changed directly.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.publication_unavailable",
+    "zh-CN": "公告发布尚未启用：需要先完成受众授权与可靠分发接入。",
+    "en-US": "Announcement publication is not enabled until audience authorization and reliable delivery are installed.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.not_found",
+    "zh-CN": "公告不存在或无权访问。",
+    "en-US": "The announcement does not exist or is not accessible.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.not_editable",
+    "zh-CN": "当前状态不能执行此操作，请刷新查看最新状态。",
+    "en-US": "This action is unavailable in the current state. Refresh to see the latest state.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.history_protected",
+    "zh-CN": "此公告已有历史版本，不能删除。",
+    "en-US": "This announcement has historical versions and cannot be deleted.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.invalid_input",
+    "zh-CN": "公告输入不符合要求。",
+    "en-US": "The announcement input is invalid.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.title_length",
+    "zh-CN": "公告标题最多256个字符。",
+    "en-US": "The announcement title must not exceed 256 characters.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.command_required",
+    "zh-CN": "请通过公告受控操作完成修改。",
+    "en-US": "Use an authorized announcement command to make changes.",
+    "source": "import",
+    "refType": "message"
   }
 ]

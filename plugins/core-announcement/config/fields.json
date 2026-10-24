@@ -4,15 +4,22 @@
     "displayName:zh-CN": "标题",
     "displayName:en": "Title",
     "dataType": "string",
-    "constraints": { "required": true, "maxLength": 256 },
-    "feature": { "searchable": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 256
+    },
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "content",
     "displayName:zh-CN": "内容",
     "displayName:en": "Content",
     "dataType": "text",
-    "extension": { "multiline": true }
+    "extension": {
+      "multiline": true
+    }
   },
   {
     "code": "announcement_priority",
@@ -21,7 +28,9 @@
     "dataType": "enum",
     "dictCode": "announcement_priority",
     "defaultValue": "normal",
-    "feature": { "searchable": true }
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "status",
@@ -30,7 +39,9 @@
     "dataType": "enum",
     "dictCode": "announcement_status",
     "defaultValue": "draft",
-    "feature": { "searchable": true }
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "pinned",
@@ -56,5 +67,29 @@
     "displayName:zh-CN": "过期时间",
     "displayName:en": "Expires At",
     "dataType": "datetime"
+  },
+  {
+    "code": "row_version",
+    "displayName:zh-CN": "记录版本",
+    "displayName:en": "Record version",
+    "dataType": "integer"
+  },
+  {
+    "code": "editor_revision",
+    "displayName:zh-CN": "草稿版本",
+    "displayName:en": "Draft revision",
+    "dataType": "integer"
+  },
+  {
+    "code": "lifecycle_revision",
+    "displayName:zh-CN": "生命周期版本",
+    "displayName:en": "Lifecycle revision",
+    "dataType": "integer"
+  },
+  {
+    "code": "current_version_pid",
+    "displayName:zh-CN": "已冻结版本",
+    "displayName:en": "Frozen version",
+    "dataType": "string"
   }
 ]

@@ -3,7 +3,7 @@ type: system-reference
 status: active
 created: 2026-10-24
 updated: 2026-10-24
-implementation_status: design-only
+implementation_status: s1-in-progress
 ---
 
 # 公告管理需求与 BPM 集成设计
@@ -875,3 +875,57 @@ BPM禁用/卸载必须显式preflight：存在运行中申请/待处理任务/�
 目前没有需要用户再选择的产品分叉。已知剩余工作是实施与实测，不是待补一层设计：物理DDL与DTO按仓库约定落实、公共契约候选构件、动态权限接线、附件部署限额、免打扰配置、锁定制品安装和容量测量。附件P0复核补充：`platform/platform-app/src/main/resources/application.yml` 通用multipart默认100MB/101MB请求上限；同文件的AI storage 50MB和AI attachment 10MB是其他域配置，不能误当公告附件限额。公告显示实际平台有效限制，部署override优先，上传/提交/下载均不得绕过。
 
 容量不以未测吞吐值宣称达标：实施前记录目标租户最大有效成员、峰值并发公告、平均/最大正文附件量、待办/导出积压，形成批准的验收负载；无数据时做受控测量并报告适用上限。此项工程输入不要求重新讨论已定产品范围，不因缺测量就把“设计完整”说成“功能上线可用”。
+
+
+## 17. S1 实施契约与验证边界
+
+本节记录已进入实现的 S1 基础切片；§1–16 仍是完整产品目标，不代表这些功能已经全部交付。S1 仅覆盖内容草稿、受控写入、历史版本迁移及其撤回/修订、接收事实读取基础。人员/部门/角色受众编辑、免审/审批提交、定时任务、新公告发布分发、铃铛/待办接入、阅读/知悉写入、催办和统计导出按 S2–S8 实施，不能因预留字段而计为完成。
+
+### 17.1 物理模型及安装顺序
+
+新增 Core Flyway 迁移 `V20261024190000__announcement_controlled_lifecycle.sql`，由同源迁移生成 `db/snapshots/schema-current.sql`。升级必须先停写并运行迁移/validate，再部署同版本后端，最后显式导入 `core-announcement` 元数据；新建环境加载生成快照。导入失败时不得开放旧的可写入口。S1 无 aura-bpm 代码、表或依赖；OSS 单独安装可保存草稿，发布操作明确返回“尚未启用”。组合安装仍按 §14–16 的 Core → 公共审批契约 → aura-bpm provider → 业务绑定顺序推进，安装 BPM 本身不会自动启用尚未实现的公告发布链。
+
+| 表/字段 | S1 权威含义 | 后续边界 |
+| --- | --- | --- |
+| `ab_announcement` | 一个主体及当前草稿；`owner_user_id` 为内部用户关联，外部仍用 PID；`row_version` 为所有写入的 CAS，`editor_revision` 为内容草稿修订，`lifecycle_revision` 为撤回/修订/删除控制修订 | S1 可编辑字段仅 title/content/announcement_priority/pinned/expires_at；`draft_settings` 是保留容器，客户端不能任意提交；完整受众、附件、审批和政策按各切片引入强校验 |
+| `ab_announcement_version` | 不可变 JSON 快照及 schema/hash；同租户主体内 version_no 唯一 | 新公告冻结/送审由 S2/S3/S4 接入；S1 仅为非草稿存量建立 `legacy-v1` 快照 |
+| `ab_announcement_version_control` | 正文之外的审批/发布控制；legacy 依据为 `legacy_existing_content`，不伪造 approved | S1 支持 legacy published → withdrawn；其余审批/调度转换尚未开放 |
+| `ab_announcement_recipient_snapshot` / `recipient` | 版本/用户/原 membership 的接收事实；存量使用 `migration_cohort` 并记录迁移时解析时间、人数和封存标记 | 不称历史真实收件名单；不补历史已读/知悉；仅迁移时有效成员及启用用户进入；新成员不自动补入 |
+| `ab_announcement_operation` / `audit` | 前者是租户、操作人、命令、operationId 的唯一操作结果；后者为同事务追加的修订审计 | 失败整笔回滚；重放不再次写审计；操作身份独立于缓存生命周期 |
+
+主表当前/生效版本引用具有 `(tenant,announcement,version)` 外键，不能引用另一租户或另一公告的版本。版本和审计由数据库触发器禁止 UPDATE/DELETE。active/archived 迁移为 published/withdrawn，high/urgent 迁移为 important；不制造知悉政策、批准、投递成功或阅读事实。未知历史状态直接阻断升级，不能猜测映射。迁移时无可恢复 owner 的记录只允许当前具有租户记录管理范围且具备独立动作权限者管理。
+
+### 17.2 命令、状态和权限
+
+| 命令 | 输入/前置 | 结果 |
+| --- | --- | --- |
+| `announcement:create_announcement` | 当前有效成员和启用用户、edit、operationId；允许不完整内容 | 新 draft，三种 revision 初值 1；无冻结版本和消息副作用 |
+| `announcement:update_announcement` | edit + 管理归属 + draft + expectedVersion；仅五个草稿字段 | row/editor revision +1；历史正文不变 |
+| `announcement:delete_announcement` | delete + 管理归属 + draft + 无历史版本 + expectedVersion；业务 payload 为空 | 软删除，row/lifecycle revision +1；保留操作和审计 |
+| `announcement:archive` | withdraw + 管理归属 + published + activeVersion + expectedVersion；空 payload | 主体 withdrawn，清 activeVersion，版本控制 withdrawn；无渠道撤回承诺 |
+| `announcement:republish` | edit + 管理归属 + withdrawn/expired + currentVersion + expectedVersion；空 payload | 基于历史内容建立 draft，保留历史版本，不直接发布；row/editor/lifecycle revision +1 |
+| `announcement:publish` | S1 不开放 | 明确业务拒绝；无状态、版本、收件或通知变化 |
+
+普通编辑者只能修改本人主体；`announcement.announcement.manage` 可扩展为当前租户全部记录的管理范围，但每个写动作仍需独立 edit/delete/withdraw。旧 manage 不自动授予任何新动作。`publish_all` 只扩大将来发布受众，不能代替记录管理范围，更不能代替 edit/exempt。普通接收者通过专门接收接口授权；`model.ab_announcement.read` 是管理模型读取能力，应只授予管理/观察角色，不能因授予业务 read 就自动授予该管理能力。
+
+`ModelMutationGuard` 新增模型级 `extension.commandWriters`，create/update/delete 三组准确命令白名单同时保护动态 CRUD、批量、导入和递增入口；避免在全局共享的 title/content/status 字段上设置公告专用写白名单而误伤其他模型。仅有 CommandPermit 或管理员身份不能绕过该守卫。
+
+Spring 的 `CommandTargetAuthorizer` 是受控领域目标授权扩展：仅完整拥有持久化的处理器可声明，命令权限先校验，再由其重查当前身份/动作和存储中的归属，最后才进入幂等结果读取。公告在此读取同租户 tombstone 做重放授权；普通动态读取仍不展示软删除记录，撤权者不能读取旧结果。该扩展不是 BPM API，也不改变其他命令的默认目标范围校验。
+
+`requiresDslPersistence=false` 的完整写入拥有者同时跳过 FIELD_MAP、computed-field 写入和 handler result 写回，返回的 status/row_version 仅作为结果，不能引发第二次更新。默认 DSL 处理器保留原行为。公共 handler context 透传 clientRequestId 与 expectedVersion。
+
+### 17.3 HTTP 与 DSL 请求
+
+命令统一使用既有 `/api/meta/commands/execute/{commandCode}`：`clientRequestId` 是 operationId，已有记录携带 `targetRecordPid`、`expectedVersion`。同键同意图返回原结果，同键不同内容冲突；并发编辑只有一个 observed revision 能写成功，不自动取最新版本覆盖用户修改。
+
+既有 REST 路由保留为受控适配：POST `/api/announcements` 仅创建草稿，PUT `/{pid}` 仅改草稿，DELETE `/{pid}` 仅删除无历史草稿。POST/PUT 传 operationId，更新另传 expectedRevision；DELETE 用 Idempotency-Key 与 If-Match。priority 可作为 announcement_priority 的兼容别名，二者同时出现拒绝。路径和结果使用公共 PID，不猜测数字内部 ID；写结果为 pid/recordPid、row_version、operationId、status。旧客户端必须迁移新增的幂等/版本要求及结果结构；status/publishedBy/publishedAt 等输入明确拒绝。
+
+GET `/api/announcements` 在 S1 保留受限 limit（1–100）读取，依据当前租户、启用用户、有效且相同 membership、sealed 接收名单、activeVersion 和未到期判断，不把 draft 或撤回内容返回读者。列表返回公开 PID 及发布人展示信息，不写阅读；分页、筛选及显式阅读/知悉仍按 S2/S7 扩展。
+
+DSL 页面通过可选 `extension.commandRequest` 配置 idempotent、versionField 和 payloadFields。表单保留同一意图在不确定网络结果后的请求标识，版本取用户打开的记录；行操作只提交声明的业务输入。公告行操作显式指定 UPDATE/DELETE，避免从按钮翻译文案猜测操作类型。用户界面不展示这些技术参数。共享字段必填规则由模型 binding 覆盖，与现有运行时 assembler 一致；公告草稿不通过降低全局 title 的 required 影响其他业务。
+
+### 17.4 当前验证与后续接入闸门
+
+S1 的验收分母包括迁移新建/升级、不可变和跨租户引用、草稿新增/保存/删除/重放、并发冲突、直接字段/动态写旁路、legacy 撤回修订、当前权限复查、菜单驱动表单/详情/过滤/空态/错误及原图复核。实际执行结论以关联的 S1 验收报告为准；静态配置合法、编译、单测、API、浏览器和视觉分别裁决，不能互相替代。
+
+进入 S2 前须补齐受众与政策编辑/解析、授权范围证明、附件身份与强类型快照 schema。进入 S3 前须接入发布事务、任务租约、封存名单、可靠 outbox 及撤回清理；S1 的发布拒绝必须保留到这些链路真实验收。BPM 进入 S4–S6，严格遵循 §15.7 公共版本/申请/终态契约，不让 OSS 引入引擎实现依赖。

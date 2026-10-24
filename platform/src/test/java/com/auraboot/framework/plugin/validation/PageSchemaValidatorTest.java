@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class PageSchemaValidatorTest {
 
@@ -504,6 +505,18 @@ class PageSchemaValidatorTest {
         )))));
 
         assertHasError(validate(manifest), "S-PAGE-FORM-REQUIRED", "pages[0].blocks[0].fields[0].required");
+    }
+
+    @Test
+    void explicitOptionalBindingOverridesSharedRequiredField() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.getModelFieldBindings().stream()
+            .filter(binding -> "pe_order_no".equals(binding.getFieldCode()))
+            .forEach(binding -> binding.setRequired(false));
+        manifest.setPages(List.of(page("pe_order_form", "form", "pe_order", List.of(Map.of(
+            "id", "basic", "blockType", "form-section", "fields", List.of(Map.of(
+                "field", "pe_order_no", "required", false)))))));
+        assertThat(validate(manifest)).noneMatch(message -> "S-PAGE-FORM-REQUIRED".equals(message.getCode()));
     }
 
     @Test

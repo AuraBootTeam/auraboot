@@ -1,0 +1,44 @@
+[
+  {
+    "commandCode": "announcement:create_announcement",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:update_announcement",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:delete_announcement",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:publish",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:archive",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:republish",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  }
+]

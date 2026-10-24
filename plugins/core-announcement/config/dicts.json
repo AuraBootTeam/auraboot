@@ -11,23 +11,19 @@
         "label:zh-CN": "普通",
         "sortNo": 10,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
       },
       {
-        "value": "high",
-        "label": "High",
-        "label:zh-CN": "高",
+        "value": "important",
+        "label": "Important",
+        "label:zh-CN": "重要",
         "sortNo": 20,
         "status": "enabled",
-        "extension": { "color": "amber" }
-      },
-      {
-        "value": "urgent",
-        "label": "Urgent",
-        "label:zh-CN": "紧急",
-        "sortNo": 30,
-        "status": "enabled",
-        "extension": { "color": "red" }
+        "extension": {
+          "color": "amber"
+        }
       }
     ]
   },
@@ -43,7 +39,9 @@
         "label:zh-CN": "草稿",
         "sortNo": 10,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
       },
       {
         "value": "published",
@@ -51,15 +49,19 @@
         "label:zh-CN": "已发布",
         "sortNo": 20,
         "status": "enabled",
-        "extension": { "color": "green" }
+        "extension": {
+          "color": "green"
+        }
       },
       {
-        "value": "archived",
+        "value": "withdrawn",
         "label": "Archived",
         "label:zh-CN": "已撤回",
         "sortNo": 30,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
       },
       {
         "value": "expired",
@@ -67,7 +69,9 @@
         "label:zh-CN": "已过期",
         "sortNo": 40,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
       }
     ]
   }

@@ -50,7 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
 @DisplayName("AnnouncementController - Integration Tests")
-@Transactional(propagation = Propagation.NOT_SUPPORTED)
+@Transactional
 class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -70,8 +70,6 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private UserPermissionService userPermissionService;
-
-    private final List<String> createdTitles = new ArrayList<>();
 
     private MockMvc mockMvc;
 
@@ -108,106 +106,65 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void grantAnnouncementManageToTestRole() {
-        grantCommittedPermissionToTestRole(
-                MetaPermission.ANNOUNCEMENT_MANAGE,
-                "dashboard",
-                "dashboard:announcement",
-                "manage",
-                "Manage announcements"
-        );
+        for(String action : List.of("edit","delete","withdraw")) {
+            grantCommittedPermissionToTestRole("announcement.announcement."+action,
+                "announcement","announcement:announcement",action,"Announcement "+action);
+        }
     }
 
-    @AfterEach
-    void cleanupCreatedAnnouncements() {
-        if (createdTitles.isEmpty()) {
-            return;
-        }
 
-        try {
-            MetaContext.setContext(
-                    getTestTenant().getId(),
-                    getTestUser().getId(),
-                    getTestUser().getPid(),
-                    getTestUser().getUserName()
-            );
-            MetaContext.setMemberId(getTestTenantMember().getId());
+    @Autowired private com.auraboot.framework.workbench.service.AnnouncementLifecycleService lifecycle;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-            announcementMapper.delete(new LambdaQueryWrapper<Announcement>()
-                    .eq(Announcement::getTenantId, getTestTenant().getId())
-                    .in(Announcement::getTitle, createdTitles));
-        } finally {
-            createdTitles.clear();
-            MetaContext.clear();
-        }
+    private void identity() {
+        MetaContext.setContext(getTestTenant().getId(),getTestUser().getId(),
+            getTestUser().getPid(),getTestUser().getUserName());
+        MetaContext.setMemberId(getTestTenantMember().getId());
     }
 
     @Test
-    @DisplayName("POST /api/announcements returns JS-safe string ids")
-    void create_returnsJsSafeStringIds() throws Exception {
-        String title = uniqueTitle("js-safe");
-        createdTitles.add(title);
-
-        MvcResult result = mockMvc.perform(post("/api/announcements")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(announcementPayload(title))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.id").exists())
-                .andExpect(jsonPath("$.data.publishedBy").exists())
-                .andReturn();
-
-        JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString()).path("data");
-
-        assertTrue(data.path("id").isTextual(), "ASSIGN_ID Long ids must be serialized as strings");
-        assertTrue(data.path("id").asText().matches("\\d+"), "Serialized id should keep the numeric value");
-        assertTrue(data.path("publishedBy").isTextual(), "Long publishedBy must be serialized as a string");
-        assertEquals(getTestUser().getId().toString(), data.path("publishedBy").asText());
+    void controlledDraftReplayConflictAndDeletePersistAtomically() throws Exception {
+        identity();
+        String operation=UniqueIdGenerator.generate();
+        Map<String,Object> input=Map.of("title","Draft "+operation,"pinned",true);
+        Map<String,Object> created=lifecycle.execute("announcement:create_announcement",null,input,operation,null);
+        String pid=(String)created.get("pid");
+        assertEquals(created,lifecycle.execute("announcement:create_announcement",null,input,operation,null));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audit WHERE tenant_id=? AND announcement_pid=?",
+            Integer.class,getTestTenant().getId(),pid));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.ConflictException.class,
+            ()->lifecycle.execute("announcement:create_announcement",null,Map.of("title","Changed"),operation,null));
+        Map<String,Object> saved=lifecycle.execute("announcement:update_announcement",pid,
+            Map.of("title","Edited"),UniqueIdGenerator.generate(),1);
+        assertEquals(2,saved.get("row_version"));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.ConflictException.class,
+            ()->lifecycle.execute("announcement:update_announcement",pid,Map.of("title","Stale"),UniqueIdGenerator.generate(),1));
+        assertEquals("Edited",jdbc.queryForObject("SELECT title FROM ab_announcement WHERE tenant_id=? AND pid=?",
+            String.class,getTestTenant().getId(),pid));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,
+            ()->lifecycle.execute("announcement:update_announcement",pid,Map.of("status","published"),UniqueIdGenerator.generate(),2));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,
+            ()->lifecycle.execute("announcement:publish",pid,Map.of(),UniqueIdGenerator.generate(),2));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_version WHERE tenant_id=? AND announcement_pid=?",
+            Integer.class,getTestTenant().getId(),pid));
+        String deletion=UniqueIdGenerator.generate();
+        Map<String,Object> deleted=lifecycle.execute("announcement:delete_announcement",pid,Map.of(),deletion,2);
+        assertEquals(deleted,lifecycle.execute("announcement:delete_announcement",pid,Map.of(),deletion,2));
+        assertTrue(jdbc.queryForObject("SELECT deleted_flag FROM ab_announcement WHERE tenant_id=? AND pid=?",
+            Boolean.class,getTestTenant().getId(),pid));
+        assertEquals(3,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audit WHERE tenant_id=? AND announcement_pid=?",
+            Integer.class,getTestTenant().getId(),pid));
     }
 
     @Test
-    @DisplayName("POST then GET /api/announcements returns the active announcement")
-    void createThenList_returnsCreatedActiveAnnouncement() throws Exception {
-        String title = uniqueTitle("read-after-write");
-        createdTitles.add(title);
-
-        mockMvc.perform(post("/api/announcements")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(announcementPayload(title))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.title").value(title));
-
-        MvcResult listResult = mockMvc.perform(get("/api/announcements")
-                        .param("limit", "10"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"))
-                .andReturn();
-
-        JsonNode matched = null;
-        for (JsonNode item : objectMapper.readTree(listResult.getResponse().getContentAsString()).path("data")) {
-            if (title.equals(item.path("title").asText())) {
-                matched = item;
-                break;
-            }
+    void draftsNeverAppearInRecipientRestList() throws Exception {
+        identity();
+        String title="Private draft "+UniqueIdGenerator.generate();
+        lifecycle.execute("announcement:create_announcement",null,Map.of("title",title),UniqueIdGenerator.generate(),null);
+        MvcResult result=mockMvc.perform(get("/api/announcements").param("limit","100"))
+            .andExpect(status().isOk()).andReturn();
+        for(JsonNode record:objectMapper.readTree(result.getResponse().getContentAsString()).path("data")) {
+            org.junit.jupiter.api.Assertions.assertNotEquals(title,record.path("title").asText());
         }
-
-        assertNotNull(matched, "active announcement list should include the record created by the preceding POST");
-        assertEquals("urgent", matched.path("priority").asText());
-        assertTrue(matched.path("pinned").asBoolean());
-        assertEquals("Runtime body " + title, matched.path("content").asText());
-    }
-
-    private String uniqueTitle(String prefix) {
-        return "Runtime Announcement " + prefix + " " + System.nanoTime();
-    }
-
-    private Map<String, Object> announcementPayload(String title) {
-        return Map.of(
-                "title", title,
-                "content", "Runtime body " + title,
-                "priority", "urgent",
-                "status", "active",
-                "pinned", true
-        );
     }
 }

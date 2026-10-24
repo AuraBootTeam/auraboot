@@ -650,7 +650,9 @@ public class PageSchemaValidator implements PluginValidator {
             }
             fieldsByModel.computeIfAbsent(binding.getModelCode(), ignored -> new LinkedHashSet<>())
                     .add(binding.getFieldCode());
-            if (Boolean.TRUE.equals(binding.getRequired()) || globallyRequiredFields.contains(binding.getFieldCode())) {
+            // Match ModelFieldDefinitionAssembler: an explicit binding overrides the shared field.
+            if (Boolean.TRUE.equals(binding.getRequired())
+                    || (binding.getRequired() == null && globallyRequiredFields.contains(binding.getFieldCode()))) {
                 requiredFieldsByModel.computeIfAbsent(binding.getModelCode(), ignored -> new LinkedHashSet<>())
                         .add(binding.getFieldCode());
             }

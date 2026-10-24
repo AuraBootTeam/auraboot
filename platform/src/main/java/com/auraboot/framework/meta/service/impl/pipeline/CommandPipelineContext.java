@@ -121,6 +121,9 @@ public class CommandPipelineContext {
     /** Whether plugin handler still needs DSL persistence */
     private boolean pluginRequiresDslPersistence;
 
+    /** The handler owns writes; its result is response metadata, never a second DSL write. */
+    private boolean handlerOwnedMutation;
+
     // ==================== Concurrency ====================
 
     /** Resolved concurrency key (null = no lock) */
