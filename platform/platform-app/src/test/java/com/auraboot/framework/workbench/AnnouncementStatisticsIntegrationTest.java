@@ -187,7 +187,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
                 MetaContext.clear();
                 var progress=new ArrayList<Integer>();
                 var result=exports.generate(prepared,owner,output,(percent,message)->progress.add(percent));
-                assertThat(MetaContext.getCurrentTenantId()).isNull();
+                assertThat(MetaContext.exists()).isFalse();
                 assertThat(result.getSuccess()).isTrue();assertThat(result.getRecordCount()).isEqualTo(1);
                 assertThat(result.getFileSize()).isEqualTo(java.nio.file.Files.size(output));
                 assertThat(progress).containsExactly(90);
@@ -213,7 +213,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             MetaContext.clear();
             assertThatThrownBy(()->exports.generate(prepared,owner,output,(percent,message)->{}))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-            assertThat(java.nio.file.Files.size(output)).isZero();assertThat(MetaContext.getCurrentTenantId()).isNull();
+            assertThat(java.nio.file.Files.size(output)).isZero();assertThat(MetaContext.exists()).isFalse();
         } finally {
             applyTestMetaContext();grantCommittedPermissionToTestRole("announcement.announcement.export","announcement","announcement:announcement","export","Announcement export");
             permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());java.nio.file.Files.deleteIfExists(output);
