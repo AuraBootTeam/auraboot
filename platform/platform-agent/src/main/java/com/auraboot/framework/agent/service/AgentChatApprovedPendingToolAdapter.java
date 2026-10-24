@@ -46,6 +46,11 @@ class AgentChatApprovedPendingToolAdapter {
             response.put("error", "Tenant mismatch for approved pending tool. No tool was executed.");
             return response;
         }
+        // Return only routing metadata from the server-owned snapshot, never credentials or principal data.
+        if (pending.getConversationId() != null) {
+            response.put("conversationId", pending.getConversationId());
+            response.put("agentCode", pending.getAgentCode());
+        }
         if (toolLoopService == null) {
             response.put("success", false);
             response.put("error", "Agent tool execution kernel is not available. No tool was executed.");

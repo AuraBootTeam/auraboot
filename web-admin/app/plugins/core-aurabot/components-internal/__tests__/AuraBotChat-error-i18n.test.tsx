@@ -55,14 +55,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderChatWithError(content: string) {
+function renderChatWithError(content: string, type: 'error' | 'text' = 'error') {
   const ctx: any = {
     state: {
       panelState: 'open',
       sessionId: 'test-session',
       currentConversationId: null,
       messages: [
-        { id: 'err-1', type: 'error', sender: 'bot', timestamp: 0, content },
+        { id: 'err-1', type, sender: 'bot', timestamp: 0, content },
       ],
       isLoading: false,
       pageContext: {},
@@ -124,4 +124,11 @@ describe('AuraBotChat — error message i18n', () => {
       screen.getByText('LLM request failed: connection timeout'),
     ).toBeInTheDocument();
   });
+});
+
+
+it('localizes the fixed approved-tool acknowledgement in persisted text messages', () => {
+  renderChatWithError('Approved tool executed.', 'text');
+  expect(screen.getByTestId('chat-msg-agent')).toHaveTextContent('审批通过，操作已完成。');
+  expect(screen.getByTestId('chat-msg-agent')).not.toHaveTextContent('Approved tool executed.');
 });

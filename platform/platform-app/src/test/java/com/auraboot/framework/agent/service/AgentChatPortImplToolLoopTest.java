@@ -1186,6 +1186,7 @@ class AgentChatPortImplToolLoopTest {
                 .turnId("turn-1")
                 .tenantId(TENANT_ID)
                 .userId(USER_ID)
+                .conversationId(77L)
                 .agentCode(AGENT_CODE)
                 .runPid("turn-1")
                 .taskPid("task-1")
@@ -1212,7 +1213,9 @@ class AgentChatPortImplToolLoopTest {
                 .containsEntry("handled", true)
                 .containsEntry("success", true)
                 .containsEntry("approvalPid", "approval-1")
-                .containsEntry("toolName", "platform.create_model");
+                .containsEntry("toolName", "platform.create_model")
+                .containsEntry("conversationId", 77L)
+                .containsEntry("agentCode", AGENT_CODE);
         assertThat(result.get("result")).isEqualTo(Map.of(
                 "success", true,
                 "data", Map.of("pid", "model-1"),

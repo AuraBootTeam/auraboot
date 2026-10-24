@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { formatToolDisplayName } from './toolDisplayName';
 
@@ -52,6 +52,18 @@ const MAX_COLS = 6;
 export function ToolResultCard({ toolName, result, success }: ToolResultCardProps) {
   const { t, locale } = useI18n();
   const [expanded, setExpanded] = useState(false);
+
+  // A policy gate is a pending decision, not a successful business write.
+  if (result.approvalRequired === true) {
+    return (
+      <div className="mb-3 flex justify-start">
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+          <Clock className="h-4 w-4" aria-hidden="true" />
+          <span>{t('aurabot.approval.required', undefined, '该操作需要审批')}</span>
+        </div>
+      </div>
+    );
+  }
 
   const records = extractRecords(result);
   const displayName = formatToolDisplayName(toolName, locale.toLowerCase().startsWith('zh'));

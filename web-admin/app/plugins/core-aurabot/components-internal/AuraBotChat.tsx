@@ -128,6 +128,10 @@ interface MessageBubbleProps {
 
 function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
+  const { t, locale } = useI18n();
+  const displayContent = !isUser && message.content === 'Approved tool executed.'
+    ? t('ai.approval.approved', undefined, locale.startsWith('zh') ? '审批通过，操作已完成。' : message.content)
+    : message.content;
   const st = useSmartText();
 
   // Error message. Backend streams user-facing errors as a `$i18n:<key>` sentinel
@@ -281,7 +285,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
         } `}
       >
         {!isUser ? (
-          <BotMessageContent content={message.content} evidence={message.retrievalEvidence} />
+          <BotMessageContent content={displayContent} evidence={message.retrievalEvidence} />
         ) : (
           <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
         )}
