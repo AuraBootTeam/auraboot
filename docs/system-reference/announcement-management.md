@@ -979,3 +979,9 @@ S1 的验收分母包括迁移新建/升级、不可变和跨租户引用、草�
 真实导入暴露并修复了重复权限与通用校验器未识别原生输入弹窗的问题；真实撤回暴露并修复原 status VARCHAR(16) 容量不足。升级夹具现在从原字段长度开始，确切验证新撤回状态可保存。失败证据保留，不能以此前编译成功代替这些运行结果。
 
 当前证据仍不是 PF4J 正式组合安装或完整浏览器验收。冻结预览/历史及管理恢复已有后端和定向组件证据，原生恢复配置已进入候选，真实菜单操作、受控附件下载和前端组合仍待完成。S2 附件/预览边界、S3 完整恢复/过期清理、S7 剩余页面边界以及全部 S8 运营/导出仍在同一任务内实施，不需要阶段性继续授权。S1 历史报告和远端旧 checks 不能代替本轮确切 head 的验收与提交。
+
+### 18.3 显式组合构建与配置导入契约
+
+Core 构件目录提供可选 `config/core-announcement`，默认 Core 应用不隐式导入它。BPM 默认 `app.yaml` 保持独立；通过 `--composition announcements` 显式选择 `app.announcements.yaml`，将公告配置、BPM provider、前端贡献及迁移集锁定到同一应用构件。两种 BPM 清单均先导入 org-management 再导入 platform-admin；组合清单在 BPM 配置之前导入 core-announcement。公告表仍属于 Core migration set，审批表属于 BPM migration set，不创建第三份公告迁移副本。
+
+部署启动器按已验证 application.lock 的 composition.nodes 配置顺序及对应构件路径导入，不依赖构件目录的字母排序。组合构件才启用 Core 的插件投递消费；普通 BPM 安装不隐式启用。导入辅助脚本包含在构件校验收据中。构建使用自己的确切版本 Core catalog，不读取旁边 OSS 源码目录；Mac 仅执行 `--skip-oci` 文件构件验证。当前安装契约静态测试已执行，真实 PF4J 安装与浏览器验收仍待完成，不能用静态结果代替。
