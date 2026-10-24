@@ -87,7 +87,7 @@ async function clickRowAction(
   const confirmationText: Record<string, string> = {
     'announcement:publish': '发布后该公告将对读者可见，确定发布吗？',
     'announcement:cancel_schedule': '取消后不会发布，冻结版本和历史记录仍会保留。确定取消吗？',
-    'announcement:archive': '撤回后该公告将不再对读者展示，可稍后重新发布。确定撤回吗？',
+    'announcement:archive': '撤回后该公告将不再对读者展示。历史版本保留；重新发布须建立修订草稿并重新提交。确定撤回吗？',
     'announcement:republish': '将基于历史版本建立可编辑草稿，保存不会直接发布。确定建立吗？',
     'announcement:delete_announcement': '确定要删除选中的记录吗？此操作不可恢复。',
   };

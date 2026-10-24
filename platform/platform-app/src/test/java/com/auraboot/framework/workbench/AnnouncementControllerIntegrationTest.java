@@ -182,6 +182,10 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private com.auraboot.framework.workbench.service.AnnouncementReaderService recipientReader;
     @Autowired private com.auraboot.framework.inbox.service.InboxService inbox;
+    @Autowired private com.auraboot.framework.notification.service.NotificationQueryService notifications;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService memberships;
+    @Autowired private com.auraboot.framework.user.service.UserService users;
+    @Autowired private com.auraboot.framework.meta.mapper.AsyncTaskMapper asyncTasks;
 
     @Test
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
@@ -265,6 +269,28 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
             getTestTenant().getId(),version,getTestUser().getId()));
         assertEquals("completed",jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
             getTestTenant().getId(),batch,getTestUser().getPid()));
+        var query=new com.auraboot.framework.notification.dto.NotificationQueryRequest();query.setPageSize(100);
+        org.assertj.core.api.Assertions.assertThat(notifications.listByUser(getTestUser().getId(),query).getRecords())
+            .extracting(com.auraboot.framework.notification.dto.NotificationDTO::getSourceId).contains(version);
+        Long itemId=jdbc.queryForObject("SELECT id FROM ab_inbox_item WHERE tenant_id=? AND source_id=? AND user_id=? AND item_type='announcement_ack'",Long.class,
+            getTestTenant().getId(),version,getTestUser().getId());
+        try {
+            new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status->{
+                status.setRollbackOnly();
+                jdbc.update("UPDATE ab_tenant_member SET deleted_flag=TRUE,status='inactive' WHERE id=? AND tenant_id=?",getTestTenantMember().getId(),getTestTenant().getId());
+                var replacement=memberships.addMember(getTestUser().getId(),getTestTenant().getId(),"active");
+                org.assertj.core.api.Assertions.assertThat(replacement.getPid()).isNotEqualTo(getTestTenantMember().getPid());
+                MetaContext.setMemberId(replacement.getId());
+                var softly=new org.assertj.core.api.SoftAssertions();
+                softly.assertThat(notifications.listByUser(getTestUser().getId(),query).getRecords())
+                    .extracting(com.auraboot.framework.notification.dto.NotificationDTO::getSourceId).doesNotContain(version);
+                softly.assertThat(inbox.getItem(itemId,getTestUser().getId(),getTestTenant().getId())).isNull();
+                softly.assertThat(inbox.listByUser(getTestUser().getId(),getTestTenant().getId(),"announcement_ack",null,1,100).getRecords())
+                    .extracting(com.auraboot.framework.inbox.model.InboxItem::getSourceId).doesNotContain(version);
+                softly.assertAll();
+            });
+        } finally {identity();}
+
     }
 
     @Test
@@ -281,4 +307,24 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         assertEquals("canceled",jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,getTestTenant().getId(),accepted.get("versionPid")));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Integer.class,getTestTenant().getId(),accepted.get("versionPid")));
     }
+    @Test void publicAsyncSubmissionCannotSelectACommandHandlerExecutionIdentity() throws Exception {
+        var input=Map.of("taskType","command-handler","taskName","Protected announcement dispatch",
+            "inputParams",Map.of("handlerCode","announcement:publish","tenantId",getTestTenant().getId(),"userId",getTestUser().getId()));
+        mockMvc.perform(post("/api/async-tasks").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(input)))
+            .andExpect(status().isForbidden());
+    }
+    @Test void publicAsyncTaskReadAndDeleteRequireThePersistedTenantAndOwner() throws Exception {
+        var other=users.signUp("async-owner-"+UniqueIdGenerator.generate()+"@example.com","Test2026x");
+        memberships.addMember(other.getId(),getTestTenant().getId(),"active");
+        var task=new com.auraboot.framework.meta.entity.AsyncTask();
+        task.setTenantId(getTestTenant().getId());task.setCreatedBy(other.getId());task.setTaskCode(UniqueIdGenerator.generate());
+        task.setTaskType("command-handler");task.setTaskName("Private owned work");task.setStatus("completed");task.setProgress(100);
+        task.setCreatedAt(java.time.Instant.now());task.setCompletedAt(java.time.Instant.now());
+        task.setInputParams(objectMapper.valueToTree(Map.of("privatePayload","Private business source")));asyncTasks.insert(task);
+        mockMvc.perform(get("/api/async-tasks/"+task.getTaskCode())).andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/async-tasks/"+task.getTaskCode()))
+            .andExpect(status().isForbidden());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_async_task WHERE tenant_id=? AND task_code=?",Integer.class,getTestTenant().getId(),task.getTaskCode()));
+    }
+
 }
