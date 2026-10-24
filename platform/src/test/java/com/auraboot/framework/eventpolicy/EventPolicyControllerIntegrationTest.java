@@ -17,6 +17,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -371,6 +373,8 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    // A real HTTP replay sees a committed dead letter before its independent action transaction.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void httpReplayActionLog_replaysDeadLetterThroughPolicyExecutorAndUpdatesAttemptEvidence() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         String rowPid = UniqueIdGenerator.generate();
