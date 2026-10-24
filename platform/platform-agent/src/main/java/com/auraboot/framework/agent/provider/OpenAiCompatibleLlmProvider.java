@@ -389,6 +389,15 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             String toolChoice = request.getToolChoice();
             if (toolChoice != null && !toolChoice.isBlank()) {
                 body.put("tool_choice", toolChoice);
+                // DeepSeek rejects required tool selection in thinking mode. Keep the
+                // evidence-first tool requirement and only resolve an unspecified mode.
+                if (isDeepSeekV4Model(request.getModel()) && "required".equals(toolChoice)) {
+                    if (request.getThinking() != null && request.getThinking().isEnabled()) {
+                        throw new IllegalArgumentException(
+                                "DeepSeek thinking mode cannot be combined with tool_choice=required");
+                    }
+                    body.put("thinking", Map.of("type", "disabled"));
+                }
             }
         } else if (request.getTools() != null && !request.getTools().isEmpty()) {
             if ("required".equals(request.getToolChoice())) {
@@ -405,7 +414,8 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             return false;
         }
         String normalized = model.trim().toLowerCase(Locale.ROOT);
-        return normalized.equals("deepseek-v4-flash") || normalized.equals("deepseek-v4-pro");
+        return normalized.equals("deepseek-flash") || normalized.equals("deepseek-v4-flash")
+                || normalized.equals("deepseek-v4-pro");
     }
 
     @Override
