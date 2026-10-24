@@ -71,28 +71,28 @@
         "columns": [
           {
             "field": "title",
-            "width": 280,
+            "width": 200,
             "sortable": true
           },
           {
             "field": "announcement_priority",
-            "width": 100,
+            "width": 88,
             "dictCode": "announcement_priority",
             "renderType": "tag"
           },
           {
             "field": "status",
-            "width": 144,
+            "width": 136,
             "dictCode": "announcement_status",
             "renderType": "tag"
           },
           {
             "field": "pinned",
-            "width": 80
+            "width": 64
           },
           {
             "field": "published_at",
-            "width": 184,
+            "width": 168,
             "format": "YYYY-MM-DD HH:mm",
             "label": {
               "zh-CN": "上次发布时间",
@@ -101,7 +101,7 @@
           },
           {
             "field": "expires_at",
-            "width": 160,
+            "width": 168,
             "format": "YYYY-MM-DD HH:mm"
           }
         ],
@@ -1620,7 +1620,8 @@
       "dataSource": {
         "type": "api",
         "method": "get",
-        "endpoint": "/api/announcements/policy"
+        "endpoint": "/api/announcements/policy",
+        "detailEndpoint": "/api/announcements/policy"
       }
     },
     "blocks": [

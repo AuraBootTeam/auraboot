@@ -189,6 +189,15 @@ test('list page shows created announcement with draft status', async ({ page }) 
   await expect(row).toBeVisible();
 
   await expectRowStatus(page, TITLE, /draft|草稿/i);
+  const headers=table.first().getByRole('columnheader');
+  const expiryIndex=await headers.evaluateAll(items=>items.findIndex(item=>item.textContent?.includes('过期')));
+  const actionsIndex=await headers.evaluateAll(items=>items.findIndex(item=>item.textContent?.trim()==='操作'));
+  expect(expiryIndex).toBeGreaterThanOrEqual(0);expect(actionsIndex).toBeGreaterThan(expiryIndex);
+  const expiryCell=row.getByRole('cell').nth(expiryIndex),actionsCell=row.getByRole('cell').nth(actionsIndex);
+  await expect(expiryCell).toContainText(/\d{4}[-/]\d{2}[-/]\d{2} \d{2}:\d{2}/);
+  const expiryBox=await expiryCell.boundingBox(),actionsBox=await actionsCell.boundingBox();
+  expect(expiryBox).not.toBeNull();expect(actionsBox).not.toBeNull();
+  expect(expiryBox!.x+expiryBox!.width,'The expiry timestamp must fit before the sticky actions').toBeLessThanOrEqual(actionsBox!.x+1);
   await page.getByTestId('filters-toggle').click();
   const filterArea = page.getByTestId('search-area');
   const titleFilter = filterArea.getByPlaceholder('例如：周末系统维护', { exact: true });
@@ -305,6 +314,10 @@ test('publication reports unavailable and leaves the draft intact', async ({ pag
 
 test('delete draft through its protected command', async ({ page }) => {
   await navigateToAnnouncementList(page);
+  await page.getByTestId('filters-toggle').click();
+  await page.getByTestId('search-area').getByPlaceholder('例如：周末系统维护',{exact:true}).fill(TITLE);
+  await page.getByTestId('filter-search').click();
+  await expect(await findRowByContent(page,TITLE)).toBeVisible();
   await clickRowAction(page, TITLE, '删除', 'announcement:delete_announcement');
   await expect(page.locator('table tbody tr').filter({ hasText: TITLE })).toHaveCount(0);
   await expect(page.getByText('没有匹配的公告', { exact: true })).toBeVisible();
@@ -596,7 +609,7 @@ test('immediate exempt publication seals the real tenant audience and dispatches
     expect(own).toMatchObject({ title: draft.title, readState: 'unread', acknowledgementState: 'pending', first_read_at: null });
     const receiverRow = await findRowByContent(page, draft.title);
     await expect(receiverRow).toContainText('未读');
-    await expect(receiverRow).toContainText(/2026[-/]\d{2}[-/]\d{2} \d{2}:\d{2}/);
+    await expect(receiverRow).toContainText(/\d{4}[-/]\d{2}[-/]\d{2} \d{2}:\d{2}/);
     await page.screenshot({ path: test.info().outputPath('recipient-unread-list.png'), animations: 'disabled', fullPage: true });
     const readRequest = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/read`));
     await receiverRow.getByRole('button', { name: '查看公告', exact: true }).click();
@@ -636,6 +649,8 @@ test('immediate exempt publication seals the real tenant audience and dispatches
       const memberNav = memberPage.locator('nav').first();const mine = memberNav.locator('a[href="/p/announcement_reader"]');
       if (!(await mine.isVisible())) await memberNav.getByText('公告管理', { exact: true }).click();
       await expect(memberNav.locator('a[href="/p/ab_announcement"]')).toHaveCount(0);
+      await expect(memberNav.locator('a[href="/p/announcement_policy/view/current"]')).toHaveCount(0);
+      expect((await memberPage.request.get('/api/announcements/policy')).status()).toBe(403);
       await mine.click();const memberRow = await findRowByContent(memberPage, draft.title);
       await expect(memberRow).toContainText('未读');
       const memberRead = memberPage.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/read`));
