@@ -1,3 +1,4 @@
+import { isButtonDisabled } from '~/framework/meta/utils/buttonPermissions';
 import { WorkspaceTabCount } from '../detail/WorkspaceTabCount';
 import { WorkspaceObjectSummary } from '../detail/WorkspaceObjectSummary';
 import { Link } from 'react-router';
@@ -359,7 +360,7 @@ export function renderDetailPageView({
                           button.code,
                         )}
                         onClick={() => handleAction(button, recordData)}
-                        disabled={actionLoading}
+                        disabled={isButtonDisabled(button, evaluateVisibleWhen, actionLoading)}
                         className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                           button.primary
                             ? 'bg-accent hover:bg-accent-hover text-white'
@@ -401,7 +402,7 @@ export function renderDetailPageView({
                               key={button.code}
                               type="button"
                               data-testid={`toolbar-btn-${button.code}`}
-                              disabled={actionLoading}
+                              disabled={isButtonDisabled(button, evaluateVisibleWhen, actionLoading)}
                               className={`hover:bg-hover block w-full rounded px-3 py-2 text-left text-xs ${button.danger ? 'text-status-red' : 'text-text-2'}`}
                               onClick={(event) => {
                                 const menu = event.currentTarget.closest('details');

@@ -128,7 +128,7 @@ public interface AnnouncementReleaseMapper {
 
     @Update("""
         UPDATE ab_announcement_release SET status=#{state},error_code=#{error},finished_at=CURRENT_TIMESTAMP,lease_until=NULL,
-            next_attempt_at=CURRENT_TIMESTAMP+INTERVAL '1 minute'
+            next_attempt_at=CURRENT_TIMESTAMP+CASE attempts WHEN 1 THEN INTERVAL '5 seconds' WHEN 2 THEN INTERVAL '30 seconds' ELSE INTERVAL '120 seconds' END
         WHERE tenant_id=#{tenant} AND pid=#{release} AND status='running' AND fencing_token=#{fence}
         """)
     int finish(@Param("tenant") Long tenant,@Param("release") String release,@Param("fence") long fence,@Param("state") String state,@Param("error") String error);

@@ -242,7 +242,7 @@ export default function Header({
             )}
 
             {/* Unified inbox entry point */}
-            {!workspace && !simplified && showNotifications && <InboxHeaderWidget />}
+            {!simplified && showNotifications && <InboxHeaderWidget />}
 
             {/* Notification centre bell (unread badge + SSE live updates) */}
             {!simplified && showNotifications && <NotificationHeaderWidget />}

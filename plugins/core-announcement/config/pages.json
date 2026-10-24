@@ -1241,5 +1241,353 @@
         "adaptor": "table"
       }
     }
+  },
+  {
+    "pageKey": "announcement_reader_list",
+    "name:zh-CN": "我的公告",
+    "name:en": "My announcements",
+    "modelCode": "ab_announcement",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideQuickFilters": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/announcements/received",
+        "method": "get",
+        "pagination": true
+      },
+      "options": {
+        "detailUrl": "/p/announcement_reader/view/{pid}"
+      }
+    },
+    "blocks": [
+      {
+        "id": "recipient_tabs",
+        "blockType": "tabs",
+        "tabs": [
+          {
+            "key": "all",
+            "label": {
+              "zh-CN": "全部",
+              "en-US": "All"
+            }
+          },
+          {
+            "key": "unread",
+            "label": {
+              "zh-CN": "未读",
+              "en-US": "Unread"
+            },
+            "filter": {
+              "field": "filter",
+              "value": "unread"
+            }
+          },
+          {
+            "key": "pending_ack",
+            "label": {
+              "zh-CN": "待确认",
+              "en-US": "To acknowledge"
+            },
+            "filter": {
+              "field": "filter",
+              "value": "pending_ack"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recipient_table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Title"
+            },
+            "width": 320
+          },
+          {
+            "field": "importance",
+            "label": {
+              "zh-CN": "重要程度",
+              "en-US": "Importance"
+            },
+            "width": 110,
+            "dictCode": "announcement_priority"
+          },
+          {
+            "field": "readState",
+            "label": {
+              "zh-CN": "阅读",
+              "en-US": "Reading"
+            },
+            "width": 100,
+            "dictCode": "announcement_read_state"
+          },
+          {
+            "field": "acknowledgementState",
+            "label": {
+              "zh-CN": "知悉",
+              "en-US": "Acknowledgement"
+            },
+            "width": 130,
+            "dictCode": "announcement_ack_state"
+          },
+          {
+            "field": "published_at",
+            "label": {
+              "zh-CN": "发布时间",
+              "en-US": "Published at"
+            },
+            "width": 184,
+            "format": "datetime"
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无符合条件的公告",
+            "en-US": "No matching announcements"
+          },
+          "description": {
+            "zh-CN": "这里只显示你有权查看的有效公告。",
+            "en-US": "Only active announcements available to your current membership appear here."
+          }
+        },
+        "rowActions": [
+          {
+            "code": "open_announcement",
+            "label": {
+              "zh-CN": "查看公告",
+              "en-US": "Open announcement"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/p/announcement_reader/view/${record.pid}"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "announcement_reader_detail",
+    "name:zh-CN": "公告详情",
+    "name:en": "Announcement detail",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideQuickFilters": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/announcements/versions/{recordPid}/recipient",
+        "method": "get"
+      },
+      "renderedReceipt": {
+        "bodyField": "content",
+        "endpoint": "/api/announcements/versions/{recordPid}/read",
+        "payloadFields": {
+          "snapshotHash": "snapshotHash"
+        }
+      },
+      "backUrl": "/p/announcement_reader"
+    },
+    "blocks": [
+      {
+        "id": "recipient_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "acknowledge",
+            "label": {
+              "zh-CN": "确认已知悉",
+              "en-US": "Acknowledge"
+            },
+            "variant": "primary",
+            "visibleWhen": "record.acknowledgementRequired == true && record.acknowledgementState == 'pending'",
+            "confirm": "announcement.ack.confirm",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "endpoint": "/api/announcements/versions/${record.versionPid}/acknowledge",
+                  "method": "post",
+                  "body": {
+                    "snapshotHash": "${record.snapshotHash}"
+                  }
+                },
+                {
+                  "action": "event.emit",
+                  "args": {
+                    "event": "aura:inbox-update",
+                    "type": "inbox"
+                  }
+                },
+                {
+                  "action": "refresh"
+                }
+              ]
+            },
+            "disableWhen": "!record.first_read_at",
+            "primary": true
+          }
+        ]
+      },
+      {
+        "id": "recipient_content",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告内容",
+          "en-US": "Announcement"
+        },
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Title"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "importance",
+            "label": {
+              "zh-CN": "重要程度",
+              "en-US": "Importance"
+            },
+            "component": "select",
+            "dictCode": "announcement_priority",
+            "colSpan": 6
+          },
+          {
+            "field": "publisherName",
+            "label": {
+              "zh-CN": "发布人",
+              "en-US": "Publisher"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "published_at",
+            "label": {
+              "zh-CN": "发布时间",
+              "en-US": "Published at"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "expires_at",
+            "label": {
+              "zh-CN": "公告有效期",
+              "en-US": "Available until"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "acknowledgementState",
+            "label": {
+              "zh-CN": "知悉状态",
+              "en-US": "Acknowledgement"
+            },
+            "component": "select",
+            "dictCode": "announcement_ack_state",
+            "colSpan": 6
+          },
+          {
+            "field": "ack_due_at",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement due"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "acknowledged_at",
+            "label": {
+              "zh-CN": "首次确认时间",
+              "en-US": "First acknowledged"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "content",
+            "label": {
+              "zh-CN": "公告正文",
+              "en-US": "Announcement content"
+            },
+            "component": "richtext",
+            "colSpan": 12
+          },
+          {
+            "field": "attachments",
+            "label": {
+              "zh-CN": "附件",
+              "en-US": "Attachments"
+            },
+            "component": "fileAttachment",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "ack_overdue",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "知悉截止时间已过。公告仍有效时，你可以继续确认知悉，系统将记录逾期完成。",
+          "en-US": "The acknowledgement deadline has passed. You can still acknowledge while this announcement is active; completion will be recorded as late."
+        },
+        "visibleWhen": "record.ackOverdue == true"
+      },
+      {
+        "id": "ack_complete",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "你已确认知悉，首次确认时间会保留。",
+          "en-US": "Your first acknowledgement has been recorded."
+        },
+        "visibleWhen": "record.acknowledgementState == 'completed'"
+      }
+    ]
   }
 ]

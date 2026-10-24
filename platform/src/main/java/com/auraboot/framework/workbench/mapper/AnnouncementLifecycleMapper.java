@@ -118,6 +118,18 @@ public interface AnnouncementLifecycleMapper {
         """)
     int withdrawVersion(@Param("tenant") Long tenant, @Param("version") String version);
 
+    @Select("SELECT a.tenant_id,a.pid,a.active_version_pid AS version FROM ab_announcement a JOIN ab_announcement_version_control c ON c.tenant_id=a.tenant_id AND c.version_pid=a.active_version_pid WHERE a.status='published' AND a.deleted_flag=FALSE AND c.publication_state='published' AND c.expires_at<=clock_timestamp() ORDER BY c.expires_at,a.pid LIMIT 100")
+    List<Map<String,Object>> dueExpiry();
+    @Update("UPDATE ab_announcement SET status='expired',active_version_pid=NULL,row_version=row_version+1,lifecycle_revision=lifecycle_revision+1,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=#{tenant} AND pid=#{pid} AND active_version_pid=#{version} AND status='published'")
+    int expire(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version);
+    @Update("UPDATE ab_announcement_version_control SET publication_state='expired',publication_revision=publication_revision+1 WHERE tenant_id=#{tenant} AND version_pid=#{version} AND publication_state='published' AND expires_at<=clock_timestamp()")
+    int expireVersion(@Param("tenant") Long tenant,@Param("version") String version);
+
+    @Update("UPDATE ab_inbox_item SET status='closed',acted_at=CURRENT_TIMESTAMP,action_taken='announcement_unavailable' WHERE tenant_id=#{tenant} AND source_type='announcement' AND source_id=#{version} AND item_type='announcement_ack' AND status='pending'")
+    int closeRecipientTasks(@Param("tenant") Long tenant,@Param("version") String version);
+    @Update("UPDATE ab_announcement_delivery SET status='canceled',error_code='VERSION_INACTIVE' WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status='queued'")
+    int cancelRecipientDeliveries(@Param("tenant") Long tenant,@Param("version") String version);
+
     @Select(
             "SELECT count(*) FROM ab_announcement_version WHERE tenant_id=#{tenant} AND"
                 + " announcement_pid=#{pid}")

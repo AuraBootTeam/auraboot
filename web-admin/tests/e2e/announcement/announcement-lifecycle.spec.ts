@@ -578,5 +578,49 @@ test('immediate exempt publication seals the real tenant audience and dispatches
     await navigateToAnnouncementList(page);
     await expectRowStatus(page, draft.title, /已发布/);
     await page.screenshot({ path: test.info().outputPath('published-and-projected.png'), animations: 'disabled', fullPage: true });
+    // Recipient path starts from its real menu; list GET must not manufacture reading facts.
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    const nav = page.locator('nav').first();
+    const receiverLink = nav.locator('a[href="/p/announcement_reader"]');
+    if (!(await receiverLink.isVisible())) await nav.getByText('公告管理', { exact: true }).click();
+    const receivedList = page.waitForResponse(r => r.request().method() === 'GET' && r.url().includes('/api/announcements/received'));
+    await receiverLink.click();const listResult = await receivedList;
+    expect(listResult.ok()).toBe(true);
+    const own = (await listResult.json()).data.records.find((r: any) => r.versionPid === version.active_version_pid);
+    expect(own).toMatchObject({ title: draft.title, readState: 'unread', acknowledgementState: 'pending', first_read_at: null });
+    const receiverRow = await findRowByContent(page, draft.title);
+    await expect(receiverRow).toContainText('未读');
+    await page.screenshot({ path: test.info().outputPath('recipient-unread-list.png'), animations: 'disabled', fullPage: true });
+    const readRequest = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/read`));
+    await receiverRow.getByRole('button', { name: '查看公告', exact: true }).click();
+    const request = await readRequest;
+    await expect(page.getByTestId('form-field-content')).toContainText(`Audience policy for ${UID}`);
+    expect(request.postDataJSON()).toEqual({ snapshotHash: own.snapshotHash });
+    const acknowledgement = page.getByTestId('toolbar-btn-acknowledge');
+    await expect(acknowledgement).toBeEnabled();
+    const recipient = async () => (await db.query(`SELECT first_read_at,acknowledged_at,acknowledged_hash FROM ab_announcement_recipient
+      WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=(SELECT pid FROM ab_user WHERE email='admin@auraboot.com')`, [version.tenant_id, version.active_version_pid])).rows[0];
+    const readFact = await recipient();expect(readFact.first_read_at).toBeTruthy();expect(readFact.acknowledged_at).toBeNull();
+    await page.screenshot({ path: test.info().outputPath('recipient-body-read-awaiting-ack.png'), animations: 'disabled', fullPage: true });
+    await page.getByTestId('inbox-badge').click();
+    await page.getByTestId('inbox-mark-all-read').click();
+    await expect(page.getByTestId('inbox-badge')).toHaveAttribute('title', /待处理/);
+    await page.getByTestId('inbox-badge').click();
+    expect((await recipient()).acknowledged_at).toBeNull();
+    await acknowledgement.click();
+    const confirm = page.getByTestId('confirm-dialog');await expect(confirm).toContainText('确认你已阅读并知悉本版本公告');
+    await confirm.screenshot({ path: test.info().outputPath('acknowledgement-confirmation.png'), animations: 'disabled' });
+    const ackResponse = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/acknowledge`));
+    await page.getByTestId('confirm-ok').click();const acknowledged = await ackResponse;
+    expect(acknowledged.ok()).toBe(true);expect(String((await acknowledged.json()).code)).toBe('0');
+    expect(acknowledged.request().postDataJSON()).toEqual({ snapshotHash: own.snapshotHash });
+    await expect(acknowledgement).toHaveCount(0);
+    await expect(page.getByText('你已确认知悉，首次确认时间会保留。', { exact: true })).toBeVisible();
+    const ackFact = await recipient();expect(ackFact.acknowledged_at).toBeTruthy();expect(ackFact.acknowledged_hash).toBe(own.snapshotHash);
+    expect(ackFact.first_read_at).toEqual(readFact.first_read_at);
+    await page.reload();await expect(page.getByText('你已确认知悉，首次确认时间会保留。', { exact: true })).toBeVisible();
+    expect((await recipient()).acknowledged_at).toEqual(ackFact.acknowledged_at);
+    await page.screenshot({ path: test.info().outputPath('recipient-acknowledged-persisted.png'), animations: 'disabled', fullPage: true });
+
   } finally { await db.end(); }
 });

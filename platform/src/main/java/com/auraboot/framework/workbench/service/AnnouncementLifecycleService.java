@@ -148,6 +148,8 @@ public class AnnouncementLifecycleService {
                 if (mapper.withdraw(tenant, actor, pid, expectedVersion) != 1
                         || mapper.withdrawVersion(tenant, record.getActiveVersionPid()) != 1)
                     throw conflict();
+                mapper.closeRecipientTasks(tenant,record.getActiveVersionPid());
+                mapper.cancelRecipientDeliveries(tenant,record.getActiveVersionPid());
             } else if (REVISE.equals(command)) {
                 if (!payload.isEmpty()
                         || !Set.of("withdrawn", "expired", "missed", "rejected", "approval_withdrawn", "approval_failed").contains(record.getStatus())

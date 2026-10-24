@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { InboxBadge } from '../InboxBadge';
 
-vi.mock('~/shared/services/inboxService', () => ({ getUnreadCount: vi.fn(async () => 3) }));
+vi.mock('~/shared/services/inboxService', () => ({ getPendingCount: vi.fn(async () => 3) }));
 
 describe('InboxBadge hydration boundary', () => {
   it('does not advertise a clickable inbox before hydration attaches the handler', () => {

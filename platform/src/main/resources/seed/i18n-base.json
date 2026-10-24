@@ -6361,5 +6361,90 @@
     "key": "auth.phone_enrollment.rejected",
     "zh-CN": "手机号授权登录未完成，请联系管理员核对入驻信息。",
     "en-US": "Phone authorization login could not complete. Ask the administrator to check your enrollment details."
+  },
+  {
+    "key": "inbox.pendingCount",
+    "zh-CN": "{count} 项待处理",
+    "en-US": "{count} pending items"
+  },
+  {
+    "key": "inbox.markAllRead",
+    "zh-CN": "全部已读",
+    "en-US": "Mark all read"
+  },
+  {
+    "key": "inbox.empty",
+    "zh-CN": "暂无待处理事项",
+    "en-US": "No pending items"
+  },
+  {
+    "key": "inbox.viewAll",
+    "zh-CN": "查看全部待办",
+    "en-US": "View all pending work"
+  },
+  {
+    "key": "inbox.loadFailed",
+    "zh-CN": "暂时无法加载待办，请重试。",
+    "en-US": "Pending work could not be loaded. Retry."
+  },
+  {
+    "key": "inbox.type.announcement_ack",
+    "zh-CN": "公告待知悉",
+    "en-US": "Announcement acknowledgement"
+  },
+  {
+    "key": "inbox.type.approval",
+    "zh-CN": "审批",
+    "en-US": "Approval"
+  },
+  {
+    "key": "inbox.type.task",
+    "zh-CN": "任务",
+    "en-US": "Task"
+  },
+  {
+    "key": "inbox.type.mention",
+    "zh-CN": "提及",
+    "en-US": "Mention"
+  },
+  {
+    "key": "inbox.type.ai_suggestion",
+    "zh-CN": "建议",
+    "en-US": "Suggestion"
+  },
+  {
+    "key": "inbox.type.alert",
+    "zh-CN": "提醒",
+    "en-US": "Alert"
+  },
+  {
+    "key": "inbox.type.assignment",
+    "zh-CN": "分派",
+    "en-US": "Assignment"
+  },
+  {
+    "key": "inbox.type.system",
+    "zh-CN": "事项",
+    "en-US": "Work item"
+  },
+  {
+    "key": "workbench.inbox.announcement_ack",
+    "zh-CN": "公告知悉",
+    "en-US": "Acknowledgements"
+  },
+  {
+    "key": "workbench.inbox.sourceAnnouncement",
+    "zh-CN": "公告",
+    "en-US": "Announcement"
+  },
+  {
+    "key": "workbench.inbox.queueAcknowledgementsTitle",
+    "zh-CN": "公告知悉待办",
+    "en-US": "Announcement acknowledgements"
+  },
+  {
+    "key": "workbench.inbox.queueAcknowledgementsDescription",
+    "zh-CN": "打开准确版本的公告，阅读后确认已知悉。",
+    "en-US": "Open the exact announcement version and acknowledge after reading."
   }
 ]

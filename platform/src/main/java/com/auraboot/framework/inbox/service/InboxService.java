@@ -74,6 +74,8 @@ public interface InboxService {
     /**
      * Mark an item as acted (approve, reject, mark_done, etc.).
      */
+    int getPendingCount(Long userId, Long tenantId);
+
     void markActed(Long id, Long userId, Long tenantId, String action);
 
     /** Record the caller's decision only after its exact workflow task completed. */

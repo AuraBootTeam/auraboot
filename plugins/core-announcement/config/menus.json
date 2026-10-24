@@ -8,7 +8,7 @@
     "component": null,
     "icon": "IconSpeakerphone",
     "type": 0,
-    "permissionCode": "announcement.announcement.read",
+    "permissionCode": null,
     "orderNo": 920,
     "visible": true,
     "extension": {
@@ -30,6 +30,24 @@
     "permissionCode": "announcement.announcement.read",
     "orderNo": 10,
     "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "my_announcements",
+    "parentCode": "announcement_root",
+    "name:zh-CN": "我的公告",
+    "name:en": "My announcements",
+    "path": "/p/announcement_reader",
+    "pageKey": "announcement_reader_list",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 5,
+    "visible": true,
+    "icon": "IconSpeakerphone",
     "extension": {
       "platforms": [
         "web"

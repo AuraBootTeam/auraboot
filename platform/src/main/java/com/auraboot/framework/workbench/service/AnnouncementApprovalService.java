@@ -147,6 +147,9 @@ public class AnnouncementApprovalService {
             } else if(!Boolean.TRUE.equals(status.get("found"))) throw new IllegalStateException("Approval status omitted its found discriminator");
             if(!binding.submissionId().equals(status.get("submissionId")) || !(status.get("stateRevision") instanceof Number revision)
                 || revision.longValue()<1 || revision.doubleValue()!=revision.longValue()) throw new IllegalStateException("Approval provider status identity/revision is invalid");
+            if(revision.longValue()<number(row.get("provider_revision"))
+                || (row.get("instance_pid")!=null && !Objects.equals(row.get("instance_pid"),status.get("instancePid"))))
+                throw new SecurityException("Approval provider identity or revision regressed");
             if("withdraw_requested".equals(row.get("state")) && !ApprovalContract.TERMINAL_STATES.contains(status.get("state"))) {
                 status=asActor(row,true,()->{
                     access.manage(record.getPid(),"withdraw",false);
@@ -196,7 +199,7 @@ public class AnnouncementApprovalService {
         @SuppressWarnings("unchecked") var policy=policies.parseStored((Map<String,Object>)frozen.get("policy"));
         Instant now=Instant.now(),planned=policy.scheduledAt()==null ? now : policy.scheduledAt();
         Instant latest=planned.plus(Duration.ofMinutes(((Number)frozen.get("lateWindowMinutes")).longValue()));
-        if((policy.scheduledAt()!=null && result.decidedAt().isAfter(planned)) || now.isAfter(latest)) {
+        if((policy.scheduledAt()!=null && (now.isAfter(planned) || result.decidedAt().isAfter(planned))) || now.isAfter(latest)) {
             applyControl(record,row,"approved","approved","missed","missed",null);return;
         }
         String release=UniqueIdGenerator.generate(),state=policy.scheduledAt()==null ? "unpublished" : "scheduled";

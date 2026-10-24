@@ -53,6 +53,7 @@ public class AnnouncementDeliveryConsumer implements ReliableEventConsumerExtens
             return;
         }
         String user=required(event,"userPid");
+        if(deliveries.lockRoot(event.tenantId(),version)==null) throw new IllegalStateException("Delivery version root is missing");
         Map<String,Object> row=deliveries.plan(event.tenantId(),batch,user);
         if(row==null) {deliveries.complete(event.tenantId(),batch,user,"canceled","RECIPIENT_OR_VERSION_INACTIVE");return;}
         if(!version.equals(row.get("version_pid"))) throw new SecurityException("Announcement delivery binding changed");
@@ -71,7 +72,7 @@ public class AnnouncementDeliveryConsumer implements ReliableEventConsumerExtens
             item.setPriority("important".equals(snapshot.get("importance")) ? "high" : "normal");
             item.setStatus("pending");item.setSourceType("announcement");item.setSourceId(version);item.setModelCode("ab_announcement");
             item.setRecordPid((String)row.get("announcement_pid"));item.setClientItemId("announcement_ack:"+version+":"+user);
-            item.setDeepLink("/announcements/"+row.get("announcement_pid")+"/versions/"+version);item.setIsRead(false);
+            item.setDeepLink("/p/announcement_reader/view/"+version);item.setIsRead(false);
             if(row.get("expires_at")!=null) item.setExpiresAt(AnnouncementDeliveryPlanResolver.instant(row.get("expires_at")));
             inbox.createItem(item);
         }

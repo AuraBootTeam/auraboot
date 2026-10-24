@@ -29,7 +29,7 @@ public class AnnouncementReleaseWorker {
                 releases.fail(claim,"blocked",error.getClass().getSimpleName());
                 log.warn("Announcement release blocked: release={}, reason={}",claim.get("pid"),error.getClass().getSimpleName());
             } catch(TransientDataAccessException error) {
-                boolean exhausted=((Number)claim.get("attempts")).intValue()>=10;
+                boolean exhausted=((Number)claim.get("attempts")).intValue()>=4;
                 releases.fail(claim,exhausted ? "blocked" : "retryable_failed",exhausted ? "RETRY_EXHAUSTED" : "TRANSIENT_DATABASE_FAILURE");
                 log.warn("Announcement release database failure: release={}",claim.get("pid"),error);
             } catch(RuntimeException error) {

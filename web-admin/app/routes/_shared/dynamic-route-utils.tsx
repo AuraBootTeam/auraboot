@@ -660,6 +660,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         return (
           <div
             className="prose prose-sm max-w-none rounded-md border border-gray-200 bg-gray-50 p-3 text-gray-900"
+            data-rendered-field={field.field}
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(value)) }}
           />
         );

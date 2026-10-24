@@ -14,6 +14,21 @@ import org.apache.ibatis.annotations.Update;
  */
 public interface InboxItemMapper extends BaseMapper<InboxItem> {
 
+    String ACTIVE_ACK = """
+        (item_type != 'announcement_ack' OR EXISTS (
+          SELECT 1 FROM ab_announcement_recipient ar
+          JOIN ab_announcement_recipient_snapshot ars ON ars.tenant_id=ar.tenant_id AND ars.version_pid=ar.version_pid AND ars.sealed=TRUE
+          JOIN ab_announcement aa ON aa.tenant_id=ar.tenant_id AND aa.active_version_pid=ar.version_pid AND aa.deleted_flag=FALSE
+          JOIN ab_announcement_version_control ac ON ac.tenant_id=ar.tenant_id AND ac.version_pid=ar.version_pid AND ac.publication_state='published'
+          JOIN ab_tenant_member am ON am.tenant_id=ar.tenant_id AND am.pid=ar.member_pid AND am.user_id=ab_inbox_item.user_id AND am.status='active' AND am.deleted_flag=FALSE
+          JOIN ab_user au ON au.id=am.user_id AND au.pid=ar.user_pid AND au.is_enabled=TRUE AND au.deleted_flag=FALSE
+          WHERE ar.tenant_id=ab_inbox_item.tenant_id AND ar.version_pid=ab_inbox_item.source_id AND ar.acknowledged_at IS NULL
+            AND (ac.expires_at IS NULL OR ac.expires_at>clock_timestamp()) ))
+        """;
+
+    @Select("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND status='pending' AND (expires_at IS NULL OR expires_at>clock_timestamp()) AND "+ACTIVE_ACK)
+    int countPending(@Param("tenantId") Long tenantId,@Param("userId") Long userId);
+
     @Select("""
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
@@ -39,7 +54,7 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
     @Update("""
         UPDATE ab_inbox_item SET status = 'acted', action_taken = #{action}, acted_at = NOW()
         WHERE id = #{id} AND tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
         """)
     int markActed(@Param("id") Long id, @Param("tenantId") Long tenantId,
                   @Param("userId") Long userId, @Param("action") String action);
@@ -60,7 +75,7 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
     @Update("""
         UPDATE ab_inbox_item SET status = 'dismissed', acted_at = NOW()
         WHERE id = #{id} AND tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
         """)
     int dismiss(@Param("id") Long id, @Param("tenantId") Long tenantId,
                 @Param("userId") Long userId);
@@ -96,7 +111,7 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         <script>
         UPDATE ab_inbox_item SET status = 'acted', action_taken = #{action}, acted_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
           AND id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}
@@ -113,7 +128,7 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         <script>
         UPDATE ab_inbox_item SET status = 'dismissed', acted_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
           AND id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}

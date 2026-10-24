@@ -90,6 +90,11 @@ public class InboxController {
     /**
      * Get total unread count (for badge display).
      */
+    @GetMapping("/pending-count")
+    public ApiResponse<Integer> pendingCount() {
+        return ApiResponse.success(inboxService.getPendingCount(MetaContext.getCurrentUserId(),MetaContext.getCurrentTenantId()));
+    }
+
     @GetMapping("/unread-count")
     public ApiResponse<Integer> unreadCount() {
         Long userId = MetaContext.getCurrentUserId();

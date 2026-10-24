@@ -6,6 +6,9 @@ import java.util.*;
 /** Fixed recipient facts, never watchers or role re-resolution. */
 @Mapper
 public interface AnnouncementDeliveryMapper {
+    @Select("SELECT a.pid FROM ab_announcement a JOIN ab_announcement_version v ON v.tenant_id=a.tenant_id AND v.announcement_pid=a.pid WHERE a.tenant_id=#{tenant} AND v.pid=#{version} FOR UPDATE OF a")
+    String lockRoot(@Param("tenant") Long tenant,@Param("version") String version);
+
     @Select("""
         SELECT r.user_pid,r.member_pid,v.pid AS version_pid,v.snapshot::text AS snapshot,c.published_at,c.expires_at,
             c.ack_due_at,v.announcement_pid,u.id AS user_id

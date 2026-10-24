@@ -180,6 +180,43 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
             .executeWithoutResult(status -> deliveryConsumer.consume(event));
     }
 
+    @Autowired private com.auraboot.framework.workbench.service.AnnouncementReaderService recipientReader;
+    @Autowired private com.auraboot.framework.inbox.service.InboxService inbox;
+
+    @Test
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void explicitReadingAndAcknowledgementPreserveFirstFactsAndCannotBeDismissed() {
+        identity();String operation=UniqueIdGenerator.generate();
+        var policy=Map.of("audience",Map.of("kind","all"),"exemptionReason","Recipient verification","acknowledgementRequired",true);
+        var created=lifecycle.execute("announcement:create_announcement",null,Map.of("title","Receipt "+operation,"content","Frozen receipt body","policy",policy),operation,null);
+        String pid=(String)created.get("pid");var accepted=releaseService.execute("announcement:publish",pid,Map.of(),operation+"-publish",1);
+        String version=(String)accepted.get("versionPid");
+        new com.auraboot.framework.workbench.service.AnnouncementReleaseWorker(releaseService).tick();identity();
+        var detail=recipientReader.detail(version);String hash=(String)detail.get("snapshotHash");
+        assertEquals("Frozen receipt body",detail.get("content"));assertEquals("unread",detail.get("readState"));
+        assertEquals(null,jdbc.queryForObject("SELECT first_read_at FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=? AND user_pid=?",java.time.Instant.class,getTestTenant().getId(),version,getTestUser().getPid()));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,()->recipientReader.mark(version,Map.of("snapshotHash",hash),true));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,()->recipientReader.mark(version,Map.of("snapshotHash","wrong"),false));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,()->recipientReader.mark(version,Map.of("snapshotHash",hash,"userPid","someone-else"),false));
+        var item=new com.auraboot.framework.inbox.model.InboxItem();item.setTenantId(getTestTenant().getId());item.setUserId(getTestUser().getId());
+        item.setItemType("announcement_ack");item.setSourceType("announcement");item.setSourceId(version);item.setTitle("Receipt pending");item.setClientItemId("recipient-it:"+version);
+        inbox.createItem(item);int pending=inbox.getPendingCount(getTestUser().getId(),getTestTenant().getId());
+        inbox.markAllRead(getTestUser().getId(),getTestTenant().getId());assertEquals(pending,inbox.getPendingCount(getTestUser().getId(),getTestTenant().getId()));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,()->inbox.dismiss(item.getId(),getTestUser().getId(),getTestTenant().getId()));
+        assertEquals(0,inbox.batchMarkActed(List.of(item.getId()),getTestUser().getId(),getTestTenant().getId(),"done"));
+        var read=recipientReader.mark(version,Map.of("snapshotHash",hash),false);
+        assertNotNull(read.get("first_read_at"));assertEquals(read.get("first_read_at"),recipientReader.mark(version,Map.of("snapshotHash",hash),false).get("first_read_at"));
+        assertEquals("pending",read.get("acknowledgementState"));
+        var ack=recipientReader.mark(version,Map.of("snapshotHash",hash),true);
+        assertEquals("completed",ack.get("acknowledgementState"));assertEquals(read.get("first_read_at"),ack.get("first_read_at"));
+        assertEquals(ack.get("acknowledged_at"),recipientReader.mark(version,Map.of("snapshotHash",hash),true).get("acknowledged_at"));
+        assertEquals(pending-1,inbox.getPendingCount(getTestUser().getId(),getTestTenant().getId()));
+        assertEquals("acted",inbox.getItem(item.getId(),getTestUser().getId(),getTestTenant().getId()).getStatus());
+        lifecycle.execute("announcement:archive",pid,Map.of(),operation+"-withdraw",3);
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,()->recipientReader.detail(version));
+        org.junit.jupiter.api.Assertions.assertThrows(com.auraboot.framework.exception.BusinessException.class,()->recipientReader.mark(version,Map.of("snapshotHash",hash),true));
+    }
+
     @Test
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     void frozenExemptionPublishesToRealMembersAndProjectsSeparateNotificationAndAcknowledgement() {

@@ -1,13 +1,14 @@
 import { useI18n } from '~/contexts/I18nContext';
 /**
- * InboxBadge — header icon showing unified inbox unread count.
+ * InboxBadge — header icon showing unified inbox pending count.
  * Replaces ApprovalBadge with unified inbox data source.
  * Clicking opens InboxDropdown (managed by parent).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { InboxIcon } from '@heroicons/react/24/outline';
-import { getUnreadCount } from '~/shared/services/inboxService';
+import { getPendingCount } from '~/shared/services/inboxService';
+import { useAuth } from '~/contexts/AuthContext';
 import { useHydrated } from '~/hooks/useHydrated';
 
 interface InboxBadgeProps {
@@ -20,18 +21,22 @@ interface InboxBadgeProps {
 export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }: InboxBadgeProps) {
   const { t } = useI18n();
   const hydrated = useHydrated();
+  const { user } = useAuth();
+  const scope = `${user?.tenantId ?? ''}:${user?.pid ?? ''}`;
+  const scopeRef = useRef(scope); scopeRef.current = scope;
   const [count, setCount] = useState(0);
 
   const fetchCount = useCallback(async () => {
     try {
-      const c = await getUnreadCount();
-      setCount(typeof c === 'number' ? c : 0);
+      const c = await getPendingCount();
+      if (scopeRef.current === scope) setCount(c);
     } catch {
       // Non-critical
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
+    setCount(0);
     fetchCount();
     const timer = setInterval(fetchCount, pollInterval);
     return () => clearInterval(timer);
@@ -42,11 +47,8 @@ export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.type !== 'inbox') return;
-      if (typeof detail.count === 'number') {
-        setCount(detail.count);
-      } else {
-        void fetchCount();
-      }
+      // Transport counts historically describe unread reminders, not pending business work.
+      void fetchCount();
     };
     window.addEventListener('aura:inbox-update', handler);
     return () => window.removeEventListener('aura:inbox-update', handler);
@@ -65,7 +67,7 @@ export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }
           ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
       } ${className || ''}`}
-      title={count > 0 ? t('inbox.unreadCount', { count }) : t('inbox.title')}
+      title={count > 0 ? t('inbox.pendingCount', { count }) : t('inbox.title')}
     >
       <InboxIcon className="h-5 w-5" />
       {count > 0 && (

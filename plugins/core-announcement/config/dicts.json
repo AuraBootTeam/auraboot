@@ -324,5 +324,56 @@
         "status": "enabled"
       }
     ]
+  },
+  {
+    "code": "announcement_read_state",
+    "name": "阅读状态",
+    "name:zh-CN": "阅读状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "unread",
+        "label": "Unread",
+        "label:zh-CN": "未读",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "read",
+        "label": "Read",
+        "label:zh-CN": "已读",
+        "sortNo": 10,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_ack_state",
+    "name": "知悉状态",
+    "name:zh-CN": "知悉状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "not_required",
+        "label": "Not required",
+        "label:zh-CN": "无需确认",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待确认",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "completed",
+        "label": "Acknowledged",
+        "label:zh-CN": "已知悉",
+        "sortNo": 20,
+        "status": "enabled"
+      }
+    ]
   }
 ]

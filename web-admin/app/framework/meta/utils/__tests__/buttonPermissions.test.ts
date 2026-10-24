@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasButtonPermissions } from '../buttonPermissions';
+import { hasButtonPermissions, isButtonDisabled } from '../buttonPermissions';
 
 describe('composed action permissions', () => {
   const granted = new Set(['edit', 'publish']);
@@ -17,5 +17,16 @@ describe('composed action permissions', () => {
   it('fails closed on malformed runtime declarations', () => {
     expect(hasButtonPermissions({ permissionCodes: [''] }, has)).toBe(false);
     expect(hasButtonPermissions({ permissionCodes: 'publish' } as any, has)).toBe(false);
+  });
+});
+
+describe('button disabled state', () => {
+  it('keeps pending prerequisites disabled, respects enable precedence and busy/static state', () => {
+    const evaluate = (expression: string) => expression === 'ready';
+    expect(isButtonDisabled({ disableWhen: 'ready' }, evaluate)).toBe(true);
+    expect(isButtonDisabled({ enableWhen: 'waiting' }, evaluate)).toBe(true);
+    expect(isButtonDisabled({ enableWhen: 'ready', disableWhen: 'ready' }, evaluate)).toBe(false);
+    expect(isButtonDisabled({}, evaluate, true)).toBe(true);
+    expect(isButtonDisabled({ disabled: true }, evaluate)).toBe(true);
   });
 });

@@ -257,5 +257,54 @@
     "en-US": "The approval workflow requires attention from the workflow administrator.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.error.recipient_unavailable",
+    "zh-CN": "该公告已失效或你不在本版本接收范围内。",
+    "en-US": "This version is no longer available to your current membership.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.version_changed",
+    "zh-CN": "公告版本已变化，请刷新后再操作。",
+    "en-US": "The announcement version changed. Refresh before continuing.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.ack_not_required",
+    "zh-CN": "本版本不要求确认知悉。",
+    "en-US": "This version does not require acknowledgement.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.read_required",
+    "zh-CN": "请先打开并阅读公告正文，再确认知悉。",
+    "en-US": "Open the announcement content before acknowledging it.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.ack_business_action_required",
+    "zh-CN": "请打开公告并使用“确认已知悉”，不能直接完成或忽略此待办。",
+    "en-US": "Open the announcement and acknowledge it to complete this task.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "message.announcement.ack.confirm.title",
+    "zh-CN": "确认已知悉",
+    "en-US": "Acknowledge this announcement",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "message.announcement.ack.confirm.content",
+    "zh-CN": "确认你已阅读并知悉本版本公告。系统将保留首次确认时间。",
+    "en-US": "Confirm that you have read and understood this version. Your first acknowledgement time will be preserved.",
+    "source": "import",
+    "refType": "message"
   }
 ]
