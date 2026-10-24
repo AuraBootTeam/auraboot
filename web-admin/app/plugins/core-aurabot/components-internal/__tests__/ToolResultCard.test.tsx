@@ -13,7 +13,7 @@ describe('ToolResultCard', () => {
         success
       />,
     );
-    expect(screen.getByText('操作等待审批')).toBeInTheDocument();
+    expect(screen.getByText('该操作需要审批')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('PRIVATE');
     expect(document.body).not.toHaveTextContent('Internal policy');

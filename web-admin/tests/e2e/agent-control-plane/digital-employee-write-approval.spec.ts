@@ -240,7 +240,7 @@ if (approvalFixture) {
       await expect(confirm).toBeVisible({ timeout: 120_000 });
       await expect(confirm).toContainText(marker);
       await expect(confirm).toContainText('审批业务操作');
-      await expect(chat).toContainText('操作等待审批');
+      await expect(chat).toContainText('该操作需要审批');
       await expect(confirm).not.toContainText('This tool requires');
       await expect(confirm).not.toContainText(fixture.toolCode.replaceAll(':', '_'));
       await expect(confirm).not.toContainText(fixture.field);

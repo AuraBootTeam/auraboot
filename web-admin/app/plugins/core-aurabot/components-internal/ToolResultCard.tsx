@@ -59,7 +59,7 @@ export function ToolResultCard({ toolName, result, success }: ToolResultCardProp
       <div className="mb-3 flex justify-start">
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
           <Clock className="h-4 w-4" aria-hidden="true" />
-          <span>{t('aurabot.approval.waiting', undefined, '操作等待审批')}</span>
+          <span>{t('aurabot.approval.required', undefined, '该操作需要审批')}</span>
         </div>
       </div>
     );
