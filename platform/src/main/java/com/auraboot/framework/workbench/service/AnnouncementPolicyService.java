@@ -148,6 +148,11 @@ public class AnnouncementPolicyService {
     }
 
     private List<String> uploadedFilePids(Object input) {
+        if(input instanceof String encoded) {
+            // Native JSON-backed form values may retain their database representation until changed.
+            try { input=json.readValue(encoded,Object.class); }
+            catch(JsonProcessingException error) { invalid(); }
+        }
         if(!(input instanceof List<?>)) invalid();
         List<String> pids=new ArrayList<>();
         for(Object item:(List<?>)input) {

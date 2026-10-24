@@ -63,4 +63,10 @@ class AnnouncementPolicyServiceTest {
         when(records.draftSettings(1L,"notice")).thenReturn(encoded);
         assertThat(service.fromForm(Map.of("ack_days",14),"notice")).contains(instant.toString());
     }
+    @Test void unchangedNativeFileJsonIsNormalizedWithoutTrustingPresentation() {
+        when(records.draftSettings(1L,"notice")).thenReturn("{}");
+        assertThat(service.fromForm(Map.of("attachments","[]"),"notice")).contains("\"attachmentPids\":[]");
+        assertThatThrownBy(()->service.fromForm(Map.of("attachments","{\"fileId\":\"foreign\"}"),"notice")).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->service.fromForm(Map.of("attachments","broken"),"notice")).isInstanceOf(BusinessException.class);
+    }
 }
