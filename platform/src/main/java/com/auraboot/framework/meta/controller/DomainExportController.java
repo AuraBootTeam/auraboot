@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/exports/domain")
+@com.auraboot.framework.permission.annotation.AuthenticatedAccess("Own export handles only; the registered source enforces current business permissions, original membership and captured row scope")
 public class DomainExportController {
     private final DomainExportTaskService exports;
     @GetMapping("/{taskPid}")
