@@ -271,18 +271,25 @@ if (approvalFixture) {
       expect(approved).toHaveLength(1);
       expect(approved[0].approval_status).toBe('approved');
       expect(approved[0].consumed_at).not.toBeNull();
-      const conversationId = await page.evaluate(() => localStorage.getItem('aurabot.lastConversationId'));
+      const conversationId = await page.evaluate(() =>
+        localStorage.getItem('aurabot.lastConversationId'),
+      );
       expect(conversationId).toMatch(/^\d+$/);
-      const outboundRows = async () => (await db.query(
-        "SELECT id,sender_id,content FROM ab_im_message WHERE tenant_id=$1 AND conversation_id=$2 AND sender_type='agent' AND content='Approved tool executed.'",
-        [fixture.tenantId, conversationId],
-      )).rows;
+      const outboundRows = async () =>
+        (
+          await db.query(
+            "SELECT id,sender_id,content FROM ab_im_message WHERE tenant_id=$1 AND conversation_id=$2 AND sender_type='agent' AND content='Approved tool executed.'",
+            [fixture.tenantId, conversationId],
+          )
+        ).rows;
       await expect.poll(outboundRows, { timeout: 15_000 }).toHaveLength(1);
       const outbound = await outboundRows();
-      const expectedAgent = (await db.query(
-        'SELECT id FROM ab_agent_definition WHERE tenant_id=$1 AND pid=$2',
-        [fixture.tenantId, fixture.agentPid],
-      )).rows;
+      const expectedAgent = (
+        await db.query('SELECT id FROM ab_agent_definition WHERE tenant_id=$1 AND pid=$2', [
+          fixture.tenantId,
+          fixture.agentPid,
+        ])
+      ).rows;
       expect(expectedAgent).toHaveLength(1);
       expect(String(outbound[0].sender_id)).toBe(String(expectedAgent[0].id));
       const persisted = await recordRows();
@@ -292,7 +299,9 @@ if (approvalFixture) {
       await expect(page.getByTestId('agent-chat-page')).toBeVisible();
       expect(page.url()).toBe(initialUrl);
       await expect(page.getByTestId('agent-chat-page')).toContainText(marker);
-      await expect(page.getByTestId('chat-msg-agent')).toContainText('审批通过，操作已完成。');
+      await expect(page.getByTestId('agent-chat-page').getByTestId('chat-msg-agent')).toContainText(
+        '审批通过，操作已完成。',
+      );
       await expect(page.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
       expect(await recordRows()).toEqual(persisted);
       await page.screenshot({ path: `${output}/APPROVAL-RELOADED.png`, fullPage: true });
