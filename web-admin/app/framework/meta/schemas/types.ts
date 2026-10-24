@@ -353,14 +353,22 @@ export interface CommandInputFormConfig {
   inputFieldsSubmitLabel?: string | LocalizedText;
 }
 
+/** Existing-record command options shared by toolbar and sub-table actions. */
+export interface CommandActionConfig extends CommandInputFormConfig {
+  payload?: Record<string, unknown>;
+  operationType?: 'create' | 'update' | 'delete' | 'CREATE' | 'UPDATE' | 'DELETE';
+  expectedVersion?: number | string;
+  idempotent?: boolean;
+}
+
 // Action definition — unified button behavior
 export type ActionDef =
   | ({
       type: 'command';
       command: string;
       download?: { fileIdField: string };
-    } & CommandInputFormConfig)
-  | ({ type: 'state_transition'; command: string } & CommandInputFormConfig)
+    } & CommandActionConfig)
+  | ({ type: 'state_transition'; command: string } & CommandActionConfig)
   | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
   | ({ type: 'bulk_state_transition'; command: string } & CommandInputFormConfig)
   | {

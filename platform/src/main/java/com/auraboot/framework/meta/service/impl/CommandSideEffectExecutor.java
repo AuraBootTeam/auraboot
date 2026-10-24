@@ -91,6 +91,32 @@ public class CommandSideEffectExecutor {
      */
     @SuppressWarnings("unchecked")
     public void executeSideEffectPhase(Map<String, Object> execConfig, Map<String, Object> payload,
+            Long tenantId, Long userId, CommandDefinition command, CommandExecuteRequest request,
+            Map<String, Object> fieldMapResults, Map<String, Object> beforeSnapshot) {
+        boolean deleting = request != null && "delete".equalsIgnoreCase(request.getOperationType());
+        deleting = deleting || (execConfig != null && "delete".equalsIgnoreCase(String.valueOf(execConfig.get("type"))));
+        boolean hasEffects = execConfig != null && execConfig.get("sideEffects") instanceof List<?> effects && !effects.isEmpty();
+        if (!deleting || !hasEffects) {
+            executeSideEffectPhase(execConfig, payload, tenantId, userId, command, request, fieldMapResults);
+            return;
+        }
+        // The row is already deleted. Only its host-captured preimage may identify
+        // an aggregate parent; caller payload fields must not redirect the rollup.
+        if (request == null || !StringUtils.hasText(request.getTargetRecordId()) || beforeSnapshot == null
+                || tenantId == null || !(beforeSnapshot.get("tenant_id") instanceof Number actualTenant)
+                || new BigDecimal(actualTenant.toString()).compareTo(BigDecimal.valueOf(tenantId)) != 0) {
+            throw new IllegalStateException("Delete side-effect snapshot is unavailable or mismatched");
+        }
+        var target = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
+        Object snapshotId = beforeSnapshot.get(target.getKey());
+        if (snapshotId == null || !String.valueOf(target.getValue()).equals(String.valueOf(snapshotId)))
+            throw new IllegalStateException("Delete side-effect snapshot is unavailable or mismatched");
+        Map<String,Object> trusted = new HashMap<>(payload);
+        trusted.putAll(beforeSnapshot);
+        executeSideEffectPhase(execConfig, trusted, tenantId, userId, command, request, fieldMapResults);
+    }
+
+    public void executeSideEffectPhase(Map<String, Object> execConfig, Map<String, Object> payload,
                                 Long tenantId, Long userId, CommandDefinition command,
                                 CommandExecuteRequest request,
                                 Map<String, Object> fieldMapResults) {

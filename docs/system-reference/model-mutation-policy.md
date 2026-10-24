@@ -148,3 +148,21 @@ It does not set Inventory state, post stock, change order approval or turn
 request delivery into receipt confirmation. Ordinary non-collaboration events
 retain their previous no-counter/no-source-write behavior. Deployment and native
 transaction qualification are separate from the candidate's hermetic tests.
+
+## Delete side effects and the original target
+
+The command pipeline passes its server-captured before snapshot to post-execution
+side effects. A delete with side effects requires that snapshot to match the exact
+target identity and tenant. The deleted row's stored fields override caller payload
+fields when resolving an aggregate parent; an empty payload still recalculates the
+original parent's total, including zero after its last child is removed. Missing or
+mismatched snapshots reject the command transaction instead of trusting caller
+lineage or silently skipping the aggregate. Non-delete side-effect context remains
+unchanged. This is an internal pipeline boundary, not a new HTTP input or write grant.
+
+Sub-table command row actions may opt into expectedVersion, idempotent request keys,
+explicit update/delete operation types and projected payloads. The target remains
+the selected child. Configured input defaults resolve against that row and its
+parent form; user cancellation sends no write. Opted-in missing/invalid versions
+fail closed, and option-loading errors remain visible instead of being treated as
+cancellation. Legacy actions without these options retain their existing protocol.
