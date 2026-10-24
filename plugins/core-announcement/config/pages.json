@@ -1596,5 +1596,319 @@
         "visibleWhen": "record.acknowledgementState == 'completed'"
       }
     ]
+  },
+  {
+    "pageKey": "announcement_policy_detail",
+    "name:zh-CN": "公告政策",
+    "name:en": "Announcement policy",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "backUrl": "/home",
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/policy"
+      }
+    },
+    "blocks": [
+      {
+        "id": "policy_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "公告政策仅作用于当前租户。安全规则在执行时实时复查；提醒时刻、次数和免打扰窗口仅供新提交版本冻结使用，不追溯修改已有公告。",
+          "en-US": "Policy applies to the current tenant. Security rules are rechecked at execution. Reminder timing, limits and quiet hours are frozen for new submissions and do not reschedule existing announcements."
+        }
+      },
+      {
+        "id": "policy_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "edit_announcement_policy",
+            "label": {
+              "zh-CN": "编辑政策",
+              "en-US": "Edit policy"
+            },
+            "variant": "primary",
+            "permissionCode": "announcement.announcement.policy_manage",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.form",
+                  "args": {
+                    "title": {
+                      "zh-CN": "编辑公告政策",
+                      "en-US": "Edit announcement policy"
+                    },
+                    "fields": [
+                      {
+                        "field": "forceApproval",
+                        "label": {
+                          "zh-CN": "所有公告必须审批",
+                          "en-US": "Require approval for every announcement"
+                        },
+                        "type": "checkbox",
+                        "defaultValue": "${record.forceApproval}",
+                        "helpText": {
+                          "zh-CN": "收紧后立即复查尚未执行的发布任务。",
+                          "en-US": "A tighter rule is rechecked before pending publication executes."
+                        }
+                      },
+                      {
+                        "field": "defaultDefinitionPid",
+                        "label": {
+                          "zh-CN": "默认审批流程",
+                          "en-US": "Default approval workflow"
+                        },
+                        "type": "select",
+                        "defaultValue": "${record.defaultDefinitionPid}",
+                        "dataSource": {
+                          "type": "api",
+                          "endpoint": "/api/announcements/policy/approval-options"
+                        },
+                        "helpText": {
+                          "zh-CN": "仅可新选当前可用且本人有权使用的流程；已有实例保持原流程。",
+                          "en-US": "New selections require a qualified available workflow. Existing instances keep their original definition."
+                        }
+                      },
+                      {
+                        "field": "clearDefaultDefinition",
+                        "label": {
+                          "zh-CN": "移除默认审批流程",
+                          "en-US": "Remove the default workflow"
+                        },
+                        "type": "checkbox",
+                        "defaultValue": false
+                      },
+                      {
+                        "field": "lateWindowMinutes",
+                        "label": {
+                          "zh-CN": "发布技术延迟窗口（分钟）",
+                          "en-US": "Publication technical grace period (minutes)"
+                        },
+                        "type": "number",
+                        "required": true,
+                        "defaultValue": "${record.lateWindowMinutes}",
+                        "helpText": {
+                          "zh-CN": "1–120 分钟，仅用于已获许可的发布技术重试，不为逾期审批补发。",
+                          "en-US": "1–120 minutes for authorized technical retries. Late approval never triggers a missed publication."
+                        }
+                      },
+                      {
+                        "field": "reminderAt",
+                        "label": {
+                          "zh-CN": "每日自动催办时刻",
+                          "en-US": "Daily automatic reminder time"
+                        },
+                        "type": "string",
+                        "required": true,
+                        "defaultValue": "${record.reminderAt}",
+                        "placeholder": "09:00",
+                        "helpText": {
+                          "zh-CN": "HH:mm，使用公告版本冻结的租户时区。",
+                          "en-US": "HH:mm in the tenant time zone frozen for the announcement version."
+                        }
+                      },
+                      {
+                        "field": "automaticReminderLimit",
+                        "label": {
+                          "zh-CN": "自动催办次数上限",
+                          "en-US": "Automatic reminder limit"
+                        },
+                        "type": "number",
+                        "required": true,
+                        "defaultValue": "${record.automaticReminderLimit}",
+                        "helpText": {
+                          "zh-CN": "1–3 次。没有合格收件人的扫描不消耗次数。",
+                          "en-US": "1–3 batches. Scans without eligible recipients do not consume the limit."
+                        }
+                      },
+                      {
+                        "field": "reminderDedupeMinutes",
+                        "label": {
+                          "zh-CN": "重复提醒间隔（分钟）",
+                          "en-US": "Minimum reminder interval (minutes)"
+                        },
+                        "type": "number",
+                        "required": true,
+                        "defaultValue": "${record.reminderDedupeMinutes}",
+                        "helpText": {
+                          "zh-CN": "60–1440 分钟；手动和自动催办共用。",
+                          "en-US": "60–1440 minutes, shared by manual and automatic reminders."
+                        }
+                      },
+                      {
+                        "field": "quietStart",
+                        "label": {
+                          "zh-CN": "免打扰开始",
+                          "en-US": "Quiet hours start"
+                        },
+                        "type": "string",
+                        "defaultValue": "${record.quietStart}",
+                        "placeholder": "22:00"
+                      },
+                      {
+                        "field": "quietEnd",
+                        "label": {
+                          "zh-CN": "免打扰结束",
+                          "en-US": "Quiet hours end"
+                        },
+                        "type": "string",
+                        "defaultValue": "${record.quietEnd}",
+                        "placeholder": "08:00",
+                        "helpText": {
+                          "zh-CN": "开始与结束同时填写或同时留空；支持跨午夜，结束时刻可发送。",
+                          "en-US": "Set or clear both times together. Overnight intervals are supported; reminders are allowed at the end time."
+                        }
+                      }
+                    ],
+                    "submitLabel": {
+                      "zh-CN": "保存政策",
+                      "en-US": "Save policy"
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "announcementPolicyOperation"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:update_policy",
+                  "body": {
+                    "clientRequestId": "${state.announcementPolicyOperation}",
+                    "payload": {
+                      "forceApproval": "${form.forceApproval}",
+                      "lateWindowMinutes": "${form.lateWindowMinutes}",
+                      "reminderAt": "${form.reminderAt}",
+                      "automaticReminderLimit": "${form.automaticReminderLimit}",
+                      "reminderDedupeMinutes": "${form.reminderDedupeMinutes}",
+                      "quietStart": "${form.quietStart}",
+                      "quietEnd": "${form.quietEnd}",
+                      "expectedPolicyRevision": "${record.revision}",
+                      "defaultDefinitionPid": "${form.clearDefaultDefinition ? '' : form.defaultDefinitionPid}"
+                    }
+                  }
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "announcementPolicyOperation"
+                  }
+                },
+                {
+                  "action": "toast.show",
+                  "args": {
+                    "level": "success",
+                    "message": {
+                      "zh-CN": "公告政策已保存；已有公告的提醒时间保持不变。",
+                      "en-US": "Announcement policy saved. Existing announcements keep their frozen reminder schedule."
+                    }
+                  }
+                },
+                {
+                  "action": "refresh"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy_current",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "当前政策",
+          "en-US": "Current policy"
+        },
+        "fields": [
+          {
+            "field": "forceApproval",
+            "label": {
+              "zh-CN": "所有公告必须审批",
+              "en-US": "Approval required for every announcement"
+            },
+            "component": "checkbox",
+            "colSpan": 6
+          },
+          {
+            "field": "lateWindowMinutes",
+            "label": {
+              "zh-CN": "技术延迟窗口（分钟）",
+              "en-US": "Technical grace period (minutes)"
+            },
+            "component": "number",
+            "colSpan": 6
+          },
+          {
+            "field": "reminderAt",
+            "label": {
+              "zh-CN": "每日自动催办时刻",
+              "en-US": "Daily automatic reminder time"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "automaticReminderLimit",
+            "label": {
+              "zh-CN": "自动催办次数上限",
+              "en-US": "Automatic reminder limit"
+            },
+            "component": "number",
+            "colSpan": 6
+          },
+          {
+            "field": "reminderDedupeMinutes",
+            "label": {
+              "zh-CN": "重复提醒间隔（分钟）",
+              "en-US": "Minimum reminder interval (minutes)"
+            },
+            "component": "number",
+            "colSpan": 6
+          },
+          {
+            "field": "quietStart",
+            "label": {
+              "zh-CN": "免打扰开始",
+              "en-US": "Quiet hours start"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "quietEnd",
+            "label": {
+              "zh-CN": "免打扰结束",
+              "en-US": "Quiet hours end"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "policy_safety",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "默认审批流程可在“编辑政策”中查看、更换或移除。知悉截止后停止自动催办，但有效公告仍允许手动催办和确认。免打扰时段同时留空表示未配置；新公告默认每日 09:00、最多三次。",
+          "en-US": "View, replace or remove the default workflow in Edit policy. Automatic reminders stop at the acknowledgement deadline; active announcements still allow manual reminders and acknowledgement. Empty quiet-hour fields mean no quiet interval is configured. New announcements default to 09:00 daily and at most three automatic batches."
+        }
+      }
+    ]
   }
 ]
