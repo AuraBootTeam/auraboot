@@ -113,3 +113,9 @@ The overview references `bpmPanel.formBinding.formRef: "tpm_acceptance_form"` an
 At process start, BPM freezes the published page DTO and node field permissions in the protected `_formBindingsSnapshot`. Subsequent page publication affects new submissions only. This freezes structure and permissions, **not business values**: read-only detail displays the current governed business record. Historical values remain in field audit. Historical instances without a schema snapshot explicitly report an unconfirmed form version; they do not silently load the latest form.
 
 Both review nodes use the acceptance form with all business fields read-only and `variable_only` saving. Corrections require rejection and the normal edit/resubmit path. The decision/comment map to the existing workflow result variables. The backend rejects read-only, hidden and undeclared field writes, mapped-variable bypasses and save-strategy overrides before running a command.
+
+## First-use evaluation setup
+
+On an empty local evaluation instance, run `bash scripts/project-delivery-demo.sh` after starting the stack. It performs the normal quickstart, explicitly imports this template, and creates fictional sample customers, real local members, projects, milestones, files and audit configuration through platform APIs. No SQL or application-start backfill is used.
+
+The default frontend URL is `http://localhost:3000`. Host-first maintainers set `BACKEND_URL` to their owned frontend URL and `PLUGINS_PATH` to the plugin directory visible to the backend. The script accepts only local HTTP evaluation URLs; it never clears projects and refuses to seed an already populated project list. The initialization receipt directory is printed. Existing installations may import the template with `bash scripts/quickstart.sh --project-delivery` without requesting sample data.
