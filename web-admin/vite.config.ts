@@ -200,6 +200,12 @@ export default defineConfig({
       ],
     },
     proxy: {
+      // IM authenticates its own upgrade request; the HTTP BFF has no WS tunnel.
+      '^/api/im/ws(?:\\?|$)': {
+        target: apiDocsProxyTarget,
+        ws: true,
+        changeOrigin: true,
+      },
       '^/(swagger-ui(?:/|$)|v3/api-docs(?:/|$))': {
         target: apiDocsProxyTarget,
         changeOrigin: true,

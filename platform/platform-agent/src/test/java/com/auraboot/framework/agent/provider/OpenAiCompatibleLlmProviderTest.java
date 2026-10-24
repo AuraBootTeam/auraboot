@@ -238,6 +238,65 @@ class OpenAiCompatibleLlmProviderTest {
     }
 
     @Test
+    void requiredDeepSeekToolSelectionDisablesOnlyUnspecifiedThinking() throws Exception {
+        var request = requiredToolRequest("deepseek-flash");
+        var body = createProvider().buildOpenAiRequestBody(request);
+        assertThat(body).containsEntry("tool_choice", "required")
+                .containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat((List<?>) body.get("tools")).hasSize(1);
+    }
+
+    @Test
+    void explicitThinkingAndRequiredDeepSeekToolsFailBeforeNetwork() {
+        var request = requiredToolRequest("deepseek-flash");
+        request.setThinking(LlmChatRequest.ThinkingConfig.builder().enabled(true).build());
+        assertThatThrownBy(() -> createProvider().buildOpenAiRequestBody(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("thinking mode cannot be combined");
+    }
+
+    @Test
+    void requiredToolsOnOtherProvidersPreserveThinkingDefault() throws Exception {
+        var body = createProvider().buildOpenAiRequestBody(requiredToolRequest("gpt-4o"));
+        assertThat(body).containsEntry("tool_choice", "required").doesNotContainKey("thinking");
+    }
+
+    @Test
+    void deepSeekToolContinuationKeepsTheFirstRoundsNonThinkingMode() throws Exception {
+        var request = requiredToolRequest("deepseek-flash");
+        var provider = createProvider();
+        assertThat(provider.buildOpenAiRequestBody(request))
+                .containsEntry("thinking", Map.of("type", "disabled"));
+        request.setToolChoice(null);
+        request.setMessages(List.of(
+                LlmChatRequest.Message.text("user", "Use the tool."),
+                LlmChatRequest.Message.builder().role("assistant").content(List.of(
+                        Map.of("type", "tool_use", "id", "call-1", "name", "list_models", "input", Map.of()))).build(),
+                LlmChatRequest.Message.builder().role("user").content(List.of(
+                        Map.of("type", "tool_result", "tool_use_id", "call-1", "content", "No models."))).build()));
+        var body = provider.buildOpenAiRequestBody(request);
+        assertThat(body).containsEntry("thinking", Map.of("type", "disabled"))
+                .doesNotContainKey("tool_choice");
+        assertThat(body.get("messages").toString()).contains("tool_call_id=call-1");
+    }
+
+    @Test
+    void firstAutomaticDeepSeekToolRoundKeepsTheProviderDefault() throws Exception {
+        var request = requiredToolRequest("deepseek-flash");
+        request.setToolChoice("auto");
+        assertThat(createProvider().buildOpenAiRequestBody(request))
+                .containsEntry("tool_choice", "auto").doesNotContainKey("thinking");
+    }
+
+    private LlmChatRequest requiredToolRequest(String model) {
+        return LlmChatRequest.builder().model(model).maxTokens(256)
+                .messages(List.of(LlmChatRequest.Message.text("user", "Use the tool.")))
+                .tools(List.of(LlmChatRequest.Tool.builder().name("list_models")
+                        .description("List models").inputSchema(Map.of("type", "object", "properties", Map.of()))
+                        .build())).toolChoice("required").build();
+    }
+
+    @Test
     void buildRequestBodyMapsJsonObjectResponseFormat() throws Exception {
         OpenAiCompatibleLlmProvider provider = createProvider();
         LlmChatRequest request = LlmChatRequest.builder()

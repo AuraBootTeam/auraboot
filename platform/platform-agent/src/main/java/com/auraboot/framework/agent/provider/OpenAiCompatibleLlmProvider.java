@@ -389,6 +389,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             String toolChoice = request.getToolChoice();
             if (toolChoice != null && !toolChoice.isBlank()) {
                 body.put("tool_choice", toolChoice);
+
             }
         } else if (request.getTools() != null && !request.getTools().isEmpty()) {
             if ("required".equals(request.getToolChoice())) {
@@ -396,6 +397,19 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                         "tool_choice=required requested but tool payload is disabled for model: " + request.getModel());
             }
             log.debug("Skipping tool payload for model '{}' because provider compatibility is disabled", request.getModel());
+        }
+        // A required first round is non-thinking. Its subsequent tool exchange
+        // must stay non-thinking: the compatible wire history has no reasoning_content.
+        boolean toolHistoryWithoutReasoning = messages.stream().anyMatch(message ->
+                "assistant".equals(message.get("role")) && message.containsKey("tool_calls")
+                        && !message.containsKey("reasoning_content"));
+        if (isDeepSeekV4Model(request.getModel())
+                && ("required".equals(body.get("tool_choice")) || toolHistoryWithoutReasoning)) {
+            if (request.getThinking() != null && request.getThinking().isEnabled()) {
+                throw new IllegalArgumentException(
+                        "DeepSeek thinking mode cannot be combined with required tools or tool history without reasoning_content");
+            }
+            body.put("thinking", Map.of("type", "disabled"));
         }
         return body;
     }
@@ -405,7 +419,8 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             return false;
         }
         String normalized = model.trim().toLowerCase(Locale.ROOT);
-        return normalized.equals("deepseek-v4-flash") || normalized.equals("deepseek-v4-pro");
+        return normalized.equals("deepseek-flash") || normalized.equals("deepseek-v4-flash")
+                || normalized.equals("deepseek-v4-pro");
     }
 
     @Override
