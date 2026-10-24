@@ -261,6 +261,16 @@ class AsyncTaskServiceImplTest {
         verify(executor,never()).execute(any(),any());
     }
 
+    @Test void saturatedCallerDispatchLeavesDurableWorkPendingUntilTheCallerTransactionIsGone() {
+        var task=executableTask();task.setInputParams(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("resumeOnRestart",true));
+        when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {service.executeTaskAsync(1L,123L);} finally {TransactionSynchronizationManager.setActualTransactionActive(false);}
+        verify(asyncTaskMapper,never()).claimPending(any(),any(),any());
+        verify(executor,never()).execute(any(),any());
+        assertThat(task.getStatus()).isEqualTo(AsyncTask.STATUS_PENDING);
+    }
+
     private AsyncTask executableTask() {
         AsyncTask task = new AsyncTask();
         task.setId(1L);

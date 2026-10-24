@@ -54,6 +54,12 @@ public interface AsyncTaskMapper extends BaseMapper<AsyncTask> {
                             @Param("token") String token, @Param("progress") int progress,
                             @Param("message") String message);
 
+    @Select("""
+            SELECT id FROM ab_async_task WHERE id=#{id} AND tenant_id=#{tenantId} AND execution_token=#{token}
+                AND status='running' AND lease_until>clock_timestamp() FOR UPDATE
+            """)
+    Long lockOwnedExecution(@Param("id") Long id,@Param("tenantId") Long tenantId,@Param("token") String token);
+
     @Update("""
             UPDATE ab_async_task SET status=#{task.status}, progress=#{task.progress},
               progress_message=#{task.progressMessage}, error_message=#{task.errorMessage},

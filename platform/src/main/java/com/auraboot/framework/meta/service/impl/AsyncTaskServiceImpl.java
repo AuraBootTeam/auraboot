@@ -51,6 +51,9 @@ public class AsyncTaskServiceImpl {
     @org.springframework.context.annotation.Lazy
     private AsyncTaskServiceImpl self;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private AsyncTaskCompletionService completions;
+
     /** Registered executors keyed by task type */
     private final Map<String, AsyncTaskExecutor> executorRegistry = new ConcurrentHashMap<>();
 
@@ -304,6 +307,15 @@ public class AsyncTaskServiceImpl {
             return;
         }
 
+        // CallerRunsPolicy may dispatch from afterCommit before the caller transaction is cleaned up.
+        // Durable host tasks stay pending for recovery instead of joining that completed transaction.
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && java.util.Set.of("command-handler","domain-export").contains(task.getTaskType())
+                && task.getInputParams()!=null && task.getInputParams().path("resumeOnRestart").asBoolean(false)) {
+            log.info("Deferring durable task until caller transaction cleanup: code={}",task.getTaskCode());
+            return;
+        }
+
         // Skip if already cancelled before execution started
         if (AsyncTask.STATUS_CANCELLED.equals(task.getStatus())) {
             log.info("Task already cancelled, skipping execution: code={}", task.getTaskCode());
@@ -339,8 +351,8 @@ public class AsyncTaskServiceImpl {
 
             // Execute with timeout awareness
             AsyncTaskResult result;
-            try (var scope = AsyncTaskExecutionContext.enter(new AsyncTaskExecutionContext.Snapshot(
-                    task.getId(), task.getTaskCode(), task.getTenantId(), task.getCreatedBy(), token))) {
+            var identity=new AsyncTaskExecutionContext.Snapshot(task.getId(),task.getTaskCode(),task.getTenantId(),task.getCreatedBy(),token);
+            try (var scope = AsyncTaskExecutionContext.enter(identity)) {
                 result = executor.execute(task.getInputParams(), callback);
             }
 
@@ -359,7 +371,11 @@ public class AsyncTaskServiceImpl {
                 task.setProgressMessage("Completed");
                 task.setResultData(result.getData());
                 task.setCompletedAt(Instant.now());
-                if (finishOwnedTask(task) != 1) return;
+                if(result.getTransactionalCompletion()!=null) {
+                    try(var scope=AsyncTaskExecutionContext.enter(identity)) {
+                        if(!completions.complete(task,result.getTransactionalCompletion())) return;
+                    }
+                } else if (finishOwnedTask(task) != 1) return;
                 log.info("Async task completed: code={}, type={}", task.getTaskCode(), task.getTaskType());
             } else {
                 handleFailure(task, result.getErrorMessage(), result.isRetryable());

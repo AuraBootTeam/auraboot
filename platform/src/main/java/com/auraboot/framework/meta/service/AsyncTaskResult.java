@@ -19,6 +19,15 @@ public class AsyncTaskResult {
      * their behavior. Executors that know the failure class use the explicit factories.</p>
      */
     private boolean retryable;
+    /** Trusted host completion writes join the fenced task-completion transaction after external work finishes. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Runnable transactionalCompletion;
+
+    public AsyncTaskResult withTransactionalCompletion(Runnable completion) {
+        if(!success) throw new IllegalStateException("Only successful work may publish transactional completion");
+        transactionalCompletion=java.util.Objects.requireNonNull(completion);
+        return this;
+    }
 
     /**
      * Create a successful result.
