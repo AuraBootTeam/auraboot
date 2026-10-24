@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { commandRequestMetadata, projectCommandPayload } from '../commandRequestPolicy';
+import { commandRequestMetadata, projectCommandPayload, commandPolicyFor } from '../commandRequestPolicy';
 
 describe('command-owned request policy', () => {
   it('retains the identity of an uncertain request and changes it with the intent', () => {
@@ -38,4 +38,14 @@ describe('command-owned request policy', () => {
     const payload = { name: 'Existing' };
     expect(projectCommandPayload(payload)).toBe(payload);
   });
+});
+
+it('scopes dialog payload fields to their command without widening publish or delete', () => {
+  const fallback = { idempotent: true, payloadFields: [] };
+  const overrides = { 'announcement:update_announcement': { idempotent: true, payloadFields: ['ack_required'] } };
+  const raw = { pid: 'notice', status: 'draft', ack_required: false };
+  expect(projectCommandPayload(raw, commandPolicyFor(fallback, overrides, 'announcement:update_announcement')))
+    .toEqual({ ack_required: false });
+  expect(projectCommandPayload(raw, commandPolicyFor(fallback, overrides, 'announcement:publish'))).toEqual({});
+  expect(commandPolicyFor(undefined, undefined, 'other:action')).toBeUndefined();
 });

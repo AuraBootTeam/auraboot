@@ -69,7 +69,7 @@ public class AnnouncementPolicyService {
     public Policy load(String pid) {
         String value=records.draftSettings(MetaContext.getCurrentTenantId(),pid);
         if(value==null) throw BusinessException.i18n("announcement.error.not_found");
-        try { return parse(json.readValue(value,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){})); }
+        try { return parseStored(json.readValue(value,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){})); }
         catch(JsonProcessingException error) { throw new IllegalStateException("Invalid stored announcement policy",error); }
     }
 
@@ -81,11 +81,19 @@ public class AnnouncementPolicyService {
         Map<String,Object> values=recordPid==null ? new LinkedHashMap<>() : new LinkedHashMap<>(decode(encode(load(recordPid))));
         @SuppressWarnings("unchecked") Map<String,Object> oldAudience=(Map<String,Object>)values.getOrDefault("audience",Map.of());
         Map<String,Object> audience=new LinkedHashMap<>(oldAudience);
+        values.remove("attachmentMetadata");
         input.forEach((field,value)->{
             String key=FORM_FIELDS.get(field);
             if(key==null) return;
-            if(field.startsWith("audience_")) audience.put(key,value); else values.put(key,value);
+            if(field.startsWith("audience_")) audience.put(key,value);
+            else if("attachments".equals(field)) values.put(key,uploadedFilePids(value));
+            else values.put(key,value);
         });
+        if("all".equals(input.get("audience_kind"))) {
+            for(String field:List.of("audience_users","audience_departments","audience_roles")) {
+                if(!input.containsKey(field)) audience.put(FORM_FIELDS.get(field),List.of());
+            }
+        }
         values.put("audience",audience);
         return validateDraft(values,recordPid);
     }
@@ -101,6 +109,19 @@ public class AnnouncementPolicyService {
         Policy policy=parse(values);
         verifyAttachments(policy,recordPid,false);
         return encode(policy);
+    }
+
+    public void linkDraftAttachments(String recordPid,String settings) {
+        Policy policy=parseStored(decode(settings));
+        Set<String> linked=new HashSet<>();
+        files.getFilesByEntityAndField("ab_announcement",recordPid,"attachments").forEach(file->linked.add(file.getPid()));
+        List<String> append=policy.attachmentPids().stream().filter(pid->!linked.contains(pid)).toList();
+        if(append.isEmpty()) return;
+        var request=new com.auraboot.framework.file.dto.FileRelationRequestDTO();
+        request.setEntityType("ab_announcement");request.setEntityId(recordPid);request.setFieldName("attachments");
+        request.setFileIds(append.toArray(String[]::new));
+        if(!files.appendFileRelation(request,MetaContext.getCurrentUserId()))
+            throw new IllegalStateException("Announcement attachment relation was not persisted");
     }
 
     public void verifyAttachments(Policy policy,String recordPid,boolean retain) {
@@ -119,8 +140,36 @@ public class AnnouncementPolicyService {
         }
     }
 
+    public Policy parseStored(Map<String,Object> value) {
+        Map<String,Object> policy=new LinkedHashMap<>(value);
+        policy.remove("attachmentMetadata");
+        return parse(policy);
+    }
+
+    private List<String> uploadedFilePids(Object input) {
+        if(!(input instanceof List<?>)) invalid();
+        List<String> pids=new ArrayList<>();
+        for(Object item:(List<?>)input) {
+            if(!(item instanceof Map<?,?> file) || !Set.of("fileId","name","url","size","type").containsAll(file.keySet())
+                || !(file.get("fileId") instanceof String)) invalid();
+            pids.add((String)((Map<?,?>)item).get("fileId"));
+        }
+        return strings(pids);
+    }
+
     public String encode(Policy policy) {
-        try { return json.writeValueAsString(policy); }
+        Map<String,Object> stored=json.convertValue(policy,new com.fasterxml.jackson.core.type.TypeReference<>(){});
+        List<Map<String,Object>> metadata=new ArrayList<>();
+        for(String pid:policy.attachmentPids()) {
+            FileEntity file=files.findByPid(pid);
+            if(file==null || !pid.equals(file.getPid())) throw BusinessException.i18n("announcement.error.attachment_unavailable");
+            Map<String,Object> presentation=new LinkedHashMap<>();
+            presentation.put("fileId",pid);presentation.put("name",file.getOriginalName());
+            presentation.put("size",file.getFileSize());presentation.put("type",file.getMimeType());
+            presentation.put("url","/api/file/download/"+pid);metadata.add(presentation);
+        }
+        stored.put("attachmentMetadata",metadata);
+        try { return json.writeValueAsString(stored); }
         catch(JsonProcessingException error) { throw new IllegalArgumentException("Invalid announcement policy",error); }
     }
     private static List<String> strings(Object value) {

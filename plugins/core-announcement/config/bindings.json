@@ -104,5 +104,101 @@
     "required": false,
     "visible": false,
     "editable": false
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "audience_kind",
+    "sequence": 100,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "audience_users",
+    "sequence": 101,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "audience_departments",
+    "sequence": 102,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "audience_roles",
+    "sequence": 103,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "ack_required",
+    "sequence": 104,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "ack_required_effective",
+    "sequence": 105,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "ack_days",
+    "sequence": 106,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "approval_mode",
+    "sequence": 107,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "approval_definition",
+    "sequence": 108,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "scheduled_at",
+    "sequence": 109,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "exemption_reason",
+    "sequence": 110,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_announcement",
+    "fieldCode": "attachments",
+    "sequence": 111,
+    "required": false,
+    "visible": false,
+    "editable": true
   }
 ]

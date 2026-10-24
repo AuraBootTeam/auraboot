@@ -150,7 +150,7 @@ public class AnnouncementLifecycleService {
                     throw conflict();
             } else if (REVISE.equals(command)) {
                 if (!payload.isEmpty()
-                        || !Set.of("withdrawn", "expired").contains(record.getStatus())
+                        || !Set.of("withdrawn", "expired", "missed").contains(record.getStatus())
                         || record.getCurrentVersionPid() == null)
                     throw BusinessException.i18n("announcement.error.not_editable");
                 Map<String, Object> snapshot =
@@ -188,8 +188,11 @@ public class AnnouncementLifecycleService {
             }
             after = before + 1;
         }
-        if (policyJson != null && mapper.saveSettings(tenant, pid, policyJson) != 1)
-            throw new IllegalStateException("Announcement policy was not persisted");
+        if (policyJson != null) {
+            if (mapper.saveSettings(tenant, pid, policyJson) != 1)
+                throw new IllegalStateException("Announcement policy was not persisted");
+            policies.linkDraftAttachments(pid,policyJson);
+        }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("pid", pid);
         result.put("recordPid", pid);

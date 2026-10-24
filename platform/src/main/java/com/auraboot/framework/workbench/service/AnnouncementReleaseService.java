@@ -121,18 +121,22 @@ public class AnnouncementReleaseService {
     }
 
     @Transactional
-    public Map<String,Object> claim(){return releases.claim();}
+    public Map<String,Object> claim(){
+        // Only the durable task registry is global; business execution restores the captured tenant below.
+        return MetaContext.runWithoutTenantFilter(releases::claim);
+    }
 
     @Transactional(isolation=Isolation.REPEATABLE_READ)
     public void perform(Map<String,Object> claim) {
         Long tenant=((Number)claim.get("tenant_id")).longValue(),actor=((Number)claim.get("actor_user_id")).longValue();
         String version=(String)claim.get("version_pid"),release=(String)claim.get("pid");
         long fence=((Number)claim.get("fencing_token")).longValue();
-        Map<String,Object> member=releases.actor(tenant,actor);
+        Map<String,Object> member=MetaContext.runWithoutTenantFilter(()->releases.actor(tenant,actor));
         if(member==null) { fail(claim,"blocked","ACTOR_INACTIVE");return; }
         MetaContext.Snapshot previous=MetaContext.snapshot();
         try {
             Long memberId=((Number)member.get("member_id")).longValue();
+            MetaContext.setContext(tenant,actor,(String)member.get("user_pid"),(String)member.get("username"));
             MetaContext.setContext(tenant,actor,(String)member.get("user_pid"),(String)member.get("username"),releases.actorRoles(tenant,memberId));
             MetaContext.setMemberId(memberId);
             // The aggregate lock is always first, matching cancel/withdraw and avoiding inverted locks.
@@ -148,7 +152,7 @@ public class AnnouncementReleaseService {
                 releases.stopControl(tenant,version,"missed");releases.stopRecord(tenant,pid,version,"missed");fail(claim,"missed","SCHEDULE_MISSED");return;
             }
             Map<String,Object> snapshot=codec.object(frozen.get("snapshot").toString());
-            @SuppressWarnings("unchecked") var policy=policies.parse((Map<String,Object>)snapshot.get("policy"));
+            @SuppressWarnings("unchecked") var policy=policies.parseStored((Map<String,Object>)snapshot.get("policy"));
             if(!"exempt".equals(frozen.get("authorization_basis"))) invalid("approval_not_ready");
             access.actor("exempt");
             var recipients=audiences.resolve(policy.audience());
@@ -174,8 +178,9 @@ public class AnnouncementReleaseService {
 
     @Transactional
     public void fail(Map<String,Object> claim,String state,String error) {
-        releases.finish(((Number)claim.get("tenant_id")).longValue(),(String)claim.get("pid"),
-            ((Number)claim.get("fencing_token")).longValue(),state,error);
+        // This updates only the trusted claimed task's exact tenant/pid/fence after a rolled-back business transaction.
+        MetaContext.runWithoutTenantFilter(()->releases.finish(((Number)claim.get("tenant_id")).longValue(),(String)claim.get("pid"),
+            ((Number)claim.get("fencing_token")).longValue(),state,error));
     }
     private static Instant time(Object value) {
         if(value instanceof Instant instant) return instant;

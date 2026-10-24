@@ -98,6 +98,24 @@ public class IdentityDirectoryAccessorImpl implements IdentityDirectoryAccessor 
                 && !Boolean.TRUE.equals(member.getDeletedFlag()) && "active".equalsIgnoreCase(member.getStatus()) ? user : null;
     }
 
+    @Override
+    public TenantUserIdentity findEnabledTenantMembership(Long tenantId, String userPid) {
+        UserIdentity identity=findActiveTenantUser(tenantId,userPid);
+        if(identity==null || !identity.pid().equals(userPid)) return null;
+        User user=userMapper.selectById(identity.id());
+        if(user==null || !user.isEnabled() || Boolean.TRUE.equals(user.getDeletedFlag())) return null;
+        TenantMember member=tenantMemberService.findByTenantIdAndUserId(tenantId,identity.id());
+        return member==null ? null : new TenantUserIdentity(identity,member.getPid());
+    }
+
+    @Override
+    public List<String> userPidsForRolePid(Long tenantId, String rolePid) {
+        if(!Objects.equals(tenantId,com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()))
+            throw new SecurityException("Strict role lookup requires the current tenant");
+        return userRoleMapper.findEffectiveUserPidsByRolePid(tenantId,rolePid).stream()
+            .filter(pid->findEnabledTenantMembership(tenantId,pid)!=null).distinct().sorted().toList();
+    }
+
     private void addCodes(Set<String> target, List<Role> roles) {
         if (roles == null) return;
         roles.stream().map(Role::getCode).filter(code -> code != null && !code.isBlank()).forEach(target::add);

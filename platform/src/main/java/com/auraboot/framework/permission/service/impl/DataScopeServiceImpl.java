@@ -78,7 +78,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Override
     public DataScopeCondition resolveAudienceScope(Long memberId, String resourceCode, String actionCode) {
         if (memberId == null) return DataScopeCondition.none();
-        List<Long> roles = userRoleMapper.findRoleIdsByMemberId(memberId);
+        List<Long> roles = userRoleMapper.findEffectiveRoleIdsByMemberId(MetaContext.getCurrentTenantId(),memberId);
         if (roles == null || roles.isEmpty()) return DataScopeCondition.notConfigured();
         List<RoleDataScope> entries = roleDataScopeMapper.findByRoleIdsAndResource(roles, resourceCode, actionCode);
         if (entries == null || entries.isEmpty()) return DataScopeCondition.notConfigured();

@@ -3660,7 +3660,8 @@ CREATE TABLE public.ab_announcement (
     approval_definition text GENERATED ALWAYS AS ((draft_settings ->> 'definitionPid'::text)) STORED,
     scheduled_at text GENERATED ALWAYS AS ((draft_settings ->> 'scheduledAt'::text)) STORED,
     exemption_reason text GENERATED ALWAYS AS ((draft_settings ->> 'exemptionReason'::text)) STORED,
-    attachments jsonb GENERATED ALWAYS AS (COALESCE((draft_settings -> 'attachmentPids'::text), '[]'::jsonb)) STORED,
+    ack_required_effective boolean GENERATED ALWAYS AS (COALESCE(((draft_settings ->> 'acknowledgementRequired'::text))::boolean, ((announcement_priority)::text = 'important'::text))) STORED,
+    attachments jsonb GENERATED ALWAYS AS (COALESCE((draft_settings -> 'attachmentMetadata'::text), '[]'::jsonb)) STORED,
     CONSTRAINT chk_announcement_revisions CHECK (((row_version > 0) AND (editor_revision > 0) AND (lifecycle_revision > 0))),
     CONSTRAINT chk_announcement_state CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'unpublished'::character varying, 'scheduled'::character varying, 'missed'::character varying, 'published'::character varying, 'withdrawn'::character varying, 'expired'::character varying])::text[])))
 );

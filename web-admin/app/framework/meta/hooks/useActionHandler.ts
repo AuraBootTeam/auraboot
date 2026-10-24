@@ -1,5 +1,6 @@
 import {
   commandRequestMetadata,
+  commandPolicyFor,
   projectCommandPayload,
   type CommandRequestIdentity,
 } from '~/framework/meta/utils/commandRequestPolicy';
@@ -953,7 +954,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   `no explicit command and no convention "${operationType}" command on the model`,
               );
             }
-            const policy = runtime?.getSchema?.()?.extension?.commandRequest;
+            const requestExtension = runtime?.getSchema?.()?.extension;
+            const policy = commandPolicyFor(
+              requestExtension?.commandRequest,
+              requestExtension?.commandRequestByCommand,
+              effectiveCommand,
+            );
             payload = projectCommandPayload(payload, policy);
             const request = commandRequestMetadata(
               policy,

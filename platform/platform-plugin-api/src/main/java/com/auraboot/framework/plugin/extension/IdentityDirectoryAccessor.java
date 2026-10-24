@@ -17,5 +17,15 @@ public interface IdentityDirectoryAccessor {
     /** Resolve a user only when they are an active member of the current tenant. */
     UserIdentity findActiveTenantUser(Long tenantId, String idOrPid);
 
+    /** Exact public role identity; older hosts cannot claim strict role support. */
+    default List<String> userPidsForRolePid(Long tenantId, String rolePid) {
+        throw new UnsupportedOperationException("Strict public role lookup is unavailable");
+    }
+
+    /** Enabled membership incarnation, used by sealed approval assignments. */
+    default TenantUserIdentity findEnabledTenantMembership(Long tenantId, String userPid) { return null; }
+
+    record TenantUserIdentity(UserIdentity user, String memberPid) {}
+
     record UserIdentity(Long id, String pid, String username, String displayName) {}
 }

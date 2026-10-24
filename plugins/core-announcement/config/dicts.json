@@ -72,6 +72,78 @@
         "extension": {
           "color": "gray"
         }
+      },
+      {
+        "value": "unpublished",
+        "label": "Publication queued",
+        "label:zh-CN": "发布处理中",
+        "sortNo": 100,
+        "status": "enabled"
+      },
+      {
+        "value": "scheduled",
+        "label": "Scheduled",
+        "label:zh-CN": "定时待发布",
+        "sortNo": 110,
+        "status": "enabled"
+      },
+      {
+        "value": "missed",
+        "label": "Publication window missed",
+        "label:zh-CN": "已错过发布时间",
+        "sortNo": 120,
+        "status": "enabled"
+      },
+      {
+        "value": "pending",
+        "label": "Approval pending",
+        "label:zh-CN": "审批中",
+        "sortNo": 130,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_audience_kind",
+    "name": "announcement_audience_kind",
+    "name:zh-CN": "通知范围",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "selected",
+        "label": "Selected audience",
+        "label:zh-CN": "定向通知",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "all",
+        "label": "All tenant members",
+        "label:zh-CN": "当前租户全员",
+        "sortNo": 20,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_mode",
+    "name": "announcement_approval_mode",
+    "name:zh-CN": "发布方式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "exempt",
+        "label": "Exempt publication",
+        "label:zh-CN": "免审发布",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "approval",
+        "label": "Publish after approval",
+        "label:zh-CN": "审批后发布",
+        "sortNo": 20,
+        "status": "enabled"
       }
     ]
   }

@@ -166,5 +166,19 @@
     "en-US": "The notification bridge is disabled. Ask the tenant administrator to enable it before publication.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "message.announcement.cancel_schedule.confirm.title",
+    "zh-CN": "取消发布安排",
+    "en-US": "Cancel release",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.cancel_schedule.confirm.content",
+    "zh-CN": "取消后不会发布，冻结版本和历史记录仍会保留。确定取消吗？",
+    "en-US": "The release will stop. Its frozen version and history will remain. Cancel it?",
+    "source": "import",
+    "refType": "action"
   }
 ]

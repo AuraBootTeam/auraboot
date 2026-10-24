@@ -1,0 +1,10 @@
+package com.auraboot.framework.plugin.extension.approval;
+
+import org.pf4j.ExtensionPoint;
+import java.util.Optional;
+
+/** A business fact owner resolves only its own persisted, authorized approval submissions. */
+public interface ApprovalSubmissionSource extends ExtensionPoint {
+    String businessType();
+    Optional<ApprovalContract.SubmittedApproval> findSubmitted(long tenantId,long actorUserId,String submissionId);
+}

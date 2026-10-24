@@ -10,5 +10,29 @@
   "uploadFailed": {
     "zh-CN": "上传失败，请重试",
     "en": "Upload failed. Try again."
+  },
+  "limitsLoading": {
+    "zh-CN": "正在读取上传限制…",
+    "en-US": "Loading upload limits…"
+  },
+  "limitsUnavailable": {
+    "zh-CN": "无法读取上传限制，请刷新后重试。",
+    "en-US": "Upload limits could not be loaded. Refresh and try again."
+  },
+  "effectiveLimit": {
+    "zh-CN": "当前单文件上限：{size} MB",
+    "en-US": "Current file-size limit: {size} MB"
+  },
+  "unlimitedSize": {
+    "zh-CN": "单文件大小由服务器请求限制控制。",
+    "en-US": "File size is controlled by the server request limits."
+  },
+  "tooManyFiles": {
+    "zh-CN": "最多选择 {count} 个附件。",
+    "en-US": "Select at most {count} attachments."
+  },
+  "fileTooLarge": {
+    "zh-CN": "{name} 超出 {size} MB 限制。",
+    "en-US": "{name} exceeds the {size} MB limit."
   }
 }

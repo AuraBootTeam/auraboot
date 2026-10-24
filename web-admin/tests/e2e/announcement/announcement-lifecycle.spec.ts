@@ -86,6 +86,7 @@ async function clickRowAction(
   await expect(dialog).toBeVisible();
   const confirmationText: Record<string, string> = {
     'announcement:publish': '发布后该公告将对读者可见，确定发布吗？',
+    'announcement:cancel_schedule': '取消后不会发布，冻结版本和历史记录仍会保留。确定取消吗？',
     'announcement:archive': '撤回后该公告将不再对读者展示，可稍后重新发布。确定撤回吗？',
     'announcement:republish': '将基于历史版本建立可编辑草稿，保存不会直接发布。确定建立吗？',
     'announcement:delete_announcement': '确定要删除选中的记录吗？此操作不可恢复。',
@@ -129,7 +130,7 @@ test('create announcement in draft status', async ({ page }) => {
   await expect(title).toHaveAttribute('placeholder', '例如：10 月 12 日系统维护通知');
   await expect(content).toHaveAttribute('placeholder', '说明适用对象、具体事项和生效时间');
   await expect(
-    page.getByText('可先保存未完成的草稿；发布能力将在受众与分发接入后启用。', { exact: true }),
+    page.getByText('可先保存未完成的草稿，再从公告列表的“通知设置”选择受众、发布方式和知悉要求。', { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText('补充影响范围、时间安排和需要读者采取的行动。', { exact: true }),
@@ -252,6 +253,7 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
   expect(input.clientRequestId).toBeTruthy();
   expect(Object.keys(input.payload).sort()).toEqual([
     'announcement_priority',
+    'attachments',
     'content',
     'expires_at',
     'pinned',
@@ -276,7 +278,7 @@ test('publication reports unavailable and leaves the draft intact', async ({ pag
   await row.getByTestId('row-action-more').click();
   await page
     .getByTestId('row-action-dropdown')
-    .getByRole('menuitem', { name: '发布（暂未启用）', exact: true })
+    .getByRole('menuitem', { name: '免审发布', exact: true })
     .click();
   const responsePromise = page.waitForResponse(
     (response) =>
@@ -290,7 +292,7 @@ test('publication reports unavailable and leaves the draft intact', async ({ pag
   await expect(
     page
       .getByTestId('ab:list:ab_announcement:action-error')
-      .getByText('公告发布尚未启用：需要先完成受众授权与可靠分发接入。', { exact: true }),
+      .getByText('免审发布需要选择免审模式并填写免审原因。', { exact: true }),
   ).toBeVisible();
   await page.screenshot({
     animations: 'disabled',
@@ -470,4 +472,109 @@ test('read-only manager cannot create or modify notices', async ({ page, browser
   } finally {
     await context.close();
   }
+});
+
+
+async function setupPublicationDraft(page: Page, suffix: string) {
+  const title = `${suffix} ${UID}`;
+  const response = await page.request.post('/api/announcements', { data: {
+    operationId: randomUUID(), title, content: `Audience policy for ${UID}`, priority: 'important',
+  } });
+  expect(response.status(), await response.text()).toBe(200);
+  return { title, pid: (await response.json()).data.pid as string };
+}
+
+async function openNotificationSettings(page: Page, title: string) {
+  const row = await findRowByContent(page, title);
+  await row.getByTestId('row-action-more').click();
+  await page.getByTestId('row-action-dropdown').getByRole('menuitem', { name: '通知设置', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: '通知设置', exact: true })).toBeVisible();
+  return dialog;
+}
+
+test('scheduled audience settings preserve important acknowledgement and cancellation never creates recipients', async ({ page }) => {
+  const draft = await setupPublicationDraft(page, 'Scheduled audience');
+  const code = `notice_recipient_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
+  const role = await page.request.post('/api/roles', { data: {
+    code, name: 'Announcement recipient', type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'self',
+  } });
+  expect(role.status(), await role.text()).toBe(200);
+  const recipientName = `No employee ${UID}`;
+  const email = `${code}@example.com`;
+  const user = await page.request.post('/api/admin/users', { data: {
+    email, displayName: recipientName, initialPassword: 'Test2026x', roleCodes: [code], sendInviteEmail: false,
+  } });
+  expect(user.status(), await user.text()).toBe(200);
+  const db = new Client(PG_CONN); await db.connect();
+  try {
+    const person = (await db.query(`SELECT u.pid,m.pid AS member_pid FROM ab_user u
+      JOIN ab_tenant_member m ON m.user_id=u.id WHERE u.email=$1 AND m.status='active' AND m.deleted_flag=FALSE`, [email])).rows[0];
+    expect(person).toBeTruthy();
+    expect((await db.query('SELECT count(*)::int AS count FROM mt_org_employee WHERE org_emp_member_id=$1 AND deleted_flag=FALSE', [person.member_pid])).rows[0].count).toBe(0);
+    await navigateToAnnouncementList(page);
+    let dialog = await openNotificationSettings(page, draft.title);
+    await expect(dialog.getByLabel('要求确认已知悉', { exact: true })).toBeChecked();
+    await dialog.getByTestId('form-dialog-field-audience_users').getByRole('checkbox', { name: recipientName, exact: true }).check();
+    await dialog.getByLabel('免审原因', { exact: true }).fill('Scheduled maintenance approved by the tenant.');
+    await dialog.getByLabel('预约发布时间', { exact: true }).fill(dateOffsetStr(2) + 'T12:00');
+    await dialog.screenshot({ path: test.info().outputPath('notification-settings-audience.png'), animations: 'disabled' });
+    const savedResponse = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/meta/commands/execute/announcement:update_announcement'));
+    await dialog.getByTestId('form-dialog-submit').click();
+    const saved = await savedResponse;
+    expect(saved.status(), await saved.text()).toBe(200);
+    const payload = saved.request().postDataJSON();
+    expect(payload.expectedVersion).toBe(1);
+    expect(payload.payload.audience_users).toEqual([person.pid]);
+    expect(payload.payload.ack_required).toBe(true);
+    expect(payload.payload.scheduled_at).toMatch(/Z$/);
+    expect(payload.payload.status).toBeUndefined();
+    await expect(dialog).toBeHidden();
+    dialog = await openNotificationSettings(page, draft.title);
+    await expect(dialog.getByTestId('form-dialog-field-audience_users').getByRole('checkbox', { name: recipientName, exact: true })).toBeChecked();
+    await expect(dialog.getByLabel('要求确认已知悉', { exact: true })).toBeChecked();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await clickRowAction(page, draft.title, '免审发布', 'announcement:publish', draft.pid);
+    await expectRowStatus(page, draft.title, /定时待发布/);
+    await page.screenshot({ path: test.info().outputPath('scheduled-publication.png'), animations: 'disabled', fullPage: true });
+    await clickRowAction(page, draft.title, '取消发布安排', 'announcement:cancel_schedule', draft.pid);
+    await expectRowStatus(page, draft.title, /已撤回/);
+    const facts = await db.query(`SELECT r.status,(SELECT count(*)::int FROM ab_announcement_recipient p
+      WHERE p.tenant_id=r.tenant_id AND p.version_pid=r.version_pid) AS recipients
+      FROM ab_announcement_release r WHERE announcement_pid=$1`, [draft.pid]);
+    expect(facts.rows).toEqual([{ status: 'canceled', recipients: 0 }]);
+    await page.screenshot({ path: test.info().outputPath('canceled-publication.png'), animations: 'disabled', fullPage: true });
+  } finally { await db.end(); }
+});
+
+test('immediate exempt publication seals the real tenant audience and dispatches independent projections', async ({ page }) => {
+  const draft = await setupPublicationDraft(page, 'Immediate audience');
+  await navigateToAnnouncementList(page);
+  const dialog = await openNotificationSettings(page, draft.title);
+  await dialog.getByLabel('通知范围', { exact: true }).selectOption('all');
+  await expect(dialog.getByTestId('form-dialog-field-audience_users')).toHaveCount(0);
+  await dialog.getByLabel('免审原因', { exact: true }).fill('Authorized tenant-wide policy announcement.');
+  const savedResponse = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/meta/commands/execute/announcement:update_announcement'));
+  await dialog.getByTestId('form-dialog-submit').click();
+  const saved = await savedResponse; expect(saved.status(), await saved.text()).toBe(200);
+  expect(saved.request().postDataJSON().payload.audience_kind).toBe('all');
+  await clickRowAction(page, draft.title, '免审发布', 'announcement:publish', draft.pid);
+  const db = new Client(PG_CONN); await db.connect();
+  try {
+    await expect.poll(async () => (await db.query('SELECT status FROM ab_announcement WHERE pid=$1', [draft.pid])).rows[0].status,
+      { timeout: 20000 }).toBe('published');
+    const version = (await db.query('SELECT active_version_pid,tenant_id FROM ab_announcement WHERE pid=$1', [draft.pid])).rows[0];
+    const expected = (await db.query(`SELECT count(DISTINCT u.pid)::int AS count FROM ab_tenant_member m JOIN ab_user u ON u.id=m.user_id
+      WHERE m.tenant_id=$1 AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE`, [version.tenant_id])).rows[0].count;
+    expect(expected).toBeGreaterThan(0);
+    expect((await db.query('SELECT recipient_count::int,sealed FROM ab_announcement_recipient_snapshot WHERE tenant_id=$1 AND version_pid=$2', [version.tenant_id, version.active_version_pid])).rows)
+      .toEqual([{ recipient_count: expected, sealed: true }]);
+    await expect.poll(async () => (await db.query("SELECT count(*)::int AS count FROM ab_notification WHERE tenant_id=$1 AND source_type='announcement' AND source_id=$2", [version.tenant_id, version.active_version_pid])).rows[0].count,
+      { timeout: 20000 }).toBe(expected);
+    await expect.poll(async () => (await db.query("SELECT count(*)::int AS count FROM ab_inbox_item WHERE tenant_id=$1 AND source_type='announcement' AND source_id=$2 AND item_type='announcement_ack' AND status='pending'", [version.tenant_id, version.active_version_pid])).rows[0].count,
+      { timeout: 20000 }).toBe(expected);
+    await navigateToAnnouncementList(page);
+    await expectRowStatus(page, draft.title, /已发布/);
+    await page.screenshot({ path: test.info().outputPath('published-and-projected.png'), animations: 'disabled', fullPage: true });
+  } finally { await db.end(); }
 });

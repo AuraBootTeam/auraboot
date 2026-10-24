@@ -39,34 +39,10 @@ public class AnnouncementAudienceService {
 
     @Transactional(readOnly=true)
     public Resolution resolve(Rule rule) {
-        Long tenant=MetaContext.getCurrentTenantId(), actor=MetaContext.getCurrentUserId();
-        if(tenant==null || actor==null || !permissions.hasPermission(actor,"announcement.announcement.publish")) denied();
-        List<Map<String,Object>> memberRows=directory.members(tenant);
-        String actorPid=MetaContext.getCurrentUserPid();
-        if(memberRows.stream().noneMatch(m->actorPid.equals(m.get("user_pid")))) denied();
-        boolean all=permissions.hasPermission(actor,"announcement.announcement.publish_all");
-        DataScopeCondition scope=all ? DataScopeCondition.all()
-            : scopes.resolveAudienceScope(MetaContext.getCurrentMemberId(),"ab_announcement","publish");
-        if(scope==null || Set.of("none","not_configured").contains(scope.scopeType())) denied();
-        Set<String> allowedDepartments=new TreeSet<>(scope.deptPids());
-        List<Map<String,Object>> departments=directory.departments(tenant);
-        Set<String> allowedUsers=new TreeSet<>();
-        Set<String> teamUsers=new TreeSet<>();
-        if("team".equals(scope.scopeType())) {
-            directory.teams(tenant).stream().filter(m->allowedDepartments.contains(m.get("team_pid")))
-                .forEach(m->teamUsers.add((String)m.get("user_pid")));
-        }
-        for(Map<String,Object> m:memberRows) {
-            String user=(String)m.get("user_pid"), dept=(String)m.get("department_pid");
-            boolean permitted=switch(scope.scopeType()) {
-                case "all" -> all;
-                case "self" -> actorPid.equals(user);
-                case "dept","dept_and_sub" -> dept!=null && allowedDepartments.contains(dept);
-                case "team" -> teamUsers.contains(user);
-                default -> false;
-            };
-            if(permitted) allowedUsers.add(user);
-        }
+        ScopeView view=scopeView();
+        Long tenant=view.tenant(); boolean all=view.all(); DataScopeCondition scope=view.scope();
+        List<Map<String,Object>> memberRows=view.members(),departments=view.departments();
+        Set<String> allowedDepartments=view.allowedDepartments(),allowedUsers=view.allowedUsers();
         if("all".equals(rule.kind()) && !all) denied();
         Set<String> selectedDepartments=new TreeSet<>();
         for(String root:rule.departmentPids()) {
@@ -101,6 +77,60 @@ public class AnnouncementAudienceService {
                 Objects.toString(m.get("display_name"),Objects.toString(m.get("username"),"")),List.copyOf(combined)));
         }
         return new Resolution(List.copyOf(recipients.values()),scope.scopeType(),List.copyOf(allowedDepartments),true,Instant.now());
+    }
+
+    private record ScopeView(Long tenant,boolean all,DataScopeCondition scope,List<Map<String,Object>> members,
+        List<Map<String,Object>> departments,Set<String> allowedUsers,Set<String> allowedDepartments) {}
+
+    private ScopeView scopeView() {
+        Long tenant=MetaContext.getCurrentTenantId(), actor=MetaContext.getCurrentUserId();
+        if(tenant==null || actor==null || !permissions.hasPermission(actor,"announcement.announcement.publish")) denied();
+        List<Map<String,Object>> memberRows=directory.members(tenant);
+        String actorPid=MetaContext.getCurrentUserPid();
+        if(memberRows.stream().noneMatch(m->actorPid.equals(m.get("user_pid")))) denied();
+        boolean all=permissions.hasPermission(actor,"announcement.announcement.publish_all");
+        DataScopeCondition scope=all ? DataScopeCondition.all()
+            : scopes.resolveAudienceScope(MetaContext.getCurrentMemberId(),"ab_announcement","publish");
+        if(scope==null || Set.of("none","not_configured").contains(scope.scopeType())) denied();
+        Set<String> allowedDepartments=new TreeSet<>(scope.deptPids());
+        List<Map<String,Object>> departments=directory.departments(tenant);
+        Set<String> allowedUsers=new TreeSet<>();
+        Set<String> teamUsers=new TreeSet<>();
+        if("team".equals(scope.scopeType())) {
+            directory.teams(tenant).stream().filter(m->allowedDepartments.contains(m.get("team_pid")))
+                .forEach(m->teamUsers.add((String)m.get("user_pid")));
+        }
+        for(Map<String,Object> m:memberRows) {
+            String user=(String)m.get("user_pid"), dept=(String)m.get("department_pid");
+            boolean permitted=switch(scope.scopeType()) {
+                case "all" -> all;
+                case "self" -> actorPid.equals(user);
+                case "dept","dept_and_sub" -> dept!=null && allowedDepartments.contains(dept);
+                case "team" -> teamUsers.contains(user);
+                default -> false;
+            };
+            if(permitted) allowedUsers.add(user);
+        }
+        return new ScopeView(tenant,all,scope,memberRows,departments,allowedUsers,allowedDepartments);
+    }
+
+    public record Option(String value,Map<String,String> label) {
+        public Option(String value,String name) {this(value,Map.of("zh-CN",name,"en-US",name));}
+    }
+    @Transactional(readOnly=true)
+    public List<Option> options(String kind) {
+        ScopeView view=scopeView();
+        if("kind".equals(kind)) return view.all() ? List.of(new Option("selected",Map.of("zh-CN","定向通知","en-US","Selected audience")),new Option("all",Map.of("zh-CN","当前租户全员","en-US","All tenant members"))) : List.of(new Option("selected",Map.of("zh-CN","定向通知","en-US","Selected audience")));
+        if("person".equals(kind)) return view.members().stream().filter(m->view.allowedUsers().contains(m.get("user_pid")))
+            .map(m->new Option((String)m.get("user_pid"),Objects.toString(m.get("display_name"),Objects.toString(m.get("username"),"")))).distinct().toList();
+        if("department".equals(kind)) return view.departments().stream()
+            .filter(d->view.all() || (Set.of("dept","dept_and_sub").contains(view.scope().scopeType())
+                && view.allowedDepartments().containsAll(subtree((String)d.get("pid"),view.departments()))))
+            .map(d->new Option((String)d.get("pid"),(String)d.get("label"))).toList();
+        if("role".equals(kind)) return directory.roles(view.tenant()).stream()
+            .filter(r->r.get("user_pid")!=null && view.allowedUsers().contains(r.get("user_pid")))
+            .map(r->new Option((String)r.get("role_pid"),(String)r.get("label"))).distinct().toList();
+        invalid(); return List.of();
     }
 
     private static Set<String> subtree(String root,List<Map<String,Object>> departments) {

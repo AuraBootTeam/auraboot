@@ -173,8 +173,15 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.workbench.mapper.AnnouncementReleaseMapper releaseMapper;
     @Autowired private com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer deliveryConsumer;
     @Autowired private com.auraboot.framework.workbench.service.AnnouncementCodec announcementCodec;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    private void consume(com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope event) {
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+            .executeWithoutResult(status -> deliveryConsumer.consume(event));
+    }
 
     @Test
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
     void frozenExemptionPublishesToRealMembersAndProjectsSeparateNotificationAndAcknowledgement() {
         identity();
         String operation=UniqueIdGenerator.generate();
@@ -186,10 +193,12 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         assertEquals(accepted,releaseService.execute("announcement:publish",pid,Map.of(),operation+"-publish",1));
         String version=(String)accepted.get("versionPid");
         assertEquals("unpublished",accepted.get("status"));
+        MetaContext.clear();
         Map<String,Object> claim=releaseService.claim();
         assertNotNull(claim);
         assertEquals(version,claim.get("version_pid"));
         releaseService.perform(claim);
+        org.junit.jupiter.api.Assertions.assertFalse(MetaContext.exists());
         identity();
         assertEquals("published",jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid));
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=? AND user_pid=? AND member_pid=?",Integer.class,
@@ -201,20 +210,20 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
             com.auraboot.framework.workbench.service.AnnouncementReleaseService.RELEASED_EVENT,"auraboot.announcement",version,
             java.time.Instant.now(),getTestTenant().getId(),batch,null,"announcement:"+version,1,
             Map.of("versionPid",version,"batchPid",batch),Map.of());
-        deliveryConsumer.consume(root);
+        consume(root);
         var payload=Map.<String,Object>of("versionPid",version,"batchPid",batch,"userPid",getTestUser().getPid());
         // Projection is an independent event and can complete before notification persistence.
         var ack=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0","ack:"+batch,
             com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer.ACK,"auraboot.announcement",version,
             root.occurredAt(),getTestTenant().getId(),batch,batch,"ack:"+version,1,payload,Map.of());
-        deliveryConsumer.consume(ack);
+        consume(ack);
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=? AND user_id=? AND source_id=? AND item_type='announcement_ack' AND status='pending'",Integer.class,
             getTestTenant().getId(),getTestUser().getId(),version));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND source_id=?",Integer.class,getTestTenant().getId(),version));
         var delivery=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0",batch+":"+getTestUser().getPid(),
             com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer.DELIVER,"auraboot.announcement",version,
             root.occurredAt(),getTestTenant().getId(),batch,batch,"delivery:"+version,1,payload,Map.of());
-        deliveryConsumer.consume(delivery);deliveryConsumer.consume(delivery);
+        consume(delivery);consume(delivery);
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND source_id=? AND user_id=?",Integer.class,
             getTestTenant().getId(),version,getTestUser().getId()));
         assertEquals("completed",jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
@@ -222,6 +231,7 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
     void futureReleaseCancellationRetainsVersionButCannotPublish() {
         identity();
         String operation=UniqueIdGenerator.generate();

@@ -31,6 +31,22 @@ public class AnnouncementController {
     private final com.auraboot.framework.workbench.service.AnnouncementAccessService access;
     private final com.auraboot.framework.workbench.service.AnnouncementPolicyService policies;
 
+    @GetMapping("/audience-options")
+    @RequirePermission("announcement.announcement.publish")
+    public ApiResponse<List<com.auraboot.framework.workbench.service.AnnouncementAudienceService.Option>> audienceOptions(
+            @RequestParam String kind) {
+        return ApiResponse.success(audiences.options(kind));
+    }
+
+    private final com.auraboot.framework.workbench.service.AnnouncementApprovalCatalog approvalCatalog;
+
+    @GetMapping("/approval-options")
+    @RequirePermission("announcement.announcement.publish")
+    public ApiResponse<List<com.auraboot.framework.workbench.service.AnnouncementAudienceService.Option>> approvalOptions() {
+        access.actor("publish");
+        return ApiResponse.success(approvalCatalog.choices());
+    }
+
     public record AudiencePreviewRequest(String recordPid,
             com.auraboot.framework.workbench.service.AnnouncementAudienceService.Rule audience) {}
 

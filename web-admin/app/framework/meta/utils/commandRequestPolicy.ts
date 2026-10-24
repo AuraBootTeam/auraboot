@@ -45,3 +45,12 @@ export function commandRequestMetadata(
   metadata.clientRequestId = identity.clientRequestId;
   return { metadata, identity };
 }
+
+/** Dialog commands may declare their own payload contract without broadening sibling actions. */
+export function commandPolicyFor(
+  fallback: CommandRequestPolicy | undefined,
+  overrides: Record<string, CommandRequestPolicy> | undefined,
+  command: string,
+): CommandRequestPolicy | undefined {
+  return overrides?.[command] ?? fallback;
+}
