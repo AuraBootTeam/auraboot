@@ -389,15 +389,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             String toolChoice = request.getToolChoice();
             if (toolChoice != null && !toolChoice.isBlank()) {
                 body.put("tool_choice", toolChoice);
-                // DeepSeek rejects required tool selection in thinking mode. Keep the
-                // evidence-first tool requirement and only resolve an unspecified mode.
-                if (isDeepSeekV4Model(request.getModel()) && "required".equals(toolChoice)) {
-                    if (request.getThinking() != null && request.getThinking().isEnabled()) {
-                        throw new IllegalArgumentException(
-                                "DeepSeek thinking mode cannot be combined with tool_choice=required");
-                    }
-                    body.put("thinking", Map.of("type", "disabled"));
-                }
+
             }
         } else if (request.getTools() != null && !request.getTools().isEmpty()) {
             if ("required".equals(request.getToolChoice())) {
@@ -405,6 +397,19 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                         "tool_choice=required requested but tool payload is disabled for model: " + request.getModel());
             }
             log.debug("Skipping tool payload for model '{}' because provider compatibility is disabled", request.getModel());
+        }
+        // A required first round is non-thinking. Its subsequent tool exchange
+        // must stay non-thinking: the compatible wire history has no reasoning_content.
+        boolean toolHistoryWithoutReasoning = messages.stream().anyMatch(message ->
+                "assistant".equals(message.get("role")) && message.containsKey("tool_calls")
+                        && !message.containsKey("reasoning_content"));
+        if (isDeepSeekV4Model(request.getModel())
+                && ("required".equals(body.get("tool_choice")) || toolHistoryWithoutReasoning)) {
+            if (request.getThinking() != null && request.getThinking().isEnabled()) {
+                throw new IllegalArgumentException(
+                        "DeepSeek thinking mode cannot be combined with required tools or tool history without reasoning_content");
+            }
+            body.put("thinking", Map.of("type", "disabled"));
         }
         return body;
     }
