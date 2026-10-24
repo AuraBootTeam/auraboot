@@ -39,6 +39,9 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired AnnouncementReleaseService releases;
     @Autowired AnnouncementReaderService readers;
     @Autowired AnnouncementStatisticsService statistics;
+    @Autowired AnnouncementStatisticsExportSource exports;
+    @Autowired com.auraboot.framework.i18n.service.I18nResourceService translationResources;
+    @Autowired com.auraboot.framework.i18n.service.I18nService messages;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
     @Autowired UserPermissionService permissions;
@@ -152,5 +155,69 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(()->statistics.summary(token)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
         assertThatThrownBy(()->statistics.authorizeExport(token,true)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
         assertThat(statistics.authorizeExport(token,false).get("version_pid")).isEqualTo(version);
+    }
+
+    private void importExportTranslations() throws Exception {
+        var file=java.nio.file.Path.of("../plugins/core-announcement/config/i18n.json");
+        if(!java.nio.file.Files.exists(file)) file=java.nio.file.Path.of("../../plugins/core-announcement/config/i18n.json");
+        var resources=new ArrayList<com.auraboot.framework.i18n.entity.I18nResource>();
+        for(var entry:json.readTree(java.nio.file.Files.readString(file))) {
+            if(!entry.path("key").asText().startsWith("announcement.statistics.csv.")) continue;
+            resources.add(com.auraboot.framework.i18n.entity.I18nResource.builder()
+                .tenantId(getTestTenant().getId()).i18nKey(entry.required("key").textValue()).lang("en-US")
+                .value(entry.required("en-US").textValue()).source("import").status("approved").build());
+        }
+        assertThat(resources).hasSize(34);
+        assertThat(translationResources.batchUpsert(resources)).isEqualTo(34);messages.clearCache("en-US");
+    }
+    @Test void actualExportUsesOriginalActorAndCapturedRowsDespiteLaterReadAndTranslationChanges() throws Exception {
+        importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
+        java.nio.file.Path output=java.nio.file.Files.createTempFile("announcement-real-export-",".csv");
+        try {
+            String version=publish();String token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+            var prepared=exports.prepare(token);
+            assertThat(prepared.rowCount()).isEqualTo(1);
+            var owner=new com.auraboot.framework.meta.service.DomainExportSource.Owner(getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getPid());
+            var detail=readers.detail(version);var mark=Map.<String,Object>of("snapshotHash",detail.get("snapshotHash"));
+            readers.mark(version,mark,false);readers.mark(version,mark,true);
+            var translation=translationResources.findByKeyAndLang("announcement.statistics.csv.state.unread","en-US");
+            String original=translation.getValue();
+            try {
+                translation.setValue("Changed after acceptance");translationResources.upsert(translation);messages.clearCache("en-US");
+                MetaContext.clear();
+                var progress=new ArrayList<Integer>();
+                var result=exports.generate(prepared,owner,output,(percent,message)->progress.add(percent));
+                assertThat(MetaContext.getCurrentTenantId()).isNull();
+                assertThat(result.getSuccess()).isTrue();assertThat(result.getRecordCount()).isEqualTo(1);
+                assertThat(result.getFileSize()).isEqualTo(java.nio.file.Files.size(output));
+                assertThat(progress).containsExactly(90);
+                String csv=java.nio.file.Files.readString(output);
+                assertThat(csv).startsWith("\uFEFFAnnouncement title,Version,Published at,Recipient,Departments at publication,Matched roles,")
+                    .contains(",Unread,Not yet,Yes,None,Pending acknowledgement,Not yet,No,Active,")
+                    .contains("[Asia/Shanghai]").doesNotContain("Changed after acceptance",token,getTestTenantMember().getPid(),version);
+                assertThat(java.nio.file.Files.readAllBytes(output)).startsWith((byte)0xef,(byte)0xbb,(byte)0xbf);
+            } finally {applyTestMetaContext();translation.setValue(original);translationResources.upsert(translation);messages.clearCache("en-US");}
+        } finally {java.nio.file.Files.deleteIfExists(output);org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();applyTestMetaContext();}
+    }
+    @Test void acceptedExportRechecksCurrentOriginalActorPermissionsBeforeWritingAnyCsvBytes() throws Exception {
+        importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
+        java.nio.file.Path output=java.nio.file.Files.createTempFile("announcement-denied-export-",".csv");
+        try {
+            String version=publish();String token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+            var prepared=exports.prepare(token);
+            var owner=new com.auraboot.framework.meta.service.DomainExportSource.Owner(getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getPid());
+            assertThat(jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.export")).isEqualTo(1);
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.export")).isFalse();
+            MetaContext.clear();
+            assertThatThrownBy(()->exports.generate(prepared,owner,output,(percent,message)->{}))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThat(java.nio.file.Files.size(output)).isZero();assertThat(MetaContext.getCurrentTenantId()).isNull();
+        } finally {
+            applyTestMetaContext();grantCommittedPermissionToTestRole("announcement.announcement.export","announcement","announcement:announcement","export","Announcement export");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());java.nio.file.Files.deleteIfExists(output);
+            org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
+        }
     }
 }
