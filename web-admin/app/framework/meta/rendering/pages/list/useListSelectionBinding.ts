@@ -16,17 +16,22 @@ interface ListSelectionBindingInput {
 
 /** Expose complete, current explicit selections to existing DSL flows. */
 export function useListSelectionBinding({
-  runtime, tableBlock, data, selectionState, setSelectionState, loading,
+  runtime,
+  tableBlock,
+  data,
+  selectionState,
+  setSelectionState,
+  loading,
 }: ListSelectionBindingInput): void {
   const config = tableBlock?.table?.selection ?? tableBlock?.selection;
-  const bind = config?.mode === 'multiple' && typeof config.bind === 'string'
-    ? config.bind.trim() : '';
+  const bind =
+    config?.mode === 'multiple' && typeof config.bind === 'string' ? config.bind.trim() : '';
   const rows = useMemo(() => {
     // Never treat an unloaded cross-page or all-matching set as a single row.
-    if (loading || selectionState.mode !== 'explicit') return [];
+    if (!bind || loading || selectionState.mode !== 'explicit') return [];
     const selected = data.filter((row) => selectionState.ids.has(getPublicRecordKey(row) || ''));
     return selected.length === selectionState.ids.size ? selected : [];
-  }, [data, loading, selectionState]);
+  }, [bind, data, loading, selectionState]);
   const published = useRef<unknown>(undefined);
 
   useEffect(() => {
@@ -38,8 +43,11 @@ export function useListSelectionBinding({
       const value = runtime.getContext().state?.[bind];
       // state.set([]) from a successful flow or Reload must clear the checkboxes.
       if (value !== published.current && Array.isArray(value) && value.length === 0) {
-        setSelectionState((previous) => previous.mode === 'explicit' && previous.ids.size === 0
-          ? previous : createSelectionModel());
+        setSelectionState((previous) =>
+          previous.mode === 'explicit' && previous.ids.size === 0
+            ? previous
+            : createSelectionModel(),
+        );
       }
     });
   }, [runtime, bind, setSelectionState]);
