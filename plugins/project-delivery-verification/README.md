@@ -30,3 +30,7 @@ Handler 不使用客户端提交的结论或金额，没有直接 SQL、任意 H
 构建必须使用当前宿主的 `platform-plugin-api` JAR，并通过 Workspace 的受管 Gradle 入口传入 `-PplatformPluginApiJar=<absolute-api-jar>`。构建产物是 `backend/build/libs/delivery-verification-plugin-1.0.0.jar`；部署前检查 `META-INF/extensions.idx` 包含 `VerifyDeliveryHandler`。
 
 算法、精度、拒绝与干跑测试位于 `backend/src/test`。真实安装、表单补正、预算边界、普通负责人/只读权限及跨租户验证复用 Enterprise 场景 runner 的 `verification` profile，对应 `web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts`。测试文件存在不代表已执行，实际结论以本轮证据为准。
+
+## 核验记录的当前有效性
+
+验收详情的核验 Tab 通过 `tdv_acceptance_verifications` 读取真实快照。查询先校验目标验收单读取权限，材料更新时间晚于核验时间时返回只读派生状态 `stale`（资料已更新 · 需复核）。原核验状态、时间及通过项数不被重写；通过项数是检查当时的快照，不代表更新后的材料仍有效。重新核验后由服务端时间重新判定。未安装本可选插件时，原有 `tdv.check.read` 权限门继续隐藏该 Tab。
