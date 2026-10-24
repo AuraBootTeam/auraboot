@@ -115,6 +115,20 @@ Effect and receipt remain in the existing independent transaction. Duplicate rec
 
 The internal delivery verifier requires the complete persisted envelope, stamp and command to match `ab_outbox`, with the current processing lease still valid. A header alone is not proof; unstamped historical events are not automatically upgraded, and the current JAR cannot attest an older posting artifact. The verifier is prepared for the subsequent fixed Procurement received-quantity consumer; this enqueue slice alone does not implement or validate that consumer. No new business receipt table or public raw-apply endpoint is introduced. Actual PG/PF4J producer invocation, lease/receipt atomicity and physical-table existence remain native admission requirements.
 
+## Validation composition and legacy compatibility
+
+Native PostgreSQL evidence must use an explicitly composed test application. The shared
+`TestApplication` excludes unrelated Boot test configurations and other application entry points
+from its component scan, and registers its required mapper packages directly. Case-specific
+fixtures remain explicit imports. A scheduling mock in an exact-count worker test must not leak
+into other applications or be mistaken for evidence that the production scheduler ran.
+
+The unversioned JVM-event path remains a compatibility contract: a committed `OutboxWriter`
+event preserves its public event ID, tenant, payload and result through publication; a subsequent
+poll does not republish a delivered row. PostgreSQL delivery tests, synthetic PF4J JAR discovery
+and business-plugin admission remain separate evidence scopes. Passing one does not attest the
+others or every external ERP contract.
+
 ## Observability and rollback
 
 Micrometer counter `auraboot_integration_events_total{outcome=...}` exposes enqueue, claim, receipt,
@@ -181,18 +195,3 @@ metadata cannot authorize these reads. Product reads retain their actual legitim
 this change does not require product models to belong to Procurement. Standalone counterexamples
 cover wrong PR ownership and invalid current definitions; assembled tenant metadata and PG
 permission acceptance still require native verification.
-
-
-## Validation composition and legacy compatibility
-
-Native PostgreSQL evidence must use an explicitly composed test application. The shared
-`TestApplication` excludes unrelated Boot test configurations and other application entry points
-from its component scan, and registers its required mapper packages directly. Case-specific
-fixtures remain explicit imports. A scheduling mock in an exact-count worker test must not leak
-into other applications or be mistaken for evidence that the production scheduler ran.
-
-The unversioned JVM-event path remains a compatibility contract: a committed `OutboxWriter`
-event preserves its public event ID, tenant, payload and result through publication; a subsequent
-poll does not republish a delivered row. PostgreSQL delivery tests, synthetic PF4J JAR discovery
-and business-plugin admission remain separate evidence scopes. Passing one does not attest the
-others or every external ERP contract.
