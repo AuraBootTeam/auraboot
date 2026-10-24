@@ -31,6 +31,34 @@ public interface DataAccessor extends RecordReadAccessor {
     Map<String, Object> getById(String modelCode, String recordId);
 
     /**
+     * Get a single record by ID, mapping a record-not-found outcome to
+     * {@code null} without relying on the platform exception's message text.
+     *
+     * <p>The default implementation preserves compatibility for existing test
+     * doubles by delegating to {@link #getById} and applying a best-effort
+     * "not found" message match. Runtime implementations SHOULD override this
+     * method and catch the platform's typed not-found exception instead, so a
+     * wording change can never turn lookups into spurious {@code null}s (or,
+     * worse, hide a genuine failure).
+     *
+     * @param modelCode the model code
+     * @param recordId  the record ID
+     * @return record data map, or null if the record does not exist
+     * @since 2.8.0
+     */
+    default Map<String, Object> getByIdOrNull(String modelCode, String recordId) {
+        try {
+            return getById(modelCode, recordId);
+        } catch (RuntimeException e) {
+            String msg = e.getMessage();
+            if (msg != null && msg.toLowerCase().contains("not found")) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    /**
      * Query records with simple field-value equality filters.
      * Returns all matching records (no pagination).
      *

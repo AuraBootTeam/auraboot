@@ -139,6 +139,30 @@ class DynamicDataAccessorImplTest {
     }
 
     @Test
+    void getByIdOrNull_returnsRecord_whenPresent() {
+        when(dynamicDataService.getById("m", "1")).thenReturn(Map.of("id", "1"));
+        assertThat(accessor.getByIdOrNull("m", "1")).containsEntry("id", "1");
+    }
+
+    @Test
+    void getByIdOrNull_mapsTypedNotFoundToNull_regression() {
+        // 2026-10-24: the typed platform exception is the not-found contract —
+        // no coupling to the message text, so a rewording can't break lookups.
+        when(dynamicDataService.getById("m", "missing"))
+                .thenThrow(new com.auraboot.framework.meta.exception.MetaRecordNotFoundException("m", "missing"));
+        assertThat(accessor.getByIdOrNull("m", "missing")).isNull();
+    }
+
+    @Test
+    void getByIdOrNull_reraisesUnrelatedFailures() {
+        when(dynamicDataService.getById("m", "1"))
+                .thenThrow(new com.auraboot.framework.meta.exception.MetaServiceException("boom"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.getByIdOrNull("m", "1"))
+                .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class)
+                .hasMessageContaining("boom");
+    }
+
+    @Test
     void getById_translatesHostPermissionDenialToStablePluginErrorCode() {
         AccessDeniedException denied = new AccessDeniedException("host-specific detail");
         when(dynamicDataService.getById("m", "1")).thenThrow(denied);
