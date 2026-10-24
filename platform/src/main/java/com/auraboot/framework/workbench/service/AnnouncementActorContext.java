@@ -20,9 +20,9 @@ public class AnnouncementActorContext {
         var member=MetaContext.runWithoutTenantFilter(()->actors.actor(tenant,actor));
         if(member==null || !originalMemberPid.equals(member.get("member_pid")))
             throw new AccessDeniedException("The original announcement membership is no longer active");
-        if(!(member.get("member_id") instanceof Number memberId) || !(member.get("user_pid") instanceof String userPid)
-            || !(member.get("username") instanceof String username))
+        if(!(member.get("member_id") instanceof Number memberId) || !(member.get("user_pid") instanceof String userPid))
             throw new IllegalStateException("Announcement actor identity mapping is incomplete");
+        String username=(String)member.get("username");
         var roles=MetaContext.runWithoutTenantFilter(()->actors.actorRoles(tenant,memberId.longValue()));
         var previous=MetaContext.snapshot();
         var identity=new MetaContext.Snapshot(tenant,actor,userPid,username,roles,memberId.longValue(),null,

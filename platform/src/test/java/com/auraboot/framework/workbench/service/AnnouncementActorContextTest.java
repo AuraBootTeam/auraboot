@@ -41,4 +41,14 @@ class AnnouncementActorContextTest {
             .isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessage("revoked");
         assertThat(MetaContext.exists()).isFalse();assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
     }
+    @Test void nullableDisplayUsernameDoesNotInvalidatePersistedUserAndMemberIdentity() {
+        when(actors.actor(1L,2L)).thenReturn(Map.of("member_pid","original","member_id",3L,"user_pid","user"));
+        when(actors.actorRoles(1L,3L)).thenReturn(Set.of(4L));
+        assertThat(context.call(1L,2L,"original",()->{
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(2L);
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(3L);
+            return MetaContext.getCurrentUserPid();
+        })).isEqualTo("user");
+        assertThat(MetaContext.exists()).isFalse();
+    }
 }
