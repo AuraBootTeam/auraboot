@@ -523,6 +523,10 @@
                   "helpText": {
                     "zh-CN": "请求受理后将核对实际流程结果；尚未发布的公告会停止自动发布。",
                     "en-US": "The request reconciles the authoritative workflow outcome and prevents an unpublished version from being automatically released."
+                  },
+                  "placeholder": {
+                    "zh-CN": "例如：发布安排调整，撤销本次申请",
+                    "en-US": "e.g. Publication plans changed; withdraw this request"
                   }
                 }
               ]
@@ -1083,10 +1087,44 @@
                   "helpText": {
                     "zh-CN": "请求受理后将核对实际流程结果；尚未发布的公告会停止自动发布。",
                     "en-US": "The request reconciles the authoritative workflow outcome and prevents an unpublished version from being automatically released."
+                  },
+                  "placeholder": {
+                    "zh-CN": "例如：发布安排调整，撤销本次申请",
+                    "en-US": "e.g. Publication plans changed; withdraw this request"
                   }
                 }
               ]
             }
+          },
+          {
+            "code": "statistics",
+            "label": {
+              "zh-CN": "接收统计",
+              "en-US": "Recipient statistics"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.pid}/statistics/snapshots",
+                  "body": {
+                    "query": "",
+                    "state": "all",
+                    "departmentPid": null
+                  },
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.stats"
           }
         ]
       },
@@ -1375,8 +1413,8 @@
             "en-US": "No matching announcements"
           },
           "description": {
-            "zh-CN": "这里只显示你有权查看的有效公告。",
-            "en-US": "Only active announcements available to your current membership appear here."
+            "zh-CN": "请刷新或调整筛选；这里只显示你有权查看的有效公告。",
+            "en-US": "Refresh or adjust filters. Only active announcements available to your current membership appear here."
           }
         },
         "rowActions": [
@@ -1924,5 +1962,1110 @@
         }
       }
     ]
+  },
+  {
+    "pageKey": "announcement_statistics",
+    "name:zh-CN": "接收统计",
+    "name:en": "Recipient statistics",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/statistics/snapshots/{recordPid}",
+        "detailEndpoint": "/api/announcements/statistics/snapshots/{recordPid}"
+      }
+    },
+    "blocks": [
+      {
+        "id": "statistics_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "本页是固定时间、固定版本的统计。筛选不改变接收历史分母；重新统计会生成新快照。历史未知及无需知悉显示“不适用 / 未知”。失效成员仍保留在历史名单，已读不等于已确认知悉。",
+          "en-US": "This page captures one version at a fixed time. Filters preserve the historical denominator; recapturing creates a new snapshot. Unknown history and inapplicable acknowledgement display as not applicable / unknown. Inactive members remain in history. Reading and acknowledgement are separate."
+        }
+      },
+      {
+        "id": "statistics_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "export_statistics",
+            "label": {
+              "zh-CN": "导出当前明细",
+              "en-US": "Export current details"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "statisticsExportOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:export_statistics",
+                  "body": {
+                    "clientRequestId": "${state.statisticsExportOperation}",
+                    "targetRecordPid": "${record.metadata.recordPid}",
+                    "payload": {
+                      "snapshotToken": "${record.snapshotToken}"
+                    }
+                  },
+                  "target": "statisticsExport"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "statisticsExportOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics_export/view/${state.statisticsExport.data.exportTaskPid}"
+                  }
+                }
+              ]
+            },
+            "variant": "primary",
+            "permissionCode": "announcement.announcement.export",
+            "permissionCodes": [
+              "announcement.announcement.stats"
+            ]
+          },
+          {
+            "code": "filter_statistics",
+            "label": {
+              "zh-CN": "筛选明细",
+              "en-US": "Filter details"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.form",
+                  "args": {
+                    "title": {
+                      "zh-CN": "筛选接收明细",
+                      "en-US": "Filter recipient details"
+                    },
+                    "fields": [
+                      {
+                        "field": "query",
+                        "label": {
+                          "zh-CN": "姓名关键词",
+                          "en-US": "Name keywords"
+                        },
+                        "type": "string",
+                        "defaultValue": "${record.filters.query}",
+                        "placeholder": {
+                          "zh-CN": "例如：王小明",
+                          "en-US": "e.g. Alex"
+                        },
+                        "helpText": {
+                          "zh-CN": "搜索发布时封存的姓名，最多 200 字。",
+                          "en-US": "Search frozen publication names, up to 200 characters."
+                        }
+                      },
+                      {
+                        "field": "state",
+                        "label": {
+                          "zh-CN": "接收状态",
+                          "en-US": "Recipient state"
+                        },
+                        "type": "select",
+                        "required": true,
+                        "defaultValue": "${record.filters.state}",
+                        "dataSource": {
+                          "type": "static",
+                          "data": [
+                            {
+                              "value": "all",
+                              "label": {
+                                "zh-CN": "全部",
+                                "en-US": "All"
+                              }
+                            },
+                            {
+                              "value": "unread",
+                              "label": {
+                                "zh-CN": "未读",
+                                "en-US": "Unread"
+                              }
+                            },
+                            {
+                              "value": "pending_ack",
+                              "label": {
+                                "zh-CN": "待知悉",
+                                "en-US": "Pending acknowledgement"
+                              }
+                            },
+                            {
+                              "value": "overdue",
+                              "label": {
+                                "zh-CN": "逾期未知悉",
+                                "en-US": "Overdue acknowledgement"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "field": "departmentPid",
+                        "label": {
+                          "zh-CN": "发布时部门",
+                          "en-US": "Department at publication"
+                        },
+                        "type": "select",
+                        "defaultValue": "${record.filters.departmentPid}",
+                        "dataSource": {
+                          "type": "api",
+                          "endpoint": "/api/announcements/statistics/snapshots/${record.snapshotToken}/departments"
+                        },
+                        "helpText": {
+                          "zh-CN": "仅列出本快照中当前有权查看的部门；留空为全部。",
+                          "en-US": "Only currently authorized departments in this capture are listed. Leave empty for all."
+                        }
+                      }
+                    ],
+                    "submitLabel": {
+                      "zh-CN": "应用筛选",
+                      "en-US": "Apply filters"
+                    }
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${record.versionPid}/statistics/snapshots",
+                  "body": {
+                    "query": "${form.query || ''}",
+                    "state": "${form.state}",
+                    "departmentPid": "${form.departmentPid ? form.departmentPid : null}"
+                  },
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "switch_statistics_version",
+            "label": {
+              "zh-CN": "切换版本",
+              "en-US": "Switch version"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.form",
+                  "args": {
+                    "title": {
+                      "zh-CN": "选择发布版本",
+                      "en-US": "Choose a published version"
+                    },
+                    "fields": [
+                      {
+                        "field": "versionPid",
+                        "label": {
+                          "zh-CN": "发布版本",
+                          "en-US": "Published version"
+                        },
+                        "type": "select",
+                        "required": true,
+                        "defaultValue": "${record.versionPid}",
+                        "dataSource": {
+                          "type": "api",
+                          "endpoint": "/api/announcements/records/${record.metadata.recordPid}/statistics/versions"
+                        },
+                        "helpText": {
+                          "zh-CN": "切换版本会清除筛选，并生成该版本的新统计。",
+                          "en-US": "Switching versions clears filters and creates a new capture for that version."
+                        }
+                      }
+                    ],
+                    "submitLabel": {
+                      "zh-CN": "查看统计",
+                      "en-US": "View statistics"
+                    }
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${form.versionPid}/statistics/snapshots",
+                  "body": {
+                    "query": "",
+                    "state": "all",
+                    "departmentPid": null
+                  },
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "refresh_statistics",
+            "label": {
+              "zh-CN": "重新统计",
+              "en-US": "Capture latest statistics"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${record.versionPid}/statistics/snapshots",
+                  "body": "${record.filters}",
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement_detail/view/${record.metadata.recordPid}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_context",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "统计口径",
+          "en-US": "Capture context"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "metadata.versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            }
+          },
+          {
+            "field": "asOf",
+            "label": {
+              "zh-CN": "统计时间",
+              "en-US": "Statistics as of"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "expiresAt",
+            "label": {
+              "zh-CN": "本页有效期",
+              "en-US": "Page expires at"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "metadata.snapshotOrigin",
+            "label": {
+              "zh-CN": "名单来源",
+              "en-US": "Audience origin"
+            },
+            "valueMap": {
+              "publication": {
+                "zh-CN": "实际发布封存",
+                "en-US": "Sealed at publication"
+              },
+              "legacy_migration": {
+                "zh-CN": "存量迁移（历史阅读未知）",
+                "en-US": "Migrated; historical reads unknown"
+              },
+              "__default": {
+                "zh-CN": "迁移名单（历史数据未知）",
+                "en-US": "Migrated audience; history unknown"
+              }
+            }
+          },
+          {
+            "field": "summary.denominatorScope",
+            "label": {
+              "zh-CN": "当前授权范围",
+              "en-US": "Current authorization scope"
+            },
+            "valueMap": {
+              "all": {
+                "zh-CN": "全员管理范围",
+                "en-US": "All members"
+              },
+              "dept": {
+                "zh-CN": "指定部门",
+                "en-US": "Authorized departments"
+              },
+              "dept_and_sub": {
+                "zh-CN": "部门及下级",
+                "en-US": "Departments and descendants"
+              },
+              "self": {
+                "zh-CN": "本人",
+                "en-US": "Self"
+              }
+            }
+          },
+          {
+            "field": "metadata.acknowledgementRequired",
+            "label": {
+              "zh-CN": "要求确认知悉",
+              "en-US": "Acknowledgement required"
+            },
+            "valueMap": {
+              "true": {
+                "zh-CN": "是",
+                "en-US": "Yes"
+              },
+              "false": {
+                "zh-CN": "否",
+                "en-US": "No"
+              }
+            }
+          },
+          {
+            "field": "metadata.acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime",
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "无需知悉",
+                "en-US": "Not required"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_summary",
+        "blockType": "metric-strip",
+        "context": "${record}",
+        "columns": 3,
+        "metrics": [
+          {
+            "key": "actualRecipients",
+            "valueField": "summary.actualRecipients",
+            "label": {
+              "zh-CN": "接收人数 N",
+              "en-US": "Recipients N"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          },
+          {
+            "key": "read",
+            "valueField": "summary.read",
+            "label": {
+              "zh-CN": "已读人数 R",
+              "en-US": "Read R"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          },
+          {
+            "key": "acknowledged",
+            "valueField": "summary.acknowledged",
+            "label": {
+              "zh-CN": "已知悉人数 A",
+              "en-US": "Acknowledged A"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          },
+          {
+            "key": "readRate",
+            "valueField": "summary.readRate",
+            "label": {
+              "zh-CN": "阅读率（%）",
+              "en-US": "Read rate (%)"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            },
+            "precision": 2
+          },
+          {
+            "key": "acknowledgementRate",
+            "valueField": "summary.acknowledgementRate",
+            "label": {
+              "zh-CN": "知悉率（%）",
+              "en-US": "Acknowledgement rate (%)"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            },
+            "precision": 2
+          },
+          {
+            "key": "filteredRows",
+            "valueField": "summary.filteredRows",
+            "label": {
+              "zh-CN": "筛选后人数",
+              "en-US": "Filtered recipients"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_operations",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "运营信息",
+          "en-US": "Operational information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "summary.visibleCohort",
+            "label": {
+              "zh-CN": "当前可见的封存人数",
+              "en-US": "Visible sealed cohort"
+            }
+          },
+          {
+            "field": "summary.inactiveMembers",
+            "label": {
+              "zh-CN": "已失效成员",
+              "en-US": "Inactive members"
+            }
+          },
+          {
+            "field": "summary.overdueUnacknowledged",
+            "label": {
+              "zh-CN": "逾期未知悉",
+              "en-US": "Overdue unacknowledged"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用",
+                "en-US": "Not applicable"
+              }
+            }
+          },
+          {
+            "field": "summary.lateCompleted",
+            "label": {
+              "zh-CN": "逾期后知悉",
+              "en-US": "Acknowledged late"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用",
+                "en-US": "Not applicable"
+              }
+            }
+          },
+          {
+            "field": "summary.actionable",
+            "label": {
+              "zh-CN": "可催办人数",
+              "en-US": "Actionable recipients"
+            }
+          },
+          {
+            "field": "summary.readsAfterMigration",
+            "label": {
+              "zh-CN": "迁移后已读",
+              "en-US": "Read after migration"
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_recipients",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "接收明细",
+          "en-US": "Recipient details"
+        },
+        "dataSource": "recipients",
+        "table": {
+          "columns": [
+            {
+              "field": "displayName",
+              "label": {
+                "zh-CN": "姓名",
+                "en-US": "Name"
+              },
+              "width": 160
+            },
+            {
+              "field": "departments",
+              "label": {
+                "zh-CN": "发布时部门",
+                "en-US": "Departments at publication"
+              },
+              "width": 180
+            },
+            {
+              "field": "matchedRoles",
+              "label": {
+                "zh-CN": "匹配角色",
+                "en-US": "Matched roles"
+              },
+              "width": 160
+            },
+            {
+              "field": "readState",
+              "label": {
+                "zh-CN": "阅读状态",
+                "en-US": "Read state"
+              },
+              "dictCode": "announcement_statistics_read",
+              "width": 145
+            },
+            {
+              "field": "firstReadAt",
+              "label": {
+                "zh-CN": "首次阅读",
+                "en-US": "First read"
+              },
+              "valueType": "datetime",
+              "width": 168
+            },
+            {
+              "field": "acknowledgementState",
+              "label": {
+                "zh-CN": "知悉状态",
+                "en-US": "Acknowledgement"
+              },
+              "dictCode": "announcement_statistics_ack",
+              "width": 145
+            },
+            {
+              "field": "acknowledgedAt",
+              "label": {
+                "zh-CN": "确认时间",
+                "en-US": "Acknowledged at"
+              },
+              "valueType": "datetime",
+              "width": 168
+            },
+            {
+              "field": "memberEligible",
+              "label": {
+                "zh-CN": "成员资格",
+                "en-US": "Membership"
+              },
+              "dictCode": "announcement_statistics_membership",
+              "width": 110
+            },
+            {
+              "field": "notificationState",
+              "label": {
+                "zh-CN": "通知投递",
+                "en-US": "Notification delivery"
+              },
+              "dictCode": "announcement_statistics_delivery",
+              "width": 140
+            }
+          ],
+          "rowKey": "pid",
+          "pagination": {
+            "mode": "server",
+            "pageField": "pageNum",
+            "pageSizeOptions": [
+              20,
+              50,
+              100
+            ]
+          }
+        },
+        "states": {
+          "403": {
+            "title": {
+              "zh-CN": "当前权限已变更，请返回公告重新统计。",
+              "en-US": "Permissions changed. Return to the announcement and capture again."
+            }
+          },
+          "stale": {
+            "title": {
+              "zh-CN": "翻页失败，仍展示上一次的数据。重试后再操作。",
+              "en-US": "Paging failed. Previous data is shown; retry before acting."
+            }
+          }
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "没有匹配的接收人",
+            "en-US": "No matching recipients"
+          },
+          "description": {
+            "zh-CN": "没有符合当前筛选的接收人。请调整筛选；历史分母保持不变。",
+            "en-US": "No recipients match these filters. Adjust filters; the historical denominator is unchanged."
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "recipients": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/statistics/snapshots/${$page.recordPid}/recipients",
+        "params": {
+          "pageNum": 1,
+          "pageSize": 20
+        }
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_statistics_export",
+    "name:zh-CN": "统计导出",
+    "name:en": "Statistics export",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/exports/domain/{recordPid}",
+        "detailEndpoint": "/api/exports/domain/{recordPid}"
+      }
+    },
+    "blocks": [
+      {
+        "id": "export_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "导出文件固定保留受理时的版本、统计时间与筛选结果，24 小时内可下载。刷新仅查询原任务；权限变化后可能无法下载，请重新统计。失败、取消或过期后，可查看此版本最新统计并创建新导出。",
+          "en-US": "The file preserves the accepted version, capture time and filters, and is available for 24 hours. Refresh checks this task. Changed permissions can prevent download; capture again. For failed, canceled or expired tasks, view the latest statistics for this version and create another export."
+        }
+      },
+      {
+        "id": "export_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "download_statistics",
+            "label": {
+              "zh-CN": "下载 CSV",
+              "en-US": "Download CSV"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "file.download",
+                  "args": {
+                    "url": "${record.downloadUrl}",
+                    "expectedContentType": "text/csv"
+                  }
+                }
+              ]
+            },
+            "variant": "primary",
+            "visibleWhen": "record.status === 'completed' && record.downloadUrl != null",
+            "permissionCode": "announcement.announcement.export"
+          },
+          {
+            "code": "refresh_export",
+            "label": {
+              "zh-CN": "刷新进度",
+              "en-US": "Refresh progress"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "artifactFacts"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "latest_version_statistics",
+            "label": {
+              "zh-CN": "查看此版本最新统计",
+              "en-US": "View latest statistics for this version"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${record.sourceSnapshot.versionPid}/statistics/snapshots",
+                  "body": "${record.sourceSnapshot.filters}",
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "export_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement_detail/view/${record.sourceSnapshot.recordPid}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "export_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "导出文件",
+          "en-US": "Export file"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "fileName",
+            "label": {
+              "zh-CN": "文件名",
+              "en-US": "File name"
+            },
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "export_details",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "文件与任务",
+          "en-US": "File and task"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "sourceSnapshot.versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            }
+          },
+          {
+            "field": "sourceSnapshot.asOf",
+            "label": {
+              "zh-CN": "统计时间",
+              "en-US": "Statistics as of"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "sourceSnapshot.rowCount",
+            "label": {
+              "zh-CN": "导出行数",
+              "en-US": "Exported rows"
+            }
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "任务状态",
+              "en-US": "Task status"
+            },
+            "valueMap": {
+              "pending": {
+                "zh-CN": "等待执行",
+                "en-US": "Pending"
+              },
+              "running": {
+                "zh-CN": "正在生成",
+                "en-US": "Running"
+              },
+              "completed": {
+                "zh-CN": "可下载",
+                "en-US": "Ready to download"
+              },
+              "failed": {
+                "zh-CN": "生成失败",
+                "en-US": "Failed"
+              },
+              "canceled": {
+                "zh-CN": "已取消",
+                "en-US": "Canceled"
+              },
+              "cancelled": {
+                "zh-CN": "已取消",
+                "en-US": "Canceled"
+              },
+              "expired": {
+                "zh-CN": "已过期",
+                "en-US": "Expired"
+              }
+            }
+          },
+          {
+            "field": "progress",
+            "label": {
+              "zh-CN": "进度（%）",
+              "en-US": "Progress (%)"
+            }
+          },
+          {
+            "field": "format",
+            "label": {
+              "zh-CN": "文件格式",
+              "en-US": "File format"
+            },
+            "valueMap": {
+              "CSV": "CSV",
+              "csv": "CSV"
+            }
+          },
+          {
+            "field": "expiresAt",
+            "label": {
+              "zh-CN": "下载截止",
+              "en-US": "Download expires at"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "sourceSnapshot.filters.query",
+            "label": {
+              "zh-CN": "姓名筛选",
+              "en-US": "Name filter"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "全部姓名",
+                "en-US": "All names"
+              }
+            }
+          },
+          {
+            "field": "sourceSnapshot.filters.state",
+            "label": {
+              "zh-CN": "状态筛选",
+              "en-US": "State filter"
+            },
+            "valueMap": {
+              "all": {
+                "zh-CN": "全部",
+                "en-US": "All"
+              },
+              "unread": {
+                "zh-CN": "未读",
+                "en-US": "Unread"
+              },
+              "pending_ack": {
+                "zh-CN": "待知悉",
+                "en-US": "Pending acknowledgement"
+              },
+              "overdue": {
+                "zh-CN": "逾期未知悉",
+                "en-US": "Overdue acknowledgement"
+              }
+            }
+          },
+          {
+            "field": "errorMessage",
+            "label": {
+              "zh-CN": "处理提示",
+              "en-US": "Result guidance"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "—",
+                "en-US": "—"
+              },
+              "$i18n:export.domain_failed": {
+                "zh-CN": "生成失败。请返回统计页重新创建导出。",
+                "en-US": "Generation failed. Return to statistics and create a new export."
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "export_artifact_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "生成结果",
+          "en-US": "Generated artifact facts"
+        },
+        "dataSource": "artifactFacts",
+        "columns": [
+          {
+            "field": "totalRows",
+            "label": {
+              "zh-CN": "总行数",
+              "en-US": "Total rows"
+            },
+            "width": 100
+          },
+          {
+            "field": "processedRows",
+            "label": {
+              "zh-CN": "已处理行数",
+              "en-US": "Processed rows"
+            },
+            "width": 110
+          },
+          {
+            "field": "fileSize",
+            "label": {
+              "zh-CN": "文件字节数",
+              "en-US": "File bytes"
+            },
+            "width": 120
+          },
+          {
+            "field": "completedAt",
+            "label": {
+              "zh-CN": "完成时间",
+              "en-US": "Completed at"
+            },
+            "valueType": "datetime",
+            "width": 180
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无生成结果",
+            "en-US": "No generated artifact yet"
+          },
+          "description": {
+            "zh-CN": "请刷新进度；生成完成后可查看文件信息。",
+            "en-US": "Refresh progress to see file information after generation."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "结果刷新失败，仍展示上一次的文件信息，请重试。",
+              "en-US": "Result refresh failed. Previous artifact information is shown; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "artifactFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/exports/domain/${$page.recordPid}"
+      }
+    }
   }
 ]

@@ -375,5 +375,187 @@
         "status": "enabled"
       }
     ]
+  },
+  {
+    "code": "announcement_statistics_read",
+    "name": "Statistics read states",
+    "name:zh-CN": "统计阅读状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "unread",
+        "label": "Unread",
+        "label:zh-CN": "未读",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "read",
+        "label": "Read",
+        "label:zh-CN": "已读",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "unknown",
+        "label": "History unknown",
+        "label:zh-CN": "历史未知",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "read_after_migration",
+        "label": "Read after migration",
+        "label:zh-CN": "迁移后已读",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_statistics_ack",
+    "name": "Statistics acknowledgement states",
+    "name:zh-CN": "统计知悉状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending_ack",
+        "label": "Pending acknowledgement",
+        "label:zh-CN": "待知悉",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Acknowledged",
+        "label:zh-CN": "已知悉",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "not_required",
+        "label": "Not required",
+        "label:zh-CN": "无需知悉",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "unknown",
+        "label": "History unknown",
+        "label:zh-CN": "历史未知",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_statistics_membership",
+    "name": "Statistics membership",
+    "name:zh-CN": "统计成员资格",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "true",
+        "label": "Active",
+        "label:zh-CN": "有效",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "false",
+        "label": "Inactive",
+        "label:zh-CN": "已失效",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_statistics_delivery",
+    "name": "Statistics delivery states",
+    "name:zh-CN": "统计投递状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "queued",
+        "label": "Queued",
+        "label:zh-CN": "待投递",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Delivered",
+        "label:zh-CN": "已投递",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "投递失败",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "canceled",
+        "label": "Canceled",
+        "label:zh-CN": "已取消",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "not_generated",
+        "label": "Not generated",
+        "label:zh-CN": "未生成",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
   }
 ]

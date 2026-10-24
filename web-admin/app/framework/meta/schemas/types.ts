@@ -165,6 +165,12 @@ export interface FlowStep {
 // Field 配置（用于表单）
 export interface FieldConfig {
   field: string;
+  /** Read-only inspector path and presentation; values stay in the parent record. */
+  path?: string;
+  valueType?: string;
+  dataType?: string;
+  format?: string;
+  valueMap?: Record<string, string | LocalizedText>;
   label?: string | LocalizedText;
   /** Business input guidance localized by the controlled renderer. */
   placeholder?: string | LocalizedText;
