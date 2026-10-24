@@ -215,6 +215,36 @@ END $$;
 
 
 --
+-- Name: ab_announcement_guard_recipient_identity(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_announcement_guard_recipient_identity() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Announcement recipient identity is immutable'; END IF;
+ IF ROW(NEW.tenant_id,NEW.version_pid,NEW.user_pid,NEW.member_pid,NEW.display_name_snapshot,NEW.organization_snapshot)
+    IS DISTINCT FROM ROW(OLD.tenant_id,OLD.version_pid,OLD.user_pid,OLD.member_pid,OLD.display_name_snapshot,OLD.organization_snapshot)
+ THEN RAISE EXCEPTION 'Announcement recipient identity is immutable'; END IF;
+ RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_announcement_guard_sealed_audience(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_announcement_guard_sealed_audience() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+ IF OLD.sealed THEN RAISE EXCEPTION 'Sealed announcement audience is immutable'; END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ RETURN NEW;
+END $$;
+
+
+--
 -- Name: ab_announcement_reject_estimate_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -997,7 +1027,7 @@ CREATE TABLE public.ab_activity (
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
     object_model character varying(100) NOT NULL,
-    object_record character varying(26) NOT NULL,
+    object_record character varying(36) NOT NULL,
     activity_type character varying(50) NOT NULL,
     subject character varying(500),
     content text,
@@ -3761,7 +3791,9 @@ CREATE TABLE public.ab_announcement_audience_estimate (
     user_pid character varying(36) NOT NULL,
     member_pid character varying(36) NOT NULL,
     display_name character varying(300) NOT NULL,
-    matched_rule_refs jsonb NOT NULL
+    matched_rule_refs jsonb NOT NULL,
+    organization_snapshot jsonb DEFAULT '{"captured": false, "teamPids": [], "departments": [], "matchedRoles": []}'::jsonb NOT NULL,
+    CONSTRAINT ab_announcement_estimate_org_object CHECK ((jsonb_typeof(organization_snapshot) = 'object'::text))
 );
 
 
@@ -3877,7 +3909,9 @@ CREATE TABLE public.ab_announcement_recipient (
     first_read_at timestamp with time zone,
     acknowledged_at timestamp with time zone,
     acknowledged_hash character varying(64),
-    CONSTRAINT ab_announcement_recipient_check CHECK (((acknowledged_at IS NULL) OR (first_read_at IS NOT NULL)))
+    organization_snapshot jsonb DEFAULT '{"captured": false, "teamPids": [], "departments": [], "matchedRoles": []}'::jsonb NOT NULL,
+    CONSTRAINT ab_announcement_recipient_check CHECK (((acknowledged_at IS NULL) OR (first_read_at IS NOT NULL))),
+    CONSTRAINT ab_announcement_recipient_org_object CHECK ((jsonb_typeof(organization_snapshot) = 'object'::text))
 );
 
 
@@ -31174,6 +31208,20 @@ CREATE TRIGGER ab_announcement_estimate_immutable BEFORE DELETE OR UPDATE ON pub
 --
 
 CREATE TRIGGER ab_announcement_policy_audit_immutable BEFORE DELETE OR UPDATE ON public.ab_announcement_policy_audit FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_reject_policy_audit_mutation();
+
+
+--
+-- Name: ab_announcement_recipient ab_announcement_recipient_identity_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_recipient_identity_guard BEFORE DELETE OR UPDATE ON public.ab_announcement_recipient FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_guard_recipient_identity();
+
+
+--
+-- Name: ab_announcement_recipient_snapshot ab_announcement_sealed_audience_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_sealed_audience_guard BEFORE DELETE OR UPDATE ON public.ab_announcement_recipient_snapshot FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_guard_sealed_audience();
 
 
 --

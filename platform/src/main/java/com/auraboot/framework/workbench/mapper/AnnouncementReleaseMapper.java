@@ -104,9 +104,9 @@ public interface AnnouncementReleaseMapper {
 
     @Insert("""
         <script>
-        INSERT INTO ab_announcement_recipient(tenant_id,version_pid,user_pid,member_pid,display_name_snapshot) VALUES
+        INSERT INTO ab_announcement_recipient(tenant_id,version_pid,user_pid,member_pid,display_name_snapshot,organization_snapshot) VALUES
         <foreach collection="recipients" item="r" separator=",">
-          (#{tenant},#{version},#{r.userPid},#{r.memberPid},#{r.displayName})
+          (#{tenant},#{version},#{r.userPid},#{r.memberPid},#{r.displayName},CAST(#{r.organizationSnapshotJson} AS jsonb))
         </foreach>
         </script>
         """)

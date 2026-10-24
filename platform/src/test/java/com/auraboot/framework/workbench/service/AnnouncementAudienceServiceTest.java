@@ -15,7 +15,7 @@ class AnnouncementAudienceServiceTest {
     private final AnnouncementAudienceMapper directory=mock(AnnouncementAudienceMapper.class);
     private final DataScopeService scopes=mock(DataScopeService.class);
     private final UserPermissionService permissions=mock(UserPermissionService.class);
-    private final AnnouncementAudienceService service=new AnnouncementAudienceService(directory,scopes,permissions);
+    private final AnnouncementAudienceService service=new AnnouncementAudienceService(directory,scopes,permissions,new AnnouncementCodec(new com.fasterxml.jackson.databind.ObjectMapper()));
     @BeforeEach void setup() {
         MetaContext.setContext(1L,7L,"author","Author"); MetaContext.setMemberId(70L);
         when(permissions.hasPermission(7L,"announcement.announcement.publish")).thenReturn(true);
@@ -27,7 +27,7 @@ class AnnouncementAudienceServiceTest {
     }
     @AfterEach void clear(){MetaContext.clear();}
     private Map<String,Object> member(String user,String member,String dept) {
-        Map<String,Object> value=new HashMap<>(Map.of("user_pid",user,"member_pid",member,"display_name",user));
+        Map<String,Object> value=new HashMap<>(Map.of("user_pid",user,"member_pid",member,"display_name",user,"member_id",user.equals("author") ? 70L : 71L));
         value.put("department_pid",dept);return value;
     }
     @Test void allIncludesMembersWithoutEmployeeAndDeduplicatesMatches() {
@@ -61,4 +61,43 @@ class AnnouncementAudienceServiceTest {
         assertThatThrownBy(()->service.resolve(new AnnouncementAudienceService.Rule("selected",List.of("author"),null,null))).isInstanceOf(AccessDeniedException.class);
         verify(directory,never()).departments(2L);
     }
+    @Test void freezesAllEmployeeDepartmentsTeamsAndOnlyMatchedRoleLabelsWithoutExposingPrivateJson() throws Exception {
+        when(directory.members(1L)).thenReturn(List.of(member("author","m1","dept"),member("employee","m2","child"),
+            member("employee","m2","other"),member("employee","m2","child")));
+        when(directory.departments(1L)).thenReturn(List.of(Map.of("pid","dept","label","Sales"),
+            Map.of("pid","child","parent_pid","dept","label","East"),Map.of("pid","other","label","Support")));
+        when(directory.roles(1L)).thenReturn(List.of(Map.of("role_pid","operators","label","Operators","user_pid","employee"),
+            Map.of("role_pid","private-role","label","Private role","user_pid","employee")));
+        when(directory.teams(1L)).thenReturn(List.of(Map.of("team_pid","team-a","user_pid","employee"),Map.of("team_pid","team-a","user_pid","employee")));
+        var result=service.resolve(new AnnouncementAudienceService.Rule("selected",null,null,List.of("operators")));
+        var recipient=result.recipients().getFirst();
+        var json=new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        var captured=json.readTree(recipient.organizationSnapshotJson());
+        assertThat(captured.path("captured").asBoolean()).isTrue();
+        assertThat(captured.path("departments").toString()).isEqualTo("[{\"label\":\"East\",\"pid\":\"child\"}]");
+        assertThat(captured.path("departmentPids").toString()).isEqualTo("[\"child\",\"other\"]");
+        assertThat(captured.path("teamPids").toString()).isEqualTo("[\"team-a\"]");
+        assertThat(captured.path("matchedRoles").toString()).isEqualTo("[{\"label\":\"Operators\",\"pid\":\"operators\"}]");
+        assertThat(json.writeValueAsString(result)).doesNotContain("organizationSnapshotJson","Private role","Support","team-a");
+    }
+    @Test void statisticsAuthorityDoesNotImplicitlyRequirePublicationPermission() {
+        when(permissions.hasPermission(7L,"announcement.announcement.publish")).thenReturn(false);
+        when(permissions.hasPermission(7L,"announcement.announcement.stats")).thenReturn(true);
+        var scope=service.managementScope("stats");
+        assertThat(scope.type()).isEqualTo("dept_and_sub");
+        assertThat(scope.currentUserPids()).containsExactlyInAnyOrder("author","employee");
+        assertThatThrownBy(()->service.managementScope("remind")).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void staleOrMissingMembershipCannotUseAnotherMembershipScope() {
+        MetaContext.setMemberId(71L);
+        assertThatThrownBy(()->service.resolve(new AnnouncementAudienceService.Rule("selected",List.of("employee"),null,null)))
+            .isInstanceOf(AccessDeniedException.class);
+        verify(scopes,never()).resolveAudienceScope(any(),any(),any());
+    }
+    @Test void aConfiguredAllScopeWithoutTenantWideGrantFailsClosed() {
+        when(scopes.resolveAudienceScope(any(),any(),any())).thenReturn(DataScopeCondition.all());
+        assertThatThrownBy(()->service.resolve(new AnnouncementAudienceService.Rule("selected",List.of("author"),null,null)))
+            .isInstanceOf(AccessDeniedException.class);
+    }
+
 }

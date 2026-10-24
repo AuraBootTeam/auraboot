@@ -22,8 +22,8 @@
   },
   {
     "key": "message.announcement.archive.confirm.content",
-    "zh-CN": "撤回后该公告将不再对读者展示，可稍后重新发布。确定撤回吗？",
-    "en-US": "Withdrawing will hide this announcement from readers. You can publish it again later. Withdraw it?",
+    "zh-CN": "撤回后该公告将不再对读者展示。历史版本保留；重新发布须建立修订草稿并重新提交。确定撤回吗？",
+    "en-US": "Withdrawing hides this announcement from readers and preserves its historical version. Publishing again requires a revision draft and a new submission. Withdraw it?",
     "source": "import",
     "refType": "action"
   },

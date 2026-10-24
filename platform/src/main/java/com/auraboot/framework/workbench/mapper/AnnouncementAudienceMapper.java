@@ -8,7 +8,7 @@ import java.util.Map;
 @Mapper
 public interface AnnouncementAudienceMapper {
     @Select("""
-        SELECT m.pid AS member_pid,u.pid AS user_pid,u.nick_name AS display_name,u.user_name AS username,
+        SELECT m.id AS member_id,m.pid AS member_pid,u.pid AS user_pid,u.nick_name AS display_name,u.user_name AS username,
             e.org_emp_dept_id AS department_pid
         FROM ab_tenant_member m JOIN ab_user u ON u.id=m.user_id
         LEFT JOIN mt_org_employee e ON e.tenant_id=m.tenant_id AND e.deleted_flag=FALSE

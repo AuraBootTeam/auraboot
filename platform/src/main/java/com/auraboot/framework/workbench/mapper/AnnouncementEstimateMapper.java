@@ -13,9 +13,9 @@ public interface AnnouncementEstimateMapper {
     int header(@Param("tenant") Long tenant,@Param("version") String version,@Param("at") Instant at,@Param("count") int count);
     @Insert("""
         <script>
-        INSERT INTO ab_announcement_audience_estimate(tenant_id,version_pid,user_pid,member_pid,display_name,matched_rule_refs) VALUES
+        INSERT INTO ab_announcement_audience_estimate(tenant_id,version_pid,user_pid,member_pid,display_name,matched_rule_refs,organization_snapshot) VALUES
         <foreach collection="rows" item="r" separator=",">
-          (#{tenant},#{version},#{r.user},#{r.member},#{r.name},CAST(#{r.rules} AS jsonb))
+          (#{tenant},#{version},#{r.user},#{r.member},#{r.name},CAST(#{r.rules} AS jsonb),CAST(#{r.organization} AS jsonb))
         </foreach>
         </script>
         """)

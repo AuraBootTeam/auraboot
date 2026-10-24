@@ -66,7 +66,7 @@ public class AnnouncementPreparationService {
             throw new IllegalStateException("Audience estimate header was not persisted");
         for(int offset=0;offset<recipients.size();offset+=500) {
             var batch=recipients.subList(offset,Math.min(offset+500,recipients.size())).stream()
-                .map(recipient->Map.<String,Object>of("user",recipient.userPid(),"member",recipient.memberPid(),"name",recipient.displayName(),"rules",codec.encode(recipient.matchedRuleRefs()))).toList();
+                .map(recipient->Map.<String,Object>of("user",recipient.userPid(),"member",recipient.memberPid(),"name",recipient.displayName(),"rules",codec.encode(recipient.matchedRuleRefs()),"organization",recipient.organizationSnapshotJson())).toList();
             if(estimates.rows(tenant,version,batch)!=batch.size()) throw new IllegalStateException("Audience estimate rows were not persisted");
         }
     }

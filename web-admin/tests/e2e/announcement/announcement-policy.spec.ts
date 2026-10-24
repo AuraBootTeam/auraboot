@@ -24,6 +24,8 @@ async function openPolicy(page:Page) {
   await link.click();const response=await loaded;expect(response.status()).toBe(200);
   const body=await response.json();expect(body.code).toBe('0');
   await expect(page.getByText('当前政策',{exact:true})).toBeVisible();
+  await expect(page.getByText('公告政策仅作用于当前租户。安全规则在执行时实时复查；提醒时刻、次数和免打扰窗口仅供新提交版本冻结使用，不追溯修改已有公告。',{exact:true})).toBeVisible();
+  await expect(page.locator('main').getByRole('link',{name:'返回',exact:true})).toHaveCount(0);
   await expect(page.getByText('记录不存在',{exact:true})).toHaveCount(0);
   return body.data;
 }
@@ -90,7 +92,7 @@ test('invalid reminder time is rejected visibly and cannot append policy audit',
   await dialog.getByTestId('form-dialog-field-reminderAt').fill('25:00');
   const response=await submit(page,dialog,false);expect(response.status()).toBe(422);
   const operation=response.request().postDataJSON().clientRequestId;
-  await expect(page.getByText('公告输入不符合要求。',{exact:true})).toBeVisible();
+  await expect(page.getByTestId('ab:detail:ab_announcement:action-error').getByText('公告输入不符合要求。',{exact:true})).toBeVisible();
   expect((await db.query('SELECT count(*)::int AS count FROM ab_announcement_policy_audit WHERE operation_id=$1',[operation])).rows[0].count).toBe(0);
   await page.screenshot({path:info.outputPath('policy-invalid-time.png'),fullPage:true,animations:'disabled'});
   expect(await reloadPolicy(page)).toEqual(before);
