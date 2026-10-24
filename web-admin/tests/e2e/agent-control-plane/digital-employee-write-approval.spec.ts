@@ -279,7 +279,12 @@ if (approvalFixture) {
       )).rows;
       await expect.poll(outboundRows, { timeout: 15_000 }).toHaveLength(1);
       const outbound = await outboundRows();
-      expect(String(outbound[0].sender_id)).toBe(String(fixture.agentId));
+      const expectedAgent = (await db.query(
+        'SELECT id FROM ab_agent_definition WHERE tenant_id=$1 AND pid=$2',
+        [fixture.tenantId, fixture.agentPid],
+      )).rows;
+      expect(expectedAgent).toHaveLength(1);
+      expect(String(outbound[0].sender_id)).toBe(String(expectedAgent[0].id));
       const persisted = await recordRows();
       expect(persisted[0].marker).toBe(marker);
       await page.screenshot({ path: `${output}/APPROVAL-COMPLETED.png`, fullPage: true });
