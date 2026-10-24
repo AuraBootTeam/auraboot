@@ -74,6 +74,26 @@ class AsyncTaskServiceImplCoverageIT {
         }));
     }
 
+    @Test
+    void persistedTaskCanBeDispatchedWithoutACallerTenantContext() {
+        String expected=System.getenv("TEST_EXPECTED_DATABASE");
+        org.assertj.core.api.Assertions.assertThat(expected).isNotBlank().isEqualTo(System.getenv("POSTGRES_DB"));
+        assertEquals(expected,jdbcTemplate.queryForObject("SELECT current_database()",String.class));
+        AsyncTask task=seedTask("lease-fixture");
+        MetaContext.Snapshot identity=MetaContext.snapshot();
+        try {
+            MetaContext.clear();
+            asyncTaskService.executeTaskAsync(task.getId(),TENANT_ID);
+        } finally {MetaContext.restore(identity);}
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(5)).untilAsserted(()->MetaContext.runWithSnapshot(identity,()->{
+            var persisted=asyncTaskMapper.findByTaskCode(task.getTaskCode());
+            assertEquals(AsyncTask.STATUS_COMPLETED,persisted.getStatus());
+            assertEquals(100,persisted.getProgress());
+            assertEquals(42,persisted.getResultData().path("value").asInt());
+            org.junit.jupiter.api.Assertions.assertNull(persisted.getExecutionToken());
+        }));
+    }
+
     private static final long TENANT_ID = 991_000_001L;
     private static final long USER_ID = 991_000_002L;
     private static final long OTHER_USER_ID = 991_000_003L;
