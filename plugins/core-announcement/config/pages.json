@@ -272,13 +272,14 @@
                     "endpoint": "/api/announcements/approval-options"
                   },
                   "helpText": {
-                    "zh-CN": "流程由租户流程管理员维护；能力未安装时不可送审。",
-                    "en-US": "Tenant workflow administrators maintain processes. Submission requires the installed approval capability."
+                    "zh-CN": "可先保存草稿。提交前选择可用流程，或使用租户公告政策中的默认流程。",
+                    "en-US": "You can save the draft first. Before submission, select an available workflow or use the tenant default."
                   },
                   "visibleWhen": {
                     "field": "approval_mode",
                     "value": "approval"
-                  }
+                  },
+                  "required": false
                 },
                 {
                   "field": "scheduled_at",
@@ -861,13 +862,14 @@
                     "endpoint": "/api/announcements/approval-options"
                   },
                   "helpText": {
-                    "zh-CN": "流程由租户流程管理员维护；能力未安装时不可送审。",
-                    "en-US": "Tenant workflow administrators maintain processes. Submission requires the installed approval capability."
+                    "zh-CN": "可先保存草稿。提交前选择可用流程，或使用租户公告政策中的默认流程。",
+                    "en-US": "You can save the draft first. Before submission, select an available workflow or use the tenant default."
                   },
                   "visibleWhen": {
                     "field": "approval_mode",
                     "value": "approval"
-                  }
+                  },
+                  "required": false
                 },
                 {
                   "field": "scheduled_at",

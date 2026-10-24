@@ -40,6 +40,7 @@ const CONTENT = `Announcement content for E2E test ${UID}`;
 const EXPIRES = dateOffsetStr(30) + 'T23:59:59Z';
 
 let recordPid: string;
+let recipientLogin: { email: string; userPid: string };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,9 +53,8 @@ async function navigateToAnnouncementList(page: Page): Promise<void> {
 
   const parentBtn = nav.locator('text="公告管理"').first();
   await parentBtn.waitFor({ state: 'visible', timeout: 5_000 });
-  await parentBtn.click();
-
-  const leafLink = nav.locator('a[href*="ab_announcement"]').first();
+  const leafLink = nav.locator('a[href="/p/ab_announcement"]');
+  if (!(await leafLink.isVisible())) await parentBtn.click();
   await leafLink.waitFor({ state: 'visible', timeout: 5_000 });
   await leafLink.click();
 
@@ -511,6 +511,7 @@ test('scheduled audience settings preserve important acknowledgement and cancell
     const person = (await db.query(`SELECT u.pid,m.pid AS member_pid FROM ab_user u
       JOIN ab_tenant_member m ON m.user_id=u.id WHERE u.email=$1 AND m.status='active' AND m.deleted_flag=FALSE`, [email])).rows[0];
     expect(person).toBeTruthy();
+    recipientLogin = { email, userPid: person.pid };
     expect((await db.query('SELECT count(*)::int AS count FROM mt_org_employee WHERE org_emp_member_id=$1 AND deleted_flag=FALSE', [person.member_pid])).rows[0].count).toBe(0);
     await navigateToAnnouncementList(page);
     let dialog = await openNotificationSettings(page, draft.title);
@@ -549,7 +550,7 @@ test('scheduled audience settings preserve important acknowledgement and cancell
   } finally { await db.end(); }
 });
 
-test('immediate exempt publication seals the real tenant audience and dispatches independent projections', async ({ page }) => {
+test('immediate exempt publication seals the real tenant audience and dispatches independent projections', async ({ page, browser }) => {
   const draft = await setupPublicationDraft(page, 'Immediate audience');
   await navigateToAnnouncementList(page);
   const dialog = await openNotificationSettings(page, draft.title);
@@ -621,6 +622,29 @@ test('immediate exempt publication seals the real tenant audience and dispatches
     await page.reload();await expect(page.getByText('你已确认知悉，首次确认时间会保留。', { exact: true })).toBeVisible();
     expect((await recipient()).acknowledged_at).toEqual(ackFact.acknowledged_at);
     await page.screenshot({ path: test.info().outputPath('recipient-acknowledged-persisted.png'), animations: 'disabled', fullPage: true });
+    // A recipient with a custom role and no announcement management grants follows the same real menu path.
+    const memberContext = await browser.newContext({ baseURL: new URL(page.url()).origin, locale: 'zh-CN' });
+    try {
+      await authenticateBffSession(memberContext.request, new URL(page.url()).origin, recipientLogin.email, 'Test2026x');
+      const memberPage = await memberContext.newPage();await memberPage.goto('/home', { waitUntil: 'domcontentloaded' });
+      const memberNav = memberPage.locator('nav').first();const mine = memberNav.locator('a[href="/p/announcement_reader"]');
+      if (!(await mine.isVisible())) await memberNav.getByText('公告管理', { exact: true }).click();
+      await expect(memberNav.locator('a[href="/p/ab_announcement"]')).toHaveCount(0);
+      await mine.click();const memberRow = await findRowByContent(memberPage, draft.title);
+      await expect(memberRow).toContainText('未读');
+      const memberRead = memberPage.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/read`));
+      await memberRow.getByRole('button', { name: '查看公告', exact: true }).click();
+      expect((await memberRead).ok()).toBe(true);
+      await expect(memberPage.getByTestId('form-field-content')).toContainText(`Audience policy for ${UID}`);
+      await memberPage.screenshot({ path: test.info().outputPath('nonmanager-recipient-body.png'), animations: 'disabled', fullPage: true });
+      await memberPage.getByTestId('toolbar-btn-acknowledge').click();await expect(memberPage.getByTestId('confirm-dialog')).toBeVisible();
+      const memberAck = memberPage.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/acknowledge`));
+      await memberPage.getByTestId('confirm-ok').click();expect((await memberAck).ok()).toBe(true);
+      await expect(memberPage.getByText('你已确认知悉，首次确认时间会保留。', { exact: true })).toBeVisible();
+      expect((await db.query('SELECT acknowledged_hash FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3', [version.tenant_id, version.active_version_pid, recipientLogin.userPid])).rows).toEqual([{ acknowledged_hash: own.snapshotHash }]);
+      await memberPage.screenshot({ path: test.info().outputPath('nonmanager-recipient-acknowledged.png'), animations: 'disabled', fullPage: true });
+    } finally { await memberContext.close(); }
+
 
   } finally { await db.end(); }
 });
