@@ -143,7 +143,7 @@ public class PluginRestDispatcher {
                 case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
             };
             // Match the command SPI boundary; GlobalExceptionHandler owns locale resolution.
-            throw new BusinessException(responseCode, "$i18n:" + e.messageKey(), e);
+            throw new BusinessException(responseCode, "$i18n:" + e.messageKey(), e, e.messageArgs());
         } catch (BusinessException e) {
             throw e;
         } catch (SecurityException | AccessDeniedException e) {

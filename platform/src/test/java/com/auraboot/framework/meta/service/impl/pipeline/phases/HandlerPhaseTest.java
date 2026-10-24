@@ -116,6 +116,7 @@ class HandlerPhaseTest {
 
     @AfterEach
     void tearDown() {
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         MetaContext.clear();
     }
 
@@ -325,7 +326,7 @@ class HandlerPhaseTest {
     void execute_preservesLocalizedPluginBusinessErrorKeyAndCause() {
         PluginCommandRejectionException overQuantity = new PluginCommandRejectionException(
                 PluginCommandRejectionException.Code.INVALID_ARGUMENT,
-                "inventory.error.putaway_quantity_exceeds_remaining");
+                "inventory.error.putaway_quantity_exceeds_remaining", "D51GT01067100");
         CommandHandlerExtension rejected = new CommandHandlerExtension() {
             @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
             @Override public Object execute(CommandContext context) { throw overQuantity; }
@@ -336,7 +337,8 @@ class HandlerPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
                 .hasMessage("$i18n:inventory.error.putaway_quantity_exceeds_remaining")
-                .hasCause(overQuantity);
+                .hasCause(overQuantity)
+                .satisfies(error -> assertThat(((BusinessException) error).getI18nArgs()).containsExactly("D51GT01067100"));
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
     }
 
@@ -484,6 +486,13 @@ class HandlerPhaseTest {
                 "handler", PLUGIN_HANDLER_CODE,
                 "handlerParams", Map.of("async", true)
         ));
+        var localeRequest = new org.springframework.mock.web.MockHttpServletRequest();
+        localeRequest.addHeader("X-Locale", "en-US");
+        localeRequest.addHeader("Accept-Language", "zh-CN");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(localeRequest));
+        ReflectionTestUtils.setField(phase, "i18nLocaleResolver",
+                new com.auraboot.framework.i18n.util.I18nLocaleResolver());
         ctx.getRequest().setExpectedVersion(6);
         MetaContext.setContext(1L, 2L, "user-pid", "tester");
 
@@ -504,6 +513,8 @@ class HandlerPhaseTest {
                 ArgumentCaptor.forClass(AsyncTaskSubmitRequest.class);
         verify(asyncTaskService).submitTask(taskCaptor.capture(), eq(1L), eq(2L));
         com.fasterxml.jackson.databind.JsonNode taskInput = taskCaptor.getValue().getInputParams();
+        assertThat(taskInput.path("locale").asText()).isEqualTo("en-US");
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         assertThat(taskInput.path("commandPermitScope").asText()).isEqualTo("SELF");
         assertThat(taskInput.path("commandExpectedVersion").asLong()).isEqualTo(6L);
         assertThat(taskInput.path("clientRequestId").asText()).isEqualTo("client-request-1");
