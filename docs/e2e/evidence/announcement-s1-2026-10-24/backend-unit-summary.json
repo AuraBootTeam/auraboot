@@ -1,0 +1,65 @@
+[
+  {
+    "name": "com.auraboot.framework.workbench.service.impl.AnnouncementServiceImplTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest",
+    "tests": "16",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest",
+    "tests": "35",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.plugin.validation.PageSchemaValidatorTest",
+    "tests": "45",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.ComputedFieldsPhaseTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetScopePhaseTest",
+    "tests": "31",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.workbench.controller.AnnouncementControllerAuthzTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.meta.service.impl.ModelMutationGuardTest",
+    "tests": "10",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.FieldMapPhaseTest",
+    "tests": "15",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  }
+]

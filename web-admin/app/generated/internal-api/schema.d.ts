@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: cde653e0dd2b9dab792aa47679f79f132a7ed5aef5521124b7289e9e47dbf811
+ * Contract SHA-256: dba460efe0bf09f6cdfc063f4ba0e846eca80e87a1d8666451d48d4604ef700e
  */
 export interface paths {
     "/api/activities": {
@@ -3604,7 +3604,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/announcements/{id}": {
+    "/api/announcements/{pid}": {
         parameters: {
             query?: never;
             header?: never;
@@ -23336,26 +23336,16 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             expiresAt?: string;
-            /** Format: int64 */
-            id?: number;
+            id?: string;
+            pid?: string;
             pinned?: boolean;
             priority?: string;
             /** Format: date-time */
             publishedAt?: string;
-            /** Format: int64 */
-            publishedBy?: number;
+            publishedBy?: string;
             publishedByName?: string;
             status?: string;
             title?: string;
-        };
-        AnnouncementRequest: {
-            content?: string;
-            /** Format: date-time */
-            expiresAt?: string;
-            pinned?: boolean;
-            priority?: string;
-            status?: string;
-            title: string;
         };
         ApiConnector: {
             authConfig?: string;
@@ -23536,14 +23526,6 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["AnalyticsRetention"] | null;
-            message?: string;
-            /** Format: int64 */
-            timestamp?: number;
-        };
-        ApiResponseAnnouncementDTO: {
-            code?: string;
-            context?: unknown;
-            data?: components["schemas"]["AnnouncementDTO"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -45952,7 +45934,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AnnouncementRequest"];
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -45962,7 +45946,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseAnnouncementDTO"];
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
                 };
             };
         };
@@ -45972,13 +45956,15 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                pid: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AnnouncementRequest"];
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -45988,7 +45974,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseAnnouncementDTO"];
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
                 };
             };
         };
@@ -45996,9 +45982,12 @@ export interface operations {
     delete_23: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+                "If-Match"?: number;
+            };
             path: {
-                id: number;
+                pid: string;
             };
             cookie?: never;
         };
@@ -46010,7 +45999,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
                 };
             };
         };
