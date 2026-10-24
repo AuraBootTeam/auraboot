@@ -42,6 +42,11 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired AnnouncementStatisticsExportSource exports;
     @Autowired com.auraboot.framework.i18n.service.I18nResourceService translationResources;
     @Autowired com.auraboot.framework.i18n.service.I18nService messages;
+    @Autowired com.auraboot.framework.meta.service.impl.DomainExportTaskService exportTasks;
+    @Autowired com.auraboot.framework.meta.service.impl.ExportTaskService legacyExports;
+    @Autowired com.auraboot.framework.meta.mapper.ExportTaskMapper exportRegistry;
+    @Autowired com.auraboot.module.exchange.service.ExecutionJobQueryService executionJobs;
+    @Autowired com.auraboot.framework.infrastructure.storage.StorageProperties storageProperties;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
     @Autowired UserPermissionService permissions;
@@ -220,6 +225,53 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             applyTestMetaContext();grantCommittedPermissionToTestRole("announcement.announcement.export","announcement","announcement:announcement","export","Announcement export");
             permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());java.nio.file.Files.deleteIfExists(output);
             org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
+        }
+    }
+    @Test void durableExportCompletesWithPrivateArtifactAndEveryReadSurfaceRechecksCurrentSourceAuthority() throws Exception {
+        String privateRoot=System.getenv("AURA_FILE_STORAGE_PATH");
+        assertThat(privateRoot).as("The managed test invocation must specify its task-owned private artifact directory").isNotBlank();
+        assertThat(storageProperties.getLocal().getBasePath()).isEqualTo(privateRoot);
+        importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
+        String pid=null;
+        try {
+            String version=publish();String token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+            var submitted=new TransactionTemplate(transactions).execute(state->exportTasks.submit(AnnouncementStatisticsExportSource.CODE,token));
+            assertThat(submitted.getPid()).isNotBlank();pid=submitted.getPid();String taskPid=pid;
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->
+                assertThat(exportTasks.status(taskPid).getStatus()).isEqualTo("completed"));
+            var stored=exportRegistry.findByPid(pid);
+            assertThat(stored.getRequestParams().isObject()).isTrue();
+            assertThat(stored.getRequestParams().path("sourceType").textValue()).isEqualTo("domain");
+            assertThat(stored.getRequestParams().path("checksumSha256").textValue()).matches("[0-9a-f]{64}");
+            assertThat(stored.getFileKey()).startsWith("exports/").endsWith(".csv");
+            var statusResponse=http.perform(get("/api/exports/domain/"+pid)).andExpect(status().isOk()).andReturn().getResponse();
+            assertThat(statusResponse.getContentAsString()).contains("/api/exports/domain/"+pid+"/download")
+                .doesNotContain(stored.getFileKey(),"temp_path","memberPid","executionToken","createdBy","tenantId");
+            var first=http.perform(get("/api/exports/domain/"+pid+"/download")).andExpect(status().isOk()).andReturn().getResponse();
+            assertThat(first.getHeader("Cache-Control")).isEqualTo("no-store");
+            assertThat(first.getHeader("Content-Disposition")).contains("announcement-statistics.csv");
+            byte[] bytes=first.getContentAsByteArray();assertThat(bytes).startsWith((byte)0xef,(byte)0xbb,(byte)0xbf);
+            assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).contains(",Unread,Not yet,Yes,");
+            var detail=readers.detail(version);var mark=Map.<String,Object>of("snapshotHash",detail.get("snapshotHash"));
+            readers.mark(version,mark,false);readers.mark(version,mark,true);
+            var second=http.perform(get("/api/exports/domain/"+pid+"/download")).andExpect(status().isOk()).andReturn().getResponse();
+            assertThat(second.getContentAsByteArray()).isEqualTo(bytes);
+            assertThat(legacyExports.getTaskStatus(pid).getStatus()).isEqualTo("completed");
+            assertThat(executionJobs.recent(100)).anySatisfy(job->{assertThat(job.getPid()).isEqualTo(taskPid);
+                assertThat(job.getDownloadUrl()).isEqualTo("/api/exports/domain/"+taskPid+"/download");});
+            assertThat(jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.export")).isEqualTo(1);
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.export")).isFalse();
+            http.perform(get("/api/exports/domain/"+pid)).andExpect(status().isForbidden());
+            var denied=http.perform(get("/api/exports/domain/"+pid+"/download")).andExpect(status().isForbidden()).andReturn().getResponse();
+            assertThat(denied.getContentAsByteArray()).doesNotStartWith((byte)0xef,(byte)0xbb,(byte)0xbf);
+            assertThatThrownBy(()->legacyExports.getTaskStatus(taskPid)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThat(legacyExports.getRecentTasks("domain:"+AnnouncementStatisticsExportSource.CODE,100)).isEmpty();
+            assertThat(executionJobs.recent(100)).noneMatch(job->taskPid.equals(job.getPid()));
+        } finally {
+            grantCommittedPermissionToTestRole("announcement.announcement.export","announcement","announcement:announcement","export","Announcement export");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
         }
     }
 }
