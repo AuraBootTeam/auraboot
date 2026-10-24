@@ -8,6 +8,7 @@ import {
   readDataSourceRecord,
   readDataSourceState,
   readPath,
+  resolveRuntimeValue,
   useDataSourceSubscription,
   useRuntimeStateSubscription,
 } from './workbenchBlockUtils';
@@ -130,7 +131,9 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
   useDataSourceSubscription(runtime, dataSourceId);
   useRuntimeStateSubscription(runtime);
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
-  const record = readDataSourceRecord(runtime, dataSourceId);
+  const record = block.context !== undefined
+    ? resolveRuntimeValue(runtime, block.context) ?? {}
+    : readDataSourceRecord(runtime, dataSourceId);
   const metrics = Array.isArray((block as any).metrics) ? (block as any).metrics : [];
   const variant = (block as any).variant || 'cards';
   const density = (block as any).density || 'default';

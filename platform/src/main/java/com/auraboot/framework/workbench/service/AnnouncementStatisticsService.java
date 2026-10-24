@@ -138,9 +138,10 @@ public class AnnouncementStatisticsService {
     }
 
     private Map<String,Object> publicSnapshot(String token,Map<String,Object> snapshot) {
-        return Map.of("pid",token,"snapshotToken",token,"schema",snapshot.get("snapshot_schema"),"asOf",iso(snapshot.get("as_of")),
+        var metadata=codec.object(snapshot.get("metadata").toString());
+        return Map.of("pid",token,"title",metadata.get("title"),"snapshotToken",token,"schema",snapshot.get("snapshot_schema"),"asOf",iso(snapshot.get("as_of")),
             "expiresAt",iso(snapshot.get("view_expires_at")),"versionPid",snapshot.get("version_pid"),
-            "metadata",codec.object(snapshot.get("metadata").toString()),"summary",codec.object(snapshot.get("summary").toString()),
+            "metadata",metadata,"summary",codec.object(snapshot.get("summary").toString()),
             "filters",codec.object(snapshot.get("filters").toString()));
     }
     private String currentMember() {

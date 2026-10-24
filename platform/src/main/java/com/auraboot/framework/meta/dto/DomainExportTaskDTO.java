@@ -8,6 +8,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class DomainExportTaskDTO extends ExportTaskDTO {
+    private String title;
     private String fileName;
     private JsonNode sourceSnapshot;
 }

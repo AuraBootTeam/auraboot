@@ -160,6 +160,8 @@ public class DomainExportTaskService {
     private DomainExportTaskDTO view(ExportTask task) {
         var dto=new DomainExportTaskDTO();dto.setPid(task.getPid());dto.setQueryCode(task.getQueryCode());dto.setFormat(task.getFormat());
         var descriptor=prepared(task);dto.setFileName(descriptor.fileName());dto.setSourceSnapshot(source(sourceCode(task)).publicMetadata(descriptor));
+        if(dto.getSourceSnapshot()==null || !dto.getSourceSnapshot().isObject()) throw new IllegalStateException("Domain export public source description must be an object");
+        String title=dto.getSourceSnapshot().path("title").textValue();dto.setTitle(title==null || title.isBlank() ? descriptor.fileName() : title);
         dto.setStatus(task.getStatus());dto.setProgress(task.getProgress());dto.setTotalRows(task.getTotalRows());dto.setProcessedRows(task.getProcessedRows());
         dto.setFileSize(task.getFileSize());
         if(task.getExpiresAt()==null || !Instant.now().isBefore(task.getExpiresAt())) dto.setStatus(ExportTask.STATUS_EXPIRED);

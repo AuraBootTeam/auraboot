@@ -255,6 +255,8 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             assertThat(statusResponse.getContentAsString()).contains("/api/exports/domain/"+pid+"/download")
                 .doesNotContain(stored.getFileKey(),"temp_path","memberPid","executionToken","createdBy","tenantId");
             var publicSource=json.readTree(statusResponse.getContentAsString()).required("data").required("sourceSnapshot");
+            assertThat(json.readTree(statusResponse.getContentAsString()).required("data").required("title").textValue())
+                .isEqualTo(publicSource.required("title").textValue());
             assertThat(publicSource.required("versionPid").textValue()).isEqualTo(version);
             assertThat(publicSource.required("asOf").textValue()).isEqualTo(stored.getRequestParams().required("prepared").required("evidence")
                 .required("snapshot").required("asOf").textValue());
@@ -333,6 +335,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             .andExpect(status().isOk()).andReturn().getResponse();
         var captured=json.readTree(response.getContentAsString()).required("data");String token=captured.required("snapshotToken").textValue();
         assertThat(captured.required("pid").textValue()).isEqualTo(token);
+        assertThat(captured.required("title").textValue()).isEqualTo(captured.required("metadata").required("title").textValue());
         assertThat(captured.required("versionPid").textValue()).isEqualTo(firstVersion);
         jdbc.update("UPDATE mt_org_department SET org_dept_name='Statistics renamed department' WHERE tenant_id=? AND pid=?",tenant,department);
         var options=http.perform(get("/api/announcements/statistics/snapshots/"+token+"/departments")).andExpect(status().isOk()).andReturn().getResponse();
