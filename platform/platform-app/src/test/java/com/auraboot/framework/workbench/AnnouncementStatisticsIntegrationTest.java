@@ -42,6 +42,8 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
     @Autowired UserPermissionService permissions;
+    @Autowired com.auraboot.framework.tenant.service.TenantMemberService memberships;
+    @Autowired com.auraboot.framework.rbac.service.UserRoleService roles;
     @Autowired PlatformTransactionManager transactions;
     @Autowired WebApplicationContext context;
     @Autowired ObjectMapper json;
@@ -102,20 +104,39 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
                 getTestTenant().getId(),token,UniqueIdGenerator.generate(),getTestTenantMember().getPid());
         })).hasMessageContaining("Announcement statistics snapshot is missing or sealed");
     }
-    @Test void revokingCurrentStatisticsPermissionDeniesAnExistingSnapshotWithoutErasingIt() {
+    @Test void revokingCurrentStatisticsPermissionDeniesAnExistingSnapshotWithoutErasingIt() throws Exception {
+        String version=publish();String token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+        try {
+            assertThat(jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.stats")).isEqualTo(1);
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.stats")).isFalse();
+            http.perform(get("/api/announcements/statistics/snapshots/"+token)).andExpect(status().isForbidden());
+            assertThatThrownBy(()->statistics.authorizeExport(token,false)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        } finally {
+            grantCommittedPermissionToTestRole("announcement.announcement.stats","announcement","announcement:announcement","stats","Announcement stats");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+        }
+        assertThat(statistics.summary(token).get("snapshotToken")).isEqualTo(token);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_statistics_row WHERE tenant_id=? AND snapshot_pid=?",Integer.class,getTestTenant().getId(),token)).isEqualTo(1);
+    }
+    @Test void replacementMembershipWithTheSameEffectiveGrantsCannotInheritTheOldSnapshot() {
         String version=publish();String token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
         try {
             assertThatThrownBy(()->new TransactionTemplate(transactions).executeWithoutResult(state->{
                 state.setRollbackOnly();
-                jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
-                    getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.stats");
-                permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
-                assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.stats")).isFalse();
+                jdbc.update("UPDATE ab_tenant_member SET deleted_flag=TRUE,status='inactive' WHERE tenant_id=? AND id=?",getTestTenant().getId(),getTestTenantMember().getId());
+                var replacement=memberships.addMember(getTestUser().getId(),getTestTenant().getId(),"active");
+                assertThat(replacement.getPid()).isNotEqualTo(getTestTenantMember().getPid());
+                assertThat(roles.assignRolesToMember(replacement.getId(),List.of(getTestRole().getId()),getTestTenant().getId(),null)).isTrue();
+                MetaContext.setMemberId(replacement.getId());
+                permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+                assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.stats")).isTrue();
+                assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.export")).isTrue();
                 statistics.authorizeExport(token,false);
-            })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-        } finally {permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());}
+            })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessageContaining("permissions changed");
+        } finally {applyTestMetaContext();permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());}
         assertThat(statistics.summary(token).get("snapshotToken")).isEqualTo(token);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_statistics_row WHERE tenant_id=? AND snapshot_pid=?",Integer.class,getTestTenant().getId(),token)).isEqualTo(1);
     }
     @Test void expiredViewCannotCreateAnExportButAcceptedExportAuthorizationKeepsItsRetentionWindow() {
         String version=publish();String original=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");

@@ -32,7 +32,7 @@ public interface AnnouncementStatisticsMapper {
             r.first_read_at,r.acknowledged_at,
             (m.pid IS NOT NULL AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE) AS member_eligible,
             COALESCE((SELECT d.status FROM ab_announcement_delivery d WHERE d.tenant_id=r.tenant_id AND d.version_pid=r.version_pid
-                AND d.user_pid=r.user_pid AND d.kind='publication' AND d.channel='in_app' ORDER BY d.created_at DESC,d.batch_pid LIMIT 1),'not_planned') AS notification_state
+                AND d.user_pid=r.user_pid AND d.kind='publication' AND d.channel='in_app' ORDER BY d.created_at DESC,d.batch_pid LIMIT 1),'not_generated') AS notification_state
         FROM ab_announcement_recipient r
         LEFT JOIN ab_tenant_member m ON m.tenant_id=r.tenant_id AND m.pid=r.member_pid
         LEFT JOIN ab_user u ON u.id=m.user_id AND u.pid=r.user_pid
