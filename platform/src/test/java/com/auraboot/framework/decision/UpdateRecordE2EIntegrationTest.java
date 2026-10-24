@@ -1,6 +1,5 @@
 package com.auraboot.framework.decision;
 
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
 import com.auraboot.framework.eventpolicy.model.DedupStrategy;
@@ -105,6 +104,9 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
                 .displayName("Status").tenantId(getTestTenant().getId()).build());
         String permission = "model." + modelCode + ".update";
         grantCommittedPermissionToTestRole(permission, "model", modelCode, "update", "Update test record");
+        // The real command boundary requires both update capability and a readable named target.
+        grantCommittedPermissionToTestRole("model." + modelCode + ".read",
+                "model", modelCode, "read", "Read test record");
         var command = new CommandDefinitionCreateRequest();
         command.setCode(modelCode + ":update");
         command.setDisplayName("Update test record");
@@ -135,6 +137,7 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> created = dynamicDataService.create(modelCode, rec);
         String recordPid = String.valueOf(created.get("pid"));
         assertThat(recordPid).isNotBlank();
+        assertThat(dynamicDataService.getById(modelCode, recordPid).get(statusField)).isEqualTo("OPEN");
 
         // publish a policy whose UPDATE_RECORD action sets status=ESCALATED when priority=HIGH
         String code = "it_ur_pol_" + System.nanoTime();
@@ -162,12 +165,8 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(result.execution().actions().get(0).status().name())
                 .as("Action results: %s", result.execution().actions()).isEqualTo("SUCCESS");
 
-        // the real record was mutated by the production UpdateRecordActionHandler -> DynamicDataService.
-        // This IT creates its own dynamic tenant/user with no rule-center grant, so the verification
-        // read-back must bypass record-permission enforcement (established pattern, cf. c737b79d3) —
-        // we are asserting the mutation persisted, not asserting a deny.
-        Map<String, Object> after = MetaContext.runWithCommandPermitScope("ALL",
-                () -> dynamicDataService.getById(modelCode, recordPid));
+        // Verify the production mutation through the same actor's ordinary authorized read path.
+        Map<String, Object> after = dynamicDataService.getById(modelCode, recordPid);
         assertThat(after.get(statusField)).isEqualTo("ESCALATED");
     }
 
