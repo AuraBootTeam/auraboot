@@ -193,7 +193,7 @@ export function useListPageState(
   // Debounced auto-search: triggers loadData 300ms after the user stops typing,
   // so results update without requiring Enter. Reduces API calls by ~60-80%
   // compared to firing on every keystroke.
-  const { debouncedSearch, commitSearch, rememberSubmittedFilters } = useListKeywordSearch(
+  const { debouncedSearch, commitSearch, rememberSubmittedFilters, getSubmittedFilters } = useListKeywordSearch(
     (params) => { void late.loadData(params); },
     Boolean(schema),
     pagination.pageSize,
@@ -522,6 +522,7 @@ export function useListPageState(
     debouncedSearch,
     commitSearch,
     rememberSubmittedFilters,
+    getSubmittedFilters,
     readApiRequest,
     getFailedApiRequest,
     clearApiReadFailure,

@@ -87,11 +87,13 @@ export function resolveDetailRecordEndpoint(
   recordPid: string,
 ): { endpoint: string; method: 'get' | 'post' } {
   const ds = schema?.extension?.dataSource as
-    | { type?: string; endpoint?: string; method?: string; adaptor?: string }
+    | { type?: string; endpoint?: string; method?: string; adaptor?: string; detailEndpoint?: string; recordEndpoint?: string }
     | undefined;
   if (ds && ds.type === 'api' && typeof ds.endpoint === 'string' && ds.endpoint.length > 0) {
     const method = String(ds.method || 'get').toLowerCase() === 'post' ? 'post' : 'get';
-    let endpoint = ds.endpoint;
+    const declaredDetail = ds.detailEndpoint || ds.recordEndpoint;
+    const hasExplicitDetail = typeof declaredDetail === 'string' && declaredDetail.trim().length > 0;
+    let endpoint = hasExplicitDetail ? declaredDetail.trim() : ds.endpoint;
     const legacyRecordKey = 'record' + 'Id';
     const publicRecordEndpointPlaceholder = new RegExp(
       `\\{recordPid\\}|\\$\\{recordPid\\}|\\{pid\\}|\\$\\{pid\\}|\\{id\\}|\\{${legacyRecordKey}\\}|\\$\\{${legacyRecordKey}\\}`,
@@ -99,7 +101,7 @@ export function resolveDetailRecordEndpoint(
     );
     if (recordPid && publicRecordEndpointPlaceholder.test(endpoint)) {
       endpoint = endpoint.replace(publicRecordEndpointPlaceholder, encodeURIComponent(recordPid));
-    } else if (recordPid && ds.adaptor !== 'commandRecord') {
+    } else if (recordPid && !hasExplicitDetail && ds.adaptor !== 'commandRecord') {
       endpoint = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordPid)}`;
     } else {
       endpoint = endpoint.replace(/\/+$/, '');

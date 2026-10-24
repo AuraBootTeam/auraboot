@@ -8,7 +8,7 @@ import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state'
 import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
 import { canonicalizePageSchemaDto } from '~/framework/meta/utils/canonicalizePageDsl';
 import { validateStructure } from '~/framework/meta/validation/DslValidator';
-import { buildDetailRecordEndpoint } from '~/framework/meta/rendering/pages/detailPage/detailRecordRequests';
+import { buildDetailRecordEndpoint, resolveDetailRecordEndpoint } from '~/framework/meta/rendering/pages/detailPage/detailRecordRequests';
 
 const pages=JSON.parse(readFileSync(resolve(import.meta.dirname,'../../../../../../../plugins/core-announcement/config/pages.json'),'utf8'));
 const schema=pages.find((page:any)=>page.pageKey==='announcement_policy_detail');
@@ -33,6 +33,7 @@ describe('Native tenant announcement policy',()=>{
   it('loads the tenant singleton through the actual detail request builder without appending a record id',()=>{
     const canonical=canonicalizePageSchemaDto(schema);
     expect(buildDetailRecordEndpoint('ab_announcement','current',canonical)).toBe('/api/announcements/policy');
+    expect(resolveDetailRecordEndpoint(canonical,'ab_announcement','current')).toEqual({endpoint:'/api/announcements/policy',method:'get'});
   });
   it('uses valid native DSL without displaying internal workflow identities',()=>{
     expect(validateStructure(canonicalizePageSchemaDto(schema))).toEqual([]);
