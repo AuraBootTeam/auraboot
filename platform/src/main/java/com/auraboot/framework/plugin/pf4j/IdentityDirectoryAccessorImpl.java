@@ -36,6 +36,9 @@ public class IdentityDirectoryAccessorImpl implements IdentityDirectoryAccessor 
     }
 
     @Override
+    public boolean supportsStrictApprovalIdentity() { return true; }
+
+    @Override
     public List<String> userPidsForRole(Long tenantId, String roleIdOrCode) {
         if (tenantId == null || roleIdOrCode == null || roleIdOrCode.isBlank()) return List.of();
         Long roleId;

@@ -17,6 +17,9 @@ public interface IdentityDirectoryAccessor {
     /** Resolve a user only when they are an active member of the current tenant. */
     UserIdentity findActiveTenantUser(Long tenantId, String idOrPid);
 
+    /** Strict approval requires both exact role PIDs and enabled membership incarnations. */
+    default boolean supportsStrictApprovalIdentity() { return false; }
+
     /** Exact public role identity; older hosts cannot claim strict role support. */
     default List<String> userPidsForRolePid(Long tenantId, String rolePid) {
         throw new UnsupportedOperationException("Strict public role lookup is unavailable");

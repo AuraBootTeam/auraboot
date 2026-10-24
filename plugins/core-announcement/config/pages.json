@@ -82,7 +82,7 @@
           },
           {
             "field": "status",
-            "width": 100,
+            "width": 144,
             "dictCode": "announcement_status",
             "renderType": "tag"
           },
@@ -92,7 +92,7 @@
           },
           {
             "field": "published_at",
-            "width": 160,
+            "width": 184,
             "format": "YYYY-MM-DD HH:mm",
             "label": {
               "zh-CN": "上次发布时间",
