@@ -613,9 +613,10 @@ test('immediate exempt publication seals the real tenant audience and dispatches
     await expect(receiverRow).toContainText('未读');
     await expect(receiverRow).toContainText(/\d{4}[-/]\d{2}[-/]\d{2} \d{2}:\d{2}/);
     const publishedCell=receiverRow.locator('td').nth(4);
-    const timestamp=publishedCell.locator('.truncate').first();
-    const geometry=await timestamp.evaluate(element=>({visible:element.clientWidth,content:element.scrollWidth}));
-    expect(geometry.content,'Published timestamp must be fully readable without ellipsis').toBeLessThanOrEqual(geometry.visible);
+    const geometry=await publishedCell.evaluate(cell=>[cell,...Array.from(cell.querySelectorAll('*'))]
+      .filter(element=>element.clientWidth>0).map(element=>({visible:element.clientWidth,content:element.scrollWidth})));
+    expect(geometry.length).toBeGreaterThan(0);
+    for(const box of geometry)expect(box.content,'Published timestamp must be fully readable without ellipsis').toBeLessThanOrEqual(box.visible);
     await page.screenshot({ path: test.info().outputPath('recipient-unread-list.png'), animations: 'disabled', fullPage: true });
     const readRequest = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/read`));
     await receiverRow.getByRole('button', { name: '查看公告', exact: true }).click();
