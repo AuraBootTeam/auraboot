@@ -320,6 +320,33 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_preservesWrappedSerializationFailureWithoutBusinessErrorLeakage() {
+        var conflict = new org.springframework.dao.CannotSerializeTransactionException(
+                "private SQL diagnostics", new java.sql.SQLException("private table", "40001"));
+        assertWrappedPersistenceFailurePreserved(conflict);
+    }
+
+    @Test
+    void execute_preservesWrappedPersistenceFailureForSanitizedTransportHandling() {
+        assertWrappedPersistenceFailurePreserved(new org.springframework.dao.DataIntegrityViolationException(
+                "private constraint and SQL diagnostics"));
+    }
+
+    private void assertWrappedPersistenceFailurePreserved(org.springframework.dao.DataAccessException failure) {
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new com.auraboot.framework.meta.exception.MetaServiceException("Update failed: private SQL", failure);
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
     void execute_preservesLocalizedPluginBusinessErrorKeyAndCause() {
         PluginCommandRejectionException overQuantity = new PluginCommandRejectionException(
                 PluginCommandRejectionException.Code.INVALID_ARGUMENT,

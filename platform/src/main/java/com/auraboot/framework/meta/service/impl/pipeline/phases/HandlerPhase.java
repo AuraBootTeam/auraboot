@@ -766,8 +766,13 @@ public class HandlerPhase implements CommandPhase {
             }
             // Preserve the typed persistence boundary: the global response handler
             // sanitizes database diagnostics in every profile, including dev.
-            if (e instanceof org.springframework.dao.DataAccessException persistenceFailure) {
-                throw persistenceFailure;
+            // Meta services can wrap mapper failures. Inspect typed causes rather
+            // than diagnostic text, preserving rollback/conflict transport semantics.
+            java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            for (Throwable cause = e; cause != null && seen.add(cause); cause = cause.getCause()) {
+                if (cause instanceof org.springframework.dao.DataAccessException persistenceFailure) {
+                    throw persistenceFailure;
+                }
             }
             // Plugin handlers use stable, transport-neutral error keys because
             // the plugin API must not depend on host web exceptions. Preserve
