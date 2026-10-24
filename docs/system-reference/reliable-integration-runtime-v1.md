@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-08-23
-updated: 2026-09-04
+updated: 2026-10-24
 ---
 
 # Reliable Integration Runtime v1
@@ -13,7 +13,8 @@ effects; they do not copy the dispatcher, receipt, lease, DLQ, or replay tables.
 ## Public contract
 
 - Java API: `IntegrationEventEnvelope`, `ReliableIntegrationAccessor`, and
-  `ReliableEventConsumerExtension` in `platform-plugin-api`.
+  `ReliableEventConsumerExtension` in `platform-plugin-api`. The `ReliableIntegrationDispatcher` port
+  provides bounded dispatch for a trusted current tenant, source, and registered event types.
 - Envelope version: `1.0`.
 - Delivery: at-least-once, with a unique receipt fence on
   `(tenant_id, event_id, consumer_code)`.
@@ -30,14 +31,39 @@ effects; they do not copy the dispatcher, receipt, lease, DLQ, or replay tables.
 ## Lease, retry, and terminal failure
 
 The dispatcher atomically claims eligible rows with `FOR UPDATE SKIP LOCKED`, a random lease token,
-and a 30-second expiry. All completion/failure updates are fenced by that token. Expired leases are
-recovered by reconcile. Retry delay is deterministic bounded exponential backoff from one second
+and a 30-second expiry. Completion/failure updates require the exact token and an unexpired lease
+using `clock_timestamp()`. Every reliable consumer requires an active, writable independent transaction,
+locks its exact current lease before receipt/effect work, and rechecks wall-clock expiry before
+marking its receipt applied. Expiry during the callback rolls back its effect and receipt.
+
+Global, tenant-scoped, and internal exact-event claims share the same crash budget. Reclaiming
+expired processing increments `retry_count` once; claiming a due pending row does not charge a
+second failure. Exhaustion atomically clears ownership, marks the row failed, and writes its durable
+DLQ in the same SQL statement. Workers do not invoke consumers for those terminal claim results.
+Reconcile uses bounded `FOR UPDATE SKIP LOCKED` recovery, counts each abandoned attempt, and
+materializes terminal DLQs in its transaction; it cannot reset the budget by returning a row to pending.
+ Retry delay is deterministic bounded exponential backoff from one second
 to fifteen minutes. A row that reaches `max_retries` enters `failed` and receives one durable
 `ab_integration_dead_letter` row.
 
 Replay is explicit and attributed (`replayed_by`). It resets the original outbox row to `pending`;
 it never mutates the envelope or silently retries an open poison event. Reconcile only recovers
 expired leases and materializes missing DLQ rows.
+
+## Host-authorized tenant dispatch
+
+`ReliableIntegrationDispatcher.dispatchCurrentTenant(source, eventTypes, limit)` requires a
+trusted tenant/user frame, 1–32 registered event types and a batch limit of 1–100. Source/type codes
+are canonical, nonblank and bounded to 128 characters. Callers cannot supply a tenant, operator or
+lease; host business action authorization must run before invoking this port. It rejects an active
+business transaction because claim ownership must commit before independent effects start.
+
+The claim binds the current tenant, exact source and allowed types, excludes unversioned legacy
+rows and preserves tenant-local ordering. Its result contains claimed/delivered/failed/lost-lease
+counts and terminal public event ids; it exposes no payload or internal numeric ids. Fenced-out
+terminal writes are reported as lost leases rather than successful delivery or recorded failures.
+Global polling remains the native scheduler's responsibility. Reliable JSON floating-point values
+are decoded as `BigDecimal`, including non-resource event sources.
 
 ## Tenant-admin DLQ operator API
 
@@ -123,12 +149,13 @@ holding that same outbox row lock in an outer transaction would self-block the i
 The annotation/BoundSql contract tests are not PostgreSQL lease or ordering acceptance.
 
 The trusted receipt counter closes the lease-check/receipt-commit race by locking the exact
-`tenant_id/event_id/lease_token` processing outbox row with `lease_until > NOW() FOR UPDATE`
+`tenant_id/event_id/lease_token` processing outbox row with `lease_until > clock_timestamp() FOR UPDATE`
 inside its independent T01 effect transaction. It requires an active Spring transaction,
 checks the complete persisted envelope both before and after acquiring the row lock, and
 holds the lock through effect and receipt commit. Missing or replaced leases reject before
 plugin work. Per-access and post-effect envelope/metadata verification remains in place.
-Ordinary consumers and the global dispatcher do not acquire this new lock. Native two-transaction
+All reliable consumers now acquire this lease lock in the common delivery executor; the receipt
+counter retains its additional owner/provenance checks. Native two-transaction
 verification must prove that a competing exact claim skips the held row, and that a lease replaced
 before lock acquisition causes rollback with no plugin effect or applied receipt. The separate
 lease-claim transaction must already have committed; an outer held row lock followed by this
