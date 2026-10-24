@@ -362,7 +362,7 @@ test('withdraw legacy content and create a revision without mutating its frozen 
     );
     await db.query(
       `INSERT INTO ab_announcement_recipient_snapshot(tenant_id,pid,version_pid,origin,recipient_count,sealed)
-      SELECT tenant_id,$1,$2,'migration_cohort',1,TRUE FROM ab_announcement WHERE pid=$3`,
+      SELECT tenant_id,$1,$2,'migration_cohort',1,FALSE FROM ab_announcement WHERE pid=$3`,
       [randomUUID(), versionPid, pid],
     );
     await db.query(
@@ -372,6 +372,7 @@ test('withdraw legacy content and create a revision without mutating its frozen 
       WHERE a.pid=$2 AND m.status='active' AND m.deleted_flag=FALSE`,
       [versionPid, pid],
     );
+    await db.query('UPDATE ab_announcement_recipient_snapshot SET sealed=TRUE WHERE version_pid=$1',[versionPid]);
     await db.query('COMMIT');
     const visible = await page.request.get('/api/announcements?limit=100');
     expect(visible.status()).toBe(200);

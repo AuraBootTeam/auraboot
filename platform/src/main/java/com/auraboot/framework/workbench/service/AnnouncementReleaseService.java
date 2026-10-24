@@ -152,12 +152,13 @@ public class AnnouncementReleaseService {
             Instant due=Boolean.TRUE.equals(policy.acknowledgementRequired()) ? now.plus(Duration.ofDays(policy.acknowledgementDays())) : null;
             if(expiry!=null && (!now.isBefore(expiry) || (due!=null && due.isAfter(expiry)))) invalid("expiry_invalid");
             String recipientSnapshot=UniqueIdGenerator.generate();
-            if(releases.seal(tenant,recipientSnapshot,version,now,recipients.recipients().size())!=1) throw new IllegalStateException("Recipient snapshot was not sealed");
+            if(releases.beginSnapshot(tenant,recipientSnapshot,version,now,recipients.recipients().size())!=1) throw new IllegalStateException("Recipient snapshot was not opened");
             List<AnnouncementAudienceService.Recipient> targets=recipients.recipients();
             for(int start=0;start<targets.size();start+=500) {
                 List<AnnouncementAudienceService.Recipient> batch=targets.subList(start,Math.min(start+500,targets.size()));
                 if(releases.recipients(tenant,version,batch)!=batch.size()) throw new IllegalStateException("Recipient facts were not persisted");
             }
+            if(releases.seal(tenant,version)!=1) throw new IllegalStateException("Recipient snapshot was not sealed with its exact count");
             if(releases.publishControl(tenant,version,now,due)!=1 || releases.publishRecord(tenant,pid,version,actor,now)!=1
                 || releases.finish(tenant,release,fence,"succeeded",null)!=1) conflict();
             records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,version,"announcement:publication_completed",release,record.getRowVersion(),record.getRowVersion()+1);

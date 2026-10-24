@@ -98,9 +98,17 @@ public interface AnnouncementReleaseMapper {
 
     @Insert("""
         INSERT INTO ab_announcement_recipient_snapshot(tenant_id,pid,version_pid,origin,resolved_at,recipient_count,sealed)
-        VALUES(#{tenant},#{snapshot},#{version},'publication',#{at},#{count},TRUE)
+        VALUES(#{tenant},#{snapshot},#{version},'publication',#{at},#{count},FALSE)
         """)
-    int seal(@Param("tenant") Long tenant,@Param("snapshot") String snapshot,@Param("version") String version,@Param("at") Instant at,@Param("count") int count);
+    int beginSnapshot(@Param("tenant") Long tenant,@Param("snapshot") String snapshot,@Param("version") String version,@Param("at") Instant at,@Param("count") int count);
+
+    @Update("""
+        UPDATE ab_announcement_recipient_snapshot s SET sealed=TRUE
+        WHERE s.tenant_id=#{tenant} AND s.version_pid=#{version} AND s.sealed=FALSE
+            AND s.recipient_count=(SELECT count(*) FROM ab_announcement_recipient r
+                WHERE r.tenant_id=s.tenant_id AND r.version_pid=s.version_pid)
+        """)
+    int seal(@Param("tenant") Long tenant,@Param("version") String version);
 
     @Insert("""
         <script>
