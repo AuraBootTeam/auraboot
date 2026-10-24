@@ -236,6 +236,8 @@ export interface EventConfig {
 
 // Column 配置（用于列表）
 export interface ColumnConfig {
+  /** Localized placeholder for explicitly empty values, including empty arrays. */
+  emptyText?: string | LocalizedText;
   /** Structured, reusable business cell presentation. */
   presentation?: import('../runtime/renderers/WorkspaceCells').WorkspaceCellPresentation;
   field: string;

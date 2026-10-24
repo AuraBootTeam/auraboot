@@ -709,6 +709,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       return String(enrichedDisplayValue);
     }
 
+    if (column.emptyText !== undefined && (value === null || value === undefined || value === ''
+      || (Array.isArray(value) && value.length === 0))) {
+      return <span className="text-text-3">{getLocalizedText(column.emptyText, locale, t)}</span>;
+    }
+
     // Null/undefined 处理
     if (value === null || value === undefined) {
       return <span className="text-text-3">-</span>;
@@ -1514,7 +1519,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                         key={column.field}
                         className={`${bodyCellClass} text-text text-sm ${
                           colIdx === 0 ? 'font-medium' : ''
-                        } ${column.ellipsis ? 'truncate' : ''} text-${column.align || 'left'}`}
+                        } ${column.ellipsis ? 'truncate' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
                         title={getCellTitle(column, row)}
                         style={{
                           maxWidth: column.ellipsis ? column.width : undefined,

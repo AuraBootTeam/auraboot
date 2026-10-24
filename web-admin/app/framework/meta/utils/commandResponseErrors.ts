@@ -22,6 +22,15 @@ export function resolveCommandErrorMessage(
   fallbackMessage?: string,
 ): string {
   const body = (result || {}) as Record<string, any>;
+  if (String(body.code || '').toUpperCase() === 'NETWORK_ERROR') {
+    const key = 'common.error.networkRequestUncertain';
+    const localized = translate?.(key);
+    return localized && localized !== key ? localized
+      : locale?.toLowerCase().startsWith('zh')
+        ? '网络连接中断，暂时无法确认操作结果。请先刷新检查最新状态，再按页面提示重试。'
+        : 'Connection lost; the operation result is uncertain. Refresh to check the latest status, then retry as the page directs.';
+  }
+
   const stableI18nKey =
     String(body.code || '').toUpperCase() === 'BACKEND_REQUEST_TIMEOUT'
       ? 'common.error.backendRequestTimeout'

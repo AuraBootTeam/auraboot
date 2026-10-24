@@ -119,3 +119,20 @@ describe('workflow configuration feedback', () => {
     expect(resolveCommandErrorMessage(body,'any:submit',undefined,'en-US')).toContain('rolled back');
   });
 });
+
+
+describe('coded transport failure feedback', () => {
+  it.each(['zh-CN', 'en-US'])('localizes an uncertain network result in %s without exposing transport diagnostics', locale => {
+    const result = resolveCommandErrorMessage({ code: 'network_error', message: 'Network error: Failed to fetch SECRET-DIAGNOSTIC' }, '', key => key, locale);
+    expect(result).toContain(locale === 'zh-CN' ? '暂时无法确认操作结果' : 'the operation result is uncertain');
+    expect(result).not.toContain('SECRET-DIAGNOSTIC');expect(result).not.toContain('Failed to fetch');
+  });
+  it('uses the shared locale catalog for a coded network failure', () => {
+    expect(resolveCommandErrorMessage({code:'network_error'},'',key=>key==='common.error.networkRequestUncertain' ? 'Localized uncertain operation' : key,'en-US'))
+      .toBe('Localized uncertain operation');
+  });
+  it('does not classify a business rejection from transport-looking text', () => {
+    expect(resolveCommandErrorMessage({code:'35000',message:'Network error: Check the configured connector'},'',key=>key,'en-US'))
+      .toBe('Network error: Check the configured connector');
+  });
+});

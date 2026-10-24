@@ -1,5 +1,10 @@
 [
   {
+    "key": "common.error.networkRequestUncertain",
+    "zh-CN": "网络连接中断，暂时无法确认操作结果。请先刷新检查最新状态，再按页面提示重试。",
+    "en-US": "Connection lost; the operation result is uncertain. Refresh to check the latest status, then retry as the page directs."
+  },
+  {
     "key": "export.domain_task_retained",
     "zh-CN": "导出有效期内需保留任务记录。到期后可删除。",
     "en-US": "Keep the task record while its export is available. You can delete it after expiry."

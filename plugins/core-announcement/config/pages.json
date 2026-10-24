@@ -1996,8 +1996,8 @@
         "id": "statistics_guidance",
         "blockType": "rich-text",
         "content": {
-          "zh-CN": "本页是固定时间、固定版本的统计。筛选不改变接收历史分母；重新统计会生成新快照。历史未知及无需知悉显示“不适用 / 未知”。失效成员仍保留在历史名单，已读不等于已确认知悉。",
-          "en-US": "This page captures one version at a fixed time. Filters preserve the historical denominator; recapturing creates a new snapshot. Unknown history and inapplicable acknowledgement display as not applicable / unknown. Inactive members remain in history. Reading and acknowledgement are separate."
+          "zh-CN": "固定版本、固定统计时间。筛选不改变历史分母，重新统计会生成新快照。已读与已知悉分别统计；失效成员保留在历史名单，未知或不适用项单独标明。网络中断时请保持本页快照，刷新后重试导出会沿用原请求。",
+          "en-US": "One fixed version and capture time. Filters preserve the historical denominator; recapturing creates a new snapshot. Reading and acknowledgement are separate. Inactive members remain in history; unknown and inapplicable values are identified. After a connection loss, keep this capture and reload to retry the original export request."
         }
       },
       {
@@ -2577,7 +2577,11 @@
                 "zh-CN": "发布时部门",
                 "en-US": "Departments at publication"
               },
-              "width": 180
+              "width": 180,
+              "emptyText": {
+                "zh-CN": "无可显示部门",
+                "en-US": "No visible department"
+              }
             },
             {
               "field": "matchedRoles",
@@ -2585,7 +2589,11 @@
                 "zh-CN": "匹配角色",
                 "en-US": "Matched roles"
               },
-              "width": 160
+              "width": 160,
+              "emptyText": {
+                "zh-CN": "无可显示角色",
+                "en-US": "No visible roles"
+              }
             },
             {
               "field": "readState",
@@ -2603,7 +2611,7 @@
                 "en-US": "First read"
               },
               "valueType": "datetime",
-              "width": 168
+              "width": 208
             },
             {
               "field": "acknowledgementState",
@@ -2621,7 +2629,7 @@
                 "en-US": "Acknowledged at"
               },
               "valueType": "datetime",
-              "width": 168
+              "width": 208
             },
             {
               "field": "memberEligible",

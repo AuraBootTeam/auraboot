@@ -1343,6 +1343,16 @@ describe('SelectionInfoBlockRenderer', () => {
 
 
 describe('server-paged table contract', () => {
+  it('shows configured business explanations for empty array classifications', () => {
+    const manager = { getData: () => [{ pid: 'person-1', departments: [], roles: [] }], has: () => true, register: vi.fn() };
+    const runtime = makeRuntime({ getDataSourceManager: () => manager });
+    const view = render(<TableBlockRenderer block={{ type: 'table', dataSource: 'people', columns: [
+      { field: 'departments', label: 'Departments', emptyText: { 'zh-CN': '无可显示部门', 'en-US': 'No visible department' } },
+      { field: 'roles', label: 'Matched roles', emptyText: { 'zh-CN': '无可显示角色', 'en-US': 'No visible roles' } },
+    ] } as any} runtime={runtime} />);
+    expect(view.getByText('No visible department')).toBeInTheDocument();expect(view.getByText('No visible roles')).toBeInTheDocument();
+  });
+
   const rows = (start: number, count: number) => Array.from({ length: count }, (_, i) => ({ pid: `row-${start + i}`, name: `Person ${start + i}` }));
   const block = { type: 'table', dataSource: 'recipients', table: { columns: [{ field: 'name', label: 'Name' }], pagination: { mode: 'server' } } };
   const fixture = () => {
