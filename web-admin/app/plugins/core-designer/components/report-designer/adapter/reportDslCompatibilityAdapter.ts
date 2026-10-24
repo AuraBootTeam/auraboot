@@ -81,6 +81,7 @@ function toChartDataSource(ds: ReportDataSource | undefined): ChartDataSource {
   const out: ChartDataSource = { type: DATA_SOURCE_TYPE_MAP[ds.type] };
   if (ds.modelCode) out.modelCode = ds.modelCode;
   if (ds.queryCode) out.queryCode = ds.queryCode;
+  if (ds.params) out.parameters = { ...ds.params };
   if (ds.url) out.url = ds.url;
   if (ds.type === 'static' && ds.data) out.staticData = ds.data;
   if (ds.filters) {

@@ -92,3 +92,11 @@ it('preserves an optional AI analysis heading in a rich-text block', () => {
     title: 'Analysis notes',
   });
 });
+
+it('round-trips scoped named-query business parameters', () => {
+  const report = { ...createEmptyReport('Project review'), dataSources: { rows: {
+    type: 'namedQuery' as const, queryCode: 'project_review',
+    params: { projectPid: 'project-a', includeCompleted: true, phase: 2 },
+  } } };
+  expect(parseReportTemplate(serializeReportTemplate(report))).toEqual(report);
+});
