@@ -794,6 +794,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
 
     private void verifyDynamicKeywordAndRowScope() {
         String code = "agg_keyword_" + com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
+        grantCommittedPermissionToTestRole("model." + code + ".read", "model", code, "read", "Read keyword aggregate fixture");
         var definition = ModelDefinition.builder().code(code).tableName("mt_" + code).displayName("Aggregate keyword fixture")
                 .status("published").sourceType("physical").primaryKey("id")
                 .capabilities(ModelCapabilities.fullPhysical()).fields(List.of(

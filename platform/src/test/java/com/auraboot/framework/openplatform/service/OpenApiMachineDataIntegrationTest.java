@@ -2276,12 +2276,13 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
 
     @Test void publishedBusinessSourceCannotFloatAndDisabledApplicationsCannotReceiveNewGrants() throws Exception {
         var action = publishBusinessAction("command"); var source = commands.findByCode(action.sourceCode());
-        var changed = new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
+        var changed = json.readValue(source.getExecutionConfig().replace("Assigned", "Changed"),
+                com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO.class);
         changed.setCode(source.getCode()); changed.setDisplayName(source.getDisplayName());
         changed.setModelCode(source.getModelCode()); changed.setCmdRiskLevel(source.getCmdRiskLevel());
         changed.setInputSchema(json.readValue(source.getInputSchema(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
-        changed.setExecutionConfig(json.readValue(source.getExecutionConfig().replace("Assigned", "Changed"),
-                com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO.ExecutionConfig.class));
+        assertThat(changed.getConsolidatedExecutionConfig())
+                .containsEntry("type", "state_transition").containsEntry("toState", "Changed");
         // Plugin reimport updates the published source in place. Delete/create allocates
         // another historical version and PID, which would test identity drift instead.
         var imported = commandImporter.importCommand(changed, null, UniqueIdGenerator.generate(), principal.tenantId(),
