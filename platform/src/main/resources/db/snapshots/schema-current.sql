@@ -3661,7 +3661,7 @@ CREATE TABLE public.ab_announcement (
     content text,
     priority character varying(16) DEFAULT 'normal'::character varying NOT NULL,
     announcement_priority character varying(16) DEFAULT 'normal'::character varying NOT NULL,
-    status character varying(16) DEFAULT 'draft'::character varying NOT NULL,
+    status character varying(24) DEFAULT 'draft'::character varying NOT NULL,
     pinned boolean DEFAULT false NOT NULL,
     published_by bigint,
     published_at timestamp with time zone,

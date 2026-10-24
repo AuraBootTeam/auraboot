@@ -1,4 +1,5 @@
 -- Business approval mapping contains only neutral bindings and publication coordination.
+ALTER TABLE ab_announcement ALTER COLUMN status TYPE VARCHAR(24);
 ALTER TABLE ab_announcement DROP CONSTRAINT chk_announcement_state;
 ALTER TABLE ab_announcement ADD CONSTRAINT chk_announcement_state CHECK(status IN
  ('draft','pending_approval','approval_withdrawn','approval_failed','rejected','unpublished','scheduled','missed','published','withdrawn','expired'));
