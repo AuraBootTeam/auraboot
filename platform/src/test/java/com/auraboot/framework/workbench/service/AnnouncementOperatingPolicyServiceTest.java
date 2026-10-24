@@ -27,6 +27,7 @@ class AnnouncementOperatingPolicyServiceTest {
             new IdentityDirectoryAccessor.UserIdentity(7L,"actor","actor","Actor"),"membership",70L));
         when(operations.claim(anyLong(),anyLong(),anyString(),anyString(),anyString())).thenReturn(1);
         when(operations.finish(anyLong(),anyLong(),anyString(),anyString(),isNull(),anyString())).thenReturn(1);
+        when(store.lock(1L)).thenReturn(null);
         when(store.insert(anyLong(),anyLong(),anyMap())).thenReturn(1);
         when(store.update(anyLong(),anyLong(),anyInt(),anyMap())).thenReturn(1);
         when(store.audit(anyString(),anyLong(),anyLong(),anyString(),anyString(),anyInt(),anyString(),anyString())).thenReturn(1);
