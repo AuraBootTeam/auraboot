@@ -9,18 +9,19 @@ export interface FormPresentation {
 }
 
 export function resolveFormPresentation(
-  extension: Record<string, any> = {},
+  extension: Record<string, any> | null = {},
   embedded = false,
 ): FormPresentation {
-  const legacy = extension.presentation === 'workspace';
-  const value = extension.formPresentation ?? {};
+  const config = extension ?? {};
+  const legacy = config.presentation === 'workspace';
+  const value = config.formPresentation ?? {};
   const choice = <T extends string>(candidate: unknown, options: readonly T[], fallback: T): T =>
     options.includes(candidate as T) ? (candidate as T) : fallback;
   return {
     width: choice(
       value.width,
       ['comfortable', 'wide', 'full'],
-      legacy ? 'full' : extension.formWidth === 'comfortable' ? 'comfortable' : 'wide',
+      legacy ? 'full' : config.formWidth === 'comfortable' ? 'comfortable' : 'wide',
     ),
     columns: value.columns === 1 || value.columns === 3 ? value.columns : 2,
     surface: value.surface === 'plain' ? 'plain' : 'card',

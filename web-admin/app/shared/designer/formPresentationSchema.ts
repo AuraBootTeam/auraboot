@@ -9,8 +9,16 @@ export const formPresentationProperties: PropertySchema<string>[] = [
     ['actions', 'Action bar', ['sticky', 'inline', 'fixed']],
     ['guidance', 'Guidance placement', ['none', 'aside']],
   ].map(([key, label, values]) => ({
-    key: `extension.formPresentation.${key}`, label: label as string, type: 'select' as const,
-    options: (values as string[]).map(value => ({ label: value, value })),
+    key: `extension.formPresentation.${key}`,
+    label: label as string,
+    type: 'select' as const,
+    options: (values as string[]).map((value) => ({ label: value, value })),
   })),
-  { key: 'extension.formPresentation.columns', label: 'Form columns', type: 'number', min: 1, max: 3 },
+  {
+    key: 'extension.formPresentation.columns',
+    label: 'Form columns',
+    type: 'number',
+    min: 1,
+    max: 3,
+  },
 ];

@@ -168,7 +168,8 @@ export function renderFormPageView({
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
   );
   const workspace = schema.extension?.presentation === 'workspace';
-  const presentation = resolveFormPresentation(schema.extension, Boolean(onCancelOverride || onSubmitOverride));
+  const embedded = Boolean(onCancelOverride || onSubmitOverride);
+  const presentation = resolveFormPresentation(schema.extension, embedded);
   const hasGuidance = presentation.guidance === 'aside' && Boolean(schema.extension?.formGuidance);
   const fixedActions = presentation.actions === 'fixed';
   const backLink = resolveFormBackLink(schema, tableName);
@@ -187,48 +188,55 @@ export function renderFormPageView({
           wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
           a comfortable 2-column line length while staying roomy for sub-tables. */}
         <div
-          className={`mx-auto w-full min-w-0 bg-[#F7F7F8] px-4 py-6 sm:px-6 ${fixedActions ? 'pb-24' : ''} ${presentation.width === 'comfortable' ? 'max-w-4xl' : presentation.width === 'wide' ? 'max-w-6xl' : ''}`}
+          className={
+            embedded
+              ? 'w-full min-w-0'
+              : `mx-auto w-full min-w-0 bg-[#F7F7F8] px-4 py-6 sm:px-6 ${fixedActions ? 'pb-24' : ''} ${presentation.width === 'comfortable' ? 'max-w-4xl' : presentation.width === 'wide' ? 'max-w-6xl' : ''}`
+          }
           data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
         >
           <div className="bg-transparent">
-            {/* Page Header */}
-            <div className="pt-2 pb-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-text text-2xl font-semibold tracking-tight">
-                    {getLocalizedText(
-                      (isEditMode ? schema.extension?.editTitle : schema.extension?.createTitle) ||
-                        schema.title,
-                      locale,
-                      t,
+            {/* The embedding host owns its heading and navigation. */}
+            {!embedded && (
+              <div className="pt-2 pb-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-text text-2xl font-semibold tracking-tight">
+                      {getLocalizedText(
+                        (isEditMode
+                          ? schema.extension?.editTitle
+                          : schema.extension?.createTitle) || schema.title,
+                        locale,
+                        t,
+                      )}
+                    </h2>
+                    {schema.extension?.pageDescription && (
+                      <p className="text-text-2 mt-2 text-xs">
+                        {getLocalizedText(schema.extension.pageDescription, locale, t)}
+                      </p>
                     )}
-                  </h2>
-                  {schema.extension?.pageDescription && (
-                    <p className="text-text-2 mt-2 text-xs">
-                      {getLocalizedText(schema.extension.pageDescription, locale, t)}
-                    </p>
-                  )}
+                  </div>
+                  {onCancelOverride ? (
+                    <button
+                      type="button"
+                      onClick={onCancelOverride}
+                      data-testid="form-back-link"
+                      className="text-accent text-sm hover:text-blue-800"
+                    >
+                      {t('action.back')}
+                    </button>
+                  ) : backLink ? (
+                    <Link
+                      to={backLink}
+                      data-testid="form-back-link"
+                      className="text-accent text-sm hover:text-blue-800"
+                    >
+                      {t('action.back')}
+                    </Link>
+                  ) : null}
                 </div>
-                {onCancelOverride ? (
-                  <button
-                    type="button"
-                    onClick={onCancelOverride}
-                    data-testid="form-back-link"
-                    className="text-accent text-sm hover:text-blue-800"
-                  >
-                    {t('action.back')}
-                  </button>
-                ) : backLink ? (
-                  <Link
-                    to={backLink}
-                    data-testid="form-back-link"
-                    className="text-accent text-sm hover:text-blue-800"
-                  >
-                    {t('action.back')}
-                  </Link>
-                ) : null}
               </div>
-            </div>
+            )}
 
             <div
               className={
@@ -660,9 +668,11 @@ export function renderFormPageView({
                     effectiveButtonBlock.buttons.length > 0 && (
                       <div
                         className={
-                          fixedActions
-                            ? 'border-border bg-panel fixed right-0 bottom-0 z-30 flex flex-wrap items-center justify-end gap-3 border-t px-8 py-4'
-                            : `border-border bg-panel rounded-card ${presentation.actions === 'sticky' ? 'sticky bottom-0 z-20' : ''} mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm`
+                          embedded
+                            ? 'border-border mt-5 flex flex-wrap justify-end gap-3 border-t pt-4'
+                            : fixedActions
+                              ? 'border-border bg-panel fixed right-0 bottom-0 z-30 flex flex-wrap items-center justify-end gap-3 border-t px-8 py-4'
+                              : `border-border bg-panel rounded-card ${presentation.actions === 'sticky' ? 'sticky bottom-0 z-20' : ''} mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm`
                         }
                         style={fixedActions ? { left: sidebarWidth } : undefined}
                         data-testid="form-action-footer"

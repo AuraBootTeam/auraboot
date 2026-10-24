@@ -3,6 +3,7 @@ import { resolveFormPresentation, formGridClass, formFieldSpanClass } from '../f
 
 describe('composable form presentation', () => {
   it('uses cards and a bounded form without requiring a scene preset', () => {
+    expect(resolveFormPresentation(null)).toEqual(resolveFormPresentation());
     expect(resolveFormPresentation()).toEqual({
       width: 'wide',
       columns: 2,

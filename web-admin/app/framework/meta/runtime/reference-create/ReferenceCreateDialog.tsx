@@ -1,3 +1,4 @@
+import { getLocalizedText } from '~/utils/i18n';
 // web-admin/app/framework/meta/runtime/reference-create/ReferenceCreateDialog.tsx
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/ui/ui/dialog';
@@ -106,9 +107,9 @@ export function ReferenceCreateDialog({
         if (!v) onClose();
       }}
     >
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{form.schema?.title ? `${title}${locale === 'zh-CN' ? '' : ' '}${getLocalizedText(form.schema.title, locale)}` : title}</DialogTitle>
         </DialogHeader>
         {submitError && (
           <div className="mb-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">

@@ -1,3 +1,5 @@
+import { FormSectionPreview } from '../../designers/areas/previews/FormSectionPreview';
+import { StudioFormPresentationContext } from '../../StudioFormPresentation';
 /**
  * PreviewModal Component
  *
@@ -41,6 +43,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   schema,
   pageTitle,
 }) => {
+  const { presentation } = React.useContext(StudioFormPresentationContext);
   const [device, setDevice] = React.useState<DeviceType>('desktop');
   const [showGrid, setShowGrid] = React.useState(false);
 
@@ -53,13 +56,13 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const renderPageContent = useCallback(() => {
     if (!schema || schema.blocks.length === 0) return <EmptyPagePlaceholder />;
     return (
-      <LayoutContainer layout={schema.layout} showGrid={showGrid}>
+      <div className={`mx-auto w-full ${schema.kind === 'form' ? presentation.width === 'comfortable' ? 'max-w-4xl' : presentation.width === 'wide' ? 'max-w-6xl' : '' : ''}`}><LayoutContainer layout={schema.layout} showGrid={showGrid}>
         {schema.blocks.map((block) => (
           <BlockPreview key={block.id} block={block} showGrid={showGrid} />
         ))}
-      </LayoutContainer>
+      </LayoutContainer></div>
     );
-  }, [schema, showGrid]);
+  }, [schema, showGrid, presentation.width]);
 
   if (!isOpen) return null;
 
@@ -291,26 +294,7 @@ const BlockPreview: React.FC<{ block: DslBlock; showGrid: boolean }> = ({ block,
 
     case 'form-section':
     case 'detail-section':
-      return (
-        <div className={`${borderClass} rounded-lg p-3`}>
-          {block.title && (
-            <div className="mb-2 text-sm font-medium text-gray-700">{resolveLocalizedText(block.title)}</div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            {(block.fields || []).slice(0, 8).map((field, i) => {
-              const fieldName = typeof field === 'string' ? field : field.field;
-              return (
-                <div key={i} className="space-y-1">
-                  <label className="text-xs text-gray-500">{fieldName}</label>
-                  <div className="flex h-8 items-center rounded border border-gray-300 bg-white px-2">
-                    <span className="text-xs text-gray-400">...</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
+      return <div className={`${borderClass} rounded-lg`}><FormSectionPreview block={block} readonly /></div>;
 
     case 'toolbar':
     case 'form-buttons':
