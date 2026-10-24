@@ -304,6 +304,33 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void expiredReleaseCannotPublishAndOnlyTheNewLeaseCanComplete() {
+        identity();
+        new com.auraboot.framework.workbench.service.AnnouncementReleaseWorker(releaseService).tick();identity();
+        String operation=UniqueIdGenerator.generate();
+        var created=lifecycle.execute("announcement:create_announcement",null,
+            Map.of("title","Lease "+operation,"content","Lease boundary body","policy",
+                Map.of("audience",Map.of("kind","all"),"exemptionReason","Lease boundary verification")),operation,null);
+        String pid=(String)created.get("pid");
+        var accepted=releaseService.execute("announcement:publish",pid,Map.of(),operation+"-publish",1);
+        String version=(String)accepted.get("versionPid");
+        var stale=releaseService.claim();assertNotNull(stale);assertEquals(version,stale.get("version_pid"));
+        jdbc.update("UPDATE ab_announcement_release SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE tenant_id=? AND pid=?",
+            getTestTenant().getId(),stale.get("pid"));
+        releaseService.perform(stale);identity();
+        assertEquals("unpublished",jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Integer.class,getTestTenant().getId(),version));
+        var current=releaseService.claim();assertNotNull(current);assertEquals(version,current.get("version_pid"));
+        org.assertj.core.api.Assertions.assertThat(((Number)current.get("fencing_token")).longValue())
+            .isGreaterThan(((Number)stale.get("fencing_token")).longValue());
+        assertEquals(0,releaseMapper.finish(getTestTenant().getId(),(String)stale.get("pid"),((Number)stale.get("fencing_token")).longValue(),"succeeded",null));
+        releaseService.perform(current);identity();
+        assertEquals("published",jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid));
+        assertEquals("succeeded",jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,getTestTenant().getId(),version));
+    }
+
+    @Test
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
     void futureReleaseCancellationRetainsVersionButCannotPublish() {
         identity();
         String operation=UniqueIdGenerator.generate();
