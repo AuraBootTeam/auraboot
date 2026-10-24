@@ -25,6 +25,7 @@ class AnnouncementOrganizationIntegrationTest extends BaseIntegrationTest {
     @Autowired AnnouncementReaderService reader;
     @Autowired AnnouncementCodec codec;
     @Autowired ActivityService activities;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
 
     @BeforeAll void admitOwnedDatabaseBeforeFixtureWrites() {
         String expected=System.getenv("TEST_EXPECTED_DATABASE");
@@ -72,6 +73,12 @@ class AnnouncementOrganizationIntegrationTest extends BaseIntegrationTest {
             .hasMessageContaining("Sealed announcement audience is immutable");
         assertThatThrownBy(()->jdbc.update("UPDATE ab_announcement_audience_estimate SET organization_snapshot='{}'::jsonb WHERE tenant_id=? AND version_pid=?",tenant,version))
             .hasMessageContaining("Submission audience estimates are immutable");
+        new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(status->{
+            status.setRollbackOnly();
+            assertThatThrownBy(()->jdbc.update("INSERT INTO ab_announcement_recipient(tenant_id,version_pid,user_pid,member_pid) VALUES(?,?,?,?)",
+                tenant,version,UniqueIdGenerator.generate(),getTestTenantMember().getPid()))
+                .hasMessageContaining("Sealed announcement audience rejects additional recipients");
+        });
         var detail=reader.detail(version);assertThat(detail).doesNotContainKeys("organizationSnapshot","organizationSnapshotJson");
         String hash=(String)detail.get("snapshotHash");
         assertThat(reader.mark(version,Map.of("snapshotHash",hash),false).get("readState")).isEqualTo("read");
