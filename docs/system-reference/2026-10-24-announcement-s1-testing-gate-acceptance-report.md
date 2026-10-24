@@ -19,13 +19,13 @@ updated: 2026-10-24
 
 | 层次 | 实际执行 | 裁决与边界 |
 | --- | --- | --- |
-| 后端 hermetic unit | 9 类，161 例，0 失败/跳过 | 生命周期、处理器管线、目标授权、字段映射、计算字段、模型写守卫、控制器授权、页面 schema；[类级结果](../e2e/evidence/announcement-s1-2026-10-24/backend-unit-summary.json) |
+| 后端 hermetic unit | 9 类，161 例，0 失败/跳过 | 生命周期、处理器管线、目标授权、字段映射、计算字段、模型写守卫、控制器授权、页面 schema；[类级结果](./evidence/announcement-s1-2026-10-24/backend-unit-summary.json) |
 | Spring + PostgreSQL integration | 2 例通过 | 实际事务内创建/重放/编辑/CAS/非法字段/发布拒绝/删除/审计和接收读取；`AnnouncementControllerIntegrationTest`；不是模拟数据库 |
 | 前端 hermetic unit | 7 文件，79 例通过 | commandRequestPolicy、useActionHandler、formPage；没有以纯工具测试替代页面交互 |
-| API + 真实后端/数据库 | 3 例通过，0 跳过/失败/重试 | 命令幂等、变更意图冲突、并发一胜一冲突、动态写旁路拒绝、REST 适配；[runner](../e2e/evidence/announcement-s1-2026-10-24/api-results.json) |
-| Chromium + Web/BFF/后端/数据库 | 7 例通过，0 跳过/失败/重试 | 真实菜单进入新增/筛选/详情/编辑/发布拒绝/删除/历史撤回修订/观察角色；[runner](../e2e/evidence/announcement-s1-2026-10-24/browser-results.json) |
-| 视觉与交互 | 9 场景，15 张最终原图逐一打开复核 | `agent-vision`，桌面 1280×720、zh-CN，部分为控件裁图；[矩阵与逐图记录](../e2e/evidence/announcement-s1-2026-10-24/manifest.md) |
-| 类型与内部契约 | `pnpm typecheck`、生成器 `--check`、契约工具 38 例通过 | [捕获快照比较](../e2e/evidence/announcement-s1-2026-10-24/openapi-drift.json)；只证明捕获生产者契约一致，不代表所有 API 已端到端测试 |
+| API + 真实后端/数据库 | 3 例通过，0 跳过/失败/重试 | 命令幂等、变更意图冲突、并发一胜一冲突、动态写旁路拒绝、REST 适配；[runner](./evidence/announcement-s1-2026-10-24/api-results.json) |
+| Chromium + Web/BFF/后端/数据库 | 7 例通过，0 跳过/失败/重试 | 真实菜单进入新增/筛选/详情/编辑/发布拒绝/删除/历史撤回修订/观察角色；[runner](./evidence/announcement-s1-2026-10-24/browser-results.json) |
+| 视觉与交互 | 9 场景，15 张最终原图逐一打开复核 | `agent-vision`，桌面 1280×720、zh-CN，部分为控件裁图；[矩阵与逐图记录](./evidence/announcement-s1-2026-10-24/manifest.md) |
+| 类型与内部契约 | `pnpm typecheck`、生成器 `--check`、契约工具 38 例通过 | [捕获快照比较](./evidence/announcement-s1-2026-10-24/openapi-drift.json)；只证明捕获生产者契约一致，不代表所有 API 已端到端测试 |
 | 数据迁移 | 141 条 Flyway 新库迁移/validate、生成快照漂移检查通过 | 真实 PostgreSQL 升级夹具与不可变触发器负向实验见下文 |
 
 浏览器/API 共同轮次为 `2026-10-24T12-13-40-542Z-79a0bbf5-3751-4ecc-9015-f762b65d89ad`，稳定 runtime `announcement-management`，OSS base + `core-announcement`，slot 1。浏览器为 Playwright 1.60 Chromium / macOS。服务从干净源绑定启动；测试过程中不更换业务实现。API 补验发生在同一实例，新增的生成声明不影响其运行时代码。
@@ -36,15 +36,15 @@ updated: 2026-10-24
 - `web-admin/tests/api/announcement-controlled-writes.spec.ts`：3 个 HTTP 场景。
 - `platform/platform-app/src/test/java/com/auraboot/framework/workbench/AnnouncementControllerIntegrationTest.java`：真实 Spring/PG 事务集成。
 - `scripts/tests/announcement-migration-upgrade.sql`：在事务内构造旧表、应用实际迁移并 ROLLBACK。
-- [动作分母与证据 manifest](../e2e/evidence/announcement-s1-2026-10-24/action-manifest.json)、[机器解析报告](../e2e/evidence/announcement-s1-2026-10-24/report.html)。报告保留 7 个后续切片未验证行；25 个通过行含 10 个 runner 场景和 15 张视觉原图，不能解读为 25 个测试或公告功能 100% 完成。
+- [动作分母与证据 manifest](./evidence/announcement-s1-2026-10-24/action-manifest.json)、[机器解析报告](./evidence/announcement-s1-2026-10-24/report.html)。报告保留 7 个后续切片未验证行；25 个通过行含 10 个 runner 场景和 15 张视觉原图，不能解读为 25 个测试或公告功能 100% 完成。
 
 ## 覆盖、权限和反证
 
 **feature_action_matrix：** 六个命令均有实际结果断言：create/update/delete/publish（预期拒绝）由 API/浏览器覆盖；archive/republish 由历史公告浏览器场景覆盖。列表、表单、详情经产品菜单进入。静态收集器仅识别 6 个命令和 3 个页面，不能推导部分动态命令地址与菜单跳转；保留其盲区，以精确 runner 证据对账，未将静态扫描计为执行。
 
-**permission_negative：** 真实创建观察角色、权限和用户，经 BFF 登录后隐藏新建及修改入口，直接命令返回 403；通用动态写入口返回拒绝。目标授权在幂等结果读取前重查当前身份和动作，不因旧缓存或 tombstone 绕过撤权。另有同一全局用户跨租户目标的按需 HTTP 探针，断言对方记录和审计不变，返回业务拒绝；[探针结果](../e2e/evidence/announcement-s1-2026-10-24/tenant-isolation-probe.json)。该探针来自上一真实运行轮次，业务 Java 代码一致；不计入本轮 3 个 API 用例。
+**permission_negative：** 真实创建观察角色、权限和用户，经 BFF 登录后隐藏新建及修改入口，直接命令返回 403；通用动态写入口返回拒绝。目标授权在幂等结果读取前重查当前身份和动作，不因旧缓存或 tombstone 绕过撤权。另有同一全局用户跨租户目标的按需 HTTP 探针，断言对方记录和审计不变，返回业务拒绝；[探针结果](./evidence/announcement-s1-2026-10-24/tenant-isolation-probe.json)。该探针来自上一真实运行轮次，业务 Java 代码一致；不计入本轮 3 个 API 用例。
 
-**backend_evidence：** 单测逐类计数可追溯；[JaCoCo 记录](../e2e/evidence/announcement-s1-2026-10-24/backend-coverage-summary.json)为 unit 行覆盖：生命周期 145/168（86.3%）、模型守卫 59/65（90.8%）、目标范围 145/165（87.9%）、处理阶段 393/486（80.9%）。**integration_coverage：未测量真实栈行覆盖**，没有用这些 unit 百分比声称集成覆盖达标。
+**backend_evidence：** 单测逐类计数可追溯；[JaCoCo 记录](./evidence/announcement-s1-2026-10-24/backend-coverage-summary.json)为 unit 行覆盖：生命周期 145/168（86.3%）、模型守卫 59/65（90.8%）、目标范围 145/165（87.9%）、处理阶段 393/486（80.9%）。**integration_coverage：未测量真实栈行覆盖**，没有用这些 unit 百分比声称集成覆盖达标。
 
 **artifact_evidence：** 新库实际执行 141 条迁移，生成 schema-current.sql 后独立漂移检查和 Flyway validate 通过。旧库夹具验证 active/archived 与 priority 映射、migration_cohort 来源、停用成员排除、不可变版本/审计、跨租户及跨公告版本指针拒绝。负向实验只在夹具事务内关闭版本不可变触发器，测试按预期以 “Version mutation was permitted” 失败（exit 3）；恢复原夹具后再次通过且无残留测试 schema。没有在产品库关闭触发器或伪造历史已读/审批事实。
 

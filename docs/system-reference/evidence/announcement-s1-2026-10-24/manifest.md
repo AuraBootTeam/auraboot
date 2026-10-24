@@ -1,3 +1,10 @@
+---
+type: system-reference
+status: active
+created: 2026-10-24
+updated: 2026-10-24
+---
+
 # S1 screenshot and action evidence
 
 Final UI run: `2026-10-24T12-13-40-542Z-79a0bbf5-3751-4ecc-9015-f762b65d89ad`; tested source `bc5a0818ec107325eb18925c0dc0a9e735ce79db`. Chromium, locale zh-CN, desktop 1280×720 (some images are element crops). Finite CSS animations were disabled for final capture. All 15 original images were opened and reviewed by agent-vision; this is not human usability testing.

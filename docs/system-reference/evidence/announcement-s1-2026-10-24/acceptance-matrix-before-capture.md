@@ -1,3 +1,10 @@
+---
+type: system-reference
+status: active
+created: 2026-10-24
+updated: 2026-10-24
+---
+
 | ID | 功能 | 行动点 | 状态/分支 | 验收要点 | 驱动 | 截图 ID | 状态 |
 |---|---|---|---|---|---|---|---|
 | S1-UI-01 | 公告 S1 | 新建草稿 | form/happy | 创建表单和引导；提交仅业务字段 | announcement-lifecycle / controlled-writes | create-form-guidance.png | new |
