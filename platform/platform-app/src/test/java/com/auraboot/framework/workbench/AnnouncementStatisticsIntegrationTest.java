@@ -265,7 +265,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.export")).isFalse();
             http.perform(get("/api/exports/domain/"+pid)).andExpect(status().isForbidden());
             var denied=http.perform(get("/api/exports/domain/"+pid+"/download")).andExpect(status().isForbidden()).andReturn().getResponse();
-            assertThat(denied.getContentAsByteArray()).doesNotStartWith((byte)0xef,(byte)0xbb,(byte)0xbf);
+            assertThat(new String(denied.getContentAsByteArray(),java.nio.charset.StandardCharsets.UTF_8)).doesNotStartWith("\uFEFF");
             assertThatThrownBy(()->legacyExports.getTaskStatus(taskPid)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             assertThat(legacyExports.getRecentTasks("domain:"+AnnouncementStatisticsExportSource.CODE,100)).isEmpty();
             assertThat(executionJobs.recent(100)).noneMatch(job->taskPid.equals(job.getPid()));
