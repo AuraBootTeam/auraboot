@@ -304,8 +304,7 @@ export const SmartWaterfallChart: React.FC<SmartWaterfallChartProps> = ({
   if (isEmpty) {
     return (
       <ChartEmptyState
-        title={title || 'No waterfall data yet'}
-        description="This chart will render once the first matching records are created."
+        title={title}
         variant="bar"
         className={className}
       />
