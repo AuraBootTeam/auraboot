@@ -1,3 +1,4 @@
+import { approvalDecisionFeedback } from './approvalDecisionFeedback';
 import { agentFetch } from '~/shared/services/application-capabilities';
 import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 /**
@@ -1037,7 +1038,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       // Update confirm card to show "executing"
       dispatch({
         type: 'update_tool_message',
-        payload: { toolId, updates: { type: 'tool_executed', content: '正在执行...' } },
+        payload: { toolId, updates: { type: 'tool_loading', content: t('ai.approval.submitting', undefined, locale.startsWith('zh') ? '正在提交审批决定…' : 'Submitting approval decision…') } },
       });
       dispatch({ type: 'set_loading', payload: true });
 
@@ -1174,18 +1175,22 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               dispatch({ type: 'set_loading', payload: false });
             },
             onError: (err: string, traceId?: string) => {
+              const feedback = approvalDecisionFeedback(err);
+              dispatch({ type: 'update_tool_message', payload: { toolId, updates: { type: 'tool_cancelled', content: t('ai.approval.notCompleted', undefined, locale.startsWith('zh') ? '审批未完成' : 'Approval not completed') } } });
               dispatch({
                 type: 'update_message',
-                payload: { id: botMsgId, content: err, type: 'error', traceId },
+                payload: { id: botMsgId, content: t(feedback.key, undefined, locale.startsWith('zh') ? feedback.zh : feedback.en), type: 'error', traceId },
               });
               dispatch({ type: 'set_loading', payload: false });
             },
           },
         );
       } catch (e: any) {
+        const feedback = approvalDecisionFeedback(e.message || 'Execute failed');
+        dispatch({ type: 'update_tool_message', payload: { toolId, updates: { type: 'tool_cancelled', content: t('ai.approval.notCompleted', undefined, locale.startsWith('zh') ? '审批未完成' : 'Approval not completed') } } });
         dispatch({
           type: 'update_message',
-          payload: { id: botMsgId, type: 'error', content: e.message || 'Execute failed' },
+          payload: { id: botMsgId, type: 'error', content: t(feedback.key, undefined, locale.startsWith('zh') ? feedback.zh : feedback.en) },
         });
         dispatch({ type: 'set_loading', payload: false });
       }
@@ -1193,30 +1198,44 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     [state.currentConversationId, state.sessionId, state.messages, locale, t],
   );
 
-  // Cancel a tool execution (user rejected)
+  // Cancellation is acknowledged only after the existing server decision path completes.
   const cancelTool = useCallback(
     async (toolId: string) => {
-      dispatch({
-        type: 'update_tool_message',
-        payload: { toolId, updates: { type: 'tool_cancelled', content: '操作已取消' } },
-      });
-      // Phase B.6: same pendingTurnId lookup pattern as confirmTool.
-      // C-5 T7: include skill_preview_card so skill cancels echo back too.
       const confirmCard = state.messages.find(
-        (m) =>
-          (m.type === 'confirm_card' || m.type === 'skill_preview_card') && m.toolId === toolId,
+        (m) => (m.type === 'confirm_card' || m.type === 'skill_preview_card') && m.toolId === toolId,
       );
-      const pendingTurnId = confirmCard?.pendingTurnId ?? '';
-      if (!pendingTurnId) {
-        return; // Already-handled or missing card; nothing to cancel server-side.
+      const pendingTurnId = confirmCard?.pendingTurnId;
+      const failDecision = (error: string, traceId?: string) => {
+        const feedback = approvalDecisionFeedback(error);
+        dispatch({ type: 'update_tool_message', payload: { toolId, updates: {
+          type: 'error', content: t(feedback.key, undefined, locale.startsWith('zh') ? feedback.zh : feedback.en), traceId,
+        } } });
+        dispatch({ type: 'set_loading', payload: false });
+      };
+      if (!pendingTurnId) { failDecision('Missing pending approval'); return; }
+      dispatch({ type: 'update_tool_message', payload: { toolId, updates: {
+        type: 'tool_loading', content: t('ai.approval.cancelling', undefined, locale.startsWith('zh') ? '正在提交取消决定…' : 'Submitting cancellation…'),
+      } } });
+      dispatch({ type: 'set_loading', payload: true });
+      try {
+        await auraBotApi.executeStream(
+          { pendingTurnId, toolId, confirmed: false },
+          {
+            onChunk: () => {},
+            onDone: () => {
+              dispatch({ type: 'update_tool_message', payload: { toolId, updates: {
+                type: 'tool_cancelled', content: t('ai.approval.cancelled', undefined, locale.startsWith('zh') ? '操作已取消' : 'Operation cancelled'),
+              } } });
+              dispatch({ type: 'set_loading', payload: false });
+            },
+            onError: failDecision,
+          },
+        );
+      } catch (error: unknown) {
+        failDecision(error instanceof Error ? error.message : 'Cancellation failed');
       }
-      // Fire and forget — tell backend user cancelled (DENIED).
-      auraBotApi.executeStream(
-        { pendingTurnId, toolId, confirmed: false },
-        { onChunk: () => {}, onDone: () => {}, onError: () => {} },
-      );
     },
-    [state.messages],
+    [state.messages, locale, t],
   );
 
   // Keyboard shortcuts

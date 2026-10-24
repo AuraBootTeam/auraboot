@@ -152,6 +152,24 @@ public class AgentRunTerminalStore {
     @Transactional
     public boolean failPendingApproval(Long tenantId, String runPid, String taskPid, String reason) {
         var now = java.time.LocalDateTime.now();
+        // Named chat uses its turn ID as the approval run reference, without a durable run row.
+        // Require the server-owned task provenance; a missing durable run alone is never enough.
+        var chatTasks = jdbc.queryForList("""
+                SELECT t.task_status FROM ab_agent_task t
+                WHERE t.tenant_id = ? AND t.pid = ? AND t.deleted_flag = FALSE
+                  AND t.assignee_type = 'ai'
+                  AND t.input_data::jsonb->>'turnId' = ?
+                  AND t.input_data::jsonb->>'conversationId' IS NOT NULL
+                  AND t.input_data::jsonb->>'agentCode' = t.assignee_id
+                  AND NOT EXISTS (SELECT 1 FROM ab_agent_run r WHERE r.tenant_id = ? AND r.pid = ?)
+                FOR UPDATE OF t
+                """, tenantId, taskPid, runPid, tenantId, runPid);
+        if (chatTasks.size() == 1) {
+            return jdbc.update("""
+                    UPDATE ab_agent_task SET task_status = 'failed', completed_at = ?, updated_at = ?
+                    WHERE tenant_id = ? AND pid = ? AND task_status = 'in_progress'
+                    """, now, now, tenantId, taskPid) == 1;
+        }
         return completeScoped(tenantId, runPid, taskPid,
                 Map.of("run_status", "failed", "error_message", reason, "completed_at", now, "updated_at", now),
                 Map.of("task_status", "blocked", "updated_at", now), () -> {}, true);

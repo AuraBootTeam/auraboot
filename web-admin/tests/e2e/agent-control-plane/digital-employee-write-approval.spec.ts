@@ -255,7 +255,8 @@ if (approvalFixture) {
         expect(await recordRows()).toEqual([]);
         if (fixture.mode && fixture.mode !== 'approve') {
           const mode = fixture.mode;
-          expect(['cancel', 'expired', 'unauthorized']).toContain(mode);
+          expect(['cancel', 'expired', 'unauthorized', 'unauthorized-cancel']).toContain(mode);
+          const isCancel = mode === 'cancel' || mode === 'unauthorized-cancel';
           const screenshot = `APPROVAL-${mode.toUpperCase()}`;
           await page.screenshot({ path: `${output}/${screenshot}-PENDING.png`, fullPage: true });
           const decisionResponse = page.waitForResponse(
@@ -264,14 +265,14 @@ if (approvalFixture) {
               r.request().method() === 'POST',
           );
           await confirm
-            .getByTestId(mode === 'cancel' ? 'aurabot-confirm-cancel' : 'aurabot-confirm-approve')
+            .getByTestId(isCancel ? 'aurabot-confirm-cancel' : 'aurabot-confirm-approve')
             .click();
           const decision = await decisionResponse;
           expect(decision.status()).toBe(200);
           const payload = decision.request().postDataJSON();
           expect(payload).toMatchObject({
             pendingTurnId: pending[0].pid,
-            confirmed: mode !== 'cancel',
+            confirmed: !isCancel,
           });
           const responseText = await decision.text();
           if (mode === 'cancel') {
@@ -297,7 +298,7 @@ if (approvalFixture) {
                 )
               ).rows;
               expect(expired).toEqual([{ expired: true }]);
-              await expect(chat).toContainText('该审批已过期，请重新发起操作。');
+              await expect(chat).toContainText('该审批已过期或已处理，请刷新后重新查看。');
             } else {
               expect(responseText).toContain('Insufficient permission to decide this approval');
               expect(String(fixture.approverUserId)).not.toBe(String(fixture.userId));
@@ -313,7 +314,7 @@ if (approvalFixture) {
           expect(terminal).toHaveLength(1);
           expect(terminal[0].consumed_at).toBeNull();
           expect(terminal[0].approval_status).not.toBe('approved');
-          if (mode === 'unauthorized') expect(terminal[0].approval_status).toBe('pending');
+          if (mode.startsWith('unauthorized')) expect(terminal[0].approval_status).toBe('pending');
           expect(await recordRows()).toEqual([]);
           await page.screenshot({ path: `${output}/${screenshot}.png`, fullPage: true });
           await page.reload();
@@ -327,7 +328,9 @@ if (approvalFixture) {
             data: { ...payload, confirmed: true },
           });
           expect(await replay.text()).toMatch(
-            mode === 'unauthorized' ? /Insufficient permission/ : /expired|no longer pending/,
+            mode.startsWith('unauthorized')
+              ? /Insufficient permission/
+              : /expired|no longer pending/,
           );
           expect(await recordRows()).toEqual([]);
           await info.attach('approval-boundary-identities', {
