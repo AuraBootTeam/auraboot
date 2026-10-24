@@ -484,6 +484,10 @@ export interface TableConfig {
 }
 
 export interface PaginationConfig {
+  /** Explicit opt-in for paged API data sources on a table block. */
+  mode?: 'server';
+  /** Use the declared response field; request parameters remain pageNum/pageSize. */
+  pageField?: 'pageNum' | 'current';
   pageSize?: number;
   pageSizeOptions?: number[];
   showTotal?: boolean;

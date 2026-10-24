@@ -1,5 +1,10 @@
 [
   {
+    "key": "table.pagination.invalid_response",
+    "zh-CN": "分页信息不可用，请刷新后重试。",
+    "en-US": "Page information is unavailable. Refresh to try again."
+  },
+  {
     "key": "file.download.failed",
     "zh-CN": "文件下载失败，请刷新并检查文件有效期及当前访问权限。",
     "en-US": "Could not download the file. Refresh and check its expiry and current access."

@@ -64,6 +64,7 @@ import { FormButtonsBlockRenderer } from '../FormButtonsBlockRenderer';
 import { ToolbarBlockRenderer } from '../ToolbarBlockRenderer';
 import { TableBlockRenderer } from '../TableBlockRenderer';
 import { SelectionInfoBlockRenderer } from '../SelectionInfoBlockRenderer';
+import { readServerTablePage, ServerTablePageError } from '../serverTablePage';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 
 // ---------------------------------------------------------------------------
@@ -1337,5 +1338,86 @@ describe('SelectionInfoBlockRenderer', () => {
     expect(getByTestId('selection-info-title')).toHaveTextContent('Selected record');
     expect(getByTestId('selection-info-count')).toHaveTextContent('1');
     expect(getByTestId('selection-info-label')).toHaveTextContent('Copper audit line');
+  });
+});
+
+
+describe('server-paged table contract', () => {
+  const rows = (start: number, count: number) => Array.from({ length: count }, (_, i) => ({ pid: `row-${start + i}`, name: `Person ${start + i}` }));
+  const block = { type: 'table', dataSource: 'recipients', table: { columns: [{ field: 'name', label: 'Name' }], pagination: { mode: 'server' } } };
+  const fixture = () => {
+    let page: unknown = { records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 };
+    let state: { loading: boolean; error: unknown } = { loading: false, error: null };
+    const fetch = vi.fn().mockResolvedValue(undefined);
+    const reload = vi.fn();
+    const manager = { getData: () => page, getState: () => state, has: () => true, register: vi.fn(), fetch, reload };
+    const runtime = makeRuntime({ getDataSourceManager: () => manager });
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    return { ...view, fetch, reload, update: (next: unknown, nextState = { loading: false, error: null } as typeof state) => {
+      page = next; state = nextState; view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    } };
+  };
+
+  it('requests the selected page and accepts navigation only from server metadata', () => {
+    const view = fixture();
+    fireEvent.click(view.getByRole('button', { name: '2', exact: true }));
+    expect(view.fetch).toHaveBeenLastCalledWith('recipients', { pageNum: 2, pageSize: 20 }, { force: false });
+    expect(view.getByText('Person 1')).toBeInTheDocument();
+    expect(view.queryByText('Person 21')).not.toBeInTheDocument();
+    view.update({ records: rows(21, 20), pageNum: 2, pageSize: 20, total: 45 });
+    expect(view.queryByText('Person 1')).not.toBeInTheDocument();
+    expect(view.getByText('Person 21')).toBeInTheDocument();
+    fireEvent.change(view.getByRole('combobox'), { target: { value: '50' } });
+    expect(view.fetch).toHaveBeenLastCalledWith('recipients', { pageNum: 1, pageSize: 50 }, { force: false });
+  });
+
+  it('disables navigation while a page request is loading', () => {
+    const view = fixture();
+    view.update({ records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 }, { loading: true, error: null });
+    expect(view.getByRole('button', { name: '2', exact: true })).toBeDisabled();
+    expect(view.getByRole('combobox')).toBeDisabled();
+    expect(view.getByTestId('table-server-pagination')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('preserves a transiently failed page and retries the exact attempted parameters', () => {
+    const view = fixture();
+    fireEvent.click(view.getByRole('button', { name: '3', exact: true }));
+    view.update({ records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 }, { loading: false, error: { statusCode: 503, message: 'Temporarily unavailable' } });
+    expect(view.getByText('Person 1')).toBeInTheDocument();
+    expect(view.getByTestId('table-stale-state')).toBeInTheDocument();
+    fireEvent.click(view.getByTestId('table-stale-retry'));
+    expect(view.fetch).toHaveBeenLastCalledWith('recipients', { pageNum: 3, pageSize: 20 }, { force: true });
+    expect(view.reload).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 403])('hides preserved rows and pagination after access failure %s', statusCode => {
+    const view = fixture();
+    view.update({ records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 }, { loading: false, error: { statusCode, message: 'Access denied' } });
+    expect(view.getByTestId(`table-error-state-${statusCode}`)).toBeInTheDocument();
+    expect(view.queryByText('Person 1')).not.toBeInTheDocument();
+    expect(view.queryByTestId('table-server-pagination')).not.toBeInTheDocument();
+  });
+
+  it('rejects a fabricated empty page instead of displaying a successful empty state', () => {
+    const view = fixture();
+    view.update({ records: [], pageNum: 1, pageSize: 20, total: 45 });
+    expect(view.getByTestId('table-page-contract-error')).toBeInTheDocument();
+    expect(view.queryByTestId('table-server-pagination')).not.toBeInTheDocument();
+    expect(view.queryByText('Person 1')).not.toBeInTheDocument();
+  });
+
+  it('accepts an explicitly empty result and the partial last page', () => {
+    expect(readServerTablePage({ records: [], pageNum: 1, pageSize: 20, total: 0 })).toEqual({ current: 1, pageSize: 20, total: 0 });
+    expect(readServerTablePage({ records: rows(41, 5), pageNum: 3, pageSize: 20, total: 45 })).toEqual({ current: 3, pageSize: 20, total: 45 });
+    expect(readServerTablePage({ records: rows(1, 1), current: 1, pageSize: 20, total: 1 }, 'current').total).toBe(1);
+  });
+
+  it.each([
+    [], { records: [], pageNum: 0, pageSize: 20, total: 0 },
+    { records: [], pageNum: 2, pageSize: 20, total: 0 },
+    { records: [null], pageNum: 1, pageSize: 20, total: 1 },
+    { records: [], pageNum: 1, pageSize: 20, total: '0' },
+  ])('rejects malformed or out-of-range server metadata: %j', page => {
+    expect(() => readServerTablePage(page)).toThrow(ServerTablePageError);
   });
 });
