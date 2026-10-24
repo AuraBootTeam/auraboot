@@ -157,7 +157,7 @@ the original review behavior; pause idle services through their product owner.
 | `kb-ingestion-golden-run.sh` | 0 | 2026-07-13 | kb-ingestion-golden-run.sh — one command, whole knowledge-ingestion golden, exit code = verdict. |
 | `local-pr-gate.sh` | 0 | 2026-07-18 | Local replacement for the required GitHub status checks. |
 | `collab-trio-golden-run.sh` | 0 | 2026-07-25 | collab-trio-golden-run.sh — self-contained browser golden runner for the collaboration trio: Inbox, notification centre, IM/agent mentions. |
-| `oss-backend-unit-ci.sh` | 1 | 2026-10-24 | Complete OSS Gradle test/bootstrap tasks with owned PostgreSQL/Redis/Kafka, fixed JVM arguments and original cgroup headroom admission. |
+| `oss-backend-unit-ci.sh` | 1 | 2026-10-24 | Complete OSS Gradle test/bootstrap tasks with owned PostgreSQL/Redis/Kafka, fixed JVM arguments and ancestor-cgroup protected working-set admission. |
 | `oss-backend-nightly-coverage.sh` | 0 | 2026-09-12 | Linux CI entrypoint for full backend coverage evidence. |
 | `oss-init-env-only.sh` | 0 | 2026-05-11 | AuraBoot Quick Environment Initialization |
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
@@ -197,7 +197,7 @@ the original review behavior; pause idle services through their product owner.
 | `dev/lib/health.sh` | 3 | 2026-05-22 | Sourceable health helpers for per-worktree dev stacks. |
 | `dev/lib/process-manager.sh` | 3 | 2026-05-22 | Sourceable process helpers for per-worktree host dev services. |
 | `lib/oss-ci-subnet.mjs` | 0 | 2026-10-04 | Select a non-overlapping subnet for isolated OSS CI Docker networks. |
-| `lib/backend-ci-resources.mjs` | contract | 2026-10-24 | Admit the shared daemon/test JVM budget against original cgroup soft and hard ancestors; emit immutable task-owned plan and fixed arguments. |
+| `lib/backend-ci-resources.mjs` | contract | 2026-10-24 | Admit the fixed JVM budget against every original cgroup soft/hard ancestor; credit only conservatively reclaimable inactive file pages, preserve raw/protected accounting, reject incomplete statistics, emit a task-owned plan. |
 | `lib/multi-worktree-guard.sh` | 5 | 2026-05-22 | Multi-worktree pre-flight guard |
 | `lib/plugin-config.mjs` | 3 | 2026-07-23 | Read a plugin's config regardless of how it is laid out on disk. |
 | `lib/repo-root.mjs` | 5 | 2026-07-23 | Resolve the repo the test-system gates should run against. |

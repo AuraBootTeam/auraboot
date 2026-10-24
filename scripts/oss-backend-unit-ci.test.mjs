@@ -359,6 +359,7 @@ function memoryFixture(t) {
     const folder=path.join(root,directory);mkdirSync(folder,{recursive:true});
     for(const [file,value] of Object.entries({'memory.current':current,'memory.high':high,'memory.max':max}))
       writeFileSync(path.join(folder,file),String(value*1024**3)+'\n');
+    writeFileSync(path.join(folder,'memory.stat'),'file 0\ninactive_file 0\nfile_dirty 0\nfile_writeback 0\nfile_mapped 0\nshmem 0\n');
   }
   return {root,membership:'0::/parent/agent\n'};
 }
@@ -375,6 +376,36 @@ test('CI JVM admission accounts for every finite ancestor soft and hard limit be
   assert.equal(inspectMemoryBudget(input).admitted,true);
   writeFileSync(path.join(input.root,'parent/agent/memory.current'),String(5*1024**3));
   assert.equal(inspectMemoryBudget(input).admitted,false,'existing child usage must be included');
+});
+test('only clean unmapped inactive file pages release budget; anonymous and protected pages still block',t=>{
+  const input=memoryFixture(t),folder=path.join(input.root,'parent/agent'),gib=1024**3;
+  writeFileSync(path.join(folder,'memory.current'),String(6*gib));
+  const stats=overrides=>Object.entries({file:4*gib,inactive_file:3*gib,file_dirty:0,file_writeback:0,file_mapped:0,shmem:0,...overrides})
+    .map(([key,value])=>`${key} ${value}`).join('\n')+'\n';
+  writeFileSync(path.join(folder,'memory.stat'),stats({}));
+  let plan=inspectMemoryBudget(input);assert.equal(plan.admitted,true);
+  assert.equal(plan.requiredBytes,String(6*gib));assert.equal(plan.accounting,'protected-working-set-v1');
+  const soft=plan.limits.find(row=>row.directory===folder&&row.file==='memory.high');
+  assert.equal(soft.rawAvailableBytes,String(4*gib));assert.equal(soft.reclaimableFileBytes,String(3*gib));
+  assert.equal(soft.protectedBytes,String(3*gib));assert.equal(soft.availableBytes,String(7*gib));
+  for(const key of ['file_dirty','file_writeback','file_mapped','shmem']) {
+    writeFileSync(path.join(folder,'memory.stat'),stats({[key]:3*gib}));
+    assert.equal(inspectMemoryBudget(input).admitted,false,`${key} pages cannot fund the JVM reservation`);
+  }
+  writeFileSync(path.join(folder,'memory.stat'),stats({file:0,inactive_file:0}));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'anonymous residency remains occupied');
+  writeFileSync(path.join(folder,'memory.stat'),stats({}));
+  writeFileSync(path.join(input.root,'parent/memory.current'),String(13*gib));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'child file cache cannot fund a busy parent');
+});
+test('missing, duplicate, malformed or inconsistent file accounting cannot assume reclaimable capacity',t=>{
+  const input=memoryFixture(t),file=path.join(input.root,'parent/agent/memory.stat');
+  const original=readFileSync(file,'utf8');
+  for(const invalid of [original.replace('file_dirty 0\n',''),original+'file 0\n',original.replace('file 0','file max'),
+    original.replace('inactive_file 0','inactive_file 1')]) {
+    writeFileSync(file,invalid);assert.throws(()=>inspectMemoryBudget(input),/kernel.*statistics/);
+  }
+  rmSync(file);assert.throws(()=>inspectMemoryBudget(input),/ENOENT/);
 });
 test('unknown or incomplete memory boundaries fail closed without assuming an unlimited worker',t=>{
   const input=memoryFixture(t);
