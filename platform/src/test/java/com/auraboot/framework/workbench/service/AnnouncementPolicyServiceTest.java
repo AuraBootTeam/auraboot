@@ -53,4 +53,14 @@ class AnnouncementPolicyServiceTest {
         service.verifyAttachments(policy,null,false);verify(files,never()).lockRetention("file");
         service.verifyAttachments(policy,null,true);verify(files).lockRetention("file");
     }
+    @Test void normalizedCommandTimeRemainsIsoAcrossStoredPolicyRoundTrip() throws Exception {
+        var instant=java.time.Instant.parse("2030-10-26T04:00:00Z");
+        when(records.draftSettings(1L,"notice")).thenReturn("{}");
+        var encoded=service.fromForm(Map.of("scheduled_at",instant,"ack_required",true),"notice");
+        var persisted=new ObjectMapper().readValue(encoded,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){});
+        assertThat(persisted.get("scheduledAt")).isEqualTo(instant.toString());
+        assertThat(service.parseStored(persisted).scheduledAt()).isEqualTo(instant);
+        when(records.draftSettings(1L,"notice")).thenReturn(encoded);
+        assertThat(service.fromForm(Map.of("ack_days",14),"notice")).contains(instant.toString());
+    }
 }

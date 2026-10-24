@@ -40,7 +40,10 @@ public final class ApprovalContract {
             String instancePid,DefinitionRef definition,String terminalState,String resultId,
             long stateRevision,Instant decidedAt,String decisionReasonCode) {
         public TerminalResult {
-            text(submissionId);Objects.requireNonNull(businessRef);digest(snapshotHash);text(instancePid);Objects.requireNonNull(definition);
+            text(submissionId);Objects.requireNonNull(businessRef);digest(snapshotHash);Objects.requireNonNull(definition);
+            if(instancePid==null && !("withdrawn".equals(terminalState) && "APPLICANT_WITHDRAWN_BEFORE_START".equals(decisionReasonCode)))
+                throw new IllegalArgumentException("Approval instance is required after engine start");
+            if(instancePid!=null) text(instancePid);
             if(!TERMINAL_STATES.contains(terminalState))throw new IllegalArgumentException("Explicit approval terminal state required");
             text(resultId);if(stateRevision<1)throw new IllegalArgumentException("Approval result revision must be positive");
             Objects.requireNonNull(decidedAt);text(decisionReasonCode);

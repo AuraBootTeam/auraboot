@@ -15,7 +15,7 @@ import java.util.*;
 public class AnnouncementCodec {
     private final ObjectMapper json;
     public String encode(Object value) {
-        try { return json.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsString(value); }
+        try { return json.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsString(value); }
         catch(JsonProcessingException error) { throw new IllegalArgumentException("Invalid announcement JSON",error); }
     }
     public Map<String,Object> object(String value) {

@@ -87,6 +87,7 @@ public class AnnouncementPolicyService {
             if(key==null) return;
             if(field.startsWith("audience_")) audience.put(key,value);
             else if("attachments".equals(field)) values.put(key,uploadedFilePids(value));
+            else if("scheduled_at".equals(field) && value instanceof Instant instant) values.put(key,instant.toString());
             else values.put(key,value);
         });
         if("all".equals(input.get("audience_kind"))) {
@@ -159,6 +160,7 @@ public class AnnouncementPolicyService {
 
     public String encode(Policy policy) {
         Map<String,Object> stored=json.convertValue(policy,new com.fasterxml.jackson.core.type.TypeReference<>(){});
+        stored.put("scheduledAt",policy.scheduledAt()==null ? null : policy.scheduledAt().toString());
         List<Map<String,Object>> metadata=new ArrayList<>();
         for(String pid:policy.attachmentPids()) {
             FileEntity file=files.findByPid(pid);
