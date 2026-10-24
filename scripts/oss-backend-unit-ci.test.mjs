@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
 import YAML from 'yaml';
+import {inspectMemoryBudget,resourceArguments} from './lib/backend-ci-resources.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.join(here, 'oss-backend-unit-ci.sh');
@@ -349,4 +350,61 @@ test('bootstrap fixture requires fresh state and preserves immutable tenant bind
   const build = readFileSync(gradleBuild, 'utf8');
   assert.match(build, /systemProperty 'allure.results.directory', retainedAllure/);
   assert.match(source, /warning: unable to copy Allure results/);
+});
+
+function memoryFixture(t) {
+  const root=mkdtempSync(path.join(tmpdir(),'backend-memory-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  for(const [directory,current,high,max] of [['parent',2,16,18],['parent/agent',3,10,14]]) {
+    const folder=path.join(root,directory);mkdirSync(folder,{recursive:true});
+    for(const [file,value] of Object.entries({'memory.current':current,'memory.high':high,'memory.max':max}))
+      writeFileSync(path.join(folder,file),String(value*1024**3)+'\n');
+  }
+  return {root,membership:'0::/parent/agent\n'};
+}
+test('CI JVM admission accounts for every finite ancestor soft and hard limit before execution',t=>{
+  const input=memoryFixture(t),plan=inspectMemoryBudget(input);
+  assert.equal(plan.requiredBytes,String(6*1024**3));assert.equal(plan.admitted,true);
+  assert.equal(plan.limits.length,4);assert.equal(plan.kernelLimitsChanged,false);
+  assert.equal(plan.testDenominatorChanged,false);
+  writeFileSync(path.join(input.root,'parent/memory.current'),String(13*1024**3));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'parent soft limit must block even with free child capacity');
+  writeFileSync(path.join(input.root,'parent/memory.high'),'max');
+  assert.equal(inspectMemoryBudget(input).admitted,false,'parent hard limit must still block');
+  writeFileSync(path.join(input.root,'parent/memory.max'),'max');
+  assert.equal(inspectMemoryBudget(input).admitted,true);
+  writeFileSync(path.join(input.root,'parent/agent/memory.current'),String(5*1024**3));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'existing child usage must be included');
+});
+test('unknown or incomplete memory boundaries fail closed without assuming an unlimited worker',t=>{
+  const input=memoryFixture(t);
+  for(const membership of ['1:memory:/parent/agent','0::/../escape','0::/parent/agent\n0::/parent'])
+    assert.throws(()=>inspectMemoryBudget({...input,membership}));
+  writeFileSync(path.join(input.root,'parent/agent/memory.max'),'invalid');
+  assert.throws(()=>inspectMemoryBudget(input),/Invalid kernel/);
+  rmSync(path.join(input.root,'parent/agent/memory.max'));
+  assert.throws(()=>inspectMemoryBudget(input),/ENOENT/);
+});
+test('both original Gradle tasks receive the admitted argument vector without changing their cases or exit status',t=>{
+  const root=mkdtempSync(path.join(tmpdir(),'backend-jvm-arguments-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(path.join(root,'platform'));
+  const wrapper=path.join(root,'platform/gradlew');
+  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify(process.argv.slice(2)));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
+  const run=source.match(/run_backend_gradle\(\) \{[\s\S]*?\n\}/)?.[0];assert.ok(run);
+  const argv=resourceArguments();
+  const quoted=value=>"'"+value.replaceAll("'","'\\''")+"'";
+  const result=spawnSync('bash',['-c',`set -uo pipefail
+    AURA_OSS_CI_POSTGRES_PORT=25000 AURA_OSS_CI_REDIS_PORT=26000 AURA_OSS_CI_KAFKA_PORT=27000
+    BOOTSTRAP_DATABASE=aura_boot_bootstrap_contract ARTIFACTS=${quoted(root)}
+    RESOURCE_ARGUMENTS=(${argv.map(quoted).join(' ')})
+    ${run}
+    run_backend_gradle aura_boot --continue cleanTest test
+    run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
+  `],{cwd:root,encoding:'utf8',env:{PATH:process.env.PATH}});
+  assert.equal(result.status,23,result.stderr);
+  const rows=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(rows.length,2);
+  for(const row of rows){assert.deepEqual(row.slice(3,8),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
+  assert.deepEqual(rows[0].slice(8),['--continue','cleanTest','test']);
+  assert.deepEqual(rows[1].slice(8),['--continue','bootstrapBillingAccountTest']);
+  assert.doesNotMatch(rows.flat().join('\n'),/--tests|exclude|retry|ContextCache/);
 });

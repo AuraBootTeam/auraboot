@@ -261,6 +261,12 @@ if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
     '[oss-backend-unit-ci] DashScope live checks disabled; set AURA_CI_INCLUDE_DASHSCOPE_LIVE=1 to opt in'
 fi
 
+resource_arguments="$(node "$SCRIPT_DIR/lib/backend-ci-resources.mjs" "$ARTIFACTS/jvm-resource-plan.json")" \
+  || environment_invalid 'JVM memory admission failed; inspect jvm-resource-plan.json before retry'
+RESOURCE_ARGUMENTS=()
+while IFS= read -r option; do RESOURCE_ARGUMENTS+=("$option"); done <<< "$resource_arguments"
+[[ ${#RESOURCE_ARGUMENTS[@]} == 5 ]] || environment_invalid 'incomplete bounded JVM arguments'
+
 run_backend_gradle() {
   local database="$1"
   shift
@@ -286,7 +292,7 @@ AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 MAVEN_REPO_LOCAL="$ARTIFACTS/m2" \
 GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
-platform/gradlew --no-daemon -p platform "$@"
+platform/gradlew --no-daemon -p platform "${RESOURCE_ARGUMENTS[@]}" "$@"
 }
 
 run_backend_gradle aura_boot --continue cleanTest test
