@@ -31,7 +31,7 @@ public interface OutboxEventMapper {
             "status = CASE WHEN " + EXHAUSTED_CLAIM + " THEN 'failed' ELSE 'processing' END, " +
             "lease_owner = CASE WHEN " + EXHAUSTED_CLAIM + " THEN NULL ELSE #{leaseOwner} END, " +
             "lease_token = CASE WHEN " + EXHAUSTED_CLAIM + " THEN NULL ELSE #{leaseToken} END, " +
-            "lease_until = CASE WHEN " + EXHAUSTED_CLAIM + " THEN NULL ELSE #{leaseUntil} END, " +
+            "lease_until = CASE WHEN " + EXHAUSTED_CLAIM + " THEN NULL ELSE #{leaseUntil}::timestamptz END, " +
             "last_error = CASE WHEN o.status = 'processing' THEN 'Recovered expired dispatcher lease' " +
             "ELSE o.last_error END, claimed_at = NOW() ";
     String CLAIM_DEAD_LETTER = ") , dead_lettered AS (INSERT INTO ab_integration_dead_letter " +

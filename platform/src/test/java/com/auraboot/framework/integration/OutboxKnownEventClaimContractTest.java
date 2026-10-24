@@ -40,7 +40,7 @@ class OutboxKnownEventClaimContractTest {
         String sql=known(parameters()).getSql();
         assertThat(sql).contains("UPDATE ab_outbox o SET retry_count = CASE WHEN o.status = 'processing'",
                 "THEN LEAST(o.retry_count::bigint + 1, 2147483647)::integer ELSE o.retry_count END",
-                "THEN 'failed' ELSE 'processing' END", "THEN NULL ELSE ? END", "claimed_at = NOW()");
+                "THEN 'failed' ELSE 'processing' END", "THEN NULL ELSE ? END", "THEN NULL ELSE ?::timestamptz END", "claimed_at = NOW()");
         assertThat(sql).contains("FROM claimed WHERE status = 'failed' ON CONFLICT (outbox_id)",
                 "INSERT INTO ab_integration_dead_letter", "SELECT * FROM claimed");
         assertThat(sql).doesNotContain("payload =", "headers =", "command_code =", "event_source =");
