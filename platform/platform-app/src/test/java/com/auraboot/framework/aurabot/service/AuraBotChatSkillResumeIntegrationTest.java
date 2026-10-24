@@ -116,6 +116,8 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
         userId = getTestUser().getId();
         MetaContext.setContext(tenantId, userId, null, "it-c5-t6-user");
 
+        when(userPermissionService.getUserPermissionCodes(eq(userId)))
+                .thenAnswer(inv -> Set.copyOf(currentPermissions));
         when(userPermissionService.getUserPermissionIds(eq(userId)))
                 .thenAnswer(inv -> Set.of(1L));
         when(permissionMapper.findByIds(any())).thenAnswer(inv ->
