@@ -681,6 +681,21 @@ describe('ActionRegistry refresh', () => {
 });
 
 describe('ActionRegistry navigate / new / router.push handlers', () => {
+  it.each(['navigate', 'router.push'])('resolves %s from the accepted API result in the real flow', async action => {
+    const context = createExpressionContext();
+    const navigate = vi.fn();
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { snapshotToken: 'sealed-capture' } });
+    const manager = { getContext: () => context, updateState: (_scope: string, key: string, value: unknown) => { context.state[key] = value; } };
+    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: manager as any, scopeId: 'capture-route', dataSourceManager: {} as any,
+      schema: {} as any, getAllFormFields: () => [], navigate });
+    await flow.run([
+      { action: 'api.request', method: 'post', endpoint: '/api/statistics/captures', body: { state: 'all' }, target: 'capture' },
+      { action, args: { path: '/p/statistics/view/${state.capture.snapshotToken}' } },
+    ], { ...context, fetchResult } as any);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('/p/statistics/view/sealed-capture');
+  });
+
   it('navigate jumps to args.path', async () => {
     const navigate = vi.fn();
     await actionRegistry.execute('navigate', { navigate, args: { path: '/p/orders' } });
