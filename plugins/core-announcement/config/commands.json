@@ -126,5 +126,18 @@
     "executionConfig": {
       "requireIdempotencyKey": true
     }
+  },
+  {
+    "code": "announcement:update_policy",
+    "displayName:zh-CN": "保存公告政策",
+    "displayName:en": "Save announcement policy",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.policy_manage"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
   }
 ]

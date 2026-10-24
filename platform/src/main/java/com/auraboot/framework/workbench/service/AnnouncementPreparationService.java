@@ -49,6 +49,12 @@ public class AnnouncementPreparationService {
         snapshot.put("importance",record.getAnnouncementPriority());snapshot.put("pinned",Boolean.TRUE.equals(record.getPinned()));
         snapshot.put("expiresAt",record.getExpiresAt());snapshot.put("policy",frozenPolicy);
         snapshot.put("lateWindowMinutes",tenantPolicies.current().lateWindowMinutes());
+        var operating=tenantPolicies.current();
+        Map<String,Object> reminders=new TreeMap<>();
+        reminders.put("at",operating.reminderAt());reminders.put("limit",operating.automaticReminderLimit());
+        reminders.put("dedupeMinutes",operating.reminderDedupeMinutes());
+        reminders.put("quietStart",operating.quietStart());reminders.put("quietEnd",operating.quietEnd());
+        snapshot.put("reminderPolicy",reminders);
         snapshot.put("timezone",zone);snapshot.put("authorizationHash",authorization);
         snapshot.put("estimatedRecipientCount",audience.recipients().size());snapshot.put("estimatedAt",audience.resolvedAt());
         return new Prepared(policy,member,zone,authorization,now,planned,codec.encode(snapshot),codec.hash(snapshot),audience);
@@ -67,7 +73,7 @@ public class AnnouncementPreparationService {
 
     public String authorization(AnnouncementAudienceService.Resolution resolution,Map<String,Object> member) {
         Map<String,Object> proof=new TreeMap<>();proof.put("memberPid",member.get("member_pid"));
-        proof.put("tenantPolicyRevision",tenantPolicies.current().revision());
+        proof.put("tenantPolicyRevision",tenantPolicies.current().securityRevision());
         proof.put("scopeType",resolution.scopeType());proof.put("departments",resolution.allowedDepartmentPids());
         proof.put("grants",codec.object(releases.authorizationEvidence(MetaContext.getCurrentTenantId(),((Number)member.get("member_id")).longValue())));
         return codec.hash(proof);

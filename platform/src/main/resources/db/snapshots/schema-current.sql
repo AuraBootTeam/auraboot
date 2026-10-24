@@ -225,6 +225,16 @@ BEGIN RAISE EXCEPTION 'Submission audience estimates are immutable'; END $$;
 
 
 --
+-- Name: ab_announcement_reject_policy_audit_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_announcement_reject_policy_audit_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN RAISE EXCEPTION 'Announcement policy audit is immutable'; END $$;
+
+
+--
 -- Name: ab_application_channel_history_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3836,6 +3846,25 @@ CREATE TABLE public.ab_announcement_operation (
 
 
 --
+-- Name: ab_announcement_policy_audit; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_policy_audit (
+    pid character varying(36) NOT NULL,
+    tenant_id bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    actor_member_pid character varying(36) NOT NULL,
+    operation_id character varying(100) NOT NULL,
+    previous_revision integer NOT NULL,
+    resulting_revision integer NOT NULL,
+    previous_policy jsonb NOT NULL,
+    resulting_policy jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ab_announcement_policy_audit_check CHECK (((previous_revision >= 0) AND (resulting_revision = (previous_revision + 1))))
+);
+
+
+--
 -- Name: ab_announcement_recipient; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3909,6 +3938,16 @@ CREATE TABLE public.ab_announcement_tenant_policy (
     late_window_minutes integer DEFAULT 30 NOT NULL,
     updated_by bigint,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    security_revision integer DEFAULT 0 NOT NULL,
+    reminder_at time without time zone DEFAULT '09:00:00'::time without time zone NOT NULL,
+    automatic_reminder_limit integer DEFAULT 3 NOT NULL,
+    reminder_dedupe_minutes integer DEFAULT 60 NOT NULL,
+    quiet_start time without time zone,
+    quiet_end time without time zone,
+    CONSTRAINT ab_announcement_policy_dedupe CHECK (((reminder_dedupe_minutes >= 60) AND (reminder_dedupe_minutes <= 1440))),
+    CONSTRAINT ab_announcement_policy_quiet CHECK ((((quiet_start IS NULL) AND (quiet_end IS NULL)) OR ((quiet_start IS NOT NULL) AND (quiet_end IS NOT NULL) AND (quiet_start <> quiet_end)))),
+    CONSTRAINT ab_announcement_policy_reminder_limit CHECK (((automatic_reminder_limit >= 1) AND (automatic_reminder_limit <= 3))),
+    CONSTRAINT ab_announcement_policy_security_revision CHECK ((security_revision >= 0)),
     CONSTRAINT ab_announcement_tenant_policy_late_window_minutes_check CHECK (((late_window_minutes >= 1) AND (late_window_minutes <= 120))),
     CONSTRAINT ab_announcement_tenant_policy_revision_check CHECK ((revision > 0))
 );
@@ -20012,6 +20051,22 @@ ALTER TABLE ONLY public.ab_announcement
 
 
 --
+-- Name: ab_announcement_policy_audit ab_announcement_policy_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_policy_audit
+    ADD CONSTRAINT ab_announcement_policy_audit_pkey PRIMARY KEY (pid);
+
+
+--
+-- Name: ab_announcement_policy_audit ab_announcement_policy_audit_tenant_id_actor_user_id_operat_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_policy_audit
+    ADD CONSTRAINT ab_announcement_policy_audit_tenant_id_actor_user_id_operat_key UNIQUE (tenant_id, actor_user_id, operation_id);
+
+
+--
 -- Name: ab_announcement_recipient ab_announcement_recipient_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -31112,6 +31167,13 @@ CREATE TRIGGER ab_announcement_estimate_header_immutable BEFORE DELETE OR UPDATE
 --
 
 CREATE TRIGGER ab_announcement_estimate_immutable BEFORE DELETE OR UPDATE ON public.ab_announcement_audience_estimate FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_reject_estimate_mutation();
+
+
+--
+-- Name: ab_announcement_policy_audit ab_announcement_policy_audit_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_policy_audit_immutable BEFORE DELETE OR UPDATE ON public.ab_announcement_policy_audit FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_reject_policy_audit_mutation();
 
 
 --

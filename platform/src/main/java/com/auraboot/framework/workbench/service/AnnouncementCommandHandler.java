@@ -20,6 +20,7 @@ public class AnnouncementCommandHandler
     private final AnnouncementLifecycleService lifecycle;
     private final AnnouncementReleaseService releases;
     private final AnnouncementApprovalService approvals;
+    private final AnnouncementOperatingPolicyService operatingPolicies;
 
     @Override
     public String getHandlerName() {
@@ -34,6 +35,7 @@ public class AnnouncementCommandHandler
 
     @Override
     public long authorizeTarget(CommandHandlerContext context) {
+        if (AnnouncementOperatingPolicyService.UPDATE.equals(context.getCommandCode())) return operatingPolicies.authorizeTarget();
         if (isApproval(context.getCommandCode())) return approvals.authorizeTarget(context.getCommandCode(),context.getTargetRecordId());
         if (isRelease(context.getCommandCode())) return releases.authorizeTarget(context.getTargetRecordId());
         return lifecycle.authorizeTarget(context.getCommandCode(), context.getTargetRecordId());
@@ -49,6 +51,7 @@ public class AnnouncementCommandHandler
 
     @Override
     public Map<String, Object> execute(CommandHandlerContext context) {
+        if (AnnouncementOperatingPolicyService.UPDATE.equals(context.getCommandCode())) return operatingPolicies.execute(context.getPayload(),context.getClientRequestId());
         if (isApproval(context.getCommandCode())) return approvals.execute(context.getCommandCode(),context.getTargetRecordId(),
                 context.getPayload(),context.getClientRequestId(),context.getExpectedVersion());
         if (isRelease(context.getCommandCode())) return releases.execute(context.getCommandCode(),context.getTargetRecordId(),

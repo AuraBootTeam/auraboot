@@ -61,5 +61,12 @@
     "handlerClass": "announcementCommandHandler",
     "sequence": 10,
     "enabled": true
+  },
+  {
+    "commandCode": "announcement:update_policy",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
   }
 ]
