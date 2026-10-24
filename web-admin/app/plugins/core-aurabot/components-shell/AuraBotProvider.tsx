@@ -372,6 +372,7 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
       return { ...state, isLoading: action.payload };
 
     case 'set_selected_agent':
+      if (state.selectedAgentCode === action.payload) return state;
       return {
         ...state,
         selectedAgentCode: action.payload,
@@ -458,6 +459,7 @@ interface AuraBotContextValue {
   clearMessages: () => void;
   newSession: () => void;
   selectSession: (sessionId: string) => void | Promise<void>;
+  restoreAgentSession: (agentCode: string) => Promise<void>;
   deleteSession: (sessionId: string) => void | Promise<void>;
   setInputValue: (value: string) => void;
   setPageContext: (ctx: Partial<PageContext>) => void;
@@ -562,7 +564,7 @@ export interface AuraBotProviderProps {
 }
 
 export function AuraBotProvider({ children }: AuraBotProviderProps) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const { agent } = useApplicationCapabilities();
   const [state, dispatch] = useReducer(auraBotReducer, initialState);
   const [sessions, setSessions] = React.useState<AuraBotSessionSummary[]>([]);
@@ -571,20 +573,17 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const formFillTargetRef = useRef<FormFillTarget | null>(null);
   const formFillTargetsRef = useRef<FormFillTarget[]>([]);
 
-  // Live mirror of currentConversationId. refreshConversations is recreated as
-  // its deps change, so a captured copy can go stale: a refreshConversations
-  // created while no conversation was current can run AFTER a send has already
-  // created+selected one (ensureConversation writes LAST_CONVERSATION_KEY before
-  // the set_current_conversation dispatch commits). Reading the ref instead of
-  // the closed-over state value prevents the auto-restore below from hydrating a
-  // (server-empty) conversation over an in-flight one — which otherwise wipes the
-  // just-rendered result_contract / streamed turn. See ai-result-contract.spec.
+  // History responses may arrive after a new turn, agent selection or explicit reset.
+  // Read the live session as well as the eager conversation ref before hydrating.
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const currentConversationIdRef = useRef(state.currentConversationId);
   useEffect(() => {
     currentConversationIdRef.current = state.currentConversationId;
   }, [state.currentConversationId]);
 
-  const refreshConversations = useCallback(async () => {
+  const refreshConversations = useCallback(async (expectedAgentCode?: string) => {
+    const requestedSessionId = stateRef.current.sessionId;
     try {
       const items = await auraBotApi.listConversations();
       const summaries = items.map(toSessionSummary);
@@ -592,7 +591,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       if (
         !currentConversationIdRef.current &&
         summaries.length > 0 &&
-        state.messages.length === 0
+        shouldAutoHydrateConversation(stateRef.current, requestedSessionId)
       ) {
         // Only auto-restore when we have an explicit remembered conversation id
         // that still exists on the server. Avoid arbitrarily resuming a random
@@ -603,10 +602,14 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             ? Number(window.localStorage.getItem(LAST_CONVERSATION_KEY) || '')
             : NaN;
         const target = Number.isFinite(preferredConversationId)
-          ? summaries.find((item) => item.conversationId === preferredConversationId)
+          ? summaries.find((item) => item.conversationId === preferredConversationId
+              && (!expectedAgentCode || item.selectedAgentCode === expectedAgentCode))
           : undefined;
         if (target) {
           const messages = await auraBotApi.getConversationMessages(target.conversationId);
+          if (currentConversationIdRef.current != null
+              || !shouldAutoHydrateConversation(stateRef.current, requestedSessionId)
+              || (expectedAgentCode && stateRef.current.selectedAgentCode !== expectedAgentCode)) return;
           dispatch({
             type: 'hydrate_session',
             payload: {
@@ -621,9 +624,8 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     } catch {
       // Conversation history unavailable — keep in-memory state only
     }
-    // currentConversationId is read via currentConversationIdRef (live value), not
-    // closed over, so it is intentionally not a dependency here.
-  }, [state.messages.length]);
+    // Restoration reads live state so callers can keep a stable action identity.
+  }, []);
 
   useEffect(() => {
     if (agent !== 'installed' || state.panelState !== 'expanded') return;
@@ -1154,6 +1156,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               dispatch({ type: 'set_loading', payload: false });
             },
             onDone: (full: string, traceId?: string) => {
+              dispatch({ type: 'update_tool_message', payload: { toolId, updates: { type: 'tool_executed', content: t('ai.approval.completed', undefined, locale.startsWith('zh') ? '已完成' : 'Completed') } } });
               // Phase B.1 + Q-B1.3=β: /execute (resume) outbound persistence is
               // deferred to B.6, where /execute will go through
               // turnService.resumeTurn and AuraBotTurnPersistence will handle
@@ -1187,7 +1190,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
         dispatch({ type: 'set_loading', payload: false });
       }
     },
-    [state.currentConversationId, state.sessionId, state.messages],
+    [state.currentConversationId, state.sessionId, state.messages, locale, t],
   );
 
   // Cancel a tool execution (user rejected)
@@ -1257,6 +1260,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     clearMessages,
     newSession,
     selectSession,
+    restoreAgentSession: refreshConversations,
     deleteSession,
     setInputValue,
     setPageContext,

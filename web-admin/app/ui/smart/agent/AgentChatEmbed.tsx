@@ -78,7 +78,7 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
   const agentPid = searchParams.get('agentPid') || undefined;
   const navigate = useNavigate();
   const { t } = useI18n();
-  const { setSelectedAgent, newSession } = useAuraBot();
+  const { state, setSelectedAgent, newSession, restoreAgentSession } = useAuraBot();
 
   const [agent, setAgent] = useState<AgentInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,6 +115,12 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
       setSelectedAgent(agent.agent_code);
     }
   }, [agent?.agent_code, setSelectedAgent]);
+
+  useEffect(() => {
+    if (agent?.agent_code && state.selectedAgentCode === agent.agent_code) {
+      void restoreAgentSession(agent.agent_code);
+    }
+  }, [agent?.agent_code, state.selectedAgentCode, restoreAgentSession]);
 
   const handleNewSession = useCallback(() => {
     newSession();

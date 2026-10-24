@@ -83,3 +83,25 @@ describe('ConfirmCard', () => {
     expect(screen.getByTestId('aurabot-confirm-cancel')).toHaveTextContent('取消');
   });
 });
+
+
+describe('L3 approval envelope', () => {
+  it('shows business parameters without exposing approval transport metadata', () => {
+    const confirm = vi.fn();
+    render(<ConfirmCard toolId="approval-secret" toolName="agent_approval_gate"
+      description="This tool requires human approval. Approval request approval-secret has been created."
+      input={{ toolName: 'cmd_private_create_record', input: { private_name: '验收记录' } }}
+      onConfirm={confirm} onCancel={() => {}} />);
+    const card = screen.getByTestId('aurabot-confirm-card');
+    expect(card).toHaveTextContent('审批业务操作');
+    expect(card).toHaveTextContent('名称');
+    expect(card).toHaveTextContent('验收记录');
+    expect(card).not.toHaveTextContent('approval-secret');
+    expect(card).not.toHaveTextContent('cmd_private');
+    expect(card).not.toHaveTextContent('private_name');
+    expect(card).not.toHaveTextContent('This tool');
+    expect(card).not.toHaveTextContent('{');
+    fireEvent.click(screen.getByTestId('aurabot-confirm-approve'));
+    expect(confirm).toHaveBeenCalledWith('approval-secret');
+  });
+});
