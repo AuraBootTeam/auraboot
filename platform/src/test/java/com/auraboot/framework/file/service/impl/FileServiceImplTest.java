@@ -632,6 +632,57 @@ class FileServiceImplTest {
     }
 
     @Test
+    void createFileRelation_retainsAnotherOwnersFileOnlyAtItsExistingTarget() {
+        FileRelationRequestDTO request = new FileRelationRequestDTO();
+        request.setEntityType("tpm_acceptance");
+        request.setEntityId("acceptance-a");
+        request.setFieldName("materials");
+        request.setFileIds(new String[]{"old-file", "new-file"});
+        FileEntity original = new FileEntity();
+        original.setId(11L);
+        original.setPid("old-file");
+        original.setCreatedBy(99L);
+        original.setDeletedFlag(false);
+        original.setStatus("success");
+        FileEntity added = new FileEntity();
+        added.setId(12L);
+        added.setPid("new-file");
+        added.setCreatedBy(42L);
+        added.setDeletedFlag(false);
+        added.setStatus("success");
+        when(fileRelationMapper.findFileIdsByEntityAndField(
+                "tpm_acceptance", "acceptance-a", "materials")).thenReturn(List.of(11L));
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(original, added);
+
+        assertThat(fileService.createFileRelation(request, 42L)).isTrue();
+        var relations = forClass(FileRelationEntity.class);
+        verify(fileRelationMapper, times(2)).insert(relations.capture());
+        assertThat(relations.getAllValues()).extracting(FileRelationEntity::getFileId)
+                .containsExactly("11", "12");
+    }
+
+    @Test
+    void createFileRelation_rejectsForeignFileBeforeRemovingExistingRelations() {
+        FileRelationRequestDTO request = new FileRelationRequestDTO();
+        request.setEntityType("tpm_acceptance");
+        request.setEntityId("another-acceptance");
+        request.setFieldName("materials");
+        request.setFileIds(new String[]{"foreign-file"});
+        FileEntity foreign = new FileEntity();
+        foreign.setId(11L);
+        foreign.setPid("foreign-file");
+        foreign.setCreatedBy(99L);
+        foreign.setDeletedFlag(false);
+        foreign.setStatus("success");
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(foreign);
+
+        assertThatThrownBy(() -> fileService.createFileRelation(request, 42L))
+                .isInstanceOf(BusinessException.class);
+        verify(fileRelationMapper, never()).delete(any(QueryWrapper.class));
+        verify(fileRelationMapper, never()).insert(any(FileRelationEntity.class));
+    }
+
+    @Test
     void getFilesByEntity_emptyIds_returnsEmpty() {
         when(fileRelationMapper.findFileIdsByEntity("user", "1")).thenReturn(List.of());
 
