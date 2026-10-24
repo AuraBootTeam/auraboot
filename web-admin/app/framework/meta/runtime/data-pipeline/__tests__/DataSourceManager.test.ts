@@ -34,7 +34,7 @@ describe('DataSourceManager', () => {
     });
     expect(manager.getData('recipients')).toEqual(wire);
     expect(readServerTablePage(manager.getData('recipients'))).toEqual({ current: 1, pageSize: 20, total: 3 });
-    manager.destroy();
+    manager.clear();
   });
 
   beforeEach(() => {
