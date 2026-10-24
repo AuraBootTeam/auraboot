@@ -173,6 +173,8 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.workbench.mapper.AnnouncementReleaseMapper releaseMapper;
     @Autowired private com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer deliveryConsumer;
     @Autowired private com.auraboot.framework.workbench.service.AnnouncementCodec announcementCodec;
+    @Autowired private com.auraboot.framework.meta.mapper.OutboxEventMapper outboxEvents;
+    @Autowired private com.auraboot.framework.meta.service.impl.OutboxWorkerImpl outboxWorker;
     @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private void consume(com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope event) {
@@ -247,10 +249,16 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         String frozen=jdbc.queryForObject("SELECT snapshot::text FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
         assertEquals("Read the updated tenant policy.",announcementCodec.object(frozen).get("content"));
         String batch=(String)accepted.get("releaseAttemptPid");
-        var root=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0",batch,
-            com.auraboot.framework.workbench.service.AnnouncementReleaseService.RELEASED_EVENT,"auraboot.announcement",version,
-            java.time.Instant.now(),getTestTenant().getId(),batch,null,"announcement:"+version,1,
-            Map.of("versionPid",version,"batchPid",batch),Map.of());
+        var committed=outboxEvents.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.auraboot.framework.meta.entity.OutboxEvent>()
+            .eq(com.auraboot.framework.meta.entity.OutboxEvent::getTenantId,getTestTenant().getId())
+            .eq(com.auraboot.framework.meta.entity.OutboxEvent::getEventId,batch));
+        assertNotNull(committed);
+        // Replaying a real event must preserve its durable timestamp, causation and payload.
+        var root=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope(
+            committed.getSchemaVersion(),committed.getEventId(),committed.getEventType(),committed.getEventSource(),
+            committed.getSubject(),committed.getOccurredAt(),committed.getTenantId(),committed.getCorrelationId(),
+            committed.getCausationId(),committed.getOrderingKey(),committed.getEventSequence(),
+            announcementCodec.object(committed.getPayload()),Map.of());
         consume(root);
         var payload=Map.<String,Object>of("versionPid",version,"batchPid",batch,"userPid",getTestUser().getPid());
         // Projection is an independent event and can complete before notification persistence.
@@ -269,6 +277,9 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
             getTestTenant().getId(),version,getTestUser().getId()));
         assertEquals("completed",jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
             getTestTenant().getId(),batch,getTestUser().getPid()));
+        outboxWorker.pollAndDispatch();identity();
+        assertEquals("delivered",jdbc.queryForObject("SELECT status FROM ab_outbox WHERE tenant_id=? AND event_id=?",String.class,getTestTenant().getId(),batch));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_integration_dead_letter WHERE tenant_id=? AND event_id=?",Integer.class,getTestTenant().getId(),batch));
         jdbc.update("UPDATE ab_notification SET source_type='ANNOUNCEMENT' WHERE tenant_id=? AND source_id=?",getTestTenant().getId(),version);
         var query=new com.auraboot.framework.notification.dto.NotificationQueryRequest();query.setPageSize(100);
         org.assertj.core.api.Assertions.assertThat(notifications.listByUser(getTestUser().getId(),query).getRecords())
