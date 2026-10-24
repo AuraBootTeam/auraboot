@@ -43,8 +43,8 @@ public interface AnnouncementStatisticsMapper {
     @Insert("""
         INSERT INTO ab_announcement_statistics_snapshot(tenant_id,pid,version_pid,owner_user_id,owner_member_pid,snapshot_schema,
             as_of,view_expires_at,retained_until,metadata,summary,filters,row_count,filtered_count)
-        VALUES(#{tenant},#{pid},#{version},#{actor},#{member},'announcement.statistics.v1',#{asOf},#{asOf}+INTERVAL '30 minutes',
-            #{asOf}+INTERVAL '25 hours',#{metadata}::jsonb,#{summary}::jsonb,#{filters}::jsonb,#{count},#{filtered})
+        VALUES(#{tenant},#{pid},#{version},#{actor},#{member},'announcement.statistics.v1',CAST(#{asOf} AS timestamptz),CAST(#{asOf} AS timestamptz)+INTERVAL '30 minutes',
+            CAST(#{asOf} AS timestamptz)+INTERVAL '25 hours',#{metadata}::jsonb,#{summary}::jsonb,#{filters}::jsonb,#{count},#{filtered})
         """)
     int insertSnapshot(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version,@Param("actor") Long actor,
         @Param("member") String member,@Param("asOf") Instant asOf,@Param("metadata") String metadata,@Param("summary") String summary,
