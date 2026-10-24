@@ -450,7 +450,12 @@ test('read-only manager cannot create or modify notices', async ({ page, browser
   try {
     await authenticateBffSession(context.request, baseURL!, email, 'Test2026x');
     const reader = await context.newPage();
+    const loaded = reader.waitForResponse(response => response.request().method() === 'GET'
+      && response.url().includes('/api/dynamic/ab_announcement/list'));
     await navigateToAnnouncementList(reader);
+    expect((await loaded).ok()).toBe(true);
+    await expect(reader.getByRole('columnheader', { name: '优先级', exact: true })).toBeVisible();
+    await expect(reader.getByText('加载中...', { exact: true })).toHaveCount(0);
     await expect(reader.getByRole('button', { name: '新建公告', exact: true })).toHaveCount(0);
     const denied = await context.request.post(
       '/api/meta/commands/execute/announcement:create_announcement',

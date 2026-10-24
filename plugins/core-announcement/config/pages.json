@@ -1197,7 +1197,8 @@
             },
             "width": 300
           }
-        ]
+        ],
+        "visibleWhen": "record.approval_mode == 'approval' && record.current_version_pid != null"
       }
     ],
     "extension": {
@@ -1233,7 +1234,11 @@
           "inputFieldsOnly": true
         }
       },
-      "showInlineApprovalPanel": false
+      "showInlineApprovalPanel": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false
     },
     "dataSources": {
       "approvalStatus": {
