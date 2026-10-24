@@ -1,6 +1,7 @@
 import type { RequestKeySession } from './request-key/session';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -609,11 +610,8 @@ actionRegistry.register('dataSource.reload', async ({ dataSourceManager, args })
 /**
  * toast.show - 显示提示消息
  */
-actionRegistry.register('toast.show', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content;
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || JSON.stringify(message);
-  }
+actionRegistry.register('toast.show', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t);
   const level = args?.level || 'info';
   showToast?.(message as string, level);
 });
@@ -621,22 +619,16 @@ actionRegistry.register('toast.show', ({ args, showToast }) => {
 /**
  * toast.success - 成功提示
  */
-actionRegistry.register('toast.success', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content || 'Operation successful';
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Operation successful';
-  }
+actionRegistry.register('toast.success', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t) || 'Operation successful';
   showToast?.(message as string, 'success');
 });
 
 /**
  * toast.error - 错误提示
  */
-actionRegistry.register('toast.error', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content || 'Operation failed';
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Operation failed';
-  }
+actionRegistry.register('toast.error', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t) || 'Operation failed';
   showToast?.(message as string, 'error');
 });
 

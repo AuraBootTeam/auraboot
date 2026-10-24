@@ -902,6 +902,13 @@ describe('ActionRegistry toast handlers', () => {
       actionRegistry.execute('toast.show', { args: { message: 'hi' } }),
     ).resolves.toBeUndefined();
   });
+  it.each(['toast.show', 'toast.success', 'toast.error'])('%s honors the active locale and catalog messages', async (action) => {
+    const showToast=vi.fn();
+    await actionRegistry.execute(action,{showToast,locale:'en-US',args:{message:{'zh-CN':'管理操作已记录','en-US':'Administration recorded'}}});
+    expect(showToast).toHaveBeenLastCalledWith('Administration recorded',expect.any(String));
+    await actionRegistry.execute(action,{showToast,locale:'zh-CN',t:key=>key==='recovery.recorded'?'管理操作已记录':key,args:{message:'$i18n:recovery.recorded'}});
+    expect(showToast).toHaveBeenLastCalledWith('管理操作已记录',expect.any(String));
+  });
 });
 
 describe('ActionRegistry dialog.form handler', () => {

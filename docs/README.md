@@ -18,7 +18,7 @@ This directory holds engineering-facing material that ships with the repository.
 
 | Topic | Reference | Status |
 | --- | --- | --- |
-| Announcement management | [Requirements, UX, permissions, BPM composition and phased implementation](./system-reference/announcement-management.md) | S1 controlled drafts and historical lifecycle verified; [acceptance evidence](./system-reference/2026-10-24-announcement-s1-testing-gate-acceptance-report.md). Later slices remain design contracts |
+| Announcement management | [Requirements, UX, permissions, BPM composition and implementation status](./system-reference/announcement-management.md) | S1 verified; S2–S7 partial real-stack evidence and remaining work tracked in §18. BPM artifact composition and S8 remain unfinished; [historical S1 evidence](./system-reference/2026-10-24-announcement-s1-testing-gate-acceptance-report.md) |
 
 ## Conventions
 

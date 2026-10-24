@@ -18,7 +18,7 @@ implementation_status: s2-s8-in-progress
 
 ## 1. 定位与文档状态
 
-本文是 OSS 公告管理的需求、UX、权限及集成目标契约的唯一入口。需求讨论已确认采用本文默认规则；**S1 受控草稿及历史生命周期已实现并定向验证，尚未合并/上线**，实际边界和契约见 §17 及 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)。其余切片仍是目标设计。阶段计划是实施顺序，不是完成记录；后续实施在本文更新契约与实际状态，不建立第二份公告需求真源。§14 记录 P0 源码事实，§15 冻结其关键缺口方案及 S1–S3/工作流详细目标契约，§16 补齐入口、运营、安装与验收闭环并记录设计自查。除 §17 明确记载的 S1 外，目标契约不代表代码已实现。
+本文是 OSS 公告管理的需求、UX、权限及集成目标契约的唯一入口。需求讨论已确认采用本文默认规则；**S1 已定向验证，S2–S7 的部分业务链路已实现并获得真实验证，全部变更尚未合并/上线**。S1 边界见 §17 及 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)，后续切片的实际证据与剩余工作统一见 §18。阶段计划是实施顺序，不是完成记录；不建立第二份公告需求真源。§14 保留 P0 当时的源码盘点，§15–§16 是完整目标及细化契约，不能把其中尚未验证的目标当作已交付能力。
 
 目标是为当前租户提供“编写 → 免审或审批 → 立即或定时发布 → 多渠道提醒 → 阅读与确认知悉 → 催办与统计导出”闭环。
 
@@ -656,30 +656,35 @@ mark_read/ack 数据身份和守卫在 S1 固定，页面操作在 S7 完成；s
 
 数据已提交但 SSE 丢失时，刷新从服务端事实重建，不重新发布。版本撤回先写失效状态，分发/待办消费者及详情读取立即复核；未消费意图标 canceled，历史已发送日志保留。任意重放不能重置阅读或重新开启已完成知悉任务。
 
-### 15.7 BPM 公共契约冻结：拟 `approval.*.v1`
+### 15.7 BPM 公共契约：`approval.*.v1`
 
-沿用单一 `WorkflowCapability` provider；不复用旧 start 的宽松语义。新增中立操作族 `approval.readiness.v1`、`approval.start.v1`、`approval.status.v1`、`approval.withdraw.v1`，旧 token 留给既有消费者。token 为本设计拟定，随平台候选 API 发布后才算可用。DTO/schema 归 platform-plugin-api，BPM 是实现者，任何类型不得含公告实体类或 SmartEngine 类型。
+沿用单一 `WorkflowCapability` provider；不复用旧 start 的宽松语义。中立操作族为 `approval.readiness.v1`、`approval.start.v1`、`approval.status.v1`、`approval.withdraw.v1`、`approval.viewer.v1`，旧 token 留给既有消费者。它们已进入当前候选源码和定向集成，尚未作为正式组合构件验收。DTO/schema 归 platform-plugin-api，BPM 是实现者，任何类型不得含公告实体类或 SmartEngine 类型。
 
 #### 15.7.1 发起及查询
 
 | 契约 | 请求（语义字段） | 结果 |
 | --- | --- | --- |
-| readiness | trusted tenant/actor；businessType；流程绑定引用 | ready、reasonCode、providerContractVersion、definitionRef/version/hash、strictPolicySupported；不就绪不分配实例 |
-| start | submissionId、idempotencyKey、businessRef(type/recordPid/versionPid)、snapshotRef/hash/schemaVersion、definitionRef/version/hash、strictPolicy、businessCaption；tenant/actor 来自可信上下文 | submissionId、instancePid、state(RUNNING/APPROVED/REJECTED/WITHDRAWN/FAILED)、resultId可空、绑定身份、acceptedAt；允许同步终态 |
-| status | submissionId（超时可仅此键查询），可附 instancePid 核对 | FOUND/NOT_FOUND/UNAVAILABLE、相同绑定身份、当前state、terminalResult；NOT_FOUND 不能当 approved，也不自动改用新申请 |
-| withdraw | submissionId、instancePid可选、operationId、reason、expectedStateRevision | WITHDRAWN 或已发生的准确终态/冲突；撤销整个申请，不借任意第一条任务替代语义 |
+| readiness | 可信 tenant/actor；payload.definitionPid | ready、definition(pid/version/hash)、definitionName、strictPolicy；不就绪返回 reasonCode，不分配实例 |
+| start | 可信 tenant/actor；payload.submissionId；完整绑定由业务来源读取 | found、submissionId、state、stateRevision、instancePid（启动前可空）、reasonCode、可选 terminalResult；starting/blocked 均不代表通过 |
+| status | 可信 tenant/actor；payload.submissionId | 有权查看业务绑定后返回 found=false 或准确状态与不可变终态；不存在不能当 approved，也不自动创建新申请 |
+| withdraw | 可信 tenant/actor；payload.submissionId、reason | 准确 withdrawn 或已经发生的终态；撤销整个申请。OSS 命令层另外承担 operationId/aggregate revision，不把它们误写成 provider 必需字段 |
+| viewer | 可信当前 tenant/actor；payload.submissionId | 当前申请人、固定审批参与人或明确监控管理权限的资格校验；允许时返回 allowed 与准确 snapshotHash，否则拒绝；不返回正文或任意人员目录 |
 
-start 仅接受由业务域提交服务持久化并授权的申请；provider 经平台只读提交解析契约核对 submission 与快照，不接受通用 workflow.start 调用者伪造相同字段取得公告批准。结果消费者也核对受信 provider 归属，不仅信任 eventSource 字符串。该提交解析是平台公共窄接口的新需求，不向 BPM 开放公告 mapper。
+start 仅接受由业务域提交服务持久化并授权的申请；`ApprovalSubmissionSource/Accessor` 返回 `SubmittedApproval`，包含幂等键、businessRef、snapshotRef/hash/schema、准确 definition、strictPolicy、申请人和提交时间。provider 不接受调用者替换这些绑定字段，也不向 BPM 开放公告 mapper。`canStart` 校验首次接收资格，`canExecute` 在延迟启动或恢复执行前复核原成员身份和业务权限，`canWithdraw` 单独校验撤销资格。后台身份必须从宿主目录恢复当前数值成员上下文；不能因用户 PID 相同就继承已删除成员的旧资格。
 
 start 两端按 `(tenant,provider,submissionId)` 建唯一映射和规范化请求摘要；同 submission 相同快照/定义等输入重放返回同实例，任一绑定字段不同报冲突。provider 拒绝与执行上下文不一致的 tenant/actor、未发布定义、内容摘要不匹配和严格策略不支持。流程定义固定版本/hash，不在 start 时重新跟随 key 的 latest。
 
 snapshotRef 是平台服务端可授权解析的不可变引用，不是任意 URL；业务处理器根据 businessType 解析本域快照和附件，BPM 仅持公共引用。任务详情使用真实 task qualification 请求授权视图；不能用可伪造的业务引用直接读取受限内容。长历史访问按授权审计入口，结果事件不携带完整正文或个人名单。
+
+`BusinessPreview` 由业务所有者返回冻结的只读 DSL schema、values、fieldMetadata 和 snapshotHash。BPM 先验证当前参与资格，OSS 再校验固定 provider、哈希和成员身份；两端都不切换为管理员身份读取正文。任务抽屉复用 L1 `useDslForm/DslFormRenderer`，不读取业务表的当前记录或实时字段元数据。附件使用同一送审申请的受控下载入口，每次下载重新校验资格。普通接收正文的阅读/知悉事实不会因审批预览而产生。
 
 #### 15.7.2 严格审批人和终态
 
 strictPolicy 至少固定 `excludeApplicant=true`、`emptyAssignee=BLOCK`、`resolutionFailure=BLOCK`、节点 ANY/ALL、`rejectTerminates=true`。节点进入解析当前有效人员并封存名单；ANY 任一同意结束该节点，ALL 全部同意才结束；任一有效驳回立即结束整申请并关闭其他待办。排除后无人不允许 MI 空集合跳过，也不进入 dispatcher 的 starter fallback。
 
 成员失效进入 ASSIGNEE_BLOCKED 执行异常，不形成业务 REJECTED。流程管理员替换剩余人员须校验租户/自审、理由、审计，已发生同意保留；不能添加虚假同意。角色成员后续变化不自动改封存名单，只使失效人不能继续操作。定义冻结后仍需每次动作检查当前资格。
+
+管理恢复独立使用 `bpm.monitor.update`，当前成员必须有效；操作要求 operationId、state revision 和非空原因，并写入不可变操作审计。`resolve_node` 仅对未封存节点指定有效人员及其成员身份，仍使用原节点的 ANY/ALL；`replace_assignee` 只替换尚未提交意见的固定人员，已排队或已执行的意见均不可覆盖；`resume` 重新排队原阻断任务，不转移执行主体。ANY 保留同一共享任务与其他候选人，ALL 保留已完成意见和剩余人数。原成员已删除时，旧排队意见不能由新成员身份执行；需要撤销并按正常业务入口重新提交，而不是补写同意。
 
 terminal state 只能是 APPROVED/REJECTED/WITHDRAWN/FAILED，RUNNING/BLOCKED 不可发布。APPROVED 仅在流程规定的完整批准条件达成后生成；任意普通 end event/completed 不可自动解释为批准。技术暂态停在执行异常，只有不可恢复且明确结束时才 FAILED；拒绝意见必须有值。
 
@@ -940,10 +945,10 @@ S1 的验收分母包括迁移新建/升级、不可变和跨租户引用、草�
 | --- | --- | --- |
 | S2 | 人员/部门子树/管理范围内角色预览、政策编辑、附件授权、管理/接收身份分离；越权和成员边界真实验证 | 原生政策弹窗与无员工档案人员选择已真实验证；预览页面、上传/下载及完整边界仍待完成 |
 | S3 | 冻结版本、免审、立即/定时、持久任务与窗口、取消/恢复、封存收件与可靠分发 | 免审立即/预约/取消、实际调度与 outbox 双投影已真实验证；恢复、撤回清理与完整异常仍待完成 |
-| S4 | 中立 approval.v1 操作及只读申请解析、准确绑定、可靠终态契约 | 中立 binding、业务来源、start/withdraw 授权、终态核对已接通；真实公告与 BPM 同进程集成已定向验证，正式构件安装待验 |
-| S5 | BPM 严格人员/角色、排除自审、ANY/ALL、驳回终止、异常分配、申请撤销 | 真实 PG/引擎六条场景验证指定人员、角色排除申请人、ANY/ALL、驳回和空审批人阻断；正式安装、管理恢复与页面验证仍待完成 |
-| S6 | 公告发起/终态消费、同步结束和超时核对、明确组合清单与安装验证 | 真实业务来源经公共能力、BPM 引擎、可靠 outbox、发布与收件封存五条场景已通过；批准、驳回、两类撤回和晚批准均有实际证据。正式构件组合与 UI 仍待验证 |
-| S7 | 我的公告/版本详情、显式阅读/确认、铃铛与待办、独立待处理数 | 接收者读取/显式写入、受控附件、不可绕过知悉守卫与 pending count 已进入代码；首次事实保留及撤回失效真实集成通过。原生 DSL、正文展示回执、导航和 UI 验证进行中 |
+| S4 | 中立 approval.v1 操作及只读申请解析、准确绑定、可靠终态契约 | binding、来源、首次/延迟启动/撤销授权、参与预览和终态核对已接通；真实集成定向通过，正式构件安装待验 |
+| S5 | BPM 严格人员/角色、排除自审、ANY/ALL、驳回终止、异常分配、申请撤销 | 十条真实 PG/引擎场景已覆盖基本决定、成员重建、空节点恢复及 ANY/ALL 替换；管理恢复服务已验证，原生页面和正式安装待验 |
+| S6 | 公告发起/终态消费、同步结束和超时核对、明确组合清单与安装验证 | 七条真实业务组合场景通过，包括晚结果、晚同步和无管理权审批人的冻结预览；正式构件组合、附件下载和审批 UI 仍待验证 |
+| S7 | 我的公告/版本详情、显式阅读/确认、铃铛与待办、独立待处理数 | 后端定向集成及管理员/普通接收者的九条真实浏览器旅程通过；截图发现的问题已修正，当前修订版重验尚未全部完成，完整错误/附件边界待补 |
 | S8 | 每日最多一次/最多三次自动催办、截止停止与手动催办、统计快照和授权 CSV 下载 | pending |
 
 页面优先复用既有 DSL、字段选择器、附件控件、工作台与 BPM 贡献，不另建手写业务页面。蓝图及状态验收沿用 §16.8 的 D01–D15：
@@ -961,14 +966,16 @@ S1 的验收分母包括迁移新建/升级、不可变和跨租户引用、草�
 
 公告内容沿用原生表单，政策使用列表/详情的原生“通知设置”分组弹窗；不新建业务 React 页面。选择器从后端当前有效权限范围加载，重要公告的知悉默认值按当前内容计算，显式取消优先。预约输入使用用户有效时区解析，夏令时不存在时间拒绝保存。附件元数据来自服务端已完成文件，客户端展示字段不参与授权。
 
-本轮中立审批契约新增严格策略：排除申请人，空分配和解析失败阻断，驳回终止。BPM 严格模式当前实现基础按已发布、无循环的人工节点与标准网关校验；人员与角色保留完整选择。通用引擎实例结束不能替代明确的通过决定。此处是实施边界，provider、任务动作守卫、可靠进度与终态、公告消费及组合安装仍待完成和真实验证，不能将 DTO 或解析器单测当作 BPM 已集成。
+中立审批契约执行排除申请人、空分配/解析失败阻断和驳回终止。BPM 严格模式按已发布、无循环的人工节点与标准网关校验；人员与角色保留完整选择。通用引擎实例结束不能替代明确的通过决定。provider、任务动作守卫、可靠进度、终态和公告消费已经获得定向真实证据，正式组合安装和完整页面仍待验证，不能把前者等同于后者。
 
-S2/S3 最新真实浏览器链在原 runtime 的全新数据库执行九条场景，通过新增/编辑/删除、权限拒绝、legacy 撤回修订、预约取消及立即发布后的实际通知/知悉待办落库。此结果仅覆盖这些行动点。逐图复核发现定时状态和历史发布时间列宽不足，已修正配置，待重新截图；不能将功能通过计为视觉全通过。宿主身份端口增加严格审批能力探测，旧实现默认不可用，安装契约不能仅以方法名存在推断身份校验已具备。
+九条浏览器旅程已从真实菜单覆盖新增/编辑/删除、权限拒绝、legacy 撤回修订、预约取消、立即发布后的实际通知/知悉待办，以及管理员和普通接收者的正文阅读、独立确认和刷新保留首次事实。全部标为已读不会关闭未完成知悉。逐图复核确认定时状态和历史时间列宽修正有效，另发现接收列表把 datetime 语义当成格式模板、详情带有无关通用操作和权限截图拍在加载中；修正已进入候选源码。后续修订版有一次表头可访问名称定位错误，属于测试驱动问题，不能声称该次九条全部通过；当前完整重验和其余图片审阅仍待完成。
 
 ### 18.2 审批集成当前实证与缺口
 
-截至 2026-10-25，五条真实公告集成场景和六条真实引擎场景在原任务数据库运行，未跳过。前者使用实际公告业务来源与封存数据、BPM provider、SmartEngine、持久工作器和可靠事件，证明批准后才封存实际收件名单并生成提醒/知悉待办；驳回、发起前撤回、引擎未启动时撤回和晚批准均不发布。公共契约不以回调的 source 字符串授予批准；结果事件只唤醒同步，业务方再次拉取同一 provider 的不可变终态，并核对 submission、内容哈希、准确流程版本和实例绑定。
+截至 2026-10-25，OSS `1733c9fbd` 构件与 BPM `d9c53e8` 的定向验证包含七条真实公告组合、十条真实引擎场景和三十五条相关单元场景，无失败、无跳过。组合测试使用实际公告业务来源、BPM provider、SmartEngine、持久工作器和可靠事件，证明批准后才封存实际收件名单并生成提醒/知悉待办；驳回、两类撤回、晚批准和批准后的晚同步均不能误发。无公告管理授权的审批人可以查看准确冻结正文，非参与人被拒绝。结果事件仅唤醒同步，业务方再次拉取固定 provider 的不可变终态并核对完整绑定。
+
+引擎场景证明空节点可经审计指定人员后显式恢复而不自动批准；ANY 替换保留共享任务和其他候选人，原人员失去任务资格；ALL 替换保留已有通过意见和原通过规则。排队意见不能由重新创建的成员身份执行。业务启动工作器额外复核原申请人的当前成员及业务权限，恢复不借管理员身份代执行。审批历史将已接收但尚未执行的意见显示为待处理，不提前显示通过。
 
 真实导入暴露并修复了重复权限与通用校验器未识别原生输入弹窗的问题；真实撤回暴露并修复原 status VARCHAR(16) 容量不足。升级夹具现在从原字段长度开始，确切验证新撤回状态可保存。失败证据保留，不能以此前编译成功代替这些运行结果。
 
-当前证据仍不是 PF4J 正式组合安装或完整浏览器验收。BPM 管理恢复/重新分配、冻结业务快照的审批预览与历史、组合清单和前端贡献安装尚待完成；S2 附件/预览边界、S3 完整恢复/过期清理、S7 页面及 S8 运营/导出仍在同一任务内持续实施，不需要阶段性继续授权。
+当前证据仍不是 PF4J 正式组合安装或完整浏览器验收。冻结预览/历史及管理恢复已有后端和定向组件证据，原生恢复配置已进入候选，真实菜单操作、受控附件下载和前端组合仍待完成。S2 附件/预览边界、S3 完整恢复/过期清理、S7 剩余页面边界以及全部 S8 运营/导出仍在同一任务内实施，不需要阶段性继续授权。S1 历史报告和远端旧 checks 不能代替本轮确切 head 的验收与提交。
