@@ -18,7 +18,7 @@ function setup() {
   const manager=new ScopedStateManager({locale:'en-US',theme:'light'} as any);manager.createScope('policy',{});
   const fetchResult=vi.fn().mockImplementation(async (_url:string,request:any)=>({code:'0',data:request.method==='get' ? [] : {operationState:'completed'}}));
   const loadData=vi.fn(),showToast=vi.fn();
-  const runner=new FlowRunner({evaluator:new ExpressionEvaluator(),actionRegistry,stateManager:manager,scopeId:'policy',
+  const runner=new FlowRunner({evaluator:new ExpressionEvaluator(),actionRegistry,stateManager:manager,scopeId:'policy',dataSourceManager:{reload:vi.fn()} as any,
     schema,getAllFormFields:()=>[],loadData,showToast});
   const context=()=>({...manager.getContext('policy'),fetchResult,record:{revision:0,forceApproval:false,
     defaultDefinitionPid:null,lateWindowMinutes:30,reminderAt:'09:00',automaticReminderLimit:3,
