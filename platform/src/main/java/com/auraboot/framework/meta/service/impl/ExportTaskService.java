@@ -190,7 +190,7 @@ public class ExportTaskService {
         if (task == null || !belongsToCurrentOwner(task)) {
             throw new MetaServiceException("Export task not found: " + taskPid);
         }
-        if(DomainExportTaskService.isDomain(task)) return domainExports.getObject().status(taskPid);
+        if(DomainExportTaskService.isDomain(task)) return domainExports.getObject().baseStatus(taskPid);
         return toDTO(task);
     }
 
@@ -461,7 +461,7 @@ public class ExportTaskService {
     }
 
     private ExportTaskDTO toDTO(ExportTask entity) {
-        if(DomainExportTaskService.isDomain(entity)) return domainExports.getObject().status(entity.getPid());
+        if(DomainExportTaskService.isDomain(entity)) return domainExports.getObject().baseStatus(entity.getPid());
         ExportTaskDTO dto = new ExportTaskDTO();
         dto.setPid(entity.getPid());
         dto.setQueryCode(entity.getQueryCode());

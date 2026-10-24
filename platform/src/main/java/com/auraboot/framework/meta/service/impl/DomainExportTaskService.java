@@ -98,7 +98,10 @@ public class DomainExportTaskService {
         }
     }
 
-    public ExportTaskDTO status(String pid) {var task=owned(pid);authorize(task);return view(task);}
+    public DomainExportTaskDTO status(String pid) {var task=owned(pid);authorize(task);return view(task);}
+    public ExportTaskDTO baseStatus(String pid) {
+        var view=new ExportTaskDTO();org.springframework.beans.BeanUtils.copyProperties(status(pid),view);return view;
+    }
     public boolean visible(ExportTask task) {
         requireOwner(task);
         return task.getExpiresAt()!=null && Instant.now().isBefore(task.getExpiresAt()) && source(sourceCode(task)).visible(prepared(task));
@@ -154,8 +157,9 @@ public class DomainExportTaskService {
     private DomainExportSource.Prepared prepared(ExportTask task) {
         return DomainExportSource.Prepared.fromJson(task.getRequestParams().required("prepared"));
     }
-    private ExportTaskDTO view(ExportTask task) {
-        var dto=new ExportTaskDTO();dto.setPid(task.getPid());dto.setQueryCode(task.getQueryCode());dto.setFormat(task.getFormat());
+    private DomainExportTaskDTO view(ExportTask task) {
+        var dto=new DomainExportTaskDTO();dto.setPid(task.getPid());dto.setQueryCode(task.getQueryCode());dto.setFormat(task.getFormat());
+        var descriptor=prepared(task);dto.setFileName(descriptor.fileName());dto.setSourceSnapshot(source(sourceCode(task)).publicMetadata(descriptor));
         dto.setStatus(task.getStatus());dto.setProgress(task.getProgress());dto.setTotalRows(task.getTotalRows());dto.setProcessedRows(task.getProcessedRows());
         dto.setFileSize(task.getFileSize());
         if(task.getExpiresAt()==null || !Instant.now().isBefore(task.getExpiresAt())) dto.setStatus(ExportTask.STATUS_EXPIRED);

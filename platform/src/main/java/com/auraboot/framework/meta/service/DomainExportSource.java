@@ -36,5 +36,6 @@ public interface DomainExportSource {
     void authorizeForOwner(Prepared prepared,Owner owner);
     boolean visible(Prepared prepared);
     JsonNode auditMetadata(Prepared prepared);
+    JsonNode publicMetadata(Prepared prepared);
     ExportResult generate(Prepared prepared,Owner owner,Path output,AsyncTaskExecutor.ProgressCallback progress);
 }

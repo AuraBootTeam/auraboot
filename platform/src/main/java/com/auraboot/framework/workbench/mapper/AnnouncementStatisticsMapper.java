@@ -28,6 +28,25 @@ public interface AnnouncementStatisticsMapper {
     Map<String,Object> version(@Param("tenant") Long tenant,@Param("version") String version);
 
     @Select("""
+        SELECT v.pid,v.version_no FROM ab_announcement_version v
+        JOIN ab_announcement_recipient_snapshot s ON s.tenant_id=v.tenant_id AND s.version_pid=v.pid AND s.sealed=TRUE
+        JOIN ab_announcement a ON a.tenant_id=v.tenant_id AND a.pid=v.announcement_pid AND a.deleted_flag=FALSE
+        WHERE v.tenant_id=#{tenant} AND v.announcement_pid=#{record}
+        ORDER BY CASE WHEN v.pid=a.active_version_pid THEN 0 ELSE 1 END,v.version_no DESC
+        """)
+    List<Map<String,Object>> versions(@Param("tenant") Long tenant,@Param("record") String record);
+
+    @Select("""
+        SELECT DISTINCT department->>'pid' AS value,department->>'label' AS label
+        FROM ab_announcement_statistics_row r
+        CROSS JOIN LATERAL jsonb_array_elements(r.organization_snapshot->'departments') department
+        WHERE r.tenant_id=#{tenant} AND r.snapshot_pid=#{pid}
+            AND r.display_proof->'departmentPids' @> jsonb_build_array(department->>'pid')
+        ORDER BY label,value
+        """)
+    List<Map<String,Object>> departments(@Param("tenant") Long tenant,@Param("pid") String pid);
+
+    @Select("""
         SELECT r.user_pid,r.member_pid,r.display_name_snapshot,r.organization_snapshot::text AS organization_snapshot,
             r.first_read_at,r.acknowledged_at,
             (m.pid IS NOT NULL AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE) AS member_eligible,

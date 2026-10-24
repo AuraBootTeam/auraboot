@@ -64,7 +64,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(expected);
     }
     @BeforeEach void grantAndAuthenticate() {
-        for(String action:List.of("edit","publish","publish_all","exempt","stats","export"))
+        for(String action:List.of("edit","publish","publish_all","exempt","stats","export","withdraw"))
             grantCommittedPermissionToTestRole("announcement.announcement."+action,"announcement","announcement:announcement",action,"Announcement "+action);
         applyTestMetaContext();
         var authorities=AuthorityUtils.createAuthorityList("role_admin");
@@ -168,13 +168,19 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         if(!java.nio.file.Files.exists(file)) file=java.nio.file.Path.of("../../plugins/core-announcement/config/i18n.json");
         var resources=new ArrayList<com.auraboot.framework.i18n.entity.I18nResource>();
         for(var entry:json.readTree(java.nio.file.Files.readString(file))) {
+            if("announcement.statistics.version_option".equals(entry.path("key").asText())) {
+                for(String locale:List.of("zh-CN","en-US")) resources.add(com.auraboot.framework.i18n.entity.I18nResource.builder()
+                    .tenantId(getTestTenant().getId()).i18nKey(entry.required("key").textValue()).lang(locale)
+                    .value(entry.required(locale).textValue()).source("import").status("approved").build());
+                continue;
+            }
             if(!entry.path("key").asText().startsWith("announcement.statistics.csv.")) continue;
             resources.add(com.auraboot.framework.i18n.entity.I18nResource.builder()
                 .tenantId(getTestTenant().getId()).i18nKey(entry.required("key").textValue()).lang("en-US")
                 .value(entry.required("en-US").textValue()).source("import").status("approved").build());
         }
-        assertThat(resources).hasSize(34);
-        assertThat(translationResources.batchUpsert(resources)).isEqualTo(34);messages.clearCache("en-US");
+        assertThat(resources).hasSize(36);
+        assertThat(translationResources.batchUpsert(resources)).isEqualTo(36);messages.clearCache("en-US");messages.clearCache("zh-CN");
     }
     @Test void actualExportUsesOriginalActorAndCapturedRowsDespiteLaterReadAndTranslationChanges() throws Exception {
         importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
@@ -248,6 +254,12 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             var statusResponse=http.perform(get("/api/exports/domain/"+pid)).andExpect(status().isOk()).andReturn().getResponse();
             assertThat(statusResponse.getContentAsString()).contains("/api/exports/domain/"+pid+"/download")
                 .doesNotContain(stored.getFileKey(),"temp_path","memberPid","executionToken","createdBy","tenantId");
+            var publicSource=json.readTree(statusResponse.getContentAsString()).required("data").required("sourceSnapshot");
+            assertThat(publicSource.required("versionPid").textValue()).isEqualTo(version);
+            assertThat(publicSource.required("asOf").textValue()).isEqualTo(stored.getRequestParams().required("prepared").required("evidence")
+                .required("snapshot").required("asOf").textValue());
+            assertThat(publicSource.required("rowCount").longValue()).isEqualTo(1);
+            assertThat(publicSource.toString()).doesNotContain("digest","labels","owner","memberPid","organization");
             var first=http.perform(get("/api/exports/domain/"+pid+"/download")).andExpect(status().isOk()).andReturn().getResponse();
             assertThat(first.getHeader("Cache-Control")).isEqualTo("no-store");
             assertThat(first.getHeader("Content-Disposition")).contains("announcement-statistics.csv");
@@ -306,5 +318,45 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             grantCommittedPermissionToTestRole("announcement.announcement.export","announcement","announcement:announcement","export","Announcement export");
             permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
         }
+    }
+    @Test void recordCaptureAndFrozenDepartmentOptionsSupportActiveAndHistoricalVersionsWithoutFollowingDirectoryRenames() throws Exception {
+        importExportTranslations();Long tenant=getTestTenant().getId();
+        String department=UniqueIdGenerator.generate(),position=UniqueIdGenerator.generate(),employee=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO mt_org_department(pid,tenant_id,org_dept_name,org_dept_status) VALUES(?,?,'Statistics frozen department','active')",department,tenant);
+        jdbc.update("INSERT INTO mt_org_position(pid,tenant_id,org_pos_name,org_pos_dept_id,org_pos_level) VALUES(?,?,'Staff',?,'1')",position,tenant,department);
+        jdbc.update("INSERT INTO mt_org_employee(pid,tenant_id,org_emp_name,org_emp_dept_id,org_emp_position_id,org_emp_member_id,org_emp_status) VALUES(?,?,'Statistics employee',?,?,?,'active')",
+            employee,tenant,department,position,getTestTenantMember().getPid());
+        String firstVersion=publish();var firstCapture=statistics.capture(firstVersion,AnnouncementStatistics.Filters.all());
+        String record=json.valueToTree(firstCapture).required("metadata").required("recordPid").textValue();
+        var response=http.perform(post("/api/announcements/records/"+record+"/statistics/snapshots")
+            .contentType(MediaType.APPLICATION_JSON).content(codec.encode(AnnouncementStatistics.Filters.all())))
+            .andExpect(status().isOk()).andReturn().getResponse();
+        var captured=json.readTree(response.getContentAsString()).required("data");String token=captured.required("snapshotToken").textValue();
+        assertThat(captured.required("pid").textValue()).isEqualTo(token);
+        assertThat(captured.required("versionPid").textValue()).isEqualTo(firstVersion);
+        jdbc.update("UPDATE mt_org_department SET org_dept_name='Statistics renamed department' WHERE tenant_id=? AND pid=?",tenant,department);
+        var options=http.perform(get("/api/announcements/statistics/snapshots/"+token+"/departments")).andExpect(status().isOk()).andReturn().getResponse();
+        var departments=json.readTree(options.getContentAsString()).required("data");
+        assertThat(departments.findValuesAsText("value")).contains(department);
+        assertThat(departments.toString()).contains("Statistics frozen department").doesNotContain("Statistics renamed department");
+        int revision=jdbc.queryForObject("SELECT row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,tenant,record);
+        var withdrawn=lifecycle.execute("announcement:archive",record,Map.of(),UniqueIdGenerator.generate(),revision);
+        assertThat(statistics.captureRecord(record,AnnouncementStatistics.Filters.all()).get("versionPid")).isEqualTo(firstVersion);
+        var revised=lifecycle.execute("announcement:republish",record,Map.of(),UniqueIdGenerator.generate(),((Number)withdrawn.get("row_version")).intValue());
+        var accepted=releases.execute("announcement:publish",record,Map.of(),UniqueIdGenerator.generate(),((Number)revised.get("row_version")).intValue());
+        MetaContext.clear();new AnnouncementReleaseWorker(releases).tick();applyTestMetaContext();
+        String secondVersion=(String)accepted.get("versionPid");assertThat(secondVersion).isNotEqualTo(firstVersion);
+        var latest=statistics.captureRecord(record,AnnouncementStatistics.Filters.all());assertThat(latest.get("versionPid")).isEqualTo(secondVersion);
+        var versions=http.perform(get("/api/announcements/records/"+record+"/statistics/versions")).andExpect(status().isOk()).andReturn().getResponse();
+        var choices=json.readTree(versions.getContentAsString()).required("data");
+        assertThat(choices).hasSize(2);assertThat(choices.get(0).required("value").textValue()).isEqualTo(secondVersion);
+        assertThat(choices.get(0).required("label").required("en-US").textValue()).isEqualTo("Version 2");
+        var historical=statistics.capture(firstVersion,AnnouncementStatistics.Filters.all());
+        assertThat(statistics.departments((String)historical.get("snapshotToken"))).anySatisfy(option->{
+            assertThat(option.value()).isEqualTo(department);assertThat(option.label().get("en-US")).isEqualTo("Statistics frozen department");
+        });
+        assertThat(statistics.departments((String)latest.get("snapshotToken"))).anySatisfy(option->{
+            assertThat(option.value()).isEqualTo(department);assertThat(option.label().get("en-US")).isEqualTo("Statistics renamed department");
+        });
     }
 }

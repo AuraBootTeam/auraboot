@@ -69,6 +69,14 @@ public class AnnouncementStatisticsExportSource implements DomainExportSource {
             .set("filters",captured.required("filters"));
     }
 
+    @Override public com.fasterxml.jackson.databind.JsonNode publicMetadata(Prepared prepared) {
+        var captured=prepared.evidence().required("snapshot");var metadata=captured.required("metadata");
+        var view=json.createObjectNode().put("recordPid",metadata.required("recordPid").textValue())
+            .put("title",metadata.required("title").textValue()).put("versionNumber",metadata.required("versionNumber").intValue())
+            .put("snapshotOrigin",metadata.required("snapshotOrigin").textValue());
+        view.setAll((com.fasterxml.jackson.databind.node.ObjectNode)auditMetadata(prepared));return view;
+    }
+
     @Override public ExportResult generate(Prepared prepared,Owner owner,Path output,AsyncTaskExecutor.ProgressCallback progress) {
         if(!prepared.memberPid().equals(owner.memberPid())) throw new AccessDeniedException("Export membership binding changed");
         return actors.call(owner.tenantId(),owner.userId(),owner.memberPid(),()->{

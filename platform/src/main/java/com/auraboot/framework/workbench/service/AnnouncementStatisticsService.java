@@ -21,7 +21,37 @@ public class AnnouncementStatisticsService {
     private final AnnouncementAudienceService audiences;
     private final AnnouncementStatisticsMapper statistics;
     private final AnnouncementCodec codec;
+    private final com.auraboot.framework.i18n.service.I18nService messages;
     @Value("${auraboot.announcement.statistics-max-recipients:50000}") private int maximumRecipients;
+
+    @Transactional(isolation=Isolation.REPEATABLE_READ)
+    public Map<String,Object> captureRecord(String record,AnnouncementStatistics.Filters filters) {
+        access.manage(record,"stats",false);audiences.managementScope("stats");
+        var versions=statistics.versions(MetaContext.getCurrentTenantId(),record);
+        if(versions.isEmpty()) invalid("statistics_unavailable");
+        return capture((String)versions.getFirst().get("pid"),filters);
+    }
+
+    @Transactional(readOnly=true)
+    public List<AnnouncementAudienceService.Option> versions(String record) {
+        access.manage(record,"stats",false);audiences.managementScope("stats");
+        return statistics.versions(MetaContext.getCurrentTenantId(),record).stream().map(row->{
+            Map<String,String> labels=new LinkedHashMap<>();
+            for(String locale:List.of("zh-CN","en-US")) {
+                String label=messages.getMessage(locale,"announcement.statistics.version_option",row.get("version_no"));
+                if(label==null) throw new IllegalStateException("Missing announcement version option translation");
+                labels.put(locale,label);
+            }
+            return new AnnouncementAudienceService.Option((String)row.get("pid"),labels);
+        }).toList();
+    }
+
+    @Transactional(readOnly=true)
+    public List<AnnouncementAudienceService.Option> departments(String token) {
+        authorize(token,"stats",true);
+        return statistics.departments(MetaContext.getCurrentTenantId(),token).stream()
+            .map(row->new AnnouncementAudienceService.Option((String)row.get("value"),(String)row.get("label"))).toList();
+    }
 
     @Transactional(isolation=Isolation.REPEATABLE_READ)
     public Map<String,Object> capture(String version,AnnouncementStatistics.Filters filters) {
@@ -108,7 +138,7 @@ public class AnnouncementStatisticsService {
     }
 
     private Map<String,Object> publicSnapshot(String token,Map<String,Object> snapshot) {
-        return Map.of("snapshotToken",token,"schema",snapshot.get("snapshot_schema"),"asOf",iso(snapshot.get("as_of")),
+        return Map.of("pid",token,"snapshotToken",token,"schema",snapshot.get("snapshot_schema"),"asOf",iso(snapshot.get("as_of")),
             "expiresAt",iso(snapshot.get("view_expires_at")),"versionPid",snapshot.get("version_pid"),
             "metadata",codec.object(snapshot.get("metadata").toString()),"summary",codec.object(snapshot.get("summary").toString()),
             "filters",codec.object(snapshot.get("filters").toString()));

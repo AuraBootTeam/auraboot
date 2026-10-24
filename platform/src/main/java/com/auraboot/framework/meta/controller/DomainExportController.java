@@ -1,7 +1,7 @@
 package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
-import com.auraboot.framework.meta.dto.ExportTaskDTO;
+import com.auraboot.framework.meta.dto.DomainExportTaskDTO;
 import com.auraboot.framework.meta.service.impl.DomainExportTaskService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 public class DomainExportController {
     private final DomainExportTaskService exports;
     @GetMapping("/{taskPid}")
-    public ApiResponse<ExportTaskDTO> status(@PathVariable String taskPid){return ApiResponse.success(exports.status(taskPid));}
+    public ApiResponse<DomainExportTaskDTO> status(@PathVariable String taskPid){return ApiResponse.success(exports.status(taskPid));}
     @GetMapping("/{taskPid}/download")
     public void download(@PathVariable String taskPid,HttpServletResponse response) throws IOException {
         var artifact=exports.download(taskPid);

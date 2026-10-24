@@ -565,5 +565,12 @@
     "en-US": "Canceled",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.version_option",
+    "zh-CN": "第 {0} 版",
+    "en-US": "Version {0}",
+    "source": "import",
+    "refType": "message"
   }
 ]
