@@ -8,5 +8,6 @@ public interface ApprovalSubmissionAccessor {
     Optional<ApprovalContract.SubmittedApproval> findSubmitted(long tenantId,long actorUserId,String submissionId);
     default boolean canStart(long tenantId,long actorUserId,String submissionId) { return false; }
     default boolean canWithdraw(long tenantId,long actorUserId,String submissionId) { return false; }
+    default boolean canExecute(long tenantId,long actorUserId,String submissionId) { return false; }
     default Optional<ApprovalContract.BusinessPreview> preview(long tenantId,long actorUserId,String submissionId) { return Optional.empty(); }
 }

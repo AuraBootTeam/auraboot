@@ -28,7 +28,9 @@ public interface IdentityDirectoryAccessor {
     /** Enabled membership incarnation, used by sealed approval assignments. */
     default TenantUserIdentity findEnabledTenantMembership(Long tenantId, String userPid) { return null; }
 
-    record TenantUserIdentity(UserIdentity user, String memberPid) {}
+    record TenantUserIdentity(UserIdentity user, String memberPid, Long memberId) {
+        public TenantUserIdentity(UserIdentity user,String memberPid) {this(user,memberPid,null);}
+    }
 
     record UserIdentity(Long id, String pid, String username, String displayName) {}
 }

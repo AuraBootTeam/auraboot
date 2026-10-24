@@ -57,6 +57,15 @@ public class AnnouncementApprovalSource implements ApprovalSubmissionSource {
         var record=access.manage((String)row.get("announcement_pid"),"withdraw",false);
         return "pending_approval".equals(record.getStatus()) && row.get("version_pid").equals(record.getCurrentVersionPid());
     }
+    public boolean canExecute(long tenant,long actor,String submission) {
+        var row=store.read(tenant,submission);
+        if(row==null || !Objects.equals(row.get("actor_user_id"),actor) || !Set.of("pending_dispatch","running").contains(row.get("state"))) return false;
+        var member=identities.findEnabledTenantMembership(tenant,MetaContext.getCurrentUserPid());
+        if(member==null || !member.memberPid().equals(row.get("actor_member_pid"))) return false;
+        // This read deliberately does not take the business root after the provider lock.
+        var record=access.manage((String)row.get("announcement_pid"),"submit",false);access.actor("publish");
+        return "pending_approval".equals(record.getStatus()) && row.get("version_pid").equals(record.getCurrentVersionPid());
+    }
 
     public Optional<ApprovalContract.BusinessPreview> preview(long tenant,long actor,String submission) {
         if(!Objects.equals(MetaContext.getCurrentTenantId(),tenant) || !Objects.equals(MetaContext.getCurrentUserId(),actor))

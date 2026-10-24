@@ -49,4 +49,9 @@ public class ApprovalSubmissionAccessorImpl implements ApprovalSubmissionAccesso
         if(results.size()>1) throw new IllegalStateException("Approval preview has multiple business owners");
         return results.stream().findFirst();
     }
+    public boolean canExecute(long tenant,long actor,String submissionId) {
+        var binding=findSubmitted(tenant,actor,submissionId);
+        return binding.isPresent() && sources().stream().filter(source->source.businessType().equals(binding.get().businessRef().type()))
+            .anyMatch(source->source.canExecute(tenant,actor,submissionId));
+    }
 }

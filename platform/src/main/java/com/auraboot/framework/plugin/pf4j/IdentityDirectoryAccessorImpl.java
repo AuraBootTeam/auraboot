@@ -108,7 +108,7 @@ public class IdentityDirectoryAccessorImpl implements IdentityDirectoryAccessor 
         User user=userMapper.selectById(identity.id());
         if(user==null || !user.isEnabled() || Boolean.TRUE.equals(user.getDeletedFlag())) return null;
         TenantMember member=tenantMemberService.findByTenantIdAndUserId(tenantId,identity.id());
-        return member==null ? null : new TenantUserIdentity(identity,member.getPid());
+        return member==null ? null : new TenantUserIdentity(identity,member.getPid(),member.getId());
     }
 
     @Override
