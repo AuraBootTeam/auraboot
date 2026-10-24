@@ -604,6 +604,27 @@ $$;
 
 
 --
+-- Name: ab_guard_domain_export_attempt(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_guard_domain_export_attempt() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  IF NOT EXISTS(SELECT 1 FROM ab_export_task WHERE pid=NEW.export_task_pid AND tenant_id=NEW.tenant_id
+      AND query_code LIKE 'domain:%' AND request_params->>'sourceType'='domain')
+  THEN RAISE EXCEPTION 'Domain export attempt owner binding is invalid'; END IF;
+  RETURN NEW;
+ END IF;
+ IF TG_OP='DELETE' OR (to_jsonb(NEW)-ARRAY['next_cleanup_at','cleanup_count','cleanup_error','cleaned_at'])
+       IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['next_cleanup_at','cleanup_count','cleanup_error','cleaned_at'])
+ THEN RAISE EXCEPTION 'Domain export attempt identity is immutable'; END IF;
+ RETURN NEW;
+END $$;
+
+
+--
 -- Name: ab_guard_immutable_agent_release(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -7915,6 +7936,28 @@ CREATE TABLE public.ab_distributed_lock (
 --
 
 COMMENT ON TABLE public.ab_distributed_lock IS '分布式锁表 - 用于集群环境下的任务协调';
+
+
+--
+-- Name: ab_domain_export_attempt; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_domain_export_attempt (
+    pid character varying(36) NOT NULL,
+    tenant_id bigint NOT NULL,
+    export_task_pid character varying(32) NOT NULL,
+    execution_token character varying(36) NOT NULL,
+    file_key text NOT NULL,
+    temp_path text NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    next_cleanup_at timestamp with time zone NOT NULL,
+    cleanup_count integer DEFAULT 0 NOT NULL,
+    cleanup_error text,
+    cleaned_at timestamp with time zone,
+    CONSTRAINT ab_domain_export_attempt_check CHECK ((expires_at > created_at)),
+    CONSTRAINT ab_domain_export_attempt_cleanup_count_check CHECK ((cleanup_count >= 0))
+);
 
 
 --
@@ -21473,6 +21516,30 @@ ALTER TABLE ONLY public.ab_distributed_lock
 
 
 --
+-- Name: ab_domain_export_attempt ab_domain_export_attempt_file_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_domain_export_attempt
+    ADD CONSTRAINT ab_domain_export_attempt_file_key_key UNIQUE (file_key);
+
+
+--
+-- Name: ab_domain_export_attempt ab_domain_export_attempt_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_domain_export_attempt
+    ADD CONSTRAINT ab_domain_export_attempt_pkey PRIMARY KEY (pid);
+
+
+--
+-- Name: ab_domain_export_attempt ab_domain_export_attempt_temp_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_domain_export_attempt
+    ADD CONSTRAINT ab_domain_export_attempt_temp_path_key UNIQUE (temp_path);
+
+
+--
 -- Name: ab_drt_action_audit ab_drt_action_audit_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -27871,6 +27938,20 @@ CREATE INDEX idx_distributed_lock_expires ON public.ab_distributed_lock USING bt
 
 
 --
+-- Name: idx_domain_export_cleanup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_domain_export_cleanup ON public.ab_domain_export_attempt USING btree (next_cleanup_at);
+
+
+--
+-- Name: idx_domain_export_execution; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_domain_export_execution ON public.ab_domain_export_attempt USING btree (tenant_id, export_task_pid, execution_token);
+
+
+--
 -- Name: idx_drt_action_audit_tenant_time; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -31399,6 +31480,13 @@ CREATE TRIGGER ab_application_release_require_actor BEFORE INSERT ON public.ab_a
 
 
 --
+-- Name: ab_domain_export_attempt ab_domain_export_attempt_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_domain_export_attempt_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_domain_export_attempt FOR EACH ROW EXECUTE FUNCTION public.ab_guard_domain_export_attempt();
+
+
+--
 -- Name: ab_agent_definition trg_agent_definition_initial_release; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -31929,6 +32017,14 @@ ALTER TABLE ONLY public.ab_billing_usage_event
 
 ALTER TABLE ONLY public.ab_cross_tenant_spawn_audit
     ADD CONSTRAINT ab_cross_tenant_spawn_audit_grant_id_fkey FOREIGN KEY (grant_id) REFERENCES public.ab_cross_tenant_grant(id);
+
+
+--
+-- Name: ab_domain_export_attempt ab_domain_export_attempt_export_task_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_domain_export_attempt
+    ADD CONSTRAINT ab_domain_export_attempt_export_task_pid_fkey FOREIGN KEY (export_task_pid) REFERENCES public.ab_export_task(pid);
 
 
 --
