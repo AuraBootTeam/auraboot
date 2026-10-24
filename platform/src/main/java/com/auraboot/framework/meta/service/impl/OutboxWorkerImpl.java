@@ -75,8 +75,11 @@ public class OutboxWorkerImpl implements ReliableIntegrationDispatcher {
 
     @Override
     public DispatchResult dispatchCurrentTenant(String source, Set<String> eventTypes, int limit) {
+        if (!MetaContext.exists()) {
+            throw new SecurityException("Reliable dispatch requires a verified current tenant member");
+        }
         Long tenant = MetaContext.getCurrentTenantId();
-        if (!MetaContext.exists() || tenant == null || tenant <= 0 || MetaContext.getCurrentMemberId() == null
+        if (tenant == null || tenant <= 0 || MetaContext.getCurrentMemberId() == null
                 || MetaContext.getCurrentUserPid() == null || MetaContext.getCurrentUserPid().isBlank()) {
             throw new SecurityException("Reliable dispatch requires a verified current tenant member");
         }

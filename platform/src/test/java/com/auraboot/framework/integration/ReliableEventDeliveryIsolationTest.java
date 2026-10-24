@@ -37,9 +37,13 @@ class ReliableEventDeliveryIsolationTest {
         when(manager.getTransaction(any())).thenAnswer(a -> {
             TransactionDefinition d = a.getArgument(0);
             isolation = d.getIsolationLevel();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+            org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
             assertThat(d.getPropagationBehavior()).isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
             return new SimpleTransactionStatus();
         });
+        org.mockito.Mockito.doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.clear(); return null; }).when(manager).commit(any());
+        org.mockito.Mockito.doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.clear(); return null; }).when(manager).rollback(any());
         when(mapper.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
         when(mapper.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         when(mapper.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
@@ -48,6 +52,7 @@ class ReliableEventDeliveryIsolationTest {
     @AfterEach
     void cleanup() {
         MetaContext.clear();
+        org.springframework.transaction.support.TransactionSynchronizationManager.clear();
     }
     static class Ordinary implements ReliableEventConsumerExtension {
         public String consumerCode() {
@@ -145,5 +150,30 @@ class ReliableEventDeliveryIsolationTest {
         verify(consumer, never()).consume(any());
         verify(mapper, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
         verify(manager).commit(any());
+    }
+
+    @Test
+    void missingTransactionMarkerCannotLockOrApplyEvenWithAValidLease() {
+        when(manager.getTransaction(any())).thenAnswer(call -> {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+            return new SimpleTransactionStatus();
+        });
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, new Ordinary(), "lease")).isInstanceOf(SecurityException.class);
+        verify(mapper, never()).lockActiveDeliveryLease(anyLong(), anyString(), anyString());
+        verify(manager).rollback(any());
+    }
+
+    @Test
+    void readOnlyTransactionCannotLockOrApply() {
+        when(manager.getTransaction(any())).thenAnswer(call -> {
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+            org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
+            return new SimpleTransactionStatus();
+        });
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, new Ordinary(), "lease")).isInstanceOf(SecurityException.class);
+        verify(mapper, never()).lockActiveDeliveryLease(anyLong(), anyString(), anyString());
+        verify(manager).rollback(any());
     }
 }
