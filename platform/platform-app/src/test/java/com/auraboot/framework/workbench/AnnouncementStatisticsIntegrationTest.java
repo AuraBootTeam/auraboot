@@ -341,7 +341,10 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         var options=http.perform(get("/api/announcements/statistics/snapshots/"+token+"/departments")).andExpect(status().isOk()).andReturn().getResponse();
         var departments=json.readTree(options.getContentAsString()).required("data");
         assertThat(departments.findValuesAsText("value")).contains(department);
-        assertThat(departments.toString()).contains("Statistics frozen department").doesNotContain("Statistics renamed department");
+        var capturedDepartment=java.util.stream.StreamSupport.stream(departments.spliterator(),false)
+            .filter(option->department.equals(option.required("value").textValue())).findFirst().orElseThrow();
+        assertThat(capturedDepartment.required("label").required("en-US").textValue()).isEqualTo("Statistics frozen department");
+        assertThat(capturedDepartment.required("label").required("zh-CN").textValue()).isEqualTo("Statistics frozen department");
         int revision=jdbc.queryForObject("SELECT row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,tenant,record);
         var withdrawn=lifecycle.execute("announcement:archive",record,Map.of(),UniqueIdGenerator.generate(),revision);
         assertThat(statistics.captureRecord(record,AnnouncementStatistics.Filters.all()).get("versionPid")).isEqualTo(firstVersion);
