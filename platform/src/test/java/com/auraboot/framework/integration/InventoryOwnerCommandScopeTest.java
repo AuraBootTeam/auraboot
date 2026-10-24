@@ -59,6 +59,8 @@ class InventoryOwnerCommandScopeTest {
 
     @BeforeEach
     void setup() throws Exception {
+        when(receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
+        when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         Path source = directory.resolve("ReliableInventoryEventConsumer.java");
         Files.writeString(source, """
             package com.auraboot.plugins.inventory;

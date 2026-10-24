@@ -71,4 +71,28 @@ class OutboxKnownEventClaimContractTest {
         assertThat(global).contains("WITH candidates AS", "LIMIT ?").doesNotContain("o.event_id = ?");
         assertThat(known(parameters()).getSql()).contains("WITH candidate AS").doesNotContain("LIMIT ?");
     }
+
+    @Test void tenantScopedBatchBindsSourceTypesAndTenantWithoutLegacyFallback() {
+        Configuration configuration = new Configuration(); configuration.addMapper(OutboxEventMapper.class);
+        var parameters = Map.<String,Object>of("tenantId",31L,"source","commerce","eventTypes",List.of("commerce.a","commerce.b"),
+                "limit",2,"leaseOwner","owner","leaseToken","token","leaseUntil",Instant.EPOCH);
+        var statement = configuration.getMappedStatement(OutboxEventMapper.class.getName()+".claimReadyEventsForTenant");
+        BoundSql bound = statement.getBoundSql(parameters);
+        assertThat(bound.getSql()).contains("o.tenant_id = ? AND o.event_source = ? AND o.schema_version IS NOT NULL",
+                "o.event_type IN", "WHERE o.id = c.id AND o.tenant_id = ? AND o.event_source = ?", "FOR UPDATE SKIP LOCKED LIMIT ?");
+        var hostile = new java.util.HashMap<>(parameters);
+        hostile.put("source", "x' OR true --"); hostile.put("eventTypes", List.of("x' OR true --", "other"));
+        assertThat(statement.getBoundSql(hostile).getSql()).isEqualTo(bound.getSql()).doesNotContain("x' OR true --");
+        assertThat(bound.getParameterMappings().stream().map(value -> value.getProperty()).toList())
+                .contains("tenantId", "source", "limit", "leaseOwner", "leaseToken", "leaseUntil");
+    }
+
+    @Test void terminalAndRetryWritesRequireTheUnexpiredCurrentLease() {
+        Configuration configuration = new Configuration(); configuration.addMapper(OutboxEventMapper.class);
+        var values = Map.<String,Object>of("id",1L,"leaseToken","token","nextRetryAt",Instant.EPOCH,"lastError","error");
+        for (String method : List.of("markDeliveredFenced", "recordFailureFenced")) {
+            String sql = configuration.getMappedStatement(OutboxEventMapper.class.getName()+"."+method).getBoundSql(values).getSql();
+            assertThat(sql).contains("WHERE id = ? AND status = 'processing' AND lease_token = ?", "lease_until > clock_timestamp()");
+        }
+    }
 }

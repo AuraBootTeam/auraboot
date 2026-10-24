@@ -90,6 +90,28 @@ public interface OutboxEventMapper {
                                       @Param("leaseToken") String leaseToken,
                                       @Param("leaseUntil") Instant leaseUntil);
 
+    /** A host-authorized current-tenant dispatch cannot claim another source or an unversioned event. */
+    @Select("<script>WITH candidates AS (SELECT o.id FROM ab_outbox o WHERE " +
+            "o.tenant_id = #{tenantId} AND o.event_source = #{source} AND o.schema_version IS NOT NULL " +
+            "AND o.event_type IN <foreach collection='eventTypes' item='type' open='(' separator=',' close=')'>#{type}</foreach> " +
+            "AND ((o.status = 'pending' AND o.next_retry_at &lt;= NOW()) " +
+            "OR (o.status = 'processing' AND o.lease_until &lt; NOW())) " +
+            "AND (o.ordering_key IS NULL OR NOT EXISTS (SELECT 1 FROM ab_outbox earlier " +
+            "WHERE earlier.tenant_id = o.tenant_id AND earlier.ordering_key = o.ordering_key " +
+            "AND earlier.event_sequence &lt; o.event_sequence AND earlier.status IN ('pending', 'processing'))) " +
+            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT #{limit}) " +
+            "UPDATE ab_outbox o SET status = 'processing', lease_owner = #{leaseOwner}, " +
+            "lease_token = #{leaseToken}, lease_until = #{leaseUntil}, claimed_at = NOW() " +
+            "FROM candidates c WHERE o.id = c.id AND o.tenant_id = #{tenantId} " +
+            "AND o.event_source = #{source} RETURNING o.*</script>")
+    List<OutboxEvent> claimReadyEventsForTenant(@Param("tenantId") long tenantId,
+                                              @Param("source") String source,
+                                              @Param("eventTypes") List<String> eventTypes,
+                                              @Param("limit") int limit,
+                                              @Param("leaseOwner") String leaseOwner,
+                                              @Param("leaseToken") String leaseToken,
+                                              @Param("leaseUntil") Instant leaseUntil);
+
     /** Internal exact-event lease claim; never polls or claims another tenant's queue. */
     @Select("<script>WITH candidate AS (" +
             "SELECT o.id FROM ab_outbox o WHERE o.tenant_id = #{tenantId} AND o.event_id = #{eventId} " +
@@ -114,7 +136,8 @@ public interface OutboxEventMapper {
 
     @Update("UPDATE ab_outbox SET status = 'delivered', delivered_at = NOW(), " +
             "lease_owner = NULL, lease_token = NULL, lease_until = NULL " +
-            "WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken}")
+            "WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken} " +
+            "AND lease_until > clock_timestamp()")
     int markDeliveredFenced(@Param("id") Long id, @Param("leaseToken") String leaseToken);
 
     @Update("UPDATE ab_outbox SET status = 'delivered', delivered_at = NOW() WHERE id = #{id}")
@@ -130,7 +153,8 @@ public interface OutboxEventMapper {
     @Update("UPDATE ab_outbox SET retry_count = retry_count + 1, next_retry_at = #{nextRetryAt}, " +
             "last_error = #{lastError}, status = CASE WHEN retry_count + 1 >= max_retries " +
             "THEN 'failed' ELSE 'pending' END, lease_owner = NULL, lease_token = NULL, " +
-            "lease_until = NULL WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken}")
+            "lease_until = NULL WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken} " +
+            "AND lease_until > clock_timestamp()")
     int recordFailureFenced(@Param("id") Long id, @Param("leaseToken") String leaseToken,
                             @Param("nextRetryAt") Instant nextRetryAt,
                             @Param("lastError") String lastError);

@@ -40,6 +40,8 @@ class ReliableEventDeliveryIsolationTest {
             assertThat(d.getPropagationBehavior()).isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
             return new SimpleTransactionStatus();
         });
+        when(mapper.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
+        when(mapper.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         when(mapper.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
         when(mapper.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
     }
@@ -75,7 +77,9 @@ class ReliableEventDeliveryIsolationTest {
         assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_SERIALIZABLE);
         var order = inOrder(manager, mapper);
         order.verify(manager).getTransaction(any());
+        order.verify(mapper).lockActiveDeliveryLease(1L, "id", "lease");
         order.verify(mapper).claimReceipt(1L, "id", "test", "lease");
+        order.verify(mapper).countActiveDeliveryLease(1L, "id", "lease");
         order.verify(mapper).markReceiptApplied(1L, "id", "test", "lease");
         order.verify(manager).commit(any());
     }
@@ -106,5 +110,40 @@ class ReliableEventDeliveryIsolationTest {
         });
         new ReliableEventDeliveryExecutor(mapper, metrics, manager).deliver(event,(ReliableEventConsumerExtension) consumer, "lease");
         assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+    }
+
+    @Test
+    void inactiveLeaseRejectsBeforeReceiptOrEffect() {
+        when(mapper.lockActiveDeliveryLease(1L, "id", "lease")).thenReturn(null);
+        var consumer = mock(ReliableEventConsumerExtension.class);
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, consumer, "lease")).isInstanceOf(IllegalStateException.class).hasMessageContaining("lease");
+        verify(mapper, never()).claimReceipt(anyLong(), anyString(), anyString(), anyString());
+        verify(consumer, never()).consume(any());
+        verify(manager).rollback(any());
+    }
+
+    @Test
+    void expiryAfterEffectRollsBackBeforeAppliedReceipt() {
+        when(mapper.countActiveDeliveryLease(1L, "id", "lease")).thenReturn(0);
+        var consumer = mock(ReliableEventConsumerExtension.class);
+        when(consumer.consumerCode()).thenReturn("test");
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, consumer, "lease")).isInstanceOf(IllegalStateException.class).hasMessageContaining("lease");
+        verify(consumer).consume(event);
+        verify(mapper, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(manager).rollback(any());
+    }
+
+    @Test
+    void activeDuplicateSkipsEffectButStillRequiresCurrentLease() {
+        when(mapper.claimReceipt(1L, "id", "test", "lease")).thenReturn(0);
+        var consumer = mock(ReliableEventConsumerExtension.class);
+        when(consumer.consumerCode()).thenReturn("test");
+        new ReliableEventDeliveryExecutor(mapper, metrics, manager).deliver(event, consumer, "lease");
+        verify(mapper).lockActiveDeliveryLease(1L, "id", "lease");
+        verify(consumer, never()).consume(any());
+        verify(mapper, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(manager).commit(any());
     }
 }
