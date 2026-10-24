@@ -86,6 +86,9 @@ class AgentChatPortImplToolLoopTest {
     @Mock private ToolLoopService toolLoopService;
     @Mock private ToolAclChecker toolAclChecker;
 
+    @Mock private com.auraboot.framework.agent.trace.AiTraceService traces;
+    private final com.auraboot.framework.agent.trace.TraceContext trace =
+            com.auraboot.framework.agent.trace.TraceContext.builder().traceId("named-trace").build();
     private AgentChatPortImpl service;
 
     private static final long TENANT_ID = 1L;
@@ -99,7 +102,7 @@ class AgentChatPortImplToolLoopTest {
     }
 
     private AgentChatPortImpl newService(DefaultAgentReducer reducer) {
-        return new AgentChatPortImpl(
+        var result = new AgentChatPortImpl(
                 dynamicDataMapper,
                 providerFactory,
                 toolProviderRegistry,
@@ -113,6 +116,9 @@ class AgentChatPortImplToolLoopTest {
                 reducer,
                 new ChatTurnRuntime(),
                 new PendingToolSnapshotFactory(new AgentRuntimeStateFactory()));
+        ReflectionTestUtils.setField(result, "aiTraceService", traces);
+        lenient().when(traces.createTrace(any(), any(), any(), any(), anyMap(), any())).thenReturn(trace);
+        return result;
     }
 
     // =========================================================================
@@ -388,10 +394,47 @@ class AgentChatPortImplToolLoopTest {
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
         TurnOutcome.Success success = (TurnOutcome.Success) outcome;
         assertThat(success.finalResponse()).isEqualTo("Acme PCB is available.");
+        verify(traces).endTrace(trace, "Acme PCB is available.", "success");
         verify(sink).onTextChunk("Acme PCB is available.");
         verify(sink).onDone("Acme PCB is available.", null);
         // Final-turn message tape persisted so the next turn can rehydrate.
         verify(chatMessageTapeStore).storeConversationMessages(eq(SESSION_ID), any());
+    }
+
+    @Test
+    void traceStorageFailureDoesNotChangeSuccessfulTurnOrRepeatTheProviderCall() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
+        when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
+                .thenReturn(endTurnResponse("Completed once."));
+        org.mockito.Mockito.doThrow(new IllegalStateException("trace unavailable"))
+                .when(traces).endTrace(trace, "Completed once.", "success");
+
+        TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Hello"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        verify(provider).chat(any(LlmChatRequest.class), anyString(), anyString());
+        verify(sink).onDone("Completed once.", null);
+        verify(traces, never()).endTraceWithError(any(), any());
+    }
+
+    @Test
+    void contextAssemblyFailureClosesTheTraceAndRethrowsTheOriginalFailure() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
+        var adapter = org.mockito.Mockito.mock(AgentChatContextAdapter.class);
+        var failure = new IllegalStateException("context unavailable");
+        when(adapter.assembleWithDiagnostics(any(), any(), any())).thenThrow(failure);
+        ReflectionTestUtils.setField(service, "contextAdapter", adapter);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                service.runAgentTurn(newTurnContext(), newRequest("Hello"), sink)).isSameAs(failure);
+
+        verify(traces).endTraceWithError(trace, "context unavailable");
+        verify(provider, never()).chat(any(), any(), any());
     }
 
     @Test
@@ -772,6 +815,7 @@ class AgentChatPortImplToolLoopTest {
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
         TurnOutcome.Failed failed = (TurnOutcome.Failed) outcome;
+        verify(traces).endTraceWithError(trace, failed.errorMessage());
         assertThat(failed.errorMessage())
                 .contains("required tool call")
                 .contains("openai")
@@ -1287,6 +1331,7 @@ class AgentChatPortImplToolLoopTest {
         TurnOutcome.PendingConfirmation pending = (TurnOutcome.PendingConfirmation) outcome;
         assertThat(pending.pendingTurnId()).isEqualTo(ctx.turnId());
         assertThat(pending.pendingToolId()).isEqualTo("toolu-write");
+        verify(traces).endTrace(trace, pending.partialResponse(), "pending");
 
         // SSE confirmation event with the turnId echoed for the frontend.
         verify(sink).onConfirmRequired(
@@ -1482,6 +1527,7 @@ class AgentChatPortImplToolLoopTest {
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
         TurnOutcome.Failed failed = (TurnOutcome.Failed) outcome;
+        verify(traces).endTraceWithError(trace, failed.errorMessage());
         assertThat(failed.errorMessage())
                 .contains("LLM provider request failed.")
                 .doesNotContain("sk-secret")
