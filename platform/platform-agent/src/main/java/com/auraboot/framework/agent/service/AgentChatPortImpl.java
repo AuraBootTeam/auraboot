@@ -459,25 +459,76 @@ public class AgentChatPortImpl implements AgentChatPort {
                         toolDefs);
         boolean requireInitialToolCall = profile.evidenceFirst();
         List<String> boundKnowledgeBaseIds = boundKnowledgeBaseIds(agentDef);
-        AgentChatContextAdapter.AssemblyResult contextAssembly =
-                traceContextAssembly(ctx, request, boundKnowledgeBaseIds);
-        List<AgentContextBlock> contextBlocks = contextAssembly.blocks();
-        if (!contextAssembly.retrievalEvidence().isEmpty()) {
-            sink.onRetrievalEvidence(contextAssembly.retrievalEvidence());
+        var trace = startNamedAgentTrace(ctx, request);
+        try {
+            AgentChatContextAdapter.AssemblyResult contextAssembly =
+                    traceContextAssembly(ctx, request, boundKnowledgeBaseIds, trace);
+            List<AgentContextBlock> contextBlocks = contextAssembly.blocks();
+            if (!contextAssembly.retrievalEvidence().isEmpty()) {
+                sink.onRetrievalEvidence(contextAssembly.retrievalEvidence());
+            }
+
+            log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
+                    agentCode, providerCode, model, tools.size(), overrides != null);
+
+            // Run the tool loop
+            TurnOutcome outcome = doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
+                    systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink,
+                    effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks, scopedQueryAllowlist);
+            finishNamedAgentTrace(trace, outcome);
+            return outcome;
+        } catch (RuntimeException | Error failure) {
+            finishNamedAgentTrace(trace, new TurnOutcome.Failed(safeExceptionMessage(failure), failure));
+            throw failure;
         }
-
-        log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
-                agentCode, providerCode, model, tools.size(), overrides != null);
-
-        // Run the tool loop
-        return doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
-                systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink,
-                effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks, scopedQueryAllowlist);
     }
 
     // =========================================================================
     // Tool loop
     // =========================================================================
+
+    private com.auraboot.framework.agent.trace.TraceContext startNamedAgentTrace(
+            TurnContext ctx, ChatRequest request) {
+        if (aiTraceService != null) {
+            try {
+                var trace = aiTraceService.createTrace(
+                        ctx != null ? ctx.tenantId() : null,
+                        request != null ? request.getSessionId() : null,
+                        request != null ? request.getMessage() : null,
+                        ctx != null ? ctx.userId() : null,
+                        java.util.Map.of("path", "named_agent",
+                                "agentCode", java.util.Objects.toString(
+                                        ctx != null ? ctx.agentCode() : null, "")),
+                        MetaContext.getOtelTraceId());
+                if (turnEvalTelemetryRegistry != null && ctx != null && trace != null) {
+                    turnEvalTelemetryRegistry.recordTrace(ctx.turnId(), trace.getTraceId());
+                }
+                return trace;
+            } catch (Exception failure) {
+                log.warn("Could not start the named-agent trace: {}", failure.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private void finishNamedAgentTrace(com.auraboot.framework.agent.trace.TraceContext trace,
+                                       TurnOutcome outcome) {
+        if (aiTraceService == null || trace == null) return;
+        try {
+            if (outcome instanceof TurnOutcome.Success success) {
+                aiTraceService.endTrace(trace, success.finalResponse(), "success");
+            } else if (outcome instanceof TurnOutcome.Failed failed) {
+                aiTraceService.endTraceWithError(trace, failed.errorMessage());
+            } else if (outcome instanceof TurnOutcome.PendingConfirmation pending) {
+                aiTraceService.endTrace(trace, pending.partialResponse(), "pending");
+            } else if (outcome instanceof TurnOutcome.Interrupted interrupted) {
+                aiTraceService.endTrace(trace, interrupted.partialResponse(), "interrupted");
+            }
+        } catch (Exception failure) {
+            // Observability must not change the turn result or trigger a second execution.
+            log.warn("Could not finish the named-agent trace: {}", failure.getMessage());
+        }
+    }
 
     /**
      * Assemble the context blocks and record what they contained.
@@ -494,30 +545,18 @@ public class AgentChatPortImpl implements AgentChatPort {
     private AgentChatContextAdapter.AssemblyResult traceContextAssembly(
             TurnContext ctx,
             ChatRequest request,
-            List<String> boundKnowledgeBaseIds) {
+            List<String> boundKnowledgeBaseIds,
+            com.auraboot.framework.agent.trace.TraceContext trace) {
         if (turnEvalTelemetryRegistry != null && ctx != null) {
             turnEvalTelemetryRegistry.recordInput(
                     ctx.turnId(), request != null ? request.getMessage() : null);
         }
-        com.auraboot.framework.agent.trace.TraceContext trace = null;
         com.auraboot.framework.agent.trace.SpanContext span = null;
         if (aiTraceService != null) {
             try {
-                trace = aiTraceService.createTrace(
-                        ctx != null ? ctx.tenantId() : null,
-                        request != null ? request.getSessionId() : null,
-                        request != null ? request.getMessage() : null,
-                        ctx != null ? ctx.userId() : null,
-                        java.util.Map.of("path", "named_agent",
-                                "agentCode", java.util.Objects.toString(
-                                        ctx != null ? ctx.agentCode() : null, "")),
-                        MetaContext.getOtelTraceId());
                 span = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
-                if (turnEvalTelemetryRegistry != null && ctx != null && trace != null) {
-                    turnEvalTelemetryRegistry.recordTrace(ctx.turnId(), trace.getTraceId());
-                }
-            } catch (Exception e) {
-                log.warn("Could not start the named-agent prompt span: {}", e.getMessage());
+            } catch (Exception failure) {
+                log.warn("Could not start the named-agent prompt span: {}", failure.getMessage());
             }
         }
 
@@ -896,7 +935,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         return tools;
     }
 
-    private String safeExceptionMessage(Exception e) {
+    private String safeExceptionMessage(Throwable e) {
         if (e == null) {
             return "Unknown error";
         }
