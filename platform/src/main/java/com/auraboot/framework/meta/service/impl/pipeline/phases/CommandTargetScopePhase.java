@@ -137,6 +137,7 @@ public class CommandTargetScopePhase implements CommandPhase {
                         com.auraboot.framework.meta.service.CommandHandlerContext.builder()
                                 .commandCode(ctx.getCommandCode()).modelCode(ctx.getCommand().getModelCode())
                                 .targetRecordId(ctx.getRequest().getTargetRecordId())
+                                .payload(ctx.getRequest().getPayload())
                                 .tenantId(ctx.getTenantId()).userId(ctx.getUserId()).build());
                 if (revision < 1) throw new IllegalStateException("Target authorizer returned an invalid revision");
                 ctx.setTargetRecordVersion(revision);

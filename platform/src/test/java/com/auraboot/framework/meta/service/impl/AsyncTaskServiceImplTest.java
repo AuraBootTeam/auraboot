@@ -85,6 +85,31 @@ class AsyncTaskServiceImplTest {
         }
     }
 
+    @Test
+    void domainExportQueueCannotBeDeletedDuringItsArtifactRetention() {
+        for (String status : List.of("completed", "failed", "cancelled")) {
+            AsyncTask task = new AsyncTask();task.setId(101L);task.setTaskCode(status);
+            task.setTaskType("domain-export");task.setStatus(status);task.setCreatedAt(java.time.Instant.now());
+            when(asyncTaskMapper.findByTaskCode(status)).thenReturn(task);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.deleteTask(status))
+                    .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                    .hasMessage("$i18n:export.domain_task_retained");
+        }
+        verify(asyncTaskMapper, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void domainExportQueueDeletionRequiresKnownExpiredRetention() {
+        AsyncTask task = new AsyncTask();task.setId(102L);task.setTaskCode("retained");
+        task.setTaskType("domain-export");task.setStatus("failed");
+        when(asyncTaskMapper.findByTaskCode("retained")).thenReturn(task);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.deleteTask("retained"))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        verify(asyncTaskMapper, never()).deleteById(anyLong());
+        task.setCreatedAt(java.time.Instant.now().minus(java.time.Duration.ofHours(25)));
+        service.deleteTask("retained");verify(asyncTaskMapper).deleteById(102L);
+    }
+
     private AsyncTaskSubmitRequest request() {
         AsyncTaskSubmitRequest req = new AsyncTaskSubmitRequest();
         req.setTaskType("command-handler");

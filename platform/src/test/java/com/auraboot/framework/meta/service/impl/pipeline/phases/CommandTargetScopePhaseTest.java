@@ -476,12 +476,14 @@ class CommandTargetScopePhaseTest {
     void springOwnerReauthorizesTombstoneBeforeReplay() {
         var owner = nativeOwner();
         var ctx = nativeTarget();
+        ctx.getRequest().setPayload(Map.of("snapshotToken", "bound-capture"));
         when(owner.authorizeTarget(any())).thenReturn(4L);
         phase().execute(ctx);
         assertThat(ctx.getTargetRecordVersion()).isEqualTo(4L);
         assertThat(ctx.getTargetRecordReadable()).isTrue();
         verify(owner).authorizeTarget(argThat(input -> input.getTargetRecordId().equals("REC-1")
-                && input.getTenantId().equals(1L) && input.getUserId().equals(42L)));
+                && input.getTenantId().equals(1L) && input.getUserId().equals(42L)
+                && input.getPayload().equals(Map.of("snapshotToken", "bound-capture"))));
         verifyNoInteractions(dynamicDataService);
         MetaContext.clear();
     }

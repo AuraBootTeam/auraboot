@@ -261,6 +261,12 @@ public class AsyncTaskServiceImpl {
             if (!task.isTerminal()) {
                 throw new MetaServiceException("Only terminal tasks can be deleted (current: " + task.getStatus() + ")");
             }
+            // A domain export still derives failed/cancelled status from this owner-bound queue row.
+            if (DomainExportTaskService.TASK_TYPE.equals(task.getTaskType())
+                    && (task.getCreatedAt() == null || Instant.now().isBefore(
+                            task.getCreatedAt().plus(DomainExportTaskService.ARTIFACT_RETENTION)))) {
+                throw com.auraboot.framework.exception.BusinessException.i18n("export.domain_task_retained");
+            }
             asyncTaskMapper.deleteById(task.getId());
             log.info("Async task deleted: code={}", taskCode);
         });

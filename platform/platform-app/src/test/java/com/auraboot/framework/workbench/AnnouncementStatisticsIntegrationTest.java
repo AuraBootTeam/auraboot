@@ -48,6 +48,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired com.auraboot.module.exchange.service.ExecutionJobQueryService executionJobs;
     @Autowired com.auraboot.framework.infrastructure.storage.StorageProperties storageProperties;
     @Autowired AnnouncementStatisticsExportCommand exportCommand;
+    @Autowired com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl backgroundTasks;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
     @Autowired UserPermissionService permissions;
@@ -234,6 +235,27 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
         }
     }
+    @Test void canceledExportQueueCannotBeDeletedWhileItsOwnerStatusIsStillAvailable() throws Exception {
+        importExportTranslations();
+        String version=publish();String token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+        String pid=new TransactionTemplate(transactions).execute(state->{
+            var submitted=exportTasks.submit(AnnouncementStatisticsExportSource.CODE,token);
+            var row=exportRegistry.findByPid(submitted.getPid());
+            String code=row.getRequestParams().required("asyncTaskCode").textValue();
+            assertThat(backgroundTasks.cancelTask(code).getStatus()).isEqualTo("cancelled");
+            return submitted.getPid();
+        });
+        var row=exportRegistry.findByPid(pid);String code=row.getRequestParams().required("asyncTaskCode").textValue();
+        var denied=http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/async-tasks/"+code))
+                .andExpect(status().isUnprocessableEntity()).andReturn().getResponse();
+        assertThat(denied.getContentAsString()).contains("export.domain_task_retained");
+        assertThat(exportTasks.status(pid).getStatus()).isEqualTo("cancelled");
+        assertThat(exportTasks.status(pid).getDownloadUrl()).isNull();
+        assertThat(backgroundTasks.getTask(code).getStatus()).isEqualTo("cancelled");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_domain_export_attempt WHERE tenant_id=? AND export_task_pid=?",Long.class,
+                getTestTenant().getId(),pid)).isZero();
+    }
+
     @Test void durableExportCompletesWithPrivateArtifactAndEveryReadSurfaceRechecksCurrentSourceAuthority() throws Exception {
         String privateRoot=System.getenv("AURA_FILE_STORAGE_PATH");
         assertThat(privateRoot).as("The managed test invocation must specify its task-owned private artifact directory").isNotBlank();

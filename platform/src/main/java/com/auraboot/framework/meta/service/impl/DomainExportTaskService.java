@@ -27,6 +27,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class DomainExportTaskService {
     public static final String TASK_TYPE="domain-export";
+    public static final Duration ARTIFACT_RETENTION=Duration.ofHours(24);
     private final ExportTaskMapper exports;
     private final DomainExportMapper registry;
     private final AsyncTaskMapper queue;
@@ -51,7 +52,7 @@ public class DomainExportTaskService {
         var task=new ExportTask();task.setPid(UlidGenerator.generate());task.setTenantId(tenant);task.setCreatedBy(actor);
         task.setQueryCode("domain:"+sourceCode);task.setStatus(ExportTask.STATUS_PENDING);task.setProgress(0);
         task.setTotalRows(prepared.rowCount());task.setProcessedRows(0L);task.setFormat(prepared.format());
-        task.setCreatedAt(Instant.now());task.setExpiresAt(task.getCreatedAt().plus(Duration.ofHours(24)));
+        task.setCreatedAt(Instant.now());task.setExpiresAt(task.getCreatedAt().plus(ARTIFACT_RETENTION));
         var metadata=json.createObjectNode().put("sourceType","domain").put("sourceCode",sourceCode).set("prepared",json.valueToTree(prepared));
         task.setRequestParams(metadata);
         if(exports.insert(task)!=1) throw new IllegalStateException("Domain export registry insertion failed");

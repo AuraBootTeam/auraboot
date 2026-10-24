@@ -1988,7 +1988,8 @@
         "method": "get",
         "endpoint": "/api/announcements/statistics/snapshots/{recordPid}",
         "detailEndpoint": "/api/announcements/statistics/snapshots/{recordPid}"
-      }
+      },
+      "headerTitleField": "title"
     },
     "blocks": [
       {
@@ -2051,7 +2052,8 @@
             "permissionCode": "announcement.announcement.export",
             "permissionCodes": [
               "announcement.announcement.stats"
-            ]
+            ],
+            "primary": true
           },
           {
             "code": "filter_statistics",
@@ -2715,7 +2717,8 @@
         "method": "get",
         "endpoint": "/api/exports/domain/{recordPid}",
         "detailEndpoint": "/api/exports/domain/{recordPid}"
-      }
+      },
+      "headerTitleField": "title"
     },
     "blocks": [
       {
@@ -2750,7 +2753,8 @@
             },
             "variant": "primary",
             "visibleWhen": "record.status === 'completed' && record.downloadUrl != null",
-            "permissionCode": "announcement.announcement.export"
+            "permissionCode": "announcement.announcement.export",
+            "primary": true
           },
           {
             "code": "refresh_export",
