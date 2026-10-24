@@ -106,7 +106,8 @@ export interface DataSourceConfig {
   body?: string | Record<string, any>;
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
-  adaptor?: string; // Default: 'optionList'
+  /** Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata. */
+  adaptor?: string;
   /** Explicit path inside completed command data; no fallback. */
   dataPath?: string;
   /** Optional safe projection before commandArray rows seed a scoped form. */

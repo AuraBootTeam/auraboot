@@ -42,6 +42,7 @@ export default function DynamicDetailView() {
   }
   return (
     <DynamicPageRenderer
+      key={`${tableName}:${recordPid}`}
       tableName={tableName}
       pageType="detail"
       recordPid={recordPid}

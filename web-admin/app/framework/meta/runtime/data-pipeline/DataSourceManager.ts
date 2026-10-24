@@ -743,6 +743,8 @@ export class DataSourceManager {
     }
 
     switch (config.adaptor) {
+      case 'raw':
+        return data;
       case 'commandArray':
         return completedCommandArray(data, config);
       case 'commandOptions':

@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import { fetchResult } from '~/shared/services/http-client';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import { canonicalizePageSchemaDto } from '~/framework/meta/utils/canonicalizePageDsl';
+import { mergeDataSources } from '~/framework/meta/utils/extractDataSourcesFromSchema';
+import { readServerTablePage } from '~/framework/meta/rendering/blocks/serverTablePage';
 import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 
 vi.mock('~/shared/services/http-client', () => ({
@@ -12,6 +17,26 @@ vi.mock('~/shared/services/http-client', () => ({
 const mockedFetchResult = vi.mocked(fetchResult);
 
 describe('DataSourceManager', () => {
+  it('preserves real paging metadata through the native statistics configuration and manager defaults', async () => {
+    const pages = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../../../plugins/core-announcement/config/pages.json'), 'utf8'));
+    const page = canonicalizePageSchemaDto(pages.find((candidate: any) => candidate.pageKey === 'announcement_statistics_detail'));
+    const config = mergeDataSources(page).recipients;
+    const context = createExpressionContext({} as any);
+    (context as any).$page = { recordPid: 'capture-fixture' };
+    const manager = new DataSourceManager(context);
+    const records = Array.from({ length: 3 }, (_, i) => ({ pid: `recipient-${i}`, displayName: `Person ${i}` }));
+    const wire = { records, total: 3, pageNum: 1, pageSize: 20, asOf: '2026-10-25T00:00:00Z' };
+    mockedFetchResult.mockResolvedValueOnce({ code: '0', data: wire } as any);
+    manager.register('recipients', { ...config, autoFetch: false });
+    await manager.fetch('recipients');
+    expect(mockedFetchResult).toHaveBeenCalledExactlyOnceWith('/api/announcements/statistics/snapshots/capture-fixture/recipients', {
+      method: 'get', params: { pageNum: 1, pageSize: 20 },
+    });
+    expect(manager.getData('recipients')).toEqual(wire);
+    expect(readServerTablePage(manager.getData('recipients'))).toEqual({ current: 1, pageSize: 20, total: 3 });
+    manager.destroy();
+  });
+
   beforeEach(() => {
     mockedFetchResult.mockReset();
   });
