@@ -6,7 +6,8 @@ import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.bi.service.ReportExportService;
 import com.auraboot.framework.bi.service.ReportStorageService;
-import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.integration.TestIdGenerator;
 import com.auraboot.framework.meta.entity.AuditTrail;
@@ -177,7 +178,9 @@ class ReportExportServiceReadSwitchIT extends BaseIntegrationTest {
         request.setReportPid("missing-report-definition");
 
         assertThatThrownBy(() -> reportExportService.exportExcel(request))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("Report not found");
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Report not found")
+                .satisfies(failure -> assertThat(((BusinessException) failure).getResponseCode())
+                        .isEqualTo(ResponseCode.NOT_FOUND));
     }
 }

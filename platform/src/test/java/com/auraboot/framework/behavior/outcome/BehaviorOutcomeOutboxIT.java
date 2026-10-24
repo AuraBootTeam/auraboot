@@ -50,7 +50,9 @@ class BehaviorOutcomeOutboxIT {
 
     @BeforeEach
     void setup() {
-        ensureTables();
+        TransactionTemplate setup = new TransactionTemplate(transactionManager);
+        setup.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+        setup.executeWithoutResult(status -> ensureTables());
         cleanup();
     }
 

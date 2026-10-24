@@ -2,12 +2,18 @@ package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.ConflictException;
+import com.auraboot.framework.application.exception.ResourceNotFoundException;
+import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.*;
 import com.auraboot.framework.meta.mapper.*;
 import com.auraboot.framework.meta.template.dto.CrudTemplateConfig;
 import com.auraboot.framework.meta.template.generator.DslGenerator;
 import com.auraboot.framework.meta.template.service.impl.TemplateGeneratorServiceImpl;
+import com.auraboot.framework.permission.dto.PermissionDTO;
+import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +35,8 @@ class TemplateGeneratorStubUpgradeTest {
     @Mock PageSchemaService pages;
     @Mock PageSchemaMapper pageMapper;
     @Mock DslGenerator dsl;
+    @Mock PermissionService permissions;
+    @Mock UserPermissionService userPermissions;
     @Spy ObjectMapper json = new ObjectMapper();
     @InjectMocks TemplateGeneratorServiceImpl generator;
 
@@ -60,6 +68,74 @@ class TemplateGeneratorStubUpgradeTest {
         var binding = new ModelFieldBinding(); binding.setFieldId(2L);
         when(models.getModelFieldBindings(1L, true)).thenReturn(List.of(binding));
         when(fields.findByIds(List.of(2L))).thenReturn(List.of(new Field()));
+    }
+
+    private CrudTemplateConfig permissionGeneration() {
+        var config = config("form");
+        config.setCreatePermissions(true);
+        when(userPermissions.hasPermission(99L, MetaPermission.PERMISSION_MANAGE)).thenReturn(true);
+        bindFields();
+        var generated = new PageSchema();
+        generated.setKind("form"); generated.setName("Customer form"); generated.setBlocks("[]");
+        when(dsl.generateFormPage(any(), anyList(), anyList(), any())).thenReturn(generated);
+        var created = stub("form");
+        when(pages.create(any())).thenReturn(created);
+        when(pages.publish(created.getPid())).thenReturn(created);
+        return config;
+    }
+
+    private PermissionDTO permission(String action, long id) {
+        var value = new PermissionDTO();
+        value.setId(id); value.setPid("permission-" + id); value.setTenantId(7L);
+        value.setCode("model.customer." + action); value.setName("Customer " + action);
+        value.setResourceType("model"); value.setResourceCode("customer"); value.setAction(action);
+        value.setStatus(StatusConstants.ACTIVE); value.setParentId(77L); value.setSource("generated");
+        value.setDataScopeType("SELF");
+        return value;
+    }
+
+    @Test void reusesRegisteredModelPermissionsWithoutChangingTheirPolicyOrHierarchy() {
+        var config = permissionGeneration();
+        List<String> actions = List.of("read", "create", "update", "delete");
+        var existing = new ArrayList<PermissionDTO>();
+        for (int i = 0; i < actions.size(); i++) {
+            var value = permission(actions.get(i), 100L + i); existing.add(value);
+            when(permissions.findByCode(value.getCode())).thenReturn(value);
+        }
+        when(permissions.findByCode("model.customer.export"))
+                .thenThrow(new ResourceNotFoundException("Permission not found: model.customer.export"));
+        when(permissions.create(argThat(request -> "export".equals(request.getAction())
+                && "model".equals(request.getResourceType()) && "customer".equals(request.getResourceCode()))))
+                .thenReturn(permission("export", 104L));
+        var result = generator.generateCrudPages("customer", config);
+        assertThat(result.getGeneratedResources().getPermissions()).extracting(value -> value.getId())
+                .containsExactly("100", "101", "102", "103", "104");
+        for (var value : existing) {
+            assertThat(value.getParentId()).isEqualTo(77L);
+            assertThat(value.getDataScopeType()).isEqualTo("SELF");
+            assertThat(value.getSource()).isEqualTo("generated");
+        }
+        verify(permissions, times(1)).create(any());
+        verify(permissions, never()).update(anyLong(), any());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"tenant", "type", "resource", "action", "status", "code"})
+    void refusesRebindingOrReactivatingExistingPermissions(String mismatch) {
+        var config = permissionGeneration();
+        var existing = permission("read", 100L);
+        switch (mismatch) {
+            case "tenant" -> existing.setTenantId(8L);
+            case "type" -> existing.setResourceType("command");
+            case "resource" -> existing.setResourceCode("another_model");
+            case "action" -> existing.setAction("delete");
+            case "status" -> existing.setStatus(StatusConstants.DEPRECATED);
+            default -> existing.setCode("model.another_model.read");
+        }
+        when(permissions.findByCode("model.customer.read")).thenReturn(existing);
+        assertThatThrownBy(() -> generator.generateCrudPages("customer", config))
+                .isInstanceOf(ConflictException.class);
+        verify(permissions, never()).create(any());
+        verify(permissions, never()).update(anyLong(), any());
     }
 
     @ParameterizedTest @ValueSource(strings = {"list", "form", "detail"})

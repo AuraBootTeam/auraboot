@@ -355,17 +355,17 @@ test('bootstrap fixture requires fresh state and preserves immutable tenant bind
 function memoryFixture(t) {
   const root=mkdtempSync(path.join(tmpdir(),'backend-memory-'));
   t.after(()=>rmSync(root,{recursive:true,force:true}));
-  for(const [directory,current,high,max] of [['parent',2,16,18],['parent/agent',3,10,14]]) {
+  for(const [directory,current,high,max] of [['parent',2,16,18],['parent/agent',0.5,10,14]]) {
     const folder=path.join(root,directory);mkdirSync(folder,{recursive:true});
     for(const [file,value] of Object.entries({'memory.current':current,'memory.high':high,'memory.max':max}))
       writeFileSync(path.join(folder,file),String(value*1024**3)+'\n');
-    writeFileSync(path.join(folder,'memory.stat'),'file 0\ninactive_file 0\nfile_dirty 0\nfile_writeback 0\nfile_mapped 0\nshmem 0\n');
+    writeFileSync(path.join(folder,'memory.stat'),'file 0\ninactive_file 0\nfile_dirty 0\nfile_writeback 0\nfile_mapped 0\nshmem 0\nkernel 0\nslab 0\nslab_reclaimable 0\n');
   }
   return {root,membership:'0::/parent/agent\n'};
 }
 test('CI JVM admission accounts for every finite ancestor soft and hard limit before execution',t=>{
   const input=memoryFixture(t),plan=inspectMemoryBudget(input);
-  assert.equal(plan.requiredBytes,String(6*1024**3));assert.equal(plan.admitted,true);
+  assert.equal(plan.requiredBytes,String(9*1024**3));assert.equal(plan.admitted,true);
   assert.equal(plan.limits.length,4);assert.equal(plan.kernelLimitsChanged,false);
   assert.equal(plan.testDenominatorChanged,false);
   writeFileSync(path.join(input.root,'parent/memory.current'),String(13*1024**3));
@@ -377,17 +377,17 @@ test('CI JVM admission accounts for every finite ancestor soft and hard limit be
   writeFileSync(path.join(input.root,'parent/agent/memory.current'),String(5*1024**3));
   assert.equal(inspectMemoryBudget(input).admitted,false,'existing child usage must be included');
 });
-test('only clean unmapped inactive file pages release budget; anonymous and protected pages still block',t=>{
+test('only clean unmapped file pages release budget; anonymous and protected pages still block',t=>{
   const input=memoryFixture(t),folder=path.join(input.root,'parent/agent'),gib=1024**3;
-  writeFileSync(path.join(folder,'memory.current'),String(6*gib));
-  const stats=overrides=>Object.entries({file:4*gib,inactive_file:3*gib,file_dirty:0,file_writeback:0,file_mapped:0,shmem:0,...overrides})
+  writeFileSync(path.join(folder,'memory.current'),String(4*gib));
+  const stats=overrides=>Object.entries({file:3*gib,inactive_file:2*gib,file_dirty:0,file_writeback:0,file_mapped:0,shmem:0,kernel:0,slab:0,slab_reclaimable:0,...overrides})
     .map(([key,value])=>`${key} ${value}`).join('\n')+'\n';
   writeFileSync(path.join(folder,'memory.stat'),stats({}));
   let plan=inspectMemoryBudget(input);assert.equal(plan.admitted,true);
-  assert.equal(plan.requiredBytes,String(6*gib));assert.equal(plan.accounting,'protected-working-set-v1');
+  assert.equal(plan.requiredBytes,String(9*gib));assert.equal(plan.accounting,'protected-working-set-v2');
   const soft=plan.limits.find(row=>row.directory===folder&&row.file==='memory.high');
-  assert.equal(soft.rawAvailableBytes,String(4*gib));assert.equal(soft.reclaimableFileBytes,String(3*gib));
-  assert.equal(soft.protectedBytes,String(3*gib));assert.equal(soft.availableBytes,String(7*gib));
+  assert.equal(soft.rawAvailableBytes,String(6*gib));assert.equal(soft.reclaimableFileBytes,String(3*gib));
+  assert.equal(soft.protectedBytes,String(1*gib));assert.equal(soft.availableBytes,String(9*gib));
   for(const key of ['file_dirty','file_writeback','file_mapped','shmem']) {
     writeFileSync(path.join(folder,'memory.stat'),stats({[key]:3*gib}));
     assert.equal(inspectMemoryBudget(input).admitted,false,`${key} pages cannot fund the JVM reservation`);
@@ -406,6 +406,20 @@ test('missing, duplicate, malformed or inconsistent file accounting cannot assum
     writeFileSync(file,invalid);assert.throws(()=>inspectMemoryBudget(input),/kernel.*statistics/);
   }
   rmSync(file);assert.throws(()=>inspectMemoryBudget(input),/ENOENT/);
+});
+test('only explicitly reclaimable kernel slab can fund the unchanged full test heap',t=>{
+  const input=memoryFixture(t),folder=path.join(input.root,'parent/agent'),gib=1024**3;
+  writeFileSync(path.join(folder,'memory.current'),String(2*gib));
+  const stats=reclaimable=>`file 0\ninactive_file 0\nfile_dirty 0\nfile_writeback 0\nfile_mapped 0\nshmem 0\nkernel ${2*gib}\nslab ${2*gib}\nslab_reclaimable ${reclaimable}\n`;
+  writeFileSync(path.join(folder,'memory.stat'),stats(gib));
+  const plan=inspectMemoryBudget(input),soft=plan.limits.find(row=>row.directory===folder&&row.file==='memory.high');
+  assert.equal(plan.resources.testHeapMiB,6144,'preserve the original six-GiB complete-suite heap');
+  assert.equal(plan.requiredBytes,String(9*gib));assert.equal(plan.admitted,true);
+  assert.equal(soft.reclaimableSlabBytes,String(gib));assert.equal(soft.protectedBytes,String(gib));
+  writeFileSync(path.join(folder,'memory.stat'),stats(0));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'in-use kernel memory remains occupied');
+  writeFileSync(path.join(folder,'memory.stat'),stats(3*gib));
+  assert.throws(()=>inspectMemoryBudget(input),/kernel slab/);
 });
 test('unknown or incomplete memory boundaries fail closed without assuming an unlimited worker',t=>{
   const input=memoryFixture(t);
