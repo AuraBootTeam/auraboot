@@ -265,7 +265,7 @@ export default function FormDialog() {
       }
       if (
         ['select', 'segmented'].includes(field.type || '') &&
-        value !== undefined &&
+        value != null &&
         value !== ''
       ) {
         const options = visibleOptions(field, state.fieldOptions, formData);
