@@ -296,8 +296,10 @@ public class AsyncTaskServiceImpl {
      */
     @Async("asyncTaskExecutor")
     public void executeTaskAsync(Long taskId, Long tenantId) {
-        AsyncTask task = asyncTaskMapper.selectById(taskId);
-        if (task == null) {
+        // The trusted registry lookup can run after restart with no caller identity.
+        // Verify the persisted tenant before claiming or exposing the job to an executor.
+        AsyncTask task = MetaContext.runWithoutTenantFilter(() -> asyncTaskMapper.selectById(taskId));
+        if (task == null || !java.util.Objects.equals(tenantId, task.getTenantId())) {
             log.warn("Task not found for execution: taskId={}", taskId);
             return;
         }
@@ -310,7 +312,7 @@ public class AsyncTaskServiceImpl {
 
         // Claim once even if after-commit dispatch and recovery race.
         String token = UUID.randomUUID().toString();
-        if (asyncTaskMapper.claimPending(task.getId(), tenantId, token) != 1) return;
+        if (MetaContext.runWithoutTenantFilter(() -> asyncTaskMapper.claimPending(task.getId(), tenantId, token)) != 1) return;
         task.setExecutionToken(token);
         Execution execution = new Execution(taskId, tenantId, token, Thread.currentThread(),
                 new java.util.concurrent.atomic.AtomicBoolean(true));
@@ -329,20 +331,24 @@ public class AsyncTaskServiceImpl {
             }
             // Create a progress callback that persists to DB
             AsyncTaskExecutor.ProgressCallback callback = (percentage, message) -> {
-                if (asyncTaskMapper.updateOwnedProgress(task.getId(), tenantId, token,
-                        Math.max(0, Math.min(percentage, 99)), message) != 1) {
+                if (MetaContext.runWithoutTenantFilter(() -> asyncTaskMapper.updateOwnedProgress(task.getId(), tenantId, token,
+                        Math.max(0, Math.min(percentage, 99)), message)) != 1) {
                     throw new IllegalStateException("Async task execution lease is no longer owned");
                 }
             };
 
             // Execute with timeout awareness
-            AsyncTaskResult result = executor.execute(task.getInputParams(), callback);
+            AsyncTaskResult result;
+            try (var scope = AsyncTaskExecutionContext.enter(new AsyncTaskExecutionContext.Snapshot(
+                    task.getId(), task.getTaskCode(), task.getTenantId(), task.getCreatedBy(), token))) {
+                result = executor.execute(task.getInputParams(), callback);
+            }
 
             if (Thread.currentThread().isInterrupted()) {
                 // Task was cancelled during execution
                 task.setStatus(AsyncTask.STATUS_CANCELLED);
                 task.setCancelledAt(Instant.now());
-                asyncTaskMapper.finishOwned(task);
+                finishOwnedTask(task);
                 log.info("Task execution interrupted (cancelled): code={}", task.getTaskCode());
                 return;
             }
@@ -353,7 +359,7 @@ public class AsyncTaskServiceImpl {
                 task.setProgressMessage("Completed");
                 task.setResultData(result.getData());
                 task.setCompletedAt(Instant.now());
-                if (asyncTaskMapper.finishOwned(task) != 1) return;
+                if (finishOwnedTask(task) != 1) return;
                 log.info("Async task completed: code={}, type={}", task.getTaskCode(), task.getTaskType());
             } else {
                 handleFailure(task, result.getErrorMessage(), result.isRetryable());
@@ -363,7 +369,7 @@ public class AsyncTaskServiceImpl {
             if (Thread.currentThread().isInterrupted()) {
                 task.setStatus(AsyncTask.STATUS_CANCELLED);
                 task.setCancelledAt(Instant.now());
-                asyncTaskMapper.finishOwned(task);
+                finishOwnedTask(task);
                 log.info("Task execution interrupted by cancellation: code={}", task.getTaskCode());
             } else {
                 log.error("Async task execution failed: code={}, type={}",
@@ -404,6 +410,11 @@ public class AsyncTaskServiceImpl {
 
     // ==================== Private Helpers ====================
 
+    private int finishOwnedTask(AsyncTask task) {
+        // Only the registry write bypasses ambient identity; SQL requires tenant/id/live execution token.
+        return MetaContext.runWithoutTenantFilter(() -> asyncTaskMapper.finishOwned(task));
+    }
+
     /**
      * Handle task failure with optional retry.
      */
@@ -422,7 +433,7 @@ public class AsyncTaskServiceImpl {
                     task.getRetryCount(), task.getMaxRetries(), task.getTaskCode(), errorMessage);
             task.setStatus(AsyncTask.STATUS_PENDING);
             task.setProgressMessage("Retry " + task.getRetryCount() + "/" + task.getMaxRetries());
-            if (asyncTaskMapper.finishOwned(task) != 1) return;
+            if (finishOwnedTask(task) != 1) return;
 
             // Re-submit for execution via self-proxy
             triggerExecution(task.getId(), task.getTenantId());
@@ -435,7 +446,7 @@ public class AsyncTaskServiceImpl {
         task.setStatus(AsyncTask.STATUS_FAILED);
         task.setErrorMessage(errorMessage);
         task.setCompletedAt(Instant.now());
-        if (asyncTaskMapper.finishOwned(task) != 1) return;
+        if (finishOwnedTask(task) != 1) return;
         log.error("Async task failed permanently: code={}, error={}", task.getTaskCode(), errorMessage);
     }
 

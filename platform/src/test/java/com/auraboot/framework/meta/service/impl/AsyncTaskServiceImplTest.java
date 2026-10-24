@@ -228,6 +228,39 @@ class AsyncTaskServiceImplTest {
         }
     }
 
+    @Test void executorIdentityComesFromTheClaimedRowWithoutPropagatingRegistryBypass() {
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+        AsyncTask task=executableTask();task.setCreatedBy(45L);
+        task.setInputParams(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("tenantId",999).put("createdBy",999));
+        when(asyncTaskMapper.selectById(1L)).thenAnswer(invocation->{
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isTrue();return task;
+        });
+        when(asyncTaskMapper.updateOwnedProgress(eq(1L),eq(123L),any(),eq(50),eq("progress"))).thenAnswer(invocation->{
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isTrue();return 1;
+        });
+        when(executor.execute(any(),any())).thenAnswer(invocation->{
+            var claimed=AsyncTaskExecutionContext.require();
+            assertThat(claimed.taskId()).isEqualTo(1L);assertThat(claimed.taskCode()).isEqualTo("TASK-1");
+            assertThat(claimed.tenantId()).isEqualTo(123L);assertThat(claimed.createdBy()).isEqualTo(45L);
+            assertThat(claimed.token()).isEqualTo(task.getExecutionToken());
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isFalse();
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+            ((AsyncTaskExecutor.ProgressCallback)invocation.getArgument(1)).report(50,"progress");
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isFalse();
+            return AsyncTaskResult.ok(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("completed",true));
+        });
+        service.executeTaskAsync(1L,123L);
+        assertThat(task.getStatus()).isEqualTo(AsyncTask.STATUS_COMPLETED);
+        org.assertj.core.api.Assertions.assertThatThrownBy(AsyncTaskExecutionContext::require).isInstanceOf(IllegalStateException.class);
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isFalse();
+    }
+    @Test void dispatchCannotClaimARecordBelongingToADifferentPersistedTenant() {
+        AsyncTask task=executableTask();when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        service.executeTaskAsync(1L,999L);
+        verify(asyncTaskMapper,never()).claimPending(any(),any(),any());
+        verify(executor,never()).execute(any(),any());
+    }
+
     private AsyncTask executableTask() {
         AsyncTask task = new AsyncTask();
         task.setId(1L);

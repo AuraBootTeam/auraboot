@@ -1039,3 +1039,12 @@ Core 新增 `V20261025030000__announcement_operating_policy.sql`，由145条迁�
 候选新增接口：POST `/api/announcements/versions/{versionPid}/statistics/snapshots`（query/state/departmentPid筛选）；GET `/api/announcements/statistics/snapshots/{snapshotPid}`；GET 同路径 `/recipients?pageNum=1&pageSize=20`。仅统计权限的管理者可用，均校验当前租户与固定所有者。默认单版本统计容量50,000人，超限明确拒绝，性能适用上限须以受控测量验证，不能把配置上限当吞吐验收。
 
 本节记录正在实现的统计底座；尚未计为真实集成、原生统计页面、持久催办或受控CSV导出完成。待这些接口的实际Service/Mapper JSONB往返、状态/撤权/不可篡改反例及页面入口分别验证后更新追踪表。
+
+
+### 18.9 异步导出恢复所需的平台执行身份
+
+统计底座已有真实HTTP/数据库证据：四项统计用例与十一项公告回归通过，包含撤权后的HTTP403，以及退出重加且恢复相同有效角色后仍拒绝继承旧快照。原生统计页与CSV尚未完成。
+
+为受控导出复用平台异步任务时，实际验证发现：没有请求租户上下文的持久任务派发会停留pending。任务登记表的读取、领取、进度与完成必须由服务器指定的持久化tenant/id及有效执行令牌约束，不依赖启动或恢复线程的登录态；作用域豁免仅覆盖这些登记表语句，不能传入业务执行者。新增宿主执行上下文从已领取记录固定task/tenant/creator/token，客户端输入不能设置它；业务适配器仍须按原成员身份重新建立当前授权。
+
+该底座修复已有真实失败反例，当前正在复验；不能据此声称CSV已生成，亦不能将原来仅支持command-handler的恢复清单称为任意执行器自动恢复。公告导出类型、私有文件校验/保留、撤权拒绝与浏览器下载仍须分别实现及验证。
