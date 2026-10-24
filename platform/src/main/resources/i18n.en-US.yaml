@@ -2816,3 +2816,8 @@ im.sender.user: "User"
 im.sender.system: "System"
 im.agent.type.reactive: "On-demand"
 im.agent.type.proactive: "Proactive"
+
+im.agent.welcome: "I'm {name}, {role}. @me to start collaborating."
+im.agent.role.employee: "AI Employee"
+im.agent.role.assistant: "AI Assistant"
+im.agent.replyFailed: "The AI reply could not be completed. Please retry or contact an administrator."

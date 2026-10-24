@@ -7,6 +7,8 @@
  * @since 1.0.0
  */
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import React, { useState, useCallback, useRef, useEffect, type KeyboardEvent } from 'react';
 import {
   useAuraBot,
@@ -134,6 +136,13 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     : message.content;
   const st = useSmartText();
 
+  // Text placeholders reserve streaming state, not an empty message bubble.
+  // Keep an available trace reachable even when this turn has no prose yet.
+  if (message.type === 'text' && !isUser && !displayContent.trim()
+    && !message.retrievalEvidence?.length) {
+    return message.traceId ? <TraceLink traceId={message.traceId} /> : null;
+  }
+
   // Error message. Backend streams user-facing errors as a `$i18n:<key>` sentinel
   // (e.g. "$i18n:aurabot.error.no_llm_provider") because the service layer has no
   // request locale — resolution happens here where the browser locale is known.
@@ -256,12 +265,12 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     );
   }
 
-  // Tool cancelled — grey italic text
+  // Cancellation is a completed decision and needs readable status feedback.
   if (message.type === 'tool_cancelled') {
     return (
-      <div className="mb-3 flex justify-start">
-        <div className="rounded-2xl rounded-bl-md bg-gray-50 px-4 py-2.5 dark:bg-gray-700/30">
-          <span className="text-sm text-gray-400 italic dark:text-gray-500">{message.content}</span>
+      <div className="mb-3 flex justify-start" role="status" data-testid="chat-tool-cancelled">
+        <div className="rounded-2xl rounded-bl-md border border-gray-200 bg-gray-100 px-4 py-2.5 dark:border-gray-600 dark:bg-gray-700">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-100">{message.content}</span>
         </div>
       </div>
     );
@@ -299,6 +308,8 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
 // Bot Message Content — renders trusted retrieval evidence from the SSE event.
 // ============================================================================
 
+type MarkdownTextNode = { type: string; value?: string; children?: MarkdownTextNode[] };
+
 function BotMessageContent({
   content,
   evidence,
@@ -306,9 +317,33 @@ function BotMessageContent({
   content: string;
   evidence?: import('../services/auraBotApi').RetrievalEvidence[];
 }) {
+  const { t } = useI18n();
+  // Replace exact trusted references after parsing so document names stay literal,
+  // including Markdown punctuation in filenames and references inside inline code.
+  const resolveReferences = () => (tree: MarkdownTextNode) => {
+    const visit = (node: MarkdownTextNode) => {
+      if ((node.type === 'text' || node.type === 'inlineCode') && node.value) {
+        for (const item of evidence || []) {
+          if (!item.evidenceId) continue;
+          const label = item.documentName || item.kbName || t('ai.knowledge.detail.tab.documents', undefined, 'Documents');
+          node.value = node.value.split(item.evidenceId).join(label);
+        }
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
   return (
     <div className="space-y-2 text-sm">
-      <p className="break-words whitespace-pre-wrap">{content}</p>
+      <div className="break-words space-y-2 [&_p]:my-2 [&_h1]:text-lg [&_h2]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-black/5 [&_pre]:p-2 [&_code]:font-mono [&_code]:text-xs">
+        <ReactMarkdown remarkPlugins={[remarkGfm, resolveReferences]} skipHtml components={{
+          table: ({ children }) => <div className="overflow-x-auto"><table className="w-full border-collapse text-left text-xs">{children}</table></div>,
+          th: ({ children, style }) => <th className="border border-gray-300 bg-black/5 p-2 font-semibold dark:border-gray-600" style={style}>{children}</th>,
+          td: ({ children, style }) => <td className="border border-gray-300 p-2 align-top dark:border-gray-600" style={style}>{children}</td>,
+          a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-400">{children}</a>,
+          img: ({ alt }) => <span>{alt}</span>,
+        }}>{content}</ReactMarkdown>
+      </div>
       {evidence && evidence.length > 0 ? <EvidencePanel evidence={evidence} /> : null}
     </div>
   );
