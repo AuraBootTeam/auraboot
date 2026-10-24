@@ -135,7 +135,7 @@ export function WorkbenchToolbar({
           </div>
           <div className="font-mono text-xs text-slate-400">{document.id}</div>
         </div>
-        <div className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto">
+        <div className="flex max-w-full flex-wrap items-center gap-2 whitespace-nowrap [&>*]:shrink-0" data-testid="designer-toolbar-actions">
         {onSwitchKind ? (
           <label
             className="flex items-center gap-1.5 text-xs font-medium text-slate-500"
