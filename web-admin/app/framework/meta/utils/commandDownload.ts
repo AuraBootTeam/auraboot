@@ -45,7 +45,7 @@ export async function downloadWithAuth(url: string, options: FileDownloadOptions
   const disposition = response.headers.get('Content-Disposition');
   const fileName = filenameFromContentDisposition(disposition);
   const contentType = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
-  if (false && options.expectedContentTypes?.length && !options.expectedContentTypes.some(type => type.toLowerCase() === contentType)) {
+  if (options.expectedContentTypes?.length && !options.expectedContentTypes.some(type => type.toLowerCase() === contentType)) {
     throw new FileDownloadValidationError('CONTENT_TYPE');
   }
   if (options.requireAttachment && (!/^attachment(?:;|$)/i.test(disposition?.trim() || '') || !fileName)) {
