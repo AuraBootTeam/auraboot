@@ -556,7 +556,8 @@ describe('SubTableViewer', () => {
       ] }} parentRecordPid="parent-1" isEditable />);
     fireEvent.click(await screen.findByTestId('subtable-empty-action'));
     fireEvent.click(screen.getByTestId('subtable-save-btn'));
-    expect(await screen.findByTestId('subtable-error-title')).toBeInTheDocument();
+    expect(await screen.findByTestId('subtable-error-title')).toHaveTextContent('此项为必填项');
+    expect(screen.queryByTestId('inline-edit-error')).not.toBeInTheDocument();
     expect(fetchResultMock.mock.calls.filter(([url]) => url.includes('/commands/execute/'))).toHaveLength(0);
     expect(screen.getByTestId('subtable-add-due')).toHaveAttribute('type', 'date');
     expect(screen.getByTestId('subtable-add-priority').tagName).toBe('SELECT');

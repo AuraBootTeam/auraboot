@@ -24,6 +24,7 @@ export interface InlineEditableCellProps {
   displayValue: string;
   isEditing: boolean;
   error?: string;
+  showErrorTooltip?: boolean;
   onChange: (value: any) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   referenceDataSource?: DataSourceConfig;
@@ -42,6 +43,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
   displayValue,
   isEditing,
   error,
+  showErrorTooltip = true,
   onChange,
   onKeyDown,
   dictOptions,
@@ -85,7 +87,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
           dataSource={referenceDataSource}
           context={referenceContext}
         />
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -110,7 +112,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
             </option>
           ))}
         </select>
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -129,7 +131,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
           data-testid={testId ?? `inline-edit-${col.field}`}
           aria-label={placeholder ?? col.field}
         />
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -154,7 +156,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
           data-testid={testId ?? `inline-edit-${col.field}`}
           aria-label={placeholder ?? col.field}
         />
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -174,7 +176,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
         data-testid={testId ?? `inline-edit-${col.field}`}
           aria-label={placeholder ?? col.field}
       />
-      {error && <ErrorTooltip message={error} />}
+      {error && showErrorTooltip && <ErrorTooltip message={error} />}
     </div>
   );
 };

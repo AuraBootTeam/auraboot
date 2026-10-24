@@ -651,6 +651,7 @@ export function renderSubTableView({
                             testId={`subtable-add-${col.field}`}
                             placeholder={`${resolveColumnLabel(col.field)}${col.required ? ' *' : ''}`}
                             error={addErrors[col.field]}
+                            showErrorTooltip={false}
                             dictOptions={col.dictCode ? (getDictItems(col.dictCode) || []).map(item => ({ value: item.value, label: item.label })) : undefined}
                             onChange={(value) => {
                               setNewRowData(previous => ({ ...previous, [col.field]: value }));
