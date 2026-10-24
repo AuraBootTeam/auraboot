@@ -264,7 +264,7 @@ function resolveDataSourceTargets(args?: Record<string, any>): string | string[]
 /**
  * 导航动作 - 跳转到指定路径
  */
-actionRegistry.register('navigate', ({ args, navigate }) => {
+actionRegistry.register('navigate', ({ args, navigate, expressionEvaluator, expressionContext }) => {
   if (!navigate) {
     console.error('[ActionRegistry] navigate: navigate function not provided');
     return;
@@ -274,7 +274,9 @@ actionRegistry.register('navigate', ({ args, navigate }) => {
     console.error('[ActionRegistry] navigate: missing path argument');
     return;
   }
-  navigate(path);
+  const resolvedPath = expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateTemplate(path, expressionContext) : path;
+  navigate(resolvedPath);
 });
 
 /**
@@ -570,7 +572,7 @@ actionRegistry.register('setState', ({ setFilters, args }) => {
 /**
  * router.push - 路由跳转
  */
-actionRegistry.register('router.push', ({ args, navigate }) => {
+actionRegistry.register('router.push', ({ args, navigate, expressionEvaluator, expressionContext }) => {
   if (!navigate) {
     console.error('[ActionRegistry] router.push: missing navigate');
     return;
@@ -580,7 +582,9 @@ actionRegistry.register('router.push', ({ args, navigate }) => {
     console.error('[ActionRegistry] router.push: missing path argument');
     return;
   }
-  navigate(path);
+  const resolvedPath = expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateTemplate(path, expressionContext) : path;
+  navigate(resolvedPath);
 });
 
 /**
