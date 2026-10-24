@@ -10,6 +10,17 @@ public interface DomainExportSource {
     String code();
     record Owner(Long tenantId,Long userId,String memberPid) {}
     record Prepared(String reference,String memberPid,String locale,String fileName,String format,long rowCount,JsonNode evidence) {
+        /** Retain the precise JSONB evidence tree; bean conversion may normalize decimal scale. */
+        public static Prepared fromJson(JsonNode value) {
+            if(value==null || !value.isObject() || !value.path("rowCount").isIntegralNumber() || !value.path("rowCount").canConvertToLong())
+                throw new IllegalArgumentException("Invalid persisted domain export descriptor");
+            return new Prepared(text(value,"reference"),text(value,"memberPid"),text(value,"locale"),text(value,"fileName"),
+                text(value,"format"),value.required("rowCount").longValue(),value.required("evidence"));
+        }
+        private static String text(JsonNode value,String field) {
+            if(!value.path(field).isTextual()) throw new IllegalArgumentException("Invalid persisted domain export descriptor field: "+field);
+            return value.required(field).textValue();
+        }
         public Prepared {
             Objects.requireNonNull(reference);Objects.requireNonNull(memberPid);Objects.requireNonNull(locale);
             Objects.requireNonNull(fileName);Objects.requireNonNull(format);Objects.requireNonNull(evidence);

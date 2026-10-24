@@ -152,7 +152,7 @@ public class DomainExportTaskService {
         if(!task.getQueryCode().equals("domain:"+code)) throw new IllegalStateException("Domain export source code binding changed");return code;
     }
     private DomainExportSource.Prepared prepared(ExportTask task) {
-        return json.convertValue(task.getRequestParams().required("prepared"),DomainExportSource.Prepared.class);
+        return DomainExportSource.Prepared.fromJson(task.getRequestParams().required("prepared"));
     }
     private ExportTaskDTO view(ExportTask task) {
         var dto=new ExportTaskDTO();dto.setPid(task.getPid());dto.setQueryCode(task.getQueryCode());dto.setFormat(task.getFormat());
