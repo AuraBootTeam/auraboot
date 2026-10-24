@@ -30,7 +30,15 @@ public class AnnouncementOperatingPolicyService {
     private final AnnouncementCodec codec;
 
     public AnnouncementTenantPolicyService.Policy view() { member(); return policies.current(); }
-    public java.util.List<AnnouncementAudienceService.Option> definitions() { member(); return catalog.choices(); }
+    public java.util.List<AnnouncementAudienceService.Option> definitions() {
+        member();
+        var choices=new ArrayList<>(catalog.choices());
+        String selected=policies.current().defaultDefinitionPid();
+        if(selected!=null && choices.stream().noneMatch(option->selected.equals(option.value())))
+            choices.add(new AnnouncementAudienceService.Option(selected,Map.of("zh-CN","已配置流程当前不可用，请重新选择",
+                "en-US","The configured workflow is unavailable; choose a replacement")));
+        return List.copyOf(choices);
+    }
 
     public long authorizeTarget() { member(); return Math.max(1,policies.current().revision()); }
 
@@ -40,7 +48,7 @@ public class AnnouncementOperatingPolicyService {
         Long tenant=MetaContext.getCurrentTenantId(),actor=MetaContext.getCurrentUserId();
         if(operation==null || operation.isBlank() || operation.length()>100) invalid("operation_required");
         if(payload==null || !FIELDS.containsAll(payload.keySet())) invalid("protected_input");
-        int expected=integer(payload.get("expectedPolicyRevision"),0,Integer.MAX_VALUE);
+        int expected=integer(payload.get("expectedPolicyRevision"),0,Integer.MAX_VALUE-1);
         String hash=codec.hash(payload);
         if(operations.claim(tenant,actor,UPDATE,operation,hash)==0) {
             var prior=operations.operation(tenant,actor,UPDATE,operation);
@@ -85,12 +93,12 @@ public class AnnouncementOperatingPolicyService {
         return member;
     }
     private static String definition(Object value) {
-        if(value==null) return null;
+        if(value==null || "".equals(value)) return null;
         if(!(value instanceof String text) || text.isBlank() || text.length()>36) {invalid("invalid_input");return null;}
         return (String)value;
     }
     private static String time(Object value,boolean nullable) {
-        if(value==null && nullable) return null;
+        if(nullable && (value==null || "".equals(value))) return null;
         if(!(value instanceof String text) || !text.matches("[0-2][0-9]:[0-5][0-9]")) {invalid("invalid_input");return null;}
         try {return LocalTime.parse((String)value).toString();}
         catch(DateTimeException invalidTime) {invalid("invalid_input");return null;}

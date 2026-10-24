@@ -92,6 +92,20 @@ class AnnouncementOperatingPolicyServiceTest {
         }
         verify(store,never()).insert(anyLong(),anyLong(),anyMap());
     }
+    @Test void administratorsCanExplicitlyClearTheDefaultFlowAndQuietWindow() {
+        var existing=row();existing.put("default_definition_pid","old-flow");existing.put("quiet_start","22:00:00");existing.put("quiet_end","08:00:00");
+        when(store.lock(1L)).thenReturn(existing);
+        assertThat(saved(Map.of("expectedPolicyRevision",5,"defaultDefinitionPid","","quietStart","","quietEnd","")))
+            .containsEntry("defaultDefinitionPid",null).containsEntry("quietStart",null).containsEntry("quietEnd",null)
+            .containsEntry("securityRevision",2);
+    }
+    @Test void unavailableCurrentFlowUsesAHumanLabelWithoutPretendingItIsReady() {
+        when(policies.current()).thenReturn(new AnnouncementTenantPolicyService.Policy(1,false,"old-flow",30));
+        var choices=service.definitions();
+        assertThat(choices).hasSize(1);
+        assertThat(choices.getFirst().value()).isEqualTo("old-flow");
+        assertThat(choices.getFirst().label().get("en-US")).contains("unavailable").doesNotContain("old-flow");
+    }
     @Test void selectingAFlowRequiresCurrentQualifiedProviderReadiness() {
         assertThatThrownBy(()->saved(Map.of("expectedPolicyRevision",0,"defaultDefinitionPid","unavailable")))
             .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
