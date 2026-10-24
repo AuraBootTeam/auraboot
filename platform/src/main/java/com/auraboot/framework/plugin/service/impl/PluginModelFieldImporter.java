@@ -150,6 +150,7 @@ final class PluginModelFieldImporter {
         extension.put("commandOnlyCreate", Boolean.TRUE.equals(dto.getCommandOnlyCreate()));
         // Warn on unknown extension keys (informational, does not block)
         com.auraboot.framework.meta.security.RecordCommandWriterDeclaration.validate(extension.get("recordCommandWriters"));
+        com.auraboot.framework.meta.security.RecordMutationLockDeclaration.validate(extension.get("recordMutationLock"));
         ExtensionBean.warnUnknownModelKeys(dto.getCode(), extension.keySet(), log);
         // tableName is a first-class column. Extract from extension as fallback (legacy format).
         String effectiveTableName = dto.getTableName();

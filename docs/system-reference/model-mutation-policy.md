@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-03
-updated: 2026-10-10
+updated: 2026-10-24
 ---
 
 # Model mutation policy
@@ -82,3 +82,49 @@ File import checks the materialized physical parent reference before its raw map
 Computed fields normalize their expression context with the same declared field conversion used by FIELD_MAP, so JSON decimal strings yield decimal arithmetic. Expression errors fail the command instead of silently retaining a null amount. Computed persistence locks and checks the actual target and its parent, and requires one affected row. Client-provided computed amounts are overwritten by the evaluated expression.
 
 The extended targeted selection has 79 hermetic cases and ten PostgreSQL cases using explicit enterprise_22 and temporary tables. File import and computed writes have real parent-denial/ordinary-or-exact positive controls. Removing input conversion fails three of four computed unit cases; disabling import, direct junction, state and handler predicates fails seven of 35 selected cases. Restored targeted runs pass. Seven separate Spring metadata-query cases were rerun with explicit enterprise_22/Redis DB 13; they are not procurement business acceptance. An earlier invocation omitted the database override and used default aura_boot, so those seven earlier executions are excluded from owned-runtime proof and no zero-effect claim is made. The paired native runtime initially failed ordinary order amount persistence before this repair; a new source-set and HTTP run are still required.
+
+## Durable-operation aggregate mutation lock (candidate)
+
+A model may declare extension.recordMutationLock with a physical nullable reference
+or string field and exact create/update/delete command lists. Any non-null stored
+claim freezes ordinary mutations and deletion. Claim acquisition requires both a
+published command permit and an exact allowed command; caller payloads cannot
+clear a persisted claim or authorize themselves. This policy complements tenant,
+row-scope, field ownership and optimistic-version guards.
+
+The child explicitly declares extension.inheritParentMutationLock=true together
+with parentModel and a physical parentField reference whose valueField is pid.
+Missing metadata, wrong parent target, nonphysical fields, conflicting aliases,
+missing tenant or missing transaction fail closed. Children lock their submitted
+and stored parents before mutation; a claimed parent denies child creation,
+update, deletion and relation changes even when the child has no record ownership
+marker. Ordinary models without either declaration retain existing behavior.
+
+Existing-target guards run before dynamic scoped writes, CAS batches, increments,
+bulk deletion, FIELD_MAP, side effects, handler result persistence and legacy
+state/relation/rollup/computed mutations. Bulk insert checks each proposed parent.
+Checks use the existing structured mapper lock with tenant predicates and FOR UPDATE;
+no arbitrary SQL expression is accepted in the declaration. The receipt request
+command already locks its named source before reading lines, so the child guard
+and source claim can share that lock. This concurrency protocol still needs actual
+database and product-pipeline verification for the new declaration.
+
+Example root declaration:
+
+    "recordMutationLock": {
+      "field": "inventory_request",
+      "commands": {"create": [], "update": ["receipt:request"], "delete": []}
+    }
+
+Candidate round118 compiles and passes223 targeted tests without skips, including
+the explicitly bound enterprise_22/Redis13 Spring suite. Removing the parent-claim
+check fails three of nine guard tests; the original implementation is restored.
+The broad prior attempt retains an initialization failure against nonexistent
+default aura_boot and five stale fixture failures. The fixture now injects the
+real empty ThreadContextScopes dependency without removing permission assertions.
+
+This is source/test evidence, not deployment qualification. The active procurement
+runtime has not been upgraded to this Core candidate, and its new receipt model
+declarations must not be imported into the old Core. Real PostgreSQL concurrency,
+formal child command/generic-write refusal, complete import-path audit and source
+posted-state feedback remain in the product's original acceptance report.

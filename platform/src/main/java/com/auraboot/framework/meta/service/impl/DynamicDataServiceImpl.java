@@ -528,6 +528,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             sql.append(")");
         }
         sql.append(")");
+        for (int i = 0; i < updates.size(); i++) {
+            RecordMutationLockGuard.guardTargets(dynamicDataMapper, model,
+                    code -> metadataService.getModelDefinition(code).orElse(null), "update",
+                    RecordMutationLockGuard.targetConditions(pk, updates.get(i).recordId(), tenantId), rows.get(i));
+        }
         appendAggregateBindingGuard(sql, params, model);
         RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         dynamicScopedWriteSupport().appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update", params);
@@ -605,6 +610,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         String pkColumn = SqlSafetyUtils.requireIdentifier(
                 pkField.getColumnName(), "primary key column");
         long tenantId = getCurrentTenantId();
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, model,
+                code -> metadataService.getModelDefinition(code).orElse(null), "update",
+                RecordMutationLockGuard.targetConditions(pkColumn, recordId, tenantId), Map.of());
         Long currentUserId = getCurrentUserId();
         var scopeParameters = new LinkedHashMap<String, Object>();
         var scopePredicate = new StringBuilder("1 = 1");

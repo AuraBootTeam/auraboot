@@ -439,6 +439,10 @@ public class CommandSideEffectExecutor {
                 .append(idEntry.getKey())
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, writerModel,
+                code -> metaModelService.getModelDefinition(code).orElse(null),
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update",
+                RecordMutationLockGuard.targetConditions(idEntry.getKey(), idEntry.getValue(), tenantId), data);
         RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
                 Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update", code -> metaModelService.getModelDefinition(code).orElse(null));
         RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);

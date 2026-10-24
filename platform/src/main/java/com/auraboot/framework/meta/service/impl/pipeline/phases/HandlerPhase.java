@@ -30,6 +30,7 @@ import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
 import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
+import com.auraboot.framework.meta.service.impl.RecordMutationLockGuard;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
@@ -410,6 +411,9 @@ public class HandlerPhase implements CommandPhase {
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
         ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, writerModel,
+                code -> metaModelService.getModelDefinition(code).orElse(null), "update",
+                RecordMutationLockGuard.targetConditions(idEntry.getKey(), idEntry.getValue(), tenantId), data);
         RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel, "update",
                 code -> metaModelService.getModelDefinition(code).orElse(null));
         RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);

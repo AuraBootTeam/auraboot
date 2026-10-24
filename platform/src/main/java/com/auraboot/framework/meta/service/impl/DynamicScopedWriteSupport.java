@@ -76,6 +76,9 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
         Long tenantId = getCurrentTenantId();
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, model,
+                metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null),
+                permissionOperation, RecordMutationLockGuard.targetConditions(pkColumn, recordId, tenantId), columnData);
         Long userId = getCurrentUserId();
 
         Map<String, Object> params = new LinkedHashMap<>();
@@ -155,6 +158,9 @@ final class DynamicScopedWriteSupport extends BaseMetaService {
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
         Long tenantId = getCurrentTenantId();
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, model,
+                metadataService == null ? null : code -> metadataService.getModelDefinition(code).orElse(null),
+                "delete", RecordMutationLockGuard.targetConditions(pkColumn, recordId, tenantId), Map.of());
         Long userId = getCurrentUserId();
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("recordId", recordId);

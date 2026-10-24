@@ -229,6 +229,8 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             enrichedData = convertDataTypes(model, enrichedData);
             filterVirtualFields(model, enrichedData);
 
+            RecordMutationLockGuard.guardParentInput(dynamicDataMapper, model,
+                    code -> metadataService.getModelDefinition(code).orElse(null), enrichedData);
             columnDataList.add(toColumnData(model, enrichedData));
             createdRecords.add(enrichedData); // carries generated PK, in input order
         }
@@ -371,6 +373,11 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             }
         }
 
+        for (String recordId : new java.util.TreeSet<>(recordIds)) {
+            RecordMutationLockGuard.guardTargets(dynamicDataMapper, model,
+                    code -> metadataService.getModelDefinition(code).orElse(null), "delete",
+                    RecordMutationLockGuard.targetConditions(primaryKeyColumn, recordId, tenantId), Map.of());
+        }
         RecordCommandWriterGuard.appendStoredPredicate(sql, model, "delete", code -> metadataService.getModelDefinition(code).orElse(null));
         for (String recordId : recordIds) {
             mutationObserver.observe(model, recordId, ModelMutationObserver.Operation.DELETED);

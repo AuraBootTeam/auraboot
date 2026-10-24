@@ -14,6 +14,8 @@ public final class PluginModelOwnershipImportGate {
             var model = models.getModelDefinitionFromDb(code)
                 .orElseThrow(() -> new PluginException("Imported model metadata is missing: " + code));
             RecordCommandWriterGuard.validatePolicy(model);
+            com.auraboot.framework.meta.service.impl.RecordMutationLockGuard.validateRelations(
+                model, parentCode -> models.getModelDefinitionFromDb(parentCode).orElse(null));
         }
     }
 }
