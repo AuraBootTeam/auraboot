@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +182,19 @@ class AuraBotChatToolRuntimeAdapter {
             @Override
             public void storeConfirmationPending(ChatTurnRuntime.PendingChatTool pending) {
                 storePending(ctx, pending, modelCode);
+            }
+
+            @Override
+            public void storeToolResultConfirmationPending(ChatTurnRuntime.PendingChatTool pending,
+                                                           Map<String, Object> result) {
+                Map<String, Object> extension = new LinkedHashMap<>();
+                if (isAurabotSkillPreviewPending(pending.toolName(), result)) {
+                    extension.put("_aurabot_skill", true);
+                    extension.put("previewToken", result.get("previewToken"));
+                    extension.put("preview", result.get("preview"));
+                    extension.put("riskLevel", result.get("riskLevel"));
+                }
+                storePending(ctx, pending, modelCode, extension);
             }
 
             @Override
@@ -374,6 +388,13 @@ class AuraBotChatToolRuntimeAdapter {
     private void storePending(TurnContext ctx,
                               ChatTurnRuntime.PendingChatTool pending,
                               String modelCode) {
+        storePending(ctx, pending, modelCode, Map.of());
+    }
+
+    private void storePending(TurnContext ctx,
+                              ChatTurnRuntime.PendingChatTool pending,
+                              String modelCode,
+                              Map<String, Object> extension) {
         if (pendingToolStore == null || pendingToolSnapshotFactory == null) {
             throw new IllegalStateException("Pending tool store is not configured for AuraBot tool confirmation.");
         }
@@ -407,6 +428,7 @@ class AuraBotChatToolRuntimeAdapter {
                         .maxTokens(pending.maxTokens())
                         .currentLoop(pending.round() + 1)
                         .toolChoice(pending.toolChoice())
+                        .extension(extension)
                         .build()));
     }
 
