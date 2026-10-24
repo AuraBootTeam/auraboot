@@ -512,7 +512,8 @@ async function openNotificationSettings(page: Page, title: string) {
   return dialog;
 }
 
-test('scheduled audience settings preserve important acknowledgement and cancellation never creates recipients', async ({ page }) => {
+test('scheduled audience settings preserve important acknowledgement and cancellation never creates recipients', async ({ page, browser }) => {
+  test.setTimeout(30000);
   const draft = await setupPublicationDraft(page, 'Scheduled audience');
   const code = `notice_recipient_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
   const role = await page.request.post('/api/roles', { data: {
@@ -566,6 +567,19 @@ test('scheduled audience settings preserve important acknowledgement and cancell
       FROM ab_announcement_release r WHERE announcement_pid=$1`, [draft.pid]);
     expect(facts.rows).toEqual([{ status: 'canceled', recipients: 0 }]);
     await page.screenshot({ path: test.info().outputPath('canceled-publication.png'), animations: 'disabled', fullPage: true });
+    const emptyContext=await browser.newContext({baseURL:new URL(page.url()).origin,locale:'zh-CN'});
+    try {
+      await authenticateBffSession(emptyContext.request,new URL(page.url()).origin,email,'Test2026x');
+      const emptyPage=await emptyContext.newPage();await emptyPage.goto('/home',{waitUntil:'domcontentloaded'});
+      const menu=emptyPage.locator('nav').first();const mine=menu.locator('a[href="/p/announcement_reader"]');
+      if(!await mine.isVisible())await menu.getByText('公告管理',{exact:true}).click();
+      const loaded=emptyPage.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/announcements/received');
+      await mine.click();const response=await loaded;expect(response.status()).toBe(200);
+      expect((await response.json()).data.records).toEqual([]);
+      await expect(emptyPage.getByText('暂无符合条件的公告',{exact:true})).toBeVisible();
+      await emptyPage.screenshot({path:test.info().outputPath('recipient-empty-after-schedule-cancel.png'),fullPage:true,animations:'disabled'});
+    } finally {await emptyContext.close();}
+
   } finally { await db.end(); }
 });
 
@@ -661,9 +675,37 @@ test('immediate exempt publication seals the real tenant audience and dispatches
       expect((await memberPage.request.get('/api/announcements/policy')).status()).toBe(403);
       await mine.click();const memberRow = await findRowByContent(memberPage, draft.title);
       await expect(memberRow).toContainText('未读');
+      const bellLoaded=memberPage.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/notifications');
+      await memberPage.getByTestId('notification-bell').click();const bellResponse=await bellLoaded;expect(bellResponse.status()).toBe(200);
+      expect((await bellResponse.json()).data.records.some((item:any)=>item.sourceId===version.active_version_pid)).toBe(true);
+      await expect(memberPage.getByTestId('notification-item').filter({hasText:draft.title})).toBeVisible();
+      await memberPage.screenshot({path:test.info().outputPath('recipient-bell-version-link.png'),fullPage:true,animations:'disabled'});
       const memberRead = memberPage.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/api/announcements/versions/${version.active_version_pid}/read`));
-      await memberRow.getByRole('button', { name: '查看公告', exact: true }).click();
+      await memberPage.getByTestId('notification-item').filter({hasText:draft.title}).click();
       expect((await memberRead).ok()).toBe(true);
+      await expect(memberPage).toHaveURL(new RegExp(`/p/announcement_reader/view/${version.active_version_pid}$`));
+      await expect(memberPage.getByTestId('form-field-content')).toContainText(`Audience policy for ${UID}`);
+      await expect(memberPage.locator('main').getByRole('link',{name:'返回',exact:true})).toHaveCount(0);
+      const returned=memberPage.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/announcements/received');
+      await memberPage.getByRole('button',{name:'返回我的公告',exact:true}).click();expect((await returned).status()).toBe(200);
+      await expect(memberPage).toHaveURL(url=>url.pathname==='/p/announcement_reader');
+      const bellAgain=memberPage.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/notifications');
+      await memberPage.getByTestId('notification-bell').click();expect((await bellAgain).status()).toBe(200);
+      const bellMarked=memberPage.waitForResponse(r=>r.request().method()==='PUT'&&new URL(r.url()).pathname==='/api/notifications/read-all');
+      await memberPage.getByTestId('mark-all-read-btn').click();expect((await bellMarked).status()).toBe(200);
+      await memberPage.getByTestId('notification-bell').click();
+      expect((await db.query('SELECT is_read FROM ab_notification WHERE tenant_id=$1 AND source_id=$2 AND user_id=(SELECT id FROM ab_user WHERE pid=$3)',[version.tenant_id,version.active_version_pid,recipientLogin.userPid])).rows).toEqual([{is_read:true}]);
+      expect((await db.query('SELECT acknowledged_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[version.tenant_id,version.active_version_pid,recipientLogin.userPid])).rows).toEqual([{acknowledged_at:null}]);
+      const inboxLoaded=memberPage.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/inbox');
+      await memberPage.getByTestId('inbox-badge').click();const inboxResponse=await inboxLoaded;expect(inboxResponse.status()).toBe(200);
+      const pending=(await inboxResponse.json()).data.records.find((item:any)=>item.sourceId===version.active_version_pid);
+      expect(pending).toBeTruthy();
+      await expect(memberPage.getByTestId(`inbox-item-${pending.id}`)).toBeVisible();
+      await memberPage.screenshot({path:test.info().outputPath('recipient-inbox-version-link.png'),fullPage:true,animations:'disabled'});
+      const inboxDetail=memberPage.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname===`/api/announcements/versions/${version.active_version_pid}/recipient`);
+      await memberPage.getByTestId(`inbox-item-${pending.id}`).click();const viaInbox=await inboxDetail;expect(viaInbox.status()).toBe(200);
+      expect((await viaInbox.json()).data).toMatchObject({versionPid:version.active_version_pid,content:`Audience policy for ${UID}`,acknowledgementState:'pending'});
+      await expect(memberPage).toHaveURL(new RegExp(`/p/announcement_reader/view/${version.active_version_pid}$`));
       await expect(memberPage.getByTestId('form-field-content')).toContainText(`Audience policy for ${UID}`);
       await memberPage.screenshot({ path: test.info().outputPath('nonmanager-recipient-body.png'), animations: 'disabled', fullPage: true });
       await memberPage.getByTestId('toolbar-btn-acknowledge').click();await expect(memberPage.getByTestId('confirm-dialog')).toBeVisible();
@@ -672,6 +714,9 @@ test('immediate exempt publication seals the real tenant audience and dispatches
       await expect(memberPage.getByText('你已确认知悉，首次确认时间会保留。', { exact: true })).toBeVisible();
       expect((await db.query('SELECT acknowledged_hash FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3', [version.tenant_id, version.active_version_pid, recipientLogin.userPid])).rows).toEqual([{ acknowledged_hash: own.snapshotHash }]);
       await memberPage.screenshot({ path: test.info().outputPath('nonmanager-recipient-acknowledged.png'), animations: 'disabled', fullPage: true });
+      await memberPage.getByRole('button',{name:'返回我的公告',exact:true}).click();
+      const completedRow=await findRowByContent(memberPage,draft.title);await expect(completedRow).toContainText('已读');await expect(completedRow).toContainText('已知悉');
+      await memberPage.screenshot({path:test.info().outputPath('recipient-read-acknowledged-list.png'),fullPage:true,animations:'disabled'});
     } finally { await memberContext.close(); }
 
 

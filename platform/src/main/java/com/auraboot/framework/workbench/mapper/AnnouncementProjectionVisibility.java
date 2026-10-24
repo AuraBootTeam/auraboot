@@ -20,7 +20,7 @@ public final class AnnouncementProjectionVisibility {
     private static final String VERSION=".tenant_id AND ar.version_pid=";
     private static final String EXPIRY=".source_id AND (ac.expires_at IS NULL OR ac.expires_at>clock_timestamp()))";
 
-    public static final String NOTIFICATION="(source_type IS DISTINCT FROM 'announcement' OR "+RECIPIENT+
+    public static final String NOTIFICATION="(LOWER(source_type) IS DISTINCT FROM 'announcement' OR "+RECIPIENT+
         "ab_notification"+MEMBERSHIP+"ab_notification"+VERSION+"ab_notification"+EXPIRY+")";
     public static final String INBOX="(item_type IS DISTINCT FROM 'announcement_ack' OR "+RECIPIENT+
         "ab_inbox_item"+MEMBERSHIP+"ab_inbox_item"+VERSION+"ab_inbox_item"+EXPIRY+")";

@@ -269,6 +269,7 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
             getTestTenant().getId(),version,getTestUser().getId()));
         assertEquals("completed",jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
             getTestTenant().getId(),batch,getTestUser().getPid()));
+        jdbc.update("UPDATE ab_notification SET source_type='ANNOUNCEMENT' WHERE tenant_id=? AND source_id=?",getTestTenant().getId(),version);
         var query=new com.auraboot.framework.notification.dto.NotificationQueryRequest();query.setPageSize(100);
         org.assertj.core.api.Assertions.assertThat(notifications.listByUser(getTestUser().getId(),query).getRecords())
             .extracting(com.auraboot.framework.notification.dto.NotificationDTO::getSourceId).contains(version);

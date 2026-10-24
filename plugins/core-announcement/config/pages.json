@@ -1433,7 +1433,7 @@
           "snapshotHash": "snapshotHash"
         }
       },
-      "backUrl": "/p/announcement_reader"
+      "showBack": false
     },
     "blocks": [
       {
@@ -1474,6 +1474,18 @@
             },
             "disableWhen": "!record.first_read_at",
             "primary": true
+          },
+          {
+            "code": "back_to_announcements",
+            "label": {
+              "zh-CN": "返回我的公告",
+              "en-US": "Back to my announcements"
+            },
+            "variant": "secondary",
+            "action": {
+              "type": "navigate",
+              "to": "/p/announcement_reader"
+            }
           }
         ]
       },
