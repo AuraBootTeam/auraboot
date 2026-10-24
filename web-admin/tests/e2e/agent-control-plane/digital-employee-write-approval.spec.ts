@@ -246,6 +246,7 @@ if (approvalFixture) {
         await expect(confirm).not.toContainText(fixture.toolCode.replaceAll(':', '_'));
         await expect(confirm).not.toContainText(fixture.field);
         await expect(confirm).not.toContainText('{');
+        await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: /^\s*$/ })).toHaveCount(0);
         const pending = await approvalRows();
         expect(pending).toHaveLength(1);
         expect(fixture.mode === 'expired' ? ['pending', 'expired'] : ['pending']).toContain(
@@ -280,6 +281,8 @@ if (approvalFixture) {
               .poll(async () => (await approvalRows())[0].approval_status)
               .toBe('rejected');
             await expect(chat).toContainText('操作已取消');
+            await expect(chat.getByTestId('chat-tool-cancelled')).toHaveAttribute('role', 'status');
+            await expect(chat.getByTestId('chat-tool-cancelled')).toBeVisible();
             const task = (
               await db.query(
                 'SELECT task_status FROM ab_agent_task WHERE tenant_id=$1 AND pid=$2',

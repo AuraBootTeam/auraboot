@@ -55,7 +55,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderChatWithError(content: string, type: 'error' | 'text' = 'error') {
+function renderChatWithError(content: string, type: 'error' | 'text' | 'tool_cancelled' = 'error') {
   const ctx: any = {
     state: {
       panelState: 'open',
@@ -131,4 +131,15 @@ it('localizes the fixed approved-tool acknowledgement in persisted text messages
   renderChatWithError('Approved tool executed.', 'text');
   expect(screen.getByTestId('chat-msg-agent')).toHaveTextContent('审批通过，操作已完成。');
   expect(screen.getByTestId('chat-msg-agent')).not.toHaveTextContent('Approved tool executed.');
+});
+
+
+it('does not render an empty assistant text placeholder', () => {
+  renderChatWithError('   ', 'text');
+  expect(screen.queryByTestId('chat-msg-agent')).not.toBeInTheDocument();
+});
+
+it('announces a completed cancellation as readable status feedback', () => {
+  renderChatWithError('操作已取消', 'tool_cancelled');
+  expect(screen.getByRole('status')).toHaveTextContent('操作已取消');
 });

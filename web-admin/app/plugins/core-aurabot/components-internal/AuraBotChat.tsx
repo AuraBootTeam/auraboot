@@ -134,6 +134,13 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     : message.content;
   const st = useSmartText();
 
+  // Text placeholders reserve streaming state, not an empty message bubble.
+  // Keep an available trace reachable even when this turn has no prose yet.
+  if (message.type === 'text' && !isUser && !displayContent.trim()
+    && !message.retrievalEvidence?.length) {
+    return message.traceId ? <TraceLink traceId={message.traceId} /> : null;
+  }
+
   // Error message. Backend streams user-facing errors as a `$i18n:<key>` sentinel
   // (e.g. "$i18n:aurabot.error.no_llm_provider") because the service layer has no
   // request locale — resolution happens here where the browser locale is known.
@@ -256,12 +263,12 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     );
   }
 
-  // Tool cancelled — grey italic text
+  // Cancellation is a completed decision and needs readable status feedback.
   if (message.type === 'tool_cancelled') {
     return (
-      <div className="mb-3 flex justify-start">
-        <div className="rounded-2xl rounded-bl-md bg-gray-50 px-4 py-2.5 dark:bg-gray-700/30">
-          <span className="text-sm text-gray-400 italic dark:text-gray-500">{message.content}</span>
+      <div className="mb-3 flex justify-start" role="status" data-testid="chat-tool-cancelled">
+        <div className="rounded-2xl rounded-bl-md border border-gray-200 bg-gray-100 px-4 py-2.5 dark:border-gray-600 dark:bg-gray-700">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-100">{message.content}</span>
         </div>
       </div>
     );
