@@ -46,7 +46,9 @@ async function submit(page:Page,dialog:ReturnType<Page['getByRole']>,expectRefre
 async function reloadPolicy(page:Page) {
   const loaded=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname==='/api/announcements/policy');
   await page.reload({waitUntil:'domcontentloaded'});const response=await loaded;expect(response.status()).toBe(200);
-  const body=await response.json();expect(body.code).toBe('0');return body.data;
+  const body=await response.json();expect(body.code).toBe('0');
+  await expect(page.getByText('公告政策仅作用于当前租户。安全规则在执行时实时复查；提醒时刻、次数和免打扰窗口仅供新提交版本冻结使用，不追溯修改已有公告。',{exact:true})).toBeVisible();
+  return body.data;
 }
 test('tenant policy opens from its real menu and cancelling creates no operation',async({page},info)=>{
   const before=await openPolicy(page);const writes:string[]=[];

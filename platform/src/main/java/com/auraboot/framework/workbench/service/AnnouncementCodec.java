@@ -3,7 +3,6 @@ package com.auraboot.framework.workbench.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -11,11 +10,16 @@ import java.util.*;
 
 /** Canonical JSON evidence uses one deterministic serializer across submission and execution. */
 @Component
-@RequiredArgsConstructor
 public class AnnouncementCodec {
     private final ObjectMapper json;
+    private final ObjectWriter canonicalWriter;
+    public AnnouncementCodec(ObjectMapper json) {
+        this.json=json;
+        canonicalWriter=json.writer().without(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+    }
     public String encode(Object value) {
-        try { return json.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsString(value); }
+        try { return canonicalWriter.writeValueAsString(value); }
         catch(JsonProcessingException error) { throw new IllegalArgumentException("Invalid announcement JSON",error); }
     }
     public Map<String,Object> object(String value) {

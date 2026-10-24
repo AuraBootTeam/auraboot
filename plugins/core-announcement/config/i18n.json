@@ -306,5 +306,26 @@
     "en-US": "Confirm that you have read and understood this version. Your first acknowledgement time will be preserved.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.error.statistics_unavailable",
+    "zh-CN": "该公告版本的封存统计暂不可用。",
+    "en-US": "Sealed statistics are unavailable for this announcement version.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.statistics_expired",
+    "zh-CN": "统计快照已过期，请刷新统计后重试。",
+    "en-US": "This statistics snapshot has expired. Refresh statistics and try again.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.statistics_capacity_exceeded",
+    "zh-CN": "本版本接收人数超过当前统计容量，请联系管理员。",
+    "en-US": "This version exceeds the configured statistics capacity. Contact an administrator.",
+    "source": "import",
+    "refType": "message"
   }
 ]
