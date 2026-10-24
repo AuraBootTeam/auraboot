@@ -569,6 +569,8 @@ test('scheduled audience settings preserve important acknowledgement and cancell
 });
 
 test('immediate exempt publication seals the real tenant audience and dispatches independent projections', async ({ page, browser }) => {
+  // Includes bounded worker waits and two independently authenticated recipient journeys.
+  test.setTimeout(90000);
   const draft = await setupPublicationDraft(page, 'Immediate audience');
   await navigateToAnnouncementList(page);
   const dialog = await openNotificationSettings(page, draft.title);

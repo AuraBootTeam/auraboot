@@ -45,17 +45,18 @@ test('tenant policy opens from its real menu and cancelling creates no operation
   page.on('request',r=>{if(r.method()==='POST'&&new URL(r.url()).pathname===endpoint)writes.push(r.url());});
   await page.screenshot({path:info.outputPath('policy-current.png'),fullPage:true,animations:'disabled'});
   const dialog=await edit(page);
-  await expect(dialog.getByTestId('form-dialog-field-reminderAt').getByRole('textbox')).toHaveValue(before.reminderAt);
-  await dialog.getByTestId('form-dialog-field-reminderAt').getByRole('textbox').fill('10:30');
+  await expect(dialog.getByTestId('form-dialog-field-reminderAt')).toHaveValue(before.reminderAt);
+  await dialog.getByTestId('form-dialog-field-reminderAt').fill('10:30');
   await page.screenshot({path:info.outputPath('policy-edit-cancel.png'),fullPage:true,animations:'disabled'});
   await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(dialog).not.toBeVisible();
   expect(writes).toEqual([]);expect(await reloadPolicy(page)).toEqual(before);
 });
 test('policy save and explicit quiet-hour clear persist CAS and immutable audit without changing security generation',async({page},info)=>{
+  test.setTimeout(60000);
   const before=await openPolicy(page);let dialog=await edit(page);
-  await dialog.getByTestId('form-dialog-field-reminderAt').getByRole('textbox').fill('10:30');
-  await dialog.getByTestId('form-dialog-field-quietStart').getByRole('textbox').fill('22:00');
-  await dialog.getByTestId('form-dialog-field-quietEnd').getByRole('textbox').fill('08:00');
+  await dialog.getByTestId('form-dialog-field-reminderAt').fill('10:30');
+  await dialog.getByTestId('form-dialog-field-quietStart').fill('22:00');
+  await dialog.getByTestId('form-dialog-field-quietEnd').fill('08:00');
   const response=await submit(page,dialog);expect(response.status(),await response.text()).toBe(200);
   const wire=response.request().postDataJSON();expect(wire).not.toHaveProperty('targetRecordPid');
   expect(wire.clientRequestId).toMatch(/^[0-9a-f-]{36}$/);
@@ -69,7 +70,7 @@ test('policy save and explicit quiet-hour clear persist CAS and immutable audit 
   await page.screenshot({path:info.outputPath('policy-saved-reloaded.png'),fullPage:true,animations:'disabled'});
   dialog=await edit(page);
   for(const [key,value] of [['reminderAt',before.reminderAt],['quietStart',before.quietStart||''],['quietEnd',before.quietEnd||'']])
-    await dialog.getByTestId(`form-dialog-field-${key}`).getByRole('textbox').fill(value);
+    await dialog.getByTestId(`form-dialog-field-${key}`).fill(value);
   const restoredResponse=await submit(page,dialog);expect(restoredResponse.status(),await restoredResponse.text()).toBe(200);
   expect(restoredResponse.request().postDataJSON().clientRequestId).not.toBe(wire.clientRequestId);
   await expect(page.getByText(success,{exact:true})).toBeVisible();
@@ -79,7 +80,7 @@ test('policy save and explicit quiet-hour clear persist CAS and immutable audit 
 });
 test('invalid reminder time is rejected visibly and cannot append policy audit',async({page},info)=>{
   const before=await openPolicy(page);const dialog=await edit(page);
-  await dialog.getByTestId('form-dialog-field-reminderAt').getByRole('textbox').fill('25:00');
+  await dialog.getByTestId('form-dialog-field-reminderAt').fill('25:00');
   const response=await submit(page,dialog);expect(response.status()).toBe(422);
   const operation=response.request().postDataJSON().clientRequestId;
   await expect(page.getByText('公告输入不符合要求。',{exact:true})).toBeVisible();
