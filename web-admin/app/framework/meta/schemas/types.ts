@@ -355,6 +355,8 @@ export interface CommandInputFormConfig {
 
 /** Existing-record command options shared by toolbar and sub-table actions. */
 export interface CommandActionConfig extends CommandInputFormConfig {
+  /** Defaults to true for legacy actions; false sends only configured and prompted fields. */
+  includeRecordPayload?: boolean;
   payload?: Record<string, unknown>;
   operationType?: 'create' | 'update' | 'delete' | 'CREATE' | 'UPDATE' | 'DELETE';
   expectedVersion?: number | string;
