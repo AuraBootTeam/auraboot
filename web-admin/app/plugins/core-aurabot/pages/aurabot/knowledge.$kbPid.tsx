@@ -417,6 +417,8 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
           body: formData,
         });
         if (!resp.ok) throw new Error('Upload failed');
+        const result = await resp.json();
+        if (result.code !== '0') throw new Error('Upload failed');
       }
       toast.showSuccessToast(t('ai.knowledge.detail.toast.uploaded', { count: files.length }, `${files.length} file(s) uploaded — processing started`));
       fetchDocs();
