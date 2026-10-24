@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: cde653e0dd2b9dab792aa47679f79f132a7ed5aef5521124b7289e9e47dbf811
+ * Contract SHA-256: 6360aa9bf46d867973722d571e0312d822e3278a302d947bd607ffdbfef5b3da
  */
 export interface paths {
     "/api/activities": {
@@ -29520,6 +29520,8 @@ export interface components {
             enableExport?: boolean;
             enableImport?: boolean;
             formFields?: string[];
+            formGroups?: components["schemas"]["FormGroup"][];
+            formPresentation?: components["schemas"]["FormPresentation"];
             generateDetail?: boolean;
             generateForm?: boolean;
             generateList?: boolean;
@@ -32118,6 +32120,26 @@ export interface components {
             modelCode?: string;
             targetId?: string;
             timeZone?: string;
+        };
+        FormGroup: {
+            collapsible?: boolean;
+            defaultCollapsed?: boolean;
+            fields?: string[];
+            title?: string;
+        };
+        FormPresentation: {
+            /** @enum {string} */
+            actions?: "sticky" | "inline" | "fixed";
+            /** Format: int32 */
+            columns?: number;
+            /** @enum {string} */
+            density?: "comfortable" | "compact";
+            /** @enum {string} */
+            guidance?: "none" | "aside";
+            /** @enum {string} */
+            surface?: "card" | "plain";
+            /** @enum {string} */
+            width?: "comfortable" | "wide" | "full";
         };
         FormSchema: {
             defaultValues?: {

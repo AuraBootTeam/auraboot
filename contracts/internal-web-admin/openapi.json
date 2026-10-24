@@ -21578,6 +21578,15 @@
             },
             "type": "array"
           },
+          "formGroups": {
+            "items": {
+              "$ref": "#/components/schemas/FormGroup"
+            },
+            "type": "array"
+          },
+          "formPresentation": {
+            "$ref": "#/components/schemas/FormPresentation"
+          },
           "generateDetail": {
             "type": "boolean"
           },
@@ -28963,6 +28972,72 @@
             "type": "string"
           },
           "timeZone": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormGroup": {
+        "properties": {
+          "collapsible": {
+            "type": "boolean"
+          },
+          "defaultCollapsed": {
+            "type": "boolean"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormPresentation": {
+        "properties": {
+          "actions": {
+            "enum": [
+              "sticky",
+              "inline",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "columns": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "density": {
+            "enum": [
+              "comfortable",
+              "compact"
+            ],
+            "type": "string"
+          },
+          "guidance": {
+            "enum": [
+              "none",
+              "aside"
+            ],
+            "type": "string"
+          },
+          "surface": {
+            "enum": [
+              "card",
+              "plain"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "enum": [
+              "comfortable",
+              "wide",
+              "full"
+            ],
             "type": "string"
           }
         },
