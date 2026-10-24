@@ -62,8 +62,7 @@ class OutboxIntegrationTest extends BaseIntegrationTest {
         return mapper.valueToTree(Map.of(
                 "record", Map.of("entityCode", targetKey, "recordPid", "CMP-OB-1",
                         "data", Map.of("priority", "HIGH")),
-                "actor", Map.of("userId", getTestUser().getId(), "userPid", getTestUser().getPid(),
-                        "username", getTestUser().getUsername())));
+                "actor", Map.of("userId", getTestUser().getId(), "userPid", getTestUser().getPid())));
     }
 
     @Test
