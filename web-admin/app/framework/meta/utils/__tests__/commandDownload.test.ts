@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { downloadWithAuth, resolveCommandFileDownload } from '../commandDownload';
+import { downloadWithAuth, FileDownloadValidationError, resolveCommandFileDownload } from '../commandDownload';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -62,5 +62,45 @@ describe('explicit command file downloads', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     await expect(downloadWithAuth('/api/file/download/denied')).rejects.toThrow('403');
     expect(click).not.toHaveBeenCalled();
+  });
+  it.each(['text/html', 'application/json'])('rejects a successful %s response before reading artifact bytes', async contentType => {
+    const read = vi.fn().mockResolvedValue(new Blob(['not a CSV']));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, headers: new Headers({
+      'Content-Type': contentType, 'Content-Disposition': 'attachment; filename="statistics.csv"',
+    }), blob: read }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    await expect(downloadWithAuth('/api/exports/domain/task/download', {
+      expectedContentTypes: ['text/csv'], requireAttachment: true, requireNonEmpty: true,
+    })).rejects.toBeInstanceOf(FileDownloadValidationError);
+    expect(read).not.toHaveBeenCalled();expect(click).not.toHaveBeenCalled();
+  });
+  it('rejects missing attachment names and empty files without triggering a browser download', async () => {
+    const read = vi.fn().mockResolvedValue(new Blob([]));
+    const headers = new Headers({ 'Content-Type': 'text/csv' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, headers, blob: read }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    await expect(downloadWithAuth('/api/exports/domain/task/download', {
+      expectedContentTypes: ['text/csv'], requireAttachment: true,
+    })).rejects.toMatchObject({ code: 'ATTACHMENT' });
+    expect(read).not.toHaveBeenCalled();
+    headers.set('Content-Disposition', 'attachment; filename="statistics.csv"');
+    await expect(downloadWithAuth('/api/exports/domain/task/download', {
+      expectedContentTypes: ['text/csv'], requireAttachment: true, requireNonEmpty: true,
+    })).rejects.toMatchObject({ code: 'EMPTY' });
+    expect(click).not.toHaveBeenCalled();
+  });
+  it('validates the named CSV response and retains the exact BOM-containing blob', async () => {
+    const blob = new Blob(['\uFEFFname,state\r\n"Reader, A",Unread\r\n']);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, headers: new Headers({
+      'Content-Type': 'text/csv; charset=UTF-8', 'Content-Disposition': 'attachment; filename="statistics.csv"',
+    }), blob: async () => blob }));
+    const create = vi.fn().mockReturnValue('blob:validated-csv');
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: create, revokeObjectURL: vi.fn() }));
+    let name = '';
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { name = this.download; });
+    await downloadWithAuth('/api/exports/domain/task/download', {
+      expectedContentTypes: ['text/csv'], requireAttachment: true, requireNonEmpty: true,
+    });
+    expect(create).toHaveBeenCalledWith(blob);expect(name).toBe('statistics.csv');
   });
 });

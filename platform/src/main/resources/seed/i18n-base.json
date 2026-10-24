@@ -1,5 +1,20 @@
 [
   {
+    "key": "file.download.failed",
+    "zh-CN": "文件下载失败，请刷新并检查文件有效期及当前访问权限。",
+    "en-US": "Could not download the file. Refresh and check its expiry and current access."
+  },
+  {
+    "key": "file.download.invalid_response",
+    "zh-CN": "服务端未返回完整文件，请刷新或重新创建导出任务。",
+    "en-US": "The server did not return a complete file. Refresh or create a new export."
+  },
+  {
+    "key": "file.download.invalid_url",
+    "zh-CN": "受控文件链接不可用，请刷新任务后重试。",
+    "en-US": "The protected file link is unavailable. Refresh the task."
+  },
+  {
     "key": "export.domain_failed",
     "zh-CN": "导出失败，请检查当前权限或重新创建导出任务。",
     "en-US": "Export failed. Check current permissions or create a new export task."

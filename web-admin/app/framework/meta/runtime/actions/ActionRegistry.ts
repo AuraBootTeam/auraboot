@@ -1,4 +1,5 @@
 import type { RequestKeySession } from './request-key/session';
+import { downloadWithAuth, FileDownloadHttpError, FileDownloadValidationError } from '~/framework/meta/utils/commandDownload';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
@@ -36,6 +37,7 @@ function translateOrFallback(
   const translated = t?.(key);
   return translated && translated !== key ? translated : fallback;
 }
+
 
 /**
  * 动作执行上下文
@@ -207,6 +209,34 @@ class ActionRegistry {
 
 // 导出单例
 export const actionRegistry = new ActionRegistry();
+
+actionRegistry.register('file.download', async ({ args, t, locale, expressionEvaluator, expressionContext }) => {
+  const failed = translateOrFallback(t, 'file.download.failed', 'Could not download the file. Refresh and check its expiry and current access.');
+  const invalid = translateOrFallback(t, 'file.download.invalid_response', 'The server did not return a complete file. Refresh or create a new export.');
+  const configured = args?.url;
+  const url = typeof configured === 'string' && expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateTemplate(configured, expressionContext) : configured;
+  if (typeof url !== 'string' || !url.startsWith('/api/') || url.includes('\\')
+    || typeof window === 'undefined' || new URL(url, window.location.origin).pathname.indexOf('/api/') !== 0) {
+    throw new Error(translateOrFallback(t, 'file.download.invalid_url', 'The protected file link is unavailable. Refresh the task.'));
+  }
+  const expected = args?.expectedContentType;
+  if (expected !== undefined && (typeof expected !== 'string' || !expected.includes('/'))) throw new Error(invalid);
+  try {
+    await downloadWithAuth(url, {
+      expectedContentTypes: expected ? [expected] : undefined,
+      requireAttachment: true,
+      requireNonEmpty: true,
+      resolveFailure: async response => {
+        const body = response.headers.get('Content-Type')?.includes('json') ? await response.json() : undefined;
+        return resolveCommandErrorMessage(body, '', t, locale, failed);
+      },
+    });
+  } catch (failure) {
+    if (failure instanceof FileDownloadHttpError) throw failure;
+    throw new Error(failure instanceof FileDownloadValidationError ? invalid : failed, { cause: failure });
+  }
+});
 
 // ============================================
 // 注册内置动作处理器
