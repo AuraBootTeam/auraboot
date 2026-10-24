@@ -1,6 +1,8 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.integration.DeclaredTestInfrastructure;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.mapper.CloudConfigMapper;
@@ -26,6 +28,7 @@ class TenantSecretAccessorRealDbIT {
     @Autowired CloudConfigMapper mapper;
     @Autowired ObjectMapper json;
     @Autowired DataSource dataSource;
+    @Autowired RedisProperties redisProperties;
     @AfterEach void clearContext() { MetaContext.clear(); }
 
     private String provider() { return "ps_"+UUID.randomUUID().toString().replace("-","").substring(0,24); }
@@ -41,9 +44,7 @@ class TenantSecretAccessorRealDbIT {
         TenantSecretAccessorImpl.install(settings,1L,configs,json);return (TenantSecretAccessor)settings.get(TenantSecretAccessor.SETTINGS_KEY);
     }
     private void assertDatabase() throws Exception {
-        assertNotNull(System.getenv("TEST_DATABASE_URL"));
-        assertEquals("13",System.getenv("TEST_REDIS_DATABASE"));
-        try(var connection=dataSource.getConnection()) { assertEquals("enterprise_22",connection.getCatalog()); }
+        DeclaredTestInfrastructure.assertSelected(dataSource, redisProperties);
     }
     @Test void actualEncryptedTenantConfigurationResolvesOnlyItsGrantedField() throws Exception {
         assertDatabase();context();String provider=provider();save(provider,"tenant","fixture-secret-value");

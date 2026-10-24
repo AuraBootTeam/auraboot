@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -29,6 +30,12 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired private MetaModelService models;
     @Autowired private SchemaManagementService schemas;
     @Autowired private DynamicDataService data;
+
+    @BeforeEach
+    void grantAggregateSourceReads() {
+        grantCommittedPermissionToTestRole("model.ab_tenant.read", "model", "ab_tenant", "read", "Read tenant aggregates");
+        grantCommittedPermissionToTestRole("model.ab_role.read", "model", "ab_role", "read", "Read role aggregates");
+    }
 
     // ==================== Helper Methods ====================
 

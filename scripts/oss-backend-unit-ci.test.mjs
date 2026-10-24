@@ -188,6 +188,9 @@ test('backend CI runner points fixed-stack tests at runtime-owned host ports', (
   assert.match(source, /SPRING_DATASOURCE_PASSWORD='auraboot_dev'/);
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
   assert.match(source, /SPRING_DATA_REDIS_PORT="\$AURA_OSS_CI_REDIS_PORT"/);
+  assert.match(source, /TEST_EXPECTED_DATABASE="\$database"/);
+  assert.match(source, /TEST_REDIS_DATABASE='0'/);
+  assert.match(source, /SPRING_DATA_REDIS_DATABASE='0'/);
   assert.match(source, /SPRING_DATA_REDIS_URL="redis:\/\/127\.0\.0\.1:\$AURA_OSS_CI_REDIS_PORT"/);
   assert.match(source, /SPRING_KAFKA_BOOTSTRAP_SERVERS="127\.0\.0\.1:\$AURA_OSS_CI_KAFKA_PORT"/);
   assert.match(source, /AURA_CI_REQUIRE_KAFKA='1'/);
@@ -434,7 +437,7 @@ test('both original Gradle tasks receive the admitted argument vector without ch
   const root=mkdtempSync(path.join(tmpdir(),'backend-jvm-arguments-'));
   t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(path.join(root,'platform'));
   const wrapper=path.join(root,'platform/gradlew');
-  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify(process.argv.slice(2)));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
+  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({args:process.argv.slice(2),database:process.env.TEST_EXPECTED_DATABASE,redis:process.env.TEST_REDIS_DATABASE,springRedis:process.env.SPRING_DATA_REDIS_DATABASE}));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
   const run=source.match(/run_backend_gradle\(\) \{[\s\S]*?\n\}/)?.[0];assert.ok(run);
   const argv=resourceArguments();
   const quoted=value=>"'"+value.replaceAll("'","'\\''")+"'";
@@ -447,7 +450,9 @@ test('both original Gradle tasks receive the admitted argument vector without ch
     run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
   `],{cwd:root,encoding:'utf8',env:{PATH:process.env.PATH}});
   assert.equal(result.status,23,result.stderr);
-  const rows=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(rows.length,2);
+  const invocations=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(invocations.length,2);
+  for(const row of invocations) {assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');}
+  const rows=invocations.map(row=>row.args);
   for(const row of rows){assert.deepEqual(row.slice(3,8),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
   assert.deepEqual(rows[0].slice(8),['--continue','cleanTest','test']);
   assert.deepEqual(rows[1].slice(8),['--continue','bootstrapBillingAccountTest']);

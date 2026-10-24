@@ -39,6 +39,7 @@ class ChartDataControllerTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
+        grantCommittedPermissionToTestRole("model.ab_tenant.read", "model", "ab_tenant", "read", "Read chart source");
         // Create a filter that sets MetaContext for each request
         // This is necessary because MockMvc doesn't go through the JWT filter
         Filter metaContextFilter = new Filter() {

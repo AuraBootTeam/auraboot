@@ -1,6 +1,8 @@
 package com.auraboot.framework.notification.wechat;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.integration.DeclaredTestInfrastructure;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
@@ -57,6 +59,7 @@ class WechatSubscriptionDeliveryPostgresIT {
     @Autowired ApplicationContext context;
     @Autowired JdbcTemplate jdbc;
     @Autowired DataSource source;
+    @Autowired RedisProperties redisProperties;
     @Autowired PlatformTransactionManager transactions;
     @Autowired NotificationSendLogMapper ledger;
     @Autowired NotificationMapper recipients;
@@ -81,8 +84,7 @@ class WechatSubscriptionDeliveryPostgresIT {
 
     @BeforeEach void fixture() throws Exception {
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
-        assertThat(System.getenv("TEST_DATABASE_URL")).isNotBlank();assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
-        try(var connection=source.getConnection()){assertThat(connection.getCatalog()).isEqualTo("enterprise_22");}
+        DeclaredTestInfrastructure.assertSelected(source, redisProperties);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='ab_notification_send_log' AND column_name='delivery_key'",Integer.class)).isEqualTo(1);
         tenant=tenant();foreignTenant=tenant();userPid=UniqueIdGenerator.generate();user=IdWorker.getId();
         jdbc.update("INSERT INTO ab_user(id,pid,user_name,deleted_flag) VALUES(?,?,?,FALSE)",user,userPid,"s06-durable-"+userPid);users.add(user);

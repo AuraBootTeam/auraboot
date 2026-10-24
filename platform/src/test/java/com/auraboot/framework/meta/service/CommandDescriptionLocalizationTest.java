@@ -36,6 +36,7 @@ class CommandDescriptionLocalizationTest {
         entity.setDescription("Legacy description"); entity.setExtension(JsonUtil.parse(JSON, ExtensionBean.class)); return entity;
     }
     @Test void createPersistsDeclaredTranslationsWithoutReturningOtherExtensionData() {
+        when(mapper.insertIdempotent(any(CommandDefinition.class))).thenReturn(1);
         var request = request(); request.setExtension(JSON); var dto = service.create(request);
         var capture = ArgumentCaptor.forClass(CommandDefinition.class); verify(mapper).insertIdempotent(capture.capture());
         assertThat(capture.getValue().getExtension().get("backendOnly")).isEqualTo(true);
@@ -57,6 +58,7 @@ class CommandDescriptionLocalizationTest {
         assertThat(service.findByPid("command-pid").getLocalizedDisplayNames()).containsEntry("en-US", "Create member");
     }
     @Test void legacyCommandKeepsItsDescriptionWithNoLocalizedEntries() {
+        when(mapper.insertIdempotent(any(CommandDefinition.class))).thenReturn(1);
         var dto = service.create(request()); assertThat(dto.getDescription()).isEqualTo("Legacy description");
         assertThat(dto.getLocalizedDescriptions()).isEmpty();
     }

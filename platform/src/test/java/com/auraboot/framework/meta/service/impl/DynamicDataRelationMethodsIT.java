@@ -41,8 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Real-stack IT for the DynamicDataService many-to-many relation runtime that
  * {@code loadModelRelations} just made reachable: createRelations inserts into the junction
- * table, removeRelations deletes from it (idempotent on re-create). A source model with a
- * MANY_TO_MANY reference field + a physical junction table; source/target records are not needed
+ * table, removeRelations deletes from it (idempotent on re-create). Published source and target models with a
+ * MANY_TO_MANY reference field + a physical junction table; unguarded source/target records are not needed
  * for the link CRUD itself.
  */
 @Slf4j
@@ -89,6 +89,8 @@ class DynamicDataRelationMethodsIT {
 
             srcCode = "relcov_src_" + Math.abs(System.nanoTime() % 1_000_000);
             Model src = newModel(srcCode);
+            String targetCode = srcCode.replace("relcov_src_", "relcov_tgt_");
+            newModel(targetCode);
             FieldRefTargetBean.BidirectionalConfig bidi = new FieldRefTargetBean.BidirectionalConfig();
             bidi.setRelationType("MANY_TO_MANY");
             bidi.setJunctionTable(JUNCTION);
@@ -96,7 +98,7 @@ class DynamicDataRelationMethodsIT {
             bidi.setJunctionTargetColumn("tgt_pid");
             FieldRefTargetBean rt = new FieldRefTargetBean();
             rt.setRefType("entity");
-            rt.setTargetEntity("relcov_tgt");
+            rt.setTargetEntity(targetCode);
             rt.setTargetField("pid");
             rt.setBidirectional(bidi);
             bind(src, refField("tags_ref", rt));
@@ -201,10 +203,10 @@ class DynamicDataRelationMethodsIT {
         Long tid = testTenant.getId();
         try {
             jdbcTemplate.update("DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
-                    + "(SELECT id FROM ab_meta_model WHERE code LIKE 'relcov_src%' AND tenant_id = ?)", tid);
+                    + "(SELECT id FROM ab_meta_model WHERE (code LIKE 'relcov_src%' OR code LIKE 'relcov_tgt%') AND tenant_id = ?)", tid);
             jdbcTemplate.update("DELETE FROM ab_meta_field WHERE code = 'tags_ref' AND tenant_id = ? "
                     + "AND id NOT IN (SELECT field_id FROM ab_meta_model_field_binding)", tid);
-            jdbcTemplate.update("DELETE FROM ab_meta_model WHERE code LIKE 'relcov_src%' AND tenant_id = ?", tid);
+            jdbcTemplate.update("DELETE FROM ab_meta_model WHERE (code LIKE 'relcov_src%' OR code LIKE 'relcov_tgt%') AND tenant_id = ?", tid);
         } catch (Exception e) {
             log.warn("relcov purge failed: {}", e.getMessage());
         }
