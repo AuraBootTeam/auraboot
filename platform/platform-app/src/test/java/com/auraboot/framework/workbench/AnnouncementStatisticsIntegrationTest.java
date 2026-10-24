@@ -47,6 +47,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired com.auraboot.framework.meta.mapper.ExportTaskMapper exportRegistry;
     @Autowired com.auraboot.module.exchange.service.ExecutionJobQueryService executionJobs;
     @Autowired com.auraboot.framework.infrastructure.storage.StorageProperties storageProperties;
+    @Autowired AnnouncementStatisticsExportCommand exportCommand;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
     @Autowired UserPermissionService permissions;
@@ -269,6 +270,38 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             assertThatThrownBy(()->legacyExports.getTaskStatus(taskPid)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             assertThat(legacyExports.getRecentTasks("domain:"+AnnouncementStatisticsExportSource.CODE,100)).isEmpty();
             assertThat(executionJobs.recent(100)).noneMatch(job->taskPid.equals(job.getPid()));
+        } finally {
+            grantCommittedPermissionToTestRole("announcement.announcement.export","announcement","announcement:announcement","export","Announcement export");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
+        }
+    }
+    @Test void businessExportAcceptanceReplaysOneTaskRejectsChangedCaptureAndReauthorizesBeforeReplay() throws Exception {
+        importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
+        try {
+            String version=publish();var captured=statistics.capture(version,AnnouncementStatistics.Filters.all());
+            String token=(String)captured.get("snapshotToken"),record=(String)codec.object(codec.encode(captured.get("metadata"))).get("recordPid");
+            int revision=jdbc.queryForObject("SELECT row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,getTestTenant().getId(),record);
+            String operation=UniqueIdGenerator.generate();var payload=Map.<String,Object>of("snapshotToken",token);
+            var first=exportCommand.execute(record,payload,operation);
+            assertThat(exportCommand.execute(record,payload,operation)).isEqualTo(first);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_export_task WHERE tenant_id=? AND created_by=? AND query_code=? AND request_params->'prepared'->>'reference'=?",
+                Integer.class,getTestTenant().getId(),getTestUser().getId(),"domain:"+AnnouncementStatisticsExportSource.CODE,token)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audit WHERE tenant_id=? AND command_code=? AND operation_id=?",
+                Integer.class,getTestTenant().getId(),AnnouncementStatisticsExportCommand.CODE,operation)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,getTestTenant().getId(),record)).isEqualTo(revision);
+            String replacement=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+            assertThatThrownBy(()->exportCommand.execute(record,Map.of("snapshotToken",replacement),operation))
+                .isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
+            String otherVersion=publish(),other=(String)statistics.capture(otherVersion,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+            assertThatThrownBy(()->exportCommand.execute(record,Map.of("snapshotToken",other),UniqueIdGenerator.generate()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessageContaining("different record");
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->
+                assertThat(exportTasks.status((String)first.get("exportTaskPid")).getStatus()).isEqualTo("completed"));
+            assertThat(jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.export")).isEqualTo(1);
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.export")).isFalse();
+            assertThatThrownBy(()->exportCommand.execute(record,payload,operation)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         } finally {
             grantCommittedPermissionToTestRole("announcement.announcement.export","announcement","announcement:announcement","export","Announcement export");
             permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();

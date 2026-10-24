@@ -68,5 +68,12 @@
     "handlerClass": "announcementCommandHandler",
     "sequence": 10,
     "enabled": true
+  },
+  {
+    "commandCode": "announcement:export_statistics",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
   }
 ]

@@ -139,5 +139,19 @@
     "executionConfig": {
       "requireIdempotencyKey": true
     }
+  },
+  {
+    "code": "announcement:export_statistics",
+    "displayName:zh-CN": "导出接收明细",
+    "displayName:en": "Export recipient statistics",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.stats",
+      "announcement.announcement.export"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
   }
 ]
