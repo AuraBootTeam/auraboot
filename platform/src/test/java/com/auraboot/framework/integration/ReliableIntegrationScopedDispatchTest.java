@@ -110,8 +110,9 @@ class ReliableIntegrationScopedDispatchTest {
         when(registry.consumersFor(anyString())).thenReturn(List.of(consumer));
         var success = event(1L, "success"); var dead = event(2L, "dead");
         var lost = event(3L, "lost"); var failureLost = event(4L, "failure-lost");
+        var exhausted = event(5L, "exhausted"); exhausted.setStatus("failed");
         when(claims.claimTenant(eq(31L), eq("commerce"), eq(List.of("commerce.a", "commerce.z")),
-                eq(4), anyString(), anyString(), any())).thenReturn(List.of(success, dead, lost, failureLost));
+                eq(5), anyString(), anyString(), any())).thenReturn(List.of(success, dead, lost, failureLost, exhausted));
         doAnswer(call -> {
             IntegrationEventEnvelope envelope = call.getArgument(0);
             if (Set.of("dead", "failure-lost").contains(envelope.eventId())) throw new IllegalStateException("controlled consumer failure");
@@ -119,10 +120,10 @@ class ReliableIntegrationScopedDispatchTest {
         }).when(executor).deliver(any(), same(consumer), anyString());
         when(state.markDelivered(same(success), anyString())).thenReturn(true);
         when(state.recordFailure(same(dead), anyString(), any(), anyString())).thenReturn(true);
-        var result = worker.dispatchCurrentTenant("commerce", Set.of("commerce.z", "commerce.a"), 4);
-        assertThat(result.claimed()).isEqualTo(4); assertThat(result.delivered()).isEqualTo(1);
-        assertThat(result.failed()).isEqualTo(1); assertThat(result.leaseLost()).isEqualTo(2);
-        assertThat(result.deadLetterEventIds()).containsExactly("dead");
+        var result = worker.dispatchCurrentTenant("commerce", Set.of("commerce.z", "commerce.a"), 5);
+        assertThat(result.claimed()).isEqualTo(5); assertThat(result.delivered()).isEqualTo(1);
+        assertThat(result.failed()).isEqualTo(2); assertThat(result.leaseLost()).isEqualTo(2);
+        assertThat(result.deadLetterEventIds()).containsExactly("dead", "exhausted");
         var envelopes = ArgumentCaptor.forClass(IntegrationEventEnvelope.class);
         verify(executor, times(4)).deliver(envelopes.capture(), same(consumer), anyString());
         assertThat(envelopes.getAllValues()).allSatisfy(envelope -> {
@@ -131,8 +132,10 @@ class ReliableIntegrationScopedDispatchTest {
                     .isEqualTo(new BigDecimal("123456789012345.67"));
         });
         verify(claims).claimTenant(eq(31L), eq("commerce"), eq(List.of("commerce.a", "commerce.z")),
-                eq(4), anyString(), anyString(), any());
+                eq(5), anyString(), anyString(), any());
         verify(claims, never()).claimGlobal(anyInt(), anyString(), anyString(), any());
+        verify(state, never()).markDelivered(same(exhausted), anyString());
+        verify(state, never()).recordFailure(same(exhausted), anyString(), any(), anyString());
     }
 
     @Test

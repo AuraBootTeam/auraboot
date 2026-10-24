@@ -123,6 +123,13 @@ public class OutboxWorkerImpl implements ReliableIntegrationDispatcher {
         List<String> dead = new ArrayList<>();
         for (OutboxEvent event : events) {
             metrics.record("claimed");
+            if ("failed".equals(event.getStatus())) {
+                // The claim transaction atomically exhausted a crashed worker's budget and wrote its DLQ.
+                failed++;
+                dead.add(event.getEventId());
+                metrics.record("dead_lettered");
+                continue;
+            }
             try {
                 if (event.getSchemaVersion() == null) dispatchLegacy(event);
                 else dispatchReliable(event, leaseToken);
