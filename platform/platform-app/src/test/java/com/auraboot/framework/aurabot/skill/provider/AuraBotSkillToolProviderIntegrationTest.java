@@ -4,8 +4,6 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.integration.BaseIntegrationTest;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,7 +17,6 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -27,7 +24,7 @@ import static org.mockito.Mockito.when;
  * IT for {@link AuraBotSkillToolProvider} (C-5 Task 2 §4.1).
  *
  * <p>Mirrors the {@link com.auraboot.framework.aurabot.skill.AuraBotSkillControllerIntegrationTest}
- * mocking pattern: {@link UserPermissionService} + {@link PermissionMapper} are
+ * mocking pattern: {@link UserPermissionService} are
  * mocked so each case can drive a deterministic permission set without
  * provisioning real role rows. The SkillRegistry, MessageSource and provider
  * itself are real Spring beans on the standard {@code integration-test} stack (real
@@ -39,9 +36,8 @@ class AuraBotSkillToolProviderIntegrationTest extends BaseIntegrationTest {
     @Autowired AuraBotSkillToolProvider provider;
 
     @MockBean private UserPermissionService userPermissionService;
-    @MockBean private PermissionMapper permissionMapper;
 
-    /** Per-test permission code set the mocked PermissionMapper materialises. */
+    /** Per-test effective permission codes. */
     private final Set<String> currentPermissions = new HashSet<>();
 
     @BeforeEach
@@ -49,16 +45,9 @@ class AuraBotSkillToolProviderIntegrationTest extends BaseIntegrationTest {
         currentPermissions.clear();
         MetaContext.setContext(getTestTenant().getId(), 1L, null, "it-c5-user");
 
-        // Any non-null userId resolves to a non-empty id list so the mapper is
-        // consulted; mapper materialises Permission rows from currentPermissions.
-        when(userPermissionService.getUserPermissionIds(eq(1L)))
-                .thenAnswer(inv -> Set.of(1L));
-        when(permissionMapper.findByIds(any())).thenAnswer(inv ->
-                currentPermissions.stream().map(code -> {
-                    Permission p = new Permission();
-                    p.setCode(code);
-                    return p;
-                }).toList());
+        // Match the effective authorization contract, including published permissions.
+        when(userPermissionService.getUserPermissionCodes(eq(1L)))
+                .thenAnswer(inv -> Set.copyOf(currentPermissions));
     }
 
     @Test

@@ -10,8 +10,6 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -30,7 +28,6 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -46,8 +43,8 @@ import static org.mockito.Mockito.when;
  * </ul>
  *
  * <p>Real PG (port 25442) + real Redis (port 26389) via the
- * standard {@code integration-test} profile. {@link UserPermissionService} +
- * {@link PermissionMapper} are mocked to avoid wiring full RBAC tables —
+ * standard {@code integration-test} profile. {@link UserPermissionService}
+ * supplies controlled effective permissions without full RBAC fixture rows —
  * mirrors {@code AuraBotSkillToolProviderIntegrationTest}.
  */
 @ActiveProfiles("integration-test")
@@ -59,7 +56,6 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
     @Autowired DynamicDataMapper dynamicDataMapper;
 
     @MockBean private UserPermissionService userPermissionService;
-    @MockBean private PermissionMapper permissionMapper;
 
     private final Set<String> currentPermissions = new HashSet<>();
     private String testModelCode;
@@ -71,14 +67,8 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
         // model:create requires meta.model.update; tests grant as needed.
         MetaContext.setContext(getTestTenant().getId(), 1L, null, "it-c5-t3-user");
 
-        when(userPermissionService.getUserPermissionIds(eq(1L)))
-                .thenAnswer(inv -> Set.of(1L));
-        when(permissionMapper.findByIds(any())).thenAnswer(inv ->
-                currentPermissions.stream().map(code -> {
-                    Permission p = new Permission();
-                    p.setCode(code);
-                    return p;
-                }).toList());
+        when(userPermissionService.getUserPermissionCodes(eq(1L)))
+                .thenAnswer(inv -> Set.copyOf(currentPermissions));
 
         testModelCode = "it_c5t3_" + UniqueIdGenerator.generate().toLowerCase().substring(0, 8);
     }

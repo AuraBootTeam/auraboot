@@ -12,8 +12,6 @@ import com.auraboot.framework.aurabot.skill.SkillRequestValidator.ValidationMode
 import com.auraboot.framework.aurabot.skill.SkillResult;
 import com.auraboot.framework.aurabot.skill.error.SkillErrorCode;
 import com.auraboot.framework.aurabot.skill.error.SkillSpiException;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,14 +19,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Chat-aware dispatch shim over the AuraBot Skill SPI (Plan §C-5 Task 3 §4.2).
@@ -71,20 +64,17 @@ public class SkillToolExecutor {
     // Optional: only present when redis is configured (RedisOptionalConfig).
     private final ObjectProvider<PreviewTokenStore> previewTokenStoreProvider;
     private final UserPermissionService userPermissionService;
-    private final PermissionMapper permissionMapper;
     private final ObjectMapper objectMapper;
 
     public SkillToolExecutor(AuraBotSkillRegistry registry,
                              SkillRequestValidator validator,
                              ObjectProvider<PreviewTokenStore> previewTokenStoreProvider,
                              UserPermissionService userPermissionService,
-                             PermissionMapper permissionMapper,
                              ObjectMapper objectMapper) {
         this.registry = registry;
         this.validator = validator;
         this.previewTokenStoreProvider = previewTokenStoreProvider;
         this.userPermissionService = userPermissionService;
-        this.permissionMapper = permissionMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -251,15 +241,10 @@ public class SkillToolExecutor {
         if (userId == null) {
             return Collections.emptySet();
         }
-        Set<Long> ids = userPermissionService.getUserPermissionIds(userId);
-        if (ids == null || ids.isEmpty()) {
-            return Collections.emptySet();
-        }
-        List<Permission> perms = permissionMapper.findByIds(new ArrayList<>(ids));
-        return perms.stream()
-                .map(Permission::getCode)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        // Effective codes include permissions supplied by the published application
+        // catalog, which do not necessarily have a database permission ID.
+        Set<String> codes = userPermissionService.getUserPermissionCodes(userId);
+        return codes == null ? Collections.emptySet() : codes;
     }
 
     // ────────────────────────────────────────────────────────────────────────
