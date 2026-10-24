@@ -154,10 +154,10 @@ class ReliableEventDeliveryIsolationTest {
 
     @Test
     void missingTransactionMarkerCannotLockOrApplyEvenWithAValidLease() {
-        when(manager.getTransaction(any())).thenAnswer(call -> {
+        org.mockito.Mockito.doAnswer(call -> {
             org.springframework.transaction.support.TransactionSynchronizationManager.clear();
             return new SimpleTransactionStatus();
-        });
+        }).when(manager).getTransaction(any());
         assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
                 .deliver(event, new Ordinary(), "lease")).isInstanceOf(SecurityException.class);
         verify(mapper, never()).lockActiveDeliveryLease(anyLong(), anyString(), anyString());
@@ -166,11 +166,11 @@ class ReliableEventDeliveryIsolationTest {
 
     @Test
     void readOnlyTransactionCannotLockOrApply() {
-        when(manager.getTransaction(any())).thenAnswer(call -> {
+        org.mockito.Mockito.doAnswer(call -> {
             org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
             org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
             return new SimpleTransactionStatus();
-        });
+        }).when(manager).getTransaction(any());
         assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
                 .deliver(event, new Ordinary(), "lease")).isInstanceOf(SecurityException.class);
         verify(mapper, never()).lockActiveDeliveryLease(anyLong(), anyString(), anyString());
