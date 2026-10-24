@@ -76,6 +76,7 @@ async function clickRowAction(
   const action = menu.getByRole('menuitem', { name: actionLabel, exact: true });
   await expect(action).toBeVisible();
   await menu.screenshot({
+    animations: 'disabled',
     path: test
       .info()
       .outputPath(`menu-${String(actionLabel).replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_')}.png`),
@@ -91,6 +92,7 @@ async function clickRowAction(
   };
   await expect(dialog).toContainText(confirmationText[commandCode]);
   await dialog.screenshot({
+    animations: 'disabled',
     path: test.info().outputPath(`confirm-${commandCode.replace(':', '-')}.png`),
   });
   const responsePromise = page.waitForResponse(
@@ -133,6 +135,7 @@ test('create announcement in draft status', async ({ page }) => {
     page.getByText('补充影响范围、时间安排和需要读者采取的行动。', { exact: true }),
   ).toBeVisible();
   await page.screenshot({
+    animations: 'disabled',
     path: test.info().outputPath('create-form-guidance.png'),
     fullPage: true,
   });
@@ -192,7 +195,10 @@ test('list page shows created announcement with draft status', async ({ page }) 
   await expect(
     filterArea.getByText('按公告标题关键词查找；清除关键词可查看全部公告。', { exact: true }),
   ).toBeVisible();
-  await filterArea.screenshot({ path: test.info().outputPath('title-filter-guidance.png') });
+  await filterArea.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('title-filter-guidance.png'),
+  });
   await titleFilter.fill(`${TITLE}-no-match`);
   await page.getByTestId('filter-search').click();
   await expect(page.getByText('没有匹配的公告', { exact: true })).toBeVisible();
@@ -200,6 +206,7 @@ test('list page shows created announcement with draft status', async ({ page }) 
     page.getByText('选择“新建公告”创建草稿，或清除筛选条件查看已有公告。', { exact: true }),
   ).toBeVisible();
   await page.screenshot({
+    animations: 'disabled',
     path: test.info().outputPath('filtered-empty-recovery.png'),
     fullPage: true,
   });
@@ -225,7 +232,11 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
     'aria-checked',
     'true',
   );
-  await page.screenshot({ path: test.info().outputPath('edit-form-values.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('edit-form-values.png'),
+    fullPage: true,
+  });
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
@@ -252,7 +263,11 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
   await editedRow.getByTestId('row-action-view').click();
   await expect(page.getByText(`${CONTENT} edited`, { exact: true })).toBeVisible();
   await expect(page.getByText('重要', { exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('draft-detail.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('draft-detail.png'),
+    fullPage: true,
+  });
 });
 
 test('publication reports unavailable and leaves the draft intact', async ({ page }) => {
@@ -278,6 +293,7 @@ test('publication reports unavailable and leaves the draft intact', async ({ pag
       .getByText('公告发布尚未启用：需要先完成受众授权与可靠分发接入。', { exact: true }),
   ).toBeVisible();
   await page.screenshot({
+    animations: 'disabled',
     path: test.info().outputPath('publication-unavailable.png'),
     fullPage: true,
   });
@@ -290,7 +306,11 @@ test('delete draft through its protected command', async ({ page }) => {
   await clickRowAction(page, TITLE, '删除', 'announcement:delete_announcement');
   await expect(page.locator('table tbody tr').filter({ hasText: TITLE })).toHaveCount(0);
   await expect(page.getByText('没有匹配的公告', { exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('deleted-draft.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: test.info().outputPath('deleted-draft.png'),
+    fullPage: true,
+  });
 });
 
 test('withdraw legacy content and create a revision without mutating its frozen version', async ({
@@ -357,7 +377,11 @@ test('withdraw legacy content and create a revision without mutating its frozen 
     await expect(
       page.getByTestId('row-action-dropdown').getByRole('menuitem', { name: '删除', exact: true }),
     ).toHaveCount(0);
-    await page.screenshot({ path: test.info().outputPath('legacy-revision.png'), fullPage: true });
+    await page.screenshot({
+      animations: 'disabled',
+      path: test.info().outputPath('legacy-revision.png'),
+      fullPage: true,
+    });
     const frozen = await db.query(
       'SELECT snapshot->>$$title$$ AS title FROM ab_announcement_version WHERE pid=$1',
       [versionPid],
@@ -439,6 +463,7 @@ test('read-only manager cannot create or modify notices', async ({ page, browser
     );
     expect(denied.status(), await denied.text()).toBe(403);
     await reader.screenshot({
+      animations: 'disabled',
       path: test.info().outputPath('permission-denied.png'),
       fullPage: true,
     });
