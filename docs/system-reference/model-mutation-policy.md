@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-03
-updated: 2026-10-24
+updated: 2026-10-25
 ---
 
 # Model mutation policy
@@ -83,7 +83,7 @@ Computed fields normalize their expression context with the same declared field 
 
 The extended targeted selection has 79 hermetic cases and ten PostgreSQL cases using explicit enterprise_22 and temporary tables. File import and computed writes have real parent-denial/ordinary-or-exact positive controls. Removing input conversion fails three of four computed unit cases; disabling import, direct junction, state and handler predicates fails seven of 35 selected cases. Restored targeted runs pass. Seven separate Spring metadata-query cases were rerun with explicit enterprise_22/Redis DB 13; they are not procurement business acceptance. An earlier invocation omitted the database override and used default aura_boot, so those seven earlier executions are excluded from owned-runtime proof and no zero-effect claim is made. The paired native runtime initially failed ordinary order amount persistence before this repair; a new source-set and HTTP run are still required.
 
-## Durable-operation aggregate mutation lock (candidate)
+## Durable-operation aggregate mutation lock
 
 A model may declare extension.recordMutationLock with a physical nullable reference
 or string field and exact create/update/delete command lists. Any non-null stored
@@ -106,8 +106,8 @@ state/relation/rollup/computed mutations. Bulk insert checks each proposed paren
 Checks use the existing structured mapper lock with tenant predicates and FOR UPDATE;
 no arbitrary SQL expression is accepted in the declaration. The receipt request
 command already locks its named source before reading lines, so the child guard
-and source claim can share that lock. This concurrency protocol still needs actual
-database and product-pipeline verification for the new declaration.
+and source claim can share that lock. The product acceptance report qualifies the deployed declaration separately from
+this generic contract and retains complete write-path coverage gaps.
 
 Example root declaration:
 
@@ -123,8 +123,28 @@ The broad prior attempt retains an initialization failure against nonexistent
 default aura_boot and five stale fixture failures. The fixture now injects the
 real empty ThreadContextScopes dependency without removing permission assertions.
 
-This is source/test evidence, not deployment qualification. The active procurement
-runtime has not been upgraded to this Core candidate, and its new receipt model
-declarations must not be imported into the old Core. Real PostgreSQL concurrency,
-formal child command/generic-write refusal, complete import-path audit and source
-posted-state feedback remain in the product's original acceptance report.
+The product's round118 subsequently upgraded its original runtime and model
+declarations, verified six public/generic mutation denials and two actual PostgreSQL
+ordering cases. Those bounded results do not prove every import writer or receipt
+lifecycle. Exact runtime identity and failed attempts remain in the product report.
+
+## Confirmed receipt source transition
+
+The private ProcurementReceiptCommandScope may grant one additional CAS on
+pr_purchase_receipt, only inside the verified Inventory confirmed-fact consumer
+and its active persisted delivery lease. All qualified PO-line targets of that
+event must already have successful counter CAS results. The only accepted patch
+is pr_rcpt_status=confirmed with the source's server-read row_version. The source
+PID and type must match the fact, and tenant, draft state, enqueued integration
+state, durable request PID/key/hash, original source version and event identity
+must match the persisted Procurement request. Ordinary update/create/delete,
+other sources, extra fields, repeated source writes and missing claims are denied.
+
+The source CAS retains normal tenant/version/mutation-lock checks and exact
+internal command identity. Model ownership and the delivery lease are rechecked
+after the delegate. The consumer throws on a source conflict so the host
+transaction rolls back prior counters and cannot mark the receipt applied.
+It does not set Inventory state, post stock, change order approval or turn
+request delivery into receipt confirmation. Ordinary non-collaboration events
+retain their previous no-counter/no-source-write behavior. Deployment and native
+transaction qualification are separate from the candidate's hermetic tests.

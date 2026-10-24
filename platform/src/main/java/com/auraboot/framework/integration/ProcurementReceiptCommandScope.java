@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/** Private delivery authority: persisted Inventory facts can advance only their qualified PO lines. */
+/** Private delivery authority: persisted Inventory facts advance qualified counters and their exact source state. */
 public final class ProcurementReceiptCommandScope {
     static final String CONSUMER = "procurement.confirmed-receipt-counter.v1";
     static final String COMMAND = "pr:consume_confirmed_inventory_receipt";
@@ -24,7 +24,8 @@ public final class ProcurementReceiptCommandScope {
             "pr_inventory_operation_request", "prod_product", "pe_product");
     private record Permit(IntegrationEventEnvelope event, String lease, InventoryReceiptEnqueueProvenance provenance,
                           InventoryOwnerModelAuthority authority, Set<String> targets,
-                          Map<String, InventoryOwnerModelAuthority.Binding> bindings, Set<String> applied) {}
+                          Map<String, InventoryOwnerModelAuthority.Binding> bindings, Set<String> applied,
+                          java.util.concurrent.atomic.AtomicBoolean sourceApplied) {}
     private static final ThreadLocal<Permit> CURRENT = new ThreadLocal<>();
     private record CounterWrite(Permit permit, String record, long version, BigDecimal quantity,
                                 String parentPid, long parentVersion, java.util.concurrent.atomic.AtomicBoolean claimed) {}
@@ -60,7 +61,7 @@ public final class ProcurementReceiptCommandScope {
                 targets.add(pid);
             }
         }
-        CURRENT.set(new Permit(event, lease, provenance, authority, Set.copyOf(targets), new HashMap<>(), new HashSet<>()));
+        CURRENT.set(new Permit(event, lease, provenance, authority, Set.copyOf(targets), new HashMap<>(), new HashSet<>(), new java.util.concurrent.atomic.AtomicBoolean()));
         try { work.run(); verify(CURRENT.get()); } finally { CURRENT.remove(); }
     }
 
@@ -81,6 +82,8 @@ public final class ProcurementReceiptCommandScope {
     public static boolean compareAndSet(long tenant, String model, String record, String field,
                                        Object expected, Map<String,Object> patch, DynamicDataService data) {
         Permit permit = require(tenant);
+        if ("pr_purchase_receipt".equals(model))
+            return confirmSource(permit, tenant, record, field, expected, patch, data);
         if (!MODEL.equals(model) || !permit.targets().contains(record) || permit.applied().contains(record)
                 || !"row_version".equals(field) || patch == null || !patch.keySet().equals(Set.of("pr_pol_received_qty"))) throw denied();
         Map<String,Object> immutablePatch = Map.copyOf(patch);
@@ -121,6 +124,53 @@ public final class ProcurementReceiptCommandScope {
                         } finally {
                             COUNTER_WRITE.remove();
                         }
+                    }));
+        });
+    }
+
+    /** Complete only the source of this fact after every qualified counter CAS succeeded. */
+    private static boolean confirmSource(Permit permit, long tenant, String record, String field,
+            Object expected, Map<String,Object> patch, DynamicDataService data) {
+        String model = "pr_purchase_receipt";
+        if (!"row_version".equals(field) || !Map.of("pr_rcpt_status", "confirmed").equals(patch)
+                || permit.targets().isEmpty() || !permit.applied().equals(permit.targets())
+                || permit.sourceApplied().get()
+                || !"procurement.purchase_receipt".equals(permit.event().payload().get("sourceType"))
+                || record == null || !record.equals(permit.event().payload().get("sourcePid"))) throw denied();
+        Object originValue = permit.event().payload().get("sourceOrigin");
+        if (!(originValue instanceof Map<?,?> origin) || !(origin.get("eventId") instanceof String originId)
+                || !(origin.get("intentHash") instanceof String hash) || !hash.matches("[a-f0-9]{64}")) throw denied();
+        var sourceBinding = binding(permit, model, true);
+        return MetaContext.runWithCommandPermitPlan("ALL", null, model, record, () -> {
+            Map<String,Object> source = data.getById(model, record);
+            if (source == null || !record.equals(source.get("pid")) || number(source.get("tenant_id")) != tenant
+                    || !"draft".equals(source.get("pr_rcpt_status"))
+                    || !"enqueued".equals(source.get("pr_inventory_integration_status"))
+                    || !hash.equals(source.get("pr_inventory_request_hash"))
+                    || !(source.get("pr_inventory_request_id") instanceof String requestId) || requestId.isBlank()
+                    || number(source.get("row_version")) != number(expected) || number(expected) < 0) throw denied();
+            binding(permit, "pr_inventory_operation_request", false);
+            Map<String,Object> request = MetaContext.runWithCommandPermitPlan("ALL", null,
+                    "pr_inventory_operation_request", requestId, () -> data.getById("pr_inventory_operation_request", requestId));
+            if (request == null || !requestId.equals(request.get("pid")) || number(request.get("tenant_id")) != tenant
+                    || !"pr_purchase_receipt".equals(request.get("pr_ior_source_model"))
+                    || !record.equals(request.get("pr_ior_source_id"))
+                    || !"purchase_receipt".equals(request.get("pr_ior_operation"))
+                    || !"enqueued".equals(request.get("pr_ior_status"))
+                    || !originId.equals(request.get("pr_ior_event_id"))
+                    || !hash.equals(request.get("pr_ior_intent_hash"))
+                    || !(source.get("pr_inventory_request_key") instanceof String key) || key.isBlank()
+                    || !key.equals(request.get("pr_ior_request_key"))
+                    || number(request.get("pr_ior_source_version")) != number(origin.get("sourceVersion"))) throw denied();
+            verify(permit);
+            return MetaContext.runWithCommandPermitPlan("ALL", number(expected), model, record,
+                    () -> MetaContext.runWithAuthorizedCommandCode(COMMAND, () -> {
+                        if (!permit.sourceApplied().compareAndSet(false, true)) throw denied();
+                        boolean result = data.compareAndSet(model, record, field, expected, Map.of("pr_rcpt_status", "confirmed"));
+                        InventoryOwnerModelAuthority.assertUnchanged(sourceBinding, permit.authority().resolveProcurement(tenant, model, true));
+                        binding(permit, "pr_inventory_operation_request", false);
+                        verify(permit);
+                        return result;
                     }));
         });
     }
