@@ -1964,7 +1964,7 @@
     ]
   },
   {
-    "pageKey": "announcement_statistics",
+    "pageKey": "announcement_statistics_detail",
     "name:zh-CN": "接收统计",
     "name:en": "Recipient statistics",
     "modelCode": "ab_announcement",
@@ -2690,7 +2690,7 @@
     }
   },
   {
-    "pageKey": "announcement_statistics_export",
+    "pageKey": "announcement_statistics_export_detail",
     "name:zh-CN": "统计导出",
     "name:en": "Statistics export",
     "modelCode": "ab_announcement",
