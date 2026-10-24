@@ -24,14 +24,6 @@
     "module": "system"
   },
   {
-    "code": "announcement.announcement.submit",
-    "name:zh-CN": "提交公告审批",
-    "name:en": "Submit announcement approval",
-    "description": "Submit announcement approval",
-    "resourceType": "operation",
-    "module": "system"
-  },
-  {
     "code": "announcement.announcement.publish",
     "name:zh-CN": "发布公告",
     "name:en": "Publish announcements",
