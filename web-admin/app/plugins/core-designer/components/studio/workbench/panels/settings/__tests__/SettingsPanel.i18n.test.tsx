@@ -75,3 +75,21 @@ describe.each(['en-US', 'zh-CN'])('designer settings in %s', locale => {
     expect(screen.getByTestId('settings-panel-save')).toBeDisabled();
   });
 });
+
+describe.each(['en-US', 'zh-CN'])('form layout settings in %s', locale => {
+  it('renders schema properties and blocks invalid column counts before applying', () => {
+    const onSettingsChange = vi.fn();
+    render(<I18nProvider initialLocale={locale} initialData={dictionary(locale)}>
+      <SettingsPanel isOpen pageKind="form" onClose={vi.fn()} onSettingsChange={onSettingsChange}
+        initialSettings={{ page: { formPresentation: { width: 'comfortable', columns: 1, surface: 'card', density: 'comfortable', actions: 'inline', guidance: 'none' } } }} />
+    </I18nProvider>);
+    const columns = screen.getByRole('spinbutton', { name: locale === 'zh-CN' ? '默认列数' : 'Form columns' });
+    fireEvent.change(columns, { target: { value: '4' } });
+    expect(screen.getByRole('alert')).toHaveTextContent(locale === 'zh-CN' ? '默认列数' : 'columns');
+    expect(screen.getByTestId('settings-panel-save')).toBeDisabled();
+    expect(onSettingsChange).not.toHaveBeenCalled();
+    fireEvent.change(columns, { target: { value: '2' } });
+    fireEvent.click(screen.getByTestId('settings-panel-save'));
+    expect(onSettingsChange.mock.calls[0][0].page.formPresentation).toMatchObject({ columns: 2, width: 'comfortable', actions: 'inline' });
+  });
+});

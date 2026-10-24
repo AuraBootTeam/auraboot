@@ -1,3 +1,4 @@
+import { resolveFormPresentation, formGridClass, formFieldSpanClass } from './formPresentation';
 import { WorkspaceGuidance } from '../form/WorkspaceGuidance';
 import { FormSection } from '../form/FormSection';
 import { Link } from 'react-router';
@@ -40,6 +41,7 @@ type RenderFormPageViewArgs = Pick<
   | 'tableName'
   | 'isEditMode'
   | 'onCancelOverride'
+  | 'onSubmitOverride'
   | 'summaryErrors'
   | 'fieldErrors'
   | 'fieldPermissions'
@@ -97,6 +99,7 @@ export function renderFormPageView({
   locale,
   t,
   onCancelOverride,
+  onSubmitOverride,
   summaryErrors,
   error,
   restorableDraft,
@@ -165,6 +168,10 @@ export function renderFormPageView({
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
   );
   const workspace = schema.extension?.presentation === 'workspace';
+  const embedded = Boolean(onCancelOverride || onSubmitOverride);
+  const presentation = resolveFormPresentation(schema.extension, embedded);
+  const hasGuidance = presentation.guidance === 'aside' && Boolean(schema.extension?.formGuidance);
+  const fixedActions = presentation.actions === 'fixed';
   const backLink = resolveFormBackLink(schema, tableName);
   const activeButtons = (effectiveButtonBlock?.buttons || []).filter(
     (button: any) => !button.visibleWhen || evaluateCondition(button.visibleWhen, pageContext),
@@ -182,55 +189,58 @@ export function renderFormPageView({
           a comfortable 2-column line length while staying roomy for sub-tables. */}
         <div
           className={
-            workspace
-              ? 'min-h-[calc(100vh-56px)] bg-[#F7F7F8] px-6 pt-7 pb-24 lg:px-8'
-              : `mx-auto w-full px-2 py-3 ${schema.extension?.formWidth === 'comfortable' ? 'max-w-4xl' : 'max-w-6xl'}`
+            embedded
+              ? 'w-full min-w-0'
+              : `mx-auto w-full min-w-0 bg-[#F7F7F8] px-4 py-6 sm:px-6 ${fixedActions ? 'pb-24' : ''} ${presentation.width === 'comfortable' ? 'max-w-4xl' : presentation.width === 'wide' ? 'max-w-6xl' : ''}`
           }
           data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
         >
           <div className="bg-transparent">
-            {/* Page Header */}
-            <div className="pt-2 pb-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-text text-2xl font-semibold tracking-tight">
-                    {getLocalizedText(
-                      (isEditMode ? schema.extension?.editTitle : schema.extension?.createTitle) ||
-                        schema.title,
-                      locale,
-                      t,
+            {/* The embedding host owns its heading and navigation. */}
+            {!embedded && (
+              <div className="pt-2 pb-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-text text-2xl font-semibold tracking-tight">
+                      {getLocalizedText(
+                        (isEditMode
+                          ? schema.extension?.editTitle
+                          : schema.extension?.createTitle) || schema.title,
+                        locale,
+                        t,
+                      )}
+                    </h2>
+                    {schema.extension?.pageDescription && (
+                      <p className="text-text-2 mt-2 text-xs">
+                        {getLocalizedText(schema.extension.pageDescription, locale, t)}
+                      </p>
                     )}
-                  </h2>
-                  {workspace && schema.extension?.pageDescription && (
-                    <p className="text-text-2 mt-2 text-xs">
-                      {getLocalizedText(schema.extension.pageDescription, locale, t)}
-                    </p>
-                  )}
+                  </div>
+                  {onCancelOverride ? (
+                    <button
+                      type="button"
+                      onClick={onCancelOverride}
+                      data-testid="form-back-link"
+                      className="text-accent text-sm hover:text-blue-800"
+                    >
+                      {t('action.back')}
+                    </button>
+                  ) : backLink ? (
+                    <Link
+                      to={backLink}
+                      data-testid="form-back-link"
+                      className="text-accent text-sm hover:text-blue-800"
+                    >
+                      {t('action.back')}
+                    </Link>
+                  ) : null}
                 </div>
-                {onCancelOverride ? (
-                  <button
-                    type="button"
-                    onClick={onCancelOverride}
-                    data-testid="form-back-link"
-                    className="text-accent text-sm hover:text-blue-800"
-                  >
-                    {t('action.back')}
-                  </button>
-                ) : backLink ? (
-                  <Link
-                    to={backLink}
-                    data-testid="form-back-link"
-                    className="text-accent text-sm hover:text-blue-800"
-                  >
-                    {t('action.back')}
-                  </Link>
-                ) : null}
               </div>
-            </div>
+            )}
 
             <div
               className={
-                workspace
+                hasGuidance
                   ? 'grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_246px]'
                   : ''
               }
@@ -412,6 +422,8 @@ export function renderFormPageView({
                             return (
                               <FormSection
                                 key={block.id || `block-${blockIndex}`}
+                                surface={presentation.surface}
+                                density={presentation.density}
                                 title={blockTitle}
                                 index={
                                   workspace && !block.extension?.collapsible
@@ -419,8 +431,13 @@ export function renderFormPageView({
                                     : undefined
                                 }
                                 description={blockDescription}
-                                collapsible={block.extension?.collapsible === true}
-                                defaultCollapsed={block.extension?.defaultCollapsed === true}
+                                collapsible={
+                                  (block.collapsible ?? block.extension?.collapsible) === true
+                                }
+                                defaultCollapsed={
+                                  (block.defaultCollapsed ?? block.extension?.defaultCollapsed) ===
+                                  true
+                                }
                                 hasError={(block.fields || []).some((field: any) =>
                                   Boolean(fieldErrors[field.field]),
                                 )}
@@ -433,7 +450,7 @@ export function renderFormPageView({
                                 {/* Section Fields */}
                                 {block.fields && block.fields.length > 0 && (
                                   <div
-                                    className={`grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2 ${
+                                    className={`grid ${formGridClass(block.columns ?? block.layout?.columns ?? presentation.columns)} ${presentation.density === 'compact' ? 'gap-x-4 gap-y-3' : 'gap-x-6 gap-y-4'} ${
                                       isSettingsCard ? 'p-4 sm:p-5' : ''
                                     }`}
                                   >
@@ -531,7 +548,12 @@ export function renderFormPageView({
                                         field.layout?.colSpan ||
                                         field.colSpan ||
                                         (field.span ? field.span * 6 : 6);
-                                      const isFullWidth = colSpan >= 12;
+                                      const fieldSpanClass = formFieldSpanClass(
+                                        colSpan,
+                                        block.columns ??
+                                          block.layout?.columns ??
+                                          presentation.columns,
+                                      );
 
                                       return (
                                         <div
@@ -543,7 +565,7 @@ export function renderFormPageView({
                                             'field',
                                             field.field,
                                           )}
-                                          className={isFullWidth ? 'md:col-span-2' : ''}
+                                          className={fieldSpanClass}
                                         >
                                           {renderSmartField(field)}
                                         </div>
@@ -646,14 +668,16 @@ export function renderFormPageView({
                     effectiveButtonBlock.buttons.length > 0 && (
                       <div
                         className={
-                          workspace
-                            ? 'border-border bg-panel fixed right-0 bottom-0 z-30 flex flex-wrap items-center justify-end gap-3 border-t px-8 py-4'
-                            : 'border-border bg-panel rounded-card sticky bottom-0 z-20 mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm'
+                          embedded
+                            ? 'border-border mt-5 flex flex-wrap justify-end gap-3 border-t pt-4'
+                            : fixedActions
+                              ? 'border-border bg-panel fixed right-0 bottom-0 z-30 flex flex-wrap items-center justify-end gap-3 border-t px-8 py-4'
+                              : `border-border bg-panel rounded-card ${presentation.actions === 'sticky' ? 'sticky bottom-0 z-20' : ''} mt-6 flex flex-wrap justify-end gap-3 border px-5 py-3 shadow-sm`
                         }
-                        style={workspace ? { left: sidebarWidth } : undefined}
+                        style={fixedActions ? { left: sidebarWidth } : undefined}
                         data-testid="form-action-footer"
                       >
-                        {workspace && schema.extension?.footerNote && (
+                        {schema.extension?.footerNote && (
                           <p className="text-text-3 mr-auto text-xs">
                             {getLocalizedText(schema.extension.footerNote, locale, t)}
                           </p>
@@ -709,7 +733,7 @@ export function renderFormPageView({
                     )}
                 </form>
               </div>
-              {workspace && schema.extension?.formGuidance && (
+              {hasGuidance && (
                 <WorkspaceGuidance
                   config={
                     (isEditMode && schema.extension?.editGuidance) || schema.extension.formGuidance

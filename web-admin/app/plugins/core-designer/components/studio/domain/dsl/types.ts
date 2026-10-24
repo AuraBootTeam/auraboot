@@ -33,6 +33,12 @@ export type PageKind = 'list' | 'form' | 'detail';
  * All page-level feature flags and runtime hints live here.
  */
 export interface PageSchemaExtension {
+  formPresentation?: Partial<import('~/framework/meta/rendering/pages/formPage/formPresentation').FormPresentation>;
+  presentation?: 'workspace';
+  formWidth?: 'comfortable' | 'wide';
+  formGuidance?: Record<string, unknown>;
+  editGuidance?: Record<string, unknown>;
+  attachmentFields?: string[];
   viewModelCode?: string;
   viewModel?: {
     mode?: 'entity' | 'namedQuery';
@@ -143,6 +149,7 @@ export interface DslBlock {
   blockType: BlockType;
 
   // Layout
+  layout?: { columns?: number; colSpan?: number; rowSpan?: number };
   span?: number;
 
   // Visibility

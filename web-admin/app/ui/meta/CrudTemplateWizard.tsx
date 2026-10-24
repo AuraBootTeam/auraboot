@@ -1,3 +1,7 @@
+import { PropertyFieldRenderer, DESIGNER_I18N } from '~/shared/designer';
+import { useI18n } from '~/contexts/I18nContext';
+import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
+import { formPresentationProperties } from '~/shared/designer/formPresentationSchema';
 import React, { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import type { CrudTemplateConfig, TemplateGenerationResult } from '~/types/model';
@@ -18,6 +22,7 @@ export function CrudTemplateWizard({
   onComplete,
 }: CrudTemplateWizardProps) {
   const navigate = useNavigate();
+  const { locale } = useI18n();
   const [config, setConfig] = useState<CrudTemplateConfig>({
     generateList: true,
     generateForm: true,
@@ -33,6 +38,7 @@ export function CrudTemplateWizard({
     defaultRoles: [],
     listColumns: [],
     formFields: [],
+    formPresentation: resolveFormPresentation(),
     detailFields: [],
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -223,6 +229,21 @@ export function CrudTemplateWizard({
                     />
                     <span className="text-text-2 ml-2 text-sm">生成后自动打开页面设计</span>
                   </label>
+
+                  {config.generateForm && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="crud-form-presentation">
+                      {formPresentationProperties
+                        .map(field => {
+                          const key = field.key.split('.').at(-1)!;
+                          const labels = DESIGNER_I18N.unified.inspectorLabels as Record<string, Record<string, string>>;
+                          const localize = (label: string) => labels[label]?.[locale] ?? label;
+                          return <PropertyFieldRenderer key={field.key}
+                            schema={{ ...field, label: localize(String(field.label)), options: field.options?.map(option => ({ ...option, label: localize(String(option.label)) })) }}
+                            adapter={{ value: (config.formPresentation as unknown as Record<string, unknown>)?.[key],
+                              setValue: value => updateConfig('formPresentation', { ...config.formPresentation, [key]: value }) }} />;
+                        })}
+                    </div>
+                  )}
 
                   <button
                     type="button"

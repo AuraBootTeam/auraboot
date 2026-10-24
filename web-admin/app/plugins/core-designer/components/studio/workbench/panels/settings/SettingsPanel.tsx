@@ -1,3 +1,7 @@
+import { validateFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
+import { resolveDesignerText } from '~/shared/designer';
+import { formPresentationProperties } from '~/shared/designer/formPresentationSchema';
+import { PropertyFieldRenderer, DESIGNER_I18N } from '~/shared/designer';
 /**
  * SettingsPanel Component
  *
@@ -28,6 +32,7 @@ function parseInteger(value: string, fallback: number): number {
  * SettingsPanel props
  */
 export interface SettingsPanelProps {
+  pageKind?: string;
   /** Whether the panel is open */
   isOpen: boolean;
   /** Close callback */
@@ -43,11 +48,12 @@ export interface SettingsPanelProps {
  */
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   isOpen,
+  pageKind,
   onClose,
   initialSettings,
   onSettingsChange,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('page');
   const mergeSettings = useCallback((): AllSettings => {
     const base = { ...DEFAULT_SETTINGS };
@@ -86,11 +92,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     [],
   );
 
+  const invalidFormPresentation = pageKind === 'form' && validateFormPresentation(settings.page.formPresentation).length > 0;
   const handleSave = useCallback(() => {
+    if (invalidFormPresentation) return;
     onSettingsChange?.(settings);
     setIsDirty(false);
     onClose();
-  }, [settings, onSettingsChange, onClose]);
+  }, [settings, onSettingsChange, onClose, invalidFormPresentation]);
 
   const handleReset = useCallback(() => {
     setSettings(mergeSettings());
@@ -174,10 +182,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </button>
           </div>
 
+          {invalidFormPresentation && <p role="alert" className="text-status-red px-6 py-2 text-sm">{resolveDesignerText(DESIGNER_I18N.unified.invalidFormPresentation, locale)}</p>}
           {/* Settings content */}
           <div className="flex-1 overflow-y-auto p-6">
             {activeCategory === 'page' && (
               <PageSettingsForm
+                showFormPresentation={pageKind === 'form'}
                 settings={settings.page}
                 onChange={(updates) => updateSettings('page', updates)}
               />
@@ -220,7 +230,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <button
                 data-testid="settings-panel-save"
                 onClick={handleSave}
-                disabled={!isDirty}
+                disabled={!isDirty || invalidFormPresentation}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('designer_settings.save')}
@@ -238,11 +248,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
  */
 const PageSettingsForm: React.FC<{
   settings: PageSettings;
+  showFormPresentation?: boolean;
   onChange: (updates: Partial<PageSettings>) => void;
-}> = ({ settings, onChange }) => {
-  const { t } = useI18n();
+}> = ({ settings, showFormPresentation, onChange }) => {
+  const { t, locale } = useI18n();
   return (
     <div className="space-y-6">
+      {showFormPresentation && settings.formPresentation && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="studio-form-presentation">
+          {formPresentationProperties.map(field => {
+            const key = field.key.split('.').at(-1)!;
+            const labels = DESIGNER_I18N.unified.inspectorLabels as Record<string, Record<string, string>>;
+            const localize = (label: string) => labels[label]?.[locale] ?? label;
+            return <PropertyFieldRenderer key={field.key}
+              schema={{ ...field, label: localize(String(field.label)), options: field.options?.map(option => ({ ...option, label: localize(String(option.label)) })) }}
+              adapter={{ value: (settings.formPresentation as unknown as Record<string, unknown>)[key],
+                setValue: value => onChange({ formPresentation: { ...settings.formPresentation!, [key]: value } }) }} />;
+          })}
+        </div>
+      )}
       <SettingsField label={t('designer_settings.title')}>
         <input
           type="text"

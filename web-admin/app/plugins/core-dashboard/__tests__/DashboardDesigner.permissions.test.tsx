@@ -24,7 +24,7 @@ vi.mock('../widgets/widgetRegistry', () => ({ widgetRegistry: {} }));
 vi.mock('../utils/createWidgetDraft', () => ({ createWidgetDraft: vi.fn() }));
 vi.mock('../components', () => ({
   DesignerToolbar: ({ onSave }: { onSave: () => void }) => <button onClick={onSave}>Save dashboard</button>,
-  WidgetPalette: () => null, DesignerCanvas: () => null,
+  WidgetPalette: () => <div>Palette content</div>, DesignerCanvas: () => null,
   WidgetPropertyPanel: () => null, BigScreenMode: () => null,
 }));
 vi.mock('../store/useDashboardStore', () => ({
@@ -43,7 +43,7 @@ describe('DashboardDesigner write permission boundary', () => {
     mocks.hasPermission.mockImplementation(code => code === 'dashboard.update');
     mocks.save.mockResolvedValue(undefined);
   });
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
   it('rejects a read-only direct entry before loading or creating editor state', async () => {
     mocks.hasPermission.mockImplementation(code => code === 'dashboard.read');
@@ -54,6 +54,19 @@ describe('DashboardDesigner write permission boundary', () => {
     expect(mocks.load).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps tool panes closed when the actual workspace cannot fit both panes and metric cards', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe() { this.callback([{ contentRect: { width: 1024 } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+      disconnect() {}
+    });
+    render(<DashboardDesigner dashboardId="dashboard-1" />);
+    expect(screen.getByTestId('dashboard-designer-workspace')).toHaveAttribute('data-layout', 'compact');
+    expect(screen.getByTestId('dashboard-palette-shell')).toHaveAttribute('data-open', 'false');
+    expect(screen.getByTestId('dashboard-inspector-shell')).toHaveAttribute('data-open', 'false');
   });
 
   it('retains the existing editor and auto-save for a permitted writer', async () => {

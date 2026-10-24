@@ -18,6 +18,23 @@ import type {
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
 
+/** Keep a metric atomic in both the compact designer canvas and runtime cards. */
+function MetricValue({ value, compact = false }: { value: string; compact?: boolean }) {
+  return (
+    <div
+      className="max-w-full font-semibold tracking-tight text-slate-950 tabular-nums dark:text-slate-50"
+      title={value}
+      style={{
+        fontSize: `clamp(0.875rem, ${Math.min(14, 160 / Math.max(1, value.length))}cqw, ${compact ? '1.5rem' : '2.65rem'})`,
+        whiteSpace: 'nowrap',
+        overflowX: 'auto',
+      }}
+    >
+      {value}
+    </div>
+  );
+}
+
 function numericValue(raw: unknown): number | null {
   if (typeof raw !== 'number' && typeof raw !== 'string') return null;
   if (typeof raw === 'string' && !raw.trim()) return null;
@@ -364,12 +381,12 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
               <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 {resolveCardLabel(card)}
               </div>
-              <div className="mt-3 text-2xl font-semibold text-slate-950 tabular-nums dark:text-slate-50">
+              <div className="mt-3" style={{ containerType: 'inline-size' }}>
                 {loading
                   ? '...'
                   : error
                     ? 'Error'
-                    : formatCardValue(rowForCard[card.field], card.format, card.prefix, card.suffix)}
+                    : <MetricValue compact value={formatCardValue(rowForCard[card.field], card.format, card.prefix, card.suffix)} />}
               </div>
               <div
                 className="mt-3 h-1 w-8 rounded-full"
@@ -425,7 +442,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
           : undefined
       }
     >
-      <div className="flex h-full min-w-0 flex-col p-5" style={{ containerType: 'inline-size' }}>
+      <div className="flex h-full min-w-0 flex-col p-3 sm:p-4" style={{ containerType: 'inline-size' }}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="block truncate text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400">
@@ -467,9 +484,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             </div>
           ) : (
             <>
-              <div className="font-semibold tracking-tight text-slate-950 tabular-nums dark:text-slate-50" style={{ fontSize: 'clamp(1rem, 14cqw, 2.65rem)', overflowWrap: 'anywhere' }}>
-                {formattedValue}
-              </div>
+              <MetricValue value={formattedValue} />
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span
                   className="inline-block h-2 w-2 rounded-full"

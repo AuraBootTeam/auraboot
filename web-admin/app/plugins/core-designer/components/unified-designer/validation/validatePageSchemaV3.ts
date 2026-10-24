@@ -1,3 +1,4 @@
+import { validateFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 import { createDefaultBlockRegistryV3, type BlockRegistryV3 } from '../registry/BlockRegistry';
 import type { DslBlockV3, PageSchemaV3, PageSchemaV3Kind } from '../types';
 
@@ -26,6 +27,11 @@ export function validatePageSchemaV3(
   registry: BlockRegistryV3 = createDefaultBlockRegistryV3(),
 ): PageSchemaV3ValidationResult {
   const errors: PageSchemaV3ValidationError[] = [];
+  if (schema.kind === 'form') {
+    for (const path of validateFormPresentation(schema.extension?.formPresentation)) {
+      errors.push({ code: 'invalid_form_presentation', message: `Invalid form presentation setting: ${path}`, path: `extension.${path}` });
+    }
+  }
   const seenBlockIds = new Set<string>();
 
   if (schema.schemaVersion !== 3) {

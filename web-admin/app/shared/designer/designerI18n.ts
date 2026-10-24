@@ -893,7 +893,25 @@ export const DESIGNER_I18N = {
 
     // Inspector field labels — keyed by the schema's English label, English fallback
     // for any label not listed (e.g. the advanced "* JSON" power-user fields).
+    invalidFormPresentation: { 'zh-CN': '请检查表单布局配置：默认列数必须为 1、2 或 3。', 'en-US': 'Check form layout settings: columns must be 1, 2 or 3.' } as L,
     inspectorLabels: {
+      'Form width': { 'zh-CN': '表单宽度', 'en-US': 'Form width' },
+      'Section surface': { 'zh-CN': '分组外观', 'en-US': 'Section surface' },
+      'Field density': { 'zh-CN': '字段密度', 'en-US': 'Field density' },
+      'Action bar': { 'zh-CN': '操作栏位置', 'en-US': 'Action bar' },
+      'Guidance placement': { 'zh-CN': '说明区位置', 'en-US': 'Guidance placement' },
+      'Form columns': { 'zh-CN': '默认列数', 'en-US': 'Form columns' },
+      comfortable: { 'zh-CN': '舒适', 'en-US': 'comfortable' },
+      wide: { 'zh-CN': '宽屏', 'en-US': 'wide' },
+      full: { 'zh-CN': '铺满容器', 'en-US': 'full' },
+      card: { 'zh-CN': '卡片', 'en-US': 'card' },
+      plain: { 'zh-CN': '无边框', 'en-US': 'plain' },
+      compact: { 'zh-CN': '紧凑', 'en-US': 'compact' },
+      sticky: { 'zh-CN': '容器内吸底', 'en-US': 'sticky' },
+      inline: { 'zh-CN': '随内容排列', 'en-US': 'inline' },
+      fixed: { 'zh-CN': '页面固定底栏', 'en-US': 'fixed' },
+      none: { 'zh-CN': '隐藏', 'en-US': 'none' },
+      aside: { 'zh-CN': '右侧说明', 'en-US': 'aside' },
       Field: { 'zh-CN': '字段', 'en-US': 'Field' } as L,
       Label: { 'zh-CN': '标签', 'en-US': 'Label' } as L,
       Component: { 'zh-CN': '组件', 'en-US': 'Component' } as L,

@@ -87,7 +87,7 @@ export function RecursiveBlockRenderer({
                 {schema.blocks.map((block) => (
                   <RuntimeBlock
                     key={block.id}
-                    block={block}
+                    block={block.blockType === 'form' ? { ...block, extension: schema.extension } : block}
                     runtimeServices={runtimeServices}
                     pageContext={pageContext}
                     blockPath={[block.id]}

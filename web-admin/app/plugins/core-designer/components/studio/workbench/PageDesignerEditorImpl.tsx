@@ -1,3 +1,6 @@
+import { StudioFormPresentationProvider } from './StudioFormPresentation';
+import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
+import type { FormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 /**
  * Page Designer Editor — Implementation
  *
@@ -38,7 +41,7 @@ import { useI18n } from '~/contexts/I18nContext';
 // are no-ops, so it is safe to invoke at module-load time.
 initRegistry();
 
-const PAGE_SCHEMA_EXPORT_VERSION = '2.0.0';
+const PAGE_SCHEMA_EXPORT_VERSION = '4.0.0';
 
 function sanitizeExportFilePart(value: string | undefined | null): string {
   const cleaned = (value || 'page')
@@ -48,7 +51,7 @@ function sanitizeExportFilePart(value: string | undefined | null): string {
   return cleaned || 'page';
 }
 
-function parseImportedPageSchema(raw: unknown): PageSchema {
+export function parseImportedPageSchema(raw: unknown): PageSchema {
   if (!raw || typeof raw !== 'object') {
     throw new Error('导入文件不是有效 JSON 对象');
   }
@@ -59,8 +62,8 @@ function parseImportedPageSchema(raw: unknown): PageSchema {
     throw new Error('导入文件缺少页面 Schema');
   }
 
-  if (Number(candidate.schemaVersion) !== 2) {
-    throw new Error('仅支持 Page Schema V2');
+  if (![2, 4].includes(Number(candidate.schemaVersion))) {
+    throw new Error('Unsupported Page Schema version; expected v2 or v4');
   }
 
   if (!['list', 'form', 'detail'].includes(String(candidate.kind))) {
@@ -97,13 +100,14 @@ function parseImportedPageSchema(raw: unknown): PageSchema {
  */
 export function applySettingsToSchema(
   schema: PageSchema,
-  settings: { page: { enableMultiView: boolean } },
+  settings: { page: { enableMultiView: boolean; formPresentation?: FormPresentation } },
 ): PageSchema {
   return {
     ...schema,
     extension: {
       ...schema.extension,
       enableMultiView: settings.page.enableMultiView,
+      ...(settings.page.formPresentation ? { formPresentation: settings.page.formPresentation } : {}),
     },
   };
 }
@@ -324,6 +328,7 @@ export default function PageDesignerEditorImpl() {
         : undefined,
       schema: {
         ...currentSchema,
+        schemaVersion: 4,
         id: currentSchema.id || meta?.id || id || '',
         pageKey,
       },
@@ -491,6 +496,7 @@ export default function PageDesignerEditorImpl() {
     : undefined;
 
   return (
+    <StudioFormPresentationProvider schema={schema}>
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50"
       data-testid="page-designer-editor"
@@ -568,10 +574,11 @@ export default function PageDesignerEditorImpl() {
 
       {/* Settings Panel */}
       <SettingsPanel
+        pageKind={schema?.kind}
         isOpen={toolbarState.showSettings}
         onClose={toolbarActions.toggleSettings}
         initialSettings={{
-          page: { enableMultiView: readEnableMultiView(schema) },
+          page: { enableMultiView: readEnableMultiView(schema), ...(schema?.kind === 'form' ? { formPresentation: resolveFormPresentation(schema.extension) } : {}) },
         }}
         onSettingsChange={handleSettingsChange}
       />
@@ -601,5 +608,6 @@ export default function PageDesignerEditorImpl() {
         />
       )}
     </div>
+    </StudioFormPresentationProvider>
   );
 }

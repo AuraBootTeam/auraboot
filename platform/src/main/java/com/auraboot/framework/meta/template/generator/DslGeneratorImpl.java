@@ -124,7 +124,7 @@ public class DslGeneratorImpl implements DslGenerator {
                 model.getDisplayName() + " List"
         ));
         pageSchema.setKind("list");
-        pageSchema.setSchemaVersion(2);
+        pageSchema.setSchemaVersion(com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         pageSchema.setProfile("admin");
         pageSchema.setBlocks(blocksJson);
         pageSchema.setLayout(layoutJson);
@@ -170,8 +170,18 @@ public class DslGeneratorImpl implements DslGenerator {
                 model.getDisplayName() + "表单",
                 model.getDisplayName() + " Form"
         ));
+        if (config.getFormPresentation() != null) {
+            Integer columns = config.getFormPresentation().getColumns();
+            if (columns == null || columns < 1 || columns > 3) {
+                throw new BusinessException("Form columns must be between 1 and 3");
+            }
+            var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+            extension.setExtension(Map.of("formPresentation", objectMapper.convertValue(
+                    config.getFormPresentation(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {})));
+            pageSchema.setExtension(extension);
+        }
         pageSchema.setKind("form");
-        pageSchema.setSchemaVersion(2);
+        pageSchema.setSchemaVersion(com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         pageSchema.setProfile("admin");
         pageSchema.setBlocks(blocksJson);
         pageSchema.setLayout(layoutJson);
@@ -218,7 +228,7 @@ public class DslGeneratorImpl implements DslGenerator {
                 model.getDisplayName() + " Detail"
         ));
         pageSchema.setKind("detail");
-        pageSchema.setSchemaVersion(2);
+        pageSchema.setSchemaVersion(com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         pageSchema.setProfile("admin");
         pageSchema.setBlocks(blocksJson);
         pageSchema.setLayout(layoutJson);
@@ -297,7 +307,7 @@ public class DslGeneratorImpl implements DslGenerator {
         if (field == null || field.getDataType() == null) {
             return false;
         }
-        String dataType = field.getDataType().toUpperCase();
+        String dataType = field.getDataType().toLowerCase(Locale.ROOT);
         return "string".equals(dataType) || "enum".equals(dataType) || "reference".equals(dataType);
     }
 
@@ -675,7 +685,34 @@ public class DslGeneratorImpl implements DslGenerator {
         List<Map<String, Object>> formFields = buildFormFields(model, bindings, fields, config, dictBindings);
         formSection.put("fields", formFields);
 
-        blocks.add(formSection);
+        if (config.getFormGroups() == null || config.getFormGroups().isEmpty()) {
+            blocks.add(formSection);
+        } else {
+            java.util.Set<String> assigned = new java.util.HashSet<>();
+            for (CrudTemplateConfig.FormGroup group : config.getFormGroups()) {
+                if (group.getFields() == null || group.getFields().isEmpty()) continue;
+                List<Map<String, Object>> groupedFields = new ArrayList<>();
+                for (String code : group.getFields()) {
+                    Map<String, Object> entry = formFields.stream()
+                            .filter(candidate -> code.equals(candidate.get("field"))).findFirst()
+                            .orElseThrow(() -> new BusinessException("Unknown form group field: " + code));
+                    if (!assigned.add(code)) throw new BusinessException("Duplicate form group field: " + code);
+                    groupedFields.add(entry);
+                }
+                Map<String, Object> section = new LinkedHashMap<>(formSection);
+                section.put("id", formSection.get("id") + "_" + blocks.size());
+                section.put("title", group.getTitle());
+                section.put("fields", groupedFields);
+                section.put("extension", Map.of("collapsible", group.isCollapsible(), "defaultCollapsed", group.isDefaultCollapsed()));
+                blocks.add(section);
+            }
+            List<Map<String, Object>> remaining = formFields.stream()
+                    .filter(entry -> !assigned.contains(entry.get("field"))).toList();
+            if (!remaining.isEmpty()) {
+                formSection.put("fields", remaining);
+                blocks.add(formSection);
+            }
+        }
 
         // Add form buttons
         blocks.add(buildFormButtons(model));
@@ -745,10 +782,11 @@ public class DslGeneratorImpl implements DslGenerator {
         Map<String, Object> formField = new LinkedHashMap<>();
         formField.put("field", field.getCode());
         // Label resolved by frontend: model.{modelCode}.{fieldCode}.label
-        formField.put("component", fieldTypeMapper.getFormComponent(field));
+        String component = fieldTypeMapper.getFormComponent(field);
+        formField.put("component", component);
 
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("colSpan", 6);
+        layout.put("colSpan", Set.of("SmartTextarea", "SmartRichText", "SmartFileAttachment", "SmartUpload", "SmartJsonEditor").contains(component == null ? "" : component) ? 12 : 6);
         layout.put("rowSpan", 1);
         formField.put("layout", layout);
 
@@ -760,6 +798,10 @@ public class DslGeneratorImpl implements DslGenerator {
         // Add props (only non-i18n props)
         Map<String, Object> props = new LinkedHashMap<>();
         // Placeholder resolved by frontend: model.{modelCode}.{fieldCode}.placeholder
+
+        if ("datetime".equalsIgnoreCase(field.getDataType()) || "timestamp".equalsIgnoreCase(field.getDataType())) {
+            props.put("dateType", "datetime-local");
+        }
 
         // Add number type for number fields
         if (fieldTypeMapper.isNumberField(field)) {

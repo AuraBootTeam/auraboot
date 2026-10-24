@@ -5,17 +5,17 @@ import type { ResolvedSubTableViewerProps } from './subTableTypes';
 
 type UseSubTableValidationArgs = Pick<
   ResolvedSubTableViewerProps,
-  't' | 'config' | 'parentRecordData'
+  't' | 'config' | 'parentRecordData' | 'locale'
 >;
 
-export function useSubTableValidation({ t, config, parentRecordData }: UseSubTableValidationArgs) {
+export function useSubTableValidation({ t, config, parentRecordData, locale }: UseSubTableValidationArgs) {
   // ------- Field Validation -------
   const validateFieldValue = useCallback(
     (col: ColumnConfig, value: any): string | null => {
       // Required
       if (col.required && (value === undefined || value === null || value === '')) {
         const msg = t('common.validation.required');
-        return msg !== 'common.validation.required' ? msg : 'This field is required';
+        return msg !== 'common.validation.required' ? msg : locale.startsWith('zh') ? '此项为必填项' : 'This field is required';
       }
 
       if (value === undefined || value === null || value === '') return null;
@@ -51,7 +51,7 @@ export function useSubTableValidation({ t, config, parentRecordData }: UseSubTab
 
       return null;
     },
-    [t],
+    [t, locale],
   );
 
   // ------- Cross-Row Validation -------
