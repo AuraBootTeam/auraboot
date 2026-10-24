@@ -799,6 +799,10 @@ public class DslGeneratorImpl implements DslGenerator {
         Map<String, Object> props = new LinkedHashMap<>();
         // Placeholder resolved by frontend: model.{modelCode}.{fieldCode}.placeholder
 
+        if ("datetime".equalsIgnoreCase(field.getDataType()) || "timestamp".equalsIgnoreCase(field.getDataType())) {
+            props.put("dateType", "datetime-local");
+        }
+
         // Add number type for number fields
         if (fieldTypeMapper.isNumberField(field)) {
             props.put("type", "number");

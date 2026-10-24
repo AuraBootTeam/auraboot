@@ -45,7 +45,7 @@ export function FormSection({
         style={style}
         open={hasError || expanded}
         onToggle={(event) => setExpanded(event.currentTarget.open)}
-        className={`form-section ${surfaceClass}`}
+        className={`form-section @container/form ${surfaceClass}`}
       >
         <summary className="text-text marker:text-text-3 cursor-pointer px-5 py-4">
           {heading}
@@ -58,7 +58,7 @@ export function FormSection({
     <section
       data-testid={testId}
       style={style}
-      className={`form-section ${surfaceClass} ${padding}`}
+      className={`form-section @container/form ${surfaceClass} ${padding}`}
     >
       {title && (
         <div className="mb-5 flex items-start justify-between">

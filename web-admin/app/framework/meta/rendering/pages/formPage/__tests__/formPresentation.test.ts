@@ -50,9 +50,9 @@ describe('composable form presentation', () => {
   });
   it('keeps full-width fields across all configured column counts', () => {
     expect(formFieldSpanClass(12, 1)).toBe('');
-    expect(formFieldSpanClass(12, 2)).toBe('md:col-span-2');
-    expect(formFieldSpanClass(12, 3)).toContain('xl:col-span-3');
+    expect(formFieldSpanClass(12, 2)).toBe('@[32rem]/form:col-span-2');
+    expect(formFieldSpanClass(12, 3)).toContain('@[56rem]/form:col-span-3');
     expect(formFieldSpanClass(6, 3)).toBe('');
-    expect(formGridClass(3)).toContain('xl:grid-cols-3');
+    expect(formGridClass(3)).toContain('@[56rem]/form:grid-cols-3');
   });
 });

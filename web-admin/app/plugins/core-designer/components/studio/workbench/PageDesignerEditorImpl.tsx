@@ -1,3 +1,5 @@
+import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
+import type { FormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 /**
  * Page Designer Editor — Implementation
  *
@@ -97,13 +99,14 @@ function parseImportedPageSchema(raw: unknown): PageSchema {
  */
 export function applySettingsToSchema(
   schema: PageSchema,
-  settings: { page: { enableMultiView: boolean } },
+  settings: { page: { enableMultiView: boolean; formPresentation?: FormPresentation } },
 ): PageSchema {
   return {
     ...schema,
     extension: {
       ...schema.extension,
       enableMultiView: settings.page.enableMultiView,
+      ...(settings.page.formPresentation ? { formPresentation: settings.page.formPresentation } : {}),
     },
   };
 }
@@ -568,10 +571,11 @@ export default function PageDesignerEditorImpl() {
 
       {/* Settings Panel */}
       <SettingsPanel
+        pageKind={schema?.kind}
         isOpen={toolbarState.showSettings}
         onClose={toolbarActions.toggleSettings}
         initialSettings={{
-          page: { enableMultiView: readEnableMultiView(schema) },
+          page: { enableMultiView: readEnableMultiView(schema), ...(schema?.kind === 'form' ? { formPresentation: resolveFormPresentation(schema.extension) } : {}) },
         }}
         onSettingsChange={handleSettingsChange}
       />

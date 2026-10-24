@@ -1,7 +1,7 @@
 import { PropertyFieldRenderer, DESIGNER_I18N } from '~/shared/designer';
 import { useI18n } from '~/contexts/I18nContext';
 import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
-import { defaultInspectorSchemaRegistry } from '~/plugins/core-designer/components/unified-designer/registry/InspectorSchemaRegistry';
+import { formPresentationProperties } from '~/shared/designer/formPresentationSchema';
 import React, { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import type { CrudTemplateConfig, TemplateGenerationResult } from '~/types/model';
@@ -232,8 +232,7 @@ export function CrudTemplateWizard({
 
                   {config.generateForm && (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="crud-form-presentation">
-                      {defaultInspectorSchemaRegistry.getFields('form')
-                        .filter(field => field.key.startsWith('extension.formPresentation.'))
+                      {formPresentationProperties
                         .map(field => {
                           const key = field.key.split('.').at(-1)!;
                           const labels = DESIGNER_I18N.unified.inspectorLabels as Record<string, Record<string, string>>;

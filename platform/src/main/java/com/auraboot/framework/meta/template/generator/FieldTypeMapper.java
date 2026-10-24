@@ -32,7 +32,7 @@ public class FieldTypeMapper {
             case "money" -> "SmartMoneyInput";
             case "boolean" -> "SmartSwitch";
             case "date" -> "SmartDatePicker";
-            case "datetime", "timestamp" -> "SmartDateTimePicker";
+            case "datetime", "timestamp" -> "SmartDatePicker";
             case "enum", "reference" -> "SmartSelect";
             default -> "SmartInput";
         };

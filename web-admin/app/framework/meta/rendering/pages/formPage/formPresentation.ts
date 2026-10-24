@@ -38,14 +38,14 @@ export function formGridClass(columns: number): string {
   return columns === 1
     ? 'grid-cols-1'
     : columns === 3
-      ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
-      : 'grid-cols-1 md:grid-cols-2';
+      ? 'grid-cols-1 @[32rem]/form:grid-cols-2 @[56rem]/form:grid-cols-3'
+      : 'grid-cols-1 @[32rem]/form:grid-cols-2';
 }
 
 export function formFieldSpanClass(span: number, columns: number): string {
   if (columns === 1) return '';
-  if (span >= 12) return columns === 3 ? 'md:col-span-2 xl:col-span-3' : 'md:col-span-2';
-  return columns === 3 && span >= 8 ? 'md:col-span-2' : '';
+  if (span >= 12) return columns === 3 ? '@[32rem]/form:col-span-2 @[56rem]/form:col-span-3' : '@[32rem]/form:col-span-2';
+  return columns === 3 && span >= 8 ? '@[32rem]/form:col-span-2' : '';
 }
 
 /** Authoring rejects invalid values; runtime still tolerates older persisted pages. */

@@ -47,6 +47,7 @@ class DslGeneratorFormPresentationTest {
         assertThat(mapper.getFormComponent(field(1, "due", "DATE"))).isEqualTo("SmartDatePicker");
         assertThat(mapper.getFormComponent(field(1, "active", "Boolean"))).isEqualTo("SmartSwitch");
         assertThat(mapper.getFormComponent(field(1, "owner", "reference"))).isEqualTo("SmartSelect");
+        assertThat(mapper.getFormComponent(field(1, "at", "datetime"))).isEqualTo("SmartDatePicker");
         assertThat(mapper.isNumberField(field(1, "amount", "DECIMAL"))).isTrue();
         assertThat(mapper.getColumnValueType(field(1, "amount", "money"))).isEqualTo("currency");
     }

@@ -893,6 +893,7 @@ export const DESIGNER_I18N = {
 
     // Inspector field labels — keyed by the schema's English label, English fallback
     // for any label not listed (e.g. the advanced "* JSON" power-user fields).
+    invalidFormPresentation: { 'zh-CN': '请检查表单布局配置：默认列数必须为 1、2 或 3。', 'en-US': 'Check form layout settings: columns must be 1, 2 or 3.' } as L,
     inspectorLabels: {
       'Form width': { 'zh-CN': '表单宽度', 'en-US': 'Form width' },
       'Section surface': { 'zh-CN': '分组外观', 'en-US': 'Section surface' },

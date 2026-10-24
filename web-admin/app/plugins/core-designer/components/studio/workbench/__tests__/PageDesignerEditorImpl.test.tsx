@@ -143,3 +143,15 @@ describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', ()
     });
   });
 });
+
+
+describe('Studio form presentation bridge', () => {
+  it('persists orthogonal layout options without replacing legacy guidance or bindings', () => {
+    const schema = baseSchema({ kind: 'form', extension: { presentation: 'workspace', attachmentFields: ['files'], formGuidance: { title: 'Guidance' } } });
+    const presentation = { width: 'comfortable' as const, columns: 1 as const, surface: 'card' as const, density: 'comfortable' as const, actions: 'inline' as const, guidance: 'none' as const };
+    const next = applySettingsToSchema(schema, { page: { enableMultiView: false, formPresentation: presentation } });
+    expect(next.extension).toMatchObject({ presentation: 'workspace', attachmentFields: ['files'], formGuidance: { title: 'Guidance' }, formPresentation: presentation });
+    expect(schema.extension?.formPresentation).toBeUndefined();
+    expect(next.blocks).toBe(schema.blocks);
+  });
+});

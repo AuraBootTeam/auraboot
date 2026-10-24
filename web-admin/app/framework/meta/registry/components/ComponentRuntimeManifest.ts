@@ -41,7 +41,7 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   }),
   radio: runtime('form', 'Radio', { aliases: ['SmartRadio', 'Radio', 'radio'] }),
   datepicker: runtime('datetime', 'DatePicker', {
-    aliases: ['SmartDatePicker', 'DatePicker', 'datepicker', 'datePicker'],
+    aliases: ['SmartDatePicker', 'SmartDateTimePicker', 'DatePicker', 'datepicker', 'datePicker'],
   }),
   multiselect: runtime('form', 'MultiSelect', {
     aliases: ['SmartMultiSelect', 'MultiSelect', 'multiselect'],
