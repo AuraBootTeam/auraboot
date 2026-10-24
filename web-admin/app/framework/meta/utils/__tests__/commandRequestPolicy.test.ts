@@ -49,3 +49,11 @@ it('scopes dialog payload fields to their command without widening publish or de
   expect(projectCommandPayload(raw, commandPolicyFor(fallback, overrides, 'announcement:publish'))).toEqual({});
   expect(commandPolicyFor(undefined, undefined, 'other:action')).toBeUndefined();
 });
+
+it('does not resend hidden record selections when a dialog owns the input contract', () => {
+  const record = { audience_kind: 'selected', audience_users: '["old"]', status: 'draft' };
+  const policy = { inputFieldsOnly: true, payloadFields: ['audience_kind', 'audience_users'] };
+  expect(projectCommandPayload(record, policy, { audience_kind: 'all' })).toEqual({ audience_kind: 'all' });
+  expect(projectCommandPayload(record, policy, { audience_kind: 'selected', audience_users: [] }))
+    .toEqual({ audience_kind: 'selected', audience_users: [] });
+});

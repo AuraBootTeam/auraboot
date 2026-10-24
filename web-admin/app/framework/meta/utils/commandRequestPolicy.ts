@@ -3,6 +3,7 @@ export interface CommandRequestPolicy {
   idempotent?: boolean;
   versionField?: string;
   payloadFields?: string[];
+  inputFieldsOnly?: boolean;
 }
 
 export interface CommandRequestIdentity {
@@ -13,7 +14,9 @@ export interface CommandRequestIdentity {
 export function projectCommandPayload(
   payload: Record<string, unknown>,
   policy?: CommandRequestPolicy,
+  dialogInputs?: Record<string, unknown>,
 ): Record<string, unknown> {
+  if (policy?.inputFieldsOnly && dialogInputs) payload = dialogInputs;
   if (!Array.isArray(policy?.payloadFields)) return payload;
   return Object.fromEntries(
     policy.payloadFields

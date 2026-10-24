@@ -493,7 +493,8 @@
             "approval_definition",
             "scheduled_at",
             "exemption_reason"
-          ]
+          ],
+          "inputFieldsOnly": true
         }
       }
     }
@@ -705,7 +706,8 @@
             "approval_definition",
             "scheduled_at",
             "exemption_reason"
-          ]
+          ],
+          "inputFieldsOnly": true
         }
       }
     }

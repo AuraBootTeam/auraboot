@@ -856,8 +856,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
+            let collectedInputs: Record<string, any> | undefined;
             if (inputFields.length > 0) {
-              let collectedInputs: Record<string, any>;
               try {
                 collectedInputs = await promptInputForm(
                   inputFields,
@@ -960,7 +960,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               requestExtension?.commandRequestByCommand,
               effectiveCommand,
             );
-            payload = projectCommandPayload(payload, policy);
+            payload = projectCommandPayload(payload, policy, collectedInputs);
             const request = commandRequestMetadata(
               policy,
               actionRecord,
