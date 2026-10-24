@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 /**
  * FormButtonsBlockRenderer - 表单按钮块渲染器
  * 用于渲染表单底部的操作按钮组
@@ -114,7 +115,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
     // Mutable configuration must pass the same syntax boundary at dispatch time.
     formButtonSourceDependencies([button]);
     const freshContext = runtime.getContext();
-    if (button.permissionCode && !hasPermission(button.permissionCode)) return;
+    if (!hasButtonPermissions(button, hasPermission)) return;
     if (button.visibleWhen && !evaluator.evaluateCondition(button.visibleWhen, freshContext))
       return;
     if (
@@ -145,7 +146,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
 
   // 渲染单个按钮
   const renderButton = (button: ButtonConfig) => {
-    if (button.permissionCode && !hasPermission(button.permissionCode)) return null;
+    if (!hasButtonPermissions(button, hasPermission)) return null;
 
     // 检查按钮可见性
     if (button.visibleWhen) {

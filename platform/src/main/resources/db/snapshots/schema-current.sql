@@ -197,6 +197,34 @@ $$;
 
 
 --
+-- Name: ab_announcement_guard_approval_binding(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_announcement_guard_approval_binding() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+ IF ROW(NEW.tenant_id,NEW.pid,NEW.announcement_pid,NEW.version_pid,NEW.actor_user_id,NEW.actor_member_pid,
+        NEW.applicant_pid,NEW.provider_id,NEW.definition_label,NEW.binding,NEW.binding_hash,NEW.created_at)
+    IS DISTINCT FROM ROW(OLD.tenant_id,OLD.pid,OLD.announcement_pid,OLD.version_pid,OLD.actor_user_id,OLD.actor_member_pid,
+        OLD.applicant_pid,OLD.provider_id,OLD.definition_label,OLD.binding,OLD.binding_hash,OLD.created_at)
+    OR (OLD.terminal_result_pid IS NOT NULL AND ROW(NEW.terminal_result_pid,NEW.terminal_result) IS DISTINCT FROM ROW(OLD.terminal_result_pid,OLD.terminal_result))
+ THEN RAISE EXCEPTION 'Announcement approval binding and accepted terminal are immutable'; END IF;
+ RETURN NEW;
+END $$;
+
+
+--
+-- Name: ab_announcement_reject_estimate_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_announcement_reject_estimate_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN RAISE EXCEPTION 'Submission audience estimates are immutable'; END $$;
+
+
+--
 -- Name: ab_application_channel_history_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3663,7 +3691,7 @@ CREATE TABLE public.ab_announcement (
     ack_required_effective boolean GENERATED ALWAYS AS (COALESCE(((draft_settings ->> 'acknowledgementRequired'::text))::boolean, ((announcement_priority)::text = 'important'::text))) STORED,
     attachments jsonb GENERATED ALWAYS AS (COALESCE((draft_settings -> 'attachmentMetadata'::text), '[]'::jsonb)) STORED,
     CONSTRAINT chk_announcement_revisions CHECK (((row_version > 0) AND (editor_revision > 0) AND (lifecycle_revision > 0))),
-    CONSTRAINT chk_announcement_state CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'unpublished'::character varying, 'scheduled'::character varying, 'missed'::character varying, 'published'::character varying, 'withdrawn'::character varying, 'expired'::character varying])::text[])))
+    CONSTRAINT chk_announcement_state CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'pending_approval'::character varying, 'approval_withdrawn'::character varying, 'approval_failed'::character varying, 'rejected'::character varying, 'unpublished'::character varying, 'scheduled'::character varying, 'missed'::character varying, 'published'::character varying, 'withdrawn'::character varying, 'expired'::character varying])::text[])))
 );
 
 
@@ -3672,6 +3700,72 @@ CREATE TABLE public.ab_announcement (
 --
 
 COMMENT ON TABLE public.ab_announcement IS 'Workbench announcements visible to all tenant users';
+
+
+--
+-- Name: ab_announcement_approval_submission; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_approval_submission (
+    tenant_id bigint NOT NULL,
+    pid character varying(36) NOT NULL,
+    announcement_pid character varying(36) NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    actor_user_id bigint NOT NULL,
+    actor_member_pid character varying(36) NOT NULL,
+    applicant_pid character varying(36) NOT NULL,
+    provider_id character varying(100) NOT NULL,
+    definition_label character varying(300) NOT NULL,
+    binding jsonb NOT NULL,
+    binding_hash character varying(64) NOT NULL,
+    state character varying(24) DEFAULT 'pending_dispatch'::character varying NOT NULL,
+    sync_state character varying(16) DEFAULT 'queued'::character varying NOT NULL,
+    provider_state character varying(24),
+    instance_pid character varying(64),
+    provider_revision bigint DEFAULT 0 NOT NULL,
+    terminal_result_pid character varying(36),
+    terminal_result jsonb,
+    withdraw_actor_user_id bigint,
+    withdraw_member_pid character varying(36),
+    withdraw_reason text,
+    lease_until timestamp with time zone,
+    fence bigint DEFAULT 0 NOT NULL,
+    failure_count integer DEFAULT 0 NOT NULL,
+    next_sync_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_error character varying(100),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ab_announcement_approval_submission_check CHECK (((terminal_result_pid IS NULL) = (terminal_result IS NULL))),
+    CONSTRAINT ab_announcement_approval_submission_state_check CHECK (((state)::text = ANY ((ARRAY['pending_dispatch'::character varying, 'running'::character varying, 'withdraw_requested'::character varying, 'approved'::character varying, 'rejected'::character varying, 'withdrawn'::character varying, 'failed'::character varying])::text[]))),
+    CONSTRAINT ab_announcement_approval_submission_sync_state_check CHECK (((sync_state)::text = ANY ((ARRAY['queued'::character varying, 'polling'::character varying, 'waiting'::character varying, 'blocked'::character varying, 'completed'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_announcement_audience_estimate; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_audience_estimate (
+    tenant_id bigint NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    user_pid character varying(36) NOT NULL,
+    member_pid character varying(36) NOT NULL,
+    display_name character varying(300) NOT NULL,
+    matched_rule_refs jsonb NOT NULL
+);
+
+
+--
+-- Name: ab_announcement_audience_estimate_header; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_audience_estimate_header (
+    tenant_id bigint NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    resolved_at timestamp with time zone NOT NULL,
+    recipient_count integer NOT NULL,
+    CONSTRAINT ab_announcement_audience_estimate_header_recipient_count_check CHECK ((recipient_count > 0))
+);
 
 
 --
@@ -3800,6 +3894,23 @@ CREATE TABLE public.ab_announcement_release (
     finished_at timestamp with time zone,
     CONSTRAINT ab_announcement_release_check CHECK ((latest_allowed_at >= scheduled_at)),
     CONSTRAINT ab_announcement_release_status_check CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying, 'succeeded'::character varying, 'retryable_failed'::character varying, 'blocked'::character varying, 'canceled'::character varying, 'missed'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_announcement_tenant_policy; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_tenant_policy (
+    tenant_id bigint NOT NULL,
+    revision integer DEFAULT 1 NOT NULL,
+    force_approval boolean DEFAULT false NOT NULL,
+    default_definition_pid character varying(36),
+    late_window_minutes integer DEFAULT 30 NOT NULL,
+    updated_by bigint,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT ab_announcement_tenant_policy_late_window_minutes_check CHECK (((late_window_minutes >= 1) AND (late_window_minutes <= 120))),
+    CONSTRAINT ab_announcement_tenant_policy_revision_check CHECK ((revision > 0))
 );
 
 
@@ -19829,6 +19940,46 @@ ALTER TABLE ONLY public.ab_analytics_task_execution
 
 
 --
+-- Name: ab_announcement_approval_submission ab_announcement_approval_subm_tenant_id_provider_id_instanc_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_approval_submission
+    ADD CONSTRAINT ab_announcement_approval_subm_tenant_id_provider_id_instanc_key UNIQUE (tenant_id, provider_id, instance_pid);
+
+
+--
+-- Name: ab_announcement_approval_submission ab_announcement_approval_submission_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_approval_submission
+    ADD CONSTRAINT ab_announcement_approval_submission_pkey PRIMARY KEY (tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_approval_submission ab_announcement_approval_submission_tenant_id_version_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_approval_submission
+    ADD CONSTRAINT ab_announcement_approval_submission_tenant_id_version_pid_key UNIQUE (tenant_id, version_pid);
+
+
+--
+-- Name: ab_announcement_audience_estimate_header ab_announcement_audience_estimate_header_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_audience_estimate_header
+    ADD CONSTRAINT ab_announcement_audience_estimate_header_pkey PRIMARY KEY (tenant_id, version_pid);
+
+
+--
+-- Name: ab_announcement_audience_estimate ab_announcement_audience_estimate_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_audience_estimate
+    ADD CONSTRAINT ab_announcement_audience_estimate_pkey PRIMARY KEY (tenant_id, version_pid, user_pid);
+
+
+--
 -- Name: ab_announcement_audit ab_announcement_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -19898,6 +20049,14 @@ ALTER TABLE ONLY public.ab_announcement_release
 
 ALTER TABLE ONLY public.ab_announcement_release
     ADD CONSTRAINT ab_announcement_release_tenant_id_version_pid_key UNIQUE (tenant_id, version_pid);
+
+
+--
+-- Name: ab_announcement_tenant_policy ab_announcement_tenant_policy_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_tenant_policy
+    ADD CONSTRAINT ab_announcement_tenant_policy_pkey PRIMARY KEY (tenant_id);
 
 
 --
@@ -24842,6 +25001,13 @@ ALTER TABLE ONLY public.ab_tenant_application_binding_history
 
 ALTER TABLE ONLY public.ab_user_data_domain
     ADD CONSTRAINT uq_user_data_domain UNIQUE (user_id, domain_id);
+
+
+--
+-- Name: ab_announcement_approval_sync_poll; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ab_announcement_approval_sync_poll ON public.ab_announcement_approval_submission USING btree (sync_state, next_sync_at, lease_until);
 
 
 --
@@ -30928,6 +31094,27 @@ CREATE UNIQUE INDEX ux_meta_model_current ON public.ab_meta_model USING btree (t
 
 
 --
+-- Name: ab_announcement_approval_submission ab_announcement_approval_binding_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_approval_binding_guard BEFORE UPDATE ON public.ab_announcement_approval_submission FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_guard_approval_binding();
+
+
+--
+-- Name: ab_announcement_audience_estimate_header ab_announcement_estimate_header_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_estimate_header_immutable BEFORE DELETE OR UPDATE ON public.ab_announcement_audience_estimate_header FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_reject_estimate_mutation();
+
+
+--
+-- Name: ab_announcement_audience_estimate ab_announcement_estimate_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_estimate_immutable BEFORE DELETE OR UPDATE ON public.ab_announcement_audience_estimate FOR EACH ROW EXECUTE FUNCTION public.ab_announcement_reject_estimate_mutation();
+
+
+--
 -- Name: ab_application_release ab_application_release_require_actor; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -31249,6 +31436,30 @@ ALTER TABLE ONLY public.ab_analytics_deleted_record_basis
 
 ALTER TABLE ONLY public.ab_analytics_task_execution
     ADD CONSTRAINT ab_analytics_task_execution_tenant_id_task_pid_fkey FOREIGN KEY (tenant_id, task_pid) REFERENCES public.ab_agent_task(tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_approval_submission ab_announcement_approval_subm_tenant_id_announcement_pid_v_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_approval_submission
+    ADD CONSTRAINT ab_announcement_approval_subm_tenant_id_announcement_pid_v_fkey FOREIGN KEY (tenant_id, announcement_pid, version_pid) REFERENCES public.ab_announcement_version(tenant_id, announcement_pid, pid);
+
+
+--
+-- Name: ab_announcement_audience_estimate_header ab_announcement_audience_estimate_he_tenant_id_version_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_audience_estimate_header
+    ADD CONSTRAINT ab_announcement_audience_estimate_he_tenant_id_version_pid_fkey FOREIGN KEY (tenant_id, version_pid) REFERENCES public.ab_announcement_version(tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_audience_estimate ab_announcement_audience_estimate_tenant_id_version_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_audience_estimate
+    ADD CONSTRAINT ab_announcement_audience_estimate_tenant_id_version_pid_fkey FOREIGN KEY (tenant_id, version_pid) REFERENCES public.ab_announcement_audience_estimate_header(tenant_id, version_pid);
 
 
 --

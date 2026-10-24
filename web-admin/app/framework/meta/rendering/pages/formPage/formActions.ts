@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
@@ -107,22 +108,22 @@ export function isFormButtonDisabled(
 }
 
 export function canRenderFormButton(
-  button: { permissionCode?: string },
+  button: { permissionCode?: string; permissionCodes?: string[] },
   hasPermission: (permissionCode: string) => boolean,
 ): boolean {
-  return !button.permissionCode || hasPermission(button.permissionCode);
+  return hasButtonPermissions(button, hasPermission);
 }
 
 /** Deny authoring only when every active primary action declares a denied permission. */
 export function isFormAuthoringDenied(
-  activeButtons: Array<{ primary?: boolean; permissionCode?: string }>,
+  activeButtons: Array<{ primary?: boolean; permissionCode?: string; permissionCodes?: string[] }>,
   hasPermission: (permissionCode: string) => boolean,
 ): boolean {
   const primaryActions = activeButtons.filter((button) => button.primary === true);
   return (
     primaryActions.length > 0 &&
     primaryActions.every(
-      (button) => !!button.permissionCode && !hasPermission(button.permissionCode),
+      (button) => !hasButtonPermissions(button, hasPermission),
     )
   );
 }

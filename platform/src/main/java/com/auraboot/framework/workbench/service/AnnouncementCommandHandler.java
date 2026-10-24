@@ -19,6 +19,7 @@ public class AnnouncementCommandHandler
         implements CommandHandler, com.auraboot.framework.meta.service.CommandTargetAuthorizer {
     private final AnnouncementLifecycleService lifecycle;
     private final AnnouncementReleaseService releases;
+    private final AnnouncementApprovalService approvals;
 
     @Override
     public String getHandlerName() {
@@ -33,8 +34,13 @@ public class AnnouncementCommandHandler
 
     @Override
     public long authorizeTarget(CommandHandlerContext context) {
+        if (isApproval(context.getCommandCode())) return approvals.authorizeTarget(context.getCommandCode(),context.getTargetRecordId());
         if (isRelease(context.getCommandCode())) return releases.authorizeTarget(context.getTargetRecordId());
         return lifecycle.authorizeTarget(context.getCommandCode(), context.getTargetRecordId());
+    }
+
+    private static boolean isApproval(String code) {
+        return AnnouncementApprovalService.SUBMIT.equals(code) || AnnouncementApprovalService.WITHDRAW.equals(code);
     }
 
     private static boolean isRelease(String code) {
@@ -43,6 +49,8 @@ public class AnnouncementCommandHandler
 
     @Override
     public Map<String, Object> execute(CommandHandlerContext context) {
+        if (isApproval(context.getCommandCode())) return approvals.execute(context.getCommandCode(),context.getTargetRecordId(),
+                context.getPayload(),context.getClientRequestId(),context.getExpectedVersion());
         if (isRelease(context.getCommandCode())) return releases.execute(context.getCommandCode(),context.getTargetRecordId(),
                 context.getPayload(),context.getClientRequestId(),context.getExpectedVersion());
         return lifecycle.execute(

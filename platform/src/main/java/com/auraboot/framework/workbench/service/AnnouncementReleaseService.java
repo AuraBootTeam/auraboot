@@ -27,7 +27,9 @@ public class AnnouncementReleaseService {
     private final AnnouncementLifecycleMapper records;
     private final AnnouncementReleaseMapper releases;
     private final AnnouncementCodec codec;
-    private final TenantClock tenantClock;
+    private final AnnouncementPreparationService preparation;
+    private final AnnouncementTenantPolicyService tenantPolicies;
+    private final AnnouncementApprovalProofService approvalProof;
     private final ReliableIntegrationAccessor outbox;
     @Value("${aura.notification.plugin-delivery.enabled:false}") private boolean deliveryEnabled;
 
@@ -61,37 +63,20 @@ public class AnnouncementReleaseService {
 
     private Map<String,Object> acceptExemption(Announcement record) {
         access.actor("exempt");
+        if(tenantPolicies.current().forceApproval()) invalid("approval_required");
         if(!deliveryEnabled) invalid("delivery_disabled");
         if(!"draft".equals(record.getStatus()) || record.getActiveVersionPid()!=null) invalid("not_editable");
         var policy=policies.load(record.getPid());
         if(!"exempt".equals(policy.approvalMode()) || policy.exemptionReason()==null || policy.exemptionReason().isBlank()) invalid("exemption_required");
-        if(record.getTitle()==null || record.getTitle().isBlank() || record.getContent()==null || record.getContent().isBlank()) invalid("content_required");
-        Instant now=Instant.now(),planned=policy.scheduledAt()==null ? now : policy.scheduledAt();
-        if(policy.scheduledAt()!=null && !planned.isAfter(now)) invalid("schedule_invalid");
-        if(record.getExpiresAt()!=null && (!record.getExpiresAt().isAfter(planned)
-            || (policy.acknowledgementRequired(record.getAnnouncementPriority())
-                && record.getExpiresAt().isBefore(planned.plus(Duration.ofDays(policy.acknowledgementDays())))))) invalid("expiry_invalid");
-        var audience=audiences.resolve(policy.audience());
-        if(audience.recipients().isEmpty()) invalid("audience_empty");
-        policies.verifyAttachments(policy,record.getPid(),true);
+        var prepared=preparation.prepare(record);
         Long tenant=MetaContext.getCurrentTenantId(),actor=MetaContext.getCurrentUserId();
-        Map<String,Object> member=releases.actor(tenant,actor);
-        if(member==null) throw new AccessDeniedException("Announcement release actor is inactive");
-        String version=UniqueIdGenerator.generate(),release=UniqueIdGenerator.generate();
-        String zone=tenantClock.getZoneId(tenant).getId();
-        String authorization=authorization(audience,member);
-        Map<String,Object> frozenPolicy=codec.object(policies.encode(policy));
-        frozenPolicy.put("acknowledgementRequired",policy.acknowledgementRequired(record.getAnnouncementPriority()));
-        Map<String,Object> snapshot=new TreeMap<>();
-        snapshot.put("title",record.getTitle());snapshot.put("content",record.getContent());
-        snapshot.put("importance",record.getAnnouncementPriority());snapshot.put("pinned",Boolean.TRUE.equals(record.getPinned()));
-        snapshot.put("expiresAt",record.getExpiresAt());snapshot.put("policy",frozenPolicy);
-        snapshot.put("timezone",zone);snapshot.put("authorizationHash",authorization);
-        snapshot.put("estimatedRecipientCount",audience.recipients().size());snapshot.put("estimatedAt",audience.resolvedAt());
+        var member=prepared.member();String version=UniqueIdGenerator.generate(),release=UniqueIdGenerator.generate();
+        String zone=prepared.timezone(),authorization=prepared.authorizationHash();Instant planned=prepared.plannedAt();
         String state=policy.scheduledAt()==null ? "unpublished" : "scheduled";
-        if(releases.freeze(tenant,record.getPid(),version,record.getEditorRevision(),codec.hash(snapshot),codec.encode(snapshot),actor)!=1
-            || releases.control(tenant,version,release,state,planned,record.getExpiresAt())!=1
-            || releases.queue(tenant,release,record.getPid(),version,actor,(String)member.get("member_pid"),authorization,planned,planned.plus(Duration.ofMinutes(30)),zone)!=1
+        if(releases.freeze(tenant,record.getPid(),version,record.getEditorRevision(),prepared.snapshotHash(),prepared.snapshot(),actor)!=1) conflict();
+        preparation.persistEstimate(tenant,version,prepared);
+        if(releases.control(tenant,version,release,state,planned,record.getExpiresAt())!=1
+            || releases.queue(tenant,release,record.getPid(),version,actor,(String)member.get("member_pid"),authorization,planned,planned.plus(Duration.ofMinutes(tenantPolicies.current().lateWindowMinutes())),zone)!=1
             || releases.accept(tenant,record.getPid(),version,actor,state,record.getRowVersion())!=1) conflict();
         Map<String,Object> result=new LinkedHashMap<>();
         result.put("recordPid",record.getPid());result.put("pid",record.getPid());result.put("versionPid",version);
@@ -113,11 +98,7 @@ public class AnnouncementReleaseService {
     }
 
     public String authorization(AnnouncementAudienceService.Resolution resolution,Map<String,Object> member) {
-        Map<String,Object> proof=new TreeMap<>();
-        proof.put("memberPid",member.get("member_pid"));proof.put("scopeType",resolution.scopeType());
-        proof.put("departments",resolution.allowedDepartmentPids());
-        proof.put("grants",codec.object(releases.authorizationEvidence(MetaContext.getCurrentTenantId(),((Number)member.get("member_id")).longValue())));
-        return codec.hash(proof);
+        return preparation.authorization(resolution,member);
     }
 
     @Transactional
@@ -149,12 +130,20 @@ public class AnnouncementReleaseService {
             if(!version.equals(record.getCurrentVersionPid()) || record.getActiveVersionPid()!=null) { fail(claim,"canceled","VERSION_SUPERSEDED");return; }
             Instant now=Instant.now(),latest=time(job.get("latest_allowed_at"));
             if(now.isAfter(latest)) {
-                releases.stopControl(tenant,version,"missed");releases.stopRecord(tenant,pid,version,"missed");fail(claim,"missed","SCHEDULE_MISSED");return;
+                releases.stopControl(tenant,version,"missed");releases.stopRecord(tenant,pid,version,"missed");
+                records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,version,"announcement:publication_missed",release,record.getRowVersion(),record.getRowVersion()+1);
+                fail(claim,"missed","SCHEDULE_MISSED");return;
             }
             Map<String,Object> snapshot=codec.object(frozen.get("snapshot").toString());
             @SuppressWarnings("unchecked") var policy=policies.parseStored((Map<String,Object>)snapshot.get("policy"));
-            if(!"exempt".equals(frozen.get("authorization_basis"))) invalid("approval_not_ready");
-            access.actor("exempt");
+            if("approved".equals(frozen.get("authorization_basis"))) {
+                access.actor("submit");
+                if(!"approved".equals(frozen.get("approval_state"))) invalid("approval_not_ready");
+                approvalProof.requireValid(tenant,(String)frozen.get("current_submission_pid"),version,(String)frozen.get("snapshot_hash"));
+            } else if("exempt".equals(frozen.get("authorization_basis"))) {
+                access.actor("exempt");
+                if(tenantPolicies.current().forceApproval()) invalid("approval_required");
+            } else invalid("approval_not_ready");
             var recipients=audiences.resolve(policy.audience());
             if(!job.get("actor_member_pid").equals(member.get("member_pid")) || !job.get("authorization_hash").equals(authorization(recipients,member))) invalid("authorization_changed");
             if(recipients.recipients().isEmpty()) invalid("audience_empty");
@@ -171,6 +160,7 @@ public class AnnouncementReleaseService {
             }
             if(releases.publishControl(tenant,version,now,due)!=1 || releases.publishRecord(tenant,pid,version,actor,now)!=1
                 || releases.finish(tenant,release,fence,"succeeded",null)!=1) conflict();
+            records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,version,"announcement:publication_completed",release,record.getRowVersion(),record.getRowVersion()+1);
             outbox.enqueueIdempotent(new IntegrationEventEnvelope("1.0",release,RELEASED_EVENT,"auraboot.announcement",version,now,tenant,
                 release,null,"announcement:"+version,1,Map.of("versionPid",version,"batchPid",release,"recipientSnapshotPid",recipientSnapshot,"announcementPid",pid),Map.of()));
         } finally {MetaContext.clear();MetaContext.restore(previous);}

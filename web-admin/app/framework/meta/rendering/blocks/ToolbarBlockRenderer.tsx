@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 /**
  * ToolbarBlockRenderer - 工具栏/按钮组渲染器
  */
@@ -140,7 +141,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
       <LoadingOverlay visible={busy} label={t('common.loading')} />
       <div className="toolbar-block flex space-x-2">
         {buttons.map((button) => {
-          if (button.permissionCode && !hasPermission(button.permissionCode)) {
+          if (!hasButtonPermissions(button, hasPermission)) {
             return null;
           }
 

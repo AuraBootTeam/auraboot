@@ -7,4 +7,6 @@ import java.util.Optional;
 public interface ApprovalSubmissionSource extends ExtensionPoint {
     String businessType();
     Optional<ApprovalContract.SubmittedApproval> findSubmitted(long tenantId,long actorUserId,String submissionId);
+    default boolean canStart(long tenantId,long actorUserId,String submissionId) { return false; }
+    default boolean canWithdraw(long tenantId,long actorUserId,String submissionId) { return false; }
 }

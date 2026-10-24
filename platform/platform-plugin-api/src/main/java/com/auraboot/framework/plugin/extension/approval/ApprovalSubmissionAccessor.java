@@ -6,4 +6,6 @@ import java.util.Optional;
 public interface ApprovalSubmissionAccessor {
     boolean supports(String businessType);
     Optional<ApprovalContract.SubmittedApproval> findSubmitted(long tenantId,long actorUserId,String submissionId);
+    default boolean canStart(long tenantId,long actorUserId,String submissionId) { return false; }
+    default boolean canWithdraw(long tenantId,long actorUserId,String submissionId) { return false; }
 }

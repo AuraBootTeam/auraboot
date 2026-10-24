@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import type { TranslateFunction } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { type PageContentProps } from '@auraboot/runtime-kernel';
 import { decodeRouteContextFromSearch } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
@@ -43,10 +44,10 @@ export function shouldRenderDefaultDetailEditAction(
 }
 
 export function canRenderDetailToolbarButton(
-  button: Pick<ButtonConfig, 'permissionCode'>,
+  button: Pick<ButtonConfig, 'permissionCode' | 'permissionCodes'>,
   hasPermission: (permissionCode: string) => boolean,
 ): boolean {
-  return !button.permissionCode || hasPermission(button.permissionCode);
+  return hasButtonPermissions(button, hasPermission);
 }
 
 /**

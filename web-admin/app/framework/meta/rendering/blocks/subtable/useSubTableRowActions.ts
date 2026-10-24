@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { useCallback } from 'react';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -120,7 +121,7 @@ export function useSubTableRowActions({
 
   const isRowActionVisible = useCallback(
     (button: ButtonConfig, row: Record<string, any>) => {
-      if (button.permissionCode && !hasPermission(button.permissionCode)) return false;
+      if (!hasButtonPermissions(button, hasPermission)) return false;
       return evaluateRowCondition(button.visibleWhen, row);
     },
     [evaluateRowCondition, hasPermission],
@@ -138,7 +139,7 @@ export function useSubTableRowActions({
 
   const handleRowAction = useCallback(
     async (button: ButtonConfig, row: Record<string, any>, rowIndex: number) => {
-      if (button.permissionCode && !hasPermission(button.permissionCode)) return;
+      if (!hasButtonPermissions(button, hasPermission)) return;
       const confirmConfig = button.confirm ?? button.confirmMessageKey;
       if (confirmConfig) {
         const confirmation =

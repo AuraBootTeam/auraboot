@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
@@ -855,7 +856,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     return (
       <div className="flex flex-wrap gap-2">
         {actions.map((button) => {
-          if (button.permissionCode && !hasPermission(button.permissionCode)) {
+          if (!hasButtonPermissions(button, hasPermission)) {
             return null;
           }
           // 条件渲染
@@ -923,7 +924,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           record,
         })
       }
-      canUseButton={(button) => !button.permissionCode || hasPermission(button.permissionCode)}
+      canUseButton={(button) => hasButtonPermissions(button, hasPermission)}
       resolveButtonLabel={(button) =>
         getLocalizedText(button.label || button.content || button.code, locale, t)
       }

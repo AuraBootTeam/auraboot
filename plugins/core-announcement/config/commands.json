@@ -99,5 +99,32 @@
     "executionConfig": {
       "requireIdempotencyKey": true
     }
+  },
+  {
+    "code": "announcement:submit_approval",
+    "displayName:zh-CN": "提交审批",
+    "displayName:en": "Submit for approval",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.submit",
+      "announcement.announcement.publish"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:withdraw_approval",
+    "displayName:zh-CN": "撤销审批申请",
+    "displayName:en": "Withdraw approval",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.withdraw"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
   }
 ]

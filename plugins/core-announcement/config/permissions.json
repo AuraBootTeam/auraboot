@@ -102,5 +102,13 @@
     "description": "Manage announcement policy",
     "resourceType": "operation",
     "module": "system"
+  },
+  {
+    "code": "announcement.announcement.submit",
+    "name:zh-CN": "提交公告审批",
+    "name:en": "Submit announcement approval",
+    "description": "Submit frozen announcement versions for approval; publication permission is also required",
+    "resourceType": "operation",
+    "module": "system"
   }
 ]

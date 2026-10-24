@@ -26,6 +26,7 @@ VALUES(1,NULL,1,'Legacy draft','draft','normal',1,NULL,NULL),
 \ir ../../platform/src/main/resources/db/migration/core/V20261024190000__announcement_controlled_lifecycle.sql
 \ir ../../platform/src/main/resources/db/migration/core/V20261024210000__announcement_release_execution.sql
 \ir ../../platform/src/main/resources/db/migration/core/V20261024211500__announcement_effective_ack_policy.sql
+\ir ../../platform/src/main/resources/db/migration/core/V20261024230000__announcement_approval_submission.sql
 DO $$
 DECLARE v VARCHAR(36); failed BOOLEAN;
 BEGIN

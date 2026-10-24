@@ -440,6 +440,8 @@ export interface ButtonConfig {
   /** @deprecated Use `confirm` instead. */
   confirmMessageKey?: string;
   permissionCode?: string; // Permission control
+  /** Every listed permission is required in addition to permissionCode. */
+  permissionCodes?: string[];
   /** Custom report code (for report generation buttons) */
   reportCode?: string;
 

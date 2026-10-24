@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { type SetURLSearchParams, type NavigateFunction } from 'react-router';
@@ -459,7 +460,7 @@ export function useListQueryActions(
 
   const canUseButton = useCallback(
     (button: ButtonConfig): boolean => {
-      return !button.permissionCode || hasPermission(button.permissionCode);
+      return hasButtonPermissions(button, hasPermission);
     },
     [hasPermission],
   );

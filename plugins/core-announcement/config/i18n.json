@@ -180,5 +180,82 @@
     "en-US": "The release will stop. Its frozen version and history will remain. Cancel it?",
     "source": "import",
     "refType": "action"
+  },
+  {
+    "key": "announcement.submit_approval.confirm.title",
+    "zh-CN": "提交公告审批",
+    "en-US": "Submit announcement approval",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.submit_approval.confirm.content",
+    "zh-CN": "提交后将冻结正文、附件和通知设置；审批通过后按发布安排执行。确定提交吗？",
+    "en-US": "Content, attachments and notification settings will be frozen. Approval will authorize the configured release. Submit now?",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_required",
+    "zh-CN": "当前租户要求公告审批，请选择审批发布。",
+    "en-US": "This tenant requires announcement approval. Select approval before publishing.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_mode_required",
+    "zh-CN": "请在通知设置中选择审批发布。",
+    "en-US": "Select approval in notification settings.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_definition_required",
+    "zh-CN": "请选择可用审批流程，或由租户管理员设置默认流程。",
+    "en-US": "Select an available approval workflow or ask the tenant administrator to configure a default.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_provider_changed",
+    "zh-CN": "审批提供方已变更，请由管理员核对组合安装版本。",
+    "en-US": "The approval provider changed. Ask an administrator to verify the installed composition.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.withdraw_reason_required",
+    "zh-CN": "请填写撤销审批的原因。",
+    "en-US": "Enter a reason for withdrawing the approval.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_empty_assignees",
+    "zh-CN": "排除申请人后没有有效审批人，请联系流程管理员。",
+    "en-US": "No eligible approver remains after excluding the applicant. Contact the workflow administrator.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_assignee_inactive",
+    "zh-CN": "指定审批人的成员身份已失效，请联系流程管理员。",
+    "en-US": "A designated approver is no longer an active member. Contact the workflow administrator.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_sync_blocked",
+    "zh-CN": "审批结果同步异常，请核对流程服务和当前权限后恢复。",
+    "en-US": "Approval synchronization is blocked. Verify the workflow service and current permissions before resuming.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_provider_blocked",
+    "zh-CN": "审批流程执行异常，请联系流程管理员处理。",
+    "en-US": "The approval workflow requires attention from the workflow administrator.",
+    "source": "import",
+    "refType": "message"
   }
 ]

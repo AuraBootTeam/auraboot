@@ -371,7 +371,10 @@
               }
             },
             "permissionCode": "announcement.announcement.edit",
-            "visibleWhen": "record.status === 'draft'"
+            "visibleWhen": "record.status === 'draft'",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ]
           },
           {
             "code": "edit",
@@ -388,6 +391,25 @@
             "permissionCode": "announcement.announcement.edit"
           },
           {
+            "code": "submit_approval",
+            "label": {
+              "zh-CN": "提交审批",
+              "en-US": "Submit for approval"
+            },
+            "variant": "primary",
+            "confirm": "announcement.submit_approval.confirm",
+            "permissionCode": "announcement.announcement.submit",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ],
+            "visibleWhen": "record.status === 'draft' && record.approval_mode === 'approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:submit_approval",
+              "operationType": "UPDATE"
+            }
+          },
+          {
             "code": "publish",
             "label": {
               "zh-CN": "免审发布",
@@ -401,7 +423,10 @@
               "operationType": "UPDATE"
             },
             "visibleWhen": "record.status === 'draft' && record.approval_mode !== 'approval'",
-            "permissionCode": "announcement.announcement.publish"
+            "permissionCode": "announcement.announcement.publish",
+            "permissionCodes": [
+              "announcement.announcement.exempt"
+            ]
           },
           {
             "code": "archive",
@@ -431,7 +456,7 @@
               "command": "announcement:republish",
               "operationType": "UPDATE"
             },
-            "visibleWhen": "record.status === 'withdrawn' || record.status === 'expired' || record.status === 'missed'",
+            "visibleWhen": "['withdrawn','expired','missed','rejected','approval_withdrawn','approval_failed'].includes(record.status)",
             "permissionCode": "announcement.announcement.edit"
           },
           {
@@ -464,6 +489,43 @@
             "visibleWhen": "record.status === 'scheduled' || record.status === 'unpublished'",
             "permissionCode": "announcement.announcement.publish",
             "confirm": "announcement.cancel_schedule.confirm"
+          },
+          {
+            "code": "withdraw_approval",
+            "label": {
+              "zh-CN": "撤销审批申请",
+              "en-US": "Withdraw approval"
+            },
+            "permissionCode": "announcement.announcement.withdraw",
+            "visibleWhen": "record.status === 'pending_approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:withdraw_approval",
+              "operationType": "UPDATE",
+              "inputFieldsTitle": {
+                "zh-CN": "撤销审批申请",
+                "en-US": "Withdraw approval"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "提交撤销请求",
+                "en-US": "Request withdrawal"
+              },
+              "inputFields": [
+                {
+                  "field": "reason",
+                  "label": {
+                    "zh-CN": "撤销原因",
+                    "en-US": "Reason"
+                  },
+                  "type": "textarea",
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "请求受理后将核对实际流程结果；尚未发布的公告会停止自动发布。",
+                    "en-US": "The request reconciles the authoritative workflow outcome and prevents an unpublished version from being automatically released."
+                  }
+                }
+              ]
+            }
           }
         ],
         "defaultSort": {
@@ -493,6 +555,14 @@
             "approval_definition",
             "scheduled_at",
             "exemption_reason"
+          ],
+          "inputFieldsOnly": true
+        },
+        "announcement:withdraw_approval": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "reason"
           ],
           "inputFieldsOnly": true
         }
@@ -634,6 +704,391 @@
     },
     "blocks": [
       {
+        "id": "announcement_management_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "notification_settings",
+            "label": {
+              "zh-CN": "通知设置",
+              "en-US": "Notification settings"
+            },
+            "action": {
+              "type": "command",
+              "command": "announcement:update_announcement",
+              "operationType": "UPDATE",
+              "inputFields": [
+                {
+                  "field": "audience_kind",
+                  "label": {
+                    "zh-CN": "通知范围",
+                    "en-US": "Audience kind"
+                  },
+                  "type": "select",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_kind}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-options?kind=kind"
+                  },
+                  "required": true
+                },
+                {
+                  "field": "audience_users",
+                  "label": {
+                    "zh-CN": "人员",
+                    "en-US": "People"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_users}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-options?kind=person"
+                  },
+                  "helpText": {
+                    "zh-CN": "仅可选择当前发布管理范围内的有效成员。",
+                    "en-US": "Choose active members within your current publication scope."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "audience_departments",
+                  "label": {
+                    "zh-CN": "部门及下级",
+                    "en-US": "Departments and descendants"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_departments}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-options?kind=department"
+                  },
+                  "helpText": {
+                    "zh-CN": "包含下级；仅列出整个子树均已授权的部门。",
+                    "en-US": "Includes descendants. Only fully authorized department subtrees are selectable."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "audience_roles",
+                  "label": {
+                    "zh-CN": "管理范围内角色成员",
+                    "en-US": "Role members within management scope"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_roles}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-options?kind=role"
+                  },
+                  "helpText": {
+                    "zh-CN": "仅通知当前管理范围内的该角色成员，发布时重新解析。",
+                    "en-US": "Only role members within your current management scope; resolved again at publication."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "approval_mode",
+                  "label": {
+                    "zh-CN": "发布方式",
+                    "en-US": "Approval mode"
+                  },
+                  "type": "select",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.approval_mode}",
+                  "dataSource": {
+                    "type": "static",
+                    "data": [
+                      {
+                        "value": "exempt",
+                        "label": {
+                          "zh-CN": "免审发布",
+                          "en-US": "Exempt publication"
+                        }
+                      },
+                      {
+                        "value": "approval",
+                        "label": {
+                          "zh-CN": "审批后发布",
+                          "en-US": "Publish after approval"
+                        }
+                      }
+                    ]
+                  },
+                  "required": true
+                },
+                {
+                  "field": "approval_definition",
+                  "label": {
+                    "zh-CN": "审批流程",
+                    "en-US": "Approval process"
+                  },
+                  "type": "select",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.approval_definition}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/approval-options"
+                  },
+                  "helpText": {
+                    "zh-CN": "流程由租户流程管理员维护；能力未安装时不可送审。",
+                    "en-US": "Tenant workflow administrators maintain processes. Submission requires the installed approval capability."
+                  },
+                  "visibleWhen": {
+                    "field": "approval_mode",
+                    "value": "approval"
+                  }
+                },
+                {
+                  "field": "scheduled_at",
+                  "label": {
+                    "zh-CN": "预约发布时间",
+                    "en-US": "Scheduled publication"
+                  },
+                  "type": "datetime",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.scheduled_at}",
+                  "helpText": {
+                    "zh-CN": "留空为立即发布；审批未在预约时间前就绪时不会补发。",
+                    "en-US": "Leave empty for immediate publication. Late approval does not trigger a missed schedule."
+                  }
+                },
+                {
+                  "field": "exemption_reason",
+                  "label": {
+                    "zh-CN": "免审原因",
+                    "en-US": "Exemption reason"
+                  },
+                  "type": "textarea",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.exemption_reason}",
+                  "placeholder": {
+                    "zh-CN": "例如：已批准的例行维护通知",
+                    "en-US": "e.g. Authorized routine maintenance notice"
+                  },
+                  "helpText": {
+                    "zh-CN": "免审提交必须有独立免审权限并说明原因。",
+                    "en-US": "Exempt submission requires separate exemption permission and a reason."
+                  },
+                  "visibleWhen": {
+                    "field": "approval_mode",
+                    "value": "exempt"
+                  }
+                },
+                {
+                  "field": "ack_required",
+                  "label": {
+                    "zh-CN": "要求确认已知悉",
+                    "en-US": "Require acknowledgement"
+                  },
+                  "type": "checkbox",
+                  "group": {
+                    "zh-CN": "知悉政策",
+                    "en-US": "Acknowledgement"
+                  },
+                  "defaultValue": "${record.ack_required_effective}",
+                  "helpText": {
+                    "zh-CN": "重要公告默认开启；阅读与确认是两个独立动作。",
+                    "en-US": "Enabled by default for important notices. Reading and acknowledgement are separate."
+                  }
+                },
+                {
+                  "field": "ack_days",
+                  "label": {
+                    "zh-CN": "知悉期限（天）",
+                    "en-US": "Acknowledgement period (days)"
+                  },
+                  "type": "number",
+                  "group": {
+                    "zh-CN": "知悉政策",
+                    "en-US": "Acknowledgement"
+                  },
+                  "defaultValue": "${record.ack_days}",
+                  "helpText": {
+                    "zh-CN": "发布后 1–30 天，默认 7 天；到期后仍可确认。",
+                    "en-US": "1–30 days from publication, default 7. Late acknowledgement remains available."
+                  },
+                  "placeholder": {
+                    "zh-CN": "例如：7",
+                    "en-US": "e.g. 7"
+                  }
+                }
+              ],
+              "inputFieldsTitle": {
+                "zh-CN": "通知设置",
+                "en-US": "Notification settings"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "保存设置",
+                "en-US": "Save settings"
+              }
+            },
+            "permissionCode": "announcement.announcement.edit",
+            "visibleWhen": "record.status === 'draft'",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ]
+          },
+          {
+            "code": "submit_approval",
+            "label": {
+              "zh-CN": "提交审批",
+              "en-US": "Submit for approval"
+            },
+            "variant": "primary",
+            "confirm": "announcement.submit_approval.confirm",
+            "permissionCode": "announcement.announcement.submit",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ],
+            "visibleWhen": "record.status === 'draft' && record.approval_mode === 'approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:submit_approval",
+              "operationType": "UPDATE"
+            }
+          },
+          {
+            "code": "publish",
+            "label": {
+              "zh-CN": "免审发布",
+              "en-US": "Publish without approval"
+            },
+            "variant": "primary",
+            "confirm": "announcement.publish.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:publish",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "record.status === 'draft' && record.approval_mode !== 'approval'",
+            "permissionCode": "announcement.announcement.publish",
+            "permissionCodes": [
+              "announcement.announcement.exempt"
+            ]
+          },
+          {
+            "code": "archive",
+            "label": {
+              "zh-CN": "撤回",
+              "en": "Archive"
+            },
+            "confirm": "announcement.archive.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:archive",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "record.status === 'published'",
+            "permissionCode": "announcement.announcement.withdraw"
+          },
+          {
+            "code": "republish",
+            "label": {
+              "zh-CN": "建立修订草稿",
+              "en-US": "Create revision draft"
+            },
+            "variant": "primary",
+            "confirm": "announcement.republish.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:republish",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "['withdrawn','expired','missed','rejected','approval_withdrawn','approval_failed'].includes(record.status)",
+            "permissionCode": "announcement.announcement.edit"
+          },
+          {
+            "code": "cancel_schedule",
+            "label": {
+              "zh-CN": "取消发布安排",
+              "en-US": "Cancel release"
+            },
+            "action": {
+              "type": "command",
+              "command": "announcement:cancel_schedule",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "record.status === 'scheduled' || record.status === 'unpublished'",
+            "permissionCode": "announcement.announcement.publish",
+            "confirm": "announcement.cancel_schedule.confirm"
+          },
+          {
+            "code": "withdraw_approval",
+            "label": {
+              "zh-CN": "撤销审批申请",
+              "en-US": "Withdraw approval"
+            },
+            "permissionCode": "announcement.announcement.withdraw",
+            "visibleWhen": "record.status === 'pending_approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:withdraw_approval",
+              "operationType": "UPDATE",
+              "inputFieldsTitle": {
+                "zh-CN": "撤销审批申请",
+                "en-US": "Withdraw approval"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "提交撤销请求",
+                "en-US": "Request withdrawal"
+              },
+              "inputFields": [
+                {
+                  "field": "reason",
+                  "label": {
+                    "zh-CN": "撤销原因",
+                    "en-US": "Reason"
+                  },
+                  "type": "textarea",
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "请求受理后将核对实际流程结果；尚未发布的公告会停止自动发布。",
+                    "en-US": "The request reconciles the authoritative workflow outcome and prevents an unpublished version from being automatically released."
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "basic",
         "blockType": "form-section",
         "title": {
@@ -683,6 +1138,64 @@
             "colSpan": 12
           }
         ]
+      },
+      {
+        "id": "announcement_approval_status",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "审批进展",
+          "en-US": "Approval progress"
+        },
+        "dataSource": "approvalStatus",
+        "emptyText": {
+          "zh-CN": "此公告尚未提交审批。",
+          "en-US": "This announcement has not been submitted for approval."
+        },
+        "columns": [
+          {
+            "field": "definitionName",
+            "label": {
+              "zh-CN": "审批流程",
+              "en-US": "Workflow"
+            },
+            "width": 200
+          },
+          {
+            "field": "approvalState",
+            "label": {
+              "zh-CN": "申请状态",
+              "en-US": "Submission"
+            },
+            "dictCode": "announcement_approval_execution",
+            "width": 130
+          },
+          {
+            "field": "providerState",
+            "label": {
+              "zh-CN": "流程进度",
+              "en-US": "Workflow state"
+            },
+            "dictCode": "announcement_approval_provider",
+            "width": 150
+          },
+          {
+            "field": "syncState",
+            "label": {
+              "zh-CN": "结果同步",
+              "en-US": "Synchronization"
+            },
+            "dictCode": "announcement_approval_sync",
+            "width": 120
+          },
+          {
+            "field": "attention",
+            "label": {
+              "zh-CN": "处理提示",
+              "en-US": "Attention"
+            },
+            "width": 300
+          }
+        ]
       }
     ],
     "extension": {
@@ -708,7 +1221,24 @@
             "exemption_reason"
           ],
           "inputFieldsOnly": true
+        },
+        "announcement:withdraw_approval": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "reason"
+          ],
+          "inputFieldsOnly": true
         }
+      },
+      "showInlineApprovalPanel": false
+    },
+    "dataSources": {
+      "approvalStatus": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/${$page.recordPid}/approval",
+        "adaptor": "table"
       }
     }
   }

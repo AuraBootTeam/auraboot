@@ -95,10 +95,31 @@
         "status": "enabled"
       },
       {
-        "value": "pending",
+        "value": "pending_approval",
         "label": "Approval pending",
         "label:zh-CN": "审批中",
-        "sortNo": 130,
+        "sortNo": 140,
+        "status": "enabled"
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 150,
+        "status": "enabled"
+      },
+      {
+        "value": "approval_withdrawn",
+        "label": "Approval withdrawn",
+        "label:zh-CN": "审批已撤销",
+        "sortNo": 160,
+        "status": "enabled"
+      },
+      {
+        "value": "approval_failed",
+        "label": "Approval failed",
+        "label:zh-CN": "审批异常",
+        "sortNo": 170,
         "status": "enabled"
       }
     ]
@@ -143,6 +164,163 @@
         "label": "Publish after approval",
         "label:zh-CN": "审批后发布",
         "sortNo": 20,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_execution",
+    "name": "审批申请状态",
+    "name:zh-CN": "审批申请状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending_dispatch",
+        "label": "Awaiting dispatch",
+        "label:zh-CN": "等待发起",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "running",
+        "label": "Approval pending",
+        "label:zh-CN": "审批中",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "withdraw_requested",
+        "label": "Withdrawal requested",
+        "label:zh-CN": "撤销处理中",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已通过",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "withdrawn",
+        "label": "Withdrawn",
+        "label:zh-CN": "已撤销",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "流程异常",
+        "sortNo": 60,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_provider",
+    "name": "审批流程进度",
+    "name:zh-CN": "审批流程进度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "starting",
+        "label": "Starting",
+        "label:zh-CN": "启动处理中",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "running",
+        "label": "Running",
+        "label:zh-CN": "审批中",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "blocked",
+        "label": "Attention required",
+        "label:zh-CN": "分配或执行异常",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已通过",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "withdrawn",
+        "label": "Withdrawn",
+        "label:zh-CN": "已撤销",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "流程异常",
+        "sortNo": 60,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_sync",
+    "name": "审批同步状态",
+    "name:zh-CN": "审批同步状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "queued",
+        "label": "Queued",
+        "label:zh-CN": "待同步",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "polling",
+        "label": "Reconciling",
+        "label:zh-CN": "核对中",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "waiting",
+        "label": "Waiting",
+        "label:zh-CN": "等待进展",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "blocked",
+        "label": "Sync blocked",
+        "label:zh-CN": "同步异常",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "completed",
+        "label": "Reconciled",
+        "label:zh-CN": "已核对",
+        "sortNo": 40,
         "status": "enabled"
       }
     ]

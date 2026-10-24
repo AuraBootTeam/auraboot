@@ -27,6 +27,11 @@ import java.util.*;
 public class AnnouncementController {
     private final AnnouncementService announcementService;
     private final CommandExecutor commandExecutor;
+    private final com.auraboot.framework.workbench.service.AnnouncementApprovalService approvals;
+
+    @GetMapping("/{pid}/approval")
+    @RequirePermission("announcement.announcement.read")
+    public ApiResponse<Map<String,Object>> approvalSummary(@PathVariable String pid) { return ApiResponse.success(approvals.summary(pid)); }
     private final com.auraboot.framework.workbench.service.AnnouncementAudienceService audiences;
     private final com.auraboot.framework.workbench.service.AnnouncementAccessService access;
     private final com.auraboot.framework.workbench.service.AnnouncementPolicyService policies;

@@ -150,7 +150,7 @@ public class AnnouncementLifecycleService {
                     throw conflict();
             } else if (REVISE.equals(command)) {
                 if (!payload.isEmpty()
-                        || !Set.of("withdrawn", "expired", "missed").contains(record.getStatus())
+                        || !Set.of("withdrawn", "expired", "missed", "rejected", "approval_withdrawn", "approval_failed").contains(record.getStatus())
                         || record.getCurrentVersionPid() == null)
                     throw BusinessException.i18n("announcement.error.not_editable");
                 Map<String, Object> snapshot =

@@ -32,4 +32,14 @@ public class ApprovalSubmissionAccessorImpl implements ApprovalSubmissionAccesso
         if(results.size()>1)throw new IllegalStateException("Approval submission has multiple business owners");
         return results.stream().findFirst();
     }
+    public boolean canWithdraw(long tenant,long actor,String submissionId) {
+        var binding=findSubmitted(tenant,actor,submissionId);
+        return binding.isPresent() && sources().stream().filter(source->source.businessType().equals(binding.get().businessRef().type()))
+            .anyMatch(source->source.canWithdraw(tenant,actor,submissionId));
+    }
+    public boolean canStart(long tenant,long actor,String submissionId) {
+        var binding=findSubmitted(tenant,actor,submissionId);
+        return binding.isPresent() && sources().stream().filter(source->source.businessType().equals(binding.get().businessRef().type()))
+            .anyMatch(source->source.canStart(tenant,actor,submissionId));
+    }
 }
