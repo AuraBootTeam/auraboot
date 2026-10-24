@@ -8,6 +8,7 @@ import { useListExport } from './list/useListExport';
 import { useListMemberInvite } from './list/useListMemberInvite';
 import { useListMetadata } from './list/useListMetadata';
 import { useListPageRuntime } from './list/useListPageRuntime';
+import { useListSelectionBinding } from './list/useListSelectionBinding';
 import { useListPageState } from './list/useListPageState';
 import { useListQueryActions } from './list/useListQueryActions';
 import { useListQuickFilters } from './list/useListQuickFilters';
@@ -90,6 +91,7 @@ function ListPageContentInner(props: PageContentProps) {
     },
   });
   const pageRuntime = useListPageRuntime({ ...state });
+  useListSelectionBinding({ ...state, runtime: pageRuntime.runtime });
   const savedViews = useListSavedViewState({ ...pageRuntime, ...state });
   const metadata = useListMetadata(
     { ...pageRuntime, ...state, ...savedViews },
