@@ -31,9 +31,12 @@ public class AnnouncementAccessService {
         Long actor=actor(action),tenant=MetaContext.getCurrentTenantId();
         Announcement record=lock ? records.lock(tenant,pid) : records.readTarget(tenant,pid);
         if(record==null || Boolean.TRUE.equals(record.getDeletedFlag()))
-            throw BusinessException.i18n("announcement.error.not_found");
+            throw new RecordUnavailable();
         if(!Objects.equals(record.getOwnerUserId(),actor) && !permissions.hasPermission(actor,"announcement.announcement.manage"))
             throw new AccessDeniedException("Announcement management scope denied");
         return record;
+    }
+    public static final class RecordUnavailable extends BusinessException {
+        public RecordUnavailable(){super("$i18n:announcement.error.not_found");}
     }
 }

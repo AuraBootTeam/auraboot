@@ -54,10 +54,19 @@ public class AnnouncementStatisticsExportSource implements DomainExportSource {
         actors.call(owner.tenantId(),owner.userId(),owner.memberPid(),()->{authorize(prepared);return null;});
     }
 
-    @Override public boolean visible(Prepared prepared) {
+    @Override
+    @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public boolean visible(Prepared prepared) {
         try {authorize(prepared);return true;}
         // Only an explicit permission denial hides a task; persistence and schema failures remain observable.
-        catch(AccessDeniedException denied) {return false;}
+        catch(AccessDeniedException | AnnouncementStatisticsService.Unavailable | AnnouncementAccessService.RecordUnavailable denied) {return false;}
+    }
+
+    @Override public com.fasterxml.jackson.databind.JsonNode auditMetadata(Prepared prepared) {
+        var captured=prepared.evidence().required("snapshot");
+        return json.createObjectNode().put("versionPid",captured.required("versionPid").textValue())
+            .put("asOf",captured.required("asOf").textValue()).put("rowCount",prepared.rowCount())
+            .set("filters",captured.required("filters"));
     }
 
     @Override public ExportResult generate(Prepared prepared,Owner owner,Path output,AsyncTaskExecutor.ProgressCallback progress) {

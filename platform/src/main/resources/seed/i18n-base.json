@@ -1,5 +1,15 @@
 [
   {
+    "key": "export.domain_failed",
+    "zh-CN": "导出失败，请检查当前权限或重新创建导出任务。",
+    "en-US": "Export failed. Check current permissions or create a new export task."
+  },
+  {
+    "key": "export.private_storage_required",
+    "zh-CN": "导出需要私有文件存储，请联系管理员确认存储访问策略。",
+    "en-US": "Export requires private file storage. Ask an administrator to confirm the storage access policy."
+  },
+  {
     "key": "about.menuLabel",
     "zh-CN": "关于 {productName}",
     "en-US": "About {productName}",

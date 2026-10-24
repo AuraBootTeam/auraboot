@@ -121,6 +121,18 @@ public class AnnouncementStatisticsService {
     public void deleteExpired() {MetaContext.runWithoutTenantFilter(statistics::deleteExpired);}
     private static Instant time(Object value){return value==null ? null : AnnouncementDeliveryPlanResolver.instant(value);}
     private static String iso(Object value){var instant=time(value);return instant==null ? null : instant.toString();}
-    private static void invalid(String reason){throw BusinessException.i18n("announcement.error."+reason);}
+    public static final class Unavailable extends BusinessException {
+        public enum Reason { EXPIRED, MISSING }
+        private final Reason reason;
+        public Unavailable(Reason reason) {
+            super("$i18n:announcement.error."+(reason==Reason.EXPIRED ? "statistics_expired" : "statistics_unavailable"));this.reason=reason;
+        }
+        public Reason reason(){return reason;}
+    }
+    private static void invalid(String reason){
+        if("statistics_expired".equals(reason)) throw new Unavailable(Unavailable.Reason.EXPIRED);
+        if("statistics_unavailable".equals(reason)) throw new Unavailable(Unavailable.Reason.MISSING);
+        throw BusinessException.i18n("announcement.error."+reason);
+    }
     private static void denied(){throw new AccessDeniedException("Announcement statistics permissions changed; create a new snapshot");}
 }
