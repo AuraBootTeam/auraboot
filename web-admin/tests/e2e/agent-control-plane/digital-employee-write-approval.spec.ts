@@ -183,7 +183,7 @@ if (approvalFixture) {
       [fixture.tenantId, marker],
     )).rows;
     const approvalRows = async () => (await db.query(
-      `SELECT pid, approval_status, consumed_at, run_id, task_id, request_data FROM ab_agent_approval WHERE tenant_id=$1 AND request_data->>$2=$3`,
+      `SELECT pid, approval_status, consumed_at, run_id, task_id, request_data FROM ab_agent_approval WHERE tenant_id=$1 AND request_data::jsonb->>$2=$3`,
       [fixture.tenantId, fixture.field, marker],
     )).rows;
     mkdirSync(output!, { recursive: true });
