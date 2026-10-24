@@ -173,7 +173,6 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.workbench.mapper.AnnouncementReleaseMapper releaseMapper;
     @Autowired private com.auraboot.framework.workbench.service.AnnouncementDeliveryConsumer deliveryConsumer;
     @Autowired private com.auraboot.framework.workbench.service.AnnouncementCodec announcementCodec;
-    @Autowired private com.auraboot.framework.meta.mapper.OutboxEventMapper outboxEvents;
     @Autowired private com.auraboot.framework.meta.service.impl.OutboxWorkerImpl outboxWorker;
     @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
@@ -249,16 +248,14 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         String frozen=jdbc.queryForObject("SELECT snapshot::text FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
         assertEquals("Read the updated tenant policy.",announcementCodec.object(frozen).get("content"));
         String batch=(String)accepted.get("releaseAttemptPid");
-        var committed=outboxEvents.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.auraboot.framework.meta.entity.OutboxEvent>()
-            .eq(com.auraboot.framework.meta.entity.OutboxEvent::getTenantId,getTestTenant().getId())
-            .eq(com.auraboot.framework.meta.entity.OutboxEvent::getEventId,batch));
-        assertNotNull(committed);
+        var committedAt=jdbc.queryForObject("SELECT occurred_at FROM ab_outbox WHERE tenant_id=? AND event_id=?",java.time.Instant.class,getTestTenant().getId(),batch);
+        var committedPayload=jdbc.queryForObject("SELECT payload::text FROM ab_outbox WHERE tenant_id=? AND event_id=?",String.class,getTestTenant().getId(),batch);
+        assertNotNull(committedAt);
         // Replaying a real event must preserve its durable timestamp, causation and payload.
-        var root=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope(
-            committed.getSchemaVersion(),committed.getEventId(),committed.getEventType(),committed.getEventSource(),
-            committed.getSubject(),committed.getOccurredAt(),committed.getTenantId(),committed.getCorrelationId(),
-            committed.getCausationId(),committed.getOrderingKey(),committed.getEventSequence(),
-            announcementCodec.object(committed.getPayload()),Map.of());
+        var root=new com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope("1.0",batch,
+            com.auraboot.framework.workbench.service.AnnouncementReleaseService.RELEASED_EVENT,"auraboot.announcement",version,
+            committedAt,getTestTenant().getId(),batch,null,"announcement:"+version,1,
+            announcementCodec.object(committedPayload),Map.of());
         consume(root);
         var payload=Map.<String,Object>of("versionPid",version,"batchPid",batch,"userPid",getTestUser().getPid());
         // Projection is an independent event and can complete before notification persistence.
