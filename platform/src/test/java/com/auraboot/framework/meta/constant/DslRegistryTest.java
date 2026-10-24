@@ -84,15 +84,14 @@ class DslRegistryTest {
     }
 
     @Test
-    void preconditionOperator_has17Values() {
-        // DR-20260715-A-001: not_contains added (was implemented in AssertPhase but not declared);
-        // the 5 phantom ops (between/like/not_like/starts_with/ends_with) are now implemented too.
-        assertEquals(17, DslRegistry.PreconditionOperator.values().length);
-        Set<String> codes = DslRegistry.PreconditionOperator.codes();
-        assertTrue(codes.containsAll(Set.of(
+    void preconditionOperator_has18RuntimeSupportedValues() {
+        // Keep the closed registry aligned with AssertPhase, including structured not_empty checks.
+        assertEquals(18, DslRegistry.PreconditionOperator.values().length);
+        assertEquals(Set.of(
                 "EQ", "NE", "GT", "GE", "LT", "LE", "IN", "not_in",
-                "is_null", "is_not_null", "between", "like", "not_like",
-                "contains", "not_contains", "starts_with", "ends_with")));
+                "is_null", "is_not_null", "not_empty", "between", "like", "not_like",
+                "contains", "not_contains", "starts_with", "ends_with"),
+                DslRegistry.PreconditionOperator.codes());
     }
 
     @Test
