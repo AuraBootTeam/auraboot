@@ -138,7 +138,10 @@ public class HandlerPhase implements CommandPhase {
         Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
                 withCommandAuthority(ctx, () -> executeHandlerPhase(
                         handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
-                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig())));
+                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(),
+                        Boolean.TRUE.equals(ctx.getTargetRecordReadable())
+                            && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
+                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized())));
         ctx.setHandlerResults(handlerResults);
         persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
                 handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
@@ -152,7 +155,7 @@ public class HandlerPhase implements CommandPhase {
                                                      Map<String, Object> fieldMapResults,
                                                      Long tenantId, Long userId,
                                                      CommandExecuteRequest request,
-                                                     Map<String, Object> execConfig) {
+                                                     Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
         Map<String, Object> handlerResults = new HashMap<>();
         boolean dryRun = request.isDryRun();
 
@@ -203,7 +206,7 @@ public class HandlerPhase implements CommandPhase {
 
         // 2. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
-                fieldMapResults, handlerResults, execConfig);
+                fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized);
 
         // 3. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
@@ -533,7 +536,7 @@ public class HandlerPhase implements CommandPhase {
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults,
                                               Map<String, Object> handlerResults,
-                                              Map<String, Object> execConfig) {
+                                              Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
         if (extensionRegistry == null) {
             return;
         }
@@ -569,6 +572,11 @@ public class HandlerPhase implements CommandPhase {
         CommandHandlerExtension handler = pluginHandler.orElse(null);
 
         Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
+        if (Boolean.TRUE.equals(asyncHandlerParams.get(
+                com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))
+                && isAsyncHandler(asyncHandlerParams)) {
+            throw new AccessDeniedException("Related updates cannot execute asynchronously");
+        }
 
         // Opt-in async dispatch: commands declaring handlerParams.async run off the
         // request thread via AsyncTaskService, so long-running handlers (e.g. bulk
@@ -660,6 +668,22 @@ public class HandlerPhase implements CommandPhase {
                 }
                 pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                         new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
+                                tenantId,commandCode,modelCode,effectiveRecordId,
+                                MetaContext.getCurrentUserPid(),handler,projection));
+            }
+            if (Boolean.TRUE.equals(pluginSettings.get(
+                    com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
+                if (handler == null || !relatedUpdateBoundaryAuthorized
+                        || !StringUtils.hasText(effectiveRecordId)
+                        || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                        || Boolean.TRUE.equals(pluginSettings.get(
+                            com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))
+                        || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                            instanceof TenantProjectionAccessor projection)) {
+                    throw new AccessDeniedException("Related update requires an authorized readable target and projection");
+                }
+                pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                        new com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor(dynamicDataService,
                                 tenantId,commandCode,modelCode,effectiveRecordId,
                                 MetaContext.getCurrentUserPid(),handler,projection));
             }

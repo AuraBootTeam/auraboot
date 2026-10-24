@@ -347,6 +347,56 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_doesNotInstallRelatedUpdatesWithoutReadableAuthorizedTarget() {
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new AssertionError("Handler must not execute without its boundary decision");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_receipt", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE, "handlerParams", Map.of(
+                        "tenantProjectionRead", true, "relatedUpdateAuthorization", true)));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Related update requires an authorized readable target and projection");
+    }
+
+    @Test
+    void execute_installsRelatedUpdatesOnlyForAnAuthorizedReadableRoot() {
+        MetaContext.setContext(1L,2L,"buyer-pid","Buyer");
+        CommandHandlerExtension recording = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                assertThat(context.settings().get(CommandHandlerExtension.DATA_ACCESSOR_KEY)).isInstanceOf(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.class);
+                assertThat(context.tenantProjectionAccessor()).isNotNull();
+                return Map.of("success",true);
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(recording));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_receipt", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE, "handlerParams", Map.of(
+                        "tenantProjectionRead", true, "relatedUpdateAuthorization", true)));
+        ctx.setTargetRecordReadable(true);
+        ctx.setPermitPlan(new com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan(
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.Decision.PERMIT,
+                null,null,"po-1",com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.ALL,0L));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("pr.purchase.manage"));
+        phase.execute(ctx);
+    }
+
+    @Test
+    void execute_rejectsRelatedUpdateAsyncBeforeSubmittingAnUnscopedTask() {
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_receipt", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE, "handlerParams", Map.of(
+                        "async", true, "relatedUpdateAuthorization", true)));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Related updates cannot execute asynchronously");
+        org.mockito.Mockito.verifyNoInteractions(asyncTaskService);
+    }
+
+    @Test
     void execute_preservesLocalizedPluginBusinessErrorKeyAndCause() {
         PluginCommandRejectionException overQuantity = new PluginCommandRejectionException(
                 PluginCommandRejectionException.Code.INVALID_ARGUMENT,
