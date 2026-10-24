@@ -18,7 +18,7 @@ This directory holds engineering-facing material that ships with the repository.
 
 | Topic | Reference | Status |
 | --- | --- | --- |
-| Announcement management | [Requirements, UX, permissions, BPM composition and phased implementation](./system-reference/announcement-management.md) | Design only; implementation and functional acceptance pending |
+| Announcement management | [Requirements, UX, permissions, BPM composition and phased implementation](./system-reference/announcement-management.md) | Design and P0 source inventory; implementation and runtime acceptance pending |
 
 ## Conventions
 

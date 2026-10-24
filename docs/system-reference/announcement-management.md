@@ -89,7 +89,7 @@ CRM、EDU 等应用复用同一公开工作流边界；领域状态与页面继�
 
 组合版在同一 runtime 内以模块化单体装配，使用该组合拥有的数据库，显式应用 Core/BPM/公告所需迁移集合；不连接另一套独立 BPM 实例的数据库。独立 BPM 产品仍可单独部署和发布。
 
-默认基于现有应用清单与锁文件机制提供公告审批组合配置，不为公告新建独立产品仓。具体 manifest 路径、构件坐标和兼容版本在实施阶段依据现有 resolver 确认，本文不虚构可执行安装命令。
+默认基于现有应用清单与锁文件机制提供公告审批组合配置，不为公告新建独立产品仓。P0 已在 §14.5 明确现有坐标、组合清单的建议落点及构建缺口；建议路径仍为待新增设计，不是现有可执行安装入口。
 
 ### 3.3 组合安装流程与能力缺失
 
@@ -304,7 +304,7 @@ CRM、EDU 等应用复用同一公开工作流边界；领域状态与页面继�
 
 ## 11. 分阶段实施与出口
 
-本轮仅完成需求文档；以下阶段均为未实施。阶段用于组织依赖，不缩减本期范围；审批、导出和异常链路未验收前不能宣称整项完成。
+本轮完成需求文档与 P0 源码盘点（见 §14）；P0 未执行运行时安装或功能验证，P1–P4 均未实施。阶段用于组织依赖，不缩减本期范围；审批、导出和异常链路未验收前不能宣称整项完成。
 
 | 阶段 | OSS 工作 | Aura BPM/组合工作 | 出口 |
 | --- | --- | --- | --- |
@@ -355,4 +355,132 @@ CRM、EDU 等应用复用同一公开工作流边界；领域状态与页面继�
 | 附件 | 复用现有文件策略，不另设绕过策略 |
 | 期限 | 知悉截止不晚于公告有效期 |
 
-没有待用户批准的产品决策阻断本设计。以下是实施前技术核对，不意味着已有实现：应用 manifest 的实际落点与兼容构件版本、现有工作流契约具体缺口、组织管理范围权威入口、附件现行限制值、现有导出任务/文件保留策略、租户时区/免打扰/工作日配置能力，以及基于真实规模的容量目标。缺失时先落实公共契约与显式配置，不猜测符号、API 或静默放宽权限。
+没有待用户批准的产品决策阻断本设计。P0 源码核对结果、接口差距和安装方案统一见 §14；附件运行时限额、免打扰配置接线、兼容制品摘要和真实容量仍须在实施环境核实。缺失时先落实公共契约与显式配置，不猜测符号、API 或静默放宽权限。
+
+
+## 14. P0 实际能力盘点与实施契约
+
+### 14.1 盘点口径与结论
+
+2026-10-24 的本轮为 **source-audited / plan-only**：读取 OSS 任务分支与 Aura BPM 本地干净 main 的源码、配置、构建脚本；没有启动服务、调用业务 API、运行数据库或浏览器测试、执行组合安装。源码存在和既有测试文件存在不能替代运行时可用结论。
+
+| 输入 | 固定身份 | 使用方式 |
+| --- | --- | --- |
+| OSS | 代码基线 `c1538e194f77995c614cc3be84dd9fcb325bb6c5`；盘点时文档提交 `d7d95a3f8f55c8ccd4b531831daf413fdcb926c4` | 同一公告任务分支，仅更新本文 |
+| Aura BPM | `6730ac5144826c9feca8ce5b999cbcbf8ce94d24`，盘点时 main 干净 | 只读依赖，不创建 BPM 编辑工作区 |
+
+结论：基础设施可复用，但不存在现成的完整公告审批闭环。优先修正公告双写入口与状态、受众权限、不可变版本及结果契约，再开发发布和运营能力。BPM 需要局部扩展，不能仅靠配置即满足本期要求。
+
+下面“可复用”仅指找到相关实现；“需扩展”指现有能力语义不完整；“缺失”限定为本次检查的公告域及列出的入口中未发现相应实现。不存在“已验收”分类。
+
+### 14.2 OSS 模块、复用点与缺口
+
+路径均相对 OSS 仓库根目录。表内符号可在固定基线定位。
+
+| 编号 | 模块/源码证据 | 实际能力 | 缺口与实施决定 |
+| --- | --- | --- | --- |
+| O01 | `plugins/core-announcement/config/{models,fields,commands,pages,permissions}.json` | config-only 插件；基础 CRUD、发布/撤回；仅 read/manage 两类声明权限；字段含标题、正文、优先级、状态、置顶、发布人/时间、过期时间 | 需扩展：版本、受众、审批/免审依据、定时、知悉、催办和细分权限。模型的 semantic/lifecycle 描述不等于字段或执行能力 |
+| O02 | `framework/workbench/{controller/AnnouncementController,service/impl/AnnouncementServiceImpl,mapper/AnnouncementMapper}`（位于 `platform/src/main/java/com/auraboot/`） | `/api/announcements` 直接 CRUD，GET 仅有效列表；写接口检查 `MetaPermission.ANNOUNCEMENT_MANAGE`；服务接受请求状态 | 高优先级：管理命令写 published，工作台查 active；直接 API 和 DSL 都能写。统一业务服务/命令校验，所有写入口执行同一审批、版本和范围规则，不保留旁路 |
+| O03 | `framework/workbench/entity/Announcement`、`db/migration/core` 中公告表 | 持有基本公告事实，无本设计的版本/收件/确认聚合 | 缺失：不可变送审版本、固定接收名单、阅读/确认、发布/催办任务及操作身份；Core Flyway 增量迁移，不修改既有 migration |
+| O04 | `framework/organization/service/OrganizationService` / `impl/OrganizationServiceImpl` | 动态组织表；`getDeptAndSubPids`、`getEmployeesByDept(...recursive...)`、员工与成员/用户关联、角色员工查询 | 可复用部门展开；需扩展统一受众解析。员工不是租户成员全集，无员工记录的有效成员仍可属于全员/人员/角色受众，不能直接把员工列表当全员 |
+| O05 | `framework/permission/service/{DataScopeService,PermissionFacade}`、`DataScopeType`、`platform-plugin-api/.../IdentityDirectoryAccessor` | 数据范围有 NONE/SELF/DEPT/TEAM/DEPT_AND_SUB/ALL；目录支持角色用户 PID 和有效租户用户查询 | 需扩展公告“管理范围→候选受众→发布校验”适配；不能直接用公告记录创建者过滤替代受众授权。OSS 内部复用服务即可，BPM 只消费公开目录；不默认向插件开放整棵组织树 |
+| O06 | `framework/notification/routing/DefaultRecipientResolver` | operator/record_owner/watchers，非 watcher 策略也追加关注者 | 不可直接用于定向公告。公告分发必须以批准规则解析后的固定名单为权威，禁止关注者自动进入受众 |
+| O07 | `NotificationDeliveryAccessor`、`framework/notification/service/impl/PluginNotificationDeliveryAccessorImpl`、`NotificationDeliveryPlanResolver` | 公开请求按可信 resolutionReference 入队；默认开关 `aura.notification.plugin-delivery.enabled=false`；host 解析唯一 plan，经可靠事件机制分发 | 需扩展公告 host-owned resolver、不可变接收事实、配置及启用校验；不是给插件任意传收件人的通用 send。保持 host authority，不放宽为信任 payload |
+| O08 | `framework/inbox/{service/InboxService,controller/InboxController,listener/InboxEventListener,mapper/InboxItemMapper}` | clientItemId 去重、read/acted/dismiss/close；监听 WorkflowEvent 建审批事项；同意/驳回先调真实工作流再记动作 | 可复用审批桥接；需新增知悉事项类型与业务动作，通用 mark_done/dismiss/批量 acted 不得绕过确认。关闭事项操作核对租户与准确版本身份 |
+| O09 | `web-admin/app/ui/inbox/{InboxBadge,InboxDropdown}.tsx`、`routes/Header.tsx` | Badge 调 unread-count；SQL 为 pending 且 is_read=false；下拉查 pending；工作区隐藏 Inbox | 与目标计数不同：增加待处理计数契约，读过但未确认仍计待办；保留现有未读 API 语义给其他调用者，不偷换 unread-count；工作区入口、错误态和版本导航需补齐 |
+| O10 | `ui/notification/{NotificationHeaderWidget,NotificationDropdown}.tsx`、`plugins/core-dashboard/widgets/workbench/AnnouncementWidget.tsx` | 铃铛未读数/SSE、最近通知、全部已读；工作台是公告摘要卡片 | 需公告筛选/版本路由/错误反馈/租户切换隔离；卡片要进入同一接收者详情，不能只显示截断文本 |
+| O11 | `framework/scheduler/service/{SchedulerEngine,impl/DatabaseSchedulerEngine}`、`framework/common/util/TenantClock` | cron、interval、one_time；cron 支持任务时区→租户时区→UTC | 可复用唤醒和时区；尚非公告业务调度。公告需持久化到期任务、抢占/并发栅栏、超窗裁决、取消/重试与准确版本校验，不把 scheduler 的 Runnable 运行当作发布成功 |
+| O12 | `framework/meta/service/impl/ExportTaskService` | 命名查询/模型导出、异步任务、租户+用户归属、私有文件、摘要及下载重新授权；过期时间源码默认 24 小时 | 可复用制品生命周期，需接入公告查询/权限/快照/CSV 列与公式防护。不能直接导出公告主表代替接收统计；动态已读变化不能简单导致历史快照下载失效，需区分数据更新与权限收回 |
+| O13 | `platform-plugin-api/.../FileAccessor`、`framework/plugin/pf4j/FileAccessorImpl`、`ApplicationFileAccessorImpl` | 文件读取/元信息等窄桥接，平台掌握存储 | 需公告附件关系、定稿和受众下载校验；文件可读取不代表公告接收者有权下载。附件具体运行限额从实际部署配置回读，不凭接口注释填写 |
+| O14 | `platform-plugin-api/.../WorkflowCapability`、`framework/plugin/pf4j/{WorkflowCapabilityRegistry,ApplicationModuleRegistry}` | 单工作流 provider 注册；`available(operation)` 与 execute fail-closed；请求/结果目前是 Map payload | 可复用调用边界，缺少统一类型化版本/幂等/终态契约和前端租户就绪信息，见 §14.4 |
+
+补充缺口：当前通知偏好实体的 enabled/category/channel 不能证明租户免打扰日历已接通；知悉期限、每天一次/三次、手动一小时限制和公告批次审计均需公告业务实现。24 小时导出文件保留可作为复用基线，后续若调整须同步本文与部署配置。
+
+### 14.3 Aura BPM 实际能力与缺口
+
+以下均为 Aura BPM 仓库相对路径。固定源码可通过 [盘点提交](https://github.com/AuraBootTeam/aura-bpm/tree/6730ac5144826c9feca8ce5b999cbcbf8ce94d24) 定位；不把产品内部类变成 OSS 依赖。
+
+| 编号 | 源码证据 | 实际能力 | 对公告的判断 |
+| --- | --- | --- | --- |
+| B01 | `plugin/backend/.../bpm/extension/BpmWorkflowCapability.java` | capabilityId=`aura.bpm.workflow.v1`；有 start、catalog.list、process.status/has-running/withdraw、task.approval-detail/approve/reject 等操作 | 接入骨架存在；不新建第二套工作流 registry |
+| B02 | 同上 `start`；`service/BpmIntegrationService.startBusinessProcess`；`ProcessEngineService.startInCurrentContext` | start 收 processDefinitionKey/businessKey/variables/title，返回 processInstanceId；引擎按 key 解析版本并保存表单绑定快照 | 无显式请求幂等键、公告版本、快照摘要和要求的定义版本入参契约；has-running 只是查询，不能代替并发唯一性。引擎有 bizUniqueId 也不能直接推导公告重试语义 |
+| B03 | `BpmWorkflowCapability.processStatus`；`listener/ProcessEventListener`；`event/EventBusService` | status 返回 found/status/completed/rejected；completed 同时匹配 completed/approved；process_ended 发布 transient 事件且 payload 为空；事件总线有持久化与内存派发两条路径 | 关键阻断：不能用 completed/process_ended 作为公告批准信号。需明确 approved/rejected/withdrawn/failed 业务结果、版本关联及可恢复结果交付 |
+| B04 | `service/AssigneeResolverService`；`config/IdAndGroupTaskAssigneeDispatcher` | 指定人员和角色解析已有；目录支持有效租户成员；普通解析无结果/异常后 dispatcher 存在回退给发起人路径；MI 空集合路径另有处理 | 与禁止自审、无人阻断冲突。公告流程需显式严格策略：过滤申请人、无有效人进入异常，禁止该回退；不把此要求擅自扩大为所有历史流程全量改造 |
+| B05 | `converter/JsonToBpmnConverter`、`config/DefaultMultiInstanceCounter`、`UserTaskEditor.tsx` | 有候选人/组、multiInstance、completionCondition 及审批模式 UI；嵌套 assignee 的 userIds/roleIds 主属性取第一项 | 会签/或签基础存在，但 UI 选择并不自动证明“全部名单固定、任一驳回终止”成立；必须统一配置编译、候选名单与终态规则，不能仅配置多个用户即声称满足 |
+| B06 | `service/TaskService`、`WithdrawService`、`BpmApprovalDetailService` | 实际审批动作、候选/认领校验、转交/委托、撤回、审批详情与历史 | 可复用；补公告版本只读详情和附件访问。当前 process.withdraw 借第一条 pending task 撤回，需验证发起人撤销整实例语义；管理员异常重新分配不能等同普通转交 |
+| B07 | `packages/aura-bpm-web/src/contribution-module.ts`、`auraboot.contribution.json` | 已注册 workflow-panel、task drawer、inline approval、workflow.start、aura.inbox.workflow、aura.resource.workflow、aura.navigation.target；路由为产品所有 | 可复用嵌入区块/服务，不能复制产品 React 到 OSS；前端 workflow.start 不能直接作为公告发布按钮，必须先经公告提交/快照/权限服务 |
+| B08 | `app.yaml`、`scripts/build-application.mjs`、`plugin/plugin.json` | 独立 application；plugin `com.auraboot.bpm`；npm `@auraboot/aura-bpm-web`；migration/config 均为 bpm；构建合并平台和产品 catalog | 可复用构件和装配模式；现有脚本为独立 BPM 应用输出，不是已存在的通用公告+BPM 安装器 |
+
+公开契约带 tenantId/actorUserId，但多数 BPM 操作最终从 MetaContext 取身份，而非逐项验证 request 字段。集成需保证可信请求与执行上下文一致，后台调度显式恢复绑定身份并重新授权，不能把传入用户 ID 当授权。
+
+### 14.4 公共契约的具体细化
+
+以下字段是拟定语义，不是已实现 DTO、操作 token 或 API 路径。优先在现有 WorkflowCapability 下形成版本化、可校验请求/结果；若破坏现有语义则新增操作版本，保留现有消费者行为，不用任意 Map 约定悄悄覆盖旧接口。
+
+| 契约 | 已有 | 必须补齐的语义 | Owner/前置 |
+| --- | --- | --- | --- |
+| 就绪 | registry.available、catalog.list | 区分未安装/操作不支持/租户未配置/定义未发布/就绪；返回可用契约版本及准确流程定义版本；只有展示名称可进入 UI | 平台契约 + BPM 实现，先于审批表单 |
+| 提交 | start + businessKey | tenant、trusted actor、businessType、recordPid、announcementVersion、submissionId、idempotencyKey、snapshotReference/hash、definition identity/version；相同键同内容返回同实例，不同内容冲突 | 公告提交聚合 + 平台契约 + BPM，先于实际审批 |
+| 任务详情/动作 | task.approval-detail/approve/reject | 任务绑定提交与快照版本；允许动作来自服务端；拒绝空驳回原因、失效资格和旧版本动作；业务详情只读且附件受控 | BPM + OSS 业务详情 |
+| 撤销 | process.withdraw/task.withdraw | 明确申请人撤销整个申请与节点撤回的区别；与终态并发有确定结果；返回终态/冲突而非盲取一条任务 | BPM 实现，不以 UI 状态判定 |
+| 终态 | process.status + WorkflowEvent | 稳定 result identity、schema version、tenant、submission/version、process instance、definition version、APPROVED/REJECTED/WITHDRAWN/FAILED、occurredAt、顺序或状态栅栏；区分技术完成与业务批准 | 平台中立结果契约，BPM 生成，公告消费 |
+| 可靠交付 | WorkflowEvent；BPM 事件日志/瞬时事件；平台可靠集成设施 | 提交后可靠记录、消费确认/重试、重启恢复、查询核对；消费按 result identity+submission 去重，冲突结果拒绝；不得把内存 Spring 发布当可靠 outbox | 先做共同结果语义，再选复用的可靠传输接线 |
+| 待办 | clientItemId、read/acted、审批桥接 | 确认事项标识含 tenant/announcement/version/user；确认动作回调公告校验后才 acted；禁止 dismiss/批量通用动作完成知悉；pending count 独立于 unread count | OSS 待办与公告，审批生命周期继续归 BPM |
+| 导航 | BPM providers、Inbox deepLink、通知 sourceType/sourceId | 业务类型、记录、版本、任务/提交身份到授权页面的明确解析；已撤回/旧版/权限失效可解释；不接受任意外部 URL | OSS 导航契约 + BPM contribution |
+| 分发 | NotificationDeliveryAccessor + host Plan resolver | resolutionReference 可反查准确发布/催办批次和固定收件事实；先校验版本/可见性再入队；不追加 watchers | OSS host-owned 解析，保留现有安全边界 |
+
+持久化概念模型（物理表名/DTO 在实现前依据仓库命名冻结）：公告主体、不可变版本、受众规则与预计快照、固定接收与阅读/知悉事实、审批提交映射、发布任务、催办批次及收件执行记录、结果消费记录、审计与导出快照引用。唯一约束至少覆盖同版本接收人、审批幂等键、结果身份、发布执行身份和催办批次收件身份。
+
+业务键不应仅使用公告主记录：必须能够区分版本与再次提交；撤销后重提生成新 submissionId。公开 PID、内部 numeric user/member ID、BPM user PID 不能混用。事务持久化先建立提交映射再触发可能同步结束的流程，覆盖“流程在 start 返回前已经结束”的竞态；返回不确定时按原幂等身份核对，不启动第二实例。
+
+### 14.5 组合安装：现有机制与待新增内容
+
+现有可复用机制以 [application composition](../../distribution/application/README.md)、[manifest schema](../../distribution/application/application-manifest.schema.json)、[core-only 示例](../../distribution/application/examples/core-only/app.yaml) 和 [平台构件打包](../../scripts/application/stage-core-only-artifacts.mjs) 为依据。
+
+P0 发现：Core 打包脚本显式收集 core-meta、platform-admin、org-management、core-ownership 等配置，但没有输出 core-announcement 配置 catalog entry；BPM 独立 app 的 importOrder 也没有公告。因此“仓内有插件目录”不等于“锁定制品可安装”。
+
+| 项目 | 纯 OSS 公告组合 | 公告+BPM 组合 |
+| --- | --- | --- |
+| 建议 manifest 落点（待新增） | `distribution/application/examples/announcements/app.yaml` | `distribution/application/examples/announcements-with-bpm/app.yaml` |
+| backend.mode | core-only | application |
+| backend.plugins | 不含 BPM | `com.auraboot.bpm` 的准确版本 |
+| migrations | core（公告新表/字段归 Core migration） | core → bpm，按实际依赖排序 |
+| frontend.contributions | 不含 BPM 产品贡献 | `@auraboot/aura-bpm-web` 准确版本，client/SSR 同图 |
+| config | 基础配置 + org-management + core-announcement 及真实依赖 | 前述 + bpm + 公告审批绑定配置 |
+| 策略 | 显式启用允许授权免审；无免审权仍不能发布 | 配置默认已发布流程，可强制审批或允许授权免审 |
+
+表中 `core-announcement` 是建议配置 catalog id，现有插件 ID 为 `com.auraboot.core-announcement`；config-only 插件不冒充后端 JAR。不得把上表中的配置依赖排序当作已验证 importOrder：先核对 fields/permission/menus 的资源依赖，再由显式图确定。公告审批默认流程/绑定由组合配置安装，公告基础配置不引用缺失 BPM 表。
+
+待实现的装配步骤：
+
+1. OSS staging 输出公告配置及所需依赖的不可变 catalog 项；发布准确平台 API/Runtime/npm/Core migration 组合，记录版本、源提交和 SHA-256。
+2. Aura BPM 对该平台候选构件构建插件/配置/migration/npm；复用现有 artifact build，不从 sibling main 或 mavenLocal 偷读依赖。
+3. 组合构建入口聚合两个已验证 catalog，按类型/id/version 去重并拒绝冲突，复制锁定字节；现有 BPM build 不能直接当通用聚合器。
+4. 用真实 manifest validate/resolve/verify-lock/verify-artifacts 生成并核对 application.lock；构建前端图并拒绝重复路由、registry owner 或 React 单例冲突。
+5. 显式执行 Core migration、BPM migration，加载插件，初始化/导入配置，再由管理员发布并绑定租户默认公告流程；不在启动或租户页面访问中写入初始化数据。
+6. 就绪验证分开检查 backend provider operations、前端 contribution、租户流程和权限、公告分发开关/host resolver；任一缺失给出准确原因。
+7. 在同一组合 runtime 内验证纯 OSS 与 BPM 组合对应旅程、升级后未结任务和缺失能力行为。构件校验不能替代业务验收。
+
+示例清单不是安装成品，本轮没有生成锁文件、artifact catalog 或镜像，也未执行上述安装命令。最终准确构件版本不能从多个仓当前 `1.0.0` 字符串推导兼容，必须绑定摘要和实际组合结果。
+
+### 14.6 更细的实施依赖顺序
+
+| 顺序 | 对应阶段/Owner | 工作包 | 完成后才允许 |
+| --- | --- | --- | --- |
+| S1 | P1，OSS 公告 | 统一 published 状态、领域写入口、PID/版本/提交身份与迁移，堵住直接 API/动态 CRUD 状态绕过；权限拆分 | 新发布行为进入同一状态机 |
+| S2 | P1，OSS 组织/权限/公告 | 管理范围适配、三类受众解析、租户成员全集、预计及固定名单、附件授权 | 免审发布与接收者查看 |
+| S3 | P1，OSS 公告/调度/可靠分发 | 不可变版本、免审审计、定时任务、并发栅栏、超窗/取消/恢复、host 通知解析 | 纯 OSS 发布闭环；不可先用通用 watchers 路由上线 |
+| S4 | P2 前置，OSS API + BPM | §14.4 的就绪、幂等 start、准确定义/快照、终态与可靠结果语义，候选契约构件 | BPM 对候选 API 实现与验证 |
+| S5 | P2，BPM | 严格审批人策略、自审排除、任一/全部及驳回终止、异常重新分配、整申请撤销、送审详情/历史贡献 | 公告真正消费批准结果 |
+| S6 | P2，OSS 公告 + 组合 | 结果幂等消费、同步结束/失败恢复；§14.5 staging、组合清单、聚合构建与准确安装 | 宣称审批组合可安装，之后方可真实链路验收 |
+| S7 | P3，OSS UI/Inbox | 我的公告/详情/管理 DSL、铃铛、待办类型/动作及 pending count、版本路由、工作区入口、阅读/确认 | 知悉任务运营；每步同步已有权限契约 |
+| S8 | P3，OSS 公告/导出 | 催办批次/限制/时区、统计快照、受控 CSV 与下载重授权、可观测性 | 运营与导出完整旅程 |
+| S9 | P4，双方 | 纯 OSS 与锁定 BPM 组合实际安装、菜单驱动全链路、权限负向、并发/重启/超窗、文件解析与原图复核 | 按证据更新实际状态，不能仅按模块编译声明完成 |
+
+S4 的设计在 S1 前冻结，避免数据身份返工；实施可在 S1–S3 稳定基础上接入。S7 的管理/查看基础 UI 随 S1–S3 同步交付，表内顺序强调跨模块依赖，不允许把 P1 验收拖成纯 API 演示。公共契约先出平台候选构件，BPM 再消费，组合验收固定双方准确身份。
+
+### 14.7 P0 出口与剩余核实
+
+本轮已明确模块责任、源码复用边界、缺口、公共契约语义、组合构件及实施顺序。最先阻断正确性的事项是 O02 状态/旁路、O05/O06 范围、B02/B03 提交与批准结果、B04 自审回退，以及 O09 待办计数；这些不能延后到视觉打磨阶段。
+
+尚未由源码审阅证明：锁定构件组合实际可启动、插件跨上下文事件可靠到达、动态权限模型在接收者场景的表现、MI 实际通过/驳回行为、调度多实例及重启恢复、导出快照下载的重新授权语义、附件实际配置限额、免打扰日历接线与容量。它们是实施/验收事项，不是待用户批准的新增需求；后续证据更新同一文档，不将 source-audited 改写为 runtime-verified。
