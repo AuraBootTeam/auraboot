@@ -2598,7 +2598,9 @@ describe('DecisionOpsConsole', () => {
         expect.objectContaining({ traceId: 'trace-live' }),
       ),
     );
-    expect(screen.getByTestId('elta-trace-chain')).toHaveTextContent('R-101');
+    await waitFor(() =>
+      expect(screen.getByTestId('elta-trace-chain')).toHaveTextContent('R-101'),
+    );
     expect(screen.getByTestId('elta-virtual-sources-log-1')).toHaveTextContent(
       'virtual.leave_request_summary.v1',
     );
