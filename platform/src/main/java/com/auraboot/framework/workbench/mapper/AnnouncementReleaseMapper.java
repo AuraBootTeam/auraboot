@@ -75,15 +75,15 @@ public interface AnnouncementReleaseMapper {
     int accept(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version,
         @Param("actor") Long actor,@Param("state") String state,@Param("expected") int expected);
 
-    @Select("SELECT *,fencing_token AS fence FROM ab_announcement_release WHERE tenant_id=#{tenant} AND version_pid=#{version} FOR UPDATE")
+    @Select("SELECT *,fencing_token AS fence,(lease_until>clock_timestamp()) AS lease_valid FROM ab_announcement_release WHERE tenant_id=#{tenant} AND version_pid=#{version} FOR UPDATE")
     Map<String,Object> lock(@Param("tenant") Long tenant,@Param("version") String version);
 
     @Select(value="""
-        UPDATE ab_announcement_release SET status='running',lease_until=CURRENT_TIMESTAMP+INTERVAL '2 minutes',
+        UPDATE ab_announcement_release SET status='running',lease_until=clock_timestamp()+INTERVAL '2 minutes',
             fencing_token=fencing_token+1,attempts=attempts+1
         WHERE (tenant_id,pid) IN (SELECT tenant_id,pid FROM ab_announcement_release
-            WHERE scheduled_at<=CURRENT_TIMESTAMP AND next_attempt_at<=CURRENT_TIMESTAMP
-              AND (status IN ('queued','retryable_failed') OR (status='running' AND lease_until<CURRENT_TIMESTAMP))
+            WHERE scheduled_at<=clock_timestamp() AND next_attempt_at<=clock_timestamp()
+              AND (status IN ('queued','retryable_failed') OR (status='running' AND lease_until<=clock_timestamp()))
             ORDER BY scheduled_at,pid FOR UPDATE SKIP LOCKED LIMIT 1)
         RETURNING tenant_id,pid,version_pid,actor_user_id,fencing_token,attempts
         """,affectData=true)
@@ -135,9 +135,17 @@ public interface AnnouncementReleaseMapper {
     int publishRecord(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version,@Param("actor") Long actor,@Param("at") Instant at);
 
     @Update("""
+        UPDATE ab_announcement_release SET lease_until=clock_timestamp()+INTERVAL '2 minutes'
+        WHERE tenant_id=#{tenant} AND pid=#{release} AND status='running' AND fencing_token=#{fence}
+            AND lease_until>clock_timestamp()
+        """)
+    int renew(@Param("tenant") Long tenant,@Param("release") String release,@Param("fence") long fence);
+
+    @Update("""
         UPDATE ab_announcement_release SET status=#{state},error_code=#{error},finished_at=CURRENT_TIMESTAMP,lease_until=NULL,
             next_attempt_at=CURRENT_TIMESTAMP+CASE attempts WHEN 1 THEN INTERVAL '5 seconds' WHEN 2 THEN INTERVAL '30 seconds' ELSE INTERVAL '120 seconds' END
         WHERE tenant_id=#{tenant} AND pid=#{release} AND status='running' AND fencing_token=#{fence}
+            AND (#{state}!='succeeded' OR lease_until>clock_timestamp())
         """)
     int finish(@Param("tenant") Long tenant,@Param("release") String release,@Param("fence") long fence,@Param("state") String state,@Param("error") String error);
 

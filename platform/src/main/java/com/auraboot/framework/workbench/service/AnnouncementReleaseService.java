@@ -126,7 +126,8 @@ public class AnnouncementReleaseService {
             String pid=(String)frozen.get("announcement_pid");
             Announcement record=access.manage(pid,"publish",true);
             Map<String,Object> job=releases.lock(tenant,version);
-            if(job==null || !"running".equals(job.get("status")) || ((Number)job.get("fence")).longValue()!=fence) return;
+            if(job==null || !"running".equals(job.get("status")) || ((Number)job.get("fence")).longValue()!=fence
+                || !Boolean.TRUE.equals(job.get("lease_valid"))) return;
             if(!version.equals(record.getCurrentVersionPid()) || record.getActiveVersionPid()!=null) { fail(claim,"canceled","VERSION_SUPERSEDED");return; }
             Instant now=Instant.now(),latest=time(job.get("latest_allowed_at"));
             if(now.isAfter(latest)) {
@@ -151,20 +152,31 @@ public class AnnouncementReleaseService {
             Instant expiry=snapshot.get("expiresAt")==null ? null : Instant.parse(snapshot.get("expiresAt").toString());
             Instant due=Boolean.TRUE.equals(policy.acknowledgementRequired()) ? now.plus(Duration.ofDays(policy.acknowledgementDays())) : null;
             if(expiry!=null && (!now.isBefore(expiry) || (due!=null && due.isAfter(expiry)))) invalid("expiry_invalid");
+            keepLease(tenant,release,fence);
             String recipientSnapshot=UniqueIdGenerator.generate();
             if(releases.beginSnapshot(tenant,recipientSnapshot,version,now,recipients.recipients().size())!=1) throw new IllegalStateException("Recipient snapshot was not opened");
             List<AnnouncementAudienceService.Recipient> targets=recipients.recipients();
             for(int start=0;start<targets.size();start+=500) {
+                keepLease(tenant,release,fence);
                 List<AnnouncementAudienceService.Recipient> batch=targets.subList(start,Math.min(start+500,targets.size()));
                 if(releases.recipients(tenant,version,batch)!=batch.size()) throw new IllegalStateException("Recipient facts were not persisted");
             }
             if(releases.seal(tenant,version)!=1) throw new IllegalStateException("Recipient snapshot was not sealed with its exact count");
+            keepLease(tenant,release,fence);
             if(releases.publishControl(tenant,version,now,due)!=1 || releases.publishRecord(tenant,pid,version,actor,now)!=1
-                || releases.finish(tenant,release,fence,"succeeded",null)!=1) conflict();
+                ) conflict();
+            if(releases.finish(tenant,release,fence,"succeeded",null)!=1)
+                throw new org.springframework.dao.CannotAcquireLockException("Announcement release lease was lost before commit");
             records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,version,"announcement:publication_completed",release,record.getRowVersion(),record.getRowVersion()+1);
             outbox.enqueueIdempotent(new IntegrationEventEnvelope("1.0",release,RELEASED_EVENT,"auraboot.announcement",version,now,tenant,
                 release,null,"announcement:"+version,1,Map.of("versionPid",version,"batchPid",release,"recipientSnapshotPid",recipientSnapshot,"announcementPid",pid),Map.of()));
         } finally {MetaContext.clear();MetaContext.restore(previous);}
+    }
+
+    private void keepLease(Long tenant,String release,long fence) {
+        // Renew only a live lease under the already-held job lock; never revive an expired worker.
+        if(releases.renew(tenant,release,fence)!=1)
+            throw new org.springframework.dao.CannotAcquireLockException("Announcement release lease expired during execution");
     }
 
     @Transactional

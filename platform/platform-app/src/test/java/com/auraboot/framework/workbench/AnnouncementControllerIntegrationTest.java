@@ -317,6 +317,8 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         var stale=releaseService.claim();assertNotNull(stale);assertEquals(version,stale.get("version_pid"));
         jdbc.update("UPDATE ab_announcement_release SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE tenant_id=? AND pid=?",
             getTestTenant().getId(),stale.get("pid"));
+        assertEquals(0,releaseMapper.renew(getTestTenant().getId(),(String)stale.get("pid"),((Number)stale.get("fencing_token")).longValue()));
+        assertEquals(0,releaseMapper.finish(getTestTenant().getId(),(String)stale.get("pid"),((Number)stale.get("fencing_token")).longValue(),"succeeded",null));
         releaseService.perform(stale);identity();
         assertEquals("unpublished",jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Integer.class,getTestTenant().getId(),version));
@@ -324,6 +326,7 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(((Number)current.get("fencing_token")).longValue())
             .isGreaterThan(((Number)stale.get("fencing_token")).longValue());
         assertEquals(0,releaseMapper.finish(getTestTenant().getId(),(String)stale.get("pid"),((Number)stale.get("fencing_token")).longValue(),"succeeded",null));
+        assertEquals(1,releaseMapper.renew(getTestTenant().getId(),(String)current.get("pid"),((Number)current.get("fencing_token")).longValue()));
         releaseService.perform(current);identity();
         assertEquals("published",jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid));
         assertEquals("succeeded",jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,getTestTenant().getId(),version));
