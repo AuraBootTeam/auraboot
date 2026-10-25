@@ -241,8 +241,8 @@ test('published pinning persists through the native detail without changing its 
   }
 });
 
-test('a recovered original member retries the same blocked publication through its native execution row', async ({ page, browser, baseURL }, info) => {
-  test.setTimeout(90_000);
+test('a recovered original member resumes its original publication and automatic reminder plan through native actions', async ({ page, browser, baseURL }, info) => {
+  test.setTimeout(180_000);
   expect(baseURL).toBeTruthy();
   const db = new Client(PG_CONN);await db.connect();
   try {
@@ -324,6 +324,37 @@ test('a recovered original member retries the same blocked publication through i
     await expect.poll(async () => (await db.query("SELECT status FROM ab_announcement_delivery WHERE version_pid=$1 AND kind='publication' AND channel='in_app'", [versionPid])).rows[0]?.status, { timeout: 20_000 }).toBe('completed');
     expect(Number((await db.query("SELECT count(*) AS count FROM ab_announcement_delivery WHERE version_pid=$1 AND kind='publication' AND channel='in_app'", [versionPid])).rows[0].count)).toBe(1);
     await publisher.screenshot({ path: info.outputPath('publication-recovered.png'), fullPage: true, animations: 'disabled' });
+    // Publication authority does not imply reminder authority. The real scanner blocks this original actor.
+    const plan = async () => (await db.query('SELECT status,error_code,automatic_batches,resume_after FROM ab_announcement_reminder_plan WHERE version_pid=$1', [versionPid])).rows[0];
+    await expect.poll(async () => (await plan())?.status, {timeout: 75_000}).toBe('blocked');
+    const originalPlan = await plan();expect(originalPlan.error_code).toBe('ACTOR_OR_VERSION_UNAVAILABLE');
+    const reminderPermission = (await db.query('SELECT p.id FROM ab_permission p JOIN ab_role r ON r.tenant_id=p.tenant_id WHERE r.pid=$1 AND p.code=$2 AND p.deleted_flag=FALSE', [role.pid, 'announcement.announcement.remind'])).rows;
+    expect(reminderPermission).toHaveLength(1);
+    await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {data: [{permissionId: reminderPermission[0].id, granted: true}]}));
+    await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/scope`, {data: {resourceCode: 'ab_announcement', actionCode: 'remind', scopeType: 'self', mergeStrategy: 'MAX'}}));
+    await authenticateBffSession(context.request, baseURL!, email, 'Test2026x');
+    await enterFromMenu(publisher, title);
+    await publisher.getByRole('button', {name: '\u81ea\u52a8\u50ac\u529e\u8ba1\u5212', exact: true}).click();
+    await expect(publisher).toHaveURL(new RegExp(`/p/announcement_reminder_plan/view/${versionPid}$`));
+    const resumePlan = publisher.getByRole('button', {name: '\u6062\u590d\u81ea\u52a8\u50ac\u529e', exact: true});
+    await expect(resumePlan).toBeVisible();
+    await publisher.screenshot({path: info.outputPath('reminder-original-plan-blocked.png'), fullPage: true, animations: 'disabled'});
+    await resumePlan.click();await expect(publisher.getByTestId('confirm-dialog')).toBeVisible();
+    await publisher.getByTestId('confirm-cancel').click();expect(await plan()).toEqual(originalPlan);
+    await resumePlan.click();
+    await publisher.screenshot({path: info.outputPath('reminder-original-plan-resume-confirm.png'), fullPage: true, animations: 'disabled'});
+    const resumingPlan = publisher.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/meta/commands/execute/announcement:resume_reminders');
+    await publisher.getByTestId('confirm-ok').click();const resumedPlanResponse = await resumingPlan;
+    expect(resumedPlanResponse.request().postDataJSON()).toMatchObject({targetRecordPid: recordPid, payload: {versionPid}});
+    const resumedPlanResult = await successful(resumedPlanResponse);
+    expect(resumedPlanResult.data).toMatchObject({operationState: 'resumed', actorMemberPid: user.memberPid});
+    await expect.poll(async () => (await plan()).status).toBe('active');
+    await publisher.reload({waitUntil: 'domcontentloaded'});await expect(resumePlan).toHaveCount(0);
+    expect((await plan()).automatic_batches).toBe(0);
+    expect(Number((await db.query('SELECT count(*) AS count FROM ab_announcement_reminder_batch WHERE version_pid=$1', [versionPid])).rows[0].count)).toBe(0);
+    expect((await query()).actor_member_pid).toBe(user.memberPid);
+    await publisher.screenshot({path: info.outputPath('reminder-original-plan-resumed.png'), fullPage: true, animations: 'disabled'});
+
   } finally {
     try {
       if (suspended) { await status('active');await authenticateBffSession(context.request, baseURL!, email, 'Test2026x'); }
