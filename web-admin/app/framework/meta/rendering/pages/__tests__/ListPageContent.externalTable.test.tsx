@@ -315,3 +315,61 @@ describe('Actual ListPageContent ordinary query and retry contract', () => {
     expect(reads().at(-1)).toEqual(first);
   });
 });
+
+describe('Actual generic list selection to DSL runtime seam', () => {
+  it('shows the selection-dependent toolbar and clears real checkboxes through state.set', async () => {
+    prepareRuntime();
+    const selected = { pid: 'owned-123', title: 'Actual selectable source', row_version: 3 };
+    owned.transport.mockImplementation(async () => ({
+      code: '0',
+      data: { records: [selected], total: 1, current: 1, size: 20 },
+    }));
+    mount({
+      ...schema,
+      dataSources: {},
+      extension: {
+        ...schema.extension,
+        customOnly: false,
+        skipListData: false,
+        dataSource: { type: 'api', method: 'get', endpoint: '/api/owned-sources' },
+      },
+      blocks: [
+        {
+          id: 'source-actions',
+          blockType: 'toolbar',
+          buttons: [
+            {
+              code: 'inspect-source',
+              label: 'Inspect selected source',
+              permissionCode: 'qo.srm.use',
+              visibleWhen: '${state.selectedSources && state.selectedSources.length === 1}',
+              action: { type: 'navigate', to: '/owned-review' },
+            },
+          ],
+        },
+        {
+          ...table,
+          dataSource: undefined,
+          table: { ...table.table, selection: { mode: 'multiple', bind: 'selectedSources' } },
+        },
+      ],
+    });
+    expect(await screen.findByText('Actual selectable source')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Inspect selected source' }),
+    ).not.toBeInTheDocument();
+    const checkbox = screen.getAllByRole('checkbox').at(-1)!;
+    fireEvent.click(checkbox);
+    await waitFor(() =>
+      expect(owned.runtime.getContext().state.selectedSources).toEqual([selected]),
+    );
+    expect(await screen.findByRole('button', { name: 'Inspect selected source' })).toBeVisible();
+    await act(async () => {
+      owned.runtime.getStateManager().updateState('list', 'selectedSources', []);
+    });
+    await waitFor(() => expect(checkbox).not.toBeChecked());
+    expect(
+      screen.queryByRole('button', { name: 'Inspect selected source' }),
+    ).not.toBeInTheDocument();
+  });
+});

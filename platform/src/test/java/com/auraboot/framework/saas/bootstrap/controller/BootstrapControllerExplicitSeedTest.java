@@ -5,6 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.auraboot.framework.application.bootstrap.PlatformSeedService;
 import com.auraboot.framework.saas.bootstrap.BootstrapEngineService;
@@ -62,6 +63,21 @@ class BootstrapControllerExplicitSeedTest {
         order.verify(bootstrapEngineService).execute(request);
         order.verify(systemTaskInitializer).initializeSystemTasks();
         order.verify(schedulerEngine).reload();
+    }
+
+    @Test
+    void setupSerializesTenantIdentityAsDecimalString() {
+        BootstrapRequest request = new BootstrapRequest();
+        String tenantId = "372628565642055680";
+        when(systemConfigService.isInitialized()).thenReturn(false);
+        when(bootstrapEngineService.execute(request))
+                .thenReturn(BootstrapEngineService.BootstrapResult.success(null, Long.parseLong(tenantId)));
+
+        var response = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(controller.setup(request));
+
+        assertTrue(response.path("data").path("tenantId").isTextual(),
+                "Browser clients must never receive a Snowflake tenant ID as a JSON number");
+        assertEquals(tenantId, response.path("data").path("tenantId").textValue());
     }
 
     @Test

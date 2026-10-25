@@ -433,6 +433,10 @@ public class CommandFieldMapExecutor {
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
         ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, writerModel,
+                code -> metaModelService.getModelDefinition(code).orElse(null),
+                Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update",
+                RecordMutationLockGuard.targetConditions(idEntry.getKey(), idEntry.getValue(), tenantId), data);
         RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel,
                 Boolean.TRUE.equals(data.get("deleted_flag")) ? "delete" : "update", code -> metaModelService.getModelDefinition(code).orElse(null));
         RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
@@ -480,6 +484,9 @@ public class CommandFieldMapExecutor {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, metaModelService.getModelDefinition(modelCode).orElse(null),
+                code -> metaModelService.getModelDefinition(code).orElse(null), "delete",
+                RecordMutationLockGuard.targetConditions(idEntry.getKey(), idEntry.getValue(), tenantId), Map.of());
         RecordCommandWriterGuard.appendStoredPredicate(sql, metaModelService.getModelDefinition(modelCode).orElse(null), "delete", code -> metaModelService.getModelDefinition(code).orElse(null));
         appendScopedWriteGuards(sql, tenantId, modelCode, "delete");
 

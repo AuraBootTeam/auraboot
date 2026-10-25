@@ -6496,5 +6496,12 @@
     "key": "export.artifact_integrity",
     "zh-CN": "导出文件校验失败，下载已拒绝，请重新导出。",
     "en-US": "Export file integrity verification failed. Download was denied; create a new export."
+  },
+  {
+    "key": "currency.error.document_snapshot_unavailable",
+    "zh-CN": "无法读取有效的币种与汇率配置，请联系管理员核对后重试。",
+    "en-US": "Valid currency and exchange-rate configuration is unavailable. Ask an administrator to check it and try again.",
+    "ja-JP": "有効な通貨・為替レート設定を読み込めません。管理者に設定の確認を依頼してください。",
+    "ko-KR": "유효한 통화 및 환율 설정을 읽을 수 없습니다. 관리자에게 설정 확인을 요청하세요."
   }
 ]

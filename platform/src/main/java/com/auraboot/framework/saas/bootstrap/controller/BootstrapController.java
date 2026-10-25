@@ -70,7 +70,7 @@ public class BootstrapController {
             schedulerEngine.reload();
             return ApiResponse.success(Map.of(
                     "success", true,
-                    "tenantId", result.tenantId()
+                    "tenantId", result.tenantId().toString()
             ));
         } else {
             return ApiResponse.error(result.error());

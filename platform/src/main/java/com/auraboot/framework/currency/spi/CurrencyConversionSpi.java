@@ -21,6 +21,10 @@ public interface CurrencyConversionSpi {
                        String fromCurrencyField, String toCurrency,
                        LocalDate date, String rateType);
 
+    /** Requires explicit tenant currency configuration; no default base currency is eligible. */
+    com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Snapshot verifyDocumentSourceCurrency(
+            String currencyPid,String sourceBaseCurrencyCode,BigDecimal sourceRate,LocalDate valuationDate);
+
     String getBaseCurrency();
 
     String getBaseCurrency(Long tenantId);

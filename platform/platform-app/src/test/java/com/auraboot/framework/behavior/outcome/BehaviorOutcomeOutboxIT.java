@@ -6,11 +6,14 @@ import com.auraboot.framework.infrastructure.mq.MqProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.transaction.AfterTransaction;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -23,7 +26,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(classes = TestApplication.class)
+@SpringBootTest(classes = TestApplication.class, properties = "aura.mq.type=memory")
 @ActiveProfiles("integration-test")
 class BehaviorOutcomeOutboxIT {
 
@@ -43,9 +46,13 @@ class BehaviorOutcomeOutboxIT {
     @Autowired
     private ObjectMapper objectMapper;
 
+    private String subscriptionGroup;
+
     @BeforeEach
     void setup() {
-        ensureTables();
+        TransactionTemplate setup = new TransactionTemplate(transactionManager);
+        setup.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+        setup.executeWithoutResult(status -> ensureTables());
         cleanup();
     }
 
@@ -79,23 +86,46 @@ class BehaviorOutcomeOutboxIT {
     }
 
     @Test
+    @Transactional
     void relayPublishesPendingOutcomeOnce_andPersistsSingleBehaviorEvent() throws Exception {
+        // The relay intentionally scans all tenants. Isolate this manual relay test
+        // on transaction-local copies of the migrated PostgreSQL tables, rather than
+        // deleting or publishing another test's pending business outcomes.
+        String untouchedEvent = eventId("untouched");
+        publisher.publish(outcome(TENANT + 2, untouchedEvent, "other-fixture"));
+        jdbc.execute("CREATE TEMPORARY TABLE ab_behavior_outcome_outbox "
+                + "(LIKE public.ab_behavior_outcome_outbox INCLUDING ALL) ON COMMIT DROP");
+        jdbc.execute("CREATE TEMPORARY TABLE ab_behavior_event "
+                + "(LIKE public.ab_behavior_event INCLUDING ALL) ON COMMIT DROP");
+
         String eventId = eventId("relay");
         List<String> published = new CopyOnWriteArrayList<>();
-        mqProvider.subscribe(BehaviorIngestPublisher.TOPIC_EVENTS, "bkf7-it-" + eventId,
+        subscriptionGroup = "bkf7-it-" + eventId;
+        mqProvider.subscribe(BehaviorIngestPublisher.TOPIC_EVENTS, subscriptionGroup,
                 (topic, body, headers) -> published.add(body));
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status ->
                 publisher.publish(outcome(eventId, "task-123")));
+        String secondEvent = eventId("other-tenant");
+        publisher.publish(outcome(TENANT + 1, secondEvent, "task-456"));
+        // PostgreSQL NOW() is fixed at the outer test transaction's start;
+        // explicitly make these two owned outcomes due at that instant.
+        jdbc.update("UPDATE pg_temp.ab_behavior_outcome_outbox SET next_attempt_at = CURRENT_TIMESTAMP "
+                + "WHERE tenant_id IN (?, ?)", TENANT, TENANT + 1);
 
         int first = relay.publishPending(10);
         int second = relay.publishPending(10);
 
-        assertThat(first).isEqualTo(1);
+        assertThat(first).isEqualTo(2);
         assertThat(second).isZero();
-        assertThat(published).hasSize(1);
+        assertThat(published).hasSize(2);
 
-        JsonNode envelope = objectMapper.readTree(published.get(0));
+        List<JsonNode> envelopes = new java.util.ArrayList<>();
+        for (String body : published) envelopes.add(objectMapper.readTree(body));
+        assertThat(envelopes).extracting(row -> row.get("events").get(0).get("eventId").asText())
+                .containsExactlyInAnyOrder(eventId, secondEvent);
+        JsonNode envelope = envelopes.stream().filter(row -> row.get("tenantId").asLong() == TENANT)
+                .findFirst().orElseThrow();
         JsonNode event = envelope.get("events").get(0);
         assertThat(envelope.get("tenantId").asLong()).isEqualTo(TENANT);
         assertThat(envelope.get("userId").asLong()).isEqualTo(USER);
@@ -113,11 +143,21 @@ class BehaviorOutcomeOutboxIT {
         assertThat(jdbc.queryForObject(
                 "SELECT props->>'status' FROM ab_behavior_event WHERE tenant_id=? AND event_id=?",
                 String.class, TENANT, eventId)).isEqualTo("completed");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(1) FROM ab_behavior_event WHERE tenant_id=? AND event_id=?",
+                Integer.class, TENANT + 1, secondEvent)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM public.ab_behavior_outcome_outbox WHERE tenant_id=? AND event_id=?",
+                String.class, TENANT + 2, untouchedEvent)).isEqualTo("pending");
     }
 
     private BehaviorOutcomeEvent outcome(String eventId, String businessKey) {
+        return outcome(TENANT, eventId, businessKey);
+    }
+
+    private BehaviorOutcomeEvent outcome(long tenantId, String eventId, String businessKey) {
         return BehaviorOutcomeEvent.builder()
-                .tenantId(TENANT)
+                .tenantId(tenantId)
                 .userId(USER)
                 .eventId(eventId)
                 .eventName("agent.task.completed")
@@ -149,7 +189,13 @@ class BehaviorOutcomeOutboxIT {
         return value == null ? 0 : value;
     }
 
-    private void cleanup() {
+    @AfterEach
+    @AfterTransaction
+    void cleanup() {
+        if (subscriptionGroup != null) {
+            mqProvider.unsubscribe(BehaviorIngestPublisher.TOPIC_EVENTS, subscriptionGroup);
+            subscriptionGroup = null;
+        }
         jdbc.update("DELETE FROM ab_behavior_event WHERE tenant_id = ?", TENANT);
         jdbc.update("DELETE FROM ab_behavior_outcome_outbox WHERE tenant_id = ?", TENANT);
         jdbc.update("DELETE FROM ab_behavior_outcome_business_it WHERE tenant_id = ?", TENANT);

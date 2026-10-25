@@ -473,6 +473,28 @@ controllers must derive the actor from authenticated context and must not accept
 actor. That HTTP boundary is not yet exposed. Pool startup requires the operator audit migration;
 there is no unaudited write overload or fallback.
 
+### Explicit platform artifact transport
+
+The native product image gate can retain its already-built Core artifact set by
+setting `AURA_RELEASE_EXPORT_PLATFORM_PACKAGE=1`. It writes
+`platform-artifacts.tar` and `platform-package-receipt.json` only after the native
+product checks pass. The package preserves the original catalog, application
+lock, Core build receipt and complete file tree; it is not a Maven/npm
+publication or application release qualification.
+
+A later managed gate can explicitly select `AURA_PRODUCT_PLATFORM_ARCHIVE` as a
+frozen dependency dataset. `AURA_CI_DATASET_INPUTS` must identify that exact file
+and archive SHA-256. The gate validates the expected Core commit, native lock,
+complete catalog bytes, auxiliary files and runtime OCI graph before using the
+package instead of Core compilation. Rejected input fails without falling back
+to a source build. Product compilation and original image/business/browser
+checks still run. Core Node tool dependencies are still installed with the
+frozen lock; this option does not imply a clean Maven repository consumer.
+
+Omitting both options preserves the original source-build path. A changed Core
+commit requires a newly selected package; a package is not silently re-keyed to
+a new source or promoted to a qualified Release.
+
 
 ## Release archive receipt identity
 

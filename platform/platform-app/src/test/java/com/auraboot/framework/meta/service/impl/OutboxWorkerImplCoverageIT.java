@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@org.springframework.test.context.event.RecordApplicationEvents
 @DisplayName("OutboxWorkerImpl Coverage IT — poll/retry + cleanup")
 class OutboxWorkerImplCoverageIT {
 
@@ -40,6 +41,12 @@ class OutboxWorkerImplCoverageIT {
     private OutboxWorkerImpl outboxWorker;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private com.auraboot.framework.meta.service.OutboxWriter outboxWriter;
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactions;
+    @Autowired
+    private org.springframework.test.context.event.ApplicationEvents publishedEvents;
 
     // This IT measures explicit worker invocations. Prevent a background timer from
     // consuming the same committed fixtures; the worker, mapper and fenced state service stay real.
@@ -49,6 +56,7 @@ class OutboxWorkerImplCoverageIT {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, 991_900_002L, "outbox-test-pid", "outbox-test-user");
+        jdbcTemplate.update("DELETE FROM ab_outbox WHERE tenant_id = ?", TENANT_ID);
     }
 
     @AfterAll
@@ -94,6 +102,42 @@ class OutboxWorkerImplCoverageIT {
         assertTrue(touched >= 101, "a full source batch must not impose another scheduling interval; touched=" + touched);
         assertTrue(touched <= 400, "one poll must yield with remaining backlog; touched=" + touched);
         assertTrue(touched < eventIds.size(), "a continuously full queue must remain bounded");
+    }
+
+
+    @Test
+    @DisplayName("legacy writer preserves event identity and delivers its payload once")
+    void legacyWriterDeliversOriginalEventExactlyOnce() {
+        String command = "test:legacy_outbox_compatibility";
+        var event = new com.auraboot.framework.meta.event.CommandExecutedEvent(
+            command, "outbox_compatibility_probe", java.util.Map.of("orderReference", "LEGACY-001"),
+            java.util.Map.of("status", "acknowledged"), TENANT_ID, 991_900_002L);
+        new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(
+            status -> outboxWriter.write(event, command, TENANT_ID));
+        var pending = jdbcTemplate.queryForMap(
+            "SELECT status, schema_version FROM ab_outbox WHERE tenant_id=? AND event_id=?", TENANT_ID, event.getEventId());
+        assertEquals("pending", pending.get("status"));
+        org.junit.jupiter.api.Assertions.assertNull(pending.get("schema_version"));
+
+        outboxWorker.pollAndDispatch();
+        var state = jdbcTemplate.queryForMap(
+            "SELECT status, retry_count, lease_token, lease_until, delivered_at FROM ab_outbox WHERE tenant_id=? AND event_id=?",
+            TENANT_ID, event.getEventId());
+        assertEquals("delivered", state.get("status"));
+        assertEquals(0, ((Number) state.get("retry_count")).intValue());
+        org.junit.jupiter.api.Assertions.assertNull(state.get("lease_token"));
+        org.junit.jupiter.api.Assertions.assertNull(state.get("lease_until"));
+        org.junit.jupiter.api.Assertions.assertNotNull(state.get("delivered_at"));
+        var delivered = publishedEvents.stream(com.auraboot.framework.meta.event.CommandExecutedEvent.class)
+            .filter(candidate -> command.equals(candidate.getCommandCode())).toList();
+        assertEquals(1, delivered.size());
+        assertEquals(event.getEventId(), delivered.getFirst().getEventId());
+        assertEquals(event.getTenantId(), delivered.getFirst().getTenantId());
+        assertEquals(event.getPayload(), delivered.getFirst().getPayload());
+        assertEquals(event.getResult(), delivered.getFirst().getResult());
+        outboxWorker.pollAndDispatch();
+        assertEquals(1L, publishedEvents.stream(com.auraboot.framework.meta.event.CommandExecutedEvent.class)
+            .filter(candidate -> command.equals(candidate.getCommandCode())).count());
     }
 
     @Test

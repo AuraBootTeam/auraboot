@@ -58,7 +58,8 @@ public interface PermissionService {
      * Find permission by code
      * 
      * @param code Permission code
-     * @return Permission DTO or null
+     * @return Permission DTO
+     * @throws com.auraboot.framework.application.exception.ResourceNotFoundException when absent
      */
     PermissionDTO findByCode(String code);
     

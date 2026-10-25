@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 
@@ -93,6 +95,8 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     @Mock private PermissionFacade permissionFacade;
     @Mock private TenantMemberService tenantMemberService;
     @Mock private WorkflowCapabilityRegistry workflowCapabilityRegistry;
+
+    @Spy private ThreadContextScopes threadContexts = new ThreadContextScopes(List.of());
 
     @InjectMocks
     private DynamicDataServiceImpl service;

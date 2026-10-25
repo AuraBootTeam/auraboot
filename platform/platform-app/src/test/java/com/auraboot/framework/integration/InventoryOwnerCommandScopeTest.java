@@ -59,6 +59,8 @@ class InventoryOwnerCommandScopeTest {
 
     @BeforeEach
     void setup() throws Exception {
+        when(receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
+        when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         Path source = directory.resolve("ReliableInventoryEventConsumer.java");
         Files.writeString(source, """
             package com.auraboot.plugins.inventory;
@@ -102,12 +104,17 @@ class InventoryOwnerCommandScopeTest {
         when(models.findCurrentByCode(anyString())).thenAnswer(call -> actualModels.get(call.getArgument(0)));
         when(definitions.getModelDefinition(anyString())).thenAnswer(call -> Optional.ofNullable(effectiveModels.get(call.getArgument(0))));
         when(owners.findByPid(anyString())).thenAnswer(call -> actualOwners.get(call.getArgument(0)));
-        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(transactions.getTransaction(any())).thenAnswer(call -> {
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+            return new SimpleTransactionStatus();
+        });
+        doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); return null; }).when(transactions).commit(any());
+        doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false); return null; }).when(transactions).rollback(any());
         when(receipts.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
         when(receipts.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
     }
 
-    @AfterEach void cleanup() throws Exception { MetaContext.clear(); loader.close(); }
+    @AfterEach void cleanup() throws Exception { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.clear(); loader.close(); }
 
     @Test void actualAccessorUsesExactWriterForOnlyTwoOwnedModelsAndRestoresContext() {
         when(data.create(anyString(), anyMap())).thenAnswer(call -> {

@@ -81,6 +81,73 @@ describe('useActionHandler - offboarding action propagation', () => {
   });
 });
 
+describe('useActionHandler - explicit command payload', () => {
+  beforeEach(() => { fetchResultMock.mockReset(); });
+
+  it.each([{}, { includeRecordPayload: true }, { includeRecordPayload: false }])(
+    'separates configured payload from ambient records: %j', async option => {
+      fetchResultMock.mockResolvedValue({ code: '0', data: {} });
+      const record = { pid: 'receipt-1', row_version: 7, status: 'draft', price: 'forbidden ambient value' };
+      const { result } = renderHook(() => useActionHandler({
+        runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'receipt',
+        locale: 'en-US', t: ((key: string) => key) as any,
+      }));
+      await act(async () => {
+        await result.current.handleAction({ code: 'add_line', action: {
+          type: 'command', command: 'receipt:add_line', operationType: 'update',
+          payload: { quantity: '0.1' }, ...option,
+        } } as ButtonConfig, record);
+      });
+      expect(result.current.error).toBeNull();
+      expect(fetchResultMock).toHaveBeenCalledOnce();
+      expect(fetchResultMock.mock.calls[0][1].params).toEqual({
+        targetRecordPid: 'receipt-1', operationType: 'UPDATE', expectedVersion: 7,
+        payload: option.includeRecordPayload === false ? { quantity: '0.1' } : { ...record, quantity: '0.1' },
+      });
+    });
+
+  it.each(['false', 0, null])('rejects malformed includeRecordPayload before dispatch: %j', async includeRecordPayload => {
+    const { result } = renderHook(() => useActionHandler({
+      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'receipt',
+      locale: 'en-US', t: ((key: string) => key) as any,
+    }));
+    await act(async () => {
+      await result.current.handleAction({ code: 'add_line', action: {
+        type: 'command', command: 'receipt:add_line', operationType: 'update',
+        includeRecordPayload,
+      } } as unknown as ButtonConfig, { pid: 'receipt-1', row_version: 7 });
+    });
+    expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(result.current.error).toBeTruthy();
+  });
+
+  it('merges prompted fields into an isolated payload while preserving record expressions and CAS', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { pid: 'receipt-1', row_version: 8, status: 'draft' } });
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: {} });
+    const prompt = vi.spyOn(actionRegistry, 'promptInputForm').mockResolvedValue({ orderLinePid: 'line-1', quantity: '0.1' });
+    const errors: Error[] = [];
+    try {
+      const { result } = renderHook(() => useActionHandler({
+        runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'receipt',
+        locale: 'en-US', t: ((key: string) => key) as any, onError: error => errors.push(error),
+      }));
+      await act(async () => {
+        await result.current.handleAction({ code: 'add_line', action: {
+          type: 'command', command: 'receipt:add_line', operationType: 'update', includeRecordPayload: false,
+          payload: {}, inputFields: [{ field: 'quantity', type: 'text' }],
+        } } as unknown as ButtonConfig, { pid: 'receipt-1', row_version: 7, status: 'draft' });
+      });
+      expect(errors).toEqual([]);
+      expect(result.current.error).toBeNull();
+      expect(fetchResultMock.mock.calls[1][1].params).toEqual({
+        targetRecordPid: 'receipt-1', operationType: 'UPDATE', expectedVersion: 8,
+        payload: { orderLinePid: 'line-1', quantity: '0.1' },
+      });
+      expect(prompt.mock.calls[0][4]).toMatchObject({ record: { pid: 'receipt-1', row_version: 8 } });
+    } finally { prompt.mockRestore(); }
+  });
+});
+
 describe('useActionHandler - handlerParams.async polling', () => {
   beforeEach(() => { fetchResultMock.mockReset(); confirmMock.mockReset(); });
 

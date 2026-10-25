@@ -47,6 +47,7 @@ public final class RecordCommandWriterGuard {
 
     /** A caller cannot acquire ownership merely by setting the marker on an existing or new row. */
     public static void assertInputAllowed(ModelDefinition model, Map<String, Object> input, String operation) {
+        RecordMutationLockGuard.assertInputAllowed(model, input, operation);
         Policy policy = policy(model);
         if (policy == null || input == null) return;
         assertMatchingAliases(policy, input);
@@ -105,6 +106,7 @@ public final class RecordCommandWriterGuard {
     /** The submitted parent is locked by its stored PID, never by a display label or numeric alias. */
     public static void guardParentInput(com.auraboot.framework.meta.mapper.DynamicDataMapper mapper,
             ModelDefinition child, java.util.function.Function<String, ModelDefinition> resolver, Map<String,Object> input) {
+        RecordMutationLockGuard.guardParentInput(mapper, child, resolver, input);
         Parent parent = parent(child, resolver);
         if (parent == null || input == null) return;
         String code = parent.link().getCode();
@@ -167,12 +169,12 @@ public final class RecordCommandWriterGuard {
         appendOwnStoredPredicate(sql, model, operation);
         params.put("receiptParentPid", receipt.get().pid());
         params.put("receiptParentVersion", receipt.get().version());
-        sql.append(" AND ").append(column(childPolicy.marker())).append(" IS TRUE")
+        sql.append(" AND ").append(column(childPolicy.marker())).append(receipt.get().managed() ? " IS TRUE" : " IS NOT TRUE")
             .append(" AND EXISTS (SELECT 1 FROM ").append(parent.model().getTableName())
             .append(" record_writer_parent WHERE record_writer_parent.pid = #{params.receiptParentPid}")
             .append(" AND record_writer_parent.pid = ").append(model.getTableName()).append('.').append(column(parent.link()))
             .append(" AND record_writer_parent.tenant_id = ").append(model.getTableName()).append(".tenant_id")
-            .append(" AND record_writer_parent.").append(column(parent.policy().marker())).append(" IS TRUE")
+            .append(" AND record_writer_parent.").append(column(parent.policy().marker())).append(receipt.get().managed() ? " IS TRUE" : " IS NOT TRUE")
             .append(" AND record_writer_parent.row_version = #{params.receiptParentVersion})");
     }
 
@@ -233,7 +235,7 @@ public final class RecordCommandWriterGuard {
             throw new MetaServiceException("Conflicting record writer marker aliases");
     }
 
-    public static void validatePolicy(ModelDefinition model) { policy(model); }
+    public static void validatePolicy(ModelDefinition model) { policy(model); RecordMutationLockGuard.validatePolicy(model); }
 
     /** Legacy mapper mutations keep their existing mapping but lock and validate their exact targets. */
     public static Map<String,Object> guardLegacyConditions(
@@ -252,6 +254,7 @@ public final class RecordCommandWriterGuard {
             com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
             String table, Map<String,Object> conditions, String operation, Map<String,Object> values,
             java.util.function.Function<String, ModelDefinition> resolver) {
+        RecordMutationLockGuard.guardTargets(mapper, model, resolver, operation, conditions, values);
         assertLegacyMarkerUntouched(model, values);
         guardParentInput(mapper, model, resolver, values);
         Policy policy = policy(model);
@@ -291,6 +294,7 @@ public final class RecordCommandWriterGuard {
             com.auraboot.framework.meta.mapper.DynamicDataMapper mapper, ModelDefinition model,
             String table, java.util.Collection<String> identities, String operation,
             java.util.function.Function<String, ModelDefinition> resolver) {
+        RecordMutationLockGuard.guardRelationTargets(mapper, model, resolver, identities, operation);
         Parent parent = parent(model, resolver);
         Policy policy = policy(model);
         if (policy == null) return;
@@ -324,7 +328,7 @@ public final class RecordCommandWriterGuard {
             String targetTable, String junctionTable, String sourceColumn, String targetColumn, String sourceIdentity,
             java.util.function.Function<String, ModelDefinition> resolver) {
         parent(model, resolver);
-        if (policy(model) == null) return;
+        if (policy(model) == null && !RecordMutationLockGuard.hasPolicy(model)) return;
         Long tenant = relationTenant();
         List<Map<String,Object>> links = mapper.selectRelationTargetsForUpdate(
                 junctionTable, sourceColumn, targetColumn, tenant, sourceIdentity);
@@ -345,7 +349,7 @@ public final class RecordCommandWriterGuard {
         return tenant;
     }
 
-    public static boolean hasPolicy(ModelDefinition model) { return policy(model) != null; }
+    public static boolean hasPolicy(ModelDefinition model) { return policy(model) != null || RecordMutationLockGuard.hasPolicy(model); }
 
     public static void assertBulkClaimAllowed(ModelDefinition model) {
         Policy policy = policy(model);

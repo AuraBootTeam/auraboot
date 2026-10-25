@@ -459,6 +459,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
             ModelDefinition model = modelOpt.get();
             RecordCommandWriterGuard.validatePolicy(model);
+            RecordMutationLockGuard.validateRelations(model, code -> getModelDefinition(code).orElse(null));
             List<String> errors = new ArrayList<>();
             List<String> warnings = new ArrayList<>();
 

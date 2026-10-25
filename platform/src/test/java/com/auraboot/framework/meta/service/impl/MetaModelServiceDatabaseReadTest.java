@@ -31,7 +31,8 @@ class MetaModelServiceDatabaseReadTest {
         when(release.findModel(1L,"app","shared_bid")).thenReturn(Optional.of(old));
         assertThat(service.getModelDefinition("shared_bid")).contains(old);
         assertThat(service.getModelDefinitionFromDb("shared_bid")).isEmpty();
-        verify(mapper).findCurrentByCode("shared_bid");
+        verify(mapper).findCurrentByCodeForTenant(1L, "shared_bid");
+        verify(mapper, never()).findCurrentByCode(anyString());
         verify(cache).evict("shared_bid");
         verify(cache,never()).getModelDefinition(anyString(),any());
         assertThat(service.getModelDefinition("shared_bid")).contains(old);

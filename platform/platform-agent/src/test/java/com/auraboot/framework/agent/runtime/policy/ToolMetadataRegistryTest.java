@@ -12,13 +12,42 @@ class ToolMetadataRegistryTest {
     private final ToolMetadataRegistry registry = new ToolMetadataRegistry();
 
     @Test
+    void builtInEffectsUseCanonicalSourceRatherThanSanitizedReadLikeNames() {
+        for (String source : java.util.List.of("nq:customer_stats", "list:customer", "get:customer")) {
+            var provider = ToolDefinition.builder().toolCode("wire_tool").toolType("built_in")
+                    .sourceCode(source).build();
+            var agent = com.auraboot.framework.agent.dto.AgentToolDefinition.builder()
+                    .name("wire_tool").toolType("built_in").sourceCode(source).build();
+            for (var metadata : java.util.List.of(registry.from(provider, ToolMetadataTrustLevel.VERIFIED),
+                    registry.from(agent, ToolMetadataTrustLevel.VERIFIED))) {
+                assertThat(metadata.getEffectType()).isEqualTo(ToolEffectType.INTERNAL_READ);
+                assertThat(metadata.getApprovalRequirement()).isEqualTo(ApprovalRequirement.NONE);
+            }
+        }
+        for (String source : java.util.List.of("cmd:customer_update", "custom:unknown", "nq_customer_stats", "")) {
+            var agent = com.auraboot.framework.agent.dto.AgentToolDefinition.builder()
+                    .name("nq_customer_stats").toolType("built_in").sourceCode(source).build();
+            var metadata = registry.from(agent, ToolMetadataTrustLevel.VERIFIED);
+            assertThat(metadata.getEffectType()).isEqualTo(ToolEffectType.INTERNAL_WRITE);
+            assertThat(metadata.getApprovalRequirement()).isEqualTo(ApprovalRequirement.USER_CONFIRMATION);
+        }
+        for (String source : java.util.List.of("mcp:send_email", "api:update_customer")) {
+            var agent = com.auraboot.framework.agent.dto.AgentToolDefinition.builder()
+                    .name("nq_customer_stats").toolType("built_in").sourceCode(source).build();
+            assertThat(registry.from(agent, ToolMetadataTrustLevel.PROVIDER_DECLARED).getEffectType())
+                    .isEqualTo(ToolEffectType.EXTERNAL_ACTION);
+        }
+    }
+
+    @Test
     void authoritativeMutationAndExternalTypesCannotBeDisguisedByReadLikeNames() {
         for (String prefix : java.util.List.of("get_", "list_", "nq_")) {
             for (String type : java.util.List.of("DSL_COMMAND", "API_CALL", "MCP")) {
                 var expected = "DSL_COMMAND".equals(type) ? ToolEffectType.INTERNAL_WRITE : ToolEffectType.EXTERNAL_ACTION;
-                var provider = ToolDefinition.builder().toolCode(prefix + "customer_update").toolType(type).build();
+                var provider = ToolDefinition.builder().toolCode(prefix + "customer_update").toolType(type)
+                        .sourceCode("nq:customer_stats").build();
                 var agent = com.auraboot.framework.agent.dto.AgentToolDefinition.builder()
-                        .name(prefix + "customer_update").toolType(type).build();
+                        .name(prefix + "customer_update").toolType(type).sourceCode("nq:customer_stats").build();
                 assertThat(registry.from(provider, ToolMetadataTrustLevel.VERIFIED).getEffectType()).isEqualTo(expected);
                 assertThat(registry.from(agent, ToolMetadataTrustLevel.VERIFIED).getEffectType()).isEqualTo(expected);
             }

@@ -2,6 +2,8 @@ package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
+import com.auraboot.framework.meta.service.CommandService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -26,6 +28,9 @@ class DslToolProviderTest extends BaseIntegrationTest {
 
     @Autowired
     private DynamicDataMapper dynamicDataMapper;
+
+    @Autowired
+    private CommandService commandService;
 
     // ========== Provider Identity ==========
 
@@ -97,8 +102,19 @@ class DslToolProviderTest extends BaseIntegrationTest {
 
     // ========== Discover ==========
 
+    private String createDiscoveryCommand() {
+        var command = new CommandDefinitionCreateRequest();
+        command.setCode("aaa_dsl_discovery");
+        command.setDisplayName("DSL discovery fixture");
+        command.setModelCode("dsl_discovery_fixture");
+        command.setExecutionConfig("{\"type\":\"query\",\"permissions\":[]}");
+        commandService.publish(commandService.create(command).getPid());
+        return command.getCode();
+    }
+
     @Test
     void discover_withoutModelHint_stillOffersCommandsButNoPerModelTools() {
+        String commandCode = createDiscoveryCommand();
         // F10 (2026-07-20): this used to assert isEmpty() — pinning the behavior
         // where a turn whose object could not be inferred got ZERO DSL tools, i.e.
         // the agent was incapable of acting (live-reproduced: the @critical
@@ -116,6 +132,7 @@ class DslToolProviderTest extends BaseIntegrationTest {
 
         assertThat(tools).as("agent must retain command capability without a model hint").isNotEmpty();
         assertThat(tools).hasSizeLessThanOrEqualTo(20);
+        assertThat(tools).extracting(ToolDefinition::getToolCode).contains("cmd:" + commandCode);
         assertThat(tools).allSatisfy(t ->
                 assertThat(t.getToolCode()).startsWith("cmd:"));
         assertThat(tools).noneSatisfy(t ->
@@ -126,6 +143,7 @@ class DslToolProviderTest extends BaseIntegrationTest {
 
     @Test
     void discover_withBlankModelHint_behavesLikeNoHint() {
+        String commandCode = createDiscoveryCommand();
         // F10: blank hint takes the same bounded fallback path as a null hint.
         Long tenantId = getTestTenant().getId();
         var ctx = ToolDiscoveryContext.builder()
@@ -137,6 +155,7 @@ class DslToolProviderTest extends BaseIntegrationTest {
 
         assertThat(tools).isNotEmpty();
         assertThat(tools).hasSizeLessThanOrEqualTo(20);
+        assertThat(tools).extracting(ToolDefinition::getToolCode).contains("cmd:" + commandCode);
         assertThat(tools).allSatisfy(t ->
                 assertThat(t.getToolCode()).startsWith("cmd:"));
     }

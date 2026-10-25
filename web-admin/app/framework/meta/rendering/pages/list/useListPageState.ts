@@ -564,6 +564,7 @@ export function useListPageState(
     tableBulkCapabilities,
     pageRowIds,
     allMatchingSelected,
+    selectionState,
     selectedIds,
     pageFullySelected,
     effectiveSelectedCount,

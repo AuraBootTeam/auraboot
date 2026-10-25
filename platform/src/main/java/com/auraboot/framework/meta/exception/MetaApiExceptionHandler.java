@@ -77,6 +77,17 @@ public class MetaApiExceptionHandler {
         return ResponseEntity.status(RecordVersionConflictException.status()).body(response);
     }
 
+    /** Map a rolled-back serializable command to the existing reread/conflict contract. */
+    @ExceptionHandler(org.springframework.dao.CannotSerializeTransactionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSerializationConflict(
+            org.springframework.dao.CannotSerializeTransactionException failure) {
+        log.warn("Serializable meta operation conflicted; current state must be reread");
+        var response = ApiResponse.<Void>error(HttpStatus.CONFLICT.value(),
+                "Record changed concurrently. Reload the current record before retrying.", null);
+        response.setCode(RecordVersionConflictException.CODE);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
     /**
      * Handle security exceptions — do not expose internal details.
      */

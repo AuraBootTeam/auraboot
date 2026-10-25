@@ -78,6 +78,24 @@ public class DynamicSqlProvider {
         return sql;
     }
 
+    public static String selectCompareAndSetLocks(Map<String,Object> params) {
+        String sql=requireSql(params);
+        if(!(params.get("params") instanceof Map<?,?> bindings)
+                || !(bindings.get("tenantId") instanceof Long tenant) || tenant<=0)
+            throw new IllegalArgumentException("Identity CAS lock requires an explicit typed tenant");
+        int where=sql.indexOf(" WHERE tenant_id = #{params.tenantId} AND (");
+        if(where<0)throw new IllegalArgumentException("Identity CAS lock requires its tenant predicate");
+        String[] projection=sql.substring(0,where).split(" ",-1);
+        if(projection.length!=4 || !"SELECT".equals(projection[0]) || !"FROM".equals(projection[2]))
+            throw new IllegalArgumentException("Identity CAS lock permits only a primary-key projection");
+        String key=SqlSafetyUtils.requireIdentifier(projection[1],"identity CAS lock primary key");
+        SqlSafetyUtils.requireIdentifier(projection[3],"identity CAS lock table");
+        if(!sql.endsWith(" ORDER BY "+key+" FOR UPDATE"))
+            throw new IllegalArgumentException("Identity CAS lock requires ordered row locking");
+        SqlSafetyUtils.validateSelectOnlySql(sql.substring(0,sql.length()-" FOR UPDATE".length()));
+        return sql;
+    }
+
     public static String countByQuery(Map<String, Object> params) {
         String sql = requireSql(params);
         SqlSafetyUtils.validateSelectOnlySql(sql);

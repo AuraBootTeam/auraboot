@@ -2,6 +2,8 @@ package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
+import com.auraboot.framework.meta.service.CommandService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,6 +32,9 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
 
     @Autowired
     private ToolProviderRegistry registry;
+
+    @Autowired
+    private CommandService commandService;
 
     // ========== Provider Registration ==========
 
@@ -117,8 +122,8 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
                 .build();
         var tools = registry.discoverAll(ctx);
 
-        // Platform provider now contributes 4 tools — overall result must be >= 4
-        assertThat(tools.size()).isGreaterThanOrEqualTo(4);
+        // The platform provider contributes the six tools asserted below.
+        assertThat(tools.size()).isGreaterThanOrEqualTo(6);
     }
 
     @Test
@@ -164,16 +169,16 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
     // ========== discoverByProvider() ==========
 
     @Test
-    void discoverByProvider_platform_returnsExactlyFourTools() {
+    void discoverByProvider_platform_returnsExactDeclaredTools() {
         var ctx = ToolDiscoveryContext.builder()
                 .tenantId(testTenant.getId())
                 .maxResults(50)
                 .build();
         var tools = registry.discoverByProvider("platform", ctx);
 
-        assertThat(tools).hasSize(5);
         assertThat(tools.stream().map(ToolDefinition::getToolCode))
                 .containsExactlyInAnyOrder(
+                        "platform.resolve_reference",
                         "platform.execute_sql",
                         "platform.list_models",
                         "platform.model_suggest",
@@ -194,6 +199,12 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
 
     @Test
     void discoverByProvider_dslWithoutModelHint_returnsBoundedCommandSet() {
+        var command = new CommandDefinitionCreateRequest();
+        command.setCode("aaa_registry_discovery");
+        command.setDisplayName("Registry discovery fixture");
+        command.setModelCode("registry_discovery_fixture");
+        command.setExecutionConfig("{\"type\":\"query\",\"permissions\":[]}");
+        commandService.publish(commandService.create(command).getPid());
         // F10 (2026-07-20): DslToolProvider used to return NOTHING without a
         // modelHint, leaving the agent with no way to act whenever grounding could
         // not infer the object. It now falls back to a bounded, deterministic
@@ -207,5 +218,6 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
 
         assertThat(tools).isNotEmpty();
         assertThat(tools).hasSizeLessThanOrEqualTo(50);
+        assertThat(tools).extracting(ToolDefinition::getToolCode).contains("cmd:" + command.getCode());
     }
 }
