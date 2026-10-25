@@ -102,8 +102,8 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     const received=reader.locator('table tbody tr').filter({hasText:title});await expect(received).toHaveCount(1);
     await received.getByRole('button',{name:'查看公告',exact:true}).click();
     await expect(reader).toHaveURL(new RegExp(`/p/announcement_reader/view/${version}$`));
-    const link=reader.getByTestId('attachment-download-0');
-    await expect(link).toHaveAttribute('href',path);await expect(link).toHaveText(new RegExp(fileName));
+    const link=reader.getByRole('link',{name:fileName,exact:false});
+    await expect(link).toHaveAttribute('href',path);await expect(link).toContainText(fileName);
     await expect(reader.getByText('Attachment review text.',{exact:true})).toBeVisible();
     expect(await reader.evaluate(()=>(window as any).__announcementXss)).toBe(0);
     await expect(reader.locator('img[onerror],a[href^="javascript:"]')).toHaveCount(0);
