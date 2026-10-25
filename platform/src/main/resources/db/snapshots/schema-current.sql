@@ -17681,6 +17681,31 @@ COMMENT ON TABLE public.ab_wechat_subscription_observation IS 'Tenant/user-owned
 
 
 --
+-- Name: ab_wechat_subscription_reservation; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_wechat_subscription_reservation (
+    tenant_id bigint NOT NULL,
+    resolution_reference character varying(512) NOT NULL,
+    reservation_reference character(64) NOT NULL,
+    grant_reference character(64) NOT NULL,
+    source_version character varying(128) NOT NULL,
+    snapshot jsonb NOT NULL,
+    reserved_at timestamp with time zone NOT NULL,
+    CONSTRAINT ab_wechat_subscription_reservation_reservation_reference_check CHECK ((reservation_reference ~ '^[a-f0-9]{64}$'::text)),
+    CONSTRAINT ab_wechat_subscription_reservation_snapshot_check CHECK ((jsonb_typeof(snapshot) = 'object'::text)),
+    CONSTRAINT ab_wechat_subscription_reservation_tenant_id_check CHECK ((tenant_id > 0))
+);
+
+
+--
+-- Name: TABLE ab_wechat_subscription_reservation; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_wechat_subscription_reservation IS 'Immutable delivery-bound ownership of one verified provider grant; no replacement after unknown or failed delivery';
+
+
+--
 -- Name: ab_wechat_subscription_state; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -23835,6 +23860,30 @@ ALTER TABLE ONLY public.ab_wechat_subscription_grant
 
 ALTER TABLE ONLY public.ab_wechat_subscription_observation
     ADD CONSTRAINT ab_wechat_subscription_observation_pkey PRIMARY KEY (tenant_id, user_id, app_id, idempotency_key);
+
+
+--
+-- Name: ab_wechat_subscription_reservation ab_wechat_subscription_reservation_grant_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_wechat_subscription_reservation
+    ADD CONSTRAINT ab_wechat_subscription_reservation_grant_reference_key UNIQUE (grant_reference);
+
+
+--
+-- Name: ab_wechat_subscription_reservation ab_wechat_subscription_reservation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_wechat_subscription_reservation
+    ADD CONSTRAINT ab_wechat_subscription_reservation_pkey PRIMARY KEY (tenant_id, resolution_reference);
+
+
+--
+-- Name: ab_wechat_subscription_reservation ab_wechat_subscription_reservation_reservation_reference_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_wechat_subscription_reservation
+    ADD CONSTRAINT ab_wechat_subscription_reservation_reservation_reference_key UNIQUE (reservation_reference);
 
 
 --
@@ -31166,6 +31215,13 @@ CREATE TRIGGER trg_wechat_subscription_observation_immutable BEFORE UPDATE ON pu
 
 
 --
+-- Name: ab_wechat_subscription_reservation trg_wechat_subscription_reservation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_wechat_subscription_reservation_immutable BEFORE UPDATE ON public.ab_wechat_subscription_reservation FOR EACH ROW EXECUTE FUNCTION public.prevent_wechat_subscription_fact_change();
+
+
+--
 -- Name: ab_analytics_deleted_record_basis ab_analytics_deleted_record_basis_tenant_id_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -31627,6 +31683,14 @@ ALTER TABLE ONLY public.ab_webhook_subscription
 
 ALTER TABLE ONLY public.ab_wechat_subscription_grant
     ADD CONSTRAINT ab_wechat_subscription_grant_event_key_fkey FOREIGN KEY (event_key) REFERENCES public.ab_wechat_subscription_event(event_key);
+
+
+--
+-- Name: ab_wechat_subscription_reservation ab_wechat_subscription_reservation_grant_reference_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_wechat_subscription_reservation
+    ADD CONSTRAINT ab_wechat_subscription_reservation_grant_reference_fkey FOREIGN KEY (grant_reference) REFERENCES public.ab_wechat_subscription_grant(grant_reference);
 
 
 --
