@@ -27,6 +27,7 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 /** Actual authorized HTTP capture, immutable JSONB persistence and current-permission reauthorization. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
