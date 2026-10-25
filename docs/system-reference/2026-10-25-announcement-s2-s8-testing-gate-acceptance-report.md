@@ -11,7 +11,7 @@ updated: 2026-10-25
 
 **allowed_claim: targeted-tested；完整功能与黄金验收尚未完成。** 需求、默认取舍及唯一缺口清单以[公告管理设计](./announcement-management.md)§16–§18为准。本记录只裁决已执行证据，不另立需求或缩小S2–S8范围；小程序实际发送端不在本期，适配契约仍在范围内。现有PR保持草稿，未合并，未发布生产。
 
-最新完整导出旅程的源码为`a1b827a69d20ef740bab56da33047eb10a3287cc`，使用同一隔离数据库、独占Redis及公开启动器的Web/BFF/后端。启动器产品构件核验及完成启动后的Workspace核验通过。源码、端口、监听进程与连接身份同源；health不独立充当身份凭证。后续候选的网络提示与时间列视觉修正仍须复验，不沿用旧图冒充新图。
+最新原生导出旅程的源码为`efaa3e65c9f526a43ec4766cc9534f8f3c707f39`，使用同一隔离数据库、独占Redis及公开启动器的Web/BFF/后端。启动器产品构件核验及完成启动后的Workspace核验通过。源码、端口、监听进程与连接身份同源；health不独立充当身份凭证。网络提示与时间列修正已在该源码复验；后端Java代码与50项单测、2项真实集成所验证的a1b827a69相同。后续差异及未执行矩阵仍分开记录。
 
 ## 本轮实际证据
 
@@ -19,17 +19,17 @@ updated: 2026-10-25
 | --- | --- | --- |
 | 后端hermetic unit | 31项目标授权＋19项异步任务，共50项通过，无skip | 授权payload绑定、当前身份复查、队列保留及既有执行边界；不是全产品覆盖率 |
 | 真实数据库/HTTP集成 | 2项通过，无skip | 实际队列生成、受控HTTP下载和撤权；提交事务中先取消，删除被拒后状态仍可查，无生成尝试 |
-| 前端定向单测 | 相关动作、表格、指标、下载272项；后续数据源/路由等104项通过 | 不同轮次存在重叠，不相加；类型检查分别按准确源码通过 |
+| 前端定向单测 | 先前相关动作、表格、指标、下载272项；后续数据源/路由等104项；最新展示/反馈回归245项通过 | 不同轮次存在重叠，不相加；类型检查分别按准确源码通过 |
 | 既有浏览器回归 | 95e37918c上的12项通过，无retry/skip | 9条公告生命周期及3条租户政策；后续候选未据此声明全量重验 |
 | 新统计浏览器旅程 | 菜单→详情→固定统计→空筛选/清除→统一命令→刷新任务→真实CSV下载 | 使用原生DSL；core路径通过真实按钮，不用API调用代替按钮 |
 | 不确定网络 | 服务端受理后主动丢弃响应，刷新后按钮重试通过 | 两次请求身份相同，返回同一任务且标记幂等重放；读取数据库确认该固定快照仅一条导出 |
 | 实际文件 | 独立Python csv/datetime/zoneinfo核验通过 | UTF-8 BOM、15列、3行、冻结人员/阅读/知悉状态、发布时间/截止、Asia/Shanghai及持久字节数/摘要一致 |
-| 视觉复核 | 正常统计、筛选弹窗、空结果、导出完成、网络故障原图已逐张查看 | 发现网络原始英文提示、时间列折行及过早拍到按钮忙态；候选修正/重新等待后仍需完整复拍，不宣称黄金达成 |
+| 视觉复核 | efaa3e65c的9张正常统计、筛选、空结果、横向表格、网络故障及导出原图逐张复核通过 | 网络提示已本地化、时间文本单行、空分类说明明确，完成态等待按钮可用后重拍；完整矩阵仍未关闭，不宣称全产品黄金达成 |
 | 插件/静态 | 插件校验0错误、4条详情块类型建议警告；页面UX审计8页0错误0警告 | 不是浏览器执行，不能代替安装、HTTP、交互或文件证据 |
 
-测试源码入口：`CommandTargetScopePhaseTest`、`AsyncTaskServiceImplTest`、`AnnouncementStatisticsIntegrationTest`；前端`ActionRegistry`、`DataSourceManager`、`useSchemaLoader`、动态详情身份及块渲染测试。公开浏览器回归为`web-admin/tests/e2e/announcement/`。新统计旅程的冻结驱动与原始结果保存在任务登记的runtime evidence，受控文件和认证状态不提交到公共仓库。
+测试源码入口：`CommandTargetScopePhaseTest`、`AsyncTaskServiceImplTest`、`AnnouncementStatisticsIntegrationTest`；前端`ActionRegistry`、`DataSourceManager`、`useSchemaLoader`、动态详情身份及块渲染测试。公开浏览器回归为`web-admin/tests/e2e/announcement/`。新增`announcement-statistics.spec.ts`使用自建且仅面向当前用户的发布/阅读前置数据，核心统计及导出走UI；当前为registered，须在其准确源码执行后再记录通过。此前冻结驱动与原始结果保存在任务登记的runtime evidence，受控文件和认证状态不提交到公共仓库。
 
-可定位的原始证据轮次为`2026-10-24T23-29-35-891Z-c3432443-2f1b-4f9c-b181-573139bb7c2a`（12条回归），及`2026-10-24T23-46-09-668Z-8efa4ad3-71e4-44a2-a6a2-4f008691fbed`（a1b827a69原生统计v7/v8、实际下载）。原始失败版本、JUnit、身份核验、下载摘要及独立解析结果分别保留，不用成功重跑覆盖原失败。
+可定位的原始证据轮次为`2026-10-24T23-29-35-891Z-c3432443-2f1b-4f9c-b181-573139bb7c2a`（12条回归），及`2026-10-24T23-46-09-668Z-8efa4ad3-71e4-44a2-a6a2-4f008691fbed`（a1b827a69原生统计v7/v8、实际下载）。efaa3e65c复验轮次为`2026-10-24T23-59-04-117Z-39a89320-7ea2-419c-b48a-3f2f35882c63`（原生统计v9，含9张原图与独立CSV校验）。原始失败版本、JUnit、身份核验、下载摘要及独立解析结果分别保留，不用成功重跑覆盖原失败。
 
 ## 完整范围的覆盖分母
 
@@ -61,15 +61,15 @@ current_sot: docs/system-reference/announcement-management.md §16–§18
 business_scope: S2–S8 including BPM composition; actual mini-program sender excluded
 integration_tests: latest 50 hermetic units + 2 real-stack HTTP/database cases passed
 integration_coverage: coverage_not_measured for complete S2–S8 scope
-e2e_specs: existing announcement lifecycle/policy specs; frozen native-statistics browser driver
+e2e_specs: existing announcement lifecycle/policy specs; frozen native-statistics browser driver; repository statistics spec registered, not yet executed
 e2e_collection: separate from actual execution; static checks do not contribute passes
-e2e_execution: existing 12 scenarios passed at 95e37918c; native core and uncertain-network journeys passed at a1b827a69
+e2e_execution: existing 12 scenarios passed at 95e37918c; native core and uncertain-network journeys passed at efaa3e65c
 feature_action_matrix: partial; canonical denominator is SOT §16.8, unresolved scope listed above
 browser_evidence: registered runtime evidence rounds and original PNGs; no full golden claim
 backend_evidence: exact-source JUnit and real PostgreSQL/HTTP assertions
 artifact_evidence: actual browser CSV, independent parser, fixed-capture binding, persisted checksum/size
 permission_negative: current-authority HTTP denial tested; full browser/owner/member matrix remains partial
-visual_feedback: filter/empty/download and uncertain network observed; pending visual corrections explicitly retained
+visual_feedback: filter/empty/download and uncertain network observed; identified corrections reverified; full state/permission visual matrix remains partial
 skip_fixme_threshold_retry_audit: scoped normal runs report zero skips/retries; mutation filters and no-tests attempts are separate
 did_not_run: complete S2–S8 coverage, remaining BPM UI/composition and reminder validation
 remaining_blockers: outstanding scope and state/visual rows above
