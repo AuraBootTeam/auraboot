@@ -279,6 +279,59 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(value.size()).isEqualTo(2);assertThat(value.required("publishedAt").isTextual()).isTrue();
         assertThat(value.toString()).doesNotContain("published_by","member_pid","tenant_id");
     }
+    @Test void reminderHistoryPagesAllAcceptedBatchesAndRechecksCurrentHttpAuthority() throws Exception {
+        String version=publish(),record=recordOf(version);
+        var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        String operation=UniqueIdGenerator.generate();var payload=Map.<String,Object>of("previewToken",preview.get("previewToken"));
+        var first=reminders.execute(AnnouncementReminderService.SUBMIT,record,payload,operation);
+        var empty=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        for(int index=0;index<25;index++) assertThat(reminders.execute(AnnouncementReminderService.SUBMIT,record,
+            Map.of("previewToken",empty.get("previewToken")),UniqueIdGenerator.generate())).containsEntry("actualCount",0).containsEntry("operationState","skipped");
+        var page1=reminders.batchHistory(version,1,20);var page2=reminders.batchHistory(version,2,20);
+        assertThat(page1).containsEntry("total",26L).containsEntry("pageNum",1).containsEntry("pageSize",20);
+        var rows1=(List<Map<String,Object>>)page1.get("records");var rows2=(List<Map<String,Object>>)page2.get("records");
+        assertThat(rows1).hasSize(20);assertThat(rows2).hasSize(6);
+        var ids=new HashSet<Object>();rows1.forEach(row->assertThat(ids.add(row.get("pid"))).isTrue());rows2.forEach(row->assertThat(ids.add(row.get("pid"))).isTrue());
+        assertThat(ids).hasSize(26).contains(first.get("batchPid"));assertThat(rows2.getLast()).containsEntry("pid",first.get("batchPid")).containsEntry("actualCount",1);
+        assertThat(reminders.execute(AnnouncementReminderService.SUBMIT,record,payload,operation)).isEqualTo(first);
+        var response=http.perform(get("/api/announcements/versions/"+version+"/reminders/batches").param("pageNum","2").param("pageSize","20"))
+            .andExpect(status().isOk()).andReturn().getResponse();
+        var data=json.readTree(response.getContentAsString()).required("data");assertThat(data.required("total").longValue()).isEqualTo(26);
+        assertThat(data.required("records")).hasSize(6);assertThat(data.toString()).doesNotContain("actor_user_id","actor_member_pid","scope_hash","policy_hash","memberPid");
+        try {
+            assertThat(jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.remind")).isEqualTo(1);
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            http.perform(get("/api/announcements/versions/"+version+"/reminders/batches")).andExpect(status().isForbidden());
+        } finally {
+            grantCommittedPermissionToTestRole("announcement.announcement.remind","announcement","announcement:announcement","remind","Announcement remind");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+        }
+    }
+    @Test void staleAutomaticFailureCannotOverwriteAnExplicitlyResumedPlan() {
+        String version=publish(),record=recordOf(version);var stale=reminderPlan(version);
+        assertThat(reminders.block(stale,"ORIGINAL_FAILURE")).isTrue();
+        reminderClock.instant=reminderSlot(version,2).plusSeconds(600);
+        reminders.execute(AnnouncementReminderService.RESUME,record,Map.of("versionPid",version),UniqueIdGenerator.generate());
+        assertThat(reminders.block(stale,"LATE_FAILURE")).isFalse();
+        assertThat(reminderPlan(version)).containsEntry("status","active").containsEntry("automatic_batches",0).containsEntry("error_code",null);
+        assertThat(reminders.block(reminderPlan(version),"CURRENT_FAILURE")).isTrue();
+        assertThat(reminderPlan(version)).containsEntry("status","blocked").containsEntry("error_code","CURRENT_FAILURE");
+    }
+    @Test void withdrawalCancelsPlansAndLatestPlanReadIgnoresAnUnpublishedNewVersion() throws Exception {
+        String version=publish(),record=recordOf(version);var stale=reminderPlan(version);
+        assertThat(reminders.latestPlanStatus(record)).containsEntry("versionPid",version);
+        int revision=jdbc.queryForObject("SELECT row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,getTestTenant().getId(),record);
+        var withdrawn=lifecycle.execute("announcement:archive",record,Map.of(),UniqueIdGenerator.generate(),revision);
+        assertThat(reminderPlan(version)).containsEntry("status","canceled");assertThat(reminders.block(stale,"LATE_FAILURE")).isFalse();
+        var draft=lifecycle.execute("announcement:republish",record,Map.of(),UniqueIdGenerator.generate(),((Number)withdrawn.get("row_version")).intValue());
+        var accepted=releases.execute("announcement:publish",record,Map.of(),UniqueIdGenerator.generate(),((Number)draft.get("row_version")).intValue());
+        assertThat(accepted.get("versionPid")).isNotEqualTo(version);
+        var status=http.perform(get("/api/announcements/records/"+record+"/reminders/plan")).andExpect(status().isOk()).andReturn().getResponse();
+        var result=json.readTree(status.getContentAsString()).required("data");assertThat(result.required("versionPid").textValue()).isEqualTo(version);
+        assertThat(result.required("status").textValue()).isEqualTo("canceled");
+        releases.execute("announcement:cancel_schedule",record,Map.of(),UniqueIdGenerator.generate(),((Number)accepted.get("row_version")).intValue());
+    }
     @Test void httpSummaryAndDetailsRemainAtTheSameInstantAfterNaturalReadAndAcknowledgementChanges() throws Exception {
         String version=publish();
         var response=http.perform(post("/api/announcements/versions/"+version+"/statistics/snapshots")

@@ -28,12 +28,35 @@ public interface AnnouncementReminderMapper {
     @Update("""
         UPDATE ab_announcement_reminder_plan SET status=#{status},error_code=#{error},
         next_scan_at=clock_timestamp()+INTERVAL '5 minutes',automatic_batches=automatic_batches+#{increment}
-        WHERE tenant_id=#{tenant} AND version_pid=#{version}
+        WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status='active'
         """)
     int updatePlan(@Param("tenant") Long tenant,@Param("version") String version,@Param("status") String status,@Param("error") String error,@Param("increment") int increment);
 
     @Update("UPDATE ab_announcement_reminder_plan SET status='active',error_code=NULL,resume_after=#{now},next_scan_at=#{now} WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status='blocked'")
     int resume(@Param("tenant") Long tenant,@Param("version") String version,@Param("now") Instant now);
+
+    @Update("UPDATE ab_announcement_reminder_plan SET status='blocked',error_code=#{error},next_scan_at=clock_timestamp()+INTERVAL '5 minutes' WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status='active' AND resume_after=#{resumeAfter}")
+    int blockPlan(@Param("tenant") Long tenant,@Param("version") String version,@Param("resumeAfter") Instant resumeAfter,@Param("error") String error);
+
+    @Update("UPDATE ab_announcement_reminder_plan SET status='canceled',error_code=NULL WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status IN('active','blocked')")
+    int cancelPlan(@Param("tenant") Long tenant,@Param("version") String version);
+
+    @Select("SELECT p.version_pid FROM ab_announcement_reminder_plan p JOIN ab_announcement_version v ON v.tenant_id=p.tenant_id AND v.pid=p.version_pid WHERE p.tenant_id=#{tenant} AND v.announcement_pid=#{record} ORDER BY v.version_no DESC LIMIT 1")
+    String latestPlanVersion(@Param("tenant") Long tenant,@Param("record") String record);
+
+    @Select("SELECT count(*) FROM ab_announcement_reminder_batch WHERE tenant_id=#{tenant} AND version_pid=#{version}")
+    long countBatches(@Param("tenant") Long tenant,@Param("version") String version);
+
+    @Select("""
+        SELECT b.pid,b.mode,b.target,b.status,b.evaluated_at,b.intention_count,b.throttled_count,
+            (SELECT count(*) FROM ab_announcement_delivery d WHERE d.tenant_id=b.tenant_id AND d.batch_pid=b.pid AND d.kind='reminder' AND d.status='queued') AS queued,
+            (SELECT count(*) FROM ab_announcement_delivery d WHERE d.tenant_id=b.tenant_id AND d.batch_pid=b.pid AND d.kind='reminder' AND d.status='completed') AS completed,
+            (SELECT count(*) FROM ab_announcement_delivery d WHERE d.tenant_id=b.tenant_id AND d.batch_pid=b.pid AND d.kind='reminder' AND d.status IN('skipped','canceled')) AS skipped,
+            (SELECT count(*) FROM ab_announcement_delivery d WHERE d.tenant_id=b.tenant_id AND d.batch_pid=b.pid AND d.kind='reminder' AND d.status='failed') AS failed
+        FROM ab_announcement_reminder_batch b WHERE b.tenant_id=#{tenant} AND b.version_pid=#{version}
+        ORDER BY b.evaluated_at DESC,b.pid DESC LIMIT #{size} OFFSET #{offset}
+        """)
+    List<Map<String,Object>> batchPage(@Param("tenant") Long tenant,@Param("version") String version,@Param("size") int size,@Param("offset") int offset);
 
     @Insert("""
         INSERT INTO ab_announcement_reminder_preview(tenant_id,pid,version_pid,owner_user_id,owner_member_pid,record_revision,filters,eligible_count,evaluated_at,expires_at)

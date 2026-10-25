@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '../../fixtures';
 import type { APIResponse } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
 
@@ -122,6 +123,18 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     await screenshot('reminder-batch-completed'); await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(table.getByRole('row').nth(1).getByRole('cell').nth(2)).toHaveText('1');
     expect(await count()).toBe(1); await screenshot('reminder-batch-reloaded');
+    // Additional explicit zero-intention operations are preconditions for actual history paging.
+    const emptyPreview = await successful(await page.request.post(`/api/announcements/records/${fixture.pid}/versions/${fixture.version}/reminders/preview`, {
+      data: { query: '', state: 'all', departmentPid: null },
+    }));
+    expect(emptyPreview.eligible).toBe(0);
+    for (let index = 0; index < 25; index++) {
+      const extra = await successful(await page.request.post('/api/meta/commands/execute/announcement:remind', {
+        data: { clientRequestId: randomUUID(), targetRecordPid: fixture.pid, payload: { previewToken: emptyPreview.previewToken } },
+      }));
+      expect(extra.data.actualCount).toBe(0); expect(extra.data.operationState).toBe('skipped');
+    }
+    expect(await count()).toBe(26);
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
     await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
@@ -131,9 +144,30 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     await expect(page).toHaveURL(new RegExp(`/p/announcement_reminder_plan/view/${fixture.version}$`));
     await expect(page.getByRole('button', { name: '恢复自动催办', exact: true })).toHaveCount(0);
     await expect(page.getByRole('columnheader', { name: '额度上限', exact: true })).toBeVisible();
-    await expect(page.getByTestId('table-block').getByRole('row').nth(1).getByRole('cell').nth(1)).toHaveText('3');
+    const planFacts = page.getByTestId('table-block').filter({ has: page.getByRole('columnheader', { name: '额度上限', exact: true }) });
+    await expect(planFacts.getByRole('row').nth(1).getByRole('cell').nth(1)).toHaveText('3');
     await expect(page.getByRole('button', { name: '返回公告', exact: true })).toBeEnabled();
     await screenshot('reminder-plan-active');
+    const history = page.getByTestId('table-block').filter({ has: page.getByRole('columnheader', { name: '实际受理人数', exact: true }) });
+    await history.scrollIntoViewIfNeeded();
+    await expect(history.getByRole('row')).toHaveCount(21);
+    await expect(history.getByTestId('table-server-pagination')).toContainText('共 26 条');
+    await screenshot('reminder-history-page-one');
+    const secondPage = page.waitForResponse(r => r.request().method() === 'GET' && new URL(r.url()).pathname.endsWith('/reminders/batches') && new URL(r.url()).searchParams.get('pageNum') === '2');
+    await history.getByTestId('table-server-pagination').getByRole('button', { name: '下一页', exact: true }).click();
+    const historyData = await successful(await secondPage);
+    expect(historyData).toMatchObject({ pageNum: 2, pageSize: 20, total: 26 }); expect(historyData.records).toHaveLength(6);
+    await expect(history.getByRole('row')).toHaveCount(7); await screenshot('reminder-history-page-two');
+    const acceptedRow = history.getByRole('row').filter({ has: page.getByRole('cell', { name: '1', exact: true }) });
+    await expect(acceptedRow).toHaveCount(1);
+    await acceptedRow.getByRole('button', { name: '查看批次', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/p/announcement_reminder_batch/view/${accepted!.batchPid}$`));
+    await expect(page.getByTestId('table-block').getByRole('row').nth(1).getByRole('cell').nth(2)).toHaveText('1');
+    await screenshot('reminder-history-exact-batch');
+    const intentions = (await db.query("SELECT count(*) AS count FROM ab_announcement_delivery WHERE tenant_id=$1 AND version_pid=$2 AND kind='reminder'", [fixture.tenant, fixture.version])).rows[0].count;
+    expect(Number(intentions)).toBe(1);
+    writeFileSync(info.outputPath('reminder-validation.json'), JSON.stringify({ originalReplayUsesSameBatch: true,
+      originalReplayCreatesOneIntention: Number(intentions) === 1, explicitSkippedOperations: 25, batchCount: await count(), historyPages: 2 }, null, 2));
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
     await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();

@@ -1169,9 +1169,15 @@
               "type": "flow",
               "steps": [
                 {
+                  "action": "api.request",
+                  "method": "get",
+                  "endpoint": "/api/announcements/records/${record.pid}/reminders/plan",
+                  "target": "latestReminderPlan"
+                },
+                {
                   "action": "navigate",
                   "args": {
-                    "path": "/p/announcement_reminder_plan/view/${record.current_version_pid}"
+                    "path": "/p/announcement_reminder_plan/view/${state.latestReminderPlan.versionPid}"
                   }
                 }
               ]
@@ -3944,7 +3950,8 @@
                   "action": "refresh",
                   "args": {
                     "targets": [
-                      "reminderFacts"
+                      "reminderFacts",
+                      "reminderBatches"
                     ]
                   }
                 }
@@ -3971,7 +3978,8 @@
                   "action": "refresh",
                   "args": {
                     "targets": [
-                      "reminderFacts"
+                      "reminderFacts",
+                      "reminderBatches"
                     ]
                   }
                 }
@@ -4184,6 +4192,128 @@
             }
           }
         }
+      },
+      {
+        "id": "reminder_batch_history",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "同版本催办历史",
+          "en-US": "Reminder history for this version"
+        },
+        "dataSource": "reminderBatches",
+        "columns": [
+          {
+            "field": "mode",
+            "label": {
+              "zh-CN": "方式",
+              "en-US": "Mode"
+            },
+            "width": 100,
+            "dictCode": "announcement_reminder_mode"
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "受理状态",
+              "en-US": "Acceptance state"
+            },
+            "width": 150,
+            "dictCode": "announcement_reminder_batch_state"
+          },
+          {
+            "field": "evaluatedAt",
+            "label": {
+              "zh-CN": "受理时间",
+              "en-US": "Accepted at"
+            },
+            "width": 208,
+            "valueType": "datetime"
+          },
+          {
+            "field": "actualCount",
+            "label": {
+              "zh-CN": "实际受理人数",
+              "en-US": "Accepted intentions"
+            },
+            "width": 140
+          },
+          {
+            "field": "queued",
+            "label": {
+              "zh-CN": "排队",
+              "en-US": "Queued"
+            },
+            "width": 100
+          },
+          {
+            "field": "completed",
+            "label": {
+              "zh-CN": "提醒已生成",
+              "en-US": "Generated"
+            },
+            "width": 130
+          },
+          {
+            "field": "skipped",
+            "label": {
+              "zh-CN": "跳过",
+              "en-US": "Skipped"
+            },
+            "width": 100
+          },
+          {
+            "field": "failed",
+            "label": {
+              "zh-CN": "失败",
+              "en-US": "Failed"
+            },
+            "width": 100
+          }
+        ],
+        "table": {
+          "rowKey": "pid",
+          "pagination": {
+            "mode": "server",
+            "pageField": "pageNum",
+            "pageSizeOptions": [
+              20,
+              50,
+              100
+            ]
+          }
+        },
+        "rowActions": [
+          {
+            "code": "view_reminder_batch",
+            "label": {
+              "zh-CN": "查看批次",
+              "en-US": "View batch"
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "action": {
+              "type": "navigate",
+              "to": "/p/announcement_reminder_batch/view/{pid}"
+            }
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无催办批次",
+            "en-US": "No reminder batches"
+          },
+          "description": {
+            "zh-CN": "自动扫描或手动受理后在此核对，翻页和查看不会重新发送。",
+            "en-US": "Accepted manual batches and automatic scans appear here. Paging and viewing never resend reminders."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "批次历史刷新失败，仍显示上次结果，请重试。",
+              "en-US": "History refresh failed. Previous results remain visible; retry."
+            }
+          }
+        }
       }
     ],
     "dataSources": {
@@ -4191,6 +4321,16 @@
         "type": "api",
         "method": "get",
         "endpoint": "/api/announcements/versions/${$page.recordPid}/reminders/plan",
+        "adaptor": "raw"
+      },
+      "reminderBatches": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/${$page.recordPid}/reminders/batches",
+        "params": {
+          "pageNum": 1,
+          "pageSize": 20
+        },
         "adaptor": "raw"
       }
     }

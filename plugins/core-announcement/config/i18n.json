@@ -607,5 +607,12 @@
     "en-US": "The automatic reminder plan is not blocked. Refresh its status.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_plan_unavailable",
+    "zh-CN": "尚无已发布的自动催办计划，公告发布后可查看。",
+    "en-US": "No published reminder plan is available yet. View the plan after publication.",
+    "source": "import",
+    "refType": "message"
   }
 ]

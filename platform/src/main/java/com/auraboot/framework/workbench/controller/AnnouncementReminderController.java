@@ -28,4 +28,11 @@ public class AnnouncementReminderController {
     @GetMapping("/versions/{versionPid}/reminders/plan")
     public ApiResponse<Map<String,Object>> planByVersion(@PathVariable String versionPid) {return ApiResponse.success(reminders.planStatusByVersion(versionPid));}
 
+    @GetMapping("/records/{recordPid}/reminders/plan")
+    public ApiResponse<Map<String,Object>> latestPlan(@PathVariable String recordPid) {return ApiResponse.success(reminders.latestPlanStatus(recordPid));}
+    @GetMapping("/versions/{versionPid}/reminders/batches")
+    public ApiResponse<Map<String,Object>> batches(@PathVariable String versionPid,@RequestParam(defaultValue="1") int pageNum,@RequestParam(defaultValue="20") int pageSize) {
+        return ApiResponse.success(reminders.batchHistory(versionPid,pageNum,pageSize));
+    }
+
 }

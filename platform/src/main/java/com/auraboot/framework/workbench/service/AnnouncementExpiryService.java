@@ -16,6 +16,7 @@ import java.util.*;
 public class AnnouncementExpiryService {
     private final AnnouncementLifecycleMapper records;
     private final AnnouncementReleaseMapper versions;
+    private final com.auraboot.framework.workbench.mapper.AnnouncementReminderMapper reminderPlans;
     public List<Map<String,Object>> due(){return MetaContext.runWithoutTenantFilter(records::dueExpiry);}
     @Transactional
     public void expire(Long tenant,String pid,String version) {
@@ -27,7 +28,7 @@ public class AnnouncementExpiryService {
             var control=versions.version(tenant,version);
             if(control==null || control.get("expires_at")==null || AnnouncementDeliveryPlanResolver.instant(control.get("expires_at")).isAfter(Instant.now())) return;
             if(records.expireVersion(tenant,version)!=1 || records.expire(tenant,pid,version)!=1) throw new IllegalStateException("Announcement expiry transition was lost");
-            records.closeRecipientTasks(tenant,version);records.cancelRecipientDeliveries(tenant,version);
+            records.closeRecipientTasks(tenant,version);records.cancelRecipientDeliveries(tenant,version);reminderPlans.cancelPlan(tenant,version);
             records.audit(UniqueIdGenerator.generate(),tenant,0L,pid,version,"announcement:expired",version,record.getRowVersion(),record.getRowVersion()+1);
         } finally {MetaContext.restore(previous);}
     }

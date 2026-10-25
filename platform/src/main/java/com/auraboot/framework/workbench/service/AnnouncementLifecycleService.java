@@ -27,8 +27,7 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Sole writer for drafts; publication remains unavailable until its audience and delivery contracts
- * exist.
+ * Transactional writer for drafts, withdrawal and revision. Publication uses the frozen release service.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,6 +40,7 @@ public class AnnouncementLifecycleService {
     private static final String WITHDRAW = "announcement:archive";
     private static final String DELETE = "announcement:delete_announcement";
     private final AnnouncementLifecycleMapper mapper;
+    private final com.auraboot.framework.workbench.mapper.AnnouncementReminderMapper reminderPlans;
     private final UserPermissionService permissions;
     private final IdentityDirectoryAccessor identities;
     private final ObjectMapper objectMapper;
@@ -150,6 +150,7 @@ public class AnnouncementLifecycleService {
                     throw conflict();
                 mapper.closeRecipientTasks(tenant,record.getActiveVersionPid());
                 mapper.cancelRecipientDeliveries(tenant,record.getActiveVersionPid());
+                reminderPlans.cancelPlan(tenant,record.getActiveVersionPid());
             } else if (REVISE.equals(command)) {
                 if (!payload.isEmpty()
                         || !Set.of("withdrawn", "expired", "missed", "rejected", "approval_withdrawn", "approval_failed").contains(record.getStatus())

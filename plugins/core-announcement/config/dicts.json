@@ -557,5 +557,71 @@
         }
       }
     ]
+  },
+  {
+    "code": "announcement_reminder_mode",
+    "name": "Reminder mode",
+    "name:zh-CN": "催办方式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "AUTO",
+        "label": "Automatic",
+        "label:zh-CN": "自动",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "MANUAL",
+        "label": "Manual",
+        "label:zh-CN": "手动",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_reminder_batch_state",
+    "name": "Reminder acceptance state",
+    "name:zh-CN": "催办受理状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "已受理",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "skipped",
+        "label": "No new intentions",
+        "label:zh-CN": "无新增提醒",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Blocked",
+        "label:zh-CN": "已阻断",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
   }
 ]

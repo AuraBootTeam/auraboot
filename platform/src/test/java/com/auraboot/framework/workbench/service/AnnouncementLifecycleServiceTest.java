@@ -23,7 +23,7 @@ class AnnouncementLifecycleServiceTest {
     private final UserPermissionService permissions = mock(UserPermissionService.class);
     private final IdentityDirectoryAccessor identities = mock(IdentityDirectoryAccessor.class);
     private final AnnouncementLifecycleService service =
-            new AnnouncementLifecycleService(mapper, permissions, identities, new ObjectMapper(), mock(AnnouncementPolicyService.class));
+            new AnnouncementLifecycleService(mapper, mock(com.auraboot.framework.workbench.mapper.AnnouncementReminderMapper.class), permissions, identities, new ObjectMapper(), mock(AnnouncementPolicyService.class));
 
     @BeforeEach
     void setup() {

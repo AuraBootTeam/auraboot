@@ -182,8 +182,9 @@ public class AnnouncementReminderService {
         });
     }
     @Transactional
-    public void block(Map<String,Object> plan,String error) {
-        MetaContext.runWithoutTenantFilter(()->reminders.updatePlan(((Number)plan.get("tenant_id")).longValue(),(String)plan.get("version_pid"),"blocked",error,0));
+    public boolean block(Map<String,Object> plan,String error) {
+        return MetaContext.runWithoutTenantFilter(()->reminders.blockPlan(((Number)plan.get("tenant_id")).longValue(),
+            (String)plan.get("version_pid"),time(plan.get("resume_after")),error))==1;
     }
     @Transactional
     public String deliveryEligibility(Long tenant,String batch,String version,Map<String,Object> recipient) {
@@ -235,6 +236,29 @@ public class AnnouncementReminderService {
         view.put("actualCount",row.get("intention_count"));view.put("previewCount",row.get("preview_count"));view.put("throttled",row.get("throttled_count"));
         view.put("filters",codec.object(row.get("filter_json").toString()));view.putAll(reminders.results(MetaContext.getCurrentTenantId(),batch));
         view.put("errorCode",row.get("error_code"));return view;
+    }
+    @Transactional(readOnly=true)
+    public Map<String,Object> latestPlanStatus(String record) {
+        var root=access.manage(record,"remind",false);
+        String version=reminders.latestPlanVersion(MetaContext.getCurrentTenantId(),record);
+        if(version==null) {
+            var current=root.getCurrentVersionPid()==null ? null : facts.version(MetaContext.getCurrentTenantId(),root.getCurrentVersionPid());
+            if(current!=null && !"publication".equals(current.get("origin"))) invalid("reminder_legacy_unknown");
+            invalid("reminder_plan_unavailable");
+        }
+        return planStatus(record,version);
+    }
+    @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Map<String,Object> batchHistory(String version,int page,int size) {
+        if(page<1 || page>100000 || size<1 || size>100) invalid("invalid_input");
+        var versionRow=facts.version(MetaContext.getCurrentTenantId(),version);if(versionRow==null) invalid("statistics_unavailable");
+        var source=source((String)versionRow.get("announcement_pid"),version,false,false);selection(source,AnnouncementStatistics.Filters.all(),false);
+        var rows=reminders.batchPage(MetaContext.getCurrentTenantId(),version,size,(page-1)*size).stream().map(row->{
+            var view=new LinkedHashMap<String,Object>();
+            for(String key:List.of("pid","mode","target","status","queued","completed","skipped","failed")) view.put(key,row.get(key));
+            view.put("evaluatedAt",time(row.get("evaluated_at")));view.put("actualCount",row.get("intention_count"));view.put("throttled",row.get("throttled_count"));return view;
+        }).toList();
+        return Map.of("records",rows,"total",reminders.countBatches(MetaContext.getCurrentTenantId(),version),"pageNum",page,"pageSize",size,"asOf",source.now(),"versionPid",version);
     }
     @Transactional(readOnly=true)
     public Map<String,Object> planStatusByVersion(String version) {
