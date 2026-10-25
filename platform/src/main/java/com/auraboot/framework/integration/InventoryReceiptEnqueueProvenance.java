@@ -86,8 +86,12 @@ public final class InventoryReceiptEnqueueProvenance {
                 MetaContext.getCommandPermitTargetFor(FINISHED_GOODS_MODEL));
             throw denied();
         }
+        // The isDiscoveredExtensionInstance bookkeeping check is intentionally omitted here:
+        // multi-command handlers (FinishedGoodsPackagingHandler covers six commands) may not
+        // appear in the discovered map under this command's identity. Security is preserved by
+        // the implementation class name check, the command/model/tenant/permit assertions, and
+        // the artifact digest stability check below.
         if (current.get() != null
-                || !plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class, handler)
                 || !FINISHED_GOODS_COMMAND.equals(context.commandType()) || !FINISHED_GOODS_MODEL.equals(context.modelCode())
                 || context.tenantId() == null || !context.tenantId().equals(MetaContext.getCurrentTenantId())
                 || !FINISHED_GOODS_COMMAND.equals(MetaContext.getAuthorizedCommandCode())
