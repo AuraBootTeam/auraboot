@@ -2371,7 +2371,7 @@
                 {
                   "action": "navigate",
                   "args": {
-                    "path": "/p/ab_announcement_detail/view/${record.metadata.recordPid}"
+                    "path": "/p/ab_announcement/view/${record.metadata.recordPid}"
                   }
                 }
               ]
@@ -2920,7 +2920,7 @@
                 {
                   "action": "navigate",
                   "args": {
-                    "path": "/p/ab_announcement_detail/view/${record.sourceSnapshot.recordPid}"
+                    "path": "/p/ab_announcement/view/${record.sourceSnapshot.recordPid}"
                   }
                 }
               ]
@@ -3319,7 +3319,7 @@
                 {
                   "action": "navigate",
                   "args": {
-                    "path": "/p/ab_announcement_detail/view/${record.recordPid}"
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
                   }
                 }
               ]
@@ -3595,7 +3595,7 @@
                 {
                   "action": "navigate",
                   "args": {
-                    "path": "/p/ab_announcement_detail/view/${record.recordPid}"
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
                   }
                 }
               ]
@@ -3947,7 +3947,7 @@
                 {
                   "action": "navigate",
                   "args": {
-                    "path": "/p/ab_announcement_detail/view/${record.recordPid}"
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
                   }
                 }
               ]

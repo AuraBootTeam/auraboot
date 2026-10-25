@@ -193,6 +193,14 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
       rows: parsed.rows.length, byteCount: bytes.length, persistedDigestMatches: true, duplicateTasks: 0,
       uncertainResponseReplayed: true, timezone: artifacts[0].metadata.timezone }, null, 2));
     await expect(downloadButton).toBeEnabled(); await screenshot('export-downloaded');
+    await page.getByRole('button', { name: '返回公告', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
+    await expect(page.getByRole('heading', { name: fixture.title, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '接收统计', exact: true }).click();
+    await expect(page.getByTestId('metric-strip-item-actualRecipients')).toContainText('1');
+    await page.getByRole('button', { name: '返回公告', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
+    await expect(page.getByRole('heading', { name: fixture.title, exact: true })).toBeVisible();
   } finally {
     try {
       if (fixture) {
