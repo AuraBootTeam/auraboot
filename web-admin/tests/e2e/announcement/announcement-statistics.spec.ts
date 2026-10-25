@@ -208,7 +208,7 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     await expect(downloadButton).toBeEnabled(); await screenshot('export-downloaded');
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
-    await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('form-field-title').getByText(fixture.title, { exact: true })).toBeVisible();
     await expect(page.getByRole('cell', { name: fixture.actorName, exact: true })).toBeVisible();
     await page.getByRole('button', { name: '接收统计', exact: true }).click();
     await expect(page.getByTestId('metric-strip-item-actualRecipients')).toContainText('1');
@@ -238,7 +238,7 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     expect((await db.query('SELECT count(*)::int AS count FROM ab_announcement_delivery WHERE tenant_id=$1 AND version_pid=$2',[fixture.tenant,fixture.version])).rows[0].count).toBe(1);
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
-    await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('form-field-title').getByText(fixture.title, { exact: true })).toBeVisible();
     await expect(page.getByRole('cell', { name: fixture.actorName, exact: true })).toBeVisible();
   } finally {
     try {
