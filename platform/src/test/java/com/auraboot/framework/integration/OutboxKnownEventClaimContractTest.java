@@ -64,6 +64,16 @@ class OutboxKnownEventClaimContractTest {
         var hostile=new java.util.HashMap<>(parameters());hostile.put("leaseToken","x' OR TRUE --");
         assertThat(configuration.getMappedStatement(OutboxEventMapper.class.getName()+".countActiveDeliveryLease").getBoundSql(hostile).getSql()).isEqualTo(count.getSql()).doesNotContain("x' OR TRUE --");
     }
+    @Test void globalAndExactClaimsUseTheSameInstallationNamespaceWithoutChangingLeaseOrPayload() {
+        Configuration configuration=new Configuration();configuration.addMapper(OutboxEventMapper.class);
+        String global=configuration.getMappedStatement(OutboxEventMapper.class.getName()+".claimReadyEvents")
+            .getBoundSql(Map.of("limit",50,"leaseOwner","worker","leaseToken","lease","leaseUntil",Instant.EPOCH)).getSql();
+        for(String sql:List.of(global,known(parameters()).getSql())) {
+            assertThat(sql).contains(OutboxEventMapper.ORDERING_NAMESPACE_MATCH.trim());
+            assertThat(sql).contains("earlier.tenant_id = o.tenant_id", "earlier.ordering_key = o.ordering_key", "earlier.event_sequence < o.event_sequence");
+            assertThat(sql).doesNotContain("SET event_source", "SET ordering_key", "SET payload", "DELETE FROM");
+        }
+    }
     @Test void globalClaimContractIsUnchangedAndExactClaimDoesNotFallBackToIt() {
         Configuration configuration=new Configuration();configuration.addMapper(OutboxEventMapper.class);
         String global=configuration.getMappedStatement(OutboxEventMapper.class.getName()+".claimReadyEvents")

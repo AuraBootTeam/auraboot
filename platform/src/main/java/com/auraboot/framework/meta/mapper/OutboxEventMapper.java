@@ -24,6 +24,13 @@ import java.util.Map;
 @InterceptorIgnore(tenantLine = "true")
 public interface OutboxEventMapper {
 
+    /** External document numbers belong to one installation; local domain publishers retain aggregate-wide ordering. */
+    String ORDERING_NAMESPACE_MATCH =
+            "AND CASE WHEN earlier.event_source LIKE 'open-platform/%/%' " +
+            "THEN split_part(earlier.event_source, '/', 2) ELSE '' END " +
+            "= CASE WHEN o.event_source LIKE 'open-platform/%/%' " +
+            "THEN split_part(o.event_source, '/', 2) ELSE '' END ";
+
     @Insert("INSERT INTO ab_outbox (tenant_id, event_id, event_type, command_code, payload, " +
             "status, retry_count, max_retries, next_retry_at, created_at) " +
             "VALUES (#{tenantId}, #{eventId}, #{eventType}, #{commandCode}, " +
@@ -79,6 +86,7 @@ public interface OutboxEventMapper {
             "OR (o.status = 'processing' AND o.lease_until &lt; NOW())) " +
             "AND (o.ordering_key IS NULL OR NOT EXISTS (SELECT 1 FROM ab_outbox earlier " +
             "WHERE earlier.tenant_id = o.tenant_id AND earlier.ordering_key = o.ordering_key " +
+            ORDERING_NAMESPACE_MATCH +
             "AND earlier.event_sequence &lt; o.event_sequence " +
             "AND earlier.status IN ('pending', 'processing'))) " +
             "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT #{limit}) " +
@@ -97,6 +105,7 @@ public interface OutboxEventMapper {
             "OR (o.status = 'processing' AND o.lease_until &lt; NOW())) " +
             "AND (o.ordering_key IS NULL OR NOT EXISTS (SELECT 1 FROM ab_outbox earlier " +
             "WHERE earlier.tenant_id = o.tenant_id AND earlier.ordering_key = o.ordering_key " +
+            ORDERING_NAMESPACE_MATCH +
             "AND earlier.event_sequence &lt; o.event_sequence " +
             "AND earlier.status IN ('pending', 'processing'))) " +
             "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT 1) " +
