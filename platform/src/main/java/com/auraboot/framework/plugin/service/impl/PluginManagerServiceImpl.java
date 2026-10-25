@@ -225,6 +225,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
         if (record == null) {
             throw new PluginNotFoundException(pluginId);
         }
+        auraPluginManager.requireTenantLifecycleChange(record);
 
         PluginStatus currentStatus = record.getStatusEnum();
         if (currentStatus == PluginStatus.DISABLED) {
@@ -284,6 +285,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
         if (record == null) {
             throw new PluginNotFoundException(pluginId);
         }
+        auraPluginManager.requireTenantLifecycleChange(record);
 
         PluginStatus currentStatus = record.getStatusEnum();
         if (!currentStatus.canUninstall()) {

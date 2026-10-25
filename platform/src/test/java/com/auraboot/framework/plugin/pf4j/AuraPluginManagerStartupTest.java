@@ -26,6 +26,42 @@ class AuraPluginManagerStartupTest {
         @Override public void start() { throw new IllegalStateException("fixture start failure"); }
     }
 
+    public static class SharedApplicationModule implements com.auraboot.framework.plugin.extension.ApplicationModuleExtension {
+        public String moduleId() { return "shared-application"; }
+        public java.util.List<Class<?>> configurationTypes() { return java.util.List.of(); }
+    }
+
+    @Test void aPackagedSharedApplicationCannotBeHotRemovedButNormalHostShutdownStillStopsIt() throws Exception {
+        jar(GoodPlugin.class, null, SharedApplicationModule.class);
+        var manager = new AuraPluginManager(directory.toString());
+        try {
+            manager.init();
+            var original = manager.getPlugin("startup-fixture");
+            assertEquals(PluginState.STARTED, original.getPluginState());
+            assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                    () -> manager.requireTenantLifecycleChange("startup-fixture"));
+            assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                    () -> manager.hotUnloadPlugin("startup-fixture"));
+            assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                    () -> manager.hotReloadPlugin("startup-fixture"));
+            assertSame(original, manager.getPlugin("startup-fixture"));
+            assertEquals(PluginState.STARTED, original.getPluginState());
+            assertTrue(Files.exists(directory.resolve("fixture.jar")));
+            manager.cleanup();
+            assertEquals(PluginState.STOPPED, original.getPluginState());
+        } finally { manager.cleanup(); }
+    }
+
+    @Test void compositionMetadataProtectsImportedResourcesEvenWhenTheBackendIsNotLoaded() {
+        var manager = new AuraPluginManager(directory.toString());
+        var manifest = new com.auraboot.framework.plugin.dto.PluginManifest();
+        manifest.setMetadata(java.util.Map.of("lifecycleScope", "composition"));
+        var record = new com.auraboot.framework.plugin.entity.PluginRecord();
+        record.setPluginId("unloaded-product");record.setManifest(manifest);
+        assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                () -> manager.requireTenantLifecycleChange(record));
+    }
+
     private void jar(Class<?> pluginClass, String dependencies, Class<?>... extensions) throws Exception {
         var manifest = new Manifest();
         var attrs = manifest.getMainAttributes();

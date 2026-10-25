@@ -301,6 +301,7 @@ public class AuraPluginManager extends SpringPluginManager {
      * @return true if reload was successful
      */
     public boolean hotReloadPlugin(String pluginId) {
+        requireTenantLifecycleChange(pluginId);
         log.info("Hot-reloading plugin: {}", pluginId);
 
         PluginWrapper wrapper = getPlugin(pluginId);
@@ -346,6 +347,7 @@ public class AuraPluginManager extends SpringPluginManager {
      * @return true if unload was successful
      */
     public boolean hotUnloadPlugin(String pluginId) {
+        requireTenantLifecycleChange(pluginId);
         log.info("Hot-unloading plugin: {}", pluginId);
 
         PluginWrapper wrapper = getPlugin(pluginId);
@@ -377,6 +379,24 @@ public class AuraPluginManager extends SpringPluginManager {
     }
 
     // ========== Extension Discovery ==========
+
+    /** Shared application modules are changed by composition lifecycle, never a tenant plugin operation. */
+    public void requireTenantLifecycleChange(com.auraboot.framework.plugin.entity.PluginRecord record) {
+        var manifest = record.getManifest();
+        if (manifest != null && manifest.getMetadata() != null
+                && "composition".equals(manifest.getMetadata().get("lifecycleScope"))) {
+            throw com.auraboot.framework.exception.BusinessException.i18n("plugin.error.composition_lifecycle");
+        }
+        requireTenantLifecycleChange(record.getPluginId());
+        requireTenantLifecycleChange(record.getBackendPluginId());
+    }
+
+    public void requireTenantLifecycleChange(String pluginId) {
+        if (pluginId != null && getPlugin(pluginId) != null
+                && !getExtensionsOfType(com.auraboot.framework.plugin.extension.ApplicationModuleExtension.class, pluginId).isEmpty()) {
+            throw com.auraboot.framework.exception.BusinessException.i18n("plugin.error.composition_lifecycle");
+        }
+    }
 
     /**
      * Get all extensions of a specific type.
