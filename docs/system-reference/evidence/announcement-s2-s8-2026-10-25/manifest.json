@@ -2263,7 +2263,7 @@
       "core": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
       "bpm": "3861a3146caf07a16b0937971e4cba5c2433e8de"
     },
-    "deliverySourceEquivalence": "Subsequent Core commit changes only docs/index/public evidence; artifact producer remains exact tested source.",
+    "deliverySourceEquivalence": "Following delivery changes docs/index/public evidence and converts the identical fully-qualified AuthenticatedAccess annotation into an explicit import plus short name. Exact normalized Controller text matches tested 5f11717d0; artifact producer remains unchanged.",
     "coreCatalog": {
       "directory": "announcement-management/core-catalog-main-5f11717d0",
       "producer": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
@@ -2605,7 +2605,45 @@
       {
         "path": "announcement-management-bpm/main-integration-sla26-scheduler-fixed.log",
         "sha256": "10a64a1737798c027c36568f4f55118e234588112191c2cf2a9954777b0ce961"
+      },
+      {
+        "path": "announcement-management/main-integration-controller-authz-ci-failure.log",
+        "sha256": "bb6786530df76ec5d4252b295591c71839e83a28608289b7eaabb817610dfe7b"
+      },
+      {
+        "path": "announcement-management/main-integration-controller-authz-fixtures.log",
+        "sha256": "604e408a36361d8495522c46fe1ccea7e9cc84955744002900502af1e420cb78"
+      },
+      {
+        "path": "announcement-management/main-integration-controller-authz-audit.log",
+        "sha256": "da0a562c6149d7a59295ddb17f486c9aa8e480a6623e84b01e0b33164d6e739c"
+      },
+      {
+        "path": "announcement-management/main-integration-import-equivalence.log",
+        "sha256": "6dbb83f57c9e67f03a439bf134d78b9a139f0977f5bf963bbe4c09179f265a20"
       }
-    ]
+    ],
+    "authorizationScannerIntegration": {
+      "before": "GitHub gate failed on fully-qualified authorization marker at fb6fa99a7",
+      "change": "Same annotation type/value via explicit import; mappings, method bodies and permission semantics unchanged",
+      "scannerFixtures": {
+        "executed": 4,
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0
+      },
+      "repositoryAudit": {
+        "undecidedControllers": 0,
+        "baseline": 0,
+        "exitCode": 0
+      },
+      "evidence": [
+        "announcement-management/main-integration-controller-authz-ci-failure.log",
+        "announcement-management/main-integration-controller-authz-fixtures.log",
+        "announcement-management/main-integration-controller-authz-audit.log",
+        "announcement-management/main-integration-import-equivalence.log"
+      ],
+      "remoteNewHeadChecks": "independent; running is not passed"
+    }
   }
 }

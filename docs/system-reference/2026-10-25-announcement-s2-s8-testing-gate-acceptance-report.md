@@ -11,7 +11,7 @@ updated: 2026-10-25
 
 本轮在用户明确授权下吸收 main `9aab94663e73deaf9aab4594f27a5c4fa9bf11a3`，不合并 PR、不发布。当前设计裁决为 [§18.27](./announcement-management.md#1827-授权吸收-main-后的当前集成裁决)，确切源码、构件 lock/graph 和 12 张复核原图见[同一 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `mainIntegrationValidation`。下方“当前结论”、运行身份和旧执行表是原功能基线记录，只对原确切输入有效；不代表本轮重复运行。
 
-OSS 最终被测源码及 catalog producer 为 `5f11717d0a55dfd70c8988045055430cd6c3ce07`；BPM 为 `3861a3146caf07a16b0937971e4cba5c2433e8de`，正式消费上述 catalog。后续 OSS 交付提交只更新文档/证据，未重编译或冒称新二进制。合并语言键取双方并集；OpenAPI 类型正式重生成，digest `ab2f3c3c89b7cbd7dcdea82e3998a4e7226808475be6a97242261edf4b772f54`。
+OSS 最终被测源码及 catalog producer 为 `5f11717d0a55dfd70c8988045055430cd6c3ce07`；BPM 为 `3861a3146caf07a16b0937971e4cba5c2433e8de`，正式消费上述 catalog。后续 OSS 交付更新文档/证据及等价注解 import 写法，未重编译或冒称新二进制。合并语言键取双方并集；OpenAPI 类型正式重生成，digest `ab2f3c3c89b7cbd7dcdea82e3998a4e7226808475be6a97242261edf4b772f54`。
 
 路径以下均相对 Workspace `.workspace/evidence/`，日志、JUnit、collection/result 原件保留，未公开认证、数据库备份、原始 CSV 或私有对象地址。
 
@@ -37,6 +37,8 @@ OSS 最终被测源码及 catalog producer 为 `5f11717d0a55dfd70c8988045055430c
 BPM 首次构建 SLA 断言失败并最终 exit 137；137 原因未证。对 SLA26 的单项、加速后台定时器反例和修正后相同反例分别保留 `main-integration-sla26-{diagnostic,scheduler-counterexample,scheduler-fixed}.log`：加速反例 1 fail（预期 RETRY_PENDING 实为 DEAD_LETTER），修正测试配置后同反例 1 pass，随后完整构建 1657 通过。`plugin/backend/build.gradle` 只为 test 设置 retry initial delay 86400000ms，让测试显式驱动真实队列；生产定时器默认值/实现未改。不得把失败、中断和最终通过混为同轮。
 
 本轮 allowed_claim 为 **main-integrated-and-locally-validated-with-explicit-boundaries**。BPM 仍有 Workspace `RUNTIME_MANIFEST_MISSING` warning；独立产品及实际 BFF/DB/PID/cwd/source/artifact 证据通过，未声称零 warning。共享 CLI 前缀匹配缺陷未修，生命周期与构建串行。实际小程序 sender、远程 BPM、50000 人、独立 340 corpus、OCI/Linux/Jenkins、生产及自动需求级覆盖裁决 did_not_run；原容量 501 成员属于历史功能基线。没有新增待产品决定项。
+
+推送后远端 Controller authz gate 在 `fb6fa99a7` 发现完整类名授权注解无法被其短名扫描器识别。修正仅增加 `AuthenticatedAccess` import 并缩短同一注解名；注解值、接口和方法体无差异，文本归一化与被测 `5f11717d0` 精确相等（`main-integration-import-equivalence.log`）。`node --test scripts/check-controller-authz.test.mjs` 的 4 项 fixture 通过，`node scripts/check-controller-authz.mjs` 全仓未决授权 0、baseline 0，通过（`main-integration-controller-authz-{fixtures,audit}.log`）。没有放宽 baseline 或守卫；原 CI 失败日志保留为 `main-integration-controller-authz-ci-failure.log`。本地复验与新 head 的远端 Checks 分别裁决，运行中不算远端通过。
 
 ## 历史功能基线（吸收 main 前）
 

@@ -1291,7 +1291,7 @@ BPM Workspace 核验仍有 `RUNTIME_MANIFEST_MISSING` 警告；本轮通过独�
 
 | 当前输入 | 确切身份与结果 |
 | --- | --- |
-| OSS 源码 / Core catalog producer | `5f11717d0a55dfd70c8988045055430cd6c3ce07`；后续交付提交仅补充本文、报告、索引及公开证据 |
+| OSS 源码 / Core catalog producer | `5f11717d0a55dfd70c8988045055430cd6c3ce07`；后续交付仅更新文档/证据及等价注解 import 写法（见下文） |
 | Core catalog | `core-catalog-main-5f11717d0`；15 artifacts / 18 catalog entries；lock `sha256:4b2aed4bcd046413456a1c0a5608b29e43bae31c6429a88e7f4647268ef22d92`；graph `sha256:fb308ab0b0ed17c3cf2d8c7410b8cfad954cee1905cf303de78419389fd1b136` |
 | BPM producer / browser source | `3861a3146caf07a16b0937971e4cba5c2433e8de`；组合显式消费上行 Core catalog，不隐式构建兄弟源码 |
 | BPM 组合 | `bpm-composition-main-5f11717d0-scheduler`；22 artifacts；lock `sha256:e1532f66c916ffd4eee31324aa818482f02825ab9c09f99735e6bc83fc8fb898`；graph `sha256:58fcb7f322a353d3a78ecb1192753a45648ad237b0a876633688b984741c4baa` |
@@ -1309,3 +1309,6 @@ BPM Workspace 核验仍有 `RUNTIME_MANIFEST_MISSING` 警告；本轮通过独�
 12 张本次原图已逐张复核，位于[同一证据清单](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `mainIntegrationValidation.visualReviews`；对应表单、接收版本附件、窄屏确认/铃铛错误态、默认流程、冻结送审、决策、撤销原因及恢复替换。图片只裁决捕获状态，不外推全部排列。
 
 验证边界维持 §18.26：未追加小程序实际发送、远程 BPM、50000 人容量、独立 BPM 340 条 corpus、OCI/Linux/Jenkins 或生产验证。BPM Workspace 仍有 `RUNTIME_MANIFEST_MISSING` warning，产品独立 verify 与真实 BFF/DB/进程身份另行通过；共享 CLI Gradle 路径前缀匹配问题未修，本轮串行构建与生命周期操作。上游全部 147 个文件不等于都经本次业务回归。当前仅提交开放 PR，不合并、不部署；完整账本见[验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)。
+
+
+本轮推送触发的 GitHub Controller authz 扫描曾失败：`DomainExportController` 原本使用完整类名 `@com.auraboot.framework.permission.annotation.AuthenticatedAccess`，扫描器只匹配短注解名。改为显式 import 同一个类型并使用 `@AuthenticatedAccess`，注解值、映射、方法体和实际授权行为未变；精确文本归一化可还原被测 `5f11717d0` 文件。扫描器自身 4 项 fixture 和全仓 0 未决授权审计均通过，不通过修改 baseline 或放宽扫描规则解决。公开 source-bound 回归仍绑定原 catalog producer；未把新文档/import 提交冒称重新构建的二进制。推送新触发的远端 Checks 按 PR 当前结果独立裁决，尚在运行不算通过。
