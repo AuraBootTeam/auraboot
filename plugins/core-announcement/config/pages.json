@@ -1233,6 +1233,31 @@
               "command": "announcement:reconcile_approval",
               "operationType": "UPDATE"
             }
+          },
+          {
+            "code": "refresh_publication",
+            "label": {
+              "zh-CN": "刷新发布状态",
+              "en-US": "Refresh publication"
+            },
+            "permissionCode": "announcement.announcement.read",
+            "visibleWhen": "record.current_version_pid != null && (record.status === 'unpublished' || record.status === 'scheduled' || record.status === 'published' || record.status === 'withdrawn' || record.status === 'expired' || record.status === 'missed')",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "publicationFacts"
+                    ]
+                  }
+                }
+              ]
+            }
           }
         ]
       },

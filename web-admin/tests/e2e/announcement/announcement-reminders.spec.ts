@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
+import { authenticateBffSession } from '../../helpers/bff-auth-session';
 
 test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
 
@@ -237,4 +238,91 @@ test('published pinning persists through the native detail without changing its 
       }
     } finally { await db.end(); }
   }
+});
+
+test('a recovered original member retries the same blocked publication through its native execution row', async ({ page, browser, baseURL }, info) => {
+  test.setTimeout(90_000);
+  expect(baseURL).toBeTruthy();
+  const db = new Client(PG_CONN);await db.connect();
+  try {
+  expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(process.env.PGDATABASE || process.env.PG_DB);
+  const code = `notice_recover_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
+  const role = await successful(await page.request.post('/api/roles', { data: {
+    code, name: 'Publication recovery publisher', type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'all',
+  } }));
+  const codes = ['announcement.announcement.edit', 'announcement.announcement.publish', 'announcement.announcement.exempt',
+    'announcement.announcement.read', 'announcement.announcement.withdraw', 'model.ab_announcement.read'];
+  const permissions = (await db.query('SELECT p.id,p.code FROM ab_permission p JOIN ab_role r ON r.tenant_id=p.tenant_id WHERE r.pid=$1 AND p.code=ANY($2::text[]) AND p.deleted_flag=FALSE', [role.pid, codes])).rows;
+  expect(permissions.map(p => p.code).sort()).toEqual([...codes].sort());
+  await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, { data: permissions.map(p => ({ permissionId: p.id, granted: true })) }));
+  const email = `${code}@example.com`;
+  const user = await successful(await page.request.post('/api/admin/users', { data: {
+    email, displayName: 'Publication recovery publisher', initialPassword: 'Test2026x', roleCodes: [code], sendInviteEmail: false,
+  } }));
+  expect(user.memberPid).toEqual(expect.any(String));
+  const context = await browser.newContext({ baseURL, locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, storageState: { cookies: [], origins: [] } });
+  const publisher = await context.newPage();
+  const title = `Publication recovery ${randomUUID()}`;
+  let recordPid: string | undefined;let versionPid: string | undefined;let suspended = false;
+  const status = async (action: 'active' | 'suspended') => successful(await page.request.put(`/api/tenant/members/${user.memberPid}/status`, {
+    data: { action, reason: 'Owned publication recovery verification.' },
+  }));
+  const query = async () => (await db.query('SELECT a.row_version,a.status,r.pid AS release_pid,r.fencing_token,r.actor_member_pid,r.attempts,r.status AS release_status FROM ab_announcement a JOIN ab_announcement_release r ON r.tenant_id=a.tenant_id AND r.version_pid=a.current_version_pid WHERE a.pid=$1', [recordPid])).rows[0];
+  try {
+    await authenticateBffSession(context.request, baseURL!, email, 'Test2026x');
+    const created = await successful(await publisher.request.post('/api/announcements', { data: {
+      operationId: randomUUID(), title, content: 'Recover the original member and release, keeping all frozen business facts.',
+    } }));
+    recordPid = created.pid;
+    const saved = await command(publisher, 'announcement:update_announcement', recordPid!, created.row_version, {
+      audience_kind: 'selected', audience_users: [user.userPid], approval_mode: 'exempt',
+      exemption_reason: 'Authorized original-member publication recovery fixture.', scheduled_at: new Date(Date.now() + 20_000).toISOString(),
+    });
+    const accepted = await command(publisher, 'announcement:publish', recordPid!, saved.row_version);
+    versionPid = accepted.versionPid;const original = await query();
+    expect(original.actor_member_pid).toBe(user.memberPid);
+    await status('suspended');suspended = true;
+    await expect.poll(async () => (await query()).release_status, { timeout: 30_000 }).toBe('blocked');
+    const blocked = await query();
+    expect(Number((await db.query('SELECT count(*) AS count FROM ab_announcement_recipient WHERE version_pid=$1', [versionPid])).rows[0].count)).toBe(0);
+    await status('active');suspended = false;
+    await authenticateBffSession(context.request, baseURL!, email, 'Test2026x');
+    await enterFromMenu(publisher, title);
+    const execution = publisher.getByTestId('table-block').filter({ has: publisher.getByRole('columnheader', { name: '任务状态', exact: true }) });
+    await expect(execution.getByRole('cell', { name: '发布阻断', exact: true })).toBeVisible();
+    await expect(execution.getByRole('cell', { name: '原发布者暂不可用', exact: true })).toBeVisible();
+    await publisher.screenshot({ path: info.outputPath('publication-blocked.png'), fullPage: true, animations: 'disabled' });
+    await execution.getByRole('button', { name: '恢复发布任务', exact: true }).click();
+    await expect(publisher.getByTestId('confirm-dialog')).toContainText('沿用原版本、操作者和时间窗口');
+    await publisher.screenshot({ path: info.outputPath('publication-retry-confirm.png'), fullPage: true, animations: 'disabled' });
+    await publisher.getByTestId('confirm-cancel').click();
+    expect(await query()).toEqual(blocked);
+    await execution.getByRole('button', { name: '恢复发布任务', exact: true }).click();
+    const retry = publisher.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/commands/execute/announcement:retry_publication'));
+    await publisher.getByTestId('confirm-ok').click();const response = await retry;
+    expect(response.request().postDataJSON()).toMatchObject({ targetRecordPid: recordPid, expectedVersion: blocked.row_version, payload: {} });
+    expect(response.request().postDataJSON().clientRequestId).toMatch(/^[a-f0-9-]{36}$/);
+    const result = await successful(response);expect(result.data.releaseAttemptPid).toBe(original.release_pid);
+    await expect.poll(async () => (await query()).release_status, { timeout: 20_000 }).toBe('succeeded');
+    await publisher.getByRole('button', { name: '刷新发布状态', exact: true }).click();
+    await expect(execution.getByRole('cell', { name: '发布完成', exact: true })).toBeVisible();
+    await expect(execution.getByRole('button', { name: '恢复发布任务', exact: true })).toHaveCount(0);
+    await publisher.reload({ waitUntil: 'domcontentloaded' });
+    await expect(execution.getByRole('cell', { name: '发布完成', exact: true })).toBeVisible();
+    const finished = await query();expect(finished.release_pid).toBe(original.release_pid);expect(finished.actor_member_pid).toBe(user.memberPid);
+    expect(finished.attempts).toBe(2);expect(Number(finished.fencing_token)).toBeGreaterThan(Number(blocked.fencing_token));
+    expect(Number((await db.query("SELECT count(*) AS count FROM ab_announcement_audit WHERE announcement_pid=$1 AND command_code='announcement:publication_completed'", [recordPid])).rows[0].count)).toBe(1);
+    expect(Number((await db.query('SELECT count(*) AS count FROM ab_announcement_recipient WHERE version_pid=$1', [versionPid])).rows[0].count)).toBe(1);
+    await publisher.screenshot({ path: info.outputPath('publication-recovered.png'), fullPage: true, animations: 'disabled' });
+  } finally {
+    try {
+      if (suspended) { await status('active');await authenticateBffSession(context.request, baseURL!, email, 'Test2026x'); }
+      if (recordPid) {
+        const record = (await db.query('SELECT row_version,status FROM ab_announcement WHERE pid=$1', [recordPid])).rows[0];
+        if (record?.status === 'published') await command(publisher, 'announcement:archive', recordPid, record.row_version);
+        else if (['unpublished', 'scheduled'].includes(record?.status)) await command(publisher, 'announcement:cancel_schedule', recordPid, record.row_version);
+      }
+    } finally {await context.close();}
+  }
+  } finally {await db.end();}
 });
