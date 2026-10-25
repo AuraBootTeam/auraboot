@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "testedSource": "c1921cd6b45a59ed2a51607985d0dbc70ea9e2da",
+  "claim": "targeted-tested; incomplete S2-S8 scope",
+  "evidenceRound": "2026-10-25T01-03-32-015Z-5fa48cff-efb4-424a-946d-e63e1322aba8",
+  "browser": {
+    "executed": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "setupAuthentications": 1,
+    "specs": [
+      "announcement-lifecycle.spec.ts",
+      "announcement-policy.spec.ts",
+      "announcement-reminders.spec.ts",
+      "announcement-statistics.spec.ts"
+    ]
+  },
+  "backend": {
+    "executed": 22,
+    "passed": 22,
+    "failed": 0,
+    "skipped": 0,
+    "surface": "Actual PostgreSQL/HTTP/reliable outbox; automatic calendar fixtures replace host time only"
+  },
+  "requirementGroups": [
+    "D10",
+    "D11",
+    "D14"
+  ],
+  "visualReviews": [
+    {
+      "scenario": "reminder-batch-completed",
+      "group": "reminder",
+      "file": "visual/reminder-batch-completed.png",
+      "sha256": "71e0d959d14fde819f17e87ede8573f67078f4c45764162c68d081858f795e4b",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-batch-reloaded",
+      "group": "reminder",
+      "file": "visual/reminder-batch-reloaded.png",
+      "sha256": "8ac49427562c4c3ce1ca1ce28714fc4ab078ba2a99399c4910998a5460035a65",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-confirm-open",
+      "group": "reminder",
+      "file": "visual/reminder-confirm-open.png",
+      "sha256": "378e63ede263c1a42e09276fffc77c3a6e7331e66985b17bb23485d23f88513b",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-management-return",
+      "group": "reminder",
+      "file": "visual/reminder-management-return.png",
+      "sha256": "709dfc4ae21f6ba4adecbde38780bd0299593f068bbe4f072b2260f6212712d8",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-plan-active",
+      "group": "reminder",
+      "file": "visual/reminder-plan-active.png",
+      "sha256": "3f103a0a13ef6060db1c8b432741bc2c40354d8d35f1684ba1796b45bd568756",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-preview-ready",
+      "group": "reminder",
+      "file": "visual/reminder-preview-ready.png",
+      "sha256": "92168edf942a862409cb89da9a6881c7026439e5c5b4079e6f686cb0401ee8af",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-preview-throttled",
+      "group": "reminder",
+      "file": "visual/reminder-preview-throttled.png",
+      "sha256": "90cd1c43c3e6087c87260b351695f129965fbd21ab04d9c817120f9347286fe5",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-uncertain-response",
+      "group": "reminder",
+      "file": "visual/reminder-uncertain-response.png",
+      "sha256": "a6f737e61b0b665ddae0ee80d9ab7f79695d4bd60794fa2ec27e613b1084b902",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "export-completed",
+      "group": "statistics",
+      "file": "visual/export-completed.png",
+      "sha256": "a71e7ee25f7979762a49fd8c7fcee267bd442d2bbab5540e4b1906281d86953d",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "export-downloaded",
+      "group": "statistics",
+      "file": "visual/export-downloaded.png",
+      "sha256": "5754fc2fe53bab659f7def7dc53715dbb8c0e73b8d6d2c8e1d1c603542406f07",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "export-uncertain-network",
+      "group": "statistics",
+      "file": "visual/export-uncertain-network.png",
+      "sha256": "e5ef2d8f6fbc47483cf2c24962f1a456d802cd43f35763d458a84e1b51cea506",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-filter-open",
+      "group": "statistics",
+      "file": "visual/statistics-filter-open.png",
+      "sha256": "359cd175bbf3a00b0e2caf35fde75b648a3b5ccc85948cb48f48e3a215d3df8d",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-filtered-empty",
+      "group": "statistics",
+      "file": "visual/statistics-filtered-empty.png",
+      "sha256": "c7de1fd52a045a6e1d60e0656e85cbc08975fca59f0c221cfd66717226407a8e",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-overview",
+      "group": "statistics",
+      "file": "visual/statistics-overview.png",
+      "sha256": "5eeb89a3cfb5939f04f5c62a19a8176c7073416f028505b3547b092c4560fd09",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-recipients-left",
+      "group": "statistics",
+      "file": "visual/statistics-recipients-left.png",
+      "sha256": "f5ef3df015e71f949a23aa76042f06b1e54785faf7078ecbc83bb164d1727e0c",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-recipients-right",
+      "group": "statistics",
+      "file": "visual/statistics-recipients-right.png",
+      "sha256": "a9984e383ed765c68f5fe77ce693b9d88c0e9cf216325a7ca7aa8c8b4e56b99a",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    }
+  ],
+  "artifact": "artifact-validation.json",
+  "excludedFromPublicEvidence": [
+    "authentication storage",
+    "raw CSV",
+    "private artifact descriptors and keys",
+    "database credentials",
+    "unreviewed lifecycle/policy images"
+  ],
+  "remainingScope": "Canonical design §16.8 and acceptance report; this is not the complete feature denominator"
+}
