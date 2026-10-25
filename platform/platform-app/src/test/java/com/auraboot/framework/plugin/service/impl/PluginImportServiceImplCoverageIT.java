@@ -8,11 +8,14 @@ import com.auraboot.framework.plugin.service.PluginImportService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,11 +44,16 @@ class PluginImportServiceImplCoverageIT extends BaseIntegrationTest {
     private PluginImportService pluginImportService;
     @Autowired
     private ObjectMapper objectMapper;
+    @TempDir Path fixtureRoot;
 
     private String dirOf(String resourcePath) throws Exception {
-        var resource = getClass().getClassLoader().getResource(resourcePath);
-        assertThat(resource).as("fixture dir %s must exist", resourcePath).isNotNull();
-        return Paths.get(resource.toURI()).toString();
+        // These inline fixtures contain only plugin.json and may be packaged in the test-fixtures JAR.
+        Path directory=fixtureRoot.resolve(resourcePath);Files.createDirectories(directory);
+        try(var resource=getClass().getClassLoader().getResourceAsStream(resourcePath+"/plugin.json")) {
+            assertThat(resource).as("fixture manifest %s must exist",resourcePath).isNotNull();
+            Files.copy(resource,directory.resolve("plugin.json"),StandardCopyOption.REPLACE_EXISTING);
+        }
+        return directory.toString();
     }
 
     private ImportExecuteResult importDir(String resourcePath) throws Exception {
