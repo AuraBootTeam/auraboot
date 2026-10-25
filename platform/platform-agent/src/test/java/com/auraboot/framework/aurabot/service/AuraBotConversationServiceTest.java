@@ -82,4 +82,27 @@ class AuraBotConversationServiceTest {
         result.setUpdatedAt(Instant.parse(activity));
         return result;
     }
+    @Test void restoresVersionedGenericSnapshotsAndTraceWithoutExecutingTools() {
+        when(imConversations.isMember(71L, ImConstants.MEMBER_TYPE_HUMAN, 9L, 7L)).thenReturn(true);
+        when(analytics.restore(any())).thenReturn(List.of());
+        var message = new com.auraboot.framework.im.model.ImMessage();
+        message.setId(11L); message.setSeq(1L); message.setConversationId(71L);
+        message.setSenderType(ImConstants.SENDER_TYPE_AGENT);
+        message.setCardPayload("{\"traceId\":\"trace-1\",\"resultContractsVersion\":1,\"resultContracts\":[{\"skillCode\":\"platform.list_models\",\"status\":\"success\",\"renderHint\":\"table\",\"table\":[{\"code\":\"approve_log\",\"displayName\":\"审批台账\"}]}]}");
+        when(imMessages.getMessagesBeforeSeq(71L, Long.MAX_VALUE, 100, 7L)).thenReturn(List.of(message));
+        var history = service.getMessages(71L, 7L, 9L, 100);
+        assertEquals("trace-1", history.get(0).getTraceId());
+        var contracts = history.get(0).getResultContracts();
+        assertEquals(1, contracts.size());
+        assertEquals("success", contracts.get(0).getStatus());
+        assertEquals("审批台账", contracts.get(0).getTable().get(0).get("displayName"));
+        verify(imMessages).getMessagesBeforeSeq(71L, Long.MAX_VALUE, 100, 7L);
+        verifyNoInteractions(agents);
+    }
+
+    @Test void foreignTenantOrNonMemberCannotReadSnapshots() {
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.getMessages(71L, 8L, 9L, 100));
+        verifyNoInteractions(imMessages, analytics);
+    }
 }

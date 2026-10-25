@@ -44,19 +44,27 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
     /** CJK + English platform action verbs that imply a write action but not durable execution by themselves. */
     private static final Pattern PLATFORM_ACTION_PATTERN = Pattern.compile(
             "(创建|新建|新增|添加|编辑|修改|更新|" +
-                    "create|add|edit|update)",
+                    "(?<![A-Za-z0-9_])(?:create|add|edit|update)(?![A-Za-z0-9_]))",
             Pattern.CASE_INSENSITIVE);
 
     /** CJK + English platform action signals that require durable orchestration before model grounding. */
     private static final Pattern PLATFORM_DURABLE_PATTERN = Pattern.compile(
             "(批量|大量|全量|全部|删除|审批|导出|同步|外部|" +
-                    "batch|bulk|delete|approve|export|sync|external)",
+                    "(?<![A-Za-z0-9_])(?:batch|bulk|delete|approve|export|sync|external)(?![A-Za-z0-9_]))",
             Pattern.CASE_INSENSITIVE);
 
     /** CJK + English platform read verbs that should stay in a policy-gated read-only turn. */
     private static final Pattern PLATFORM_READONLY_PATTERN = Pattern.compile(
             "(查询|搜索|统计|筛选|分组|查看|列出|" +
-                    "query|search|filter|count|list|view all|show)",
+                    "(?<![A-Za-z0-9_])(?:query|search|filter|count|list|view all|show)(?![A-Za-z0-9_]))",
+            Pattern.CASE_INSENSITIVE);
+
+    // Ignore explicit field literals only for triage. The original request is untouched.
+    // Unquoted values stop at clause connectors so "名称为台账并删除旧记录" keeps 删除.
+    private static final Pattern BUSINESS_VALUE_PATTERN = Pattern.compile(
+            "(?:(?:显示名称|业务名称|模型名称|名称|编码|代码)\\s*(?:为|是|[:：=])|"
+                    + "(?<![A-Za-z0-9_])(?:named|called|(?:name|displayName|modelCode|code)\\s*(?:is\\b|[:=])))\\s*"
+                    + "(?:「[^」\\n]*」|『[^』\\n]*』|“[^”\\n]*”|\"[^\"\\n]*\"|'[^'\\n]*'|[^\\s,，。;；并然后再且]+)",
             Pattern.CASE_INSENSITIVE);
 
     /** Pure-explanation verbs: ask about page / record meaning, no platform action. */
@@ -116,7 +124,8 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
                     Set.of());
         }
 
-        String message = request.userMessage() == null ? "" : request.userMessage();
+        String message = BUSINESS_VALUE_PATTERN.matcher(
+                request.userMessage() == null ? "" : request.userMessage()).replaceAll(" ");
         boolean platformActionKeyword = PLATFORM_ACTION_PATTERN.matcher(message).find();
         boolean platformDurableKeyword = PLATFORM_DURABLE_PATTERN.matcher(message).find();
         boolean platformReadOnlyKeyword = PLATFORM_READONLY_PATTERN.matcher(message).find();

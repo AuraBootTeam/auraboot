@@ -802,6 +802,10 @@ public class AgentRunService {
                 runLifecycleService.stopHeartbeat(runPid);
             }
 
+            if (terminalOutcome instanceof RunOutcome.Success success && traceCtx != null) {
+                return new RunOutcome.Success(success.runPid(), success.finalResponse(), success.inputTokens(),
+                        success.outputTokens(), success.totalCost(), traceCtx.getTraceId());
+            }
             return terminalOutcome;
 
         } catch (AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted admitted) {
@@ -821,7 +825,8 @@ public class AgentRunService {
             try { aiTraceService.endTrace(traceCtx, null, "pending"); }
             catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
             // Task stays IN_PROGRESS — will be resumed after approval
-            return new RunOutcome.PendingApproval(runPid, e.getApprovalPid(), e.getMessage());
+            return new RunOutcome.PendingApproval(runPid, e.getApprovalPid(), e.getMessage(), e.getReview(),
+                    traceCtx != null ? traceCtx.getTraceId() : null);
         } catch (Exception e) {
             log.error("Agent execution failed: task={}, agent={}, error={}", taskPid, agentCode, e.getMessage(), e);
             runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, e.getMessage());

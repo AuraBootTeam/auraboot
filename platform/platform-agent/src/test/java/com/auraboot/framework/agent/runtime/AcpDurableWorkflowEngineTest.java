@@ -74,4 +74,19 @@ class AcpDurableWorkflowEngineTest {
         verify(emitter, never()).completeWithError(any());
     }
 
+    @Test void skillApprovalForwardsBusinessReviewAndTraceWithoutExposingPreviewCredential() {
+        var runs = mock(AgentRunService.class); var ctx = mock(TurnContext.class);
+        when(ctx.tenantId()).thenReturn(7L);
+        var input = java.util.Map.<String,Object>of("code", "sample");
+        var review = java.util.Map.<String,Object>of("_aurabot_skill", true, "skillName", "model:create",
+                "riskLevel", "HIGH", "preview", java.util.Map.of("input", input));
+        when(runs.executeTaskSync(7L, "task", "aurabot", "run"))
+                .thenReturn(new RunOutcome.PendingApproval("run", "approval", "Review operation", review, "trace-1"));
+        var sink = mock(com.auraboot.framework.conversation.ResponseSink.class);
+        var engine = new AcpDurableWorkflowEngine(runs, mock(DynamicDataMapper.class), new ObjectMapper());
+        assertThat(engine.resumeConversationRun(ctx, "task", "run", sink)).isInstanceOf(TurnOutcome.PendingConfirmation.class);
+        verify(sink).onConfirmRequired("approval", "agent_approval_gate", "Review operation", input, "approval", review);
+        verify(sink).onDone("", "trace-1");
+        assertThat(review).doesNotContainKey("previewToken");
+    }
 }

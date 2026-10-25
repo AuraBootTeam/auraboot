@@ -464,7 +464,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()), route);
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts(), capturingSink.capturedTraceId()), route);
         } catch (Exception e) {
             // Side effects must never block the outcome from being returned to the caller,
             // but the failure must not vanish silently (P-006).
@@ -608,7 +608,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()),
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts(), capturingSink.capturedTraceId()),
                     TurnRoute.resumedAfterConfirmation());
         } catch (Exception e) {
             recordFinalizeFailure(ctx, outcome, e);
@@ -703,6 +703,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
         TurnOutcome outcome;
         try {
+            ctx = restoreAcpConversationRouting(ctx, taskPid);
             outcome = switch (decision) {
                 case APPROVED -> {
                     Map<String, Object> approved = agentApprovalGateService.approve(
@@ -757,7 +758,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             // ACP approval resume: continuation executes on the durable engine.
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature(),
-                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts()),
+                    capturingSink.capturedRetrievalEvidence(), capturingSink.capturedResultContracts(), capturingSink.capturedTraceId()),
                     new TurnRoute(
                             TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW.name(),
                             "RESUMED_AFTER_APPROVAL",
@@ -766,6 +767,28 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             recordFinalizeFailure(ctx, outcome, e);
         }
         return outcome;
+    }
+
+    private TurnContext restoreAcpConversationRouting(TurnContext ctx, String taskPid) {
+        if (dynamicDataMapper == null || taskPid == null) return ctx;
+        var tasks = dynamicDataMapper.selectByQuery(
+                "SELECT input_data FROM ab_agent_task WHERE tenant_id=#{params.tenantId} AND pid=#{params.taskPid}",
+                Map.of("tenantId", ctx.tenantId(), "taskPid", taskPid));
+        if (tasks.isEmpty() || tasks.get(0).get("input_data") == null) return ctx;
+        try {
+            Object raw = tasks.get(0).get("input_data");
+            var input = raw instanceof Map<?, ?> ? objectMapper.valueToTree(raw)
+                    : objectMapper.readTree(String.valueOf(raw));
+            var conversationId = input.path("conversationId");
+            if (!conversationId.isIntegralNumber() || !conversationId.canConvertToLong()) return ctx;
+            return new TurnContext(ctx.turnId(), ctx.tenantId(), ctx.userId(), ctx.humanMemberId(), ctx.agentId(),
+                    input.path("agentCode").asText(ctx.agentCode()), input.path("channel").asText(ctx.channel()),
+                    input.path("profileId").asText(ctx.profileId()), input.path("channelSessionId").asText(ctx.channelSessionId()),
+                    conversationId.longValue(), ctx.inboundMessageId(), ctx.triageBucket(), ctx.allowedReadOnlyTools(),
+                    ctx.traceId(), ctx.taskPid(), ctx.beginAt(), ctx.executionPrincipal(), ctx.contextEnvelope());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new IllegalStateException("Saved task conversation routing is invalid", invalid);
+        }
     }
 
     private TurnOutcome mapApprovedChatToolOutcome(String approvalPid, Map<String, Object> chatToolResult,
