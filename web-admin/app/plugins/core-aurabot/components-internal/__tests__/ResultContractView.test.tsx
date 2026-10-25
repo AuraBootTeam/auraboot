@@ -27,6 +27,26 @@ const baseContract: ResultContract = {
 };
 
 describe('ResultContractView', () => {
+  it('keeps protocol metadata in expandable execution details', () => {
+    render(<ResultContractView contract={{ ...baseContract, renderHint: 'summary', textSummary: 'Ready' }} />);
+    const metadata = screen.getByTestId('rc-protocol-meta');
+    expect(metadata).not.toBeVisible();
+    fireEvent.click(screen.getByText(/Execution details|执行详情/));
+    expect(metadata).toBeVisible();
+    expect(metadata).toHaveTextContent('output: structured_result');
+  });
+
+  it('keeps legacy persisted preview failures diagnostic without claiming failure or execution', () => {
+    render(<ResultContractView contract={{ ...baseContract, status: 'failed',
+      textSummary: 'AuraBot skill requires confirmation before execution.' }} />);
+    const preview = screen.getByTestId('rc-approval-preview');
+    expect(preview.querySelector('pre')).not.toBeVisible();
+    expect(screen.queryByTestId('result-contract')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Approval preview details|审批预览详情/));
+    expect(preview.querySelector('pre')).toBeVisible();
+    expect(preview).toHaveTextContent('"status": "failed"');
+  });
+
   it('renders status + skillCode + durationMs header', () => {
     render(<ResultContractView contract={baseContract} />);
     expect(screen.getByText('success')).toBeInTheDocument();

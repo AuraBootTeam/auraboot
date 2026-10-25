@@ -167,6 +167,11 @@ public class ResultContractEmitter {
             Map<String, Object> parsed = resultJson == null || resultJson.startsWith("Error")
                     ? Map.of()
                     : objectMapper.readValue(resultJson, Map.class);
+            // A suspended preview is represented by its confirmation event, not a failed result.
+            if (Boolean.TRUE.equals(parsed.get("approvalRequired"))
+                    && parsed.get("previewToken") instanceof String token && !token.isBlank()) {
+                return;
+            }
             if (!success) {
                 Object error = parsed.get("error");
                 b.renderHint("summary")

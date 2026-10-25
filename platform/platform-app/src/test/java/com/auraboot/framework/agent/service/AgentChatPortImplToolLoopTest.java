@@ -396,9 +396,76 @@ class AgentChatPortImplToolLoopTest {
         assertThat(success.finalResponse()).isEqualTo("Acme PCB is available.");
         verify(traces).endTrace(trace, "Acme PCB is available.", "success");
         verify(sink).onTextChunk("Acme PCB is available.");
-        verify(sink).onDone("Acme PCB is available.", null);
+        verify(sink).onDone("Acme PCB is available.", "named-trace");
         // Final-turn message tape persisted so the next turn can rehydrate.
         verify(chatMessageTapeStore).storeConversationMessages(eq(SESSION_ID), any());
+    }
+
+    @Test
+    void namedAgentTraceIncludesEachGenerationAndTheTerminalReplyIdentity() throws Exception {
+        stubAgentDefinition();
+        stubProvider();
+        stubGrounding();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
+        var generation = com.auraboot.framework.agent.trace.SpanContext.builder()
+                .spanId("generation-1").traceId("named-trace").build();
+        when(traces.startSpan(eq(trace), isNull(), eq("generation"), anyString(), any())).thenReturn(generation);
+        when(provider.chat(any(), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(LlmChatResponse.builder().stopReason("end_turn").inputTokens(23).outputTokens(7)
+                        .content(List.of(LlmChatResponse.ContentBlock.builder().type("text").text("Observed reply").build())).build());
+        var outcome = service.runAgentTurn(newTurnContext(), newRequest("Observe this turn"), sink);
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        verify(traces).recordGeneration(eq(generation), eq("test-model"), eq(23), eq(7), any(), eq("end_turn"), any(), any());
+        verify(sink).onDone("Observed reply", "named-trace");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void backgroundTurnsScopeTheProviderAndLedgerToARealTraceAndRestoreTheWorker(boolean providerFails) throws Exception {
+        stubAgentDefinition(); stubProvider(); stubGrounding();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
+        var tracer = org.mockito.Mockito.mock(io.micrometer.tracing.Tracer.class);
+        var span = org.mockito.Mockito.mock(io.micrometer.tracing.Span.class, org.mockito.Mockito.RETURNS_SELF);
+        var context = org.mockito.Mockito.mock(io.micrometer.tracing.TraceContext.class);
+        var scope = org.mockito.Mockito.mock(io.micrometer.tracing.Tracer.SpanInScope.class);
+        when(tracer.nextSpan()).thenReturn(span); when(span.context()).thenReturn(context);
+        when(context.traceId()).thenReturn("12345678901234567890123456789012");
+        when(tracer.withSpan(span)).thenReturn(scope);
+        ReflectionTestUtils.setField(service, "tracer", tracer);
+        when(provider.chat(any(), any(), any())).thenAnswer(call -> {
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getOtelTraceId())
+                    .isEqualTo("12345678901234567890123456789012");
+            if (providerFails) throw new IllegalStateException("Provider unavailable");
+            return endTurnResponse("Scoped");
+        });
+        String previous = com.auraboot.framework.application.tenant.MetaContext.getOtelTraceId();
+        com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId(null);
+        try {
+            var outcome = service.runAgentTurn(newTurnContext(), newRequest("Observe"), sink);
+            assertThat(outcome).isInstanceOf(providerFails ? TurnOutcome.Failed.class : TurnOutcome.Success.class);
+            verify(provider).chat(any(), any(), any());
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getOtelTraceId()).isNull();
+            verify(scope).close(); verify(span).end();
+            verify(traces).createTrace(any(), any(), any(), any(), anyMap(), eq("12345678901234567890123456789012"));
+        } finally { com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId(previous); }
+    }
+
+    @Test
+    void anUnavailableTracingBackendDoesNotRepeatOrPreventTheModelCall() throws Exception {
+        stubAgentDefinition(); stubProvider(); stubGrounding();
+        when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class))).thenReturn(List.of());
+        var tracer = org.mockito.Mockito.mock(io.micrometer.tracing.Tracer.class);
+        when(tracer.nextSpan()).thenThrow(new IllegalStateException("Tracer unavailable"));
+        ReflectionTestUtils.setField(service, "tracer", tracer);
+        when(provider.chat(any(), any(), any())).thenReturn(endTurnResponse("Still available"));
+        String previous = com.auraboot.framework.application.tenant.MetaContext.getOtelTraceId();
+        com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId(null);
+        try {
+            assertThat(service.runAgentTurn(newTurnContext(), newRequest("Continue"), sink))
+                    .isInstanceOf(TurnOutcome.Success.class);
+            verify(provider).chat(any(), any(), any());
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getOtelTraceId()).isNull();
+        } finally { com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId(previous); }
     }
 
     @Test
@@ -416,7 +483,7 @@ class AgentChatPortImplToolLoopTest {
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
         verify(provider).chat(any(LlmChatRequest.class), anyString(), anyString());
-        verify(sink).onDone("Completed once.", null);
+        verify(sink).onDone("Completed once.", "named-trace");
         verify(traces, never()).endTraceWithError(any(), any());
     }
 
@@ -460,7 +527,7 @@ class AgentChatPortImplToolLoopTest {
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
         verify(providerFactory, times(1)).getProvider("stub");
         verify(providerFactory, never()).getProvider("openai");
-        verify(sink).onDone("[stub response]", null);
+        verify(sink).onDone("[stub response]", "named-trace");
     }
 
     @Test
@@ -820,7 +887,7 @@ class AgentChatPortImplToolLoopTest {
                 .contains("required tool call")
                 .contains("openai")
                 .contains("nq_pe_procurement_comparison_supplier_options");
-        verify(sink).onError(contains("required tool call"), eq(null));
+        verify(sink).onError(contains("required tool call"), eq("named-trace"));
         verify(sink, never()).onTextChunk(anyString());
         verify(sink, never()).onDone(anyString(), any());
         verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
@@ -1343,7 +1410,7 @@ class AgentChatPortImplToolLoopTest {
                 any(String.class),
                 eq(Map.of("productId", "P-100")),
                 eq(ctx.turnId()));
-        verify(sink).onDone("", null);
+        verify(sink).onDone("", "named-trace");
 
         // Pending entry persisted keyed by turnId; tape persisted by sessionId.
         ArgumentCaptor<PendingToolSnapshot> pendingCaptor =
@@ -1489,8 +1556,10 @@ class AgentChatPortImplToolLoopTest {
                 eq("aurabot_model_create"),
                 any(String.class),
                 eq(input),
-                eq(ctx.turnId()));
-        verify(sink).onDone("", null);
+                eq(ctx.turnId()),
+                eq(Map.of("_aurabot_skill", true, "skillName", "model:create", "riskLevel", "high",
+                        "preview", Map.of("modelCode", "crm_customer"), "previewToken", "preview-1")));
+        verify(sink).onDone("", "named-trace");
 
         ArgumentCaptor<ToolDiscoveryContext> discoveryCaptor =
                 ArgumentCaptor.forClass(ToolDiscoveryContext.class);
@@ -1535,7 +1604,7 @@ class AgentChatPortImplToolLoopTest {
                 .contains("LLM provider request failed.")
                 .doesNotContain("sk-secret")
                 .doesNotContain("Invalid scheme [stub]");
-        verify(sink).onError(contains("LLM provider request failed."), eq(null));
+        verify(sink).onError(contains("LLM provider request failed."), eq("named-trace"));
         // No sink.onDone on failure.
         verify(sink, never()).onDone(any(String.class), any());
         ArgumentCaptor<AgentRuntimeEvent> eventCaptor = ArgumentCaptor.forClass(AgentRuntimeEvent.class);
@@ -1601,7 +1670,7 @@ class AgentChatPortImplToolLoopTest {
         assertThat(failed.errorMessage()).contains("maximum rounds");
         // Provider was called exactly MAX_TOOL_ROUNDS times before the cap kicked in.
         verify(provider, times(5)).chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid"));
-        verify(sink).onError(any(String.class), eq(null));
+        verify(sink).onError(any(String.class), eq("named-trace"));
     }
 
     @Test

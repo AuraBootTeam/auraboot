@@ -34,6 +34,22 @@ async function propose() {
   await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('confirm_card'));
 }
 describe('approval decision feedback', () => {
+  it('replaces the same pending tool instead of duplicating its decision feedback', async () => {
+    vi.mocked(auraBotApi.chatStream).mockImplementation(async (_request, c) => {
+      c.onToolStart?.('decision', 'aurabot_model_create', { code: 'approval_visual_case' });
+      c.onToolResult?.('decision', { success: false, approvalRequired: true }, false);
+      c.onConfirmRequired?.('decision', 'aurabot_model_create', 'Review', { code: 'approval_visual_case' },
+        '01APPROVAL', { _aurabot_skill: true, riskLevel: 'HIGH', preview: { code: 'approval_visual_case' } });
+      c.onDone?.('');
+    });
+    render(<AuraBotProvider><Chat /></AuraBotProvider>);
+    fireEvent.click(screen.getByText('Propose'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('skill_preview_card'));
+    const pending = JSON.parse(screen.getByTestId('state').textContent || '{}').messages.filter((m: any) => m.toolId === 'decision');
+    expect(pending).toHaveLength(1);
+    expect(pending[0].riskLevel).toBe('HIGH');
+  });
+
   it('keeps unknown server diagnostics out of the approval UI', async () => {
     await propose(); fireEvent.click(screen.getByText('Cancel'));
     await waitFor(() => expect(auraBotApi.executeStream).toHaveBeenCalled());
@@ -65,6 +81,10 @@ describe('approval decision feedback', () => {
     await act(async () => { callbacks.onError('Approval already processed or expired: 01HIDDEN'); finish(); });
     expect(screen.getByTestId('state')).toHaveTextContent('该审批已过期或已处理，请刷新后重新查看。');
     expect(screen.getByTestId('state')).not.toHaveTextContent('01HIDDEN');
+    const messages = JSON.parse(screen.getByTestId('state').textContent || '{}').messages;
+    expect(messages.filter((message: any) => message.type === 'error')).toHaveLength(1);
+    expect(messages.find((message: any) => message.toolId === 'decision')?.type).toBe('error');
+    expect(messages.some((message: any) => message.type === 'tool_cancelled')).toBe(false);
     expect(screen.getByTestId('state')).not.toHaveTextContent('正在执行...');
     expect(screen.getByTestId('state')).not.toHaveTextContent('"type":"tool_executed"');
     expect(screen.getByTestId('state')).toHaveTextContent('"isLoading":false');

@@ -106,11 +106,11 @@ function SummaryView({ contract }: { contract: ResultContract }) {
         <p className="text-sm leading-relaxed whitespace-pre-wrap">{contract.textSummary}</p>
       )}
       {contract.data && Object.keys(contract.data).length > 0 && (
-        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dl className="mt-2 grid grid-cols-[minmax(5rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
           {Object.entries(contract.data).map(([k, v]) => (
             <div key={k} className="contents">
               <dt className="font-medium text-gray-700">{k}</dt>
-              <dd className="text-gray-900">{truncate(v, 200)}</dd>
+              <dd className="min-w-0 break-words text-gray-900">{truncate(v, 200)}</dd>
             </div>
           ))}
         </dl>
@@ -127,11 +127,11 @@ function CardView({ contract }: { contract: ResultContract }) {
         <div className="mb-2 text-sm font-medium">{contract.textSummary}</div>
       )}
       {entries.length > 0 && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dl className="grid grid-cols-[minmax(5rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
           {entries.map(([k, v]) => (
             <div key={k} className="contents">
               <dt className="text-gray-600">{k}</dt>
-              <dd className="text-gray-900">{truncate(v, 120)}</dd>
+              <dd className="min-w-0 break-words text-gray-900">{truncate(v, 120)}</dd>
             </div>
           ))}
         </dl>
@@ -181,6 +181,15 @@ export interface ResultContractViewProps {
 
 export function ResultContractView({ contract }: ResultContractViewProps) {
   const text = useSmartText();
+  // Older persisted previews were incorrectly emitted as failed execution results.
+  // Keep their diagnostic bytes inspectable without inventing a current execution status.
+  if (contract.status === 'failed'
+      && contract.textSummary === 'AuraBot skill requires confirmation before execution.') {
+    return <details data-testid="rc-approval-preview" className="text-xs text-gray-500">
+      <summary className="cursor-pointer py-1">{text({ 'zh-CN': '审批预览详情', 'en-US': 'Approval preview details' })}</summary>
+      <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words">{JSON.stringify(contract, null, 2)}</pre>
+    </details>;
+  }
   if (contract.status === 'failed' && contract.errorCode === 'analytics_history_unavailable') {
     return (
       <div
@@ -248,7 +257,16 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
   const metric = contractMetric(contract);
 
   return (
-    <div className="space-y-2" data-testid="result-contract">
+    <div className="min-w-0 max-w-full space-y-2" data-testid="result-contract">
+      <div className={`flex items-center gap-2 text-sm ${color}`}>
+        <Icon className="h-4 w-4 shrink-0" />
+        <span>{text({
+          'zh-CN': ({ success: '已完成', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
+          'en-US': ({ success: 'Completed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
+        })}</span>
+      </div>
+      <details className="min-w-0 text-xs text-gray-500" data-testid="rc-diagnostics">
+        <summary className="cursor-pointer py-1">{text({ 'zh-CN': '执行详情', 'en-US': 'Execution details' })}</summary>
       <div className="flex items-center gap-2 text-xs text-gray-600">
         <Icon className={`h-4 w-4 ${color}`} />
         <span className={`font-medium ${color}`}>{contract.status}</span>
@@ -304,6 +322,8 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
           </span>
         )}
       </div>
+
+      </details>
 
       {contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
         <TableView rows={resolveTableRows(contract)} />

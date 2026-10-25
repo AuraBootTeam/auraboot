@@ -38,6 +38,13 @@ public interface ResponseSink {
     void onConfirmRequired(String toolId, String toolName, String description,
                             Map<String, Object> input, String pendingTurnId);
 
+    /** Trusted server confirmation metadata; legacy transports keep their existing decision path. */
+    default void onConfirmRequired(String toolId, String toolName, String description,
+                                   Map<String, Object> input, String pendingTurnId,
+                                   Map<String, Object> extension) {
+        onConfirmRequired(toolId, toolName, description, input, pendingTurnId);
+    }
+
     /** v4: traceId passed on terminal event (sink does not pre-hold traceId). */
     void onError(String message, String traceId);
 

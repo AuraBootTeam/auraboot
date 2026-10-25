@@ -65,6 +65,14 @@ class ResultContractEmitterTest {
     }
 
     @Test
+    void aPendingSkillPreviewDoesNotEmitAFalseFailedContract() throws Exception {
+        emitter.emitProviderResult("aurabot_model_create", commandTool("model:create"),
+                mapper.writeValueAsString(Map.of("success", false, "approvalRequired", true,
+                        "previewToken", "opaque-preview", "error", "Requires confirmation")), 12, false);
+        assertThat(sse.events).isEmpty();
+    }
+
+    @Test
     @DisplayName("dsl_query success emits result_contract with renderHint=table + rows")
     void query_success_emits_table() throws Exception {
         String json = mapper.writeValueAsString(Map.of(

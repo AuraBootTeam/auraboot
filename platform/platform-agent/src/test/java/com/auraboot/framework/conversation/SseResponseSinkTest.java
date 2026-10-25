@@ -226,6 +226,18 @@ class SseResponseSinkTest {
     }
 
     @Test
+    void confirmationRiskAndPreviewSurviveTheThinkingDecorator() throws Exception {
+        var extension = Map.<String, Object>of("_aurabot_skill", true, "riskLevel", "HIGH",
+                "skillName", "model:create", "preview", Map.of("code", "reviewable_model"), "previewToken", "opaque-preview");
+        new ThinkingCapturingResponseSink(sink).onConfirmRequired("tool", "aurabot_model_create", "Review",
+                Map.of("code", "reviewable_model"), "pending-turn", extension);
+        var parsed = objectMapper.readValue((String) firstDataPayload(captureBuilder()), Map.class);
+        assertThat(parsed.get("extension")).isEqualTo(extension);
+        assertThat(parsed.get("input")).isEqualTo(Map.of("code", "reviewable_model"));
+        assertThat(parsed.get("pendingTurnId")).isEqualTo("pending-turn");
+    }
+
+    @Test
     @DisplayName("9) onConfirmRequired -> JSON-string {toolId, toolName, description, input, pendingTurnId}; null desc -> ''")
     void onConfirmRequired_nullDescriptionFallsBackToEmpty() throws Exception {
         sink.onConfirmRequired("tool-2", "cmd_delete_record", null, Map.of("id", 99), "01HW3KTURN");
