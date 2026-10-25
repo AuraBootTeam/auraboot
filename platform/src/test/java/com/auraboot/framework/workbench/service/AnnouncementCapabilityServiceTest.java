@@ -52,6 +52,37 @@ class AnnouncementCapabilityServiceTest {
         assertThat(service.approvalReadiness()).containsEntry("ready",false).containsEntry("reasonCode","APPROVAL_DEFAULT_DEFINITION_REQUIRED");
         verifyNoInteractions(workflows);
     }
+    @Test void installingBpmWithoutATenantDefaultDoesNotAdvertiseApprovalAsReady() {
+        ReflectionTestUtils.setField(service,"deliveryEnabled",true);
+        when(permissions.hasPermission(7L,"announcement.announcement.submit")).thenReturn(true);
+        when(catalog.available()).thenReturn(true);
+        when(policies.current()).thenReturn(new AnnouncementTenantPolicyService.Policy(4,false,null,30));
+        assertThat(service.capabilities().get("modes")).asList().contains(Map.of("code","approval","ready",false,
+            "reasonCode","APPROVAL_DEFAULT_DEFINITION_REQUIRED"));
+        assertThat(service.modeOptions()).allSatisfy(option->assertThat(option.get("disabled")).isEqualTo(true));
+        assertThat(service.defaultDefinitionOptions()).containsExactly(new AnnouncementAudienceService.Option("tenant_default",
+            Map.of("zh-CN","请管理员配置默认流程","en-US","Administrator must configure a default workflow")));
+        verifyNoInteractions(workflows);verify(catalog,never()).choices();
+    }
+    @Test void modeOptionsKeepPermissionFailuresVisibleWithoutCallingTheProvider() {
+        ReflectionTestUtils.setField(service,"deliveryEnabled",true);
+        var options=service.modeOptions();
+        assertThat(options).hasSize(2).allSatisfy(option->{
+            assertThat(option.get("disabled")).isEqualTo(true);
+            assertThat((Map<String,String>)option.get("label")).containsKey("zh-CN").containsKey("en-US");
+        });
+        assertThat(service.defaultDefinitionOptions().getFirst().value()).isEqualTo("tenant_default");
+        verifyNoInteractions(workflows);verify(catalog,never()).choices();
+    }
+    @Test void publisherDefaultOptionsNeverExposeCatalogChoicesOrTheProviderProof() {
+        when(permissions.hasPermission(7L,"announcement.announcement.submit")).thenReturn(true);
+        when(catalog.available()).thenReturn(true);
+        when(workflows.execute(eq(ApprovalContract.READINESS),any())).thenReturn(new WorkflowCapability.WorkflowResult(Map.of(
+            "ready",true,"definition",Map.of("pid","flow","version",2,"hash","a".repeat(64)),"definitionName","Tenant approval","secret","never public")));
+        assertThat(service.defaultDefinitionOptions()).containsExactly(new AnnouncementAudienceService.Option("tenant_default",
+            Map.of("zh-CN","租户默认流程：Tenant approval","en-US","Tenant default: Tenant approval")));
+        verify(catalog,never()).choices();
+    }
     @Test void aReadyNeutralPayloadReturnsOnlyTheBoundDefaultDefinition() {
         when(catalog.available()).thenReturn(true);
         when(workflows.execute(eq(ApprovalContract.READINESS),any())).thenReturn(new WorkflowCapability.WorkflowResult(Map.of(

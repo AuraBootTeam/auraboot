@@ -663,5 +663,12 @@
     "en-US": "This publication cannot be retried. Refresh and verify its state, expiry and execution window.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.error.tenant_default_required",
+    "zh-CN": "公告只能使用租户默认审批流程；请先在通知设置中明确选择租户默认审批。",
+    "en-US": "Announcements must use the tenant default approval workflow. Explicitly select the tenant default in notification settings first.",
+    "source": "import",
+    "refType": "message"
   }
 ]

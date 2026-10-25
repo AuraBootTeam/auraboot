@@ -31,6 +31,23 @@ class AnnouncementPolicyServiceTest {
             assertThatThrownBy(()->service.parse(input)).isInstanceOf(BusinessException.class);
         }
     }
+    @Test void newWorkflowOverridesAreRejectedWhileFrozenLegacyPoliciesRemainReadable() {
+        var legacy=Map.<String,Object>of("approvalMode","approval","definitionPid","legacy-flow");
+        assertThat(service.parseStored(legacy).definitionPid()).isEqualTo("legacy-flow");
+        assertThatThrownBy(()->service.validateDraft(legacy,null)).isInstanceOf(BusinessException.class)
+            .hasMessageContaining("tenant_default_required");
+        assertThatThrownBy(()->AnnouncementPolicyService.requireTenantDefault(service.parseStored(legacy)))
+            .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(files);
+    }
+    @Test void legacyDraftRequiresAnExplicitSwitchToTheTenantDefault() {
+        when(records.draftSettings(1L,"notice")).thenReturn("{\"approvalMode\":\"approval\",\"definitionPid\":\"legacy-flow\"}");
+        assertThatThrownBy(()->service.fromForm(Map.of("ack_days",14),"notice")).isInstanceOf(BusinessException.class);
+        var encoded=service.fromForm(Map.of("approval_definition","tenant_default","ack_days",14),"notice");
+        assertThat(encoded).contains("\"definitionPid\":null").contains("\"approvalMode\":\"approval\"");
+        assertThatThrownBy(()->service.fromForm(Map.of("approval_definition","another-flow"),"notice"))
+            .isInstanceOf(BusinessException.class);
+    }
     @Test void foreignTenantAttachmentIsRejectedBeforeItsMetadataIsRead() {
         var policy=service.parse(Map.of("attachmentPids",List.of("foreign-file")));
         assertThatThrownBy(()->service.verifyAttachments(policy,"notice",false)).isInstanceOf(BusinessException.class);

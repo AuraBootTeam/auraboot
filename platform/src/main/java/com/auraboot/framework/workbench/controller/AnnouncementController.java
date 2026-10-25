@@ -75,13 +75,17 @@ public class AnnouncementController {
         return ApiResponse.success(audiences.options(kind));
     }
 
-    private final com.auraboot.framework.workbench.service.AnnouncementApprovalCatalog approvalCatalog;
 
     @GetMapping("/approval-options")
     @RequirePermission("announcement.announcement.publish")
     public ApiResponse<List<com.auraboot.framework.workbench.service.AnnouncementAudienceService.Option>> approvalOptions() {
-        access.actor("publish");
-        return ApiResponse.success(approvalCatalog.choices());
+        return ApiResponse.success(capabilities.defaultDefinitionOptions());
+    }
+
+    @GetMapping("/approval-mode-options")
+    @RequirePermission("announcement.announcement.publish")
+    public ApiResponse<List<Map<String,Object>>> approvalModeOptions() {
+        return ApiResponse.success(capabilities.modeOptions());
     }
 
     public record AudiencePreviewRequest(String recordPid,

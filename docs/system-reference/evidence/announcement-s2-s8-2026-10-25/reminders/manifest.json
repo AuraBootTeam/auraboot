@@ -247,5 +247,54 @@
       }
     ],
     "claim": "Targeted functional validation; these two current originals reviewed; full visual and BPM matrix remains open"
+  },
+  "publicationRecoveryValidation": {
+    "testedSource": "2e248b1c9943201f82e4d629277f541955b982c2",
+    "evidenceRound": "2026-10-25T02-32-58-732Z-ceda6732-80e0-4f4d-b402-1e76812d17a4",
+    "unitPassed": 106,
+    "integrationPassed": 32,
+    "targetBrowserPassed": 1,
+    "existingBrowserRegressionPassed": 15,
+    "skipped": 0,
+    "retries": 0,
+    "frontendUnitPassedAtEquivalentProductionSource": 212,
+    "visualReviews": [
+      {
+        "scenario": "publication-blocked",
+        "file": "recovery/publication-blocked.png",
+        "sha256": "aa41020d3ef7877568e62c3726d804d7e784dd38ad388f2f4c280b748c73bb0c",
+        "review": "reviewed_pass",
+        "observation": "Blocked state shows the last completed attempt, original-member issue, cumulative attempt count and explicit recovery action."
+      },
+      {
+        "scenario": "publication-retry-confirm",
+        "file": "recovery/publication-retry-confirm.png",
+        "sha256": "769337b3accc436513e1fc4579e4f353983855fd29122c490ab77e2648d0a7ff",
+        "review": "reviewed_pass",
+        "observation": "Confirmation explains preservation of original version, actor and time window; cancel and confirm are legible."
+      },
+      {
+        "scenario": "publication-recovered",
+        "file": "recovery/publication-recovered.png",
+        "sha256": "7f60339253f78436c723b05c06efed743e8ccfefd413d443a3d69f893f9e8781",
+        "review": "reviewed_pass",
+        "observation": "Completed state shows two attempts, the actual publisher and publication time; the issue is cleared and recovery action is absent."
+      },
+      {
+        "scenario": "reminder-history-page-one",
+        "file": "history-current/reminder-history-page-one.png",
+        "sha256": "6ff8ed1d63579b2c172b26ac22ba38fc16ff1eba28a3fad2e7259d1634ab6cd9",
+        "review": "reviewed_pass",
+        "observation": "Visible first-page rows and all table headings are legible. The separate pagination original supplies the offscreen footer; row-count assertion confirms 20 records."
+      },
+      {
+        "scenario": "reminder-history-page-one-pagination",
+        "file": "history-current/reminder-history-page-one-pagination.png",
+        "sha256": "e1a3978cd4d211288f041d16ad775e5f7d61e0b8b22666f0814d1d826d468169",
+        "review": "reviewed_pass",
+        "observation": "Footer shows page one of two, 26 records, page size 20, disabled previous and available next page."
+      }
+    ],
+    "claim": "Targeted publication recovery and existing announcement regression; full S2-S8 acceptance remains open. New tenant-default approval changes are not covered by this round."
   }
 }

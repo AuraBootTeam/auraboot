@@ -125,6 +125,12 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         http.perform(get("/api/announcements/capabilities")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.attachments.maxCount").value(10))
             .andExpect(jsonPath("$.data.channels[1].ready").value(false));
+        http.perform(get("/api/announcements/approval-mode-options")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[1].value").value("approval"))
+            .andExpect(jsonPath("$.data[1].disabled").value(true));
+        http.perform(get("/api/announcements/approval-options")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[0].value").value("tenant_default"));
         boolean original=permissions.hasPermission(getTestUser().getId(),"announcement.announcement.submit");
         try {
             removeOwnSubmitGrant();
@@ -139,6 +145,16 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             else removeOwnSubmitGrant();
             permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
         }
+    }
+
+    @Test void aPublisherCannotCreateAPerRecordWorkflowOverrideOrLeaveAnOperationBehind() {
+        String operation=UniqueIdGenerator.generate();
+        assertThatThrownBy(()->lifecycle.execute("announcement:create_announcement",null,
+            Map.of("title","Forbidden workflow override","content","Use only the tenant default.",
+                "policy",Map.of("approvalMode","approval","definitionPid","arbitrary-workflow")),operation,null))
+            .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("tenant_default_required");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_operation WHERE tenant_id=? AND operation_id=?",
+            Integer.class,getTestTenant().getId(),operation)).isZero();
     }
 
     private void removeOwnSubmitGrant() {

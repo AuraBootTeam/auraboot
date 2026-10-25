@@ -95,7 +95,8 @@ public class AnnouncementApprovalService {
         if(!"draft".equals(record.getStatus()) || record.getActiveVersionPid()!=null) invalid("not_editable");
         var policy=policies.load(record.getPid());
         if(!"approval".equals(policy.approvalMode())) invalid("approval_mode_required");
-        String definition=policy.definitionPid()==null || policy.definitionPid().isBlank() ? tenantPolicies.current().defaultDefinitionPid() : policy.definitionPid();
+        AnnouncementPolicyService.requireTenantDefault(policy);
+        String definition=tenantPolicies.current().defaultDefinitionPid();
         if(definition==null || definition.isBlank()) invalid("approval_definition_required");
         var readiness=call(ApprovalContract.READINESS,Map.of("businessType","announcement","definitionPid",definition));
         if(!Boolean.TRUE.equals(readiness.get("ready"))) invalid("approval_not_ready");

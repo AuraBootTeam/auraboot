@@ -228,38 +228,27 @@
                     "zh-CN": "发布方式",
                     "en-US": "Approval mode"
                   },
-                  "type": "select",
+                  "type": "segmented",
                   "group": {
                     "zh-CN": "发布与审批",
                     "en-US": "Publication and approval"
                   },
                   "defaultValue": "${record.approval_mode}",
                   "dataSource": {
-                    "type": "static",
-                    "data": [
-                      {
-                        "value": "exempt",
-                        "label": {
-                          "zh-CN": "免审发布",
-                          "en-US": "Exempt publication"
-                        }
-                      },
-                      {
-                        "value": "approval",
-                        "label": {
-                          "zh-CN": "审批后发布",
-                          "en-US": "Publish after approval"
-                        }
-                      }
-                    ]
+                    "type": "api",
+                    "endpoint": "/api/announcements/approval-mode-options"
                   },
-                  "required": true
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "仅可选择当前权限和租户政策允许的方式；不可用原因会在选项上显示。已有审批草稿不会自动转为免审。",
+                    "en-US": "Only modes allowed by current permissions and tenant policy can be selected. Unavailable reasons are shown. Existing approval drafts never become exempt automatically."
+                  }
                 },
                 {
                   "field": "approval_definition",
                   "label": {
-                    "zh-CN": "审批流程",
-                    "en-US": "Approval process"
+                    "zh-CN": "租户默认审批流程",
+                    "en-US": "Tenant default approval process"
                   },
                   "type": "select",
                   "group": {
@@ -272,14 +261,18 @@
                     "endpoint": "/api/announcements/approval-options"
                   },
                   "helpText": {
-                    "zh-CN": "可先保存草稿。提交前选择可用流程，或使用租户公告政策中的默认流程。",
-                    "en-US": "You can save the draft first. Before submission, select an available workflow or use the tenant default."
+                    "zh-CN": "提交时固定管理员配置的默认流程；不可自选。历史草稿如曾指定其他流程，请明确选择“租户默认流程”后保存。已提交审批不受默认流程变更影响。",
+                    "en-US": "Submission freezes the administrator-configured default. Publishers cannot choose other workflows. For legacy drafts, explicitly choose the tenant default and save. Existing submissions retain their frozen workflow."
                   },
                   "visibleWhen": {
                     "field": "approval_mode",
                     "value": "approval"
                   },
-                  "required": false
+                  "required": false,
+                  "placeholder": {
+                    "zh-CN": "使用租户默认审批",
+                    "en-US": "Use tenant default approval"
+                  }
                 },
                 {
                   "field": "scheduled_at",
@@ -822,38 +815,27 @@
                     "zh-CN": "发布方式",
                     "en-US": "Approval mode"
                   },
-                  "type": "select",
+                  "type": "segmented",
                   "group": {
                     "zh-CN": "发布与审批",
                     "en-US": "Publication and approval"
                   },
                   "defaultValue": "${record.approval_mode}",
                   "dataSource": {
-                    "type": "static",
-                    "data": [
-                      {
-                        "value": "exempt",
-                        "label": {
-                          "zh-CN": "免审发布",
-                          "en-US": "Exempt publication"
-                        }
-                      },
-                      {
-                        "value": "approval",
-                        "label": {
-                          "zh-CN": "审批后发布",
-                          "en-US": "Publish after approval"
-                        }
-                      }
-                    ]
+                    "type": "api",
+                    "endpoint": "/api/announcements/approval-mode-options"
                   },
-                  "required": true
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "仅可选择当前权限和租户政策允许的方式；不可用原因会在选项上显示。已有审批草稿不会自动转为免审。",
+                    "en-US": "Only modes allowed by current permissions and tenant policy can be selected. Unavailable reasons are shown. Existing approval drafts never become exempt automatically."
+                  }
                 },
                 {
                   "field": "approval_definition",
                   "label": {
-                    "zh-CN": "审批流程",
-                    "en-US": "Approval process"
+                    "zh-CN": "租户默认审批流程",
+                    "en-US": "Tenant default approval process"
                   },
                   "type": "select",
                   "group": {
@@ -866,14 +848,18 @@
                     "endpoint": "/api/announcements/approval-options"
                   },
                   "helpText": {
-                    "zh-CN": "可先保存草稿。提交前选择可用流程，或使用租户公告政策中的默认流程。",
-                    "en-US": "You can save the draft first. Before submission, select an available workflow or use the tenant default."
+                    "zh-CN": "提交时固定管理员配置的默认流程；不可自选。历史草稿如曾指定其他流程，请明确选择“租户默认流程”后保存。已提交审批不受默认流程变更影响。",
+                    "en-US": "Submission freezes the administrator-configured default. Publishers cannot choose other workflows. For legacy drafts, explicitly choose the tenant default and save. Existing submissions retain their frozen workflow."
                   },
                   "visibleWhen": {
                     "field": "approval_mode",
                     "value": "approval"
                   },
-                  "required": false
+                  "required": false,
+                  "placeholder": {
+                    "zh-CN": "使用租户默认审批",
+                    "en-US": "Use tenant default approval"
+                  }
                 },
                 {
                   "field": "scheduled_at",

@@ -89,6 +89,7 @@ public class AnnouncementPolicyService {
             if(field.startsWith("audience_")) audience.put(key,value);
             else if("attachments".equals(field)) values.put(key,uploadedFilePids(value));
             else if("scheduled_at".equals(field) && value instanceof Instant instant) values.put(key,instant.toString());
+            else if("approval_definition".equals(field) && "tenant_default".equals(value)) values.put(key,null);
             else values.put(key,value);
         });
         if("all".equals(input.get("audience_kind"))) {
@@ -109,8 +110,14 @@ public class AnnouncementPolicyService {
         if(!(input instanceof Map<?,?>)) invalid();
         @SuppressWarnings("unchecked") Map<String,Object> values=(Map<String,Object>)input;
         Policy policy=parse(values);
+        requireTenantDefault(policy);
         verifyAttachments(policy,recordPid,false);
         return encode(policy);
+    }
+
+    public static void requireTenantDefault(Policy policy) {
+        if(policy.definitionPid()!=null && !policy.definitionPid().isBlank())
+            throw BusinessException.i18n("announcement.error.tenant_default_required");
     }
 
     public void linkDraftAttachments(String recordPid,String settings) {
