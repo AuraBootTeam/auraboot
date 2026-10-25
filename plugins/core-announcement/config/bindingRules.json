@@ -103,5 +103,12 @@
     "handlerClass": "announcementCommandHandler",
     "sequence": 10,
     "enabled": true
+  },
+  {
+    "commandCode": "announcement:retry_publication",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
   }
 ]

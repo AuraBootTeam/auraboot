@@ -26,8 +26,9 @@ public class AnnouncementReleaseWorker {
             // CATCH: this boundary has no transaction; perform has already rolled back before failure evidence is stored.
             try { releases.perform(claim); }
             catch(AccessDeniedException | BusinessException error) {
-                releases.fail(claim,"blocked",error.getClass().getSimpleName());
-                log.warn("Announcement release blocked: release={}, reason={}",claim.get("pid"),error.getClass().getSimpleName());
+                String reason=failureCode(error);
+                releases.fail(claim,"blocked",reason);
+                log.warn("Announcement release blocked: release={}, reason={}",claim.get("pid"),reason);
             } catch(TransientDataAccessException error) {
                 boolean exhausted=((Number)claim.get("attempts")).intValue()>=4;
                 releases.fail(claim,exhausted ? "blocked" : "retryable_failed",exhausted ? "RETRY_EXHAUSTED" : "TRANSIENT_DATABASE_FAILURE");
@@ -37,5 +38,12 @@ public class AnnouncementReleaseWorker {
                 log.error("Announcement release failed: release={}",claim.get("pid"),error);
             }
         }
+    }
+
+    static String failureCode(RuntimeException error) {
+        if(error instanceof AccessDeniedException) return "AUTHORIZATION_DENIED";
+        String message=error.getMessage(),prefix="$i18n:announcement.error.";
+        return AnnouncementReleaseService.publicFailureCode(message!=null && message.startsWith(prefix)
+            ? message.substring(prefix.length()).toUpperCase(java.util.Locale.ROOT) : null);
     }
 }

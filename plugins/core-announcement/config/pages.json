@@ -1331,6 +1331,132 @@
         "visibleWhen": "record.approval_mode == 'approval' && record.current_version_pid != null"
       },
       {
+        "id": "announcement_publication_status",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "发布执行",
+          "en-US": "Publication execution"
+        },
+        "dataSource": "publicationFacts",
+        "visibleWhen": "record.current_version_pid != null && (record.status === 'unpublished' || record.status === 'scheduled' || record.status === 'published' || record.status === 'withdrawn' || record.status === 'expired' || record.status === 'missed')",
+        "emptyText": {
+          "zh-CN": "此版本尚无发布执行记录。",
+          "en-US": "This version has no publication execution record."
+        },
+        "columns": [
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "任务状态",
+              "en-US": "Task state"
+            },
+            "dictCode": "announcement_publication_job",
+            "width": 130
+          },
+          {
+            "field": "plannedAt",
+            "label": {
+              "zh-CN": "计划发布时间",
+              "en-US": "Planned publication"
+            },
+            "valueType": "datetime",
+            "width": 190
+          },
+          {
+            "field": "latestAllowedAt",
+            "label": {
+              "zh-CN": "最晚执行时间",
+              "en-US": "Latest execution"
+            },
+            "valueType": "datetime",
+            "width": 190
+          },
+          {
+            "field": "attempts",
+            "label": {
+              "zh-CN": "累计尝试",
+              "en-US": "Attempts"
+            },
+            "width": 100
+          },
+          {
+            "field": "errorCode",
+            "label": {
+              "zh-CN": "处理提示",
+              "en-US": "Attention"
+            },
+            "dictCode": "announcement_publication_issue",
+            "width": 300
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "retry_publication",
+            "label": {
+              "zh-CN": "恢复发布任务",
+              "en-US": "Retry publication"
+            },
+            "permissionCode": "announcement.announcement.publish",
+            "visibleWhen": "record.canRetry === true",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.confirm",
+                  "args": {
+                    "title": {
+                      "zh-CN": "恢复同一发布任务？",
+                      "en-US": "Retry this publication?"
+                    },
+                    "content": {
+                      "zh-CN": "沿用原版本、操作者和时间窗口，重新检查发布条件；不会替换正文、重新批准或延长窗口。",
+                      "en-US": "Keep the original version, actor and time window, and recheck publication conditions. This does not replace content, approve again, or extend the window."
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "publicationRetry_${record.recordRevision}",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:retry_publication",
+                  "body": {
+                    "clientRequestId": "${state['publicationRetry_' + record.recordRevision]}",
+                    "targetRecordPid": "${record.recordPid}",
+                    "expectedVersion": "${record.recordRevision}",
+                    "payload": {}
+                  },
+                  "target": "publicationRetried"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "publicationRetry_${record.recordRevision}",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "publicationFacts"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "announcement_publisher",
         "blockType": "table",
         "title": {
@@ -1434,6 +1560,12 @@
         "type": "api",
         "method": "get",
         "endpoint": "/api/announcements/records/${$page.recordPid}/management-summary",
+        "adaptor": "raw"
+      },
+      "publicationFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/records/${$page.recordPid}/publication",
         "adaptor": "raw"
       }
     }

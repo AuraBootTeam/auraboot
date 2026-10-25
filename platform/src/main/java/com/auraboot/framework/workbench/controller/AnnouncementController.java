@@ -35,6 +35,11 @@ public class AnnouncementController {
     @GetMapping("/approval-readiness")
     @RequirePermission("announcement.announcement.submit")
     public ApiResponse<Map<String,Object>> approvalReadiness() {return ApiResponse.success(capabilities.approvalReadiness());}
+
+    private final com.auraboot.framework.workbench.service.AnnouncementReleaseService releases;
+    @GetMapping("/records/{pid}/publication")
+    @RequirePermission("announcement.announcement.read")
+    public ApiResponse<Map<String,Object>> publication(@PathVariable String pid) {return ApiResponse.success(releases.summary(pid));}
     private final com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyService operatingPolicies;
 
     @GetMapping("/policy")

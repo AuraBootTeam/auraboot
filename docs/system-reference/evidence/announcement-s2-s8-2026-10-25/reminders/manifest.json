@@ -221,5 +221,31 @@
       "failures": 0,
       "skipped": 0
     }
+  },
+  "managementValidation": {
+    "testedSource": "5cfd5fcd0af96bc836fcb007078ea8594dbf0e66",
+    "evidenceRound": "2026-10-25T01-47-00-260Z-071c0a16-df2d-4268-9602-87bff108d01e",
+    "unitPassed": 104,
+    "integrationPassed": 28,
+    "browserPassed": 15,
+    "skipped": 0,
+    "retries": 0,
+    "visualReviews": [
+      {
+        "scenario": "announcement-pin-confirm",
+        "file": "management/announcement-pin-confirm.png",
+        "sha256": "2a6cccd60042c1d63a3f31cb3782b9afbd7a94828aa02b7d35720360990c2834",
+        "review": "reviewed_pass",
+        "observation": "Open confirmation explains root ordering and no notification resend; cancel/confirm focus and labels are clear."
+      },
+      {
+        "scenario": "announcement-pinned",
+        "file": "management/announcement-pinned.png",
+        "sha256": "c8ed9224494114b2afe9017ac56860aa1b3838bfcd4d404fd25195814f37acdd",
+        "review": "reviewed_pass",
+        "observation": "Reloaded detail shows the pinned state, unpin action and human publisher; all five header actions fit the captured viewport."
+      }
+    ],
+    "claim": "Targeted functional validation; these two current originals reviewed; full visual and BPM matrix remains open"
   }
 }

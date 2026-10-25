@@ -44,12 +44,12 @@ const schema = {
   blocks: [],
 } as any;
 let observed: any;
-function Page({ record = 'p1' }: { record?: string }) {
+function Page({ record = 'p1', revision = 1, revisionScoped = false }: { record?: string; revision?: number; revisionScoped?: boolean }) {
   const { runtime } = usePageRuntime(schema, {
     additionalContext: {
       global: { user: { id: 'forged' }, tenant: { id: '999' } },
       form: { pid: record, quantity: '250.0000' },
-      record: { pid: record },
+      record: { pid: record, revision },
       $page: { recordPid: record },
     },
   });
@@ -70,17 +70,17 @@ function Page({ record = 'p1' }: { record?: string }) {
                 steps: [
                   {
                     action: 'state.ensureRequestKey',
-                    args: { field: 'requestKey', persistence: 'session' },
+                    args: { field: revisionScoped ? 'requestKey_${record.revision}' : 'requestKey', persistence: 'session' },
                   },
                   {
                     action: 'api.request',
                     endpoint: '/api/example/ship',
                     method: 'post',
-                    body: { requestKey: '${state.requestKey}', quantity: '${form.quantity}' },
+                    body: { requestKey: revisionScoped ? "${state['requestKey_' + record.revision]}" : '${state.requestKey}', quantity: '${form.quantity}' },
                   },
                   {
                     action: 'state.clearRequestKey',
-                    args: { field: 'requestKey', persistence: 'session' },
+                    args: { field: revisionScoped ? 'requestKey_${record.revision}' : 'requestKey', persistence: 'session' },
                   },
                 ],
               },
@@ -165,6 +165,19 @@ describe('Actual authenticated page runtime persists scoped UUID attempts', () =
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+  it('keeps an uncertain attempt stable within a revision and isolates a later explicit retry revision', async () => {
+    const mountRevision = (revision: number) => render(<MemoryRouter><Page revision={revision} revisionScoped /></MemoryRouter>);
+    const first = mountRevision(2);await send();
+    await waitFor(() => expect(auth.transport).toHaveBeenCalledTimes(1));
+    const original = auth.transport.mock.calls[0][1].params.requestKey;
+    expect(original).toMatch(/^[a-f0-9-]{36}$/);
+    first.unmount();const second = mountRevision(2);await send();
+    await waitFor(() => expect(auth.transport).toHaveBeenCalledTimes(2));
+    expect(auth.transport.mock.calls[1][1].params.requestKey).toBe(original);
+    second.unmount();mountRevision(3);await send();
+    await waitFor(() => expect(auth.transport).toHaveBeenCalledTimes(3));
+    expect(auth.transport.mock.calls[2][1].params.requestKey).not.toBe(original);
   });
   it('peek restores an existing UUID across mounted recovery flows without generating, persisting or clearing it', async () => {
     const stored = createRequestKeySession(() => identity).ensure('requestKey', null);

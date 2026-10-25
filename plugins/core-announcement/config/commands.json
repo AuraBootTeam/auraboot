@@ -205,5 +205,18 @@
     "executionConfig": {
       "requireIdempotencyKey": true
     }
+  },
+  {
+    "code": "announcement:retry_publication",
+    "displayName:zh-CN": "恢复发布任务",
+    "displayName:en": "Retry publication",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.publish"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
   }
 ]

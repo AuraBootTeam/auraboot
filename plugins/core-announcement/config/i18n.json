@@ -656,5 +656,12 @@
     "en-US": "Queue the same approval for authoritative result verification. This does not approve or create a new process.",
     "source": "import",
     "refType": "action"
+  },
+  {
+    "key": "announcement.error.publication_not_retryable",
+    "zh-CN": "此发布任务当前不能恢复；请刷新检查任务状态、有效期和执行窗口。",
+    "en-US": "This publication cannot be retried. Refresh and verify its state, expiry and execution window.",
+    "source": "import",
+    "refType": "message"
   }
 ]

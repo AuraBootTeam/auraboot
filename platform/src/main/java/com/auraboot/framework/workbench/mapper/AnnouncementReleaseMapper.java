@@ -78,6 +78,26 @@ public interface AnnouncementReleaseMapper {
     @Select("SELECT *,fencing_token AS fence,(lease_until>clock_timestamp()) AS lease_valid FROM ab_announcement_release WHERE tenant_id=#{tenant} AND version_pid=#{version} FOR UPDATE")
     Map<String,Object> lock(@Param("tenant") Long tenant,@Param("version") String version);
 
+    @Select("SELECT * FROM ab_announcement_release WHERE tenant_id=#{tenant} AND version_pid=#{version}")
+    Map<String,Object> read(@Param("tenant") Long tenant,@Param("version") String version);
+
+    @Update("""
+        UPDATE ab_announcement_release SET status='queued',next_attempt_at=clock_timestamp(),fencing_token=fencing_token+1,
+            lease_until=NULL,error_code=NULL,finished_at=NULL
+        WHERE tenant_id=#{tenant} AND pid=#{release} AND fencing_token=#{fence}
+            AND status IN ('blocked','retryable_failed') AND latest_allowed_at>=clock_timestamp()
+        """)
+    int retry(@Param("tenant") Long tenant,@Param("release") String release,@Param("fence") long fence);
+
+    @Update("""
+        UPDATE ab_announcement SET row_version=row_version+1,lifecycle_revision=lifecycle_revision+1,
+            updated_by=#{actor},updated_at=CURRENT_TIMESTAMP
+        WHERE tenant_id=#{tenant} AND pid=#{pid} AND row_version=#{expected} AND current_version_pid=#{version}
+            AND active_version_pid IS NULL AND status IN ('unpublished','scheduled') AND deleted_flag=FALSE
+        """)
+    int bumpRetry(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version,
+        @Param("actor") Long actor,@Param("expected") int expected);
+
     @Select(value="""
         UPDATE ab_announcement_release SET status='running',lease_until=clock_timestamp()+INTERVAL '2 minutes',
             fencing_token=fencing_token+1,attempts=attempts+1

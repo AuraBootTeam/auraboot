@@ -55,7 +55,7 @@ public class AnnouncementCommandHandler
     }
 
     private static boolean isRelease(String code) {
-        return AnnouncementReleaseService.PUBLISH.equals(code) || AnnouncementReleaseService.CANCEL.equals(code);
+        return AnnouncementReleaseService.PUBLISH.equals(code) || AnnouncementReleaseService.CANCEL.equals(code) || AnnouncementReleaseService.RETRY.equals(code);
     }
 
     @Override

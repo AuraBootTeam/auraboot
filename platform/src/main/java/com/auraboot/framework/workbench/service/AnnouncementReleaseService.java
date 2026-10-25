@@ -20,6 +20,7 @@ import java.util.*;
 public class AnnouncementReleaseService {
     public static final String PUBLISH="announcement:publish";
     public static final String CANCEL="announcement:cancel_schedule";
+    public static final String RETRY="announcement:retry_publication";
     public static final String RELEASED_EVENT="announcement.publication.committed.v1";
     private final AnnouncementAccessService access;
     private final AnnouncementPolicyService policies;
@@ -32,6 +33,7 @@ public class AnnouncementReleaseService {
     private final AnnouncementTenantPolicyService tenantPolicies;
     private final AnnouncementApprovalProofService approvalProof;
     private final ReliableIntegrationAccessor outbox;
+    private final com.auraboot.framework.permission.service.UserPermissionService permissions;
     @Value("${aura.notification.plugin-delivery.enabled:false}") private boolean deliveryEnabled;
 
     public long authorizeTarget(String pid) { return access.manage(pid,"publish",false).getRowVersion(); }
@@ -55,6 +57,7 @@ public class AnnouncementReleaseService {
         Map<String,Object> result;
         if(PUBLISH.equals(command)) result=acceptExemption(record);
         else if(CANCEL.equals(command)) result=cancel(record);
+        else if(RETRY.equals(command)) result=retry(record);
         else throw new IllegalArgumentException("Unsupported announcement release operation");
         result.put("operationId",operation);
         records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,(String)result.get("versionPid"),command,operation,expected,expected+1);
@@ -84,6 +87,52 @@ public class AnnouncementReleaseService {
         result.put("releaseAttemptPid",release);result.put("row_version",record.getRowVersion()+1);
         result.put("status",state);result.put("operationState","accepted");
         return result;
+    }
+
+    private Map<String,Object> retry(Announcement record) {
+        if(!deliveryEnabled) invalid("delivery_disabled");
+        if(record.getCurrentVersionPid()==null || record.getActiveVersionPid()!=null
+            || !Set.of("unpublished","scheduled").contains(record.getStatus())) invalid("not_editable");
+        Long tenant=MetaContext.getCurrentTenantId(),actor=MetaContext.getCurrentUserId();
+        var job=releases.lock(tenant,record.getCurrentVersionPid());
+        var control=releases.version(tenant,record.getCurrentVersionPid());
+        if(!retryable(record,job,control,Instant.now())) invalid("publication_not_retryable");
+        if(releases.retry(tenant,(String)job.get("pid"),((Number)job.get("fence")).longValue())!=1
+            || releases.bumpRetry(tenant,record.getPid(),record.getCurrentVersionPid(),actor,record.getRowVersion())!=1) conflict();
+        return new LinkedHashMap<>(Map.of("pid",record.getPid(),"recordPid",record.getPid(),"versionPid",record.getCurrentVersionPid(),
+            "releaseAttemptPid",job.get("pid"),"row_version",record.getRowVersion()+1,"status",record.getStatus(),"operationState","accepted"));
+    }
+
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public Map<String,Object> summary(String pid) {
+        var record=access.manage(pid,"read",false);
+        if(record.getCurrentVersionPid()==null) return Map.of("records",List.of(),"total",0);
+        Long tenant=MetaContext.getCurrentTenantId();var job=releases.read(tenant,record.getCurrentVersionPid());
+        if(job==null) return Map.of("records",List.of(),"total",0);
+        var control=releases.version(tenant,record.getCurrentVersionPid());
+        var view=new LinkedHashMap<String,Object>();view.put("pid",job.get("pid"));view.put("recordPid",pid);
+        view.put("versionPid",record.getCurrentVersionPid());view.put("recordRevision",record.getRowVersion());
+        view.put("status",job.get("status"));view.put("plannedAt",job.get("scheduled_at"));
+        view.put("latestAllowedAt",job.get("latest_allowed_at"));view.put("attempts",job.get("attempts"));
+        view.put("errorCode",job.get("error_code")==null ? null : publicFailureCode(job.get("error_code")));
+        view.put("canRetry",deliveryEnabled && permissions.hasPermission(MetaContext.getCurrentUserId(),"announcement.announcement.publish")
+            && retryable(record,job,control,Instant.now()));
+        return Map.of("records",List.of(view),"total",1);
+    }
+
+    private static boolean retryable(Announcement record,Map<String,Object> job,Map<String,Object> control,Instant now) {
+        return job!=null && control!=null && record.getActiveVersionPid()==null
+            && Set.of("unpublished","scheduled").contains(record.getStatus())
+            && Set.of("blocked","retryable_failed").contains(job.get("status"))
+            && Set.of("unpublished","scheduled").contains(control.get("publication_state"))
+            && !now.isAfter(time(job.get("latest_allowed_at")))
+            && (control.get("expires_at")==null || now.isBefore(time(control.get("expires_at"))));
+    }
+
+    public static String publicFailureCode(Object value) {
+        return value!=null && Set.of("ACTOR_INACTIVE","AUTHORIZATION_DENIED","AUTHORIZATION_CHANGED","DELIVERY_DISABLED","APPROVAL_REQUIRED",
+            "APPROVAL_NOT_READY","SCHEDULE_MISSED","VERSION_SUPERSEDED","TRANSIENT_DATABASE_FAILURE","RETRY_EXHAUSTED","EXECUTION_FAILURE")
+            .contains(value) ? value.toString() : "PUBLICATION_BLOCKED";
     }
 
     private Map<String,Object> cancel(Announcement record) {

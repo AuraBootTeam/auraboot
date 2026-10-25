@@ -623,5 +623,175 @@
         }
       }
     ]
+  },
+  {
+    "code": "announcement_publication_job",
+    "name": "Publication execution",
+    "name:zh-CN": "发布执行状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "queued",
+        "label": "Queued",
+        "label:zh-CN": "排队中",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "running",
+        "label": "Running",
+        "label:zh-CN": "执行中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "succeeded",
+        "label": "Published",
+        "label:zh-CN": "发布完成",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "retryable_failed",
+        "label": "Retry pending",
+        "label:zh-CN": "等待重试",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Blocked",
+        "label:zh-CN": "发布阻断",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "canceled",
+        "label": "Canceled",
+        "label:zh-CN": "已取消",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "missed",
+        "label": "Window missed",
+        "label:zh-CN": "窗口已错过",
+        "sortNo": 70,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_publication_issue",
+    "name": "Publication attention",
+    "name:zh-CN": "发布处理提示",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "ACTOR_INACTIVE",
+        "label": "The original publisher is inactive",
+        "label:zh-CN": "原发布者暂不可用",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "AUTHORIZATION_DENIED",
+        "label": "Original publisher authority denied",
+        "label:zh-CN": "原发布者权限不足",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "AUTHORIZATION_CHANGED",
+        "label": "Authorization changed; submit again",
+        "label:zh-CN": "授权依据已变化，需重新提交",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "DELIVERY_DISABLED",
+        "label": "In-app delivery is unavailable",
+        "label:zh-CN": "站内通知暂不可用",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "APPROVAL_REQUIRED",
+        "label": "Current policy requires approval",
+        "label:zh-CN": "当前政策要求审批",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "APPROVAL_NOT_READY",
+        "label": "Approval evidence is unavailable",
+        "label:zh-CN": "审批依据暂不可用",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "SCHEDULE_MISSED",
+        "label": "Publication window missed",
+        "label:zh-CN": "发布时间窗口已错过",
+        "sortNo": 70,
+        "status": "enabled"
+      },
+      {
+        "value": "VERSION_SUPERSEDED",
+        "label": "The version was superseded",
+        "label:zh-CN": "版本已变更",
+        "sortNo": 80,
+        "status": "enabled"
+      },
+      {
+        "value": "TRANSIENT_DATABASE_FAILURE",
+        "label": "Temporary execution failure; verify before retrying",
+        "label:zh-CN": "暂时执行异常，可核对后重试",
+        "sortNo": 90,
+        "status": "enabled"
+      },
+      {
+        "value": "RETRY_EXHAUSTED",
+        "label": "Automatic retries exhausted; verify conditions",
+        "label:zh-CN": "自动重试已用尽，请核对条件",
+        "sortNo": 100,
+        "status": "enabled"
+      },
+      {
+        "value": "EXECUTION_FAILURE",
+        "label": "Execution failed; contact an administrator",
+        "label:zh-CN": "执行异常，请联系管理员核对",
+        "sortNo": 110,
+        "status": "enabled"
+      },
+      {
+        "value": "PUBLICATION_BLOCKED",
+        "label": "Publication blocked; verify conditions before retrying",
+        "label:zh-CN": "发布条件未满足，请核对后恢复",
+        "sortNo": 120,
+        "status": "enabled"
+      }
+    ]
   }
 ]

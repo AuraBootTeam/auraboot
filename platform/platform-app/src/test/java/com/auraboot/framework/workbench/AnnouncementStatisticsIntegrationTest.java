@@ -177,6 +177,80 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         }
     }
 
+    private Map<String,Object> acceptRecoveryFixture() {
+        String operation=UniqueIdGenerator.generate();
+        String record=(String)lifecycle.execute("announcement:create_announcement",null,Map.of("title","Recovery "+operation,
+            "content","Recover only this original frozen release.","policy",Map.of("audience",Map.of("kind","selected",
+                "userPids",List.of(getTestUser().getPid())),"exemptionReason","Publication recovery verification")),operation,null).get("pid");
+        return releases.execute(AnnouncementReleaseService.PUBLISH,record,Map.of(),operation+"-publish",1);
+    }
+
+    private Map<String,Object> claimRecoveryFixture(String version) {
+        for(int index=0;index<100;index++) {
+            var claim=releases.claim();if(claim==null) break;
+            if(version.equals(claim.get("version_pid"))) return claim;
+            releases.perform(claim);
+        }
+        throw new AssertionError("The exact owned recovery fixture was not claimed");
+    }
+
+    @Test void publicationRecoveryFencesOldWorkersAndKeepsTheOriginalVersionActorAndWindow() throws Exception {
+        var accepted=acceptRecoveryFixture();String record=(String)accepted.get("recordPid"),version=(String)accepted.get("versionPid");
+        Long tenant=getTestTenant().getId();var stale=claimRecoveryFixture(version);
+        releases.fail(stale,"blocked","DELIVERY_DISABLED");
+        var original=jdbc.queryForMap("SELECT pid,actor_user_id,actor_member_pid,authorization_hash,scheduled_at,latest_allowed_at,attempts FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",tenant,version);
+        String hash=jdbc.queryForObject("SELECT snapshot_hash FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,tenant,version);
+        http.perform(get("/api/announcements/records/"+record+"/publication")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.records[0].canRetry").value(true))
+            .andExpect(jsonPath("$.data.records[0].errorCode").value("DELIVERY_DISABLED"));
+        String operation=UniqueIdGenerator.generate();
+        var retried=releases.execute(AnnouncementReleaseService.RETRY,record,Map.of(),operation,2);
+        assertThat(retried).containsEntry("releaseAttemptPid",accepted.get("releaseAttemptPid")).containsEntry("row_version",3).containsEntry("status","unpublished");
+        assertThat(releases.execute(AnnouncementReleaseService.RETRY,record,Map.of(),operation,2)).isEqualTo(retried);
+        assertThat(jdbc.queryForMap("SELECT pid,actor_user_id,actor_member_pid,authorization_hash,scheduled_at,latest_allowed_at,attempts FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",tenant,version)).isEqualTo(original);
+        assertThat(jdbc.queryForObject("SELECT fencing_token FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",Long.class,tenant,version)).isGreaterThan(((Number)stale.get("fencing_token")).longValue());
+        releases.perform(stale);releases.fail(stale,"blocked","LATE_FAILURE");
+        assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,tenant,version)).isEqualTo("queued");
+        var current=claimRecoveryFixture(version);assertThat(current.get("pid")).isEqualTo(stale.get("pid"));releases.perform(current);
+        assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,tenant,record)).isEqualTo("published");
+        assertThat(jdbc.queryForObject("SELECT snapshot_hash FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,tenant,version)).isEqualTo(hash);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audit WHERE tenant_id=? AND announcement_pid=? AND command_code='announcement:retry_publication'",Long.class,tenant,record)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("SELECT attempts FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",Integer.class,tenant,version)).isEqualTo(2);
+    }
+
+    @Test void canceledAndOutOfWindowPublicationTasksCannotBeReopened() {
+        var accepted=acceptRecoveryFixture();String record=(String)accepted.get("recordPid"),version=(String)accepted.get("versionPid");
+        releases.fail(claimRecoveryFixture(version),"blocked","EXECUTION_FAILURE");
+        releases.execute(AnnouncementReleaseService.CANCEL,record,Map.of(),UniqueIdGenerator.generate(),2);
+        assertThatThrownBy(()->releases.execute(AnnouncementReleaseService.RETRY,record,Map.of(),UniqueIdGenerator.generate(),3)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        var late=acceptRecoveryFixture();String lateRecord=(String)late.get("recordPid"),lateVersion=(String)late.get("versionPid");
+        releases.fail(claimRecoveryFixture(lateVersion),"blocked","EXECUTION_FAILURE");
+        jdbc.update("UPDATE ab_announcement_release SET scheduled_at=clock_timestamp()-INTERVAL '2 seconds',latest_allowed_at=clock_timestamp()-INTERVAL '1 second' WHERE tenant_id=? AND version_pid=?",getTestTenant().getId(),lateVersion);
+        assertThat(((List<Map<String,Object>>)releases.summary(lateRecord).get("records")).getFirst()).containsEntry("canRetry",false);
+        assertThatThrownBy(()->releases.execute(AnnouncementReleaseService.RETRY,lateRecord,Map.of(),UniqueIdGenerator.generate(),2)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Long.class,getTestTenant().getId(),lateVersion)).isZero();
+        releases.execute(AnnouncementReleaseService.CANCEL,lateRecord,Map.of(),UniqueIdGenerator.generate(),2);
+    }
+
+    @Test void publicationStatusMasksPrivateDiagnosticsAndReadOnlyAuthorityCannotResume() throws Exception {
+        var accepted=acceptRecoveryFixture();String record=(String)accepted.get("recordPid"),version=(String)accepted.get("versionPid");
+        releases.fail(claimRecoveryFixture(version),"blocked","private storage diagnostic");
+        try {
+            jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code='announcement.announcement.publish')",
+                getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId());
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            String body=http.perform(get("/api/announcements/records/"+record+"/publication")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].canRetry").value(false))
+                .andExpect(jsonPath("$.data.records[0].errorCode").value("PUBLICATION_BLOCKED")).andReturn().getResponse().getContentAsString();
+            assertThat(body).doesNotContain("private storage diagnostic","actor_user_id","authorization_hash","fencing_token");
+            assertThatThrownBy(()->releases.execute(AnnouncementReleaseService.RETRY,record,Map.of(),UniqueIdGenerator.generate(),2)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        } finally {
+            grantCommittedPermissionToTestRole("announcement.announcement.publish","announcement","announcement:announcement","publish","Announcement publish");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            releases.execute(AnnouncementReleaseService.CANCEL,record,Map.of(),UniqueIdGenerator.generate(),2);
+        }
+    }
+
     private String recordOf(String version) {
         return jdbc.queryForObject("SELECT announcement_pid FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
     }
