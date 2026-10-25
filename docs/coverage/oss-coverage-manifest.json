@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "6763dee6f",
+    "commit": "6a6b2f967",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -1654,9 +1654,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "announcement:retry_publication",
@@ -7568,7 +7570,7 @@
   ],
   "stats": {
     "commands": 279,
-    "untested": 154,
+    "untested": 153,
     "pages": 196,
     "pagesUntested": 91,
     "platformPages": 95,

@@ -338,5 +338,64 @@
       }
     ],
     "claim": "Targeted current announcement regression; attachment, full BPM composition, export races, capacity and remaining D01-D15 coverage are still open."
+  },
+  "automaticPlanRecoveryValidation": {
+    "testedSource": "6a6b2f967239b17cee666fd62466fe9285ffbf12",
+    "evidenceRound": "2026-10-25T06-53-58-237Z-d00375a4-1556-4045-a9df-b6b07fb7835c",
+    "browser": {
+      "executed": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "seconds": 49.5,
+      "setupAuthentications": 1
+    },
+    "assertions": [
+      "Real scanner blocks the original publisher without reminder authority.",
+      "Formal permission grant permits that same membership to resume through the native plan page.",
+      "Cancelling confirmation does not change the plan.",
+      "The exact resume command binds the original record and version; its public response redacts the internal member ID.",
+      "Reload renders Active, preserves the original actor, consumes no quota and creates no catch-up batch."
+    ],
+    "visualReviews": [
+      {
+        "scenario": "original-plan-blocked",
+        "file": "reminder-original-plan-blocked.png",
+        "sha256": "9859aa9ae32275e9cce7a686f31c8fdb54a7cc0e8cd362e7195409b5f7b977bd",
+        "review": "reviewed_pass",
+        "findings": "The original plan is visibly blocked with an actionable explanation and a primary resume action; the complete footer and zero quota are visible.",
+        "authority": "agent-vision",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        }
+      },
+      {
+        "scenario": "original-plan-resume-confirm",
+        "file": "reminder-original-plan-resume-confirm.png",
+        "sha256": "811ff242d0cb8f25a56ec67a5390decc4b9234cff966123d87d5e9111f59bbec",
+        "review": "reviewed_pass",
+        "findings": "The open confirmation explains original-actor resumption without catch-up; both controls and focus are visible without clipping.",
+        "authority": "agent-vision",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        }
+      },
+      {
+        "scenario": "original-plan-resumed",
+        "file": "reminder-original-plan-resumed.png",
+        "sha256": "88273c437ad2ae12c20949022da38d876f69e550fed083d4ad61105339807823",
+        "review": "reviewed_pass",
+        "findings": "The rendered plan says Active, the resume action is absent, quota remains zero and the complete empty-batch footer is visible. The earlier loading-skeleton capture was rejected.",
+        "authority": "agent-vision",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        }
+      }
+    ],
+    "previousLoadingCapture": "retained privately and rejected as completion evidence"
   }
 }
