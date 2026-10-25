@@ -5,6 +5,7 @@ import {
   type CommandRequestIdentity,
 } from '~/framework/meta/utils/commandRequestPolicy';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
+import { useActionTriggerFocus } from '~/hooks/useActionTriggerFocus';
 import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
 /**
  * useActionHandler - 统一的 Action 处理 Hook (重构版本)
@@ -441,6 +442,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
   const commandIdentity = useRef<CommandRequestIdentity | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const captureTriggerFocus = useActionTriggerFocus(loading);
   const [error, setError] = useState<string | null>(null);
   // Live async task backing the progress modal (running → terminal). Kept after
   // terminal so the modal can show the final summary until the host dismisses.
@@ -711,6 +713,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
   const handleAction = useCallback(
     async (button: ButtonConfig, record?: Record<string, any>) => {
+      captureTriggerFocus();
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
       const confirmVariant =
@@ -1329,6 +1332,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       resolveNavigateTo,
       showConfirmDialog,
       surfaceTemporaryPassword,
+      captureTriggerFocus,
     ],
   );
 

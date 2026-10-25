@@ -645,6 +645,11 @@ describe('resolveVisibleDetailTabsFromBlocks', () => {
 });
 
 describe('resolveVisibleTopLevelDetailBlocks', () => {
+  it('preserves an explicit body toolbar after the detail content without rendering the header toolbar twice', () => {
+    const blocks = [{ id: 'header', blockType: 'toolbar' },{ id: 'body', blockType: 'detail-section' },
+      { id: 'after-reading', blockType: 'toolbar', detailPlacement: 'body' }] as any;
+    expect(resolveVisibleTopLevelDetailBlocks(blocks, () => true).map(block => block.id)).toEqual(['body','after-reading']);
+  });
   it('keeps visible content blocks that sit beside tabs in source order', () => {
     const blocks = [
       { id: 'toolbar', blockType: 'toolbar' },

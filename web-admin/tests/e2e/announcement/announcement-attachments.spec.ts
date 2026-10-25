@@ -132,12 +132,17 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await expect(link).toHaveAttribute('href',path);await expect(reader.getByRole('button',{name:'确认已知悉',exact:true})).toBeEnabled();
     const fact=(await db.query('SELECT first_read_at,acknowledged_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[tenant,version,identities[0].userPid])).rows[0];
     expect(fact.first_read_at).toEqual(firstRead);expect(firstRead).toBeTruthy();expect(fact.acknowledged_at).toBeNull();
+    const contentBottom=await reader.getByTestId('form-field-attachments').boundingBox();
+    const acknowledgeBounds=await reader.getByRole('button',{name:'确认已知悉',exact:true}).boundingBox();
+    expect(contentBottom).not.toBeNull();expect(acknowledgeBounds).not.toBeNull();
+    expect(acknowledgeBounds!.y).toBeGreaterThanOrEqual(contentBottom!.y+contentBottom!.height);
     expect((await db.query('SELECT snapshot::text,snapshot_hash FROM ab_announcement_version WHERE tenant_id=$1 AND pid=$2',[tenant,version])).rows[0]).toEqual(frozen);
     await reader.screenshot({path:info.outputPath('recipient-frozen-attachment.png'),fullPage:true,animations:'disabled'});
     await reader.setViewportSize({width:390,height:844});
     const acknowledge=reader.getByRole('button',{name:'确认已知悉',exact:true});
     await expect(acknowledge).toBeVisible();
     expect(await reader.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+    await link.scrollIntoViewIfNeeded();await expect(link).toBeInViewport();await expect(acknowledge).toBeInViewport();
     await reader.screenshot({path:info.outputPath('recipient-narrow-attachment.png'),fullPage:true,animations:'disabled'});
     await acknowledge.focus();await reader.keyboard.press('Enter');
     await expect(reader.getByTestId('confirm-dialog')).toBeVisible();

@@ -1782,41 +1782,6 @@
         "blockType": "toolbar",
         "buttons": [
           {
-            "code": "acknowledge",
-            "label": {
-              "zh-CN": "确认已知悉",
-              "en-US": "Acknowledge"
-            },
-            "variant": "primary",
-            "visibleWhen": "record.acknowledgementRequired == true && record.acknowledgementState == 'pending'",
-            "confirm": "announcement.ack.confirm",
-            "action": {
-              "type": "flow",
-              "steps": [
-                {
-                  "action": "api.request",
-                  "endpoint": "/api/announcements/versions/${record.versionPid}/acknowledge",
-                  "method": "post",
-                  "body": {
-                    "snapshotHash": "${record.snapshotHash}"
-                  }
-                },
-                {
-                  "action": "event.emit",
-                  "args": {
-                    "event": "aura:inbox-update",
-                    "type": "inbox"
-                  }
-                },
-                {
-                  "action": "refresh"
-                }
-              ]
-            },
-            "disableWhen": "!record.first_read_at",
-            "primary": true
-          },
-          {
             "code": "back_to_announcements",
             "label": {
               "zh-CN": "返回我的公告",
@@ -1947,6 +1912,48 @@
           "en-US": "Your first acknowledgement has been recorded."
         },
         "visibleWhen": "record.acknowledgementState == 'completed'"
+      },
+      {
+        "id": "recipient_acknowledgement",
+        "blockType": "toolbar",
+        "detailPlacement": "body",
+        "buttons": [
+          {
+            "code": "acknowledge",
+            "label": {
+              "zh-CN": "确认已知悉",
+              "en-US": "Acknowledge"
+            },
+            "variant": "primary",
+            "visibleWhen": "record.acknowledgementRequired == true && record.acknowledgementState == 'pending'",
+            "confirm": "announcement.ack.confirm",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "endpoint": "/api/announcements/versions/${record.versionPid}/acknowledge",
+                  "method": "post",
+                  "body": {
+                    "snapshotHash": "${record.snapshotHash}"
+                  }
+                },
+                {
+                  "action": "event.emit",
+                  "args": {
+                    "event": "aura:inbox-update",
+                    "type": "inbox"
+                  }
+                },
+                {
+                  "action": "refresh"
+                }
+              ]
+            },
+            "disableWhen": "!record.first_read_at",
+            "primary": true
+          }
+        ]
       }
     ]
   },

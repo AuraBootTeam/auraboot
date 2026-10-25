@@ -157,7 +157,7 @@ export function resolveVisibleTopLevelDetailBlocks(
   isVisible: (visibleWhen: string | undefined) => boolean,
 ): BlockConfig[] {
   return blocks.filter((block) => {
-    if (block.blockType === 'toolbar' || block.blockType === 'tabs') return false;
+    if ((block.blockType === 'toolbar' && (block as { detailPlacement?: string }).detailPlacement !== 'body') || block.blockType === 'tabs') return false;
     if (block.visibleWhen && !isVisible(block.visibleWhen)) return false;
     return (block as BlockConfig & { detailPlacement?: string }).detailPlacement !== 'header';
   });
