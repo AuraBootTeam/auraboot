@@ -1,6 +1,7 @@
 import type { RequestKeySession } from './request-key/session';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
+import { completedCommandOptions } from '../data-pipeline/completed-command-array';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -750,6 +751,28 @@ export async function promptInputForm(
         description?: any;
         disabled?: boolean;
       }>;
+    } else if (field.dataSource?.type === 'command') {
+      // Choice commands use the governed command boundary; incomplete collections
+      // must not open an empty form or continue to its mutation command.
+      const fallback = translateOrFallback(feedback.t, 'error.data_load_failed', 'Could not load choices. Try again.');
+      const code = field.dataSource.commandCode;
+      const payload = field.dataSource.payload ?? {};
+      if (!fetchResult || typeof code !== 'string' || !/^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$/.test(code)
+        || typeof payload !== 'object' || Array.isArray(payload)) throw new Error(fallback);
+      const endpoint = `/api/meta/commands/execute/${encodeURIComponent(code)}`;
+      const result = await fetchPromptChoices(fetchResult, endpoint,
+        { method: 'post', params: { payload } }, feedback);
+      try {
+        fieldOptions[field.field] = completedCommandOptions(result.data, {
+          type: 'api', endpoint, adaptor: 'commandOptions', dataPath: 'items',
+          valueField: field.dataSource.valueField ?? 'value',
+          labelField: field.dataSource.labelField ?? 'label',
+        });
+      } catch {
+        // CATCH: public schema-validation boundary; never expose returned data or
+        // treat failed validation as a successful empty options collection.
+        throw new Error(fallback);
+      }
     } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
       const endpoint = String(field.dataSource.endpoint).replace(
         /\$\{([^}]+)\}/g,
