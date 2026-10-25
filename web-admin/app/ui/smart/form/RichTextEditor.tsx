@@ -47,6 +47,8 @@ const ToolbarButton: React.FC<{
     type="button"
     onClick={onClick}
     title={title}
+    aria-label={title}
+    aria-pressed={active}
     className={clsx(
       'rounded p-1.5 text-sm transition-colors',
       active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
