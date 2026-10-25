@@ -151,10 +151,10 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     const history = page.getByTestId('table-block').filter({ has: page.getByRole('columnheader', { name: '实际受理人数', exact: true }) });
     await history.scrollIntoViewIfNeeded();
     await expect(history.getByRole('row')).toHaveCount(21);
-    await expect(history.getByTestId('table-server-pagination')).toContainText('共 26 条');
+    await expect(page.getByTestId('table-server-pagination')).toContainText('共 26 条');
     await screenshot('reminder-history-page-one');
     const secondPage = page.waitForResponse(r => r.request().method() === 'GET' && new URL(r.url()).pathname.endsWith('/reminders/batches') && new URL(r.url()).searchParams.get('pageNum') === '2');
-    await history.getByTestId('table-server-pagination').getByRole('button', { name: '下一页', exact: true }).click();
+    await page.getByTestId('table-server-pagination').getByRole('button', { name: '下一页', exact: true }).click();
     const historyData = await successful(await secondPage);
     expect(historyData).toMatchObject({ pageNum: 2, pageSize: 20, total: 26 }); expect(historyData.records).toHaveLength(6);
     await expect(history.getByRole('row')).toHaveCount(7); await screenshot('reminder-history-page-two');
