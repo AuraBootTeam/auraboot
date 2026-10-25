@@ -249,7 +249,7 @@
     "ts-json-schema-generator": "^2.9.0",
     "tsx": "^4.20.5",
     "typescript": "^5.7.2",
-    "vite": "^8.0.16",
+    "vite": "^8.1.6",
     "vite-plugin-istanbul": "^9.0.1",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "4.1.12",
