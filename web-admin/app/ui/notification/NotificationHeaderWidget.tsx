@@ -39,9 +39,10 @@ export function NotificationHeaderWidget({ streamCount }: { streamCount?: number
       const result = await fetchResult<{ count: number }>('/api/notifications/unread-count', {
         method: 'get',
       });
+      const count = result.data?.count;
       if (active.current && requestRevision === revision.current && ResultHelper.isSuccess(result)
-        && Number.isSafeInteger(result.data?.count) && result.data!.count >= 0) {
-        setUnreadCount(result.data.count);
+        && typeof count === 'number' && Number.isSafeInteger(count) && count >= 0) {
+        setUnreadCount(count);
       }
     } catch {
       // A badge must never take the header down.

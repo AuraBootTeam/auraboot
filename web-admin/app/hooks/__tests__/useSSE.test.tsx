@@ -101,7 +101,7 @@ describe('useSSE', () => {
 
   it('replaces the connection at an identity boundary and ignores late frames and errors', () => {
     const first = vi.fn(), second = vi.fn();
-    const { rerender } = renderHook(({ identity, handler }) => useSSE({
+    const { rerender } = renderHook(({ identity, handler }: { identity: string; handler: (data: unknown) => void }) => useSSE({
       url: '/api/notifications/stream', connectionKey: identity,
       listeners: [{ event: 'unread-count', handler }],
     }), { initialProps: { identity: 'tenant-a:actor', handler: first } });
