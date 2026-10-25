@@ -18,7 +18,7 @@ implementation_status: implemented-local-validated-pr-open
 
 ## 1. 定位与文档状态
 
-本文是 OSS 公告管理的需求、UX、权限及集成契约的唯一入口。需求讨论采用的默认规则已落入 S1–S8 实现；**本期实现与本地分层验证已完成，三个关联 PR 保持开放，未合并、未发布生产**。当前裁决以 §18.27、[验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)及其同一证据 manifest 为准。S1 历史证据见 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)。阶段是依赖顺序，不是等待用户逐阶段确认的闸门。§14 是实施前盘点，§17 和 §18.1–18.26 是历史切片；其“待完成”描述由当前裁决取代。测试数量不等于功能覆盖率，未执行边界不会因实现完成而消失。
+本文是 OSS 公告管理的需求、UX、权限及集成契约的唯一入口。需求讨论采用的默认规则已落入 S1–S8 实现；**本期实现与本地分层验证已完成，三个关联 PR 保持开放，未合并、未发布生产**。当前裁决以 §18.28、[验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)及其同一证据 manifest 为准。S1 历史证据见 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)。阶段是依赖顺序，不是等待用户逐阶段确认的闸门。§14 是实施前盘点，§17 和 §18.1–18.27 是历史切片；其“待完成”描述由当前裁决取代。测试数量不等于功能覆盖率，未执行边界不会因实现完成而消失。
 
 目标是为当前租户提供“编写 → 免审或审批 → 立即或定时发布 → 多渠道提醒 → 阅读与确认知悉 → 催办与统计导出”闭环。
 
@@ -1312,3 +1312,29 @@ BPM Workspace 核验仍有 `RUNTIME_MANIFEST_MISSING` 警告；本轮通过独�
 
 
 本轮推送触发的 GitHub Controller authz 扫描曾失败：`DomainExportController` 原本使用完整类名 `@com.auraboot.framework.permission.annotation.AuthenticatedAccess`，扫描器只匹配短注解名。改为显式 import 同一个类型并使用 `@AuthenticatedAccess`，注解值、映射、方法体和实际授权行为未变；精确文本归一化可还原被测 `5f11717d0` 文件。扫描器自身 4 项 fixture 和全仓 0 未决授权审计均通过，不通过修改 baseline 或放宽扫描规则解决。公开 source-bound 回归仍绑定原 catalog producer；未把新文档/import 提交冒称重新构建的二进制。推送新触发的远端 Checks 按 PR 当前结果独立裁决，尚在运行不算通过。
+
+### 18.28 CI 后续修正与当前集成裁决
+
+本节取代 §18.27 的当前版本指针；业务范围与“PR 保持开放、暂不合并、不发布”约定不变。main 在上一轮验证后合入其他任务，新增文档索引和翻译种子冲突；本轮固定吸收 `463515bb730bcdad966c10d69665b8203194a8e7`，merge `6ee39382a`。翻译按 key 三方合并，保留双方新增及各自更新，无重复键；文档同时保留公告入口与上游发布工具说明。未在运行中的源码上追随 main。
+
+| 修正 | 结果与裁决 |
+| --- | --- |
+| 测试环境契约 | 公告四份 spec 的 6 处环境别名读取统一改用 `PG_CONN.database`；原任务数据库断言保留，env-drift baseline 未放宽 |
+| 存储日志 | LOCAL、MinIO、OSS、S3 上传日志仅保留字节数，不输出路径、bucket、key 或完整对象 URL；存储地址返回值与实际上传行为不变，不抑制 CodeQL 规则 |
+| 收件箱测试 | mock 与断言改为真实 `getPendingCount` / “3 项待处理”；不把未读与待办数混为一个事实 |
+| 公告 DSL | 我的公告两个筛选补显式 `EQ`；详情返回按钮使用 schema 支持的 `default`。沿用原列表、详情和导航能力，无新 React 页面 |
+| 内部 API | 从确切任务栈实时采集 1554 个操作，更新快照并正式重生成类型；contract `19da7877889dfc0fb73f6b5b131fdf15293b3256143acac8323415f7d8978eb6`，生成类型 digest `863d53e01891d573fb16ef7cea2938252e2033273596ffba50d0f01dc2d07f92`；live drift 一致 |
+
+本次沿用的 Page UX Blueprint：`announcement_reader_list` 面向接收者，以全部/未读/待确认三标签筛选有权查看的公告，列顺序保持标题、重要程度、阅读、知悉、发布时间，行内查看；`announcement_reader_detail` 以冻结正文、附件和阅读/知悉事实为主体，主要动作仍是确认知悉，返回我的公告为普通次要导航。只规范筛选运算符与按钮样式枚举，字段、分组、权限和异常反馈保持原契约；列表空态、只读与无权限说明沿用 §16。原有附件旅程实际从菜单进入接收列表及详情，宽屏原图可见普通返回按钮；窄屏收件箱、实际待确认事实与底部确认布局均复核。静态 UX 审计 12 页、9 个引导字段，0 错误/警告；不以静态结果代替操作证据。
+
+当前 Core browser producer 为 `8837ec03c2be416d524e7a8d1339bea52d6d0915`。正式 catalog producer 为 `6eae14ad872da86a453d1379a107aa17dc971253`，相对 browser 输入仅更新实时契约快照与其生成类型，后端业务和 DSL 相同。catalog 为 `core-catalog-followup-6eae14ad8`，15 artifacts / 18 entries，lock `sha256:24aec55ba20fec7ba1905394e19fbda79744cb916410e52fc7d89f970ba360a6`，graph `sha256:fb308ab0b0ed17c3cf2d8c7410b8cfad954cee1905cf303de78419389fd1b136`。交付末尾提交仅同步文档/公开证据，不冒称新二进制。catalog 正式 typecheck、client/SSR、摘要与单 React 检查通过。
+
+本轮验证：前端全量 822 文件、8774 项通过；Core 后端 285 项定向单元通过；日志改动另有 82 项存储模块/文件服务测试通过（与后轮文件服务范围有重叠，不相加）；API foundation 38 项、完整 TypeScript 和实时 drift 通过；OSS 原生公告固定 17 条全部单次通过，身份集合与 collection/result 对账一致，fail/skip/retry 为 0，认证另 1。两项原失败修正后先定向 33 项通过，再由全量单测覆盖，不能累计成额外功能数。
+
+BPM source `3861a3146caf07a16b0937971e4cba5c2433e8de` 未改代码；针对新 catalog 复验 `AnnouncementApprovalCompositionIT` 9 项与 `StrictApprovalRuntimeIT` 10 项，真实 PostgreSQL、引擎与 worker 共 19 项通过。使用受管 `announcement-management-bpm-contract`（control，slot 2，DB `aura_bpm_2`、Redis DB8）对照新 Core，原 `aura_bpm_1` 与已验证正式产品栈保持保留。对照 namespace 初始化前核对分配、精确源、无连接并备份原库且验证备份目录；由 Flyway 从空库按序执行 160 条（155 Core + 5 BPM），未手工改 schema/history 或开启 out-of-order。对照测试结束正常 close，allocation、DB、备份和证据保留。该对照没有启动新浏览器服务；§18.27 的完整 BPM 1657 项与 4 条 native 只对原 5f117/3861 正式组合有效，本轮没有为新 catalog 重跑整套 BPM 或重建新的 22 件产品组合。
+
+**初始化证据口径更正：** OSS `oss-golden-stack --fresh-db` 应用 canonical schema 快照，当前 `auraboot_1` 为 388 表且没有 `ab_flyway_schema_history`；“对应 155 个 Core 迁移文件”不等于该环境实际执行 155 条 Flyway。§18.27 的“Core fresh reset 后 153 条迁移”应按同样原则理解为快照来源，不能算逐条迁移通过；其中独立空库的 153 条 Flyway/drift 证据仍有效。原正式 BPM reset 的 158 条与本轮对照空库实际 160 条是独立的真实迁移执行。当前安装使用上述新 Core catalog 时应正常执行迁移；已有正式 BPM 组合身份仍以 §18.27 为准，不能仅替换目录名即声称它已消费本轮 catalog。
+
+保留的反例与失败：旧远端 Frontend env-drift 6 处、Docker Quickstart 的 live OpenAPI drift、CodeQL 4 项路径日志告警；本地全量 8752 pass/2 fail 后修正收件箱测试与无效 DSL；发布工具检查首轮 35 pass/1 runner error，缺 TS loader 的 1 文件使用 tsx 后 2 项通过；API foundation 首次拒绝 dirty source，提交快照后 clean checkout 的 38 项才通过。原日志不覆盖或重标。当前原 PR 的准确 head 与 Checks 是远端 CI 的裁决入口，运行中不算通过；本节记录本地测试、真实捕获与已发生失败，不预报后续 CI 结果。
+
+本期未新增小程序真实发送、远程 BPM、50000 人、独立 BPM 340 corpus、OCI/Linux/Jenkins 或生产验收；本机未运行容器。源代码改变后由 GitHub 自动触发的 Docker/CodeQL 等结果只按其准确 head 单独记录。原 Workspace `RUNTIME_MANIFEST_MISSING` warning 与共享 Gradle 路径前缀问题未修改；构建与生命周期保持串行。详情见[同一验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)与[同一 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `ciFollowupValidation`。

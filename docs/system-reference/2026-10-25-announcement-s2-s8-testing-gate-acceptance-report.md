@@ -7,7 +7,31 @@ updated: 2026-10-25
 
 # 公告 S2–S8 本地分层验收记录
 
-## 当前 main 集成回归（取代下方历史功能基线）
+## 当前 CI 后续验收（取代下方旧版本的“当前”口径）
+
+当前裁决以[设计 §18.28](./announcement-management.md#1828-ci-后续修正与当前集成裁决)及 manifest 的 `ciFollowupValidation` 为准。main 固定为 `463515bb730bcdad966c10d69665b8203194a8e7`，实际 browser source `8837ec03c2be416d524e7a8d1339bea52d6d0915`，snapshot/catalog source `6eae14ad872da86a453d1379a107aa17dc971253`；两者只差实时快照和生成类型，后续交付只改文档/证据。BPM source 3861 未改，新增 19 项真实集成对照；旧 1657/4 属于旧正式组合，未冒充新 catalog 的全量验收。
+
+| 面 / 实际执行 | 结果与证据（相对 `.workspace/evidence/`） |
+| --- | --- |
+| 环境契约 / script hermetic | env-lint 无新增，baseline 未扩；3 项环境反例测试通过；`announcement-management/followup-env-contract.log`、`followup-integrated-env-lint.log` |
+| 前端 / unit hermetic | 822 文件、8774 项通过，fail/skip 0；`followup-integrated-frontend-units.log`、`followup-integrated-frontend-unit-results.json`；原全量 8752 pass/2 fail 单独保留 |
+| Core 后端 / unit hermetic | 285 项全部通过；`followup-integrated-backend.log`、`followup-integrated-backend-junit/summary.json` |
+| 存储日志 / backend unit | 独立 82 项通过；`followup-storage-tests.log`、`followup-storage-junit/summary.json`；与上述 FileService 子集重叠不累计 |
+| 发布构件脚本 / hermetic + owned temporary processes | 35 项实际通过；首组合命令另 1 个文件缺 TS loader，整命令为失败。补充 `node --import ./web-admin/node_modules/tsx/dist/loader.mjs --test scripts/application/web-build-identity.test.mjs` 的 2 项通过；分别见 `followup-integrated-application-contracts.log`、`followup-integrated-web-build-identity.log` |
+| DSL / static | 12 页、9 引导字段，0 错误/警告；`followup-page-ux-audit.log`；static executed=0，不算 browser |
+| API / real capture + offline contract | 1554 个操作实时采集，snapshot drift 匹配；clean source foundation 38 通过、完整 TypeScript 通过；`followup-integrated-openapi-receipt.json`、`followup-integrated-drift-receipt.json`、`followup-api-foundation-clean.log`、`followup-final-typecheck.log` |
+| OSS / real-stack journey browser | 固定 17 collected/executed/passed，0 fail/skip/retry，认证另 1；`followup-integrated-cycle.log`、`followup-integrated-core-{collection,results,reconciliation}.json`；source 8837，约 3.4 分钟，正常 business_exit=0 / stop_exit=0 |
+| Core catalog / 正式构建 | `core-catalog-followup-6eae14ad8`、`followup-core-catalog-build.log`；15 artifacts / 18 entries，lock `sha256:24aec55ba20fec7ba1905394e19fbda79744cb916410e52fc7d89f970ba360a6`；client/SSR/typecheck/checksum/单 React 通过；skip OCI |
+| BPM / real-stack IT / test-function + engine + worker | 9 公告组合 + 10 严格引擎 = 19 通过，无 fail/error/skip；`announcement-management-bpm-contract/followup-contract-tests.log`、`junit/summary.json`；消费 Core 6eae 的不可变 JAR，未用兄弟源码隐式编译 |
+| 对照迁移与生命周期 | 同受管 control namespace `aura_bpm_2`，备份且无连接后从空库执行 160 条 Flyway；正常 close，原开发环境 suspended；DB/备份/构件/证据全部保留 |
+
+更正数据库证明层次：`followup-core-database-mode.json` 实测 OSS snapshot 初始化 388 表、没有 Flyway history；catalog 含 155 个 Core 迁移文件，不能称该 OSS 环境逐条执行了 155 条。下方旧 main 集成行里的 fresh Core 153 也仅是快照来源；其独立空库 153/drift 仍为真实执行。本轮对照库真实 160 = 155 Core + 5 BPM。没有手工 schema/结果写入、out-of-order 或把文件登记数当执行数。
+
+本轮新增两张原图逐张复核：宽屏冻结附件与普通返回按钮、窄屏收件箱的待知悉事实；具体图像摘要/源码/发现见 manifest。其他旧原图保留原 producer。远端曾出现的 6 条 env 漂移、live OpenAPI drift、4 条敏感日志告警及本地原失败均保留，修复没有放宽 baseline、schema 或 CodeQL 规则。最终远端 CI 由开放 PR 的准确 head 实况裁决，运行中不算通过；此处不预报远端结果。
+
+验证边界沿用设计：对新 catalog 未重建完整 BPM 22 件产品组合，也未重跑其全量 1657 和 native 4；旧正式组合只保留历史证据。未追加小程序 sender/真机、远程 BPM、50000 人、340 corpus、Jenkins、生产或本机容器。没有新增产品待决定项；仍不合并、不部署。
+
+## 历史 main 集成回归（9aab 基线）
 
 本轮在用户明确授权下吸收 main `9aab94663e73deaf9aab4594f27a5c4fa9bf11a3`，不合并 PR、不发布。当前设计裁决为 [§18.27](./announcement-management.md#1827-授权吸收-main-后的当前集成裁决)，确切源码、构件 lock/graph 和 12 张复核原图见[同一 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `mainIntegrationValidation`。下方“当前结论”、运行身份和旧执行表是原功能基线记录，只对原确切输入有效；不代表本轮重复运行。
 

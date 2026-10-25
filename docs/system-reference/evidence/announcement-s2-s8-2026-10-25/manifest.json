@@ -1639,6 +1639,15 @@
       "warnings": 0,
       "diffCheckExitCode": 0,
       "evidence": "announcement-management/main-integration-docs-governance.log"
+    },
+    "ciFollowup": {
+      "status": "completed-scoped",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0,
+      "checkedCanonicalDocuments": 2,
+      "diffCheckExitCode": 0,
+      "evidence": "announcement-management/followup-docs-governance.log"
     }
   },
   "historicalArtifact": "artifact-validation.json",
@@ -2246,7 +2255,7 @@
       "sha256": "ce3e990e9fc06170e6d1d67035da97a1d884b3cd0f4a39c12b0263396c23cc83"
     }
   ],
-  "activeValidation": "mainIntegrationValidation",
+  "activeValidation": "ciFollowupValidation",
   "featureBaselineFields": [
     "testedSource",
     "browser",
@@ -2645,5 +2654,222 @@
       ],
       "remoteNewHeadChecks": "independent; running is not passed"
     }
+  },
+  "ciFollowupValidation": {
+    "claim": "impacted-main-integration-locally-validated; remote exact-head CI is adjudicated separately; no merge or deployment",
+    "absorbedMain": "463515bb730bcdad966c10d69665b8203194a8e7",
+    "mergeCommit": "6ee39382a",
+    "source": {
+      "browser": "8837ec03c2be416d524e7a8d1339bea52d6d0915",
+      "coreCatalog": "6eae14ad872da86a453d1379a107aa17dc971253",
+      "bpmProvider": "3861a3146caf07a16b0937971e4cba5c2433e8de"
+    },
+    "sourceEquivalence": "Browser producer to catalog producer changes only runtime-captured OpenAPI and generated declarations; final delivery changes documentation and public evidence only.",
+    "coreCatalog": {
+      "directory": "announcement-management/core-catalog-followup-6eae14ad8",
+      "lock": "sha256:24aec55ba20fec7ba1905394e19fbda79744cb916410e52fc7d89f970ba360a6",
+      "graph": "sha256:fb308ab0b0ed17c3cf2d8c7410b8cfad954cee1905cf303de78419389fd1b136",
+      "artifacts": 15,
+      "entries": 18,
+      "skipOci": true
+    },
+    "counts": {
+      "frontendUnits": 8774,
+      "frontendFiles": 822,
+      "coreBackendUnits": 285,
+      "storageUnitsSeparateOverlapping": 82,
+      "apiFoundation": 38,
+      "environmentTests": 3,
+      "correctedUiUnitsSubset": 33,
+      "applicationContracts": 35,
+      "webBuildIdentityTests": 2,
+      "bpmRealStackIntegrations": 19
+    },
+    "browser": {
+      "source": "8837ec03c2be416d524e7a8d1339bea52d6d0915",
+      "collected": 17,
+      "executed": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "identitySetMatch": true,
+      "authenticationSeparate": 1,
+      "businessExit": 0,
+      "stopExit": 0,
+      "seconds": 201.853563
+    },
+    "database": {
+      "core": {
+        "database": "auraboot_1",
+        "table_count": 388,
+        "flyway_history": null,
+        "source": "8837ec03c2be416d524e7a8d1339bea52d6d0915",
+        "initializer": "public oss-golden-stack --fresh-db; apply canonical schema snapshot",
+        "coreCatalogMigrationFiles": 155,
+        "claim": "snapshot initialization is not per-migration Flyway execution"
+      },
+      "bpmControl": {
+        "runtime": "announcement-management-bpm-contract",
+        "slot": 2,
+        "mode": "control",
+        "database": "aura_bpm_2",
+        "realFlywayMigrations": 160,
+        "coreMigrationFiles": 155,
+        "bpmMigrationFiles": 5,
+        "state": "closed; allocation/database/backup/evidence retained",
+        "originalProductDatabase": "aura_bpm_1 preserved"
+      }
+    },
+    "contract": {
+      "operations": 1554,
+      "digest": "19da7877889dfc0fb73f6b5b131fdf15293b3256143acac8323415f7d8978eb6",
+      "generatedTypesDigest": "863d53e01891d573fb16ef7cea2938252e2033273596ffba50d0f01dc2d07f92",
+      "liveDrift": "pass"
+    },
+    "retainedFailures": [
+      {
+        "evidence": "announcement-management/followup-frontend-ci.log",
+        "reason": "6 direct environment alias reads"
+      },
+      {
+        "evidence": "announcement-management/followup-docker-ci.log",
+        "reason": "live API snapshot drift"
+      },
+      {
+        "kind": "CodeQL remote check 121143780304",
+        "reason": "4 uploaded object path log alerts"
+      },
+      {
+        "evidence": "announcement-management/followup-frontend-units.log",
+        "passed": 8752,
+        "failed": 2,
+        "reason": "Stale inbox mock plus invalid DSL filter/operator and button variant"
+      },
+      {
+        "evidence": "announcement-management/followup-integrated-application-contracts.log",
+        "passed": 35,
+        "failedFiles": 1,
+        "reason": "TypeScript loader missing in first local runner invocation; corrected file separately passed 2 tests"
+      },
+      {
+        "evidence": "announcement-management/followup-api-foundation.log",
+        "reason": "Correctly rejected dirty source; clean committed source passed 38"
+      }
+    ],
+    "remainingScope": "No undecided product defaults. Actual mini-program sender, remote BPM, 50000-member capacity, standalone BPM 340-case corpus, OCI/Linux/Jenkins and production did_not_run. No 100% permutation or automatic requirement coverage claim. Shared Workspace Gradle prefix-match defect remains; lifecycle operations serialized. New catalog did_not_run full BPM 1657/native4 or produce a new complete 22-artifact product composition; current coverage is 19 backend contracts.",
+    "remoteCi": "See exact-head live PR Checks; not a static future pass claim.",
+    "visualReviews": [
+      {
+        "file": "ci-followup/recipient-frozen-attachment.png",
+        "sha256": "cc8da0b7a12616e1f69a810a8e878b21ca9bd241d2914b2b9e020bb8aee97db8",
+        "sourceCommit": "8837ec03c2be416d524e7a8d1339bea52d6d0915",
+        "run": "followup-integrated-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Neutral back button remains visible; frozen body, file name/size and read-versus-acknowledgement facts stay readable; acknowledgement remains below content."
+      },
+      {
+        "file": "ci-followup/recipient-narrow-inbox-pending.png",
+        "sha256": "a6d42c88eca87ba35e567818a7e79dd2379ff4eaccd032b53560d3383dfefade",
+        "sourceCommit": "8837ec03c2be416d524e7a8d1339bea52d6d0915",
+        "run": "followup-integrated-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "390px inbox dropdown fits; actual pending acknowledgement item and business tag are legible, with all-todos action reachable; captured state only."
+      }
+    ],
+    "executionReceipts": [
+      {
+        "path": "announcement-management/followup-integrated-frontend-units.log",
+        "sha256": "3b1aef79e2126c3a5f7bbeae35dc0c78aba87b18f74ba5b13d42750633db1e4b"
+      },
+      {
+        "path": "announcement-management/followup-integrated-frontend-unit-results.json",
+        "sha256": "b2bca04b2edb0a98007d408fe80b756ef60d64d330a9a19bbe71d4ce9373c747"
+      },
+      {
+        "path": "announcement-management/followup-integrated-backend-junit/summary.json",
+        "sha256": "da3b15bf7245742719ba350ff1ac437ae53fdad043ab56caeee0346501f2a12a"
+      },
+      {
+        "path": "announcement-management/followup-storage-junit/summary.json",
+        "sha256": "fe0db5aa76eb9681af7eaca5382a197f143f8fd62f2ea4cb033a7c4b6c0fa57a"
+      },
+      {
+        "path": "announcement-management/followup-env-contract.log",
+        "sha256": "102f2f16f5ddf9b174c72241142a257b1889641f03c273c846f83a1569b5eef1"
+      },
+      {
+        "path": "announcement-management/followup-integrated-env-lint.log",
+        "sha256": "243b38da46a734aee8623d258c6207d8d218bd402031570953eedfec51ce4678"
+      },
+      {
+        "path": "announcement-management/followup-page-ux-audit.log",
+        "sha256": "e52fad5e10a9dd9b8a69b8ef486186d94577512ec917d6bc41d7b0a08aa56b9e"
+      },
+      {
+        "path": "announcement-management/followup-integrated-application-contracts.log",
+        "sha256": "761097ed0abc7a29d04cf4a180d99ca0ff8d2d46315a9cc2acd38331cfbe5e0d"
+      },
+      {
+        "path": "announcement-management/followup-integrated-web-build-identity.log",
+        "sha256": "9ca48c9bfffb950904e243b8b3db174f12bee6cdbf3307d808dd494c6f307fa9"
+      },
+      {
+        "path": "announcement-management/followup-api-foundation-clean.log",
+        "sha256": "49a1f4eaa205c9bf36a10e5d21734e907430fd26aeb474939fff109dfdbcc80d"
+      },
+      {
+        "path": "announcement-management/followup-final-typecheck.log",
+        "sha256": "7792f7d2f1a83907a64779aba24833ef84545b73c6566c80aca5b4021cc20664"
+      },
+      {
+        "path": "announcement-management/followup-integrated-openapi-receipt.json",
+        "sha256": "cdb3763e418e061ff4d4d0fed4ddadaca58a0c7f4a3e535f35e40fbc618b53f5"
+      },
+      {
+        "path": "announcement-management/followup-integrated-drift-receipt.json",
+        "sha256": "3a61712a727845ea083694d86630ba6c63566717daeeda7bb4dc2b593475c648"
+      },
+      {
+        "path": "announcement-management/followup-integrated-core-results.json",
+        "sha256": "d302622678f3b3bd3f151f3986eb4de971fbea0ba311c9cc01636030efa26b0c"
+      },
+      {
+        "path": "announcement-management/followup-integrated-core-collection.json",
+        "sha256": "34920ae4ba19253efdac4e680aa8720679a88db53b4e621dc97e0a95d9dfba06"
+      },
+      {
+        "path": "announcement-management/followup-integrated-core-reconciliation.json",
+        "sha256": "de67a6839fb5eed3129956d4832479c93a3324243de7823fb554474eb0ad4d9a"
+      },
+      {
+        "path": "announcement-management/followup-integrated-core-exit.log",
+        "sha256": "6344fddcba17a9fb042761bc7d484f38c16bb9940dc6cc3eff9c67000713652f"
+      },
+      {
+        "path": "announcement-management/followup-core-catalog-build.log",
+        "sha256": "192bb338fbba9077e434845a0c3bab15b25c89cafe0f2bef8acb5d8e93ae7ace"
+      },
+      {
+        "path": "announcement-management/followup-core-database-mode.json",
+        "sha256": "9dcc8acea91de799089e5c1743eaa03f9dbf23e49bb176a499b10e2fc0ac93c0"
+      },
+      {
+        "path": "announcement-management-bpm-contract/followup-contract-tests.log",
+        "sha256": "d6fff226713c9486d3a431f8f6619f3fc9175eee202be890915b5130782f735a"
+      },
+      {
+        "path": "announcement-management-bpm-contract/junit/summary.json",
+        "sha256": "a2f0d72132b7ad7dc68b0a8583dd3ca4387e48d810986886be160d688e4fca8d"
+      },
+      {
+        "path": "announcement-management-bpm-contract/close.log",
+        "sha256": "4669241b0e7b76fd9814ed463316200ad98b9c1e82a8f483ccfc5677e0d175c8"
+      }
+    ]
   }
 }
