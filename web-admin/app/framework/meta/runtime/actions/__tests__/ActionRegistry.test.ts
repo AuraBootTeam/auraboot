@@ -1539,5 +1539,15 @@ describe('Scoped stable request-key action and real flow transport', () => {
     manager.createScope('s');
     for (const args of [{field:'__proto__'}, {field:'state.key'}, {field:'requestKey',value:'forced'}, {}])
       await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'s',args})).rejects.toThrow();
+    for (const action of ['state.ensureRequestKey','state.peekRequestKey','state.clearRequestKey']) {
+      for (const target of ['__proto__','constructor','prototype','state.key','',null]) {
+        await expect(actionRegistry.execute(action,{stateManager:manager,scopeId:'s',args:{field:'requestKey',persistence:'session'},stepTarget:target as any})).rejects.toThrow();
+        expect(manager.getContext('s').state.requestKey).toBeUndefined();
+      }
+    }
+    await expect(actionRegistry.execute('state.ensureRequestKey',{
+      stateManager:manager,scopeId:'s',args:{field:'${record.field}'},expressionEvaluator:new ExpressionEvaluator(),
+      expressionContext:{record:{field:'__proto__'}} as any,
+    })).rejects.toThrow();
   });
 });
