@@ -147,6 +147,36 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
     }
 
+    @Test void disablingTheDeliveryBridgeAfterAcceptancePreventsPublicationAtExecution() {
+        String operation=UniqueIdGenerator.generate();
+        String record=(String)lifecycle.execute("announcement:create_announcement",null,Map.of("title","Delivery bridge "+operation,
+            "content","An accepted release must recheck its live channel capability.","policy",Map.of(
+                "audience",Map.of("kind","selected","userPids",List.of(getTestUser().getPid())),"exemptionReason","Bridge execution verification")),operation,null).get("pid");
+        String version=(String)releases.execute(AnnouncementReleaseService.PUBLISH,record,Map.of(),operation+"-publish",1).get("versionPid");
+        Map<String,Object> claim=null;
+        for(int index=0;index<100;index++) {
+            var candidate=releases.claim();if(candidate==null) break;
+            if(version.equals(candidate.get("version_pid"))) {claim=candidate;break;}
+            releases.perform(candidate);
+        }
+        assertThat(claim).as("The exact owned release must be claimed").isNotNull();
+        var ownedClaim=claim;
+        Object original=org.springframework.test.util.ReflectionTestUtils.getField(releases,"deliveryEnabled");
+        try {
+            org.springframework.test.util.ReflectionTestUtils.setField(releases,"deliveryEnabled",false);
+            assertThatThrownBy(()->releases.perform(ownedClaim)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+            assertThat(jdbc.queryForObject("SELECT publication_state FROM ab_announcement_version_control WHERE tenant_id=? AND version_pid=?",String.class,getTestTenant().getId(),version)).isEqualTo("unpublished");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Long.class,getTestTenant().getId(),version)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=?",Long.class,getTestTenant().getId(),version)).isZero();
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(releases,"deliveryEnabled",original);
+            applyTestMetaContext();
+            var root=jdbc.queryForMap("SELECT status,row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",getTestTenant().getId(),record);
+            if("published".equals(root.get("status"))) lifecycle.execute("announcement:archive",record,Map.of(),UniqueIdGenerator.generate(),((Number)root.get("row_version")).intValue());
+            else releases.execute(AnnouncementReleaseService.CANCEL,record,Map.of(),UniqueIdGenerator.generate(),((Number)root.get("row_version")).intValue());
+        }
+    }
+
     private String recordOf(String version) {
         return jdbc.queryForObject("SELECT announcement_pid FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
     }
