@@ -347,7 +347,8 @@ test('a recovered original member resumes its original publication and automatic
     await publisher.getByTestId('confirm-ok').click();const resumedPlanResponse = await resumingPlan;
     expect(resumedPlanResponse.request().postDataJSON()).toMatchObject({targetRecordPid: recordPid, payload: {versionPid}});
     const resumedPlanResult = await successful(resumedPlanResponse);
-    expect(resumedPlanResult.data).toMatchObject({operationState: 'resumed', actorMemberPid: user.memberPid});
+    expect(resumedPlanResult.data).toMatchObject({operationState: 'resumed'});
+    expect(resumedPlanResult.data).not.toHaveProperty('actorMemberPid');
     await expect.poll(async () => (await plan()).status).toBe('active');
     await publisher.reload({waitUntil: 'domcontentloaded'});await expect(resumePlan).toHaveCount(0);
     expect((await plan()).automatic_batches).toBe(0);
