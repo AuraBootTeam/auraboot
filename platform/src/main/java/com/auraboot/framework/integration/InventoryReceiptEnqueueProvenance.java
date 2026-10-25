@@ -130,7 +130,11 @@ public final class InventoryReceiptEnqueueProvenance {
         String producerCommand = inbound ? COMMAND : FINISHED_GOODS_COMMAND;
         String producerPermitModel = inbound ? "inv_inbound" : FINISHED_GOODS_MODEL;
         if (!Long.valueOf(event.tenantId()).equals(invocation.context().tenantId())
-                || (!inbound && !invocation.context().recordId().equals(event.payload().get("receiptId")))
+                // For the finished-goods producer the invocation recordId is the FG task pid while
+                // the event receiptId is the linked inv_inbound pid; they are intentionally
+                // different (the FG task links to a separate inbound record), so the equality
+                // check only applies to the inbound producer.
+                || (inbound && !invocation.context().recordId().equals(event.payload().get("receiptId")))
                 || !producerCommand.equals(MetaContext.getAuthorizedCommandCode())
                 || !invocation.context().recordId().equals(MetaContext.getCommandPermitTargetFor(producerPermitModel))
                 || !Long.valueOf(event.tenantId()).equals(MetaContext.getCurrentTenantId())) throw denied();
