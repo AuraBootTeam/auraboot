@@ -137,6 +137,13 @@ public class SseResponseSink implements ResponseSink {
     @Override
     public void onConfirmRequired(String toolId, String toolName, String description,
                                     Map<String, Object> input, String pendingTurnId) {
+        onConfirmRequired(toolId, toolName, description, input, pendingTurnId, Map.of());
+    }
+
+    @Override
+    public void onConfirmRequired(String toolId, String toolName, String description,
+                                  Map<String, Object> input, String pendingTurnId,
+                                  Map<String, Object> extension) {
         // pendingTurnId is conditionally included only when non-null (Map.of
         // disallows null values; matches SseResponseSink's traceId pattern).
         java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
@@ -147,6 +154,7 @@ public class SseResponseSink implements ResponseSink {
         if (pendingTurnId != null) {
             payload.put("pendingTurnId", pendingTurnId);
         }
+        if (extension != null && !extension.isEmpty()) payload.put("extension", extension);
         sendJsonString("confirm_required", payload);
     }
 

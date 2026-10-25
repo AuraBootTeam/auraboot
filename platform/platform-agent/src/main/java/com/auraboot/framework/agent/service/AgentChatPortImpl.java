@@ -256,6 +256,9 @@ public class AgentChatPortImpl implements AgentChatPort {
     private com.auraboot.framework.agent.trace.AiTraceService aiTraceService;
 
     @Autowired(required = false)
+    private io.micrometer.tracing.Tracer tracer;
+
+    @Autowired(required = false)
     private com.auraboot.framework.conversation.TurnEvalTelemetryRegistry turnEvalTelemetryRegistry;
 
     @Autowired(required = false)
@@ -293,6 +296,31 @@ public class AgentChatPortImpl implements AgentChatPort {
     @Override
     public TurnOutcome runAgentTurn(TurnContext ctx, ChatRequest request, ResponseSink sink,
                                      com.auraboot.framework.agent.port.AgentTurnOverrides overrides) {
+        String previousTraceId = MetaContext.getOtelTraceId();
+        io.micrometer.tracing.Span span = null;
+        io.micrometer.tracing.Tracer.SpanInScope scope = null;
+        if ((previousTraceId == null || previousTraceId.isBlank()) && tracer != null) {
+            try {
+                span = tracer.nextSpan().name("agent.chat.turn").start();
+                scope = tracer.withSpan(span);
+                MetaContext.setOtelTraceId(span.context().traceId());
+            } catch (RuntimeException failure) {
+                log.warn("Could not establish background agent trace: {}", failure.getMessage());
+            }
+        }
+        try {
+            return runAgentTurnInScope(ctx, request, sink, overrides);
+        } finally {
+            MetaContext.setOtelTraceId(previousTraceId);
+            try { if (scope != null) scope.close(); }
+            catch (RuntimeException failure) { log.warn("Could not close agent trace scope: {}", failure.getMessage()); }
+            try { if (span != null) span.end(); }
+            catch (RuntimeException failure) { log.warn("Could not end agent trace: {}", failure.getMessage()); }
+        }
+    }
+
+    private TurnOutcome runAgentTurnInScope(TurnContext ctx, ChatRequest request, ResponseSink sink,
+                                             com.auraboot.framework.agent.port.AgentTurnOverrides overrides) {
         Long tenantId = ctx.tenantId();
         String agentCode = request.getAgentCode();
 
@@ -474,7 +502,7 @@ public class AgentChatPortImpl implements AgentChatPort {
             // Run the tool loop
             TurnOutcome outcome = doAgentToolLoop(ctx, agentCode, provider, providerCode, config, model,
                     systemPrompt, maxTokens, messages, tools, toolDefs, request.getSessionId(), sink,
-                    effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks, scopedQueryAllowlist);
+                    effectivePermissions, profile, persistTape, requireInitialToolCall, contextBlocks, scopedQueryAllowlist, trace);
             finishNamedAgentTrace(trace, outcome);
             return outcome;
         } catch (RuntimeException | Error failure) {
@@ -645,7 +673,8 @@ public class AgentChatPortImpl implements AgentChatPort {
                                         AgentProfile profile,
                                         boolean persistTape,
                                         boolean requireInitialToolCall,
-                                        List<AgentContextBlock> contextBlocks, Set<String> scopedQueryAllowlist) {
+                                        List<AgentContextBlock> contextBlocks, Set<String> scopedQueryAllowlist,
+                                        com.auraboot.framework.agent.trace.TraceContext trace) {
         return chatTurnRuntime.runToolLoop(
                 new ChatTurnRuntime.ChatToolLoopSpec(
                         ctx,
@@ -669,9 +698,9 @@ public class AgentChatPortImpl implements AgentChatPort {
                         requireInitialToolCall,
                         maxToolRounds,
                         AgentChatTurnOutcomeAdapter.HANDOFF_TOOL_NAME,
-                        null,
+                        trace != null ? trace.getTraceId() : null,
                         objectMapper),
-                toolRuntimeAdapterFactory.callbacks(this, contextBlocks, scopedQueryAllowlist));
+                toolRuntimeAdapterFactory.callbacks(this, contextBlocks, scopedQueryAllowlist, aiTraceService, trace));
     }
 
     boolean defersPolicyUntilToolResult(ToolDefinition definition) {

@@ -20,7 +20,9 @@ class AgentChatToolRuntimeAdapterFactory {
     private final AgentChatToolExecutionAdapter toolExecutionAdapter;
 
     ChatTurnRuntime.ChatToolLoopCallbacks callbacks(AgentChatPortImpl owner,
-                                                    List<AgentContextBlock> contextBlocks, Set<String> allowedToolCodes) {
+                                                    List<AgentContextBlock> contextBlocks, Set<String> allowedToolCodes,
+                                                    com.auraboot.framework.agent.trace.AiTraceService traces,
+                                                    com.auraboot.framework.agent.trace.TraceContext trace) {
         return new AgentChatToolRuntimeAdapter(
                 owner,
                 runtimeStateFactory,
@@ -29,7 +31,7 @@ class AgentChatToolRuntimeAdapterFactory {
                 contextBlocks,
                 outcomeAdapter,
                 toolExecutionAdapter,
-                allowedToolCodes)
+                allowedToolCodes, traces, trace)
                 .callbacks();
     }
 }

@@ -40,16 +40,31 @@ describe('SkillPreviewCard', () => {
       />,
     );
     expect(screen.getByTestId('skill-preview-card')).toBeInTheDocument();
-    expect(screen.getByTestId('skill-name').textContent).toBe('demo:greet');
+    expect(screen.getByTestId('skill-name').textContent).toBe('DEMO › greet');
 
     const badge = screen.getByTestId('risk-badge');
     expect(badge).toHaveAttribute('data-risk', 'LOW');
-    expect(badge.textContent).toContain('LOW');
+    expect(badge.textContent).toContain('低风险');
 
     const json = screen.getByTestId('preview-json');
+    expect(json).not.toBeVisible();
+    fireEvent.click(screen.getByText('预览'));
+    expect(json).toBeVisible();
     // Pretty-printed JSON contains both keys
     expect(json.textContent).toContain('"greeting": "hello"');
     expect(json.textContent).toContain('"target": "world"');
+  });
+
+  it('shows reviewable business parameters and localized model action without exposing preview internals by default', () => {
+    render(<SkillPreviewCard {...BASE_PROPS} skillName="model:create" riskLevel="HIGH"
+      input={{ code: 'approval_visual_case', displayName: 'Approval visual case' }}
+      preview={{ ddl: 'CREATE TABLE mt_approval_visual_case', internalPreview: 'diagnostic-only' }}
+      onConfirm={() => {}} onCancel={() => {}} />);
+    expect(screen.getByTestId('skill-name')).toHaveTextContent('新建业务模型');
+    expect(screen.getByTestId('risk-badge')).toHaveTextContent('高风险');
+    expect(screen.getByTestId('skill-parameters')).toHaveTextContent('编码approval_visual_case');
+    expect(screen.getByTestId('skill-parameters')).toHaveTextContent('显示名称Approval visual case');
+    expect(screen.getByTestId('preview-json')).not.toBeVisible();
   });
 
   it('confirmButton_invokesOnConfirmWithToolId', () => {

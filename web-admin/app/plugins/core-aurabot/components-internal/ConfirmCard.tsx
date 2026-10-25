@@ -29,11 +29,17 @@ interface ConfirmCardProps {
 // Helpers
 // ============================================================================
 
-function formatParamName(key: string, isZh: boolean): string {
+export function formatParamName(key: string, isZh: boolean): string {
   const words = key.split(/[_\s]+/).filter(Boolean);
   const last = words.at(-1)?.toLowerCase() ?? key;
   const labels: Record<string, [string, string]> = {
     name: ['名称', 'Name'],
+    displayname: ['显示名称', 'Display name'],
+    modelcode: ['模型编码', 'Model code'],
+    modelcategory: ['模型类别', 'Model category'],
+    tablename: ['数据表名', 'Table name'],
+    pid: ['记录标识', 'Record identifier'],
+    id: ['编号', 'Identifier'],
     title: ['标题', 'Title'],
     description: ['描述', 'Description'],
     industry: ['行业', 'Industry'],

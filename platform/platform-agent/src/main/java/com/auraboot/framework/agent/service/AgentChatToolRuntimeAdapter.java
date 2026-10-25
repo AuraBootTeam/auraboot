@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
 class AgentChatToolRuntimeAdapter {
 
@@ -30,6 +31,9 @@ class AgentChatToolRuntimeAdapter {
     private final AgentChatTurnOutcomeAdapter outcomeAdapter;
     private final AgentChatToolExecutionAdapter toolExecutionAdapter;
     private final Set<String> allowedToolCodes;
+    private final com.auraboot.framework.agent.trace.AiTraceService traces;
+    private final com.auraboot.framework.agent.trace.TraceContext trace;
+
 
     private boolean permits(ToolDefinition definition) {
         return allowedToolCodes == null || definition != null && allowedToolCodes.contains(definition.getToolCode());
@@ -37,6 +41,39 @@ class AgentChatToolRuntimeAdapter {
 
     ChatTurnRuntime.ChatToolLoopCallbacks callbacks() {
         return new ChatTurnRuntime.ChatToolLoopCallbacks() {
+            @Override
+            public Object beforeProviderCall(ChatTurnRuntime.ChatToolLoopRound round, LlmChatRequest request) {
+                if (traces == null || trace == null) return null;
+                try { return traces.startSpan(trace, null, "generation", "llm_round_" + round.round(),
+                        Map.of("model", request.getModel(), "provider", round.providerCode())); }
+                catch (RuntimeException failure) {
+                    log.warn("Could not start agent generation observation: {}", failure.getMessage());
+                    return null;
+                }
+            }
+
+            @Override
+            public void afterProviderResponse(ChatTurnRuntime.ChatToolLoopRound round, Object observation, LlmChatResponse response) {
+                if (!(observation instanceof com.auraboot.framework.agent.trace.SpanContext span)) return;
+                try {
+                    traces.recordGeneration(span, round.model(), response.getInputTokens(), response.getOutputTokens(),
+                            null, response.getStopReason(), round.tools(), response.getContent() == null ? List.of() :
+                                    response.getContent().stream().filter(block -> "tool_use".equals(block.getType())).toList());
+                    traces.endSpan(span, null, "success");
+                } catch (RuntimeException failure) {
+                    log.warn("Could not record agent generation observation: {}", failure.getMessage());
+                }
+            }
+
+            @Override
+            public void afterProviderFailure(ChatTurnRuntime.ChatToolLoopRound round, Object observation, String message, Exception error) {
+                if (!(observation instanceof com.auraboot.framework.agent.trace.SpanContext span)) return;
+                try { traces.endSpan(span, null, "error"); }
+                catch (RuntimeException failure) {
+                    log.warn("Could not finish failed generation observation: {}", failure.getMessage());
+                }
+            }
+
             @Override
             public AgentExecutionState buildRoundState(ChatTurnRuntime.ChatToolLoopRound round) {
                 return runtimeStateFactory.chatTurnState(
