@@ -37,7 +37,7 @@ public interface AnnouncementReminderMapper {
 
     @Insert("""
         INSERT INTO ab_announcement_reminder_preview(tenant_id,pid,version_pid,owner_user_id,owner_member_pid,record_revision,filters,eligible_count,evaluated_at,expires_at)
-        VALUES(#{tenant},#{pid},#{version},#{actor},#{member},#{revision},#{filters}::jsonb,#{count},#{now},#{now}+INTERVAL '30 minutes')
+        VALUES(#{tenant},#{pid},#{version},#{actor},#{member},#{revision},#{filters}::jsonb,#{count},#{now},CAST(#{now} AS timestamptz)+INTERVAL '30 minutes')
         """)
     int preview(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version,@Param("actor") Long actor,@Param("member") String member,
         @Param("revision") int revision,@Param("filters") String filters,@Param("count") int count,@Param("now") Instant now);
