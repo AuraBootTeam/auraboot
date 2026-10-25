@@ -112,3 +112,7 @@ allowed_claim: targeted-tested; incomplete S2–S8 delivery, no merge or product
 - s7-native-header-paging-browser.log：49f74a882上3条定向旅程通过，无skip/retry，1.1分钟；认证另计。23项定向前端测试和类型检查通过。首次新增Inbox夹具因不稳定翻译函数重复加载失败，类型检查另发现测试身份数组类型缺失；修正后重验，不报告首次即通过。
 - 新增3张提醒入口窄屏原图逐张审阅并加入[同一公开清单](./evidence/announcement-s2-s8-2026-10-25/attachments/manifest.json)。真实断网由route.abort制造，恢复仍访问真实API与DB，无业务响应替身。
 - 27成员原生翻页、BPM当前正式组合/严格审批/真实热停用保护，以及最终覆盖审计仍未关闭；以上不是完整S2–S8验收结论。
+
+## 原生分页闭合：1e9298341
+
+s2-native-pager-regression-browser.log中17条公告浏览器旅程全部通过，无skip/retry，3.0分钟；认证1条另计。27人匹配25+2分页，实际按钮触发第二页请求，跨页两人选择保留；清空后保存一人，重开仍正确。26个临时成员经正式成员状态接口停用，逐一核对成功数，无SQL结果写入。s2-native-pager-typecheck.log退出0。分页原图已逐张打开，选中状态、2/2页码和禁用下一页均清晰，见同一公开附件/提醒清单。当前尚待BPM正式组合、严格审批原生流程及最终全范围对账；并未宣称任务完整完成。

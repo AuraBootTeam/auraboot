@@ -60,11 +60,18 @@
       "sha256": "e81d9ba476005d55bfba0245987708f58529ab87171505455a7c8db3ad39d1ae",
       "review": "original-viewed",
       "finding": "Successful bell read does not complete acknowledgement; inbox retains the pending item within 390px."
+    },
+    {
+      "file": "audience-page-two-preserved-selection.png",
+      "sourceCommit": "1e9298341",
+      "sha256": "82790aa30631770dc331fc3244442715d7c92a6decc928fb72ec735768d0d4e2",
+      "review": "original-viewed",
+      "finding": "Twenty-seven actual matches, page 2 of 2, two selections retained across pages, and disabled next-page styling are legible."
     }
   ],
   "limitations": [
     "Hostile HTML fixture uses protected API after native rich-text creation.",
-    "The native 27-member paging-button counterexample and latest BPM composition remain pending."
+    "Latest BPM composition and strict native approval journeys remain pending."
   ],
   "incrementalBrowser": {
     "sourceCommit": "49f74a882",
@@ -74,5 +81,14 @@
     "retried": 0,
     "duration": "1.1m",
     "scope": "Native attachment/header recovery, scheduled audience settings and immediate all-tenant publication"
+  },
+  "currentBrowser": {
+    "sourceCommit": "1e9298341",
+    "collected": 17,
+    "passed": 17,
+    "skipped": 0,
+    "retried": 0,
+    "duration": "3.0m",
+    "authSetupExcluded": true
   }
 }
