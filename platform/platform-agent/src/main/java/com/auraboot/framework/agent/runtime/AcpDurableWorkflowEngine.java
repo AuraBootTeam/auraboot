@@ -75,7 +75,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         }
         ResponseSinkContext.set(sink);
         try {
-            RunOutcome resumeOutcome = agentRunService.executeTaskSync(
+            RunOutcome resumeOutcome = agentRunService.resumeTaskSync(
                     ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, runPid);
             return mapRunToTurnOutcome(resumeOutcome, sink);
         } finally {

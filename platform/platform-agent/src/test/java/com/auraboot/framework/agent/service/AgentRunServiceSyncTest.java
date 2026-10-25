@@ -289,6 +289,64 @@ class AgentRunServiceSyncTest {
     }
 
     @Test
+    @DisplayName("synchronous approval resume binds and clears the original immutable identity")
+    void syncResumeRestoresPersistedExecutionContext() throws Exception {
+        ExecutionPrincipal principal = new ExecutionPrincipal(
+                TENANT_ID,
+                301L,
+                401L,
+                "USR_AGENT",
+                "agent-resume",
+                501L,
+                "EMP_RESUME",
+                Initiator.human(101L, 201L, "approval"),
+                DelegationGrant.employeeAutonomous(),
+                AGENT_CODE,
+                "AGENT_RELEASE_V1",
+                "DEPLOYMENT_1",
+                "release-hash-v1",
+                "approval",
+                ExecutionPrincipal.Type.DIGITAL_EMPLOYEE,
+                Set.of(11L));
+        ContextEnvelope envelope = new ContextEnvelopeFactory().compile(
+                new ContextEnvelopeFactory.CompileRequest(
+                        "RUN_V1",
+                        principal,
+                        "approval",
+                        null,
+                        null,
+                        null,
+                        "ACP_RUN",
+                        Set.of(),
+                        List.of("KB_1"),
+                        Map.of("durable", true),
+                        "zh-CN",
+                        "Asia/Shanghai",
+                        Instant.parse("2026-07-29T10:00:00Z")));
+        when(dynamicDataMapper.selectByQuery(
+                argThat(sql -> sql != null && sql.contains("context_envelope")),
+                anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "context_envelope", objectMapper.writeValueAsString(envelope),
+                        "context_envelope_hash", envelope.envelopeHash())));
+        when(agentProperties.isEnabled()).thenAnswer(invocation -> {
+            assertThat(ExecutionPrincipalContext.current()).contains(principal);
+            assertThat(com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current())
+                    .contains(envelope);
+            return false;
+        });
+
+        service.resumeTaskSync(
+                TENANT_ID,
+                TASK_PID,
+                AGENT_CODE,
+                "RUN_V1");
+
+        verifyNoInteractions(executionPrincipalResolver);
+        assertThat(ExecutionPrincipalContext.current()).isEmpty();
+    }
+
+    @Test
     @DisplayName("async principal resolution failure is persisted as blocked task evidence")
     void asyncPrincipalResolutionFailureIsPersisted() {
         when(executionPrincipalResolver.resolve(any()))

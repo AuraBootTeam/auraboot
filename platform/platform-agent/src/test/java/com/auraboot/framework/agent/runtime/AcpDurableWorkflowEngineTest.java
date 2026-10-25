@@ -44,7 +44,7 @@ class AcpDurableWorkflowEngineTest {
         var runs = mock(AgentRunService.class);
         var context = mock(TurnContext.class);
         when(context.tenantId()).thenReturn(7L);
-        when(runs.executeTaskSync(7L, "task", "aurabot", "run"))
+        when(runs.resumeTaskSync(7L, "task", "aurabot", "run"))
                 .thenReturn(new RunOutcome.Cancelled("run", "cancelled by user interrupt"));
         var mapper = new ObjectMapper();
         var engine = new AcpDurableWorkflowEngine(runs, mock(DynamicDataMapper.class), mapper);
@@ -63,7 +63,7 @@ class AcpDurableWorkflowEngineTest {
         var runs = mock(AgentRunService.class);
         var context = mock(TurnContext.class);
         when(context.tenantId()).thenReturn(7L);
-        when(runs.executeTaskSync(7L, "task", "aurabot", "run"))
+        when(runs.resumeTaskSync(7L, "task", "aurabot", "run"))
                 .thenReturn(new RunOutcome.PendingApproval("run", "approval", "Review action"));
         var mapper = new ObjectMapper();
         var engine = new AcpDurableWorkflowEngine(runs, mock(DynamicDataMapper.class), mapper);
@@ -80,7 +80,7 @@ class AcpDurableWorkflowEngineTest {
         var input = java.util.Map.<String,Object>of("code", "sample");
         var review = java.util.Map.<String,Object>of("_aurabot_skill", true, "skillName", "model:create",
                 "riskLevel", "HIGH", "preview", java.util.Map.of("input", input));
-        when(runs.executeTaskSync(7L, "task", "aurabot", "run"))
+        when(runs.resumeTaskSync(7L, "task", "aurabot", "run"))
                 .thenReturn(new RunOutcome.PendingApproval("run", "approval", "Review operation", review, "trace-1"));
         var sink = mock(com.auraboot.framework.conversation.ResponseSink.class);
         var engine = new AcpDurableWorkflowEngine(runs, mock(DynamicDataMapper.class), new ObjectMapper());

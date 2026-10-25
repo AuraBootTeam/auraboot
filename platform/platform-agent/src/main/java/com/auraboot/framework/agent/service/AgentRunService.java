@@ -411,6 +411,14 @@ public class AgentRunService {
         return executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid, existingRunPid, false);
     }
 
+    /** Resume under the original immutable execution identity, not the approving actor. */
+    public RunOutcome resumeTaskSync(Long tenantId, String taskPid, String agentCode, String resumeFromRunPid) {
+        ContextEnvelope envelope = restoreResumeEnvelope(tenantId, agentCode, resumeFromRunPid);
+        return ExecutionPrincipalContext.callAs(envelope.principal(),
+                () -> ContextEnvelopeContext.callWith(envelope,
+                        () -> executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid)));
+    }
+
     /** Retries unadmitted analytics tasks without creating another execution attempt. */
     public RunOutcome executeInitialAnalyticsTaskSync(Long tenantId, String taskPid, String agentCode) {
         return executeTaskSync(tenantId, taskPid, agentCode, null, null, true);
