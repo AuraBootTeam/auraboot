@@ -50,7 +50,8 @@ class CommandInvocationAuthorizationPhaseTest {
         assertThatThrownBy(() -> phase.execute(context(config()))).isInstanceOf(AccessDeniedException.class);
     }
     @Test void missingOrDifferentNativeIdentityFailsBeforeCallingTheHandler() {
-        var context = context(config()); context.setTenantId(8L);
+        var context = context(config()); MetaContext.setContext(8L, 9L, "user-9", "other-tenant");
+        MetaContext.setMemberId(11L);
         assertThatThrownBy(() -> phase.execute(context)).isInstanceOf(AccessDeniedException.class);
         MetaContext.clear();
         assertThatThrownBy(() -> phase.execute(context(config()))).isInstanceOf(AccessDeniedException.class);
