@@ -169,12 +169,12 @@ public final class RecordCommandWriterGuard {
         appendOwnStoredPredicate(sql, model, operation);
         params.put("receiptParentPid", receipt.get().pid());
         params.put("receiptParentVersion", receipt.get().version());
-        sql.append(" AND ").append(column(childPolicy.marker())).append(" IS TRUE")
+        sql.append(" AND ").append(column(childPolicy.marker())).append(receipt.get().managed() ? " IS TRUE" : " IS NOT TRUE")
             .append(" AND EXISTS (SELECT 1 FROM ").append(parent.model().getTableName())
             .append(" record_writer_parent WHERE record_writer_parent.pid = #{params.receiptParentPid}")
             .append(" AND record_writer_parent.pid = ").append(model.getTableName()).append('.').append(column(parent.link()))
             .append(" AND record_writer_parent.tenant_id = ").append(model.getTableName()).append(".tenant_id")
-            .append(" AND record_writer_parent.").append(column(parent.policy().marker())).append(" IS TRUE")
+            .append(" AND record_writer_parent.").append(column(parent.policy().marker())).append(receipt.get().managed() ? " IS TRUE" : " IS NOT TRUE")
             .append(" AND record_writer_parent.row_version = #{params.receiptParentVersion})");
     }
 
