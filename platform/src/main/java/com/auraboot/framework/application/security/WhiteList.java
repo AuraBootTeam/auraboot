@@ -8,8 +8,6 @@ public class WhiteList {
             "/api/auth/login/sms",
             "/api/auth/login/email-code",
             "/api/auth/login/wechat-mini",
-            // Safe-mode WeChat server events: exact route, explicit opt-in, signature + AES/AppID/account verification.
-            "/api/wechat-mini/subscription-events",
             "/api/auth/login/wechat-invitation",
             "/api/auth/login/wechat-pc/**",
             "/api/auth/login/channels",

@@ -13,7 +13,32 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** MVC/bean-registration unit tests; not a deployed callback or authenticated provider execution. */
 class WechatSubscriptionCallbackControllerTest {
-    private static final String PATH = "/api/wechat-mini/subscription-events";
+    private static final String PATH = "/api/public/wechat-mini/subscription-events";
+
+    @Test void providerRouteUsesExistingPublicMvcExclusionsWithoutWeakeningBusinessInterceptors() {
+        var registry = new org.springframework.web.servlet.config.annotation.InterceptorRegistry() {
+            java.util.List<Object> captured() { return getInterceptors(); }
+        };
+        var configuration = new com.auraboot.framework.application.config.WebMvcConfig(
+                mock(com.auraboot.framework.permission.interceptor.PermissionInterceptor.class),
+                mock(com.auraboot.framework.application.security.AdminRoleInterceptor.class),
+                mock(com.auraboot.framework.environment.web.EnvironmentResolverInterceptor.class),
+                mock(com.auraboot.framework.authoring.workspace.AuthoringBusinessWriteInterceptor.class));
+        configuration.addInterceptors(registry);
+        String route = WechatSubscriptionCallbackController.class
+                .getAnnotation(org.springframework.web.bind.annotation.RequestMapping.class).value()[0];
+        var provider = new org.springframework.mock.web.MockHttpServletRequest("GET", route);
+        org.springframework.web.util.ServletRequestPathUtils.parseAndCache(provider);
+        var business = new org.springframework.mock.web.MockHttpServletRequest("GET", "/api/notification-templates");
+        org.springframework.web.util.ServletRequestPathUtils.parseAndCache(business);
+        int protectedBusinessInterceptors = 0;
+        for (Object item : registry.captured()) {
+            var mapped = (org.springframework.web.servlet.handler.MappedInterceptor) item;
+            assertThat(mapped.matches(provider)).as("provider callback must use existing public exclusions").isFalse();
+            if (mapped.matches(business)) protectedBusinessInterceptors++;
+        }
+        assertThat(protectedBusinessInterceptors).isEqualTo(3);
+    }
 
     @Test void defaultDisabledDoesNotRegisterReceiverOrController() {
         new ApplicationContextRunner().withUserConfiguration(WechatSubscriptionConsentReceiver.class,
