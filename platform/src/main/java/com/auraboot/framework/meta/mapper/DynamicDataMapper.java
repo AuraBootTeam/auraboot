@@ -114,6 +114,12 @@ public interface DynamicDataMapper {
     @UpdateProvider(type = DynamicSqlProvider.class, method = "updateByQuery")
     int updateByQuery(@Param("sql") String sql, @Param("params") Map<String, Object> params);
 
+    /** Host-generated identity-CAS lock with the complete existing write predicate and explicit tenant. */
+    @SelectProvider(type = DynamicSqlProvider.class, method = "selectCompareAndSetLocks")
+    @InterceptorIgnore(tenantLine = "true")
+    List<Map<String, Object>> selectCompareAndSetLocks(@Param("sql") String sql,
+            @Param("params") Map<String, Object> params);
+
     /**
      * Atomic counter increment via UPDATE … RETURNING. A NEW seam: the existing
      * raw-SQL methods (selectByQuery/countByQuery/executeCustomSql) enforce

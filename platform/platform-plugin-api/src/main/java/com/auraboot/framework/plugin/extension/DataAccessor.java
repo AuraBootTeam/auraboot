@@ -161,6 +161,10 @@ public interface DataAccessor extends RecordReadAccessor {
     /**
      * Apply an entire control-state batch atomically, or throw without committing any row.
      * Implementations must retain tenant, field, row-scope and optimistic-version guards.
+     * A batch that only assigns every compare field to its expected value is an identity lock:
+     * retain ordered row locks until the active transaction ends without changing data, audit
+     * fields, row versions, mutation observers or the command's expected version. A missing or
+     * unauthorized target still conflicts. Mixed/changing batches retain their write semantics.
      * There is deliberately no read/update or per-row fallback for this atomic contract.
      */
     default void compareAndSetBatch(String modelCode, String fieldCode, List<CompareAndSetUpdate> updates) {

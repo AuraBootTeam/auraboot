@@ -437,6 +437,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         List<Map<String, Object>> rows = new ArrayList<>();
         List<Object> expectedValues = new ArrayList<>();
         List<Long> versions = new ArrayList<>();
+        boolean identityLock = true;
         Set<String> columns = null;
         java.sql.Timestamp now = java.sql.Timestamp.from(Instant.now());
         for (var update : updates) {
@@ -457,6 +458,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             payloadTemporalNormalizer.normalize(data, model);
             validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
             data = convertDataTypes(model, data);
+            boolean compareFieldOnly = data.size() == 1 && data.containsKey(fieldCode);
+            Object proposedCompareValue = data.get(fieldCode);
             data.put("updated_at", now);
             data.put("updated_by", getCurrentUserId());
             filterVirtualFields(model, data);
@@ -469,7 +472,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Map<String, Object> expected = new LinkedHashMap<>();
             expected.put(fieldCode, update.expectedValue());
             payloadTemporalNormalizer.normalize(expected, model);
-            expectedValues.add(convertDataTypes(model, expected).get(fieldCode));
+            Object normalizedExpected = convertDataTypes(model, expected).get(fieldCode);
+            expectedValues.add(normalizedExpected);
+            identityLock &= compareFieldOnly && sameControlValue(proposedCompareValue, normalizedExpected);
             versions.add(MetaContext.getCommandExpectedVersion(modelCode, update.recordId()));
         }
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -514,6 +519,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         Long tenantId = getCurrentTenantId();
         params.put("tenantId", tenantId);
+        int predicateStart = sql.length();
         sql.append(" WHERE tenant_id = #{params.tenantId} AND (");
         for (int i = 0; i < updates.size(); i++) {
             if (i > 0) sql.append(" OR ");
@@ -528,6 +534,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             sql.append(")");
         }
         sql.append(")");
+        if (identityLock && !org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new MetaServiceException("Identity CAS lock requires an active transaction");
+        }
         for (int i = 0; i < updates.size(); i++) {
             RecordMutationLockGuard.guardTargets(dynamicDataMapper, model,
                     code -> metadataService.getModelDefinition(code).orElse(null), "update",
@@ -536,6 +545,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         appendAggregateBindingGuard(sql, params, model);
         RecordCommandWriterGuard.appendStoredPredicate(sql, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         dynamicScopedWriteSupport().appendScopedWriteGuards(sql, tenantId, modelCode, getCurrentUserId(), "update", params);
+        if (identityLock) {
+            String lockSql = "SELECT " + pk + " FROM " + table + sql.substring(predicateStart)
+                    + " ORDER BY " + pk + " FOR UPDATE";
+            List<Map<String,Object>> locked = dynamicDataMapper.selectCompareAndSetLocks(lockSql, params);
+            Set<String> lockedIds = new HashSet<>();
+            if (locked != null) for (var row : locked) lockedIds.add(String.valueOf(row.get(pk)));
+            if (locked == null || locked.size() != updates.size() || !lockedIds.equals(ids)) {
+                throw new MetaServiceException("CAS batch conflict: no partial batch may commit");
+            }
+            // The transaction retains the row locks; no business state, audit or version was changed.
+            return;
+        }
         int affected = dynamicDataMapper.updateByQuery(sql.toString(), params);
         if (affected != updates.size()) {
             throw new MetaServiceException("CAS batch conflict: no partial batch may commit");
@@ -553,6 +574,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 || field.isImmutable() || field.getImmutableWhen() != null) {
             throw new MetaServiceException("CAS batch requires writable mutable stored fields: " + code);
         }
+    }
+
+    private static boolean sameControlValue(Object proposed, Object expected) {
+        if (proposed instanceof Number && expected instanceof Number) {
+            return new java.math.BigDecimal(proposed.toString()).compareTo(new java.math.BigDecimal(expected.toString())) == 0;
+        }
+        return java.util.Objects.equals(proposed, expected);
     }
 
     /**
