@@ -735,8 +735,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               record,
               context,
             );
+            const includeRecordPayload = (actionDef as any).includeRecordPayload;
+            if (includeRecordPayload !== undefined && typeof includeRecordPayload !== 'boolean') {
+              throw new Error('Command includeRecordPayload must be boolean');
+            }
             let payload = {
-              ...(record || context.data || {}),
+              ...(includeRecordPayload === false ? {} : (record || context.data || {})),
               ...resolveCommandPayload(
                 actionDef as unknown as Record<string, unknown>,
                 actionRuntimeContext,
@@ -786,7 +790,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   : {}),
               };
               payload = {
-                ...freshRecord,
+                ...(includeRecordPayload === false ? {} : freshRecord),
                 ...resolveCommandPayload(
                   actionDef as unknown as Record<string, unknown>,
                   actionRuntimeContext,

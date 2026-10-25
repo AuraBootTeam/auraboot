@@ -51,14 +51,46 @@ final class ImportedNotificationMetadataReader implements SourceBindingReader {
             tracking.addAll(rows("SELECT to_jsonb(r)::text FROM ab_plugin_resource r WHERE tenant_id=? AND resource_type='model_field_binding' AND resource_pid=? ORDER BY id FOR SHARE", tenant, binding.path("pid").textValue()));
         }
         for (var owner : approval.owners()) plugins.add(one(rows("SELECT to_jsonb(p)::text FROM ab_plugin p WHERE tenant_id=? AND pid=? AND deleted_flag=FALSE FOR SHARE", tenant, owner.pid())));
-        // Whole raw rows retain unknown security extensions; only non-semantic audit timestamps are excluded.
-        return SourceBindingCanonical.tree(Map.of("model", withoutTimes(model), "bindings", bindings.stream().map(this::withoutTimes).toList(), "fields", fields.stream().map(this::withoutTimes).toList(), "tracking", tracking.stream().map(this::withoutTimes).toList(), "plugins", plugins.stream().map(this::withoutTimes).toList()));
+        // Raw security facts remain approved. Import execution identity and activation time are operational history, not shape.
+        return SourceBindingCanonical.tree(Map.of("model", withoutTimes(model), "bindings", bindings.stream().map(this::withoutTimes).toList(), "fields", fields.stream().map(this::withoutTimes).toList(), "tracking", tracking.stream().map(row -> withoutOperationalField(row, "import_id")).toList(), "plugins", plugins.stream().map(this::pluginShape).toList()));
     }
     private JsonNode withoutTimes(JsonNode row) {
         var result = row.deepCopy();
         if (result instanceof com.fasterxml.jackson.databind.node.ObjectNode o) o.remove(List.of("created_at", "updated_at", "imported_at", "last_synced_at", "user_modified_at"));
         return result;
     }
+    private JsonNode withoutOperationalField(JsonNode row, String field) {
+        var result = withoutTimes(row);
+        if (result instanceof com.fasterxml.jackson.databind.node.ObjectNode object) object.remove(field);
+        return result;
+    }
+    private JsonNode pluginShape(JsonNode row) {
+        var result = (com.fasterxml.jackson.databind.node.ObjectNode) withoutOperationalField(row, "enabled_at");
+        if (result.hasNonNull("installed_at")) {
+            result.put("installed_at", canonicalTimestamp(result.get("installed_at")));
+        }
+        // status remains in the approved graph. An enabled plugin can retain an older stop timestamp.
+        if (result.hasNonNull("disabled_at")) canonicalTimestamp(result.get("disabled_at"));
+        if ("enabled".equals(result.path("status").asText()) && result.has("disabled_at")) {
+            result.putNull("disabled_at");
+        }
+        return result;
+    }
+
+    /** Preserve the installation instant and PostgreSQL's variable fractional precision in UTC. */
+    private String canonicalTimestamp(JsonNode value) {
+        SourceBindingTypes.require(value.isTextual());
+        try {
+            var instant = java.time.OffsetDateTime.parse(value.textValue()).withOffsetSameInstant(java.time.ZoneOffset.UTC);
+            return new java.time.format.DateTimeFormatterBuilder().appendPattern("uuuu-MM-dd'T'HH:mm:ss")
+                    .appendFraction(java.time.temporal.ChronoField.NANO_OF_SECOND, 0, 9, true)
+                    .appendOffset("+HH:MM", "+00:00").toFormatter(java.util.Locale.ROOT).format(instant);
+        } catch (java.time.format.DateTimeParseException invalid) {
+            // Expected metadata validation failure; do not include the raw value in diagnostics.
+            throw new IllegalArgumentException("NOTIFICATION_SOURCE_METADATA_TIMESTAMP_INVALID");
+        }
+    }
+
     private void allowed(SourceBindingTypes.Binding b, String model) {
         SourceBindingTypes.require(sameResource && org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
         SourceBindingTypes.require(b.approvals().stream().anyMatch(a -> a.modelCode().equals(model)));

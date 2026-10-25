@@ -199,6 +199,70 @@ class ImportedNotificationMetadataReaderTest {
         assertThat(new SourceBindingTypes.Scalar(SourceBindingTypes.ScalarType.STRING, "true").raw()).isEqualTo("true");
         assertThatThrownBy(() -> new SourceBindingTypes.Scalar(SourceBindingTypes.ScalarType.BOOLEAN, "TRUE")).isInstanceOf(IllegalArgumentException.class);
     }
+    private JsonNode snapshot(long importId, String activatedAt, String changedSection) {
+        var model = (com.fasterxml.jackson.databind.node.ObjectNode) model(Map.of("unknown_security_policy", "bound"));
+        var binding = SourceBindingCanonical.tree(Map.of("tenant_id", 1, "model_id", 11, "field_id", 21, "pid", "binding", "deleted_flag", false));
+        var field = SourceBindingCanonical.tree(Map.of("id", 21, "pid", "field", "tenant_id", 1, "feature", Map.of("readOnly", false)));
+        var tracking = SourceBindingCanonical.tree(Map.of("pid", "tracking", "resource_pid", "binding", "plugin_pid", "plugin", "resource_type", "model_field_binding", "import_id", importId));
+        var plugin = (com.fasterxml.jackson.databind.node.ObjectNode) SourceBindingCanonical.tree(Map.of("pid", "plugin", "tenant_id", 1, "version", "1.0.0", "enabled", true, "status", "enabled", "enabled_at", activatedAt,
+                "installed_at", "2026-10-20T12:27:50.06032+00:00"));
+        plugin.putNull("disabled_at");
+        switch (changedSection) {
+            case "model" -> model.put("unknown_security_policy", "changed");
+            case "modelImport" -> model.put("import_id", importId);
+            case "binding" -> ((com.fasterxml.jackson.databind.node.ObjectNode) binding).put("command_scope", "other");
+            case "field" -> ((com.fasterxml.jackson.databind.node.ObjectNode) field).put("feature", "{\"readOnly\":true}");
+            case "tracking" -> ((com.fasterxml.jackson.databind.node.ObjectNode) tracking).put("plugin_pid", "other-owner");
+            case "plugin" -> ((com.fasterxml.jackson.databind.node.ObjectNode) plugin).put("enabled", false);
+            case "version" -> plugin.put("version", "2.0.0");
+            case "offsetAndReenabled" -> {
+                plugin.put("installed_at", "2026-10-20T20:27:50.06032+08:00");
+                plugin.put("disabled_at", "2026-10-24T01:46:40.527941+08:00");
+            }
+            case "disabledStatus" -> plugin.put("status", "disabled");
+            case "installedInstant" -> plugin.put("installed_at", "2026-10-20T12:27:51.06032+00:00");
+            case "invalidInstalled" -> plugin.put("installed_at", "invalid");
+            default -> { }
+        }
+        jdbc.rows.addAll(List.of(model, binding, field, tracking, plugin));
+        var approval = fixture.binding.approvals().stream().filter(row -> row.modelCode().equals("source")).findFirst().orElseThrow();
+        return reader.metadata(1, approval);
+    }
+
+    @Test
+    void sameMetadataShapeSurvivesNewImportExecutionAndPluginActivationTime() {
+        var before = snapshot(10, "2026-10-23T01:00:00Z", "");
+        var after = snapshot(11, "2026-10-23T02:00:00Z", "");
+        assertThat(SourceBindingCanonical.hash(after)).isEqualTo(SourceBindingCanonical.hash(before));
+        assertThat(after.path("tracking").get(0).has("import_id")).isFalse();
+        assertThat(after.path("plugins").get(0).has("enabled_at")).isFalse();
+    }
+
+    @Test
+    void metadataApprovalSurvivesEquivalentOffsetAndReenabledPluginHistory() {
+        JsonNode original = snapshot(10, "2026-10-23T01:00:00Z", "");
+        JsonNode reenabled = snapshot(11, "2026-10-23T02:00:00Z", "offsetAndReenabled");
+        assertThat(SourceBindingCanonical.hash(reenabled)).isEqualTo(SourceBindingCanonical.hash(original));
+        assertThat(reenabled.path("plugins").get(0).path("installed_at").asText())
+                .isEqualTo("2026-10-20T12:27:50.06032+00:00");
+        assertThat(reenabled.path("plugins").get(0).path("disabled_at").isNull()).isTrue();
+        assertThat(SourceBindingCanonical.hash(snapshot(12, "2026-10-23T03:00:00Z", "disabledStatus")))
+                .isNotEqualTo(SourceBindingCanonical.hash(original));
+        assertThat(SourceBindingCanonical.hash(snapshot(12, "2026-10-23T03:00:00Z", "installedInstant")))
+                .isNotEqualTo(SourceBindingCanonical.hash(original));
+        assertThatThrownBy(() -> snapshot(12, "2026-10-23T03:00:00Z", "invalidInstalled"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void approvalStillChangesForSecurityFactsAndUnknownMetadataExtensions() {
+        String original = SourceBindingCanonical.hash(snapshot(10, "2026-10-23T01:00:00Z", ""));
+        for (String section : List.of("model", "modelImport", "binding", "field", "tracking", "plugin", "version")) {
+            assertThat(SourceBindingCanonical.hash(snapshot(11, "2026-10-23T02:00:00Z", section)))
+                    .as(section).isNotEqualTo(original);
+        }
+    }
+
     static class CapturingJdbc extends JdbcTemplate {
         List<JsonNode> rows = new ArrayList<>();
         List<String> sql = new ArrayList<>();

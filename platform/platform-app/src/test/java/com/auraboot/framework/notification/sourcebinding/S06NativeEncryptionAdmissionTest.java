@@ -267,6 +267,40 @@ class S06NativeEncryptionAdmissionTest {
         return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(file)));
     }
 
+    @Test
+    void orderedPrivateConfigurationRosterAdmitsOneKeyAndRejectsShadowingOrDrift(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+        var target = temp.toRealPath().resolve("field-encryption.properties");
+        var unrelated = temp.toRealPath().resolve("notification-source.properties");
+        writePrivate(target, "security.field-encryption.key=" + key() + "\n");
+        writePrivate(unrelated, "aura.notification.source.enabled=true\n");
+        ObjectNode proof = privateProof();
+        ObjectNode source = source(proof, target).put("schemaVersion", 2)
+                .put("kind", "procurement-private-additional-properties-evidence-v2")
+                .put("additionalLocationCount", 2)
+                .put("additionalLocation", target.toUri() + "," + unrelated.toUri());
+        var roster = source.putArray("additionalLocations");
+        for (var path : java.util.List.of(target, unrelated)) roster.addObject()
+                .put("path", path.toString()).put("sha256", fileHash(path));
+        S06NativeEncryptionAdmission.privateSource(proof, source, target, key());
+        ObjectNode wrongOrder = source.deepCopy();
+        wrongOrder.put("additionalLocation", unrelated.toUri() + "," + target.toUri());
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, wrongOrder, target, key()))
+                .isInstanceOf(IllegalStateException.class);
+        writePrivate(unrelated, "security.fieldEncryption.key=shadow\n");
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, source, target, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_FILE_DRIFT");
+        ((ObjectNode) roster.get(1)).put("sha256", fileHash(unrelated));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, source, target, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_OVERRIDE_CONFLICT");
+        writePrivate(unrelated, "spring.config.import=optional:file:/elsewhere\n");
+        ((ObjectNode) roster.get(1)).put("sha256", fileHash(unrelated));
+        assertThatThrownBy(() -> S06NativeEncryptionAdmission.privateSource(proof, source, target, key()))
+                .hasMessage("S06_PRIVATE_SOURCE_OVERRIDE_CONFLICT");
+        writePrivate(unrelated, "aura.notification.source.enabled=true\n");
+        ((ObjectNode) roster.get(1)).put("sha256", fileHash(unrelated));
+        S06NativeEncryptionAdmission.privateSource(proof, source, target, key());
+    }
+
     private static void writePrivate(java.nio.file.Path path, String contents) throws Exception {
         java.nio.file.Files.writeString(path, contents);
         java.nio.file.Files.setPosixFilePermissions(path, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));

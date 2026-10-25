@@ -93,6 +93,8 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     @Mock private PermissionFacade permissionFacade;
     @Mock private TenantMemberService tenantMemberService;
     @Mock private WorkflowCapabilityRegistry workflowCapabilityRegistry;
+    @org.mockito.Spy private com.auraboot.framework.event.context.ThreadContextScopes threadContexts =
+            new com.auraboot.framework.event.context.ThreadContextScopes(List.of());
 
     @InjectMocks
     private DynamicDataServiceImpl service;

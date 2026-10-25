@@ -82,6 +82,15 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             String action, Long tenantId, String currentUserPid, Map<String,Object> record,
             RecordReadAccessor records) {}
 
+    /** Explicit, per-record related update authorization; older handlers deny. */
+    default boolean authorizeRelatedUpdate(RelatedUpdateAuthorizationContext context) {
+        return false;
+    }
+
+    /** Trusted current records and the exact intended update; no authorization facts from payloads. */
+    record RelatedUpdateAuthorizationContext(TargetAuthorizationContext root,
+            String modelCode, String recordId, Map<String,Object> record, Map<String,Object> changes) {}
+
     /** Explicit per-related-record delete decision; older handlers cannot grant it. */
     default boolean authorizeRelatedDelete(RelatedDeleteAuthorizationContext context) {
         return false;
@@ -312,6 +321,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public TenantRoleAssignmentAccessor tenantRoleAssignmentAccessor() {
             Object accessor = settings != null ? settings.get(TENANT_ROLE_ASSIGNMENT_ACCESSOR_KEY) : null;
             return accessor instanceof TenantRoleAssignmentAccessor value ? value : null;
+        }
+
+        /** Present only for an explicitly opted-in host-owned financial reader. */
+        public DocumentCurrencyAccessor documentCurrencyAccessor() {
+            Object accessor=settings!=null?settings.get(DocumentCurrencyAccessor.SETTINGS_KEY):null;
+            return accessor instanceof DocumentCurrencyAccessor value?value:null;
         }
 
         /** Available only through explicit server-owned secret scope metadata. */

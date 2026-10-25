@@ -870,6 +870,223 @@ describe('SubTableViewer', () => {
     });
   });
 
+  it('submits a versioned row edit with exact contextual defaults and projected payload', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          records: [
+            {
+              pid: 'receipt-line-versioned',
+              row_version: 5,
+              quantity: '0.100000',
+              unit_price: '0.973451000000',
+              source_pid: 'receipt-parent',
+              private_snapshot: 'not-a-command-input',
+            },
+          ],
+        },
+      })
+      .mockResolvedValue({ code: '0', data: { records: [] } });
+    let observedDefaults: unknown;
+    const submit = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      observedDefaults = detail.defaults;
+      detail.onSubmit({ quantity: '0.2', unit_price: '0.973451000000' });
+    };
+    window.addEventListener('dialog:form', submit, { once: true });
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          readOnly: true,
+          rowActions: [
+            {
+              code: 'adjust_line',
+              action: {
+                type: 'command',
+                command: 'test:adjust_line',
+                operationType: 'update',
+                expectedVersion: '${row.row_version}',
+                idempotent: true,
+                payload: {},
+                inputFields: [
+                  { field: 'quantity', type: 'text', defaultValue: '${row.quantity}' },
+                  { field: 'unit_price', type: 'text', defaultValue: '${record.unit_price}' },
+                ],
+              },
+            },
+          ],
+          columns: [{ field: 'quantity', label: 'Quantity' }],
+        }}
+        parentRecordPid="receipt-parent"
+        parentRecordData={{ status: 'draft' }}
+      />,
+    );
+    await screen.findByTestId('sortable-row-receipt-line-versioned');
+    fireEvent.click(screen.getByTestId('subtable-row-action-adjust_line-0'));
+    await waitFor(() =>
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/test:adjust_line',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            targetRecordPid: 'receipt-line-versioned',
+            expectedVersion: 5,
+            payload: { quantity: '0.2', unit_price: '0.973451000000' },
+            clientRequestId: expect.any(String),
+          }),
+        }),
+      ),
+    );
+    expect(observedDefaults).toEqual({ quantity: '0.100000', unit_price: '0.973451000000' });
+  });
+
+  it('fails closed before prompting or posting when an opted-in row version is missing', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: { records: [{ pid: 'unversioned-line', quantity: '1' }] },
+    });
+    const dialog = vi.fn();
+    window.addEventListener('dialog:form', dialog);
+    try {
+      render(
+        <SubTableViewer
+          config={{
+            ...buildConfig(),
+            readOnly: true,
+            actions: [
+              {
+                code: 'adjust_versioned',
+                action: {
+                  type: 'command',
+                  command: 'test:adjust',
+                  expectedVersion: '${row.row_version}',
+                  inputFields: [{ field: 'quantity', type: 'text' }],
+                },
+              },
+            ],
+            columns: [{ field: 'quantity', label: 'Quantity' }],
+          }}
+          parentRecordPid="receipt-parent"
+        />,
+      );
+      await screen.findByTestId('sortable-row-unversioned-line');
+      fireEvent.click(screen.getByTestId('subtable-row-action-adjust_versioned-0'));
+      await screen.findByText('Unable to load the current record');
+      expect(dialog).not.toHaveBeenCalled();
+      expect(fetchResultMock.mock.calls.some(([url]) => url.includes('/commands/execute/'))).toBe(
+        false,
+      );
+    } finally {
+      window.removeEventListener('dialog:form', dialog);
+    }
+  });
+
+  it('cancels deletion without a write and sends version zero with the explicit delete operation', async () => {
+    confirmDialogMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ pid: 'delete-line', row_version: 0, quantity: '1' }] },
+      })
+      .mockResolvedValue({ code: '0', data: { records: [] } });
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          readOnly: true,
+          actions: [
+            {
+              code: 'delete_versioned',
+              danger: true,
+              confirm: { en: 'Remove this draft line?' },
+              action: {
+                type: 'command',
+                command: 'test:delete',
+                operationType: 'delete',
+                expectedVersion: '${row.row_version}',
+                idempotent: true,
+                payload: {},
+              },
+            },
+          ],
+          columns: [{ field: 'quantity', label: 'Quantity' }],
+        }}
+        parentRecordPid="receipt-parent"
+      />,
+    );
+    await screen.findByTestId('sortable-row-delete-line');
+    fireEvent.click(screen.getByTestId('subtable-row-action-delete_versioned-0'));
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    expect(fetchResultMock.mock.calls.some(([url]) => url.includes('/commands/execute/'))).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByTestId('subtable-row-action-delete_versioned-0'));
+    await waitFor(() =>
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/test:delete',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            targetRecordPid: 'delete-line',
+            expectedVersion: 0,
+            operationType: 'delete',
+            payload: {},
+            clientRequestId: expect.any(String),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('shows a prompt option load failure instead of silently treating it as cancellation', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ pid: 'option-line', row_version: 1 }] },
+      })
+      .mockRejectedValueOnce(new Error('SECRET_BACKEND_STACK'));
+    render(
+      <SubTableViewer
+        locale="en-US"
+        config={{
+          ...buildConfig(),
+          readOnly: true,
+          actions: [
+            {
+              code: 'edit_with_choices',
+              action: {
+                type: 'command',
+                command: 'test:edit',
+                expectedVersion: '${row.row_version}',
+                inputFields: [
+                  {
+                    field: 'choice',
+                    type: 'select',
+                    dataSource: {
+                      type: 'api',
+                      endpoint: '/api/choices',
+                      valueField: 'pid',
+                      labelField: 'label',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          columns: [],
+        }}
+        parentRecordPid="receipt-parent"
+      />,
+    );
+    await screen.findByTestId('sortable-row-option-line');
+    fireEvent.click(screen.getByTestId('subtable-row-action-edit_with_choices-0'));
+    await screen.findByText('Unable to load data. Try again.');
+    expect(screen.queryByText('SECRET_BACKEND_STACK')).not.toBeInTheDocument();
+    expect(fetchResultMock.mock.calls.some(([url]) => url.includes('/commands/execute/'))).toBe(
+      false,
+    );
+  });
+
   it('navigates row actions with row field path templates', async () => {
     fetchResultMock.mockResolvedValue({
       code: '0',

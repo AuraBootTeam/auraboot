@@ -108,6 +108,8 @@ class ProcurementReceiptCommandScopeTest {
         when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         when(data.getById("pr_purchase_order_line", "line")).thenReturn(row());
         when(data.getById("pr_purchase_order", "order")).thenReturn(parentRow());
+        when(data.getById("pr_purchase_receipt", "source")).thenReturn(sourceRow());
+        when(data.getById("pr_inventory_operation_request", "request")).thenReturn(requestRow());
         when(data.compareAndSet(anyString(), anyString(), anyString(), any(), anyMap())).thenReturn(true);
         when(receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
         // The memory transaction delegate exposes Spring's active-T01 marker, not PG atomicity.
@@ -357,6 +359,175 @@ class ProcurementReceiptCommandScopeTest {
         verify(transactions).rollback(any());
     }
 
+    @Test void sourceConfirmationRequiresEveryCounterThenOneExactSourceCas() {
+        effect = event -> {
+            assertThat(accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7,
+                    Map.of("pr_pol_received_qty", 25))).isTrue();
+            assertThat(accessor.compareAndSet(31, "pr_purchase_receipt", "source", "row_version", 9,
+                    Map.of("pr_rcpt_status", "confirmed"))).isTrue();
+        };
+        when(data.compareAndSet(eq("pr_purchase_receipt"), eq("source"), eq("row_version"), eq(9), anyMap()))
+                .thenAnswer(call -> {
+                    assertThat(MetaContext.getAuthorizedCommandCode()).isEqualTo(ProcurementReceiptCommandScope.COMMAND);
+                    assertThat(MetaContext.getCommandExpectedVersion("pr_purchase_receipt", "source")).isEqualTo(9L);
+                    assertThat(call.getArgument(4, Map.class)).containsExactly(entry("pr_rcpt_status", "confirmed"));
+                    return true;
+                });
+        deliver();
+        var order = inOrder(data);
+        order.verify(data).compareAndSet("pr_purchase_order_line", "line", "row_version", 7L, Map.of("pr_pol_received_qty", 25));
+        order.verify(data).compareAndSet("pr_purchase_receipt", "source", "row_version", 9, Map.of("pr_rcpt_status", "confirmed"));
+        assertThat(ProcurementReceiptCommandScope.active()).isFalse();
+    }
+
+    @Test void sourceCannotCompleteBeforeCountersOrWriteAnotherSourceOrExtraFields() {
+        effect = event -> accessor.compareAndSet(31, "pr_purchase_receipt", "source", "row_version", 9,
+                Map.of("pr_rcpt_status", "confirmed"));
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        for (Runnable invalid : List.<Runnable>of(
+                () -> accessor.compareAndSet(31, "pr_purchase_receipt", "other", "row_version", 9, Map.of("pr_rcpt_status", "confirmed")),
+                () -> accessor.compareAndSet(31, "pr_purchase_receipt", "source", "row_version", 8, Map.of("pr_rcpt_status", "confirmed")),
+                () -> accessor.compareAndSet(31, "pr_purchase_receipt", "source", "row_version", 9, Map.of("pr_rcpt_status", "draft")),
+                () -> accessor.compareAndSet(31, "pr_purchase_receipt", "source", "row_version", 9, Map.of("pr_rcpt_status", "confirmed", "pr_rcpt_remark", "extra")),
+                () -> accessor.compareAndSet(32, "pr_purchase_receipt", "source", "row_version", 9, Map.of("pr_rcpt_status", "confirmed")))) {
+            effect = event -> { advanceCounter(); invalid.run(); };
+            assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        }
+        verify(data, never()).compareAndSet(eq("pr_purchase_receipt"), anyString(), anyString(), any(), anyMap());
+    }
+
+    @Test void sourceClaimTenantStateAndRequestOriginAreAuthoritative() {
+        for (Map<String,Object> invalid : List.of(
+                sourceChanged("tenant_id", 32L), sourceChanged("pr_rcpt_status", "confirmed"),
+                sourceChanged("pr_inventory_request_id", "another-request"),
+                sourceChanged("pr_inventory_request_hash", "b".repeat(64)),
+                sourceChanged("pr_inventory_request_key", "another-key"),
+                sourceChanged("pr_inventory_integration_status", "pending"))) {
+            when(data.getById("pr_purchase_receipt", "source")).thenReturn(invalid);
+            effect = event -> { advanceCounter(); confirmSource(); };
+            assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        }
+        when(data.getById("pr_purchase_receipt", "source")).thenReturn(sourceRow());
+        for (String field : List.of("pr_ior_source_id", "pr_ior_event_id", "pr_ior_intent_hash", "pr_ior_operation", "pr_ior_status")) {
+            Map<String,Object> invalid = new HashMap<>(requestRow()); invalid.put(field, "wrong");
+            when(data.getById("pr_inventory_operation_request", "request")).thenReturn(invalid);
+            assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        }
+        verify(data, never()).compareAndSet(eq("pr_purchase_receipt"), anyString(), anyString(), any(), anyMap());
+    }
+
+    @Test void sourceLeaseLossAfterCasRollsBackAndCannotFenceApplied() {
+        when(data.compareAndSet(eq("pr_purchase_receipt"), eq("source"), eq("row_version"), eq(9), anyMap()))
+                .thenAnswer(call -> { when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(0); return true; });
+        effect = event -> { advanceCounter(); confirmSource(); };
+        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        verify(receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(transactions).rollback(any());
+        assertThat(ProcurementReceiptCommandScope.active()).isFalse();
+    }
+
+    @Test void ordinaryOwnerCountersAndSourceCompleteWithinExactNonManagedSqlFence() {
+        installOrdinaryRows();installWriterDefinitions();
+        when(data.compareAndSet(eq("pr_purchase_order_line"),eq("line"),anyString(),any(),anyMap())).thenAnswer(call -> {
+            Map<String,Object> params=new HashMap<>();
+            assertThat(counterSql(31,"line",7,"row_version",7,Map.of("pr_pol_received_qty",25),params))
+                .contains("pr_pol_collaboration_managed IS NOT TRUE", "record_writer_parent.pr_po_collaboration_managed IS NOT TRUE",
+                    "record_writer_parent.pid = #{params.receiptParentPid}","record_writer_parent.row_version = #{params.receiptParentVersion}")
+                .doesNotContain("NOT EXISTS");
+            return true;
+        });
+        effect=event->{advanceCounter();confirmSource();};deliver(ordinaryEvent(true));
+        verify(data).compareAndSet("pr_purchase_receipt","source","row_version",9,Map.of("pr_rcpt_status","confirmed"));
+    }
+    @Test void ordinaryFactWithoutPrivateSourceOriginKeepsZeroCounterAuthority() {
+        installOrdinaryRows();effect=event->advanceCounter();
+        assertThatThrownBy(()->deliver(ordinaryEvent(false))).isInstanceOf(SecurityException.class);
+        verify(data,never()).compareAndSet(anyString(),anyString(),anyString(),any(),anyMap());
+    }
+    @Test void ordinaryOwnerCannotUseManagedChildParentOrWrongSourceOrder() {
+        installOrdinaryRows();effect=event->advanceCounter();
+        when(data.getById("pr_purchase_order_line","line")).thenReturn(row());
+        assertThatThrownBy(()->deliver(ordinaryEvent(true))).isInstanceOf(SecurityException.class);
+        installOrdinaryRows();when(data.getById("pr_purchase_order","order")).thenReturn(parentRow());
+        assertThatThrownBy(()->deliver(ordinaryEvent(true))).isInstanceOf(SecurityException.class);
+        installOrdinaryRows();Map<String,Object> source=new HashMap<>(sourceRow());source.put("pr_rcpt_po_id","other");
+        when(data.getById("pr_purchase_receipt","source")).thenReturn(source);
+        assertThatThrownBy(()->deliver(ordinaryEvent(true))).isInstanceOf(SecurityException.class);
+        verify(data,never()).compareAndSet(anyString(),anyString(),anyString(),any(),anyMap());
+    }
+    @Test void ordinaryOwnerWrongRequestHashRejectsBeforeCounterDelegate() {
+        installOrdinaryRows();Map<String,Object> request=new HashMap<>(requestRow());request.put("pr_ior_intent_hash","b".repeat(64));
+        when(data.getById("pr_inventory_operation_request","request")).thenReturn(request);effect=event->advanceCounter();
+        assertThatThrownBy(()->deliver(ordinaryEvent(true))).isInstanceOf(SecurityException.class);
+        verify(data,never()).compareAndSet(anyString(),anyString(),anyString(),any(),anyMap());
+    }
+    @Test void ordinaryOwnerLegacyNullMarkersRemainStrictlyNonManaged() {
+        installOrdinaryRows();Map<String,Object> child=new HashMap<>(row());child.remove("pr_pol_collaboration_managed");
+        Map<String,Object> parent=new HashMap<>(parentRow());parent.remove("pr_po_collaboration_managed");
+        when(data.getById("pr_purchase_order_line","line")).thenReturn(child);
+        when(data.getById("pr_purchase_order","order")).thenReturn(parent);
+        effect=event->{advanceCounter();confirmSource();};deliver(ordinaryEvent(true));
+        verify(data).compareAndSet("pr_purchase_receipt","source","row_version",9,Map.of("pr_rcpt_status","confirmed"));
+    }
+    @Test void ordinaryOwnerSourceStateTenantAndKeyRejectBeforeCounterWrites() {
+        for (Map.Entry<String,Object> invalid:Map.<String,Object>of("pr_rcpt_status","confirmed",
+                "pr_inventory_integration_status","pending","tenant_id",32L,"pr_inventory_request_key","other").entrySet()) {
+            installOrdinaryRows();Map<String,Object> source=new HashMap<>(sourceRow());source.put("pr_rcpt_po_id","order");source.put(invalid.getKey(),invalid.getValue());
+            when(data.getById("pr_purchase_receipt","source")).thenReturn(source);effect=event->advanceCounter();
+            assertThatThrownBy(()->deliver(ordinaryEvent(true))).isInstanceOf(SecurityException.class);
+        }
+        verify(data,never()).compareAndSet(anyString(),anyString(),anyString(),any(),anyMap());
+    }
+    @Test void mixedOrdinaryAndManagedFactModesCannotEnterConsumer() {
+        var original=ordinaryEvent(true);Map<String,Object> payload=new HashMap<>(original.payload());
+        payload.put("lines",List.of(Map.of("sourceLine",Map.of("collaborationQualified",true,"purchaseOrderLinePid","other")),
+            Map.of("sourceLine",Map.of("collaborationQualified",false,"purchaseOrderLinePid","line","modelCode","pr_purchase_receipt_line","linePid","source-line"))));
+        var mixed=new IntegrationEventEnvelope(original.schemaVersion(),original.eventId(),original.eventType(),original.source(),original.subject(),
+            original.occurredAt(),original.tenantId(),original.correlationId(),original.causationId(),original.orderingKey(),original.sequence(),payload,original.headers());
+        java.util.concurrent.atomic.AtomicBoolean called=new java.util.concurrent.atomic.AtomicBoolean();effect=event->called.set(true);
+        assertThatThrownBy(()->deliver(mixed)).isInstanceOf(SecurityException.class);assertThat(called).isFalse();verifyNoInteractions(data);
+    }
+
+    private void installOrdinaryRows() {
+        when(data.getById("pr_purchase_order_line","line")).thenReturn(changed("pr_pol_collaboration_managed",false));
+        when(data.getById("pr_purchase_order","order")).thenReturn(parentChanged("pr_po_collaboration_managed",false));
+        Map<String,Object> source=new HashMap<>(sourceRow());source.put("pr_rcpt_po_id","order");
+        when(data.getById("pr_purchase_receipt","source")).thenReturn(source);
+    }
+    private static IntegrationEventEnvelope ordinaryEvent(boolean origin) {
+        var original=event();Map<String,Object> payload=new HashMap<>(original.payload());
+        payload.put("lines",List.of(Map.of("sourceLine",Map.of("collaborationQualified",false,"purchaseOrderLinePid","line","modelCode","pr_purchase_receipt_line","linePid","source-line"))));
+        if(!origin)payload.remove("sourceOrigin");
+        return new IntegrationEventEnvelope(original.schemaVersion(),original.eventId(),original.eventType(),original.source(),original.subject(),
+            original.occurredAt(),original.tenantId(),original.correlationId(),original.causationId(),original.orderingKey(),original.sequence(),payload,original.headers());
+    }
+    private void deliver(IntegrationEventEnvelope envelope) {
+        new ReliableEventDeliveryExecutor(receipts,metrics,transactions,plugins,authority,provenance).deliver(envelope,consumer,"lease");
+    }
+
+    private void advanceCounter() {
+        assertThat(accessor.compareAndSet(31, "pr_purchase_order_line", "line", "row_version", 7,
+                Map.of("pr_pol_received_qty", 25))).isTrue();
+    }
+    private void confirmSource() {
+        assertThat(accessor.compareAndSet(31, "pr_purchase_receipt", "source", "row_version", 9,
+                Map.of("pr_rcpt_status", "confirmed"))).isTrue();
+    }
+    private static Map<String,Object> sourceRow() {
+        return Map.of("pid", "source", "tenant_id", 31L, "row_version", 9, "pr_rcpt_status", "draft",
+                "pr_inventory_integration_status", "enqueued", "pr_inventory_request_id", "request",
+                "pr_inventory_request_hash", "a".repeat(64), "pr_inventory_request_key", "31:key");
+    }
+    private static Map<String,Object> requestRow() {
+        return Map.ofEntries(entry("pid", "request"), entry("tenant_id", 31L), entry("pr_ior_source_model", "pr_purchase_receipt"),
+                entry("pr_ior_source_id", "source"), entry("pr_ior_operation", "purchase_receipt"), entry("pr_ior_status", "enqueued"),
+                entry("pr_ior_event_id", "origin"), entry("pr_ior_intent_hash", "a".repeat(64)),
+                entry("pr_ior_request_key", "31:key"), entry("pr_ior_source_version", 3));
+    }
+    private static Map<String,Object> sourceChanged(String key, Object value) {
+        Map<String,Object> row = new HashMap<>(sourceRow()); row.put(key, value); return row;
+    }
+
     private String counterSql(long tenant, String record, Object version, String compare, Object expected,
             Map<String,Object> columns, Map<String,Object> params) {
         Long previous = MetaContext.getCurrentTenantId();
@@ -407,7 +578,9 @@ class ProcurementReceiptCommandScopeTest {
         return new IntegrationEventEnvelope("1.0", id, "inventory.receipt.confirmed.v1", "inventory", "inv_inbound/receipt", Instant.EPOCH,
             31, "correlation", "causation", "31:inv_inbound:receipt", 3,
             Map.of("schemaVersion",1, "tenantId",31L, "receiptId","receipt", "receiptVersion",3, "eventId",id,
-                "lines",List.of(Map.of("sourceLine",Map.of("collaborationQualified",true,"purchaseOrderLinePid","line")))),
+                "lines",List.of(Map.of("sourceLine",Map.of("collaborationQualified",true,"purchaseOrderLinePid","line"))),
+                "sourceType", "procurement.purchase_receipt", "sourcePid", "source",
+                "sourceOrigin", Map.of("eventId", "origin", "intentHash", "a".repeat(64), "sourceVersion", 3)),
             Map.of("core.inventory.producer.schema","1", "core.inventory.producer.plugin","com.auraboot.inventory",
                 "core.inventory.producer.artifact","a".repeat(64), "core.inventory.producer.command","inv:confirm_warehouse_in",
                 "core.inventory.producer.implementation","com.auraboot.plugins.inventory.handler.ConfirmWarehouseInHandler"));

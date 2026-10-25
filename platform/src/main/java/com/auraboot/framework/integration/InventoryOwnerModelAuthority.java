@@ -43,7 +43,7 @@ public final class InventoryOwnerModelAuthority {
     }
 
     Binding resolveProcurement(long tenantId, String modelCode, boolean write) {
-        if (write && !"pr_purchase_order_line".equals(modelCode)) throw denied();
+        if (write && !Set.of("pr_purchase_order_line", "pr_purchase_receipt").contains(modelCode)) throw denied();
         if (!RECEIPT_READ_OWNERS.containsKey(modelCode) && !PRODUCT_READS.contains(modelCode)) throw denied();
         return resolveOwned(tenantId, modelCode, RECEIPT_READ_OWNERS.get(modelCode));
     }

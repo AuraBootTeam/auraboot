@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-03
-updated: 2026-10-10
+updated: 2026-10-25
 ---
 
 # Model mutation policy
@@ -82,3 +82,91 @@ File import checks the materialized physical parent reference before its raw map
 Computed fields normalize their expression context with the same declared field conversion used by FIELD_MAP, so JSON decimal strings yield decimal arithmetic. Expression errors fail the command instead of silently retaining a null amount. Computed persistence locks and checks the actual target and its parent, and requires one affected row. Client-provided computed amounts are overwritten by the evaluated expression.
 
 The extended targeted selection has 79 hermetic cases and ten PostgreSQL cases using explicit enterprise_22 and temporary tables. File import and computed writes have real parent-denial/ordinary-or-exact positive controls. Removing input conversion fails three of four computed unit cases; disabling import, direct junction, state and handler predicates fails seven of 35 selected cases. Restored targeted runs pass. Seven separate Spring metadata-query cases were rerun with explicit enterprise_22/Redis DB 13; they are not procurement business acceptance. An earlier invocation omitted the database override and used default aura_boot, so those seven earlier executions are excluded from owned-runtime proof and no zero-effect claim is made. The paired native runtime initially failed ordinary order amount persistence before this repair; a new source-set and HTTP run are still required.
+
+## Durable-operation aggregate mutation lock
+
+A model may declare extension.recordMutationLock with a physical nullable reference
+or string field and exact create/update/delete command lists. Any non-null stored
+claim freezes ordinary mutations and deletion. Claim acquisition requires both a
+published command permit and an exact allowed command; caller payloads cannot
+clear a persisted claim or authorize themselves. This policy complements tenant,
+row-scope, field ownership and optimistic-version guards.
+
+The child explicitly declares extension.inheritParentMutationLock=true together
+with parentModel and a physical parentField reference whose valueField is pid.
+Missing metadata, wrong parent target, nonphysical fields, conflicting aliases,
+missing tenant or missing transaction fail closed. Children lock their submitted
+and stored parents before mutation; a claimed parent denies child creation,
+update, deletion and relation changes even when the child has no record ownership
+marker. Ordinary models without either declaration retain existing behavior.
+
+Existing-target guards run before dynamic scoped writes, CAS batches, increments,
+bulk deletion, FIELD_MAP, side effects, handler result persistence and legacy
+state/relation/rollup/computed mutations. Bulk insert checks each proposed parent.
+Checks use the existing structured mapper lock with tenant predicates and FOR UPDATE;
+no arbitrary SQL expression is accepted in the declaration. The receipt request
+command already locks its named source before reading lines, so the child guard
+and source claim can share that lock. The product acceptance report qualifies the deployed declaration separately from
+this generic contract and retains complete write-path coverage gaps.
+
+Example root declaration:
+
+```json
+{
+  "recordMutationLock": {
+    "field": "inventory_request",
+    "commands": {"create": [], "update": ["receipt:request"], "delete": []}
+  }
+}
+```
+
+Candidate round118 compiles and passes223 targeted tests without skips, including
+the explicitly bound enterprise_22/Redis13 Spring suite. Removing the parent-claim
+check fails three of nine guard tests; the original implementation is restored.
+The broad prior attempt retains an initialization failure against nonexistent
+default aura_boot and five stale fixture failures. The fixture now injects the
+real empty ThreadContextScopes dependency without removing permission assertions.
+
+The product's round118 subsequently upgraded its original runtime and model
+declarations, verified six public/generic mutation denials and two actual PostgreSQL
+ordering cases. Those bounded results do not prove every import writer or receipt
+lifecycle. Exact runtime identity and failed attempts remain in the product report.
+
+## Confirmed receipt source transition
+
+The private ProcurementReceiptCommandScope may grant one additional CAS on
+pr_purchase_receipt, only inside the verified Inventory confirmed-fact consumer
+and its active persisted delivery lease. All qualified PO-line targets of that
+event must already have successful counter CAS results. The only accepted patch
+is pr_rcpt_status=confirmed with the source's server-read row_version. The source
+PID and type must match the fact, and tenant, draft state, enqueued integration
+state, durable request PID/key/hash, original source version and event identity
+must match the persisted Procurement request. Ordinary update/create/delete,
+other sources, extra fields, repeated source writes and missing claims are denied.
+
+The source CAS retains normal tenant/version/mutation-lock checks and exact
+internal command identity. Model ownership and the delivery lease are rechecked
+after the delegate. The consumer throws on a source conflict so the host
+transaction rolls back prior counters and cannot mark the receipt applied.
+It does not set Inventory state, post stock, change order approval or turn
+request delivery into receipt confirmation. Ordinary non-collaboration events
+retain their previous no-counter/no-source-write behavior. Deployment and native
+transaction qualification are separate from the candidate's hermetic tests.
+
+## Delete side effects and the original target
+
+The command pipeline passes its server-captured before snapshot to post-execution
+side effects. A delete with side effects requires that snapshot to match the exact
+target identity and tenant. The deleted row's stored fields override caller payload
+fields when resolving an aggregate parent; an empty payload still recalculates the
+original parent's total, including zero after its last child is removed. Missing or
+mismatched snapshots reject the command transaction instead of trusting caller
+lineage or silently skipping the aggregate. Non-delete side-effect context remains
+unchanged. This is an internal pipeline boundary, not a new HTTP input or write grant.
+
+Sub-table command row actions may opt into expectedVersion, idempotent request keys,
+explicit update/delete operation types and projected payloads. The target remains
+the selected child. Configured input defaults resolve against that row and its
+parent form; user cancellation sends no write. Opted-in missing/invalid versions
+fail closed, and option-loading errors remain visible instead of being treated as
+cancellation. Legacy actions without these options retain their existing protocol.

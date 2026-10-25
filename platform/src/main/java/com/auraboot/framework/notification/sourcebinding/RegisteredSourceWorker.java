@@ -56,7 +56,9 @@ public final class RegisteredSourceWorker {
         }
         return count;
     }
-    record SourceFailure(String sourcePid, String exceptionType) {}
+    record SourceFailure(String sourcePid, String exceptionType, SourceFailureCode code) {
+        SourceFailure(String sourcePid, String exceptionType) { this(sourcePid, exceptionType, SourceFailureCode.PROCESSING_FAILED); }
+    }
     record BatchResult(int processedPlans, long matchedSources, int selectedSources, int nextPage,
                        List<SourceFailure> failures) {
         BatchResult {
@@ -77,7 +79,7 @@ public final class RegisteredSourceWorker {
             try {
                 plans += process(tenant, code, pid);
             } catch (RuntimeException failure) {
-                failures.add(new SourceFailure(pid, failure.getClass().getName()));
+                failures.add(new SourceFailure(pid, failure.getClass().getName(), SourceFailureCode.classify(failure)));
             }
         }
         return new BatchResult(plans, selection.total(), selection.pids().size(), selection.nextPage(), failures);
