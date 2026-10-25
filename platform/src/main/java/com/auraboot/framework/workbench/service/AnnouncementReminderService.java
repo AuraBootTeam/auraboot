@@ -28,6 +28,7 @@ public class AnnouncementReminderService {
     private final AnnouncementLifecycleMapper operations;
     private final AnnouncementCodec codec;
     private final AnnouncementActorContext actors;
+    private final AnnouncementReminderClock clock;
     private final ReliableIntegrationAccessor outbox;
     @Value("${aura.notification.plugin-delivery.enabled:false}") private boolean enabled;
     @Value("${auraboot.announcement.statistics-max-recipients:50000}") private int maximumRecipients;
@@ -47,7 +48,7 @@ public class AnnouncementReminderService {
         int minutes=integer(frozen,"dedupeMinutes");
         var policy=new Policy(true,Boolean.TRUE.equals(row.get("version_active")),Boolean.TRUE.equals(business.get("acknowledgementRequired")),
             time(row.get("ack_due_at")),time(row.get("expires_at")),Duration.ofMinutes(minutes));
-        var now=facts.databaseNow();
+        var now=clock.now();
         if(!policy.versionActive() || (policy.expiresAt()!=null && !now.isBefore(policy.expiresAt()))) invalid("reminder_version_inactive");
         return new Source(record,row,snapshot,frozen,policy,audiences.managementScope("remind"),now);
     }
@@ -113,7 +114,7 @@ public class AnnouncementReminderService {
         Map<String,Object> result;
         if(SUBMIT.equals(command)) {
             var preview=reminders.previewByOwner(tenant,(String)payload.get("previewToken"),actor,member);
-            if(preview==null || !facts.databaseNow().isBefore(time(preview.get("expires_at")))) invalid("reminder_preview_expired");
+            if(preview==null || !clock.now().isBefore(time(preview.get("expires_at")))) invalid("reminder_preview_expired");
             String version=(String)preview.get("version_pid");var source=source(record,version,true);
             if(root.getRowVersion()!=((Number)preview.get("record_revision")).intValue()) conflict("CAS_VERSION_CONFLICT");
             var filters=filters(preview.get("filter_json").toString());
@@ -125,7 +126,7 @@ public class AnnouncementReminderService {
                 throw new AccessDeniedException("Only the original reminder actor may resume the plan");
             if(((Number)plan.get("automatic_batches")).intValue()>=integer(source.frozen(),"limit")
                 || (source.policy().acknowledgementDeadline()!=null && !source.now().isBefore(source.policy().acknowledgementDeadline()))) invalid("reminder_version_inactive");
-            if(reminders.resume(tenant,version)!=1) invalid("reminder_not_blocked");
+            if(reminders.resume(tenant,version,source.now())!=1) invalid("reminder_not_blocked");
             result=new LinkedHashMap<>(Map.of("recordPid",record,"versionPid",version,"operationState","resumed"));
         } else throw new IllegalArgumentException("Unsupported reminder command");
         result.put("actorMemberPid",member);result.put("operationId",operation);

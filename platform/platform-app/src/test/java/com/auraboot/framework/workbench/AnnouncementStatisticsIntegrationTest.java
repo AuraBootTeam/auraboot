@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Actual authorized HTTP capture, immutable JSONB persistence and current-permission reauthorization. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@org.springframework.context.annotation.Import(AnnouncementStatisticsIntegrationTest.ReminderTimeConfiguration.class)
 @TestPropertySource(properties={"aura.notification.plugin-delivery.enabled=true","auraboot.announcement.worker-enabled=false",
     "auraboot.announcement.approval.worker-enabled=false"})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
@@ -48,6 +49,17 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired com.auraboot.module.exchange.service.ExecutionJobQueryService executionJobs;
     @Autowired com.auraboot.framework.infrastructure.storage.StorageProperties storageProperties;
     @Autowired AnnouncementStatisticsExportCommand exportCommand;
+    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
+    static class ReminderTimeConfiguration {
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        ControlledReminderClock controlledReminderClock() {return new ControlledReminderClock();}
+    }
+    static class ControlledReminderClock extends AnnouncementReminderClock {
+        volatile Instant instant;
+        @Override public Instant now() {return instant==null ? Instant.now() : instant;}
+    }
+    @Autowired ControlledReminderClock reminderClock;
     @Autowired AnnouncementReminderService reminders;
     @Autowired com.auraboot.framework.meta.service.impl.OutboxWorkerImpl outboxWorker;
     @Autowired com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl backgroundTasks;
@@ -75,7 +87,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user,null,authorities));
         http=MockMvcBuilders.webAppContextSetup(context).build();
     }
-    @AfterEach void clearAuthentication(){SecurityContextHolder.clearContext();}
+    @AfterEach void clearAuthentication(){reminderClock.instant=null;SecurityContextHolder.clearContext();}
     private String publish() {
         String operation=UniqueIdGenerator.generate();
         var policy=Map.of("audience",Map.of("kind","selected","userPids",List.of(getTestUser().getPid())),
@@ -144,6 +156,42 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         var next=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
         assertThatThrownBy(()->reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",next.get("previewToken")),operation))
             .isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
+    }
+    private Map<String,Object> reminderPlan(String version) {
+        return jdbc.queryForMap("SELECT p.*,j.actor_user_id,j.actor_member_pid,j.announcement_pid FROM ab_announcement_reminder_plan p JOIN ab_announcement_release j ON j.tenant_id=p.tenant_id AND j.pid=p.release_pid WHERE p.tenant_id=? AND p.version_pid=?",getTestTenant().getId(),version);
+    }
+    private Instant reminderSlot(String version,int days) {
+        var row=jdbc.queryForMap("SELECT c.published_at,v.snapshot->>'timezone' AS timezone FROM ab_announcement_version v JOIN ab_announcement_version_control c ON c.tenant_id=v.tenant_id AND c.version_pid=v.pid WHERE v.tenant_id=? AND v.pid=?",getTestTenant().getId(),version);
+        Instant published=((java.sql.Timestamp)row.get("published_at")).toInstant();
+        return published.atZone(ZoneId.of((String)row.get("timezone"))).toLocalDate().plusDays(days).atTime(9,0).atZone(ZoneId.of((String)row.get("timezone"))).toInstant();
+    }
+    @Test void automaticRemindersPersistOneBatchPerDayAndStopAfterThreePositiveBatches() {
+        String version=publish();var reference=reminderPlan(version);
+        for(int day=2;day<=5;day++) {
+            reminderClock.instant=reminderSlot(version,day);reminders.scan(reference);reminders.scan(reference);
+            assertThat(reminderPlan(version).get("automatic_batches")).isEqualTo(Math.min(day-1,3));
+        }
+        assertThat(reminderPlan(version)).containsEntry("status","completed");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_reminder_batch WHERE tenant_id=? AND version_pid=? AND mode='AUTO'",Long.class,getTestTenant().getId(),version)).isEqualTo(3L);
+        assertThat(jdbc.queryForList("SELECT intention_count FROM ab_announcement_reminder_batch WHERE tenant_id=? AND version_pid=? AND mode='AUTO'",Integer.class,getTestTenant().getId(),version)).containsExactly(1,1,1);
+    }
+    @Test void manualAndAutomaticShareTheSamePersistentWindowWithoutChargingAnEmptyDay() {
+        String version=publish(),record=recordOf(version);reminderClock.instant=reminderSlot(version,2);
+        var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());
+        reminders.scan(reminderPlan(version));reminders.scan(reminderPlan(version));
+        assertThat(reminderPlan(version).get("automatic_batches")).isEqualTo(0);
+        assertThat(jdbc.queryForMap("SELECT status,intention_count,throttled_count FROM ab_announcement_reminder_batch WHERE tenant_id=? AND version_pid=? AND mode='AUTO'",getTestTenant().getId(),version))
+            .containsEntry("status","skipped").containsEntry("intention_count",0).containsEntry("throttled_count",1);
+        reminderClock.instant=reminderSlot(version,3);reminders.scan(reminderPlan(version));
+        assertThat(reminderPlan(version).get("automatic_batches")).isEqualTo(1);
+    }
+    @Test void automaticDeadlineEqualityStopsButManualReminderRemainsAvailable() {
+        String version=publish(),record=recordOf(version);
+        reminderClock.instant=jdbc.queryForObject("SELECT ack_due_at FROM ab_announcement_version_control WHERE tenant_id=? AND version_pid=?",java.sql.Timestamp.class,getTestTenant().getId(),version).toInstant();
+        reminders.scan(reminderPlan(version));assertThat(reminderPlan(version)).containsEntry("status","completed").containsEntry("automatic_batches",0);
+        var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());assertThat(preview.get("eligible")).isEqualTo(1L);
+        var result=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());assertThat(result.get("actualCount")).isEqualTo(1);
     }
     @Test void httpSummaryAndDetailsRemainAtTheSameInstantAfterNaturalReadAndAcknowledgementChanges() throws Exception {
         String version=publish();
