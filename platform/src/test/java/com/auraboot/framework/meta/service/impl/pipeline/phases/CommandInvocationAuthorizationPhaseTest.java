@@ -70,7 +70,8 @@ class CommandInvocationAuthorizationPhaseTest {
         });
         var context = context(config());
         var nested = new HashMap<String, Object>(); nested.put("name", "Before"); nested.put("parent", null);
-        context.setPayload(new HashMap<>(Map.of("storePid", "store-1", "nested", nested, "values", List.of("one"))));
+        context.getRequest().setPayload(new HashMap<>(Map.of("storePid", "store-1", "nested", nested, "values", List.of("one"))));
+        context.setPayload(Map.of("storePid", "not-materialized-by-schema-yet"));
         phase.execute(context);
         var actual = observed.get();
         assertThat(actual.tenantId()).isEqualTo(7L);
@@ -99,6 +100,6 @@ class CommandInvocationAuthorizationPhaseTest {
         var command = new CommandDefinition(); command.setModelCode("app_workspace");
         var request = new CommandExecuteRequest(); request.setPayload(Map.of("storePid", "store-1"));
         return CommandPipelineContext.builder().tenantId(7L).userId(9L).commandCode("app:create_category")
-                .command(command).request(request).payload(request.getPayload()).execConfig(config).build();
+                .command(command).request(request).execConfig(config).build();
     }
 }

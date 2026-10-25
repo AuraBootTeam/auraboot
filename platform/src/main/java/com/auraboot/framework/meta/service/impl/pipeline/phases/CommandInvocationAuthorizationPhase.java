@@ -42,7 +42,7 @@ public class CommandInvocationAuthorizationPhase implements CommandPhase {
         var invocation = new CommandInvocationAuthorizer.InvocationContext(context.getTenantId(),
                 MetaContext.getCurrentMemberId(), MetaContext.getCurrentUserPid(), context.getCommandCode(), code,
                 context.getCommand() == null ? null : context.getCommand().getModelCode(),
-                request == null ? null : request.getTargetRecordId(), context.getPayload());
+                request == null ? null : request.getTargetRecordId(), request == null ? null : request.getPayload());
         if (!authorizer.authorizeInvocation(invocation)) throw denied();
     }
 
