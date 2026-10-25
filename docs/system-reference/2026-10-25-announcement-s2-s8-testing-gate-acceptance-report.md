@@ -95,3 +95,12 @@ allowed_claim: targeted-tested; incomplete S2–S8 delivery, no merge or product
 3bf2fdfd1的运营入口定向验证：117项hermetic单测、35项真实PostgreSQL/HTTP/outbox集成及17项前端单测通过，无失败/跳过；43d7d6d1类型检查通过，两版生产TS相同。第一次43d执行曾有116/117单测、34/35集成和16/17前端；分别因缺省mock返回空Map而非null、测试删除缺权限、以及新页使用不支持的secondary按钮值而失败，原日志和JUnit保留，不能改写为首轮通过。修正后全部相关用例实际执行，非Gradle缓存。
 
 3bf原生浏览器2条通过（54.2秒、无skip/retry，认证另1条），包括通知设置的缺BPM禁用模式、预约取消、统计筛选、导出丢响应后核对同一原操作、原键重放、实际CSV摘要/解析、准确版本渠道页和刷新不重发。公开启动9/9及Workspace监听/构件/源码/缓存/DB身份复核无finding/warning。发布方式控件与统计整页原图复核通过；渠道原图发现站内通知列换行，已登记并调整列宽；c5b1fe1dd的单行断言及新原图复核已通过。更早2e的16条浏览器旅程不借用为当前全量回归。
+
+## 2026-10-25 增量验证：8a8349e0c
+
+- 公开启动器与Workspace verify通过，三层listener身份一致；验证后正常suspend，保留DB与证据。
+- s7-header-richtext-regression-browser.log：17条公告旅程通过，无skip/retry，3.0分钟；认证1条另计。s7-header-richtext-native-browser.log：附件旅程通过。[5张原图与逐图发现](./evidence/announcement-s2-s8-2026-10-25/attachments/manifest.json)已复核。
+- 原生富文本创建与受控API注入恶意HTML夹具分别记录，不把后者称为原生编辑。19项定向前端测试通过，类型检查退出0；不替代原生铃铛故障证据。
+- s8-capacity-export-first-junit：26项单测通过，4项真实集成中2失败；分别是夹具违反不可覆盖文件契约、真实nullable SQL参数缺陷。10a8b2aaa修正后s8-capacity-export-corrected-junit中4项集成通过，无skip/retry。完整后端套件尚未重跑。
+- 501人测量原件：measurements/announcement-capacity-501-10a8b2aaa.json；发布335ms、投影5526ms、统计163ms、导出282ms、127920字节CSV，仅支持501人结论。
+- 尚未关闭：分页受众、BPM最新正式组合/严格审批原生流程/停用保护、完整覆盖和可信度对账。继续使用同一设计与PR，不合并。

@@ -1,0 +1,48 @@
+{
+  "sourceCommit": "8a8349e0c",
+  "runtime": "announcement-management",
+  "browser": {
+    "collected": 17,
+    "passed": 17,
+    "skipped": 0,
+    "retried": 0,
+    "duration": "3.0m",
+    "authSetupExcluded": true
+  },
+  "screenshots": [
+    {
+      "file": "attachment-uploaded-draft.png",
+      "sha256": "576277d8ebd918704d242c03487616638814cc1c385951b02cba36c54eba2a5a",
+      "review": "original-viewed",
+      "finding": "Rich-text formatting, retained file name, byte size and configured upload limit are legible."
+    },
+    {
+      "file": "recipient-body-failed-read-blocked.png",
+      "sha256": "53acc9e5967707fc01271922b94697d0ff735fa2ca9671c5dbdf035f28e6211d",
+      "review": "original-viewed",
+      "finding": "Localized image failure and retry; controlled attachment available, acknowledgement disabled."
+    },
+    {
+      "file": "recipient-frozen-attachment.png",
+      "sha256": "0bd5576ae6686b1737e9d24c78de790043a7ab779fa31699271068ac12e16993",
+      "review": "original-viewed",
+      "finding": "Exact attachment name and acknowledgement after body and files."
+    },
+    {
+      "file": "recipient-narrow-attachment.png",
+      "sha256": "cf9a06922d293557e7e621acaced9e048589d414b4c07c476f164e8d034cd4d9",
+      "review": "original-viewed",
+      "finding": "390px viewport retains readable content and actions without document overflow."
+    },
+    {
+      "file": "recipient-narrow-confirmation.png",
+      "sha256": "4dee5f07606cb7a3c70ad8d825cdb9666e2a7c25ddbd6349e928e4c650c4c1fd",
+      "review": "original-viewed",
+      "finding": "Confirmation fits viewport; Escape restores focus to its original trigger."
+    }
+  ],
+  "limitations": [
+    "Hostile HTML fixture uses the protected API after native rich-text creation.",
+    "Native header failure, audience paging and latest BPM composition remain pending."
+  ]
+}
