@@ -61,6 +61,9 @@ class SystemPermissionInitializerTest {
             }
         });
 
+        assertThat(com.auraboot.framework.permission.validator.PermissionCodeValidator.isValid("meta.command.execute")).isTrue();
+        assertThat(com.auraboot.framework.permission.validator.PermissionCodeValidator.isValid("unknown.command.execute")).isFalse();
+        assertThat(com.auraboot.framework.permission.validator.PermissionCodeValidator.isValid("meta.command.execute.extra.invalid")).isFalse();
         Permission canonical = permissions.stream().filter(p -> "meta.command.execute".equals(p.getCode()))
                 .findFirst().orElseThrow(() -> new AssertionError("Native HTTP command execute permission is absent"));
         assertThat(canonical.getResourceType()).isEqualTo("meta");

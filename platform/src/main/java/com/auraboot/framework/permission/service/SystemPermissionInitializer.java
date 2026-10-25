@@ -64,7 +64,7 @@ public class SystemPermissionInitializer {
      */
     public static final String[] RESOURCE_TYPES = {
         // Meta resources
-        "model", "page", "component", "dict", "field",
+        "meta", "model", "page", "component", "dict", "field",
         "query", "command", "form", "menu", "template",
         // RBAC resources
         "permission", "rbac",
