@@ -343,6 +343,22 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_preservesTypedDomainClientRejections() {
+        for (org.springframework.http.HttpStatus status : List.of(org.springframework.http.HttpStatus.FORBIDDEN,
+                org.springframework.http.HttpStatus.NOT_FOUND, org.springframework.http.HttpStatus.CONFLICT)) {
+            var rejection = new org.springframework.web.server.ResponseStatusException(status, "Domain constraint");
+            CommandHandlerExtension handler = new CommandHandlerExtension() {
+                @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+                @Override public Object execute(CommandContext context) { throw rejection; }
+            };
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+            assertThatThrownBy(() -> phase.execute(context)).isSameAs(rejection);
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        }
+    }
+
+    @Test
     void execute_mapsTypedBusinessRuleBlockWithoutMessageClassification() {
         PluginCommandRejectionException blocked = new PluginCommandRejectionException(
                 PluginCommandRejectionException.Code.BUSINESS_RULE_BLOCKED,

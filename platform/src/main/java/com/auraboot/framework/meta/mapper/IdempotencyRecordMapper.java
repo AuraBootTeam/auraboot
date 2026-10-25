@@ -38,6 +38,23 @@ public interface IdempotencyRecordMapper extends BaseMapper<IdempotencyRecord> {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertIdempotent(IdempotencyRecord record);
 
+    /** PostgreSQL infinity is an explicit retained replay fence; no schema or artificial date. */
+    @Insert("""
+        INSERT INTO ab_idempotency_record
+        (tenant_id, client_request_id, request_hash, command_code, outcome, status, expires_at, created_at)
+        VALUES
+        (#{tenantId}, #{clientRequestId}, #{requestHash}, #{commandCode},
+         #{outcome, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+         #{status}, 'infinity'::timestamptz, #{createdAt})
+        ON CONFLICT (tenant_id, client_request_id) DO NOTHING
+        """)
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insertRetainedIdempotent(IdempotencyRecord record);
+
+    @Select("SELECT * FROM ab_idempotency_record WHERE tenant_id=#{tenantId} AND client_request_id=#{clientRequestId} AND expires_at='infinity'::timestamptz")
+    IdempotencyRecord findRetainedByClientRequestId(@Param("tenantId") Long tenantId,
+            @Param("clientRequestId") String clientRequestId);
+
     @Update("""
         UPDATE ab_idempotency_record
         SET outcome = #{outcome, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},

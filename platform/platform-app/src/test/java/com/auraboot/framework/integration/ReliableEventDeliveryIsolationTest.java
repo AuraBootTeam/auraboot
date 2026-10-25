@@ -37,15 +37,22 @@ class ReliableEventDeliveryIsolationTest {
         when(manager.getTransaction(any())).thenAnswer(a -> {
             TransactionDefinition d = a.getArgument(0);
             isolation = d.getIsolationLevel();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+            org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
             assertThat(d.getPropagationBehavior()).isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
             return new SimpleTransactionStatus();
         });
+        org.mockito.Mockito.doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.clear(); return null; }).when(manager).commit(any());
+        org.mockito.Mockito.doAnswer(call -> { org.springframework.transaction.support.TransactionSynchronizationManager.clear(); return null; }).when(manager).rollback(any());
+        when(mapper.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
+        when(mapper.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
         when(mapper.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
         when(mapper.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
     }
     @AfterEach
     void cleanup() {
         MetaContext.clear();
+        org.springframework.transaction.support.TransactionSynchronizationManager.clear();
     }
     static class Ordinary implements ReliableEventConsumerExtension {
         public String consumerCode() {
@@ -75,7 +82,9 @@ class ReliableEventDeliveryIsolationTest {
         assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_SERIALIZABLE);
         var order = inOrder(manager, mapper);
         order.verify(manager).getTransaction(any());
+        order.verify(mapper).lockActiveDeliveryLease(1L, "id", "lease");
         order.verify(mapper).claimReceipt(1L, "id", "test", "lease");
+        order.verify(mapper).countActiveDeliveryLease(1L, "id", "lease");
         order.verify(mapper).markReceiptApplied(1L, "id", "test", "lease");
         order.verify(manager).commit(any());
     }
@@ -106,5 +115,65 @@ class ReliableEventDeliveryIsolationTest {
         });
         new ReliableEventDeliveryExecutor(mapper, metrics, manager).deliver(event,(ReliableEventConsumerExtension) consumer, "lease");
         assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+    }
+
+    @Test
+    void inactiveLeaseRejectsBeforeReceiptOrEffect() {
+        when(mapper.lockActiveDeliveryLease(1L, "id", "lease")).thenReturn(null);
+        var consumer = mock(ReliableEventConsumerExtension.class);
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, consumer, "lease")).isInstanceOf(IllegalStateException.class).hasMessageContaining("lease");
+        verify(mapper, never()).claimReceipt(anyLong(), anyString(), anyString(), anyString());
+        verify(consumer, never()).consume(any());
+        verify(manager).rollback(any());
+    }
+
+    @Test
+    void expiryAfterEffectRollsBackBeforeAppliedReceipt() {
+        when(mapper.countActiveDeliveryLease(1L, "id", "lease")).thenReturn(0);
+        var consumer = mock(ReliableEventConsumerExtension.class);
+        when(consumer.consumerCode()).thenReturn("test");
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, consumer, "lease")).isInstanceOf(IllegalStateException.class).hasMessageContaining("lease");
+        verify(consumer).consume(event);
+        verify(mapper, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(manager).rollback(any());
+    }
+
+    @Test
+    void activeDuplicateSkipsEffectButStillRequiresCurrentLease() {
+        when(mapper.claimReceipt(1L, "id", "test", "lease")).thenReturn(0);
+        var consumer = mock(ReliableEventConsumerExtension.class);
+        when(consumer.consumerCode()).thenReturn("test");
+        new ReliableEventDeliveryExecutor(mapper, metrics, manager).deliver(event, consumer, "lease");
+        verify(mapper).lockActiveDeliveryLease(1L, "id", "lease");
+        verify(consumer, never()).consume(any());
+        verify(mapper, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(manager).commit(any());
+    }
+
+    @Test
+    void missingTransactionMarkerCannotLockOrApplyEvenWithAValidLease() {
+        org.mockito.Mockito.doAnswer(call -> {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+            return new SimpleTransactionStatus();
+        }).when(manager).getTransaction(any());
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, new Ordinary(), "lease")).isInstanceOf(SecurityException.class);
+        verify(mapper, never()).lockActiveDeliveryLease(anyLong(), anyString(), anyString());
+        verify(manager).rollback(any());
+    }
+
+    @Test
+    void readOnlyTransactionCannotLockOrApply() {
+        org.mockito.Mockito.doAnswer(call -> {
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+            org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
+            return new SimpleTransactionStatus();
+        }).when(manager).getTransaction(any());
+        assertThatThrownBy(() -> new ReliableEventDeliveryExecutor(mapper, metrics, manager)
+                .deliver(event, new Ordinary(), "lease")).isInstanceOf(SecurityException.class);
+        verify(mapper, never()).lockActiveDeliveryLease(anyLong(), anyString(), anyString());
+        verify(manager).rollback(any());
     }
 }

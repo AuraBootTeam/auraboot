@@ -280,6 +280,10 @@ public class BootstrapEngineService {
         }
     }
 
+    /** Explicit audit allowlist: setup credentials are transient and must never be serialized. */
+    private record BootstrapAuditInput(String companyName, String adminEmail, String adminDisplayName,
+                                       String systemMode, Boolean seedDemoData, String instanceUrl) { }
+
     private BootstrapEntity createBootstrapRecord(BootstrapRequest request) {
         BootstrapEntity entity = new BootstrapEntity();
         entity.setPid(UniqueIdGenerator.generate());
@@ -293,9 +297,11 @@ public class BootstrapEngineService {
         entity.setStartedAt(Instant.now());
 
         try {
-            entity.setInputParams(objectMapper.writeValueAsString(request));
+            entity.setInputParams(objectMapper.writeValueAsString(new BootstrapAuditInput(
+                    request.getCompanyName(), request.getAdminEmail(), request.getAdminDisplayName(),
+                    request.getSystemMode(), request.getSeedDemoData(), request.getInstanceUrl())));
         } catch (Exception e) {
-            log.warn("Failed to serialize bootstrap request params", e);
+            log.warn("Failed to serialize bootstrap audit snapshot", e);
         }
 
         bootstrapMapper.insert(entity);

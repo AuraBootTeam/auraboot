@@ -763,6 +763,10 @@ public class HandlerPhase implements CommandPhase {
         } catch (Exception e) {
             log.error("Plugin command handler execution failed for {} (command={}): {}",
                     handlerCode, commandCode, e.getMessage(), e);
+            if (e instanceof org.springframework.web.server.ResponseStatusException status
+                    && status.getStatusCode().is4xxClientError()) {
+                throw status;
+            }
             if (e instanceof AccessDeniedException accessDeniedException) {
                 throw accessDeniedException;
             }

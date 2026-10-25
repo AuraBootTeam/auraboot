@@ -48,6 +48,18 @@ public interface IdempotencyService {
             Long tenantId);
 
     /**
+     * Claim an operation whose replay fence must survive automatic TTL cleanup.
+     * Uses the same transactional uniqueness/intent/outcome contract as the finite claim.
+     * Retained keys are never automatically reclaimed or converted from finite keys;
+     * callers must use a dedicated operation namespace and an explicit data-retention policy.
+     * This is a replay fence, not resource authorization. Unsupported providers fail closed.
+     */
+    default Map<String, Object> claimRetainedScopedIdempotency(
+            String clientRequestId, String operationCode, Map<String, Object> payload, Long tenantId) {
+        throw new UnsupportedOperationException("Retained scoped idempotency is not supported by this provider");
+    }
+
+    /**
      * Record successful execution outcome for future idempotent replay.
      *
      * @param clientRequestId unique client request identifier

@@ -6,11 +6,14 @@ import com.auraboot.framework.integration.IntegrationBackoffPolicy;
 import com.auraboot.framework.integration.ReliableEventConsumerRegistry;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
 import com.auraboot.framework.integration.ReliableIntegrationMetrics;
+import com.auraboot.framework.integration.ReliableIntegrationClaimService;
 import com.auraboot.framework.integration.ReliableIntegrationStateService;
 import com.auraboot.framework.meta.entity.OutboxEvent;
 import com.auraboot.framework.meta.mapper.OutboxEventMapper;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
 import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
+import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationDispatcher;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +25,8 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 
@@ -36,7 +41,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OutboxWorkerImpl {
+public class OutboxWorkerImpl implements ReliableIntegrationDispatcher {
 
     private static final int BATCH_SIZE = 50;
     private static final int MAX_BATCHES_PER_POLL = 8;
@@ -55,6 +60,7 @@ public class OutboxWorkerImpl {
     private final ReliableEventDeliveryExecutor deliveryExecutor;
     private final ReliableIntegrationStateService stateService;
     private final ReliableIntegrationMetrics metrics;
+    private final ReliableIntegrationClaimService claims;
 
     /**
      * Poll and dispatch pending outbox events.
@@ -67,49 +73,93 @@ public class OutboxWorkerImpl {
         }
     }
 
-    private int dispatchReadyBatch() {
-        String leaseToken = UUID.randomUUID().toString();
-        // Scope only the worker's own outbox-plane reads/writes; the consumer
-        // dispatch below must keep running exactly as today (unscoped), so
-        // downstream business queries keep their fail-closed semantics
-        // (tenant-exemption cleanup W3e).
-        List<OutboxEvent> events = MetaContext.runWithoutTenantFilter(
-                () -> outboxEventMapper.claimReadyEvents(
-                        BATCH_SIZE, LEASE_OWNER, leaseToken, Instant.now().plus(LEASE_DURATION)));
-        if (events.isEmpty()) {
-            return 0;
+    @Override
+    public DispatchResult dispatchCurrentTenant(String source, Set<String> eventTypes, int limit) {
+        if (!MetaContext.exists()) {
+            throw new SecurityException("Reliable dispatch requires a verified current tenant member");
         }
+        Long tenant = MetaContext.getCurrentTenantId();
+        if (tenant == null || tenant <= 0 || MetaContext.getCurrentMemberId() == null
+                || MetaContext.getCurrentUserPid() == null || MetaContext.getCurrentUserPid().isBlank()) {
+            throw new SecurityException("Reliable dispatch requires a verified current tenant member");
+        }
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Reliable dispatch must run outside a business transaction");
+        }
+        requireContractCode(source, "source");
+        if (limit < 1 || limit > 100 || eventTypes == null || eventTypes.isEmpty() || eventTypes.size() > 32) {
+            throw new IllegalArgumentException("Reliable dispatch requires bounded event types and batch size");
+        }
+        for (String type : eventTypes) {
+            requireContractCode(type, "eventType");
+            if (consumerRegistry.consumersFor(type).isEmpty()) {
+                throw new IllegalArgumentException("No reliable consumer registered for event type: " + type);
+            }
+        }
+        String token = UUID.randomUUID().toString();
+        List<OutboxEvent> events = claims.claimTenant(tenant, source, eventTypes.stream().sorted().toList(),
+                limit, LEASE_OWNER, token, Instant.now().plus(LEASE_DURATION));
+        return dispatchClaimed(events, token);
+    }
 
-        log.debug("Outbox worker found {} events ready for dispatch", events.size());
+    private void requireContractCode(String value, String name) {
+        if (value == null || value.isBlank() || value.length() > 128 || !value.equals(value.strip())) {
+            throw new IllegalArgumentException(name + " must be a canonical contract code");
+        }
+    }
 
+    private int dispatchReadyBatch() {
+        String token = UUID.randomUUID().toString();
+        // Bypass only the global outbox-plane claim, never downstream consumer business queries.
+        List<OutboxEvent> events = MetaContext.runWithoutTenantFilter(() -> claims.claimGlobal(
+                BATCH_SIZE, LEASE_OWNER, token, Instant.now().plus(LEASE_DURATION)));
+        return dispatchClaimed(events, token).claimed();
+    }
+
+    private DispatchResult dispatchClaimed(List<OutboxEvent> events, String leaseToken) {
+        int delivered = 0;
+        int failed = 0;
+        int leaseLost = 0;
+        List<String> dead = new ArrayList<>();
         for (OutboxEvent event : events) {
             metrics.record("claimed");
+            if ("failed".equals(event.getStatus())) {
+                // The claim transaction atomically exhausted a crashed worker's budget and wrote its DLQ.
+                failed++;
+                dead.add(event.getEventId());
+                metrics.record("dead_lettered");
+                continue;
+            }
             try {
-                if (event.getSchemaVersion() == null) {
-                    dispatchLegacy(event);
+                if (event.getSchemaVersion() == null) dispatchLegacy(event);
+                else dispatchReliable(event, leaseToken);
+                if (MetaContext.runWithoutTenantFilter(() -> stateService.markDelivered(event, leaseToken))) {
+                    delivered++;
                 } else {
-                    dispatchReliable(event, leaseToken);
-                }
-                if (!MetaContext.runWithoutTenantFilter(() -> stateService.markDelivered(event, leaseToken))) {
+                    leaseLost++;
                     log.warn("Outbox event {} finished after its lease fence was lost", event.getEventId());
                 }
-            } catch (Exception e) {
+            } catch (Exception error) {
                 Instant nextRetry = Instant.now().plus(BACKOFF.delayForRetry(event.getRetryCount()));
-                String errorMsg = truncateError(e.getMessage());
-                MetaContext.runWithoutTenantFilter(
-                        () -> stateService.recordFailure(event, leaseToken, nextRetry, errorMsg));
-
+                String message = truncateError(error.getMessage());
+                boolean changed = MetaContext.runWithoutTenantFilter(
+                        () -> stateService.recordFailure(event, leaseToken, nextRetry, message));
+                if (!changed) {
+                    leaseLost++;
+                    continue;
+                }
+                failed++;
                 if (event.getRetryCount() + 1 >= event.getMaxRetries()) {
-                    log.error("Outbox event {} exceeded max retries and entered the DLQ. " +
-                            "EventType={}, CommandCode={}", event.getEventId(),
-                            event.getEventType(), event.getCommandCode(), e);
+                    dead.add(event.getEventId());
+                    log.error("Outbox event {} entered the DLQ. EventType={}, CommandCode={}",
+                            event.getEventId(), event.getEventType(), event.getCommandCode(), error);
                 } else {
                     log.warn("Outbox event {} dispatch failed (retry {}), next retry at {}",
                             event.getEventId(), event.getRetryCount() + 1, nextRetry);
                 }
             }
         }
-        return events.size();
+        return new DispatchResult(events.size(), delivered, failed, leaseLost, dead);
     }
 
     private void dispatchReliable(OutboxEvent event, String leaseToken) {
@@ -131,10 +181,8 @@ public class OutboxWorkerImpl {
 
     private IntegrationEventEnvelope toEnvelope(OutboxEvent event) {
         try {
-            var reader = objectMapper.readerFor(new TypeReference<Map<String, Object>>() {});
-            if (event.getEventType().startsWith("open.resource.")) {
-                reader = reader.with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
-            }
+            var reader = objectMapper.readerFor(new TypeReference<Map<String, Object>>() {})
+                    .with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
             Map<String, Object> payload = reader.readValue(event.getPayload());
             Map<String, String> headers = event.getHeaders() == null
                     ? Map.of()
