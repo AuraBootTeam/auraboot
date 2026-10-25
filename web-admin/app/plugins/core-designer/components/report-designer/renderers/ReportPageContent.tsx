@@ -6,10 +6,11 @@ import { useToastContext } from '~/contexts/ToastContext';
  * Phase 2c: adds ParametersBar, cross-tab, chart, all block types
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import type { ReportDsl } from '../types';
 import { reportDesignerService } from '../services/reportDesignerService';
 import { useReportQuery } from '../services/useReportQuery';
+import { reportWithRouteParameters } from '../services/reportRouteParameters';
 import { ReportQueryControls } from '../components/ReportQueryControls';
 import { ReportTableBlockRenderer } from './ReportTableBlockRenderer';
 import { ReportBandRenderer } from './ReportBandRenderer';
@@ -22,12 +23,14 @@ import { ReportChartBlock } from '../blocks/ReportChartBlock';
 
 interface ReportPageContentProps {
   pageKey: string;
+  search?: string;
 }
 
-export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey }) => {
+export const ReportPageContent: React.FC<ReportPageContentProps> = ({ pageKey, search = '' }) => {
   const text = useSmartText();
   const { showErrorToast } = useToastContext();
-  const [report, setReport] = useState<ReportDsl | null>(null);
+  const [definition, setReport] = useState<ReportDsl | null>(null);
+  const report = useMemo(() => reportWithRouteParameters(definition, search), [definition, search]);
   const [reportPid, setReportPid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

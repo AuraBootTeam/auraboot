@@ -5,16 +5,17 @@ import { ParametersBar } from './ParametersBar';
 
 export function ReportQueryControls({ report, query }: { report: ReportDsl; query: ReportQuery }) {
   const text = useSmartText();
+  const editableParameters = (report.parameters ?? []).filter(parameter => parameter.inputSource !== 'route');
   return (
     <div className="print:hidden">
       <ParametersBar
-        parameters={report.parameters ?? []}
+        parameters={editableParameters}
         values={query.draft}
         onChange={query.setDraft}
         onApply={query.apply}
         disabled={query.loading}
       />
-      {!!report.parameters?.length && (
+      {!!editableParameters.length && (
         <p className="mb-3 text-sm text-gray-600">
           {text({
             zh: '修改参数后请点击应用。下载使用当前结果已应用的参数。',
