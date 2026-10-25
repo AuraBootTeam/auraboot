@@ -167,5 +167,52 @@
     "database credentials",
     "unreviewed lifecycle/policy images"
   ],
-  "remainingScope": "Canonical design §16.8 and acceptance report; this is not the complete feature denominator"
+  "remainingScope": "Canonical design \u00a716.8 and acceptance report; this is not the complete feature denominator",
+  "historyValidation": {
+    "testedSource": "19fce7258",
+    "productEquivalentSource": "6ab56e451",
+    "backend": {
+      "executed": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    "mutation": {
+      "executed": 2,
+      "assertionFailures": 2,
+      "restoredPassed": 25
+    },
+    "browser": {
+      "reminderPassed": 1,
+      "existingRegressionPassed": 12,
+      "statisticsPassedAtEquivalentSource": 1,
+      "retries": 0,
+      "skipped": 0
+    },
+    "evidenceRound": "2026-10-25T01-31-22-041Z-89e4cf47-06b9-47dc-9ba8-9b8e26f98013",
+    "visualReviews": [
+      {
+        "scenario": "reminder-history-page-one",
+        "file": "history/reminder-history-page-one.png",
+        "sha256": "a19f0d2c8d297ce4da6f3d7dc2f8a5a9bf69db625f9f9ec66154f588c0c64a0a",
+        "review": "reviewed_partial",
+        "observation": "First-page rows are legible; the viewport excludes the pagination footer. Supplementary region capture remains required."
+      },
+      {
+        "scenario": "reminder-history-page-two",
+        "file": "history/reminder-history-page-two.png",
+        "sha256": "0df1bd84bdbf83f19bd1a36e04b66e52900292c68e4c71b98e35046f07802700",
+        "review": "reviewed_pass",
+        "observation": "The second page and footer, or the original completed batch, are clear and readable."
+      },
+      {
+        "scenario": "reminder-history-exact-batch",
+        "file": "history/reminder-history-exact-batch.png",
+        "sha256": "42432590b9398cb6dd203f34d5eb7152eceb2984ebee552f110d281e686242c3",
+        "review": "reviewed_pass",
+        "observation": "The second page and footer, or the original completed batch, are clear and readable."
+      }
+    ],
+    "claim": "Targeted functional evidence; first-page region capture and full S2-S8 acceptance remain open"
+  }
 }
