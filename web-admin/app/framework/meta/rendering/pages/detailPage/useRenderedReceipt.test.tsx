@@ -1,18 +1,19 @@
 import React, { useRef } from 'react';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRenderedReceipt, type RenderedReceiptConfig } from './useRenderedReceipt';
 
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), tenant: 't1' }));
 vi.mock('~/shared/services/http-client', () => ({ fetchResult: mocks.fetch }));
 vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ user: { tenantId: mocks.tenant, pid: 'reader' } }) }));
+vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'en-US' }) }));
 const config: RenderedReceiptConfig = { bodyField: 'content', endpoint: '/api/receipt/{recordPid}', payloadFields: { snapshotHash: 'snapshotHash' } };
 const record = { pid: 'v1', content: 'Actual body', snapshotHash: 'hash1' };
 let visible = true;
-function Harness({ value = record, loading = false, failed = false, onReceipt = vi.fn() }: any) {
+function Harness({ value = record, loading = false, failed = false, image = false, onReceipt = vi.fn() }: any) {
   const root = useRef<HTMLDivElement>(null);
   const receipt = useRenderedReceipt({ config, root, record: value, recordPid: value.pid, loading, failed, onReceipt });
-  return <div ref={root}>{!loading && !failed && <div data-rendered-field="content">{value.content}</div>}
+  return <div ref={root}>{!loading && !failed && <div data-rendered-field="content">{value.content}{image && <img alt="Body" src="/body.png" />}</div>}
     {receipt.error && <div role="alert">{receipt.error}<button onClick={receipt.retry}>Retry receipt</button></div>}
   </div>;
 }
@@ -22,6 +23,20 @@ beforeEach(() => {
   mocks.fetch.mockImplementation(async () => ({ code: '0', data: record }));
 });
 describe('rendered detail receipt boundary', () => {
+  it('explains a failed body image without recording reading and recovers only after the image loads', async () => {
+    const received = vi.fn();const ui = render(<Harness image onReceipt={received} />);
+    const image = ui.getByRole('img');
+    Object.defineProperty(image, 'complete', { configurable: true, value: true });
+    Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 0 });
+    fireEvent.error(image);
+    await waitFor(() => expect(ui.getByRole('alert')).toHaveTextContent('A body image could not load'));
+    expect(mocks.fetch).not.toHaveBeenCalled();expect(received).not.toHaveBeenCalled();
+    Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 20 });
+    fireEvent.click(ui.getByRole('button'));
+    fireEvent.load(image);
+    await waitFor(() => expect(received).toHaveBeenCalledTimes(1));
+    expect(ui.queryByRole('alert')).not.toBeInTheDocument();
+  });
   it('submits the exact revision only after actual body DOM is visible and reports the returned fact', async () => {
     const received = vi.fn();
     mocks.fetch.mockImplementation(async () => {

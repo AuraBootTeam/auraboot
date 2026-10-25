@@ -45,7 +45,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     expect(limits.maxFileBytes).toBeGreaterThan(0);
     await expect(page.getByText(`当前单文件上限：${limits.maxFileBytes/(1024*1024)} MB`,{exact:true})).toBeVisible();
     await page.getByTestId('form-field-title').locator('input').fill(title);
-    await page.getByTestId('form-field-content').locator('textarea').fill('<p>Attachment review text.</p><img src="/announcement-unsafe-image" onerror="window.__announcementXss=7"><script>window.__announcementXss=9</script>');
+    await page.getByTestId('form-field-content').locator('textarea').fill('<p>Attachment review text.</p><img src="/android-chrome-192x192.png" width="32" height="32" alt="Policy illustration" onerror="window.__announcementXss=7"><script>window.__announcementXss=9</script>');
     await expect(page.getByTestId('attachment-file-input')).toBeEnabled();
     const uploaded=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/file/upload');
     await page.getByTestId('attachment-file-input').setInputFiles({name:fileName,mimeType:'text/plain',buffer:bytes});
@@ -98,6 +98,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     expect((await contexts[0].request.get(`/api/announcements/versions/${version}/attachments/guessed-unrelated-file`)).status()).toBe(403);
     const reader=await contexts[0].newPage();
     await reader.addInitScript(()=>{(window as any).__announcementXss=0;});
+    await reader.route('**/android-chrome-192x192.png',route=>route.abort('failed'));
     await enter(reader,true);
     const received=reader.locator('table tbody tr').filter({hasText:title});await expect(received).toHaveCount(1);
     await received.getByRole('button',{name:'查看公告',exact:true}).click();
@@ -105,6 +106,8 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     const link=reader.getByRole('link',{name:fileName,exact:false});
     await expect(link).toHaveAttribute('href',path);await expect(link).toContainText(fileName);
     await expect(reader.getByText('Attachment review text.',{exact:true})).toBeVisible();
+    await expect(reader.getByRole('alert').filter({hasText:'正文图片未能完整加载'})).toBeVisible();
+    await expect(reader.getByRole('button',{name:'确认已知悉',exact:true})).toBeDisabled();
     expect(await reader.evaluate(()=>(window as any).__announcementXss)).toBe(0);
     await expect(reader.locator('img[onerror],a[href^="javascript:"]')).toHaveCount(0);
     let actual:Download|undefined;
@@ -115,10 +118,20 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await expect.poll(()=>actual?.suggestedFilename(),{timeout:15_000}).toBe(fileName);
     expect(actual).toBeDefined();
     const saved=info.outputPath('retained-attachment.txt');await actual!.saveAs(saved);expect(readFileSync(saved)).toEqual(bytes);
+    const beforeRecovery=(await db.query('SELECT first_read_at,acknowledged_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[tenant,version,identities[0].userPid])).rows[0];
+    expect(beforeRecovery).toEqual({first_read_at:null,acknowledged_at:null});
+    await reader.screenshot({path:info.outputPath('recipient-body-failed-read-blocked.png'),fullPage:true,animations:'disabled'});
+    await reader.unroute('**/android-chrome-192x192.png');
+    const recording=reader.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname===`/api/announcements/versions/${version}/read`);
+    await reader.getByRole('button',{name:'重试',exact:true}).click();
+    const recorded=await recording;await successful(recorded);
+    expect(recorded.request().postDataJSON()).toEqual({snapshotHash:frozen.snapshot_hash});
+    await expect(reader.getByRole('button',{name:'确认已知悉',exact:true})).toBeEnabled();
+    const firstRead=(await db.query('SELECT first_read_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[tenant,version,identities[0].userPid])).rows[0].first_read_at;
     await reader.reload({waitUntil:'domcontentloaded'});
-    await expect(link).toHaveAttribute('href',path);await expect(reader.getByRole('button',{name:'确认已知悉',exact:true})).toBeVisible();
+    await expect(link).toHaveAttribute('href',path);await expect(reader.getByRole('button',{name:'确认已知悉',exact:true})).toBeEnabled();
     const fact=(await db.query('SELECT first_read_at,acknowledged_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[tenant,version,identities[0].userPid])).rows[0];
-    expect(fact.first_read_at).toBeTruthy();expect(fact.acknowledged_at).toBeNull();
+    expect(fact.first_read_at).toEqual(firstRead);expect(firstRead).toBeTruthy();expect(fact.acknowledged_at).toBeNull();
     expect((await db.query('SELECT snapshot::text,snapshot_hash FROM ab_announcement_version WHERE tenant_id=$1 AND pid=$2',[tenant,version])).rows[0]).toEqual(frozen);
     await reader.screenshot({path:info.outputPath('recipient-frozen-attachment.png'),fullPage:true,animations:'disabled'});
     writeFileSync(info.outputPath('attachment-validation.json'),JSON.stringify({fileName,byteCount:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),retentionDeletionDenied:true,ordinaryRecipientDownload:true,outsiderDenied:true,downloadDidNotMarkRead:true,acknowledgementRemainsIndependent:true,xssDidNotExecute:true},null,2));
