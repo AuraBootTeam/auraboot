@@ -36,6 +36,13 @@ public class AnnouncementAccessService {
             throw new AccessDeniedException("Announcement management scope denied");
         return record;
     }
+    /** Human-readable management projection; numeric internal foreign keys are never presentation values. */
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
+    public java.util.Map<String,Object> managementSummary(String pid) {
+        var record=manage(pid,"read",false);var view=new java.util.LinkedHashMap<String,Object>();
+        view.put("publisherName",records.publisherName(MetaContext.getCurrentTenantId(),pid));
+        view.put("publishedAt",record.getPublishedAt());return view;
+    }
     public static final class RecordUnavailable extends BusinessException {
         public RecordUnavailable(){super("$i18n:announcement.error.not_found");}
     }

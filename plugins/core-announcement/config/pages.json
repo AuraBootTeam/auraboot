@@ -1205,22 +1205,6 @@
             "colSpan": 4
           },
           {
-            "field": "published_by",
-            "colSpan": 6,
-            "label": {
-              "zh-CN": "上次发布人",
-              "en-US": "Last publisher"
-            }
-          },
-          {
-            "field": "published_at",
-            "colSpan": 6,
-            "label": {
-              "zh-CN": "上次发布时间",
-              "en-US": "Last published at"
-            }
-          },
-          {
             "field": "expires_at",
             "colSpan": 6
           },
@@ -1288,6 +1272,44 @@
           }
         ],
         "visibleWhen": "record.approval_mode == 'approval' && record.current_version_pid != null"
+      },
+      {
+        "id": "announcement_publisher",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "发布信息",
+          "en-US": "Publication information"
+        },
+        "dataSource": "announcementPublisher",
+        "fields": [
+          {
+            "field": "publisherName",
+            "label": {
+              "zh-CN": "上次发布人",
+              "en-US": "Last publisher"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "暂无可显示发布人",
+                "en-US": "No publisher available"
+              }
+            }
+          },
+          {
+            "field": "publishedAt",
+            "label": {
+              "zh-CN": "上次发布时间",
+              "en-US": "Last published at"
+            },
+            "valueType": "datetime",
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "尚未发布",
+                "en-US": "Not published"
+              }
+            }
+          }
+        ]
       }
     ],
     "extension": {
@@ -1335,6 +1357,12 @@
         "method": "get",
         "endpoint": "/api/announcements/${$page.recordPid}/approval",
         "adaptor": "table"
+      },
+      "announcementPublisher": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/records/${$page.recordPid}/management-summary",
+        "adaptor": "raw"
       }
     }
   },

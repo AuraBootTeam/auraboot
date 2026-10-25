@@ -11,6 +11,14 @@ import java.util.Map;
 /** Tenant-explicit persistence for the announcement aggregate's sole writer. */
 @Mapper
 public interface AnnouncementLifecycleMapper {
+    @Select("""
+        SELECT COALESCE(NULLIF(u.nick_name,''),NULLIF(u.user_name,'')) FROM ab_announcement a
+        LEFT JOIN ab_user u ON u.id=a.published_by AND u.deleted_flag=FALSE
+            AND EXISTS(SELECT 1 FROM ab_tenant_member m WHERE m.tenant_id=a.tenant_id AND m.user_id=u.id)
+        WHERE a.tenant_id=#{tenant} AND a.pid=#{pid} AND a.deleted_flag=FALSE
+        """)
+    String publisherName(@Param("tenant") Long tenant,@Param("pid") String pid);
+
     @Select("SELECT EXISTS(SELECT 1 FROM ab_file WHERE tenant_id=#{tenant} AND pid=#{pid} AND status='success' AND deleted_flag=FALSE)")
     boolean finalizedFileInTenant(@Param("tenant") Long tenant, @Param("pid") String pid);
 

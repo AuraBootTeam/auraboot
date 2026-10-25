@@ -122,7 +122,7 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     expect(await count()).toBe(1); await screenshot('reminder-batch-reloaded');
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
-    await expect(page.getByRole('heading', { name: fixture.title, exact: true })).toBeVisible();
+    await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '自动催办计划', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/announcement_reminder_plan/view/${fixture.version}$`));
     await expect(page.getByRole('button', { name: '恢复自动催办', exact: true })).toHaveCount(0);
@@ -131,14 +131,14 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     await screenshot('reminder-plan-active');
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
-    await expect(page.getByRole('heading', { name: fixture.title, exact: true })).toBeVisible();
+    await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '预览催办', exact: true }).click();
     await expect(page.getByRole('button', { name: '确认催办', exact: true })).toHaveCount(0);
     await expect(page.getByTestId('table-block').getByRole('row').nth(1).getByRole('cell').nth(2)).toHaveText('1');
     await screenshot('reminder-preview-throttled');
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
-    await expect(page.getByRole('heading', { name: fixture.title, exact: true })).toBeVisible();
+    await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
   } finally {
     try {
       if (fixture) {

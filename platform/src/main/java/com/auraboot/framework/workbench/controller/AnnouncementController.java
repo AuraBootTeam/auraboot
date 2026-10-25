@@ -48,6 +48,12 @@ public class AnnouncementController {
     private final com.auraboot.framework.workbench.service.AnnouncementAccessService access;
     private final com.auraboot.framework.workbench.service.AnnouncementPolicyService policies;
 
+    @GetMapping("/records/{pid}/management-summary")
+    @RequirePermission("announcement.announcement.read")
+    public ApiResponse<Map<String,Object>> managementSummary(@PathVariable String pid) {
+        return ApiResponse.success(access.managementSummary(pid));
+    }
+
     @GetMapping("/audience-options")
     @RequirePermission("announcement.announcement.publish")
     public ApiResponse<List<com.auraboot.framework.workbench.service.AnnouncementAudienceService.Option>> audienceOptions(

@@ -80,7 +80,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(expected);
     }
     @BeforeEach void grantAndAuthenticate() {
-        for(String action:List.of("edit","publish","publish_all","exempt","stats","export","withdraw","remind"))
+        for(String action:List.of("read","edit","publish","publish_all","exempt","stats","export","withdraw","remind"))
             grantCommittedPermissionToTestRole("announcement.announcement."+action,"announcement","announcement:announcement",action,"Announcement "+action);
         applyTestMetaContext();
         var authorities=AuthorityUtils.createAuthorityList("role_admin");
@@ -266,6 +266,15 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(reminders.batchStatus((String)accepted.get("batchPid"))).containsEntry("actualCount",1);
         assertThatThrownBy(()->reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",token),UniqueIdGenerator.generate()))
             .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+    @Test void managementPublisherUsesAnAuthorizedHumanNameInsteadOfTheInternalForeignKey() throws Exception {
+        String version=publish(),record=recordOf(version);
+        var response=http.perform(get("/api/announcements/records/"+record+"/management-summary")).andExpect(status().isOk()).andReturn().getResponse();
+        var value=json.readTree(response.getContentAsString()).required("data");
+        String expected=getTestUser().getNickName()==null || getTestUser().getNickName().isBlank() ? getTestUser().getUserName() : getTestUser().getNickName();
+        assertThat(value.required("publisherName").textValue()).isEqualTo(expected).isNotEqualTo(getTestUser().getId().toString());
+        assertThat(value.size()).isEqualTo(2);assertThat(value.required("publishedAt").isTextual()).isTrue();
+        assertThat(value.toString()).doesNotContain("published_by","member_pid","tenant_id");
     }
     @Test void httpSummaryAndDetailsRemainAtTheSameInstantAfterNaturalReadAndAcknowledgementChanges() throws Exception {
         String version=publish();
