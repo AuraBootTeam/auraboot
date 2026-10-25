@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {
   copyFileSync,
   cpSync,
@@ -22,8 +23,12 @@ import {
   sha256Path,
   validateManifest,
   verifyArtifacts,
+  canonicalJson,
 } from './application-contract.mjs';
 import { createOciImageLayout, prepareRootfs } from './oci-layout.mjs';
+import {consumePlatformArtifacts} from './platform-artifact-package.mjs';
+import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,
+  coreWebShellEntries,isWebShellPublishableSource,readCoreWebSelection} from './core-web-component.mjs';
 
 const SCRIPT_ROOT = dirname(new URL(import.meta.url).pathname);
 const DEFAULT_REPO_ROOT = resolve(SCRIPT_ROOT, '../..');
@@ -36,9 +41,17 @@ function parseArgs(argv) {
     else if (argument === '--output') options.output = resolve(argv[++index]);
     else if (argument === '--skip-oci') options.skipOci = true;
     else if (argument === '--web-only') options.webOnly = true;
+    else if (argument === '--web-platform-archive') options.webArchive = resolve(argv[++index]);
+    else if (argument === '--web-platform-source') options.webSource = argv[++index];
+    else if (argument === '--web-platform-selection') options.webSelection = resolve(argv[++index]);
     else throw new Error(`unknown argument: ${argument}`);
   }
   if (!options.output) throw new Error('--output is required');
+  if(options.webArchive||options.webSource||options.webSelection) {
+    if(!options.webArchive||Boolean(options.webSource)===Boolean(options.webSelection)||options.webOnly
+      ||(options.webSource&&!/^[a-f0-9]{40}$/.test(options.webSource))
+      ||!process.env.AURA_CI_DATASET_INPUTS)throw new Error('Explicit Web archive, original source and frozen dataset receipt required');
+  }
   return options;
 }
 
@@ -46,6 +59,7 @@ function run(command, args, options = {}) {
   try {
     const output = execFileSync(command, args, {
       cwd: options.cwd,
+      env: command === 'pnpm' ? coreWebEnvironment() : process.env,
       encoding: 'utf8',
       stdio: options.capture === false ? 'inherit' : ['ignore', 'pipe', 'pipe'],
     });
@@ -134,12 +148,6 @@ function catalogArtifact({ type, id, version, path, output, repository, commit }
   };
 }
 
-function isWebShellPublishableSource(candidate) {
-  return !/(?:^|\/)(?:__tests__|tests|test-results|golden-harness|build|node_modules|\.vite)(?:\/|$)/.test(candidate)
-    && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(candidate)
-    && !/\.tsbuildinfo$/.test(candidate);
-}
-
 function packPluginSdk(repoRoot, destination) {
   mkdirSync(destination, { recursive: true });
   const packageRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-plugin-sdk-pack-'));
@@ -196,19 +204,7 @@ function packWebShell(repoRoot, destination, version) {
   const sourceRoot = requirePath(resolve(repoRoot, 'web-admin'), 'Web Shell source');
   const packageRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-web-shell-pack-'));
   try {
-    for (const entry of [
-      'app',
-      'packages',
-      'public',
-      'scripts',
-      'react-router.config.ts',
-      'instrumentation.server.mjs',
-      'tailwind.config.js',
-      'tsconfig.json',
-      'vite.config.ts',
-      'vitest.config.ts',
-      'vitest.setup.ts',
-    ]) {
+    for (const entry of coreWebShellEntries) {
       cpSync(resolve(sourceRoot, entry), resolve(packageRoot, 'web-admin', entry), {
         recursive: true,
         errorOnExist: true,
@@ -411,7 +407,7 @@ function stageWebPackages({ repoRoot, output, version, repository, commit, manif
   console.log(`Staged ${inputs.length} Web package artifacts from ${commit}; no runtime, application build or image staged.`);
 }
 
-function main() {
+async function main() {
   const options = parseArgs(process.argv.slice(2));
   const { repoRoot, output } = options;
   if (existsSync(output)) throw new Error(`output already exists: ${output}`);
@@ -437,6 +433,41 @@ function main() {
     return;
   }
 
+  const webBefore=captureCoreWebInputs(repoRoot);
+  let selectedWeb=null,selectedRoot=null;
+  if(options.webArchive) {
+    selectedRoot=mkdtempSync(resolve(tmpdir(),'auraboot-selected-web-'));
+    try {
+      const original=resolve(selectedRoot,'platform');
+      const datasetReceiptSha256=sha256Path(process.env.AURA_CI_DATASET_INPUTS).slice(7);
+      const selected=options.webSelection?readCoreWebSelection({archive:options.webArchive,
+        selection:options.webSelection,inputs:process.env.AURA_CI_DATASET_INPUTS}):null;
+      if(selected)options.webSource=selected.document.source.commit;
+      const consumption=await consumePlatformArtifacts({archive:options.webArchive,inputs:process.env.AURA_CI_DATASET_INPUTS,
+        destination:original,coreCommit:options.webSource});
+      selectedWeb={root:original,consumption,
+        receipt:JSON.parse(readFileSync(resolve(original,'release-receipt.json'),'utf8')),
+        catalog:JSON.parse(readFileSync(resolve(original,'artifact-catalog.json'),'utf8')),
+        datasetReceiptSha256,...(selected?{selectionSha256:selected.selectionSha256,selection:selected.document}:{})};
+      if(selected&&(selected.document.lockIdentity!==consumption.lockIdentity
+        ||canonicalJson(selected.document.source)!==canonicalJson(consumption.source)
+        ||canonicalJson(selected.document.source)!==canonicalJson(selectedWeb.receipt.webComponent?.source)
+        ||selected.document.inputDigest!==selectedWeb.receipt.webComponent?.inputDigest
+        ||selected.document.componentDigest!=='sha256:'+createHash('sha256')
+          .update(canonicalJson(selectedWeb.receipt.webComponent)).digest('hex')))
+        throw new Error('Frozen Web selection differs from the original platform component');
+      if(datasetReceiptSha256!==sha256Path(process.env.AURA_CI_DATASET_INPUTS).slice(7))
+        throw new Error('Frozen Web dataset receipt changed during consumption');
+      // Reject an unusable selection before compiling any backend.
+      if(selectedWeb.receipt.webComponent?.inputDigest!==webBefore.inputDigest)
+        throw new Error('Selected Web effective inputs differ or are missing; no build fallback');
+    } catch(error) {
+      // CATCH: non-transactional extraction cleanup; retain the original failure.
+      rmSync(selectedRoot,{recursive:true,force:true});throw error;
+    }
+  }
+
+  try {
   // Never attach the current Git identity to whatever happens to be left in
   // platform/build/libs. Release staging must create the runtime bytes from the
   // clean worktree it just identified, so a previous checkout cannot leak into
@@ -457,15 +488,25 @@ function main() {
     resolve(repoRoot, `platform/platform-plugin-api/build/libs/platform-plugin-api-${version}.jar`),
     resolve(output, `maven/platform-plugin-api-${version}.jar`),
   );
+  let webSelection=null,webArtifacts=[];
+  if(selectedWeb) {
+    webSelection=copyCoreWebComponent({...selectedWeb,destination:output,current:webBefore});
+    webArtifacts=webSelection.webComponent.artifacts;
+    cpSync(resolve(repoRoot,'scripts/application'),resolve(output,'bin/application'),{
+      recursive:true,filter:candidate=>!/\.(?:test|spec)\.(?:mjs|py)$/.test(candidate)});
+    cpSync(resolve(repoRoot,'distribution/application'),resolve(output,'distribution/application'),{recursive:true});
+  }
   const npmRoot = resolve(output, 'npm');
-  const dslTypes = packCompiledPackage(repoRoot, npmRoot, 'dsl-types', 'DSL types');
-  const navModel = packCompiledPackage(repoRoot, npmRoot, 'nav-model', 'navigation model');
-  const pluginSdk = packPluginSdk(repoRoot, npmRoot);
-  const ui = packUi(repoRoot, npmRoot);
-  const dslRuntime = packSourceFacade(repoRoot, npmRoot, 'dsl-runtime', 'DSL runtime');
-  const designerSdk = packSourceFacade(repoRoot, npmRoot, 'designer-sdk', 'designer SDK');
-  const webTestkit = packSourceFacade(repoRoot, npmRoot, 'web-testkit', 'Web testkit');
-  const webShell = packWebShell(repoRoot, npmRoot, version);
+  const selectedNpm=id=>webArtifacts.find(artifact=>artifact.id===id)?.localPath;
+  const existingNpm=id=>selectedWeb?requirePath(resolve(output,selectedNpm(id)),id):null;
+  const dslTypes = existingNpm('@auraboot/dsl-types') || packCompiledPackage(repoRoot, npmRoot, 'dsl-types', 'DSL types');
+  const navModel = existingNpm('@auraboot/nav-model') || packCompiledPackage(repoRoot, npmRoot, 'nav-model', 'navigation model');
+  const pluginSdk = existingNpm('@auraboot/plugin-sdk') || packPluginSdk(repoRoot, npmRoot);
+  const ui = existingNpm('@auraboot/ui') || packUi(repoRoot, npmRoot);
+  const dslRuntime = existingNpm('@auraboot/dsl-runtime') || packSourceFacade(repoRoot, npmRoot, 'dsl-runtime', 'DSL runtime');
+  const designerSdk = existingNpm('@auraboot/designer-sdk') || packSourceFacade(repoRoot, npmRoot, 'designer-sdk', 'designer SDK');
+  const webTestkit = existingNpm('@auraboot/web-testkit') || packSourceFacade(repoRoot, npmRoot, 'web-testkit', 'Web testkit');
+  const webShell = existingNpm('@auraboot/web-shell') || packWebShell(repoRoot, npmRoot, version);
   const coreMigrations = copyArtifact(
     resolve(repoRoot, 'platform/src/main/resources/db/migration/core'),
     resolve(output, 'migrations/core'),
@@ -491,7 +532,7 @@ function main() {
     resolve(repoRoot, 'plugins/showcase'),
     resolve(output, 'config/showcase'),
   );
-  materializeAndBuildCoreWeb({
+  if(!selectedWeb)materializeAndBuildCoreWeb({
     repoRoot,
     output,
     webShell,
@@ -566,7 +607,8 @@ function main() {
   ];
   const catalog = {
     schemaVersion: 1,
-    artifacts: artifactInputs.map((artifact) => catalogArtifact({
+    artifacts: artifactInputs.map((artifact) => artifact.type==='npm'&&selectedWeb
+      ? webArtifacts.find(item=>item.id===artifact.id) : catalogArtifact({
       ...artifact,
       output,
       repository,
@@ -575,6 +617,13 @@ function main() {
   };
   const lock = resolveApplication(manifest, catalog, { skipImage: options.skipOci });
   verifyArtifacts(lock, { artifactRoot: output });
+  const webAfter=captureCoreWebInputs(repoRoot);
+  if(JSON.stringify(webBefore)!==JSON.stringify(webAfter))throw new Error('Core Web inputs changed during staging');
+  if(selectedWeb&&(selectedWeb.datasetReceiptSha256!==sha256Path(process.env.AURA_CI_DATASET_INPUTS).slice(7)
+    ||selectedWeb.consumption.archive.sha256!==sha256Path(options.webArchive).slice(7)
+    ||(options.webSelection&&selectedWeb.selectionSha256!==sha256Path(options.webSelection).slice(7))))
+    throw new Error('Frozen Web selection changed during staging');
+  const webProof=webSelection||{webComponent:createCoreWebComponent({root:output,catalog,before:webBefore,after:webAfter})};
   writeFileSync(resolve(output, 'artifact-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
   writeFileSync(resolve(output, 'application.lock'), `${JSON.stringify(lock, null, 2)}\n`);
   writeFileSync(resolve(output, 'app.resolved.yaml'), YAML.stringify(manifest));
@@ -597,6 +646,7 @@ function main() {
     `${JSON.stringify({
       schemaVersion: 1,
       source: sourceRecord(repository, commit),
+      ...webProof,
       application: lock.application,
       manifestDigest: lock.manifestDigest,
       lockIdentity: lock.identity,
@@ -639,10 +689,13 @@ function main() {
     artifactCount: lock.artifacts.length,
     catalogArtifactCount: catalog.artifacts.length,
   }, null, 2)}\n`);
+  } finally {
+    if(selectedRoot)rmSync(selectedRoot,{recursive:true,force:true});
+  }
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   process.stderr.write(`core-only artifact staging failed: ${error.message}\n`);
   process.exitCode = 1;

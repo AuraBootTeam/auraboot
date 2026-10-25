@@ -1,0 +1,113 @@
+// Prepare native library candidates without compiling or assembling an application.
+import groovy.json.JsonOutput
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+
+def require = { boolean value, String reason -> if (!value) throw new GradleException(reason) }
+def selected = providers.gradleProperty('aura.library.release').orNull == 'true'
+def destination = providers.gradleProperty('aura.library.output').orNull
+File repository = null
+if (destination != null) {
+    require(selected, 'Library output requires explicit library release mode')
+    def requested = new File(destination)
+    require(requested.absolute && requested.parentFile.isDirectory() && !requested.exists() &&
+            !Files.isSymbolicLink(requested.toPath()), 'A fresh absolute library output is required')
+    repository = requested.canonicalFile
+    require(!repository.toPath().startsWith(rootDir.canonicalFile.toPath()),
+            'Library output must be outside the source project')
+    allprojects { project ->
+        project.plugins.withId('maven-publish') {
+            project.publishing.repositories.maven {
+                name = 'AuraLibraryCandidate'
+                url = repository.toURI()
+            }
+        }
+    }
+}
+def projects = { ->
+    require(selected && repository != null, 'Explicit library release mode and fresh output are required')
+    def roots = providers.gradleProperty('aura.library.roots').getOrElse(':').split(',', -1) as List
+    require(!roots.empty && roots.toSet().size() == roots.size() && roots.every {
+        it == ':' || it ==~ /:[A-Za-z0-9_.-]+(?::[A-Za-z0-9_.-]+)*/
+    }, 'Explicit unique native publication roots required')
+    def paths = roots as Set
+    roots.each { root ->
+        def source = findProject(root)
+        require(source != null, 'Unknown native publication root')
+        def runtime = source.configurations.findByName('runtimeClasspath')
+        require(runtime != null || source.plugins.hasPlugin('java-platform'), 'Native library or platform root required')
+        runtime?.incoming?.resolutionResult?.allComponents?.each { component ->
+            if (component.id instanceof ProjectComponentIdentifier) {
+                require(component.id.build.currentBuild, 'Included-build libraries require an explicit producer')
+                paths.add(component.id.projectPath)
+            }
+        }
+    }
+    paths.sort().collect { project(it) }
+}
+def sha = { File file ->
+    require(file.isFile() && !Files.isSymbolicLink(file.toPath()), 'Regular native publication files required')
+    def hash = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { stream ->
+        byte[] buffer = new byte[1024 * 1024]
+        int count
+        while ((count = stream.read(buffer)) != -1) hash.update(buffer, 0, count)
+    }
+    hash.digest().encodeHex().toString()
+}
+tasks.register('prepareLibraryCandidate') {
+    group = 'publishing'
+    description = 'Prepare original runtime-library publications in a fresh isolated file repository.'
+    dependsOn {
+        projects().collect { project ->
+            require(project.plugins.hasPlugin('maven-publish'), 'Runtime project lacks a native Maven producer')
+            require(project.publishing.publications.size() == 1, 'An unambiguous native publication is required')
+            project.tasks.named('publishAllPublicationsToAuraLibraryCandidateRepository')
+        }
+    }
+    doLast {
+        def publications = projects().collect { project ->
+            def publication = project.publishing.publications.iterator().next()
+            require(publication.groupId == rootProject.group.toString() &&
+                    publication.version == project.version.toString(), 'Native publication coordinate differs')
+            def primary = publication.artifacts.findAll { it.extension == 'jar' && !it.classifier }
+            def platform = project.plugins.hasPlugin('java-platform')
+            require(primary.size() == (platform ? 0 : 1), 'One original primary library JAR or a native platform is required')
+            def stem = publication.artifactId + '-' + publication.version
+            def relative = publication.groupId.replace('.', '/') + '/' + publication.artifactId + '/' + publication.version
+            def directory = new File(repository, relative)
+            def originals = publication.artifacts.collectEntries { artifact ->
+                [(stem + (artifact.classifier ? '-' + artifact.classifier : '') + '.' + artifact.extension):artifact.file]
+            }
+            def taskSuffix = publication.name.capitalize() + 'Publication'
+            originals[stem + '.pom'] = project.tasks.named('generatePomFileFor' + taskSuffix).get().destination
+            originals[stem + '.module'] = project.tasks.named('generateMetadataFileFor' + taskSuffix).get().outputFile.get().asFile
+            def files = directory.listFiles().findAll { it.name.endsWith('.jar') || it.name.endsWith('.pom') || it.name.endsWith('.module') }
+            require(files.collect { it.name }.toSet() == originals.keySet(), 'Complete native publication denominator required')
+            files.each { file -> require(sha(file) == sha(originals[file.name]), 'Published metadata/artifact differs from native output') }
+            def compiled = null
+            if (!platform) {
+                def jarSha = sha(primary[0].file)
+                require(sha(new File(directory, stem + '.jar')) == jarSha, 'Published JAR differs from original compilation')
+                compiled = [path:primary[0].file.canonicalPath, sha256:jarSha]
+            }
+            def record = [project:project.path, coordinate:[group:publication.groupId, artifact:publication.artifactId, version:publication.version],
+             compiledJar:compiled,
+             files:files.sort { it.name }.collect { file ->
+                 [path:relative + '/' + file.name, sha256:sha(file), bytes:file.length()]
+             }]
+            if (providers.gradleProperty('aura.library.roots').isPresent()) record.packaging = platform ? 'pom' : 'jar'
+            record
+        }
+        def explicitRoots = providers.gradleProperty('aura.library.roots').orNull
+        def receipt = [schemaVersion:explicitRoots == null ? 1 : 2, kind:'native-library-candidate', gradleVersion:gradle.gradleVersion,
+                       versionSourceSha256:sha(file('../LIBRARY_VERSION')), publications:publications,
+                       applicationBuild:'did_not_run', remotePublication:'did_not_run', releaseQualification:false]
+        if (explicitRoots != null) receipt.publicationRoots = explicitRoots.split(',', -1) as List
+        Files.write(new File(repository, 'library-publication-inventory.json').toPath(),
+                (JsonOutput.prettyPrint(JsonOutput.toJson(receipt)) + '\n').getBytes('UTF-8'),
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+    }
+}

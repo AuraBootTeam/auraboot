@@ -2,6 +2,8 @@ package com.auraboot.framework.event.transport;
 
 import com.auraboot.framework.event.config.EventBusProperties;
 import com.auraboot.framework.event.config.EventConfiguration;
+import com.auraboot.framework.event.context.ThreadContextScopes;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -18,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EventBusTransportAutoConfigTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withBean(ThreadContextScopes.class, () -> new ThreadContextScopes(List.of()))
             .withConfiguration(AutoConfigurations.of(
                     JacksonAutoConfiguration.class,
                     EventConfiguration.class

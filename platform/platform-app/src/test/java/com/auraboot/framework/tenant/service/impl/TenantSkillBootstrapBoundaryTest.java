@@ -1,9 +1,11 @@
 package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.agent.service.SkillAutoGenerator;
+import com.auraboot.framework.agent.integration.bootstrap.AgentTenantSkillInitializer;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.tenant.dto.bootstrap.TenantBootstrapTemplate;
 import com.auraboot.framework.tenant.exception.BootstrapException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,6 +23,12 @@ import static org.mockito.Mockito.*;
 class TenantSkillBootstrapBoundaryTest {
     @Mock private SkillAutoGenerator skills;
     @Spy @InjectMocks private TenantBootstrapServiceImpl service;
+
+    @BeforeEach
+    void wireOptionalSkillInitializer() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "skillInitializers",
+                java.util.List.of(new AgentTenantSkillInitializer(skills, null)));
+    }
 
     @Test
     void explicitTenantBootstrapPropagatesSkillFailureAndRestoresContext() {

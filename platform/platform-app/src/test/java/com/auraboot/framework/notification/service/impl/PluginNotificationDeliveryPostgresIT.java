@@ -1,6 +1,8 @@
 package com.auraboot.framework.notification.service.impl;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.integration.DeclaredTestInfrastructure;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
@@ -59,6 +61,7 @@ class PluginNotificationDeliveryPostgresIT {
     @Autowired ApplicationContext context;
     @Autowired JdbcTemplate jdbc;
     @Autowired DataSource dataSource;
+    @Autowired RedisProperties redisProperties;
     @Autowired PlatformTransactionManager transactions;
     @Autowired ReliableIntegrationAccessor reliable;
     @Autowired ReliableEventDeliveryExecutor executor;
@@ -76,12 +79,7 @@ class PluginNotificationDeliveryPostgresIT {
 
     @BeforeEach void fixture() throws Exception {
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
-        assertThat(System.getenv("TEST_DATABASE_URL")).isNotBlank();
-        assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
-        try (var connection = dataSource.getConnection()) {
-            assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
-            assertThat(connection.getCatalog()).isEqualTo("enterprise_22");
-        }
+        DeclaredTestInfrastructure.assertSelected(dataSource, redisProperties);
         // INSERT only fresh IDs into the migrated schema; these are synthetic fixture facts, not real recipient policy.
         tenant = tenant(); otherTenant = tenant();
         userPid = UniqueIdGenerator.generate(); otherUserPid = UniqueIdGenerator.generate();

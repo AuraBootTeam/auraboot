@@ -31,6 +31,17 @@ Use Workspace `runtime suspend` / `runtime resume` for whole-stack lifecycle.
 Direct supervisor termination stops only its authenticated frontend tree and
 prevents further child restarts; runtime databases and evidence remain retained.
 
+### Product image gate ownership preservation
+
+`application/run-product-release-image-gate.sh` refuses an existing work root,
+including a symlink; recovery never implicitly removes the previous generation.
+On explicit non-retained cleanup, a failed product lifecycle stop preserves the
+work root and records `runtime-retained.txt` plus private `logs/product-stop.log`.
+No container, image, network or work-root removal follows that failure. A prior
+failure remains failed; otherwise cleanup failure returns environment exit2.
+INT/TERM enter EXIT cleanup once and preserve130/143. Retained environments keep
+the original review behavior; pause idle services through their product owner.
+
 ## gate (44)
 
 | script | refs | updated | purpose |
@@ -127,6 +138,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `aurabot-scenario-golden-run.sh` | 0 | 2026-07-23 | aurabot-scenario-golden-run.sh — self-contained scenario golden for the |
 | `backlog-stats.sh` | 0 | 2026-03-26 | Backlog dashboard stats — counts GAP statuses across all backlog files |
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
+| `ci/prepare-library-candidate.sh` | 1 | 2026-10-23 | Prepare native runtime-library candidates under a frozen Jenkins context without application assembly or remote publication. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
@@ -145,7 +157,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `kb-ingestion-golden-run.sh` | 0 | 2026-07-13 | kb-ingestion-golden-run.sh — one command, whole knowledge-ingestion golden, exit code = verdict. |
 | `local-pr-gate.sh` | 0 | 2026-07-18 | Local replacement for the required GitHub status checks. |
 | `collab-trio-golden-run.sh` | 0 | 2026-07-25 | collab-trio-golden-run.sh — self-contained browser golden runner for the collaboration trio: Inbox, notification centre, IM/agent mentions. |
-| `oss-backend-unit-ci.sh` | 1 | 2026-08-24 | Self-contained Linux CI runner for the complete OSS Gradle test task and its dedicated PostgreSQL/Redis dependencies. |
+| `oss-backend-unit-ci.sh` | 1 | 2026-10-24 | Complete OSS Gradle test/bootstrap tasks with owned PostgreSQL/Redis/Kafka, fixed JVM arguments and ancestor-cgroup protected working-set admission. |
 | `oss-backend-nightly-coverage.sh` | 0 | 2026-09-12 | Linux CI entrypoint for full backend coverage evidence. |
 | `oss-init-env-only.sh` | 0 | 2026-05-11 | AuraBoot Quick Environment Initialization |
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
@@ -170,6 +182,9 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `application/schema-ownership-audit.mjs` | 0 | 2026-09-25 | Audit declared migration ownership without rewriting released SQL. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
+| `application/export-product-image.mjs` | 1 | 2026-10-22 | Export the tested OCI graph before native gate cleanup; checksum-bound strict archive consumption; immutable transport only. |
+| `application/platform-artifact-package.mjs` | 1 | 2026-10-23 | Export/consume an explicitly selected native Core artifact package; original catalog/lock/source/OCI checks, no compilation or qualification. |
+| `application/core-web-component.mjs` | 1 | 2026-10-24 | Capture declared Core Web inputs and verify/copy original Web/npm bytes with immutable producer provenance; no qualification. |
 
 ## pipeline/lib (12)
 
@@ -182,6 +197,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `dev/lib/health.sh` | 3 | 2026-05-22 | Sourceable health helpers for per-worktree dev stacks. |
 | `dev/lib/process-manager.sh` | 3 | 2026-05-22 | Sourceable process helpers for per-worktree host dev services. |
 | `lib/oss-ci-subnet.mjs` | 0 | 2026-10-04 | Select a non-overlapping subnet for isolated OSS CI Docker networks. |
+| `lib/backend-ci-resources.mjs` | contract | 2026-10-24 | Admit the fixed JVM budget against every original cgroup soft/hard ancestor; credit conservatively clean file pages and explicitly reclaimable kernel slab, preserve raw/protected accounting, reject incomplete statistics, emit a task-owned plan. |
 | `lib/multi-worktree-guard.sh` | 5 | 2026-05-22 | Multi-worktree pre-flight guard |
 | `lib/plugin-config.mjs` | 3 | 2026-07-23 | Read a plugin's config regardless of how it is laid out on disk. |
 | `lib/repo-root.mjs` | 5 | 2026-07-23 | Resolve the repo the test-system gates should run against. |
@@ -240,6 +256,7 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `dev/stop-isolated.sh` | 10 | 2026-05-12 | Stop a per-worktree Docker dev stack. |
 | `dev/test-dev-env-scripts.sh` | 1 | 2026-05-22 | Smoke tests for scripts/dev environment helpers. |
 | `dev/test-gradle-guard.sh` | 1 | 2026-05-12 | Smoke test for platform/build.gradle multi-worktree Maven publish guard. |
+| `dev/test-library-version.mjs` | 1 | 2026-10-23 | Run offline real-Gradle version/publication contracts and explicit mutation guards in fresh managed evidence. |
 | `dev/verify-quickstart.sh` | 1 | 2026-05-17 | verify-quickstart.sh — pre-launch sanity check for the README quickstart. |
 | `docker-ga-e2e-bootstrap.sh` | 6 | 2026-05-20 | Bootstrap the GA-E2E docker stack for OSS Playwright runs. |
 | `docker-ga-e2e-down.sh` | 2 | 2026-05-26 | GA Follow-up E2E stack teardown — thin wrapper over stop-isolated. |
@@ -367,6 +384,19 @@ These local measurement helpers require an explicitly configured runtime and cre
 | `internal-api/drift.mjs` | contract | Compare an observed release-container OpenAPI document with the frozen snapshot; caller retains source and container provenance. |
 | `ci/capture-internal-document.py` | contract | Capture an initialized CI image's authenticated internal document and revoke the issued session without bootstrapping or persisting credentials. |
 | `internal-api/response-shape.mjs` | contract | Validate declared JSON response structures with the locked JSON Schema validator; formats and business semantics require separate assertions. |
+
+### Product image transport
+
+The existing Linux product image gate accepts `AURA_RELEASE_EXPORT_PACKAGE=1` to retain the
+tested OCI graph as `image.oci.tar` in its evidence directory before work-root cleanup.
+The default remains `0`. Export runs after native acceptance and records the actual archive
+digest in the original receipt; it neither builds another image nor grants deployment authority.
+Missing/corrupt OCI blobs, a different loaded image, partial native acceptance, external
+descriptors and existing output are rejected. Export failure fails the original gate.
+The original qualification profile and source/builder identity must include this transport mode
+before a publisher can consume it; historical receipts without an archive cannot acquire one
+by merely editing JSON. Local file/CLI self-tests use synthetic OCI bytes without Docker and
+do not represent Linux image qualification.
 
 The independent published-library consumer in [fixtures/agent-artifact-consumer](fixtures/agent-artifact-consumer/README.md) validates core/agent/app and opt-in fixtures through actual Maven POM and Gradle metadata, without producer project substitution.
 

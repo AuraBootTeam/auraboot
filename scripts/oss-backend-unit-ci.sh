@@ -261,11 +261,18 @@ if [[ "${AURA_CI_INCLUDE_DASHSCOPE_LIVE:-0}" != "1" ]]; then
     '[oss-backend-unit-ci] DashScope live checks disabled; set AURA_CI_INCLUDE_DASHSCOPE_LIVE=1 to opt in'
 fi
 
+resource_arguments="$(node "$SCRIPT_DIR/lib/backend-ci-resources.mjs" "$ARTIFACTS/jvm-resource-plan.json")" \
+  || environment_invalid 'JVM memory admission failed; inspect jvm-resource-plan.json before retry'
+RESOURCE_ARGUMENTS=()
+while IFS= read -r option; do RESOURCE_ARGUMENTS+=("$option"); done <<< "$resource_arguments"
+[[ ${#RESOURCE_ARGUMENTS[@]} == 5 ]] || environment_invalid 'incomplete bounded JVM arguments'
+
 run_backend_gradle() {
   local database="$1"
   shift
 TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 TEST_EXPECTED_DATABASE="$database" \
+TEST_REDIS_DATABASE='0' \
 POSTGRES_DB="$database" \
 AURA_TEST_POSTGRES_JDBC_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 POSTGRES_PASSWORD='auraboot_dev' \
@@ -280,13 +287,14 @@ SPRING_DATASOURCE_USERNAME='auraboot' \
 SPRING_DATASOURCE_PASSWORD='auraboot_dev' \
 SPRING_DATA_REDIS_HOST='127.0.0.1' \
 SPRING_DATA_REDIS_PORT="$AURA_OSS_CI_REDIS_PORT" \
+SPRING_DATA_REDIS_DATABASE='0' \
 SPRING_DATA_REDIS_URL="redis://127.0.0.1:$AURA_OSS_CI_REDIS_PORT" \
 SPRING_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 AURA_CI_REQUIRE_KAFKA='1' \
 AURA_CI_KAFKA_BOOTSTRAP_SERVERS="127.0.0.1:$AURA_OSS_CI_KAFKA_PORT" \
 MAVEN_REPO_LOCAL="$ARTIFACTS/m2" \
 GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
-platform/gradlew --no-daemon -p platform "$@"
+platform/gradlew --no-daemon -p platform "${RESOURCE_ARGUMENTS[@]}" "$@"
 }
 
 run_backend_gradle aura_boot --continue cleanTest test
@@ -308,10 +316,14 @@ if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-r
 fi
 # Preserve the original test status while retaining both tasks' JUnit evidence.
 mkdir -p "$ARTIFACTS/junit"
-for task in test bootstrapBillingAccountTest; do
-  if [[ -d "$PROJECT_ROOT/platform/build/test-results/$task" ]]; then
-    cp -a "$PROJECT_ROOT/platform/build/test-results/$task" "$ARTIFACTS/junit/" || \
-      printf '[oss-backend-unit-ci] warning: unable to copy %s JUnit results\n' "$task" >&2
-  fi
+for build in "$PROJECT_ROOT/platform/build" "$PROJECT_ROOT"/platform/*/build; do
+  module="$(basename "$(dirname "$build")")"
+  for task in test bootstrapBillingAccountTest; do
+    if [[ -d "$build/test-results/$task" ]]; then
+      mkdir -p "$ARTIFACTS/junit/$module"
+      cp -a "$build/test-results/$task" "$ARTIFACTS/junit/$module/" || \
+        printf '[oss-backend-unit-ci] warning: unable to copy %s/%s JUnit results\n' "$module" "$task" >&2
+    fi
+  done
 done
 exit "$gradle_status"

@@ -1039,6 +1039,9 @@
       "name": "Meta CS manage",
       "description": "Manage embeddable customer-service sites — origins, knowledge bases, identity secret",
       "type": "function",
+      "module": "meta",
+      "resource": "meta:cs",
+      "action": "manage",
       "resourceType": "function"
     },
     {
@@ -1046,6 +1049,9 @@
       "name": "Meta CS seat",
       "description": "Work the customer-service queue — go online, claim a visitor, reply, close",
       "type": "function",
+      "module": "meta",
+      "resource": "meta:cs",
+      "action": "seat",
       "resourceType": "function"
     },
     {

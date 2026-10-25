@@ -1,6 +1,5 @@
 package com.auraboot.framework.decision;
 
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
 import com.auraboot.framework.eventpolicy.model.DedupStrategy;
@@ -15,6 +14,7 @@ import com.auraboot.framework.eventpolicy.service.EventPolicyVersionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.dto.AddFieldRequest;
+import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.entity.ModelFieldBinding;
@@ -25,6 +25,7 @@ import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -59,6 +61,7 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
     @Autowired private MetaModelService metaModelService;
     @Autowired private MetaFieldService metaFieldService;
     @Autowired private DynamicDataService dynamicDataService;
+    @Autowired private CommandService commandService;
     @Autowired private MetaModelMapper metaModelMapper;
     @Autowired private MetaFieldMapper metaFieldMapper;
     @Autowired private MetaModelFieldBindingMapper bindingMapper;
@@ -73,6 +76,7 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
     private String statusField;
     private Model model;
     private Field seedField;
+    private String updateCommandPid;
 
     @BeforeEach
     public void setupModel() {
@@ -98,10 +102,26 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         metaFieldService.addToModel(AddFieldRequest.builder()
                 .modelCode(modelCode).code(statusField).dataType("string")
                 .displayName("Status").tenantId(getTestTenant().getId()).build());
+        String permission = "model." + modelCode + ".update";
+        grantCommittedPermissionToTestRole(permission, "model", modelCode, "update", "Update test record");
+        // The real command boundary requires both update capability and a readable named target.
+        grantCommittedPermissionToTestRole("model." + modelCode + ".read",
+                "model", modelCode, "read", "Read test record");
+        var command = new CommandDefinitionCreateRequest();
+        command.setCode(modelCode + ":update");
+        command.setDisplayName("Update test record");
+        command.setModelCode(modelCode);
+        command.setInputSchema("{}");
+        command.setExecutionConfig(mapper.valueToTree(Map.of("type", "update", "crudDefault", true,
+                "permissions", List.of(permission), "inputFields", List.of(statusField))).toString());
+        var createdCommand = commandService.create(command);
+        updateCommandPid = createdCommand.getPid();
+        commandService.publish(updateCommandPid);
     }
 
     @AfterEach
     public void cleanup() {
+        if (updateCommandPid != null) commandService.delete(updateCommandPid);
         try { dynamicDataMapper.alterTable("DROP TABLE IF EXISTS " + tableName); } catch (Exception ignore) { }
         try { if (model != null) bindingMapper.deleteByModelId(model.getId()); } catch (Exception ignore) { }
         try { if (seedField != null) metaFieldMapper.deleteById(seedField.getId()); } catch (Exception ignore) { }
@@ -117,6 +137,7 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> created = dynamicDataService.create(modelCode, rec);
         String recordPid = String.valueOf(created.get("pid"));
         assertThat(recordPid).isNotBlank();
+        assertThat(dynamicDataService.getById(modelCode, recordPid).get(statusField)).isEqualTo("OPEN");
 
         // publish a policy whose UPDATE_RECORD action sets status=ESCALATED when priority=HIGH
         String code = "it_ur_pol_" + System.nanoTime();
@@ -141,14 +162,11 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
-        assertThat(result.execution().actions().get(0).status().name()).isEqualTo("SUCCESS");
+        assertThat(result.execution().actions().get(0).status().name())
+                .as("Action results: %s", result.execution().actions()).isEqualTo("SUCCESS");
 
-        // the real record was mutated by the production UpdateRecordActionHandler -> DynamicDataService.
-        // This IT creates its own dynamic tenant/user with no rule-center grant, so the verification
-        // read-back must bypass record-permission enforcement (established pattern, cf. c737b79d3) —
-        // we are asserting the mutation persisted, not asserting a deny.
-        Map<String, Object> after = MetaContext.runWithCommandPermitScope("ALL",
-                () -> dynamicDataService.getById(modelCode, recordPid));
+        // Verify the production mutation through the same actor's ordinary authorized read path.
+        Map<String, Object> after = dynamicDataService.getById(modelCode, recordPid);
         assertThat(after.get(statusField)).isEqualTo("ESCALATED");
     }
 

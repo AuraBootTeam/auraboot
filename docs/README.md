@@ -14,6 +14,8 @@ This directory holds engineering-facing material that ships with the repository.
 | [`assets/`](./assets/) | Images used by the documentation (screenshots, diagrams). |
 | [`api-fixtures/`](./api-fixtures/) | Shared fixtures referenced by API contract tests. |
 
+Release tooling reference: [Core Web component inputs and explicit reuse](./system-reference/core-web-component-reuse.md).
+
 ## Conventions
 
 - Scheduled command delegation: [deployment bindings and execution boundaries](./system-reference/scheduled-command-bindings.md).

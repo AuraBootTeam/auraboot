@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.dto.ActionExecutionResult;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.security.access.AccessDeniedException;
@@ -98,9 +100,9 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     @Mock private PayloadTemporalNormalizer payloadTemporalNormalizer;
     @Mock private FieldPermissionService fieldPermissionService;
     @Mock private ExecutorRegistry executorRegistry;
-    @org.mockito.Spy private com.auraboot.framework.event.context.ThreadContextScopes threadContexts =
-            new com.auraboot.framework.event.context.ThreadContextScopes(List.of());
     @Mock private QueryBuilderService.QueryBuilder queryBuilder;
+
+    @Spy private ThreadContextScopes threadContexts = new ThreadContextScopes(List.of());
 
     @InjectMocks
     private DynamicDataServiceImpl service;

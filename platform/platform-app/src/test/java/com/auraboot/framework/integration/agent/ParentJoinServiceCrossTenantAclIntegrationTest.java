@@ -15,7 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.test.context.TestComponent;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Commit
 @Transactional(propagation = Propagation.NEVER)
 @DisplayName("ParentJoinService cross-tenant ACL bridge (C.2)")
+@Import(ParentJoinServiceCrossTenantAclIntegrationTest.RecordingChildListener.class)
 class ParentJoinServiceCrossTenantAclIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private ApplicationEventPublisher eventPublisher;
@@ -151,7 +153,7 @@ class ParentJoinServiceCrossTenantAclIntegrationTest extends BaseIntegrationTest
      * Test-only listener that records every {@link ChildRunCompletedEvent}
      * Spring publishes. Concurrent-safe so flake-free under parallel cases.
      */
-    @Component
+    @TestComponent
     static class RecordingChildListener {
         final List<ChildRunCompletedEvent> received = new CopyOnWriteArrayList<>();
 

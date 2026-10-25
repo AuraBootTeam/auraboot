@@ -6,6 +6,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.constant.DataType;
 import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.entity.DataPermissionPolicy;
 import com.auraboot.framework.meta.entity.Field;
@@ -154,6 +155,34 @@ class DynamicDataAccessorQueryInIntegrationTest {
                 .extracting(row -> String.valueOf(row.get("pid")))
                 .containsExactly(ownPid)
                 .doesNotContain(otherPid);
+    }
+
+    @Test
+    @DisplayName("queryIn and physical pages preserve every identity when update timestamps tie")
+    void tiedUpdateTimestampsCannotDuplicateOrOmitRowsAcrossPages() {
+        List<String> expected = new java.util.ArrayList<>();
+        for (int i = 0; i < 2_505; i++) {
+            expected.add(insertRowCreatedBy("PAGE-" + i, "page-ties", testUser.getId()));
+        }
+        jdbcTemplate.update("UPDATE " + tableName + " SET updated_at = TIMESTAMP '2026-10-24 00:00:00' "
+                        + "WHERE tenant_id = ? AND status = ?", testTenant.getId(), "page-ties");
+
+        List<Map<String, Object>> all = MetaContext.runWithCommandPermitScope("ALL",
+                () -> accessor.queryIn(modelCode, "status", List.of("page-ties")));
+        assertThat(all).extracting(row -> String.valueOf(row.get("pid")))
+                .doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(expected);
+
+        List<String> paged = new java.util.ArrayList<>();
+        for (int page = 1; page <= 6; page++) {
+            var request = DynamicQueryRequest.builder().pageNum(page).pageSize(500)
+                    .conditions(List.of(com.auraboot.framework.meta.dto.QueryCondition.builder()
+                            .fieldName("status").operator(com.auraboot.framework.meta.dto.QueryCondition.Operator.EQ)
+                            .value("page-ties").build())).build();
+            var result = MetaContext.runWithCommandPermitScope("ALL", () -> dynamicDataService.list(modelCode, request));
+            assertThat(result.getTotal()).isEqualTo(2_505L);
+            result.getRecords().forEach(row -> paged.add(String.valueOf(row.get("pid"))));
+        }
+        assertThat(paged).doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(expected);
     }
 
     private void setupTenantContext() {

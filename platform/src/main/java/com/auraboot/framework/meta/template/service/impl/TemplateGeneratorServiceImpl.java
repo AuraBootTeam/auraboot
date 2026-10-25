@@ -1,8 +1,10 @@
 package com.auraboot.framework.meta.template.service.impl;
 
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.application.exception.ResourceNotFoundException;
 import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.service.MenuService;
@@ -360,7 +362,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         List<GeneratedPermission> permissions = new ArrayList<>();
         
         String resourceCode = model.getCode();
-        String resourceType = "dynamic";
+        String resourceType = "model";
         
         // Basic CRUD permissions
         String[] actions = {"read", "create", "update", "delete"};
@@ -373,7 +375,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             request.setAction(action);
             request.setDescription("Auto-generated permission for " + model.getDisplayName());
             
-            PermissionDTO saved = permissionService.create(request);
+            PermissionDTO saved = createOrReuseModelPermission(request);
             
             permissions.add(GeneratedPermission.builder()
                 .id(saved.getId().toString())
@@ -395,7 +397,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             request.setAction("export");
             request.setDescription("Auto-generated export permission");
             
-            PermissionDTO saved = permissionService.create(request);
+            PermissionDTO saved = createOrReuseModelPermission(request);
             
             permissions.add(GeneratedPermission.builder()
                 .id(saved.getId().toString())
@@ -417,7 +419,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             request.setAction("import");
             request.setDescription("Auto-generated import permission");
             
-            PermissionDTO saved = permissionService.create(request);
+            PermissionDTO saved = createOrReuseModelPermission(request);
             
             permissions.add(GeneratedPermission.builder()
                 .id(saved.getId().toString())
@@ -430,6 +432,26 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         }
         
         return permissions;
+    }
+
+    private PermissionDTO createOrReuseModelPermission(PermissionCreateRequest request) {
+        PermissionDTO existing;
+        try {
+            existing = permissionService.findByCode(request.getCode());
+        } catch (ResourceNotFoundException absent) {
+            return permissionService.create(request);
+        }
+        if (existing.getId() == null
+                || !Objects.equals(existing.getTenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(existing.getCode(), request.getCode())
+                || !Objects.equals(existing.getResourceType(), request.getResourceType())
+                || !Objects.equals(existing.getResourceCode(), request.getResourceCode())
+                || !Objects.equals(existing.getAction(), request.getAction())
+                || !StatusConstants.ACTIVE.equals(existing.getStatus())) {
+            throw new ConflictException("Existing model permission has a different identity or lifecycle: " + request.getCode());
+        }
+        // Model creation already registers these permissions. Preserve their hierarchy and policy.
+        return existing;
     }
     
     private void assignPermissionsToRoles(List<GeneratedPermission> permissions, List<String> rolePids) {
