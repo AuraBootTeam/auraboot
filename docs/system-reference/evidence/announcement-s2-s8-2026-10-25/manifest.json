@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "testedSource": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+  "claim": "targeted-tested; incomplete S2-S8 scope",
+  "evidenceRound": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990",
+  "browser": {
+    "executed": 13,
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "scopes": [
+      {
+        "spec": "announcement-statistics.spec.ts",
+        "executed": 1,
+        "passed": 1,
+        "precondition": "Own unique publication, current user only; fixture API setup and formal withdrawal cleanup"
+      },
+      {
+        "spec": "announcement-lifecycle.spec.ts and announcement-policy.spec.ts",
+        "executed": 12,
+        "passed": 12
+      }
+    ],
+    "setupAuthentications": 1
+  },
+  "requirementGroups": [
+    "D11",
+    "D14"
+  ],
+  "visualReviews": [
+    {
+      "scenario": "statistics-overview",
+      "file": "visual/statistics-overview.png",
+      "sha256": "9627c7029b10ebc33e53ebc6d3df54f16224c27a239f95a6554ae3a2a5e75765",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    },
+    {
+      "scenario": "statistics-recipients-left",
+      "file": "visual/statistics-recipients-left.png",
+      "sha256": "e4a665bf5f650b46991726dd7ca56b0d793ed356a03a18863b6ea3fc7b8c8ecb",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    },
+    {
+      "scenario": "statistics-recipients-right",
+      "file": "visual/statistics-recipients-right.png",
+      "sha256": "0dff04557d96b2f593079e261f3f867d9a8fd9b9c5099b28a9a0579a4fc0051b",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    },
+    {
+      "scenario": "statistics-filter-open",
+      "file": "visual/statistics-filter-open.png",
+      "sha256": "3343a50f8fede7c86cc7b72c879bd8abb95f24141f07a187ea5334cb8ed0847c",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    },
+    {
+      "scenario": "statistics-filtered-empty",
+      "file": "visual/statistics-filtered-empty.png",
+      "sha256": "e9ca6b068a2d80a31ba87b885c8515a7efc3682f662ac17caf4de6027b104533",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    },
+    {
+      "scenario": "export-uncertain-network",
+      "file": "visual/export-uncertain-network.png",
+      "sha256": "dc97cfd3e4cf6c4c5dcf67d2aeb812db4a9d891adb985897e402f38f7456cb84",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    },
+    {
+      "scenario": "export-completed",
+      "file": "visual/export-completed.png",
+      "sha256": "d87a9092f09e19203f3c6e8f46648c0d949969013c815c7f8ff769c6fa3db576",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    },
+    {
+      "scenario": "export-downloaded",
+      "file": "visual/export-downloaded.png",
+      "sha256": "4feaa44bd674ce81519830b25c485e0e68140c979b14e99998165128ab5739ec",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix"
+    }
+  ],
+  "artifact": "artifact-validation.json",
+  "excludedFromPublicEvidence": [
+    "authentication states",
+    "raw CSV",
+    "private artifact descriptors and object keys",
+    "database credentials"
+  ],
+  "remainingScope": "Canonical design §16.8 and current acceptance report; this manifest is not the complete feature denominator"
+}
