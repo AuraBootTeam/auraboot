@@ -515,21 +515,30 @@ async function openNotificationSettings(page: Page, title: string) {
 }
 
 test('scheduled audience settings preserve important acknowledgement and cancellation never creates recipients', async ({ page, browser }) => {
-  test.setTimeout(30000);
+  test.setTimeout(60000);
   const draft = await setupPublicationDraft(page, 'Scheduled audience');
   const code = `notice_recipient_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
   const role = await page.request.post('/api/roles', { data: {
     code, name: 'Announcement recipient', type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'self',
   } });
   expect(role.status(), await role.text()).toBe(200);
-  const recipientName = `No employee ${UID}`;
+  const pagingPrefix = `No employee ${UID}`;
+  const recipientName = `${pagingPrefix} primary`;
   const email = `${code}@example.com`;
   const user = await page.request.post('/api/admin/users', { data: {
     email, displayName: recipientName, initialPassword: 'Test2026x', roleCodes: [code], sendInviteEmail: false,
   } });
   expect(user.status(), await user.text()).toBe(200);
   const db = new Client(PG_CONN); await db.connect();
+  const pagingMemberPids: string[] = [];
   try {
+    for(let index=0;index<26;index++) {
+      const response=await page.request.post('/api/admin/users',{data:{email:`pg-${index}-${code}@example.com`,
+        displayName:`${pagingPrefix} candidate ${String(index).padStart(2,'0')}`,initialPassword:'Test2026x',roleCodes:[code],sendInviteEmail:false}});
+      expect(response.status(),await response.text()).toBe(200);
+      const created=await response.json();expect(String(created.code)).toBe('0');
+      expect(created.data.memberPid).toEqual(expect.any(String));pagingMemberPids.push(created.data.memberPid);
+    }
     const person = (await db.query(`SELECT u.pid,m.pid AS member_pid FROM ab_user u
       JOIN ab_tenant_member m ON m.user_id=u.id WHERE u.email=$1 AND m.status='active' AND m.deleted_flag=FALSE`, [email])).rows[0];
     expect(person).toBeTruthy();
@@ -543,6 +552,26 @@ test('scheduled audience settings preserve important acknowledgement and cancell
     await expect(modes.getByRole('radio', { name: /^审批后发布/ })).toContainText(/未接入可用审批服务|需要相应权限/);
     await modes.screenshot({ path: test.info().outputPath('approval-modes-provider-unavailable.png'), animations: 'disabled' });
     await expect(dialog.getByLabel('要求确认已知悉', { exact: true })).toBeChecked();
+    const people=dialog.getByTestId('form-dialog-field-audience_users');
+    const initialPage=page.waitForResponse(response=>response.request().method()==='GET'
+      &&new URL(response.url()).pathname==='/api/announcements/audience-option-page'
+      &&new URL(response.url()).searchParams.get('query')===pagingPrefix);
+    await people.getByRole('searchbox').fill(pagingPrefix);
+    const firstChoices=(await(await initialPage).json()).data;expect(firstChoices.total).toBe(27);expect(firstChoices.records).toHaveLength(25);
+    const firstChoice=firstChoices.records[0];await people.getByRole('checkbox',{name:firstChoice.label['zh-CN'],exact:true}).check();
+    const nextPage=page.waitForResponse(response=>response.request().method()==='GET'
+      &&new URL(response.url()).pathname==='/api/announcements/audience-option-page'
+      &&new URL(response.url()).searchParams.get('query')===pagingPrefix&&new URL(response.url()).searchParams.get('pageNum')==='2');
+    await people.getByRole('button',{name:'下一页',exact:true}).click();
+    const secondChoices=(await(await nextPage).json()).data;expect(secondChoices.records).toHaveLength(2);
+    const secondChoice=secondChoices.records[0];expect(secondChoice.value).not.toBe(firstChoice.value);
+    await people.getByRole('checkbox',{name:secondChoice.label['zh-CN'],exact:true}).check();
+    await expect(people.getByRole('checkbox',{name:firstChoice.label['zh-CN'],exact:true})).toBeChecked();
+    await expect(people.getByRole('checkbox',{name:secondChoice.label['zh-CN'],exact:true})).toBeChecked();
+    await people.screenshot({path:test.info().outputPath('audience-page-two-preserved-selection.png'),animations:'disabled'});
+    await people.getByRole('button',{name:'上一页',exact:true}).click();
+    await expect(people.getByRole('checkbox',{name:secondChoice.label['zh-CN'],exact:true})).toBeChecked();
+    await people.getByRole('button',{name:'清空选择',exact:true}).click();
     await dialog.getByTestId('form-dialog-field-audience_users').getByRole('searchbox').fill(recipientName);
     await dialog.getByTestId('form-dialog-field-audience_users').getByRole('checkbox', { name: recipientName, exact: true }).check();
     await dialog.getByTestId('form-dialog-field-audience_kind').scrollIntoViewIfNeeded();
@@ -588,7 +617,17 @@ test('scheduled audience settings preserve important acknowledgement and cancell
       await emptyPage.screenshot({path:test.info().outputPath('recipient-empty-after-schedule-cancel.png'),fullPage:true,animations:'disabled'});
     } finally {await emptyContext.close();}
 
-  } finally { await db.end(); }
+  } finally {
+    try {
+      if(pagingMemberPids.length) {
+        const cleanup=await page.request.post('/api/tenant/members/batch-status',{data:{memberPids:pagingMemberPids,
+          action:'inactive',reason:'Release native audience paging fixtures'}});
+        expect(cleanup.status(),await cleanup.text()).toBe(200);
+        const result=await cleanup.json();expect(String(result.code)).toBe('0');
+        expect(result.data.succeeded).toBe(pagingMemberPids.length);expect(result.data.failed).toEqual([]);
+      }
+    } finally {await db.end();}
+  }
 });
 
 test('immediate exempt publication seals the real tenant audience and dispatches independent projections', async ({ page, browser }) => {

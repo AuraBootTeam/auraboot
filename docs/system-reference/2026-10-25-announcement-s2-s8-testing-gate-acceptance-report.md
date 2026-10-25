@@ -104,3 +104,11 @@ allowed_claim: targeted-tested; incomplete S2–S8 delivery, no merge or product
 - s8-capacity-export-first-junit：26项单测通过，4项真实集成中2失败；分别是夹具违反不可覆盖文件契约、真实nullable SQL参数缺陷。10a8b2aaa修正后s8-capacity-export-corrected-junit中4项集成通过，无skip/retry。完整后端套件尚未重跑。
 - 501人测量原件：measurements/announcement-capacity-501-10a8b2aaa.json；发布335ms、投影5526ms、统计163ms、导出282ms、127920字节CSV，仅支持501人结论。
 - 尚未关闭：分页受众、BPM最新正式组合/严格审批原生流程/停用保护、完整覆盖和可信度对账。继续使用同一设计与PR，不合并。
+
+## 分页与提醒入口增量：854ecf0ec / dc24c5a14 / 49f74a882
+
+- s2-audience-paging-corrected-junit：133项hermetic、39项真实集成，全部无失败/跳过；JUnit已独立保存，不能被后续catalog clean覆盖。首次测试编译失败记录保留。161项前端测试、DSL12页0错误及插件0错误8项既有布局建议分别记账。
+- s6-application-lifecycle-junit：134项定向测试通过，包含真实JAR保护和宿主正常停止；真实BPM组合HTTP验证待补。
+- s7-native-header-paging-browser.log：49f74a882上3条定向旅程通过，无skip/retry，1.1分钟；认证另计。23项定向前端测试和类型检查通过。首次新增Inbox夹具因不稳定翻译函数重复加载失败，类型检查另发现测试身份数组类型缺失；修正后重验，不报告首次即通过。
+- 新增3张提醒入口窄屏原图逐张审阅并加入[同一公开清单](./evidence/announcement-s2-s8-2026-10-25/attachments/manifest.json)。真实断网由route.abort制造，恢复仍访问真实API与DB，无业务响应替身。
+- 27成员原生翻页、BPM当前正式组合/严格审批/真实热停用保护，以及最终覆盖审计仍未关闭；以上不是完整S2–S8验收结论。

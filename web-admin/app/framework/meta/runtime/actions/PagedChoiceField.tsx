@@ -98,9 +98,9 @@ function PagedChoiceSession({ identity, endpoint, value, onChange, label }: Prop
       {!loading && !failed && choices.length === 0 && <p className="px-3 py-3 text-sm text-gray-500">{text('empty')}</p>}
     </div>
     <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-sm">
-      <button type="button" disabled={loading || page === 1} onClick={() => setPage(previous => previous - 1)}>{text('previous')}</button>
+      <button type="button" className="rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:hover:bg-gray-700" disabled={loading || page === 1} onClick={() => setPage(previous => previous - 1)}>{text('previous')}</button>
       <span>{page} / {Math.max(1, Math.ceil((data?.total ?? 0) / 25))}</span>
-      <button type="button" disabled={loading || failed || page * 25 >= (data?.total ?? 0)} onClick={() => setPage(previous => previous + 1)}>{text('next')}</button>
+      <button type="button" className="rounded-md border border-gray-200 px-2 py-1 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:hover:bg-gray-700" disabled={loading || failed || page * 25 >= (data?.total ?? 0)} onClick={() => setPage(previous => previous + 1)}>{text('next')}</button>
     </div>
   </div>;
 }

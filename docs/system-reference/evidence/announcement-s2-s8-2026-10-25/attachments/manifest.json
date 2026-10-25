@@ -39,10 +39,40 @@
       "sha256": "4dee5f07606cb7a3c70ad8d825cdb9666e2a7c25ddbd6349e928e4c650c4c1fd",
       "review": "original-viewed",
       "finding": "Confirmation fits viewport; Escape restores focus to its original trigger."
+    },
+    {
+      "file": "recipient-narrow-bell-load-error.png",
+      "sourceCommit": "49f74a882",
+      "sha256": "c695ec27f1c7962984530b5d4d18e726b033d76be9ca4d2131aadb48888dcd1c",
+      "review": "original-viewed",
+      "finding": "Real network failure shows retry; no fabricated empty list or cleared unread count."
+    },
+    {
+      "file": "recipient-narrow-bell-write-error.png",
+      "sourceCommit": "49f74a882",
+      "sha256": "a9156999c5649342943cfbef8bad54e5fa0c2b908fcc483334a36988543242f5",
+      "review": "original-viewed",
+      "finding": "Failed bulk write preserves the real unread notification and explains uncertain completion."
+    },
+    {
+      "file": "recipient-narrow-inbox-pending.png",
+      "sourceCommit": "49f74a882",
+      "sha256": "e81d9ba476005d55bfba0245987708f58529ab87171505455a7c8db3ad39d1ae",
+      "review": "original-viewed",
+      "finding": "Successful bell read does not complete acknowledgement; inbox retains the pending item within 390px."
     }
   ],
   "limitations": [
-    "Hostile HTML fixture uses the protected API after native rich-text creation.",
-    "Native header failure, audience paging and latest BPM composition remain pending."
-  ]
+    "Hostile HTML fixture uses protected API after native rich-text creation.",
+    "The native 27-member paging-button counterexample and latest BPM composition remain pending."
+  ],
+  "incrementalBrowser": {
+    "sourceCommit": "49f74a882",
+    "collected": 3,
+    "passed": 3,
+    "skipped": 0,
+    "retried": 0,
+    "duration": "1.1m",
+    "scope": "Native attachment/header recovery, scheduled audience settings and immediate all-tenant publication"
+  }
 }
