@@ -1419,15 +1419,14 @@
                   "args": {
                     "field": "publicationRetry_${record.recordRevision}",
                     "persistence": "session"
-                  },
-                  "target": "publicationRetryOperation"
+                  }
                 },
                 {
                   "action": "api.request",
                   "method": "post",
                   "endpoint": "/api/meta/commands/execute/announcement:retry_publication",
                   "body": {
-                    "clientRequestId": "${state.publicationRetryOperation}",
+                    "clientRequestId": "${state['publicationRetry_' + record.recordRevision]}",
                     "targetRecordPid": "${record.recordPid}",
                     "expectedVersion": "${record.recordRevision}",
                     "payload": {}
@@ -1439,8 +1438,7 @@
                   "args": {
                     "field": "publicationRetry_${record.recordRevision}",
                     "persistence": "session"
-                  },
-                  "target": "publicationRetryOperation"
+                  }
                 },
                 {
                   "action": "refresh"
