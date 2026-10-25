@@ -15,6 +15,25 @@ describe('Authenticated attachment links', () => {
     expect(attachmentDownloadUrl('javascript:alert(1)')).toBeNull();
     expect(attachmentDownloadUrl('//external.test/secret')).toBeNull();
   });
+  it('keeps authenticated version and approval attachments usable through the same-origin BFF', () => {
+    const recipient='/api/announcements/versions/version-1/attachments/file-1';
+    const approval='/api/announcements/approvals/submission-1/attachments/file-1';
+    expect(attachmentDownloadUrl(recipient)).toBe(recipient);
+    expect(attachmentDownloadUrl(approval)).toBe(approval);
+    expect(attachmentDownloadUrl('/api/example/documents/record-1/attachments/file-1'))
+      .toBe('/api/example/documents/record-1/attachments/file-1');
+    render(<FileAttachmentField readOnly value={[{ name: 'frozen-policy.txt', url: recipient, size: 768 }]} />);
+    expect(screen.getByTestId('attachment-download-0')).toHaveAttribute('href', recipient);
+    expect(screen.getByTestId('attachment-download-0')).toHaveAttribute('aria-disabled', 'false');
+  });
+  it('rejects arbitrary API navigation, traversal and encoded path changes', () => {
+    for (const value of ['/api/admin/users', '/api/announcements/versions/../attachments/file-1',
+      '/api/announcements/versions/%2e%2e/attachments/file-1',
+      '/api/announcements/versions/version-1/attachments/%2fsecret',
+      '/api/announcements/versions/version-1/attachments/file-1?next=//external.test']) {
+      expect(attachmentDownloadUrl(value)).toBeNull();
+    }
+  });
   it('displays actual filename, size and download target', () => {
     render(<FileAttachmentField readOnly value={[{ name: 'scope.pdf', url: '/download/42', size: 768 }]} />);
     expect(screen.getByTestId('attachment-download-0')).toHaveAttribute('href', '/api/file/download/42');
