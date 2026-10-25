@@ -26,7 +26,7 @@ describe('report query snapshots', () => {
     const definition = createEmptyReport('Project review');
     definition.parameters = [{ name: 'projectPid', label: 'Project', type: 'text', inputSource: 'route' }];
     fetchData.mockResolvedValueOnce({ rows: [{ project: 'A', amount: 18000 }] });
-    const { result, rerender } = renderHook(({ search }) => {
+    const { result, rerender } = renderHook(({ search }: { search: string }) => {
       const scoped = useMemo(() => reportWithRouteParameters(definition, search), [search]);
       return useReportQuery(scoped);
     }, { initialProps: { search: '?projectPid=A' } });
