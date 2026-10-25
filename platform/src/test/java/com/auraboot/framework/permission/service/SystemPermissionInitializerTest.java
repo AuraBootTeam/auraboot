@@ -61,6 +61,16 @@ class SystemPermissionInitializerTest {
             }
         });
 
+        Permission canonical = permissions.stream().filter(p -> "meta.command.execute".equals(p.getCode()))
+                .findFirst().orElseThrow(() -> new AssertionError("Native HTTP command execute permission is absent"));
+        assertThat(canonical.getResourceType()).isEqualTo("meta");
+        assertThat(canonical.getResourceCode()).isEqualTo("command");
+        assertThat(canonical.getAction()).isEqualTo("execute");
+        assertThat(canonical.getSource()).isEqualTo("system");
+        assertThat(canonical.getStatus()).isEqualTo("active");
+        assertThat(byId.get(canonical.getParentId()).getCode()).isEqualTo("system.command");
+        assertThat(permissions).extracting(Permission::getCode).contains("system.command.execute");
+
         verify(permissionMapper, never()).insert(any(Permission.class));
         verify(permissionMapper, times(3)).batchInsert(anyList());
         assertThat(permissions).extracting(Permission::getDeletedFlag).containsOnly(false);
