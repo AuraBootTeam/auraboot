@@ -4774,7 +4774,7 @@
                 "en-US": "Channel"
               },
               "dictCode": "announcement_delivery_channel",
-              "width": 110
+              "width": 150
             },
             {
               "field": "kind",

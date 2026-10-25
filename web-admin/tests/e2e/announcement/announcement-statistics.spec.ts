@@ -219,6 +219,14 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     const history=page.getByTestId('table-block');
     await expect(history.getByRole('row')).toHaveCount(2);
     await expect(history.getByRole('cell', {name:'站内通知',exact:true})).toBeVisible();
+    const channelLines=await history.getByRole('cell', {name:'站内通知',exact:true}).evaluate(cell=>{
+      const walker=document.createTreeWalker(cell,NodeFilter.SHOW_TEXT);let count=0;
+      while(walker.nextNode()) if(walker.currentNode.textContent?.trim()==='站内通知') {
+        const range=document.createRange();range.selectNodeContents(walker.currentNode);count+=range.getClientRects().length;
+      }
+      return count;
+    });
+    expect(channelLines).toBe(1);
     await expect(history.getByRole('cell', {name:'发布通知',exact:true})).toBeVisible();
     await expect(history.getByRole('cell', {name:'提醒已生成',exact:true})).toBeVisible();
     await screenshot('channel-history');
