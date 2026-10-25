@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {createRequire,syncBuiltinESMExports} from 'node:module';
 import {exportProductImage,unpackOciArchive,verifyOciLayout} from './export-product-image.mjs';
 import {exportPlatformArtifacts,unpackPlatformArtifacts,verifyPlatformArtifacts,consumePlatformArtifacts} from './platform-artifact-package.mjs';
 import {canonicalJson,readStructuredFile,resolveApplication,sha256Path} from './application-contract.mjs';
@@ -524,6 +525,28 @@ test('managed Web selection rejects unbound, duplicate, linked and changed evide
   const linked=join(f.directory,'linked-selection.json');symlinkSync(frozen.selection,linked);
   assert.throws(()=>readCoreWebSelection({archive:f.archive,selection:linked,inputs:frozen.inputs}),/Regular absolute/);
   assert.equal(read().document.source.commit,f.coreCommit,'restored original bytes remain consumable');
+});
+
+test('Web source swapped to a link after inspection is rejected before foreign bytes are read',t=>{
+  const f=webComponentFixture(t),file=join(f.repo,'web-admin/app/view.ts');
+  const fs=createRequire(import.meta.url)('node:fs'),original=fs.lstatSync;
+  const held=file+'.held',foreign=join(f.directory,'foreign-input');writeFileSync(foreign,'foreign bytes');
+  let swapped=false;
+  fs.lstatSync=function(candidate,...options) {
+    const stat=original(candidate,...options);
+    if(candidate===file&&!swapped) {
+      swapped=true;fs.renameSync(file,held);fs.symlinkSync(foreign,file);
+    }
+    return stat;
+  };
+  syncBuiltinESMExports();
+  try {
+    assert.throws(()=>captureCoreWebInputs(f.repo),/ELOOP|symbolic link|regular Web/);
+    assert.equal(swapped,true,'the replacement occurs at the original inspection boundary');
+  } finally {
+    fs.lstatSync=original;syncBuiltinESMExports();
+    if(swapped){fs.unlinkSync(file);fs.renameSync(held,file);}
+  }
 });
 
 test('changed Web source, lock, recipe, mode and toolchain reject selection without writing output',t=>{

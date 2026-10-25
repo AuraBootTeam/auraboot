@@ -1,12 +1,23 @@
 // Explicit Core Web build inputs and bytes. This is not application qualification.
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {cpSync,existsSync,lstatSync,readFileSync,readdirSync,realpathSync} from 'node:fs';
+import {closeSync,constants,cpSync,existsSync,fstatSync,lstatSync,openSync,readFileSync,readdirSync,realpathSync} from 'node:fs';
 import path from 'node:path';
 import {canonicalJson,sha256Path} from './application-contract.mjs';
 
 const need=(condition,message)=>{if(!condition)throw new Error(message);};
 const digest=value=>'sha256:'+createHash('sha256').update(value).digest('hex');
+function readRegularWebFile(file,limit=Infinity) {
+  const descriptor=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW);
+  try {
+    const stat=fstatSync(descriptor);
+    need(stat.isFile()&&stat.size<=limit,'Bounded regular Web file required');
+    const bytes=readFileSync(descriptor),after=fstatSync(descriptor);
+    need(['dev','ino','size','mode','mtimeMs','ctimeMs'].every(key=>stat[key]===after[key])
+      &&bytes.length===stat.size,'Web file changed while reading');
+    return {bytes,stat};
+  } finally {closeSync(descriptor);}
+}
 const roots=['packages','web-admin','scripts/application','distribution/application'];
 const files=['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml'];
 const optional=['.npmrc','tsconfig.json','tsconfig.base.json'];
@@ -39,13 +50,13 @@ export function readCoreWebSelection({archive,selection,inputs}) {
   need([archive,selection,inputs].every(file=>path.isAbsolute(file)&&lstatSync(file).isFile()),
     'Regular absolute frozen Web inputs required');
   need(lstatSync(selection).size<=1024*1024,'Bounded native Web selection required');
-  const before=sha256Path(inputs),dataset=JSON.parse(readFileSync(inputs,'utf8'));
+  const before=sha256Path(inputs),dataset=JSON.parse(readRegularWebFile(inputs).bytes.toString('utf8'));
   need(Array.isArray(dataset.files),'Original frozen Web dataset required');
   const bind=file=>{
     const selected=dataset.files.filter(item=>item.file===file),actual=sha256Path(file).slice(7);
     need(selected.length===1&&selected[0].sha256===actual,'Web input differs from frozen dataset');return actual;
   };
-  const archiveSha256=bind(archive),selectionSha256=bind(selection),bytes=readFileSync(selection,'utf8');
+  const archiveSha256=bind(archive),selectionSha256=bind(selection),bytes=readRegularWebFile(selection,1024*1024).bytes.toString('utf8');
   const document=JSON.parse(bytes);validateSelection(document);
   need(bytes===JSON.stringify(document,null,2)+'\n'&&document.archiveSha256===archiveSha256,
     'Native Web selection bytes or archive binding differ');
@@ -75,8 +86,12 @@ function regularOutput(root,relative) {
 function outputTreeDigest(root,relative) {
   const base=regularOutput(root,relative),entries=[];
   const walk=(file,name)=>{
-    const stat=lstatSync(file);entries.push({path:name,mode:stat.mode&0o777,
-      kind:stat.isDirectory()?'directory':'file',...(stat.isFile()?{sha256:digest(readFileSync(file))}:{})});
+    const stat=lstatSync(file);
+    need(stat.isDirectory()||stat.isFile(),'Web output links and special files rejected');
+    if(stat.isFile()) {
+      const selected=readRegularWebFile(file);
+      entries.push({path:name,mode:selected.stat.mode&0o777,kind:'file',sha256:digest(selected.bytes)});
+    } else entries.push({path:name,mode:stat.mode&0o777,kind:'directory'});
     if(stat.isDirectory())for(const child of readdirSync(file).sort())walk(path.join(file,child),name+'/'+child);
   };
   walk(base,relative);return digest(canonicalJson(entries));
@@ -123,7 +138,7 @@ export function captureCoreWebInputs(repoRoot) {
   need(!['.pnpmfile.cjs','pnpmfile.cjs'].some(file=>existsSync(path.join(repoRoot,file))),
     'Custom pnpm hooks require an explicit build-input contract');
   if(existsSync(path.join(repoRoot,'.npmrc')))need(!/^\s*(?:global-)?pnpmfile\s*=/mi.test(
-    readFileSync(path.join(repoRoot,'.npmrc'),'utf8')),'Custom pnpm hooks require an explicit build-input contract');
+    readRegularWebFile(path.join(repoRoot,'.npmrc')).bytes.toString('utf8')),'Custom pnpm hooks require an explicit build-input contract');
   const tracked=new Set(execFileSync('git',['ls-files','-z'],{cwd:repoRoot,encoding:'utf8'}).split('\0').filter(Boolean));
   const entries=[];
   const walk=relative=>{
@@ -133,7 +148,8 @@ export function captureCoreWebInputs(repoRoot) {
     if(stat.isDirectory())for(const name of readdirSync(file).sort())walk(relative+'/'+name);
     else {
       need(tracked.has(relative),'Untracked or ignored Web build input: '+relative);
-      entries.push({path:relative,mode:stat.mode&0o777,sha256:digest(readFileSync(file))});
+      const selected=readRegularWebFile(file);
+      entries.push({path:relative,mode:selected.stat.mode&0o777,sha256:digest(selected.bytes)});
     }
   };
   for(const relative of [...roots,...files,...optional.filter(file=>existsSync(path.join(repoRoot,file)))])walk(relative);
@@ -146,8 +162,8 @@ export function captureCoreWebInputs(repoRoot) {
   const pnpm=execFileSync(executable,['--version'],{cwd:repoRoot,encoding:'utf8',env:environment}).trim();
   need(/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(pnpm),'Exact pnpm version required');
   const inputs={schemaVersion:1,profile:'core-web-component-v1',files:entries,
-    toolchain:{node:process.version,nodeSha256:digest(readFileSync(process.execPath)),
-      pnpm,pnpmEntrySha256:digest(readFileSync(realpathSync(executable))),platform:process.platform,arch:process.arch},
+    toolchain:{node:process.version,nodeSha256:digest(readRegularWebFile(process.execPath).bytes),
+      pnpm,pnpmEntrySha256:digest(readRegularWebFile(realpathSync(executable)).bytes),platform:process.platform,arch:process.arch},
     environment:Object.fromEntries(Object.entries(environment).filter(([key])=>!['PATH','HOME','TMPDIR'].includes(key)))};
   return {source:{repository,commit},inputs,inputDigest:digest(canonicalJson(inputs))};
 }
