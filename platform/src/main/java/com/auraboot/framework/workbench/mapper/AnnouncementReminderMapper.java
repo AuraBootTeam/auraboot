@@ -81,6 +81,15 @@ public interface AnnouncementReminderMapper {
     @Update("UPDATE ab_announcement_reminder_batch SET status='blocked',error_code=#{reason} WHERE tenant_id=#{tenant} AND pid=#{batch} AND status='accepted'")
     int blockBatch(@Param("tenant") Long tenant,@Param("batch") String batch,@Param("reason") String reason);
 
+    @Update("UPDATE ab_announcement_delivery SET status='skipped',error_code=#{reason},delivered_at=clock_timestamp() WHERE tenant_id=#{tenant} AND batch_pid=#{batch} AND kind='reminder' AND status='queued'")
+    int skipBlocked(@Param("tenant") Long tenant,@Param("batch") String batch,@Param("reason") String reason);
+
+    @Select("SELECT p.*,j.actor_user_id,j.actor_member_pid FROM ab_announcement_reminder_plan p JOIN ab_announcement_release j ON j.tenant_id=p.tenant_id AND j.pid=p.release_pid WHERE p.tenant_id=#{tenant} AND p.version_pid=#{version}")
+    Map<String,Object> readPlan(@Param("tenant") Long tenant,@Param("version") String version);
+
+    @Select("SELECT count(*) FILTER(WHERE status='queued') AS queued,count(*) FILTER(WHERE status='completed') AS completed,count(*) FILTER(WHERE status IN('skipped','canceled')) AS skipped,count(*) FILTER(WHERE status='failed') AS failed FROM ab_announcement_delivery WHERE tenant_id=#{tenant} AND batch_pid=#{batch} AND kind='reminder'")
+    Map<String,Object> results(@Param("tenant") Long tenant,@Param("batch") String batch);
+
     @Delete("DELETE FROM ab_announcement_reminder_preview WHERE expires_at<=clock_timestamp()")
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine="true")
     int deleteExpiredPreviews();

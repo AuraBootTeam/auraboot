@@ -2056,6 +2056,51 @@
             "primary": true
           },
           {
+            "code": "preview_reminder",
+            "label": {
+              "zh-CN": "预览催办",
+              "en-US": "Preview reminder"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.metadata.recordPid}/versions/${record.versionPid}/reminders/preview",
+                  "body": "${record.filters}",
+                  "target": "reminderPreview"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_preview/view/${state.reminderPreview.previewToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "view_reminder_plan",
+            "label": {
+              "zh-CN": "自动催办计划",
+              "en-US": "Automatic reminder plan"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_plan/view/${record.versionPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
             "code": "filter_statistics",
             "label": {
               "zh-CN": "筛选明细",
@@ -3078,6 +3123,958 @@
         "type": "api",
         "method": "get",
         "endpoint": "/api/exports/domain/${$page.recordPid}",
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_reminder_preview_detail",
+    "name:zh-CN": "催办预览",
+    "name:en": "Reminder preview",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/previews/{recordPid}",
+        "detailEndpoint": "/api/announcements/reminders/previews/{recordPid}"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "announcement_reminder_preview_detail_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "预览有效 30 分钟，提交时重新计算实际人数。未读和待知悉合并为一条提醒；手动与自动共用一小时去重。公告有效时截止后仍可手动催办。网络中断后保留本预览并刷新重试原请求。",
+          "en-US": "The preview is valid for 30 minutes; submission recalculates eligibility. Unread and unacknowledged work share one reminder and the manual/automatic deduplication window. Manual reminders remain available after the deadline while the announcement is active. After a connection loss, keep this preview and reload to retry the original request."
+        }
+      },
+      {
+        "id": "announcement_reminder_preview_detail_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "confirm_reminder",
+            "label": {
+              "zh-CN": "确认催办",
+              "en-US": "Confirm reminder"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.confirm",
+                  "args": {
+                    "title": {
+                      "zh-CN": "确认生成催办提醒？",
+                      "en-US": "Generate reminder notifications?"
+                    },
+                    "content": {
+                      "zh-CN": "提交时会重新检查未完成状态和一小时去重。站内提醒生成不代表用户已读或已知悉。",
+                      "en-US": "Submission rechecks unfinished work and the shared deduplication window. A generated notification does not mean that the recipient has read or acknowledged it."
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "reminderOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:remind",
+                  "body": {
+                    "clientRequestId": "${state.reminderOperation}",
+                    "targetRecordPid": "${record.recordPid}",
+                    "payload": {
+                      "previewToken": "${record.previewToken}"
+                    }
+                  },
+                  "target": "reminderAccepted"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "reminderOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_batch/view/${state.reminderAccepted.data.batchPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "primary": true,
+            "variant": "primary",
+            "visibleWhen": "record.status === 'ready' && record.eligibleCount > 0"
+          },
+          {
+            "code": "reminder_repreview",
+            "label": {
+              "zh-CN": "重新预览",
+              "en-US": "Preview again"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.recordPid}/versions/${record.versionPid}/reminders/preview",
+                  "body": "${record.filters}",
+                  "target": "reminderPreview"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_preview/view/${state.reminderPreview.previewToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "reminder_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement_detail/view/${record.recordPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_preview_detail_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告与版本",
+          "en-US": "Announcement and version"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "timezone",
+            "label": {
+              "zh-CN": "冻结时区",
+              "en-US": "Frozen timezone"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_preview_detail_metadata",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "催办信息",
+          "en-US": "Reminder information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "预览状态",
+              "en-US": "Preview status"
+            },
+            "valueMap": {
+              "ready": {
+                "zh-CN": "可提交",
+                "en-US": "Ready"
+              },
+              "expired": {
+                "zh-CN": "已失效，请重新预览",
+                "en-US": "Expired; preview again"
+              }
+            }
+          },
+          {
+            "field": "filters.query",
+            "label": {
+              "zh-CN": "姓名筛选",
+              "en-US": "Name filter"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "全部姓名",
+                "en-US": "All names"
+              }
+            }
+          },
+          {
+            "field": "filters.state",
+            "label": {
+              "zh-CN": "状态筛选",
+              "en-US": "State filter"
+            },
+            "valueMap": {
+              "all": {
+                "zh-CN": "未读或待知悉",
+                "en-US": "Unread or pending acknowledgement"
+              },
+              "unread": {
+                "zh-CN": "未读",
+                "en-US": "Unread"
+              },
+              "pending_ack": {
+                "zh-CN": "待知悉",
+                "en-US": "Pending acknowledgement"
+              },
+              "overdue": {
+                "zh-CN": "逾期未知悉",
+                "en-US": "Overdue acknowledgement"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_preview_detail_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "预览资格事实",
+          "en-US": "Preview qualification facts"
+        },
+        "dataSource": "reminderFacts",
+        "columns": [
+          {
+            "field": "eligibleCount",
+            "label": {
+              "zh-CN": "预览时可催办",
+              "en-US": "Eligible at preview"
+            },
+            "width": 150
+          },
+          {
+            "field": "currentEligible",
+            "label": {
+              "zh-CN": "当前可催办",
+              "en-US": "Currently eligible"
+            },
+            "width": 150
+          },
+          {
+            "field": "currentThrottled",
+            "label": {
+              "zh-CN": "当前限流",
+              "en-US": "Currently throttled"
+            },
+            "width": 150
+          },
+          {
+            "field": "evaluatedAt",
+            "label": {
+              "zh-CN": "预览时间",
+              "en-US": "Previewed at"
+            },
+            "width": 208,
+            "valueType": "datetime"
+          },
+          {
+            "field": "expiresAt",
+            "label": {
+              "zh-CN": "有效期",
+              "en-US": "Expires at"
+            },
+            "width": 208,
+            "valueType": "datetime"
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无事实",
+            "en-US": "No facts available"
+          },
+          "description": {
+            "zh-CN": "请刷新同一预览或批次；不会重新发送。",
+            "en-US": "Refresh the same preview or batch. This does not resend notifications."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍显示上次事实，请重试。",
+              "en-US": "Refresh failed. Previous facts remain visible; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "reminderFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/previews/${$page.recordPid}",
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_reminder_batch_detail",
+    "name:zh-CN": "催办批次",
+    "name:en": "Reminder batch",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/batches/{recordPid}",
+        "detailEndpoint": "/api/announcements/reminders/batches/{recordPid}"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "announcement_reminder_batch_detail_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "本页刷新只查询原批次，不会重新发送。“提醒已生成”仅表示站内通知已持久化，不表示已读或已知悉。受理后完成、成员失效或操作者失权会跳过。实际人数可能与预览不同；限流与零人数批次不增加自动额度。",
+          "en-US": "Refresh only queries this batch. Completed means the in-app notification was persisted, not read or acknowledged. Completion, inactive membership or revoked authority can skip accepted work. Actual counts may differ from the preview; empty or throttled batches do not consume automatic quota."
+        }
+      },
+      {
+        "id": "announcement_reminder_batch_detail_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "reminder_refresh",
+            "label": {
+              "zh-CN": "刷新状态",
+              "en-US": "Refresh status"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "reminderFacts"
+                    ]
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "reminder_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement_detail/view/${record.recordPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_batch_detail_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告与版本",
+          "en-US": "Announcement and version"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "timezone",
+            "label": {
+              "zh-CN": "冻结时区",
+              "en-US": "Frozen timezone"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_batch_detail_metadata",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "催办信息",
+          "en-US": "Reminder information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "mode",
+            "label": {
+              "zh-CN": "催办方式",
+              "en-US": "Mode"
+            },
+            "valueMap": {
+              "AUTO": {
+                "zh-CN": "自动",
+                "en-US": "Automatic"
+              },
+              "MANUAL": {
+                "zh-CN": "手动",
+                "en-US": "Manual"
+              }
+            }
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "批次状态",
+              "en-US": "Batch status"
+            },
+            "valueMap": {
+              "accepted": {
+                "zh-CN": "已受理",
+                "en-US": "Accepted"
+              },
+              "skipped": {
+                "zh-CN": "无新增提醒",
+                "en-US": "No new reminders"
+              },
+              "blocked": {
+                "zh-CN": "权限或版本变化，已阻断",
+                "en-US": "Blocked by authority or version change"
+              }
+            }
+          },
+          {
+            "field": "previewCount",
+            "label": {
+              "zh-CN": "预览人数",
+              "en-US": "Preview count"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "自动批次，不适用",
+                "en-US": "Automatic batch; not applicable"
+              }
+            }
+          },
+          {
+            "field": "throttled",
+            "label": {
+              "zh-CN": "限流人数",
+              "en-US": "Throttled recipients"
+            }
+          },
+          {
+            "field": "evaluatedAt",
+            "label": {
+              "zh-CN": "受理时间",
+              "en-US": "Accepted at"
+            },
+            "valueType": "datetime"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_batch_detail_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "批次执行事实",
+          "en-US": "Batch execution facts"
+        },
+        "dataSource": "reminderFacts",
+        "columns": [
+          {
+            "field": "actualCount",
+            "label": {
+              "zh-CN": "实际受理人数",
+              "en-US": "Accepted intentions"
+            },
+            "width": 150
+          },
+          {
+            "field": "queued",
+            "label": {
+              "zh-CN": "等待执行",
+              "en-US": "Queued"
+            },
+            "width": 150
+          },
+          {
+            "field": "completed",
+            "label": {
+              "zh-CN": "提醒已生成",
+              "en-US": "Notifications generated"
+            },
+            "width": 150
+          },
+          {
+            "field": "skipped",
+            "label": {
+              "zh-CN": "已跳过",
+              "en-US": "Skipped"
+            },
+            "width": 150
+          },
+          {
+            "field": "failed",
+            "label": {
+              "zh-CN": "执行失败",
+              "en-US": "Failed"
+            },
+            "width": 150
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无事实",
+            "en-US": "No facts available"
+          },
+          "description": {
+            "zh-CN": "请刷新同一预览或批次；不会重新发送。",
+            "en-US": "Refresh the same preview or batch. This does not resend notifications."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍显示上次事实，请重试。",
+              "en-US": "Refresh failed. Previous facts remain visible; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "reminderFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/batches/${$page.recordPid}",
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_reminder_plan_detail",
+    "name:zh-CN": "自动催办计划",
+    "name:en": "Automatic reminder plan",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/{recordPid}/reminders/plan",
+        "detailEndpoint": "/api/announcements/versions/{recordPid}/reminders/plan"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "announcement_reminder_plan_detail_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "按发布时冻结的租户时区和政策每天扫描，首次不早于发布满 24 小时，最多三个有效批次。截止相等停止自动催办；恢复不补发错过周期。原操作者失权时计划阻断，管理员可在自身权限内手动催办，但不会接管自动主体。",
+          "en-US": "The plan uses the frozen publication timezone and policy, starting no earlier than 24 hours after publication and allowing at most three positive batches. Automatic reminders stop at the deadline; resumption does not catch up missed cycles. Revoked original authority blocks the plan. Administrators may send authorized manual reminders but cannot take over the automatic actor."
+        }
+      },
+      {
+        "id": "announcement_reminder_plan_detail_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "resume_reminders",
+            "label": {
+              "zh-CN": "恢复自动催办",
+              "en-US": "Resume automatic reminders"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.confirm",
+                  "args": {
+                    "title": {
+                      "zh-CN": "恢复原自动催办计划？",
+                      "en-US": "Resume the original reminder plan?"
+                    },
+                    "content": {
+                      "zh-CN": "仅恢复原操作者的现有计划，不回补已错过的日期；截止或失效后不能恢复。",
+                      "en-US": "Resume under the original actor without catching up missed dates. A deadline or expired version prevents resumption."
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "reminderResumeOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:resume_reminders",
+                  "body": {
+                    "clientRequestId": "${state.reminderResumeOperation}",
+                    "targetRecordPid": "${record.recordPid}",
+                    "payload": {
+                      "versionPid": "${record.versionPid}"
+                    }
+                  },
+                  "target": "reminderResumed"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "reminderResumeOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "reminderFacts"
+                    ]
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "primary": true,
+            "variant": "primary",
+            "visibleWhen": "record.canResume === true"
+          },
+          {
+            "code": "reminder_refresh",
+            "label": {
+              "zh-CN": "刷新状态",
+              "en-US": "Refresh status"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "reminderFacts"
+                    ]
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "reminder_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement_detail/view/${record.recordPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_plan_detail_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告与版本",
+          "en-US": "Announcement and version"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "timezone",
+            "label": {
+              "zh-CN": "冻结时区",
+              "en-US": "Frozen timezone"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_plan_detail_metadata",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "催办信息",
+          "en-US": "Reminder information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "计划状态",
+              "en-US": "Plan status"
+            },
+            "valueMap": {
+              "active": {
+                "zh-CN": "运行中",
+                "en-US": "Active"
+              },
+              "blocked": {
+                "zh-CN": "已阻断，需恢复原权限",
+                "en-US": "Blocked; restore original authority"
+              },
+              "completed": {
+                "zh-CN": "已结束",
+                "en-US": "Completed"
+              },
+              "canceled": {
+                "zh-CN": "公告已撤回或失效",
+                "en-US": "Announcement withdrawn or expired"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_plan_detail_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "冻结计划事实",
+          "en-US": "Frozen plan facts"
+        },
+        "dataSource": "reminderFacts",
+        "columns": [
+          {
+            "field": "automaticBatches",
+            "label": {
+              "zh-CN": "已使用额度",
+              "en-US": "Batches used"
+            },
+            "width": 150
+          },
+          {
+            "field": "limit",
+            "label": {
+              "zh-CN": "额度上限",
+              "en-US": "Batch limit"
+            },
+            "width": 150
+          },
+          {
+            "field": "at",
+            "label": {
+              "zh-CN": "每日本地时间",
+              "en-US": "Daily local time"
+            },
+            "width": 150
+          },
+          {
+            "field": "dedupeMinutes",
+            "label": {
+              "zh-CN": "去重（分钟）",
+              "en-US": "Dedupe (minutes)"
+            },
+            "width": 150
+          },
+          {
+            "field": "quietStart",
+            "label": {
+              "zh-CN": "免打扰开始",
+              "en-US": "Quiet hours start"
+            },
+            "width": 150,
+            "emptyText": {
+              "zh-CN": "未设置",
+              "en-US": "Not configured"
+            }
+          },
+          {
+            "field": "quietEnd",
+            "label": {
+              "zh-CN": "免打扰结束",
+              "en-US": "Quiet hours end"
+            },
+            "width": 150,
+            "emptyText": {
+              "zh-CN": "未设置",
+              "en-US": "Not configured"
+            }
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无事实",
+            "en-US": "No facts available"
+          },
+          "description": {
+            "zh-CN": "请刷新同一预览或批次；不会重新发送。",
+            "en-US": "Refresh the same preview or batch. This does not resend notifications."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍显示上次事实，请重试。",
+              "en-US": "Refresh failed. Previous facts remain visible; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "reminderFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/${$page.recordPid}/reminders/plan",
         "adaptor": "raw"
       }
     }

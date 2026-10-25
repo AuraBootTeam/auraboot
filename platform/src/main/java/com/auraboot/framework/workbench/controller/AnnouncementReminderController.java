@@ -18,4 +18,14 @@ public class AnnouncementReminderController {
     public ApiResponse<Map<String,Object>> preview(@PathVariable String recordPid,@PathVariable String versionPid,@RequestBody AnnouncementStatistics.Filters filters) {
         return ApiResponse.success(reminders.preview(recordPid,versionPid,filters));
     }
+    @GetMapping("/reminders/previews/{previewPid}")
+    public ApiResponse<Map<String,Object>> previewStatus(@PathVariable String previewPid) {return ApiResponse.success(reminders.previewStatus(previewPid));}
+    @GetMapping("/reminders/batches/{batchPid}")
+    public ApiResponse<Map<String,Object>> batchStatus(@PathVariable String batchPid) {return ApiResponse.success(reminders.batchStatus(batchPid));}
+    @GetMapping("/records/{recordPid}/versions/{versionPid}/reminders/plan")
+    public ApiResponse<Map<String,Object>> planStatus(@PathVariable String recordPid,@PathVariable String versionPid) {return ApiResponse.success(reminders.planStatus(recordPid,versionPid));}
+
+    @GetMapping("/versions/{versionPid}/reminders/plan")
+    public ApiResponse<Map<String,Object>> planByVersion(@PathVariable String versionPid) {return ApiResponse.success(reminders.planStatusByVersion(versionPid));}
+
 }

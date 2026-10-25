@@ -61,6 +61,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     }
     @Autowired ControlledReminderClock reminderClock;
     @Autowired AnnouncementReminderService reminders;
+    @Autowired com.auraboot.framework.workbench.mapper.AnnouncementReminderMapper reminderPlans;
     @Autowired com.auraboot.framework.meta.service.impl.OutboxWorkerImpl outboxWorker;
     @Autowired com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl backgroundTasks;
     @Autowired AnnouncementStatisticsMapper mapper;
@@ -226,6 +227,45 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             grantCommittedPermissionToTestRole("announcement.announcement.remind","announcement","announcement:announcement","remind","Announcement remind");
             permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
         }
+    }
+    @Test void blockedOriginalPlanResumesExplicitlyWithoutCatchingUpTheMissedSlot() {
+        String version=publish(),record=recordOf(version);reminderClock.instant=reminderSlot(version,2).plusSeconds(600);
+        try {
+            assertThat(jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.remind")).isEqualTo(1);
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            new AnnouncementReminderWorker(reminderPlans,reminders).tick();applyTestMetaContext();
+            assertThat(reminderPlan(version)).containsEntry("status","blocked").containsEntry("automatic_batches",0);
+        } finally {
+            grantCommittedPermissionToTestRole("announcement.announcement.remind","announcement","announcement:announcement","remind","Announcement remind");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+        }
+        var before=reminders.planStatusByVersion(version);assertThat(before).containsEntry("canResume",true).containsEntry("status","blocked");
+        reminders.execute(AnnouncementReminderService.RESUME,record,Map.of("versionPid",version),UniqueIdGenerator.generate());
+        reminders.scan(reminderPlan(version));assertThat(reminderPlan(version).get("automatic_batches")).isEqualTo(0);
+        reminderClock.instant=reminderSlot(version,3);reminders.scan(reminderPlan(version));
+        assertThat(reminderPlan(version)).containsEntry("status","active").containsEntry("automatic_batches",1);
+    }
+    @Test void httpReminderMetadataIsAllowlistedAndWithdrawnHistoryCannotBeSubmitted() throws Exception {
+        String version=publish(),record=recordOf(version);
+        var response=http.perform(post("/api/announcements/records/"+record+"/versions/"+version+"/reminders/preview")
+            .contentType(MediaType.APPLICATION_JSON).content(codec.encode(AnnouncementStatistics.Filters.all())))
+            .andExpect(status().isOk()).andReturn().getResponse();
+        String token=json.readTree(response.getContentAsString()).required("data").required("previewToken").textValue();
+        var preview=http.perform(get("/api/announcements/reminders/previews/"+token)).andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(preview.getContentAsString()).doesNotContain("owner_user_id","owner_member_pid","policy_hash","scope_hash","actorMemberPid");
+        assertThat(json.readTree(preview.getContentAsString()).required("data").required("currentEligible").longValue()).isEqualTo(1);
+        var accepted=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",token),UniqueIdGenerator.generate());
+        var batch=http.perform(get("/api/announcements/reminders/batches/"+accepted.get("batchPid"))).andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(batch.getContentAsString()).doesNotContain("actor_user_id","actor_member_pid","policy_hash","scope_hash","memberPid");
+        assertThat(json.readTree(batch.getContentAsString()).required("data").required("actualCount").longValue()).isEqualTo(1);
+        http.perform(get("/api/announcements/versions/"+version+"/reminders/plan")).andExpect(status().isOk());
+        int revision=jdbc.queryForObject("SELECT row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,getTestTenant().getId(),record);
+        lifecycle.execute("announcement:archive",record,Map.of(),UniqueIdGenerator.generate(),revision);
+        assertThat(reminders.planStatusByVersion(version)).containsEntry("status","canceled").containsEntry("canResume",false);
+        assertThat(reminders.batchStatus((String)accepted.get("batchPid"))).containsEntry("actualCount",1);
+        assertThatThrownBy(()->reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",token),UniqueIdGenerator.generate()))
+            .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
     }
     @Test void httpSummaryAndDetailsRemainAtTheSameInstantAfterNaturalReadAndAcknowledgementChanges() throws Exception {
         String version=publish();

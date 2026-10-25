@@ -35,11 +35,12 @@ public class AnnouncementReminderService {
 
     private record Source(Announcement record,Map<String,Object> version,Map<String,Object> snapshot,
             Map<String,Object> frozen,Policy policy,AnnouncementManagementScope scope,Instant now) {}
-    private Source source(String recordPid,String version,boolean lock) {
+    private Source source(String recordPid,String version,boolean lock) {return source(recordPid,version,lock,true);}
+    private Source source(String recordPid,String version,boolean lock,boolean requireActive) {
         var record=access.manage(recordPid,"remind",lock);
         var row=facts.version(MetaContext.getCurrentTenantId(),version);
         if(row==null || !recordPid.equals(row.get("announcement_pid"))) invalid("statistics_unavailable");
-        if(!enabled) invalid("delivery_disabled");
+        if(requireActive && !enabled) invalid("delivery_disabled");
         if(!"publication".equals(row.get("origin"))) invalid("reminder_legacy_unknown");
         if(maximumRecipients<1 || ((Number)row.get("recipient_count")).longValue()>maximumRecipients) invalid("statistics_capacity_exceeded");
         var snapshot=codec.object(row.get("snapshot").toString());
@@ -49,7 +50,7 @@ public class AnnouncementReminderService {
         var policy=new Policy(true,Boolean.TRUE.equals(row.get("version_active")),Boolean.TRUE.equals(business.get("acknowledgementRequired")),
             time(row.get("ack_due_at")),time(row.get("expires_at")),Duration.ofMinutes(minutes));
         var now=clock.now();
-        if(!policy.versionActive() || (policy.expiresAt()!=null && !now.isBefore(policy.expiresAt()))) invalid("reminder_version_inactive");
+        if(requireActive && (!policy.versionActive() || (policy.expiresAt()!=null && !now.isBefore(policy.expiresAt())))) invalid("reminder_version_inactive");
         return new Source(record,row,snapshot,frozen,policy,audiences.managementScope("remind"),now);
     }
     private String currentMember() {
@@ -184,6 +185,7 @@ public class AnnouncementReminderService {
     public void block(Map<String,Object> plan,String error) {
         MetaContext.runWithoutTenantFilter(()->reminders.updatePlan(((Number)plan.get("tenant_id")).longValue(),(String)plan.get("version_pid"),"blocked",error,0));
     }
+    @Transactional
     public String deliveryEligibility(Long tenant,String batch,String version,Map<String,Object> recipient) {
         var accepted=reminders.findBatch(tenant,batch);
         if(accepted==null || !version.equals(accepted.get("version_pid"))) throw new SecurityException("Reminder batch binding is invalid");
@@ -191,7 +193,7 @@ public class AnnouncementReminderService {
         // This is a nonthrowing denial outcome inside the receipt transaction; no protected notification is written.
         try {
             return actors.call(tenant,((Number)accepted.get("actor_user_id")).longValue(),(String)accepted.get("actor_member_pid"),()->{
-                var source=source((String)recipient.get("announcement_pid"),version,false);
+                var source=source((String)recipient.get("announcement_pid"),version,true);
                 if(!scopeHash(source.scope()).equals(accepted.get("scope_hash"))) throw new AccessDeniedException("Reminder authority changed");
                 var fact=new Recipient((String)recipient.get("user_pid"),(String)recipient.get("member_pid"),time(recipient.get("first_read_at")),time(recipient.get("acknowledged_at")),true,null);
                 var reason=evaluate(source.policy(),Target.valueOf((String)accepted.get("target")),fact,source.now(),"AUTO".equals(accepted.get("mode")),false);
@@ -199,9 +201,65 @@ public class AnnouncementReminderService {
             });
         } catch(AccessDeniedException | BusinessException denied) {
             reminders.blockBatch(tenant,batch,"ACTOR_OR_VERSION_UNAVAILABLE");
+            reminders.skipBlocked(tenant,batch,"ACTOR_OR_VERSION_UNAVAILABLE");
             if("AUTO".equals(accepted.get("mode"))) reminders.updatePlan(tenant,version,"blocked","ACTOR_OR_VERSION_UNAVAILABLE",0);
             return "ACTOR_OR_VERSION_UNAVAILABLE";
         }
+    }
+    @Transactional(readOnly=true)
+    public Map<String,Object> previewStatus(String token) {
+        var row=reminders.previewByOwner(MetaContext.getCurrentTenantId(),token,MetaContext.getCurrentUserId(),currentMember());
+        if(row==null) invalid("reminder_preview_expired");
+        String version=(String)row.get("version_pid");var versionRow=facts.version(MetaContext.getCurrentTenantId(),version);
+        if(versionRow==null) invalid("statistics_unavailable");
+        var source=source((String)versionRow.get("announcement_pid"),version,false,false);
+        var current=selection(source,filters(row.get("filter_json").toString()),false);
+        var view=description(source,version);view.put("currentEligible",current.eligible());view.put("currentThrottled",current.throttled());view.put("pid",token);view.put("previewToken",token);
+        view.put("eligibleCount",row.get("eligible_count"));view.put("evaluatedAt",time(row.get("evaluated_at")));
+        view.put("expiresAt",time(row.get("expires_at")));view.put("filters",codec.object(row.get("filter_json").toString()));
+        boolean valid=source.policy().versionActive() && (source.policy().expiresAt()==null || source.now().isBefore(source.policy().expiresAt()))
+            && source.now().isBefore(time(row.get("expires_at"))) && source.record().getRowVersion()==((Number)row.get("record_revision")).intValue();
+        view.put("status",valid ? "ready" : "expired");return view;
+    }
+    @Transactional(readOnly=true)
+    public Map<String,Object> batchStatus(String batch) {
+        var row=reminders.findBatch(MetaContext.getCurrentTenantId(),batch);if(row==null) invalid("statistics_unavailable");
+        String version=(String)row.get("version_pid");var versionRow=facts.version(MetaContext.getCurrentTenantId(),version);
+        if(versionRow==null) invalid("statistics_unavailable");
+        var source=source((String)versionRow.get("announcement_pid"),version,false,false);
+        selection(source,AnnouncementStatistics.Filters.all(),false);
+        var view=description(source,version);view.put("pid",batch);view.put("mode",row.get("mode"));view.put("target",row.get("target"));
+        view.put("status",row.get("status"));view.put("evaluatedAt",time(row.get("evaluated_at")));
+        view.put("actualCount",row.get("intention_count"));view.put("previewCount",row.get("preview_count"));view.put("throttled",row.get("throttled_count"));
+        view.put("filters",codec.object(row.get("filter_json").toString()));view.putAll(reminders.results(MetaContext.getCurrentTenantId(),batch));
+        view.put("errorCode",row.get("error_code"));return view;
+    }
+    @Transactional(readOnly=true)
+    public Map<String,Object> planStatusByVersion(String version) {
+        var row=facts.version(MetaContext.getCurrentTenantId(),version);if(row==null) invalid("statistics_unavailable");
+        return planStatus((String)row.get("announcement_pid"),version);
+    }
+    @Transactional(readOnly=true)
+    public Map<String,Object> planStatus(String record,String version) {
+        var source=source(record,version,false,false);selection(source,AnnouncementStatistics.Filters.all(),false);
+        var plan=reminders.readPlan(MetaContext.getCurrentTenantId(),version);if(plan==null) invalid("reminder_policy_unavailable");
+        var view=description(source,version);view.put("pid",version);
+        String state=(String)plan.get("status");
+        boolean active=source.policy().versionActive() && (source.policy().expiresAt()==null || source.now().isBefore(source.policy().expiresAt()));
+        if(!active) state="canceled";
+        else if(((Number)plan.get("automatic_batches")).intValue()>=integer(source.frozen(),"limit")
+            || (source.policy().acknowledgementDeadline()!=null && !source.now().isBefore(source.policy().acknowledgementDeadline()))) state="completed";
+        view.put("status",state);view.put("automaticBatches",plan.get("automatic_batches"));view.put("limit",source.frozen().get("limit"));
+        view.put("at",source.frozen().get("at"));view.put("dedupeMinutes",source.frozen().get("dedupeMinutes"));
+        view.put("quietStart",source.frozen().get("quietStart"));view.put("quietEnd",source.frozen().get("quietEnd"));
+        view.put("errorCode",plan.get("error_code"));view.put("canResume","blocked".equals(state)
+            && MetaContext.getCurrentUserId().equals(((Number)plan.get("actor_user_id")).longValue()) && currentMember().equals(plan.get("actor_member_pid")));
+        return view;
+    }
+    private Map<String,Object> description(Source source,String version) {
+        var view=new LinkedHashMap<String,Object>();view.put("title",source.snapshot().get("title"));view.put("recordPid",source.record().getPid());
+        view.put("versionPid",version);view.put("versionNumber",source.version().get("version_no"));view.put("timezone",source.snapshot().get("timezone"));
+        view.put("acknowledgementDeadline",source.policy().acknowledgementDeadline());return view;
     }
     public void expand(IntegrationEventEnvelope event) {
         String version=required(event,"versionPid"),batch=required(event,"batchPid");
