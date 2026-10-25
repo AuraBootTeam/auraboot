@@ -167,20 +167,20 @@ describe('DecisionFieldImpactPanel', () => {
     fireEvent.click(screen.getByTestId('field-preflight-run'));
 
     await waitFor(() =>
-      expect(preflightFieldChange).toHaveBeenLastCalledWith({
-        fieldRef: 'record.data.wd_req_type',
-        action: 'DELETE_DICT_ITEM',
-        currentDataType: 'enum',
-        nextDataType: undefined,
-        dictCode: 'leave_type',
-        dictValue: 'annual',
-        impactAcknowledged: false,
-        note: undefined,
-      }),
+      expect(screen.getByTestId('field-preflight-result')).toHaveTextContent(
+        '字段变更需要确认影响面：影响 1 条 SLA 规则',
+      ),
     );
-    expect(screen.getByTestId('field-preflight-result')).toHaveTextContent(
-      '字段变更需要确认影响面：影响 1 条 SLA 规则',
-    );
+    expect(preflightFieldChange).toHaveBeenLastCalledWith({
+      fieldRef: 'record.data.wd_req_type',
+      action: 'DELETE_DICT_ITEM',
+      currentDataType: 'enum',
+      nextDataType: undefined,
+      dictCode: 'leave_type',
+      dictValue: 'annual',
+      impactAcknowledged: false,
+      note: undefined,
+    });
 
     fireEvent.change(screen.getByLabelText('field-preflight-action'), {
       target: { value: 'CHANGE_PERMISSION' },
@@ -276,15 +276,15 @@ describe('DecisionFieldImpactPanel', () => {
     fireEvent.click(screen.getByTestId('field-preflight-run'));
 
     await waitFor(() =>
-      expect(preflightFieldChange).toHaveBeenLastCalledWith({
-        fieldRef: 'process.nodeId',
-        action: 'CHANGE_DATA_TYPE',
-        currentDataType: 'string',
-        nextDataType: 'decimal',
-        impactAcknowledged: false,
-        note: undefined,
-      }),
+      expect(screen.getByTestId('field-preflight-result')).toHaveTextContent('已阻断'),
     );
-    expect(screen.getByTestId('field-preflight-result')).toHaveTextContent('已阻断');
+    expect(preflightFieldChange).toHaveBeenLastCalledWith({
+      fieldRef: 'process.nodeId',
+      action: 'CHANGE_DATA_TYPE',
+      currentDataType: 'string',
+      nextDataType: 'decimal',
+      impactAcknowledged: false,
+      note: undefined,
+    });
   });
 });
