@@ -100,6 +100,43 @@ class AuraBotConversationServiceTest {
         verifyNoInteractions(agents);
     }
 
+    @Test void legacyTextHistoryWithoutSnapshotsStillRestores() {
+        var message = historyMessage(null);
+        when(analytics.restore(any())).thenReturn(List.of());
+        var restored = service.getMessages(71L, 7L, 9L, 100).get(0);
+        assertEquals("Legacy reply", restored.getContent());
+        assertEquals(List.of(), restored.getResultContracts());
+        assertEquals(null, restored.getTraceId());
+        verifyNoInteractions(agents);
+    }
+
+    @Test void analyticsReferencesRemainAuthoritativeAndSnapshotCannotDuplicateThem() {
+        var message = historyMessage("{\"analyticsReferences\":[{\"queryPid\":\"reference-only\"}],"
+                + "\"resultContractsVersion\":1,\"resultContracts\":[{\"skillCode\":\"aurabot:chat-bi\","
+                + "\"table\":[{\"name\":\"stale snapshot must not appear\"}]},{\"skillCode\":\"ledger:read\","
+                + "\"table\":[{\"name\":\"Historical ledger\"}]}]}");
+        var currentAnalytics = com.auraboot.framework.agent.dto.ResultContract.builder()
+                .skillCode("aurabot:chat-bi").table(List.of(java.util.Map.of("name", "Authorized current analytics"))).build();
+        when(analytics.restore(any())).thenReturn(List.of(currentAnalytics));
+        var restored = service.getMessages(71L, 7L, 9L, 100).get(0).getResultContracts();
+        assertEquals(2, restored.size());
+        assertEquals(currentAnalytics, restored.get(0));
+        assertEquals("Historical ledger", restored.get(1).getTable().get(0).get("name"));
+        verify(analytics).restore(argThat(refs -> refs.isArray() && refs.size() == 1
+                && "reference-only".equals(refs.get(0).path("queryPid").asText())));
+        verifyNoInteractions(agents);
+    }
+
+    private com.auraboot.framework.im.model.ImMessage historyMessage(String metadata) {
+        when(imConversations.isMember(71L, ImConstants.MEMBER_TYPE_HUMAN, 9L, 7L)).thenReturn(true);
+        var message = new com.auraboot.framework.im.model.ImMessage();
+        message.setId(11L); message.setSeq(1L); message.setConversationId(71L);
+        message.setSenderType(ImConstants.SENDER_TYPE_AGENT);
+        message.setContent("Legacy reply"); message.setCardPayload(metadata);
+        when(imMessages.getMessagesBeforeSeq(71L, Long.MAX_VALUE, 100, 7L)).thenReturn(List.of(message));
+        return message;
+    }
+
     @Test void foreignTenantOrNonMemberCannotReadSnapshots() {
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> service.getMessages(71L, 8L, 9L, 100));
