@@ -80,6 +80,8 @@ prevents further child restarts; runtime databases and evidence remain retained.
 | `check-scripts-index.mjs` | 2 | — | Falsifiable freshness gate for scripts/README.md (the scripts index). |
 | `check-test-system.sh` | 0 | 2026-07-23 | Umbrella gate for the test system's own integrity. exit code = result. |
 | `check-version-sync.sh` | 1 | 2026-06-18 | Gate: VERSION (release version, single source of truth) must equal |
+| `application/run-product-release-archive-stage.sh` | 1 | 2026-10-25 | Run the product release archive stage and preserve its release evidence. |
+| `project-delivery-demo.sh` | 1 | 2026-10-25 | Drive the project delivery walkthrough against an explicitly selected runtime. |
 | `application/deployment-target-attestation.it.mjs` | 0 | 2026-09-25 | Verify target reservation and signed deployment observation through the protected executor. |
 | `application/run-migrator-image-gate.mjs` | 0 | 2026-09-25 | Run the retained-container Linux migrator lifecycle gate and emit digest-bound evidence. |
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |

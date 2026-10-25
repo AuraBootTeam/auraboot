@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "efbc86f9d",
+    "commit": "6763dee6f",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -1539,7 +1539,24 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+            "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
+        },
+        {
+          "id": "announcement:cancel_schedule",
+          "action": "announcement:cancel_schedule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -1550,9 +1567,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "announcement:delete_announcement",
@@ -1567,13 +1587,51 @@
           "verdict": "partial"
         },
         {
+          "id": "announcement:export_statistics",
+          "action": "announcement:export_statistics",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
+        },
+        {
           "id": "announcement:publish",
           "action": "announcement:publish",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+            "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts",
+            "web-admin/tests/e2e/contextual-authoring/contextual-authoring-business-write-guard-golden.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
+        },
+        {
+          "id": "announcement:reconcile_approval",
+          "action": "announcement:reconcile_approval",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "announcement:remind",
+          "action": "announcement:remind",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -1591,8 +1649,79 @@
           "verdict": "partial"
         },
         {
+          "id": "announcement:resume_reminders",
+          "action": "announcement:resume_reminders",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "announcement:retry_publication",
+          "action": "announcement:retry_publication",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
+        },
+        {
+          "id": "announcement:set_pinned",
+          "action": "announcement:set_pinned",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
+        },
+        {
+          "id": "announcement:submit_approval",
+          "action": "announcement:submit_approval",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "announcement:update_announcement",
           "action": "announcement:update_announcement",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
+        },
+        {
+          "id": "announcement:update_policy",
+          "action": "announcement:update_policy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-policy.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
+        },
+        {
+          "id": "announcement:withdraw_approval",
+          "action": "announcement:withdraw_approval",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -1606,9 +1735,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=ab_announcement"
         },
         {
@@ -1629,11 +1761,133 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts",
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-business-write-guard-golden.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
           "note": "kind=list model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_delivery_history_detail",
+          "action": "announcement_delivery_history_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_policy_detail",
+          "action": "announcement_policy_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-policy.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_reader_detail",
+          "action": "announcement_reader_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_reader_list",
+          "action": "announcement_reader_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=list model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_reminder_batch_detail",
+          "action": "announcement_reminder_batch_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_reminder_plan_detail",
+          "action": "announcement_reminder_plan_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_reminder_preview_detail",
+          "action": "announcement_reminder_preview_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_statistics_detail",
+          "action": "announcement_statistics_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
+        },
+        {
+          "id": "page:announcement_statistics_export_detail",
+          "action": "announcement_statistics_export_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
+          "note": "kind=detail model=ab_announcement"
         }
       ]
     },
@@ -1647,9 +1901,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/aurabot/chat-bi-suggestion-revocation.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -1658,9 +1914,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/aurabot/chat-bi-suggestion-revocation.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -1726,9 +1984,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=condition_fragment"
         },
         {
@@ -1737,9 +1997,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=decision_connector"
         },
         {
@@ -1748,9 +2010,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=decision_connector"
         },
         {
@@ -1760,6 +2024,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-audit-user-renderer.spec.ts",
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-permission-negative.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
@@ -1772,9 +2038,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=decision_definition"
         },
         {
@@ -1783,9 +2052,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
+            "web-admin/tests/e2e/decisionops/event-policy-complex-condition.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=event_policy_definition"
         },
         {
@@ -1794,9 +2066,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
+            "web-admin/tests/e2e/decisionops/event-policy-complex-condition.spec.ts",
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=event_policy_definition"
         },
         {
@@ -1805,9 +2081,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/event-policy-complex-condition.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=event_policy_definition"
         },
         {
@@ -1827,9 +2105,15 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-fact-metadata-trace.spec.ts",
+            "web-admin/tests/e2e/decisionops/decisionops-virtual-source-trace.spec.ts",
+            "web-admin/tests/e2e/decisionops/event-policy-complex-condition.spec.ts",
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts",
+            "web-admin/tests/e2e/model/model-publish-governance.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=decision_execution_log"
         },
         {
@@ -1849,9 +2133,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-field-impact-preflight.spec.ts",
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=decision_model_field"
         },
         {
@@ -1860,9 +2147,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-audit-user-renderer.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=decision_rollout_policy"
         },
         {
@@ -1871,9 +2160,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-rollout-long-window.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=decision_rollout_policy"
         },
         {
@@ -1882,9 +2173,15 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
+            "web-admin/tests/e2e/decisionops/dmn-export-artifact.spec.ts",
+            "web-admin/tests/e2e/decisionops/dmn-feel-builtins.spec.ts",
+            "web-admin/tests/e2e/decisionops/dmn-table-editor-deep.spec.ts",
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=decision_definition"
         },
         {
@@ -1893,9 +2190,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=webhook"
         },
         {
@@ -1904,9 +2203,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=webhook"
         }
       ]
@@ -1931,9 +2232,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/faq-loop-conversation-queue.spec.ts",
+            "web-admin/tests/e2e/faq-loop-unpublish.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "faq:publish",
@@ -2078,6 +2382,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
@@ -2157,9 +2462,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=tpm_project"
         }
       ]
@@ -2750,6 +3057,7 @@
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
             "web-admin/tests/e2e/organization/org-position.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-focused-menu-and-permissions.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-bom-org-admin.spec.ts",
             "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -2845,6 +3153,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/organization/team-management-deep.spec.ts",
             "web-admin/tests/e2e/organization/team-management.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -2853,13 +3162,14 @@
         {
           "id": "org:open_employee_account",
           "action": "org:open_employee_account",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/menus-config.test.mjs"
+            "tests/menus-config.test.mjs",
+            "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts"
           ],
-          "assertion": "test reference registered below the UI; execution not verified",
+          "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
         },
         {
@@ -2901,7 +3211,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/organization/team-management.spec.ts"
+            "web-admin/tests/e2e/organization/team-management.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -3108,6 +3419,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts",
             "web-admin/tests/e2e/studio/page-templates.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -3165,6 +3477,7 @@
             "web-admin/tests/e2e/list-renderer/list-action-column.golden.spec.ts",
             "web-admin/tests/e2e/page-designer/page-designer-full-lifecycle.spec.ts",
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts",
             "web-admin/tests/e2e/showcase/detail-configpanel-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/form-blocksdesigner-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/list-configpanel-e2e.spec.ts",
@@ -3204,7 +3517,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts"
+            "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -3227,9 +3541,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/collab-review/notification-sse.golden.spec.ts",
+            "web-admin/tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
+            "web-admin/tests/e2e/settings/open-platform.golden.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -3263,9 +3581,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "admin:delete_data_permission",
@@ -3284,6 +3604,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/enterprise/member-management-deep.spec.ts",
             "web-admin/tests/e2e/organization/member-lifecycle-golden.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -3296,6 +3617,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/admin/scheduled-task-lifecycle.spec.ts",
             "web-admin/tests/e2e/platform-admin/scheduled-task-dsl.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -3318,6 +3640,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/enterprise/member-management-deep.spec.ts",
             "web-admin/tests/e2e/organization/member-lifecycle-golden.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -3326,14 +3649,16 @@
         {
           "id": "admin:provision_member_from_employee",
           "action": "admin:provision_member_from_employee",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
             "tests/capabilities.test.mjs",
-            "tests/menus-config.test.mjs"
+            "tests/menus-config.test.mjs",
+            "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
           ],
-          "assertion": "test reference registered below the UI; execution not verified",
+          "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
         },
         {
@@ -3342,9 +3667,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/enterprise/member-management-deep.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "admin:reset_member_password",
@@ -3352,9 +3679,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/organization/tenant-member-password-reset.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "admin:restore_member",
@@ -3363,7 +3692,9 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/organization/member-lifecycle-golden.spec.ts"
+            "web-admin/tests/e2e/enterprise/member-management-deep.spec.ts",
+            "web-admin/tests/e2e/organization/member-lifecycle-golden.spec.ts",
+            "web-admin/tests/e2e/organization/org-user-role-parity.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -3375,7 +3706,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/organization/member-lifecycle-golden.spec.ts"
+            "web-admin/tests/e2e/organization/member-lifecycle-golden.spec.ts",
+            "web-admin/tests/e2e/organization/org-user-role-parity.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -3387,7 +3719,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts"
+            "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -3474,9 +3807,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/platform/agent-assembly.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list"
         },
         {
@@ -3490,7 +3825,8 @@
             "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-module-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-routes-pos-parity.spec.ts",
-            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -3568,6 +3904,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts",
             "web-admin/tests/e2e/settings/open-platform-multi-user.golden.spec.ts",
             "web-admin/tests/e2e/settings/open-platform.golden.spec.ts"
           ],
@@ -3727,7 +4064,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts"
+            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -3754,7 +4092,8 @@
           "driver": "browser",
           "evidence": [
             "backend/src/test/java/com/auraboot/plugins/delivery/VerifyDeliveryHandlerTest.java",
-            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts"
+            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -3790,7 +4129,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts"
+            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -3851,9 +4191,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "tpm:create_acceptance",
@@ -3861,20 +4203,26 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/project-management/delivery-operations-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "tpm:create_customer",
           "action": "tpm:create_customer",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/customer-ai-intake-config.test.mjs"
+            "tests/customer-ai-intake-config.test.mjs",
+            "web-admin/tests/e2e/project-management/customer-ai-intake-live.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-analysis-report-live.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-report-print-parity-real.spec.ts"
           ],
-          "assertion": "test reference registered below the UI; execution not verified",
+          "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
         },
         {
@@ -3895,6 +4243,11 @@
           "driver": "browser",
           "evidence": [
             "tests/delivery-brief-config.test.mjs",
+            "web-admin/tests/e2e/project-management/customer-ai-project-intake-live.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-analysis-report-live.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-report-print-parity-real.spec.ts",
+            "web-admin/tests/e2e/project-management/delivery-verification-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts",
             "web-admin/tests/e2e/templates/templates-smoke.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -3907,7 +4260,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts"
+            "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-connected-real.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -4089,9 +4443,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/project-management/delivery-acceptance-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "tpm:update_acceptance",
@@ -4099,9 +4456,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -4138,13 +4498,15 @@
         {
           "id": "tpm:update_project",
           "action": "tpm:update_project",
-          "surface": "contract",
-          "dependencies": "hermetic",
-          "driver": "unit",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
           "evidence": [
-            "tests/delivery-brief-config.test.mjs"
+            "tests/delivery-brief-config.test.mjs",
+            "web-admin/tests/e2e/project-management/customer-delivery-extension-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts"
           ],
-          "assertion": "test reference registered below the UI; execution not verified",
+          "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
         },
         {
@@ -4168,7 +4530,9 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/project-management/delivery-acceptance-real.spec.ts",
-            "web-admin/tests/e2e/project-management/delivery-operations-real.spec.ts"
+            "web-admin/tests/e2e/project-management/delivery-operations-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -4193,9 +4557,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=tpm_acceptance"
         },
         {
@@ -4204,9 +4571,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=form model=tpm_customer"
         },
         {
@@ -4281,9 +4650,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=form model=tpm_project"
         },
         {
@@ -4292,9 +4663,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-multirole-real.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=detail model=tpm_project"
         },
         {
@@ -4317,9 +4690,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=list model=tpm_project"
         },
         {
@@ -4380,9 +4756,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "sc:create_monthly_metric",
@@ -4390,9 +4768,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/showcase/detail-all-blocks-e2e.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -4406,7 +4786,15 @@
             "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
             "web-admin/tests/e2e/platform/showcase-form-validation.spec.ts",
             "web-admin/tests/e2e/platform/showcase-smart-components.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts"
+            "web-admin/tests/e2e/saved-view/saved-view-gallery.spec.ts",
+            "web-admin/tests/e2e/showcase/detail-all-blocks-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/error-paths-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/ga-showcase-saved-view-deep.spec.ts",
+            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
+            "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/subtable-sorting-rollback.spec.ts",
+            "web-admin/tests/e2e/showcase/validation-e2e.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -4417,9 +4805,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/showcase/detail-all-blocks-e2e.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -4428,9 +4818,17 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/showcase/detail-all-blocks-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/error-paths-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
+            "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/subtable-sorting-rollback.spec.ts",
+            "web-admin/tests/e2e/showcase/validation-e2e.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "sc:detail_showcase",
@@ -4471,8 +4869,11 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/platform/form-redirect-regression.spec.ts",
+            "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
             "web-admin/tests/e2e/showcase/page-rebuild-from-designer-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts"
+            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
+            "web-admin/tests/e2e/showcase/validation-e2e.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -4985,9 +5386,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/approval/approval-workflow.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "e2et:cancel_order",
@@ -4996,6 +5399,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
             "web-admin/tests/e2e/automation/automation-golden.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -5018,8 +5422,12 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/ai/form-draft-fill.spec.ts",
+            "web-admin/tests/e2e/aurabot/chat-bi-suggestion-revocation.spec.ts",
             "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-customer-crud.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-reference-inline-create.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-loading-states.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
@@ -5035,12 +5443,15 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/approval/approval-workflow.spec.ts",
             "web-admin/tests/e2e/aurabot/report-analytics-permission.spec.ts",
             "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-loading-states.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
+            "web-admin/tests/e2e/mobile-seed/cross-platform-seed.spec.ts",
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/permission/permission-deep.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/report-designer-dualwrite-golden.spec.ts"
           ],
@@ -5053,9 +5464,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "e2et:create_payment",
@@ -5063,9 +5476,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/approval/approval-workflow.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "e2et:delete_customer",
@@ -5086,6 +5501,7 @@
           "evidence": [
             "web-admin/tests/e2e/contextual-authoring/contextual-authoring-release-golden.spec.ts",
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/permission/permission-deep.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -5097,9 +5513,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "e2et:pay_payment",
@@ -5127,9 +5545,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/approval/approval-workflow.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "e2et:submit_order",
@@ -5147,9 +5567,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/approval/approval-workflow.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "e2et:touch_order_noperm",
@@ -5194,9 +5616,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts"
+          ],
+          "assertion": "browser test reference registered; execution and assertions not verified",
+          "verdict": "partial"
         },
         {
           "id": "e2et_crm_opp.create",
@@ -5423,6 +5847,7 @@
             "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
             "web-admin/tests/e2e/mobile-seed/cross-platform-seed.spec.ts",
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/permission/dynamic-data-scope-runtime.spec.ts",
             "web-admin/tests/e2e/platform/list-query-config.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/saved-view/quick-filter-team-pin-golden.spec.ts",
@@ -5837,7 +6262,9 @@
           "evidence": [
             "web-admin/tests/e2e/aurabot/ai-panel.spec.ts",
             "web-admin/tests/e2e/community/community-smoke.spec.ts",
-            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts"
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts",
+            "web-admin/tests/e2e/platform/agent-assembly.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -5851,7 +6278,8 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
-            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -5920,7 +6348,8 @@
             "web-admin/tests/e2e/automation/automation-golden.spec.ts",
             "web-admin/tests/e2e/automation/automation-management.spec.ts",
             "web-admin/tests/e2e/automation/llm-call-node.spec.ts",
-            "web-admin/tests/e2e/formula/formula-editor.spec.ts"
+            "web-admin/tests/e2e/formula/formula-editor.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -6149,7 +6578,8 @@
           "evidence": [
             "web-admin/tests/e2e/decisionops/decisionops-fact-metadata-trace.spec.ts",
             "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts",
-            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -6263,6 +6693,7 @@
             "web-admin/tests/e2e/project-management/customer-analysis-report-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-formats-real.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-permissions-real.spec.ts",
+            "web-admin/tests/e2e/project-management/customer-report-print-parity-real.spec.ts",
             "web-admin/tests/e2e/project-management/delivery-brief-real.spec.ts",
             "web-admin/tests/e2e/project-management/delivery-operations-real.spec.ts",
             "web-admin/tests/e2e/project-management/showcase-designers-real.spec.ts",
@@ -6427,7 +6858,11 @@
             "web-admin/tests/e2e/amos-lenses/amos-lens-coverage.spec.ts",
             "web-admin/tests/e2e/amos-lenses/amos-lens-faults.spec.ts",
             "web-admin/tests/e2e/amos-lenses/amos-lens-journeys.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts",
             "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-policy.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts",
+            "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts",
             "web-admin/tests/e2e/aurabot/admin-agent-runs.spec.ts",
             "web-admin/tests/e2e/aurabot/behavior-analytics-page.spec.ts",
             "web-admin/tests/e2e/aurabot/behavior-execution-page.spec.ts",
@@ -6583,6 +7018,7 @@
             "web-admin/tests/e2e/plugin/plugin-import.spec.ts",
             "web-admin/tests/e2e/plugin/plugin-slot-system.spec.ts",
             "web-admin/tests/e2e/plugin-productization/managed-badge.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts",
             "web-admin/tests/e2e/search/command-palette-docs.spec.ts",
             "web-admin/tests/e2e/showcase/customer-designers-journey.spec.ts",
             "web-admin/tests/e2e/showcase/model-creation-e2e.spec.ts",
@@ -6782,7 +7218,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/project-management/showcase-connected-real.spec.ts"
+            "web-admin/tests/e2e/project-management/showcase-connected-real.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -6962,6 +7399,7 @@
             "web-admin/tests/e2e/plugin/plugin-deep.spec.ts",
             "web-admin/tests/e2e/plugin/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
+            "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts",
             "web-admin/tests/e2e/website/website-smoke.spec.ts"
           ],
           "assertion": "browser route reference registered; execution and assertions not verified",
@@ -7129,10 +7567,10 @@
     }
   ],
   "stats": {
-    "commands": 269,
-    "untested": 174,
-    "pages": 187,
-    "pagesUntested": 113,
+    "commands": 279,
+    "untested": 154,
+    "pages": 196,
+    "pagesUntested": 91,
     "platformPages": 95,
     "platformPagesUntested": 36
   }
