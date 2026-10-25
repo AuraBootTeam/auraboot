@@ -31,13 +31,19 @@ export function applyReportParameters(
     if (!bindTo || !dataSources[bindTo.dataSource] || !bindTo.field)
       throw new Error('Invalid report parameter binding');
     const source = dataSources[bindTo.dataSource];
-    if (source.type !== 'model')
-      throw new Error('Report filter parameters require a model data source');
     if (type === 'number' && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value ?? ''))
       throw new Error('Invalid numeric report parameter');
     if (type === 'date' && !validDate(value)) throw new Error('Invalid report parameter date');
     if (type === 'select' && !parameter.options?.some((option) => option.value === value))
       throw new Error('Invalid report parameter option');
+    if (source.type === 'namedQuery') {
+      const reserved = new Set(['tenantId', 'userId', 'datasourceId', 'format', 'maxItems', 'valueField', 'labelField', 'searchField', 'keyword', 'page', 'size', 'reportingCurrency']);
+      if (values || bindTo.operator !== 'EQ' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(bindTo.field) || reserved.has(bindTo.field))
+        throw new Error('Invalid named query parameter binding');
+      dataSources[bindTo.dataSource] = { ...source, params: { ...source.params, [bindTo.field]: value! } };
+      continue;
+    }
+    if (source.type !== 'model') throw new Error('Report filter parameters require a model or named query data source');
     dataSources[bindTo.dataSource] = {
       ...source,
       filters: [

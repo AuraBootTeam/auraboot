@@ -63,6 +63,8 @@ export interface ReportParameter {
   label: string;
   required?: boolean;
   defaultValue?: string;
+  /** Explicit route context; not an editable technical identifier. */
+  inputSource?: 'route';
   /** For 'select' type: list of options */
   options?: Array<{ label: string; value: string }>;
   /** Bind to data source filter field */
