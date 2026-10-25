@@ -586,11 +586,13 @@ public class PluginManagerServiceImpl implements PluginManagerService {
      * @param pluginId the plugin ID
      */
     public void removePf4jPlugin(String pluginId) {
+        auraPluginManager.requireTenantLifecycleChange(pluginId);
         Long tenantId = MetaContext.getCurrentTenantId();
         log.info("Removing PF4J plugin: {} for tenant {}", pluginId, tenantId);
 
         PluginRecord record = pluginRecordMapper.findByTenantAndPluginId(pluginId);
         if (record != null) {
+            auraPluginManager.requireTenantLifecycleChange(record);
             pluginRecordMapper.softDelete(record.getPid());
             log.info("Removed PF4J plugin from database: {}", pluginId);
         }
