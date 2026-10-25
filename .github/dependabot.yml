@@ -1,6 +1,9 @@
 # Dependabot configuration for AuraBoot OSS
 # Reduces time-to-patch on third-party CVEs without flooding the team.
 # Tune after launch — first month we may want fewer auto-PRs.
+# Security-update jobs failing on main? Start with
+# docs/system-reference/dependabot-security-pins.md (failure-mode fingerprints
+# and the stale-pin playbook).
 
 version: 2
 
