@@ -5,114 +5,99 @@ created: 2026-10-25
 updated: 2026-10-25
 ---
 
-# 公告 S2–S8 持续验收记录
+# 公告 S2–S8 本地分层验收记录
 
-## 结论与适用范围
+## 当前结论
 
-**allowed_claim: targeted-tested；完整功能与黄金验收尚未完成。** 需求、默认取舍及唯一缺口清单以[公告管理设计](./announcement-management.md)§16–§18为准。本记录只裁决已执行证据，不另立需求或缩小S2–S8范围；小程序实际发送端不在本期，适配契约仍在范围内。现有PR保持草稿，未合并，未发布生产。
+本期 S1–S8 业务实现、OSS/BPM 组合和本地分层验证已完成，交付到开放 PR；未合并、未发布生产。需求唯一真源为[公告设计](./announcement-management.md)，实际契约以其 §18.26 为准。[同一证据 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)关联生成的行动点、具体断言、准确运行和逐图裁决。本报告取代此前各增量报告中的“最新”口径；设计 §18.1–18.25 和不可变原始日志仍保留历史失败。
 
-最新完整公告浏览器回归源码为`c5b1fe1dd`：全部四份spec共16条业务旅程实际执行通过（2.8分钟），无skip/retry，认证另1条。后端生产代码与`3bf2fdfd10693edd8c12205e5ed3565cfb3b6129`完全相同，该版117项hermetic单测和35项真实PostgreSQL/HTTP/outbox集成通过；17项前端定向单测同版通过。生产TS与43d7d6d1类型检查版相同。后续仅渠道列宽、浏览器单行断言及文档差异，不将分轮证据伪写为一次执行。原始失败、准确JUnit和日志继续保留。
+**allowed_claim: implemented-and-local-validated-with-explicit-boundaries。** 这不等于所有状态排列、全产品 corpus、功能覆盖率 100%、OCI/Linux 或生产验收。小程序实际发送端不在本期；渠道适配与同一版本/知悉事实的公共边界已纳入实现。
 
-本轮覆盖默认审批模式就绪、原任务发布恢复、原导出请求查询和同键重放、准确版本渠道历史及已有生命周期/政策/催办/统计导出。公开启动9/9及Workspace核验无finding/warning。渠道列换行缺陷经原图发现、DSL列宽修正、单行断言及新原图复核闭合。发布方式控件和统计总览使用3bf已逐张审阅原图，渠道图为c5b新原图，各自来源见[同一manifest](./evidence/announcement-s2-s8-2026-10-25/reminders/manifest.json)，不换标签冒充同版截图。
+## 运行与源码身份
 
-早前2e248b1c9的106项单测、32项真实集成、原任务恢复1条及其余15条浏览器旅程，1fc8cb42b的111项单测/33项真实集成，均作为历史轮次保留，不与117/35/16重叠累加。历史保护恢复25项曾命中Gradle缓存，已改正；之后707的26项、5c的28项、2e的32项、1fc的33项和3bf的35项均有真实执行记录。催办历史第一页分页器原图缺口已由2e补图闭合。附件、真实大受众、导出竞态/清理、最新BPM组合和完整D01–D15仍未关闭，当前只允许targeted-tested。
+| 输入 | 本轮身份 |
+| --- | --- |
+| 稳定工作区 | `.workspace/worktrees/announcement-management/{auraboot,aura-bpm,auraboot-enterprise}`；统一 `codex/announcement-management`，不吸收 main |
+| Core 构件 | producer `6763dee6f2ef82c8d0a80eca4066309c378f0e1a`；`core-catalog-6763dee6f`，lock `sha256:86fb3b76fa41dfa6bda9b058d6d1f83cd085470033e80795eab2f2a1a0c957c8` |
+| BPM 正式组合 | producer `41c1ffc44022e1ef3a3634e69e850c90ff66c3e4`；`bpm-composition-41c1ffc`；22 个 staged artifacts |
+| 组合 lock / graph | `sha256:7b6f443f8f05137d53ad4686556b54df2bc0a6972319823946db93c4df1c773b` / `sha256:58fcb7f322a353d3a78ecb1192753a45648ad237b0a876633688b984741c4baa` |
+| OSS 浏览器源码 | 完整 17 条为 `c545bc7a0`；随后仅强化渲染等待的原计划恢复在 `6a6b2f967` 定向复验 1 条；Core production 与上述 catalog 相同 |
+| BPM 浏览器强化源码 | `68a4f347b91b9152fe42811a3daaf40adbcea17e`；相对 41c 仅文档和两处截图/状态断言，无 production 差异，复用原正式构件；最后 4/4 不与前轮 4/4 累加 |
+| OSS runtime | `announcement-management`，backend 6401 / Web 5101 / BFF 6101，`auraboot_1`，Redis DB12 |
+| BPM runtime | `announcement-management-bpm`，backend 6501 / Web+BFF 5401，`aura_bpm_1`，Redis DB7 |
+| 数据模式 | 曾显式初始化同一任务环境；最新浏览器轮次重建认证、使用独有 UUID 夹具并断言本轮操作的持久结果，完成后走正式撤回/撤销和政策恢复；没有靠旧记录存在自证 |
+| 凭证与私有证据 | 任务 evidence 内私有 env/认证状态，凭证 SET，不公开值；原始 CSV、下载对象、认证和 JVM 诊断不提交 |
+| 结束状态 | 两个 runtime 正常 suspended；DB、缓存、allocation、源码和证据保留，不销毁环境 |
 
-下文“本轮实际证据”表是c1921cd6b历史轮次，后续补充按准确源码分别记录。
+OSS retained DB 现在包含 152 条 Core 加 5 条 BPM 迁移，不能称为“纯 Core schema”。独立空库 Core 152、schema drift、原库增量和组合 157 validate 分别已执行；没有 out-of-order 或手工 ALTER。Core-only catalog 不包含 BPM 产品，BPM 构建只消费冻结 catalog。
 
-## 本轮实际证据
+BPM 每次浏览器门前均执行公开产品 `verify` 和 Workspace `verify`，登记 artifact、listener PID/cwd、source 及数据库身份。Workspace verdict ok、findings none，但仍有 `RUNTIME_MANIFEST_MISSING` warning；独立产品 verify 及真实 BFF/HTTP/DB 证明另行保留，不能改写为零 warning。最终文档/证据提交只更新文档；不冒充重新构建了相同 production bytes。
 
-| 层次 | 已执行裁决 | 边界 |
-| --- | --- | --- |
-| 后端hermetic unit | 31项目标授权＋19项异步任务，共50项通过，无skip | 授权payload绑定、当前身份复查、队列保留及既有执行边界；不是全产品覆盖率 |
-| 真实数据库/HTTP/outbox集成 | c1921cd6b上22项通过，无skip | 10项既有统计/导出、11项催办、1项受控发布人投影；自动日历使用测试主机时钟，数据库和系统时间不变 |
-| 前端定向单测 | 先前相关动作、表格、指标、下载272项；后续数据源/路由等104项；最新展示/反馈回归245项通过 | 不同轮次存在重叠，不相加；类型检查分别按准确源码通过 |
-| 仓库浏览器回归 | c1921cd6b上14项通过，无retry/skip | 9条生命周期、3条政策、1条催办、1条统计/导出；精确原生入口/请求/持久结果，认证setup另计 |
-| 新统计浏览器旅程 | 菜单→详情→固定统计→空筛选/清除→统一命令→刷新任务→真实CSV下载 | 使用原生DSL；core路径通过真实按钮，不用API调用代替按钮 |
-| 不确定网络 | 服务端受理后主动丢弃响应，刷新后按钮重试通过 | 两次请求身份相同，返回同一任务且标记幂等重放；读取数据库确认该固定快照仅一条导出 |
-| 实际文件 | 仓库用例的实际下载经Python csv独立解析，15列1行；先前3行文件另经csv/datetime/zoneinfo核验 | UTF-8 BOM、固定人员/阅读/知悉状态、冻结时区及持久字节数/摘要一致；1行与3行来自不同受控前置数据，不混记为同一文件 |
-| 视觉复核 | c1921cd6b的16张催办/统计/导出/发布信息原图逐张复核通过 | 网络提示已本地化、时间文本单行、空分类说明明确，完成态等待按钮可用后重拍；完整矩阵仍未关闭，不宣称全产品黄金达成 |
-| 插件/静态 | 插件校验0错误、4条详情块类型建议警告；页面UX审计8页0错误0警告 | 不是浏览器执行，不能代替安装、HTTP、交互或文件证据 |
+## 实际执行账本
 
-测试源码入口：`CommandTargetScopePhaseTest`、`AsyncTaskServiceImplTest`、`AnnouncementStatisticsIntegrationTest`；前端`ActionRegistry`、`DataSourceManager`、`useSchemaLoader`、动态详情身份及块渲染测试。公开浏览器回归为`web-admin/tests/e2e/announcement/`。新增`announcement-statistics.spec.ts`使用自建且仅面向当前用户的发布/阅读前置数据，核心统计及导出走UI；已在c1921cd6b真实执行通过，包含正文已读/知悉未完成的固定统计，以及网络故障后原请求重放。此前冻结驱动与原始结果保存在任务登记的runtime evidence，受控文件和认证状态不提交到公共仓库。
+所有路径以 Workspace 登记的 `.workspace/evidence/` 为根。计数按不同测试面和轮次分别列出，存在重叠时不相加；认证不是业务用例，collection 不是执行。
 
-可定位的原始证据轮次为`2026-10-24T23-29-35-891Z-c3432443-2f1b-4f9c-b181-573139bb7c2a`（12条回归），及`2026-10-24T23-46-09-668Z-8efa4ad3-71e4-44a2-a6a2-4f008691fbed`（a1b827a69原生统计v7/v8、实际下载）。efaa3e65c复验轮次为`2026-10-24T23-59-04-117Z-39a89320-7ea2-419c-b48a-3f2f35882c63`（原生统计v9，含9张原图与独立CSV校验）。最新仓库用例与12条回归的轮次为`2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990`；[公开裁决manifest及8张原图](./evidence/announcement-s2-s8-2026-10-25/manifest.json)仅含合成测试数据。原始失败版本、JUnit、身份核验、下载摘要及独立解析结果分别保留，不用成功重跑覆盖原失败。
+| 层次 / 四轴 | 实际命令或固定入口 | collected / executed / passed / failed / skipped | 退出与证据 |
+| --- | --- | --- | --- |
+| Core 领域；backend / hermetic / unit / test-function | 原受管 Gradle 公告定向套件，133 项 | 133 / 133 / 133 / 0 / 0 | exit 0；`announcement-management/s2-audience-paging-corrected-full-backend.log` 与 `s2-audience-paging-corrected-junit`；source `854ecf0ec` |
+| Core 持久边界；backend / real-stack / it / HTTP+worker | 同轮 PostgreSQL/HTTP/outbox 39 项 | 39 / 39 / 39 / 0 / 0 | 同上，172 合计只用于该轮 JUnit 核对；不把单元当集成 |
+| Core 共享应用保护；backend / hermetic / unit / test-function | `s6-direct-lifecycle-full-regression` 目标集 | 153 / 153 / 153 / 0 / 0 | 单元通过；该次 3 项 IT 中 1 项 classpath 夹具失败，不能把整轮算通过；原 XML 保留 |
+| Core 真实插件保护；backend / real-stack / it / HTTP+PF4J | 修正 JAR 资源夹具后重跑相关 3 项 | 3 / 3 / 3 / 0 / 0 | exit 0；`s6-direct-lifecycle-corrected-it.log` / `s6-direct-lifecycle-corrected-junit`；source `6763dee6f` |
+| Core 前端；ui / hermetic / unit / test-function | 已有相关组件 161 项；后续 Header/分页定向 23 项 | 分别 161、23 全通过，不累加 | 对应源码 `528d9799d`、`49f74a882`；最终 `final-core-typecheck.log` exit 0 |
+| OSS 原生业务；ui / real-stack / journey / browser | `playwright.oss.config.ts`，`tests/e2e/announcement/` 五份 spec | 17 / 17 / 17 / 0 / 0；retry 0 | exit 0，3.1 分钟；`final-oss-regression-browser.log`；line reporter 逐条执行和最终计数，不虚构结果 JSON |
+| 原计划恢复强化；ui / real-stack / journey / browser | 同配置同一原旅程定向复验 | 1 / 1 / 1 / 0 / 0；retry 0 | exit 0，49.5 秒；`s8-reminder-golden-browser.log`；与上述 17 重叠，不加成 18 |
+| BPM 前端；ui / hermetic / unit / test-function | 冻结预览/任务入口 5 文件 | 45 / 45 / 45 / 0 / 0 | exit 0；`announcement-management-bpm/s5-frozen-entry-front-units.log`；后续该 production TS 未变 |
+| BPM 构建契约/进程安全；script / hermetic+owned-process / unit / node | 正式 `build-application.mjs --composition announcements --skip-oci --offline` | 97 / 97 / 97 / 0 / 0 | exit 0；`final-41c-composition-build.log`，包含真实进程生成/停机反例 |
+| BPM 后端；backend / mixed hermetic+real-stack / unit+it / Gradle | 同一正式构建执行的完整 backend test | 1657 / 1657 / 1657 / 0 / 0 | 224 份 JUnit，`final-41c-junit`；其中 9 公告组合 IT + 10 严格引擎 IT 是子集，不再相加 |
+| BPM Web 构件 | 同构建的 typecheck、client/SSR、单 React、摘要与图一致性 | 不记业务测试数 | 全部 PASS，exit 0；正式 receipt 含 producer/lock/graph；不是 OCI 证据 |
+| BPM 可选浏览器 profile；ui / real-stack / journey / browser | `playwright.announcements.config.ts` | collected 4、executed 4、passed 4、failed/skipped/retry 0 | exit 0，1.7 分钟；`final-visual-browser.log`，认证另 1；collection 单独 executed=0 |
+| BPM 固定集合对账 | `verify-corpus-results.mjs collection results reconciliation announcements` | declared 4 / reported 4 / passed 4 / unresolved 0 | exit 0；`final-visual-reconciliation.json`，精确身份且每项仅一次 |
+| BPM 正常生命周期 | 同一受管 TTY：resume→登记→publish→verify→browser→suspend | business_exit=0，stop_exit=0 | `final-visual-exit.log` / `final-visual-stop.log`；listener 已退出，未销毁数据库 |
+| 静态登记与结构门 | `scripts/check-test-system.sh`，源 coverage generator | browser executed=0 | `final-test-system-with-reminder-recovery.log` PASS；不把全仓已有 untested 消除或折算为执行率 |
 
-## 完整范围的覆盖分母
+最后的文档治理和差异检查见同一 manifest 的 `documentationValidation`；仓库 PR Checks 以服务端当前 head 为准，本地 PASS 不等于 CI PASS。
 
-| 范围 | 当前状态 | 未关闭项 |
-| --- | --- | --- |
-| S2受众与附件 | partial | 分页预览、真实上传/下载、控制文件及完整身份边界 |
-| S3发布执行 | partial | 原任务显式恢复已有当前浏览器及真实集成证据；同步与过期、容量/监控及完整异常仍须对账 |
-| S4中立审批契约 | targeted-tested | 与最新BPM正式构件配套复验，不能只看领域服务 |
-| S5严格BPM | partial | 恢复/重分配页面、完整严格业务浏览器矩阵 |
-| S6组合安装/联动 | partial | 最新BPM构件、普通停止、附件及业务审批UI；历史构件组合证据不代表最新源码 |
-| S7接收者/铃铛/待办 | partial | 最新候选完整复验、附件及完整错误状态；既有核心菜单旅程有真实证据 |
-| S8催办 | targeted-tested | 核心原生旅程、持久批次、去重/额度、并发、撤权及恢复API已有证据；批次历史、完整权限/恢复UI、观测容量仍待完成 |
-| S8统计/导出 | targeted-tested | 真正跨页、版本切换、零分母/迁移、各任务/权限状态、上传取消并发、清理失败重试及完整视觉复核 |
+## 业务分母与实际断言
 
-任何missing、partial或未执行行都阻止“全部完成、黄金通过、覆盖率100%”结论。历史S1与早期S2–S8证据不重复计数；完整逐行动点的D01–D15仍以设计§16.8为分母。
+D01–D15 保持设计 §16.8 的完整分母。机器行动点来自 `core-announcement` 的 16 commands / 12 pages，关联具体 browser/IT 断言；Header、受控附件、审批任务及恢复动作作为来源明确的补充面。生成器的静态 partial/untested 原样保留，组合审批三命令和通用 form 路由由人工语义审计绑定实际执行，不能修改静态 executed=0。
 
-## 反证与可信度
+| 需求组 | 已执行的关键语义证据 |
+| --- | --- |
+| D01 草稿/版本 | 原生新增、编辑、删除、修订、置顶/取消置顶；实际 revision、冻结 hash、通知数量及刷新事实 |
+| D02 受众/权限 | 原生 27 人翻页 25+2、跨页选择/清空/重开；部门子树/角色/全员及身份轮换授权；真实 501 成员跨 500 展开和统计页 |
+| D03 政策/免审 | 实际政策菜单保存/取消/无效时间；exempt 与 manage 分离；缺 BPM 不降级；BPM 默认绑定真实 UI 保存，受理后变更默认不改原定义 |
+| D04 定时/恢复 | 实际预约取消无 recipient；过窗拒绝、旧租约不能提交；原发布任务恢复保持 actor/version/window，取消确认不写入 |
+| D05–D06 审批 | 原生 submit/reconcile/withdraw；角色 ANY 与人员 ALL；无关用户拒绝、驳回必填、首次意见不提前批准、修订后旧历史不变；原节点 resolve、原任务 resume、剩余人 replace 后旧人拒绝且意见保留 |
+| D07 渠道 | 冻结名单与 outbox、投影幂等；准确版本渠道历史分页/刷新不重发；桥接受理后关闭阻止执行，显式核对原意图 |
+| D08–D09 提醒/反馈 | 实际铃铛断网/写入不确定后恢复、全部已读仍有知悉待办；普通接收人阅读/确认、刷新保留首次时间；错图不记阅读；窄屏及 Escape 焦点 |
+| D10 催办 | 原生预览/取消/接受/原键核对/批次分页/准确批次；真实集成验证每日、三次、截止相等、手动截止后、空批次、共用去重、撤权、并发与原计划恢复；日历/DST 为 hermetic 时钟规则，未改系统时间 |
+| D11 统计/导出 | 原生固定快照与筛选/空态；丢响应后 GET 原操作和同键重放；真实 CSV 字节/摘要/行列/时区及独立解析；多页、历史组织、下载撤权、取消迟到上传、清理失败及篡改拒绝 |
+| D12 正文/附件 | 实际原生富文本及上传、冻结下载字节、保留删除拒绝、越权/猜链接拒绝、HTML 防注入；审批人只读冻结正文和同一送审附件，预览不记接收阅读 |
+| D13 组合/升级 | 冻结 Core → 正式产品构建、157 迁移 validate、锁摘要与依赖图；真实 disable/uninstall/hot-stop HTTP 全拒绝且插件状态不变；正常整栈停止通过 |
+| D14 异常/UX | 26 类固定 stage 观测语义、501 人测量；真实故障注入、加载不伪空、原键恢复、政策/渠道/审批页面原图复核；不外推所有可能布局/网络排列 |
+| D15 扩展 | 未配置渠道不可选择、不伪报发送；中立 adapter 与同一版本事实边界。实际微信 provider/真机 did_not_run，属于本期明确排除 |
 
-真实反例曾拒绝未声明页面键、默认下拉适配造成的分页信息丢失、API结果未展开的导航路径，以及统一命令未传入授权payload。修正分别经过生产解析器/数据源/FlowRunner、真实命令或浏览器复验。下载MIME守卫曾在明确变异轮次看到红色，恢复后回归通过；该变异轮次的筛选跳过不算正常回归跳过。不确定网络采用真实上游请求后丢响应，不伪造服务端成功。测试边界与真实残留数据库复跑分别记录。
+需求级 runner 自动对账尚未实现：现有结构门与 BPM 固定 case 集合对账是机器门，需求到断言的语义绑定和视觉裁决是人工审计。该工具局限不能包装成“自动全覆盖已锁定”。
 
-首次独立CSV检查错误地假设UTC；只读绑定证明公告冻结时区为Asia/Shanghai，随后按冻结元数据验证绝对时间与offset。没有修改产品数据来迎合解析器。
+## 原图与真实文件
 
-## Final Evidence Pack
+[根 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)复用已有统计、提醒、附件子清单，并补齐当前草稿/权限/发布与 BPM 原图。每图保留原 source/run/hash、打开原图后的具体观察和 agent-vision 裁决。旧截图不能换标签成为新版本截图；已有错误图和 skeleton 图保留在私有失败证据中，不作为已接受图。
 
-```text
-acceptance_report: docs/system-reference/2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md
-claim_level: targeted-tested
-current_sot: docs/system-reference/announcement-management.md §16–§18
-business_scope: S2–S8 including BPM composition; actual mini-program sender excluded
-integration_tests: latest 22 real-stack PostgreSQL/HTTP/outbox cases passed; earlier broad 92 announcement units and 19 calendar/eligibility units remain separately scoped
-integration_coverage: coverage_not_measured for complete S2–S8 scope
-e2e_specs: existing announcement lifecycle/policy specs; repository statistics/lifecycle/policy specs; earlier frozen driver evidence remains separately scoped
-e2e_collection: separate from actual execution; static checks do not contribute passes
-e2e_execution: 14 repository scenarios passed at c1921cd6b; setup authentication 1 separately; prior driver evidence not counted again
-feature_action_matrix: partial; canonical denominator is SOT §16.8, unresolved scope listed above
-browser_evidence: exact-source registered runtime evidence and 16 individually reviewed synthetic PNGs; no full golden claim
-backend_evidence: exact-source JUnit and real PostgreSQL/HTTP assertions
-artifact_evidence: actual browser CSV, independent parser, fixed-capture binding, persisted checksum/size
-permission_negative: current-authority HTTP denial tested; full browser/owner/member matrix remains partial
-visual_feedback: filter/empty/download and uncertain network observed; identified corrections reverified; full state/permission visual matrix remains partial
-skip_fixme_threshold_retry_audit: scoped normal runs report zero skips/retries; mutation filters and no-tests attempts are separate
-did_not_run: complete S2–S8 coverage, remaining BPM UI/composition, complete reminder state/security/recovery UI, history and observability validation
-remaining_blockers: outstanding scope and state/visual rows above
-allowed_claim: targeted-tested; incomplete S2–S8 delivery, no merge or production release
-```
+BPM 最终恢复详情的“所有人通过”原图曾有三行换行，已把该 DSL 列从 100 调到 160，并增加真实文本单行断言；41c 正式构件上的新原图已复核，显示已通过、两个准确审批人、无继续替换按钮。节点选择截图是 picker 打开状态，部分理由区被正常浮层遮挡；不把它描述成全部确认字段同时可见。恢复及替换确认另有原图。
 
+CSV 实际下载文件、摘要、字节数、15 列、冻结 Asia/Shanghai 与公式防护分别由 browser、独立解析及集成断言证明。501 成员实测发布 335ms、投影 5526ms、统计 163ms、导出 282ms、CSV 127920 字节；只支持该规模结论，不外推 50000 人吞吐。
 
-最新轮次为`2026-10-25T01-03-32-015Z-5fa48cff-efb4-424a-946d-e63e1322aba8`，[14条执行与16张逐图裁决](./evidence/announcement-s2-s8-2026-10-25/reminders/manifest.json)只包含合成数据；实际CSV仍为15列1行503字节、冻结Asia/Shanghai且摘要一致。原丢响应、错误返回链接、权限夹具跨租户查询及限流文案的失败/修复分别留证，不用重跑覆盖原结果。当前证据不把单页分页控件算作真正多页，也不把“提醒已生成”算作已读或知悉。
+## 失败、证伪与修正
 
-## 默认审批与运营入口补充
+- 原生网络故障在真实服务端受理后丢响应，或真实图片/铃铛请求中断；恢复仍访问真实服务，不伪造业务成功。首次 CSV 独立解析误假设 UTC，按冻结元数据修正解析器，没有改业务事实。
+- 文件清理集成反例暴露 PostgreSQL nullable 参数问题；修复后真实集成通过。缺失、短/长、同长篡改文件均被拒绝，取消后的迟到对象仍被清理。
+- 覆盖解析器曾漏掉执行型 DSL POST；修正后有正向、GET/文案/惰性 metadata 负向测试。原静态数据没有升级成执行 PASS。
+- 第一次最终 BPM 构建被 Workspace CLI 的 Gradle cache 前缀匹配误停：Core suspend 匹配了 BPM cache。该次为 environment-invalid，不记测试通过。CLI 缺陷未在本任务改动，后续两个 runtime 生命周期/构建严格串行。
+- 早前分离启动会话发生 JVM 非正常消失，原因未证明；不认定 OOM。最终受管 TTY 全周期使用明确 2GB 测试堆上限、loopback no-proxy 与独立私有诊断路径，当前全周期通过不能反推历史故障原因。
+- `final-cycle` 早前虽 4 个业务通过但 `stop_exit=2`，保留失败。新增真实 SIGTERM 排空与 tsx 启动代次反例，修正为信号前完整归属校验、信号后只等待组排空；无额外信号。41c 正式重建后 `final-verified` 为 business 0 / stop 0，不以重试冒充原轮成功。
 
-1fc8cb42b：111项单元、33项真实集成实际执行通过，JUnit独立保留。新增断言验证非空单条流程覆盖被拒绝且无操作残留、历史政策可读但草稿必须明确清除、完整提供方缺默认流程仍不可审批、发布者不读取任意流程目录，以及HTTP选项接口。BPM组合测试已转为政策入口绑定默认值，并加入默认变更不改既有申请、首次派发停用后原申请核对恢复；尚未对最新组合构件执行，不能记为通过。
+## 明确未执行与保留资源
 
-下一候选增加原操作查询、原生导出核对、渠道分页页和26个固定stage指标。Core152的全量迁移生成、独立drift、原任务库151→152增量及157条组合validate均成功；插件校验0错误/8条块类型建议，12页UX静态审计0错误。功能、UI、指标实际样本及容量验证须由对应运行结果补齐，不以静态或迁移证明代替。
+小程序发送/真机、远程 BPM、50000 人容量、BPM 独立 340 corpus、OCI/Docker/Linux image、Jenkins 和生产发布 did_not_run；不计为本期业务通过。没有执行自动需求级全覆盖裁决，也不宣称全仓既有测试债务清零。未执行平台或规模不能从当前本地证据推断为通过。
 
-
-3bf2fdfd1的运营入口定向验证：117项hermetic单测、35项真实PostgreSQL/HTTP/outbox集成及17项前端单测通过，无失败/跳过；43d7d6d1类型检查通过，两版生产TS相同。第一次43d执行曾有116/117单测、34/35集成和16/17前端；分别因缺省mock返回空Map而非null、测试删除缺权限、以及新页使用不支持的secondary按钮值而失败，原日志和JUnit保留，不能改写为首轮通过。修正后全部相关用例实际执行，非Gradle缓存。
-
-3bf原生浏览器2条通过（54.2秒、无skip/retry，认证另1条），包括通知设置的缺BPM禁用模式、预约取消、统计筛选、导出丢响应后核对同一原操作、原键重放、实际CSV摘要/解析、准确版本渠道页和刷新不重发。公开启动9/9及Workspace监听/构件/源码/缓存/DB身份复核无finding/warning。发布方式控件与统计整页原图复核通过；渠道原图发现站内通知列换行，已登记并调整列宽；c5b1fe1dd的单行断言及新原图复核已通过。更早2e的16条浏览器旅程不借用为当前全量回归。
-
-## 2026-10-25 增量验证：8a8349e0c
-
-- 公开启动器与Workspace verify通过，三层listener身份一致；验证后正常suspend，保留DB与证据。
-- s7-header-richtext-regression-browser.log：17条公告旅程通过，无skip/retry，3.0分钟；认证1条另计。s7-header-richtext-native-browser.log：附件旅程通过。[5张原图与逐图发现](./evidence/announcement-s2-s8-2026-10-25/attachments/manifest.json)已复核。
-- 原生富文本创建与受控API注入恶意HTML夹具分别记录，不把后者称为原生编辑。19项定向前端测试通过，类型检查退出0；不替代原生铃铛故障证据。
-- s8-capacity-export-first-junit：26项单测通过，4项真实集成中2失败；分别是夹具违反不可覆盖文件契约、真实nullable SQL参数缺陷。10a8b2aaa修正后s8-capacity-export-corrected-junit中4项集成通过，无skip/retry。完整后端套件尚未重跑。
-- 501人测量原件：measurements/announcement-capacity-501-10a8b2aaa.json；发布335ms、投影5526ms、统计163ms、导出282ms、127920字节CSV，仅支持501人结论。
-- 尚未关闭：分页受众、BPM最新正式组合/严格审批原生流程/停用保护、完整覆盖和可信度对账。继续使用同一设计与PR，不合并。
-
-## 分页与提醒入口增量：854ecf0ec / dc24c5a14 / 49f74a882
-
-- s2-audience-paging-corrected-junit：133项hermetic、39项真实集成，全部无失败/跳过；JUnit已独立保存，不能被后续catalog clean覆盖。首次测试编译失败记录保留。161项前端测试、DSL12页0错误及插件0错误8项既有布局建议分别记账。
-- s6-application-lifecycle-junit：134项定向测试通过，包含真实JAR保护和宿主正常停止；真实BPM组合HTTP验证待补。
-- s7-native-header-paging-browser.log：49f74a882上3条定向旅程通过，无skip/retry，1.1分钟；认证另计。23项定向前端测试和类型检查通过。首次新增Inbox夹具因不稳定翻译函数重复加载失败，类型检查另发现测试身份数组类型缺失；修正后重验，不报告首次即通过。
-- 新增3张提醒入口窄屏原图逐张审阅并加入[同一公开清单](./evidence/announcement-s2-s8-2026-10-25/attachments/manifest.json)。真实断网由route.abort制造，恢复仍访问真实API与DB，无业务响应替身。
-- 27成员原生翻页、BPM当前正式组合/严格审批/真实热停用保护，以及最终覆盖审计仍未关闭；以上不是完整S2–S8验收结论。
-
-## 原生分页闭合：1e9298341
-
-s2-native-pager-regression-browser.log中17条公告浏览器旅程全部通过，无skip/retry，3.0分钟；认证1条另计。27人匹配25+2分页，实际按钮触发第二页请求，跨页两人选择保留；清空后保存一人，重开仍正确。26个临时成员经正式成员状态接口停用，逐一核对成功数，无SQL结果写入。s2-native-pager-typecheck.log退出0。分页原图已逐张打开，选中状态、2/2页码和禁用下一页均清晰，见同一公开附件/提醒清单。当前尚待BPM正式组合、严格审批原生流程及最终全范围对账；并未宣称任务完整完成。
+PR：OSS [#2396](https://github.com/AuraBootTeam/auraboot/pull/2396)、BPM [#60](https://github.com/AuraBootTeam/aura-bpm/pull/60)、规则说明 [#1589](https://github.com/AuraBootTeam/auraboot-enterprise/pull/1589)。均保留到审阅；本次不合并，不删 worktree/分支，不销毁 runtime。两个本地栈已暂停；恢复前以最终提交和确切构件执行正式身份核验。文档与源码等价审计不会冒充新一轮业务执行。

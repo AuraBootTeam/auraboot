@@ -3,7 +3,7 @@ type: system-reference
 status: active
 created: 2026-10-24
 updated: 2026-10-25
-implementation_status: s2-s8-in-progress
+implementation_status: implemented-local-validated-pr-open
 ---
 
 # 公告管理需求与 BPM 集成设计
@@ -18,7 +18,7 @@ implementation_status: s2-s8-in-progress
 
 ## 1. 定位与文档状态
 
-本文是 OSS 公告管理的需求、UX、权限及集成目标契约的唯一入口。需求讨论已确认采用本文默认规则；**S1 已定向验证，S2–S7 的部分业务链路已实现并获得真实验证，全部变更尚未合并/上线**。S1 边界见 §17 及 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)，后续切片的实际证据与剩余工作统一见 §18。阶段计划是实施顺序，不是完成记录；不建立第二份公告需求真源。§14 保留 P0 当时的源码盘点，§15–§16 是完整目标及细化契约，不能把其中尚未验证的目标当作已交付能力。
+本文是 OSS 公告管理的需求、UX、权限及集成契约的唯一入口。需求讨论采用的默认规则已落入 S1–S8 实现；**本期实现与本地分层验证已完成，三个关联 PR 保持开放，未合并、未发布生产**。当前裁决以 §18.26、[验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)及其同一证据 manifest 为准。S1 历史证据见 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)。阶段是依赖顺序，不是等待用户逐阶段确认的闸门。§14 是实施前盘点，§17 和 §18.1–18.25 是历史切片；其“待完成”描述由当前裁决取代。测试数量不等于功能覆盖率，未执行边界不会因实现完成而消失。
 
 目标是为当前租户提供“编写 → 免审或审批 → 立即或定时发布 → 多渠道提醒 → 阅读与确认知悉 → 催办与统计导出”闭环。
 
@@ -97,7 +97,7 @@ CRM、EDU 等应用复用同一公开工作流边界；领域状态与页面继�
 
 组合版在同一 runtime 内以模块化单体装配，使用该组合拥有的数据库，显式应用 Core/BPM/公告所需迁移集合；不连接另一套独立 BPM 实例的数据库。独立 BPM 产品仍可单独部署和发布。
 
-默认基于现有应用清单与锁文件机制提供公告审批组合配置，不为公告新建独立产品仓。P0 已在 §14.5 明确现有坐标、组合清单的建议落点及构建缺口；建议路径仍为待新增设计，不是现有可执行安装入口。
+组合入口已落在 Aura BPM 的 `app.announcements.yaml` 与 `scripts/build-application.mjs --composition announcements`，不新建公告产品仓。默认 `app.yaml` 仍是独立 BPM。构建仅消费显式冻结 Core catalog，不读取兄弟 OSS worktree；公开安装命令和验证边界见 §18.26。
 
 ### 3.3 组合安装流程与能力缺失
 
@@ -123,7 +123,8 @@ CRM、EDU 等应用复用同一公开工作流边界；领域状态与页面继�
 | 审批人 | 查看送审快照、同意、驳回 | 当前节点有效任务 |
 | 统计/催办权限 | 接收明细、汇总、催办 | 被授权管理的公告 |
 | 导出权限 | 导出统计与明细 | 同时具备对应数据查看权 |
-| 流程管理员 | 维护流程、免审策略、重新分配异常任务 | 当前租户 |
+| 流程管理员 | 维护流程、恢复原任务、重新分配异常审批人 | 当前租户；恢复需要 bpm.monitor.update |
+| 公告政策管理员 | 默认流程绑定、免审策略、催办时间及额度配置 | 当前租户；policy_manage，绑定还需流程使用资格 |
 | 删除权限 | 删除 | 从未发布且无审批历史的草稿 |
 
 公告管理员不自动获得免审权限；审批不授予正文编辑或发布权限；接收者不可查看他人阅读记录。管理员管理预览不计为接收者阅读或确认。
@@ -314,7 +315,7 @@ CRM、EDU 等应用复用同一公开工作流边界；领域状态与页面继�
 
 ## 11. 分阶段实施与出口
 
-本轮完成需求文档与 P0 源码盘点（见 §14）；P0 未执行运行时安装或功能验证，P1–P4 均未实施。阶段用于组织依赖，不缩减本期范围；审批、导出和异常链路未验收前不能宣称整项完成。
+下表保留 P0→P4 的依赖顺序；对应 S1–S8 已实施并完成本地分层验证，实际出口和未执行边界统一见 §18.26 及验收报告。P0 当时仅盘点源码，不能把其静态事实追认为运行证据。
 
 | 阶段 | OSS 工作 | Aura BPM/组合工作 | 出口 |
 | --- | --- | --- | --- |
@@ -326,9 +327,9 @@ CRM、EDU 等应用复用同一公开工作流边界；领域状态与页面继�
 
 后续代码开发在稳定任务工作区执行，只为实际改动仓创建 checkout；未改依赖优先消费锁定构件。组合验收记录各构件与源码身份，不从兄弟 main 隐式构建。是否提交/合并/生产发布另按对应授权与仓库流程执行。
 
-## 12. 验收计划（plan-only）
+## 12. 验收要求与证据规则
 
-本节是未来验收要求，没有运行功能测试。复用既有公告、通知和待办用例，实施后从 DSL、命令、页面、API、状态和副作用生成行动点分母并映射证据，不以本表代替可执行测试覆盖。
+本节规定验收要求；当前执行结果在 §18.26 和同一验收报告。覆盖从 DSL、命令、页面、API、状态和副作用抽取并关联具体断言，不以本表或用例数替代业务覆盖。
 
 | 需求域 | 最低证据 |
 | --- | --- |
@@ -660,7 +661,7 @@ mark_read/ack 数据身份和守卫在 S1 固定，页面操作在 S7 完成；s
 
 ### 15.7 BPM 公共契约：`approval.*.v1`
 
-沿用单一 `WorkflowCapability` provider；不复用旧 start 的宽松语义。中立操作族为 `approval.readiness.v1`、`approval.start.v1`、`approval.status.v1`、`approval.withdraw.v1`、`approval.viewer.v1`，旧 token 留给既有消费者。它们已进入当前候选源码和定向集成，尚未作为正式组合构件验收。DTO/schema 归 platform-plugin-api，BPM 是实现者，任何类型不得含公告实体类或 SmartEngine 类型。
+沿用单一 `WorkflowCapability` provider；不复用旧 start 的宽松语义。中立操作族为 `approval.readiness.v1`、`approval.start.v1`、`approval.status.v1`、`approval.withdraw.v1`、`approval.viewer.v1`，旧 token 留给既有消费者。五操作族已通过正式组合构件和真实审批旅程验证，证据见 §18.26。DTO/schema 归 platform-plugin-api，BPM 是实现者，任何类型不得含公告实体类或 SmartEngine 类型。
 
 #### 15.7.1 发起及查询
 
@@ -692,7 +693,7 @@ terminal state 只能是 APPROVED/REJECTED/WITHDRAWN/FAILED，RUNNING/BLOCKED �
 
 #### 15.7.3 可靠结果与撤销竞态
 
-拟事件类型 `workflow.approval.terminal.v1`，使用既有 IntegrationEventEnvelope schema `1.0`；payload schema 独立版本化。字段包括 submissionId、businessRef、snapshotHash、instancePid、definitionRef/version/hash、terminalState、resultId、stateRevision、decidedAt、decisionReasonCode。tenant 及 source 来自 provider；orderingKey 绑定 tenant+submission，eventId=resultId，sequence=stateRevision，correlationId=submissionId。
+事件类型 `workflow.approval.terminal.v1`，使用既有 IntegrationEventEnvelope schema `1.0`；payload schema 独立版本化。字段包括 submissionId、businessRef、snapshotHash、instancePid、definitionRef/version/hash、terminalState、resultId、stateRevision、decidedAt、decisionReasonCode。tenant 及 source 来自 provider；orderingKey 绑定 tenant+submission，eventId=resultId，sequence=stateRevision，correlationId=submissionId。
 
 BPM 在同一业务事务内保存不可变 terminalResult 并 enqueueIdempotent；因插件事务管理器或数据源不同无法证明同一事务时，安装能力必须报不支持，不能改为内存通知。公告消费者以原可靠框架 receipt 与业务唯一键双重防重，同事务校验绑定并修改申请/发布任务；不得另启事务吞异常。原事件重放必须保留 eventId、occurredAt、sequence 与 payload，不重新生成 UUID。
 
@@ -808,7 +809,7 @@ Web站内提醒是本期公告基础渠道；接收者不能用个人偏好关�
 
 ### 16.6 安装、升级与资源生命周期补完
 
-两种组合沿用 §14.5。公开示例提供清单和说明，生产构建使用显式manifest/catalog/lock，所有artifact字节可离线校验。BPM既有build脚本能产出产品构件，但组合聚合入口需开发，不能将示例YAML描述成开箱可用安装命令。
+两种组合沿用 §3；§14.5 保留 P0 盘点。组合聚合入口现已实现：Core catalog → BPM `--composition announcements` → 校验后的 application lock、22 个 staged artifacts、client/SSR 与公开部署脚本。所有 artifact 字节可离线校验；本地 `--skip-oci` 构建不能当成 OCI 镜像验证。实际入口见 §18.26。
 
 安装顺序确定为：冻结平台候选 → BPM对候选API构建 → 验证聚合catalog及依赖图 → Core/BPM迁移 → 准确进程装配 → 显式导入基础/公告/BPM配置 → 授权发布默认流程并绑定租户 → 开启并核验公告host分发策略 → 两种组合各自真实旅程。流程配置缺失允许草稿，强制审批租户不允许发布。只为安装新租户显式执行该流程，不在每次登录/启动时重导。
 
@@ -822,20 +823,20 @@ BPM禁用/卸载必须显式preflight：存在运行中申请/待处理任务/�
 
 ### 16.7 后续阶段接口补齐与授权归属
 
-以下全部为拟实现入口，补全S7/S8及运维操作，复用§15的ApiResponse、当前租户/actor、operationId、revision及错误语义。管理读接口与接收读接口分开，不通过传入任意userPid切换身份。
+以下是已实现入口的语义目录，复用§15的ApiResponse、当前租户/actor、operationId、revision及错误语义。准确路径以本表及 §18.26 的 Controller 为准；管理读接口与接收读接口分开，不通过传入任意userPid切换身份。
 
-| 操作 | 拟入口 | 权限与关键语义 |
+| 操作 | 当前入口 | 权限与关键语义 |
 | --- | --- | --- |
 | 公告能力/有效限额 | GET `/api/announcements/capabilities` | 返回本人可用发布模式、渠道就绪、实际上传限制及稳定原因；不返回密钥或无权流程名单 |
 | 审批就绪 | GET `/api/announcements/approval-readiness` | submit+publish，解析租户唯一默认绑定及准确定义；缺BPM返回可解释未就绪，不自动fallback |
 | 撤销审批申请 | 命令 `announcement:withdraw_approval` | 申请人或授权管理者，submissionId/revision/reason；先关本地发布许可，再按§15.7撤销，不只改Inbox |
 | 核对审批结果 | 命令 `announcement:reconcile_approval` | 授权管理者，准确submission；只从可信provider恢复事实，不能手填结果 |
 | 置顶调整 | 命令 `announcement:set_pinned` | edit+记录管理权，主体revision；单独审计，不改正文快照或发新通知 |
-| 统计汇总 | GET `/api/announcements/{pid}/versions/{versionPid}/statistics` | stats+记录权，返回N/R/A、运营分母、asOf与有效筛选 |
-| 接收明细 | 同版本 `/recipients` GET | stats+记录权，分页/筛选，字段按导出同等最小化 |
-| 催办预览 | 同版本 `/reminders/preview` POST | remind+记录/当前范围，read-only业务语义；返回previewToken/evaluatedAt/人数/排除原因 |
+| 统计快照/汇总 | POST `/api/announcements/records/{recordPid}/statistics/snapshots` 或 `/api/announcements/versions/{versionPid}/statistics/snapshots`；GET `/api/announcements/statistics/snapshots/{snapshotPid}` | stats+记录权，固定N/R/A、asOf、版本及筛选 |
+| 接收明细 | GET `/api/announcements/statistics/snapshots/{snapshotPid}/recipients` | stats+记录权，分页；字段按导出同等最小化 |
+| 催办预览 | POST `/api/announcements/records/{recordPid}/versions/{versionPid}/reminders/preview` | remind+记录/当前范围，只创建有界预览引用，不创建催办批次 |
 | 手动催办 | 命令 `announcement:remind` | remind，version/revision/previewToken/目标过滤；重算、逐人去重和实际结果 |
-| 催办/渠道记录 | 同版本 `/reminder-batches`、`/deliveries` GET | 对应stats或remind权限，准确批次；不返回外部身份凭据 |
+| 催办/渠道记录 | GET `/api/announcements/versions/{versionPid}/reminders/batches`、`/api/announcements/versions/{versionPid}/deliveries` | 对应stats或remind权限，准确版本/批次；不返回外部身份凭据 |
 | 统计导出 | 命令 `announcement:export_statistics`，既有任务查询/下载适配器 | export+stats+数据范围，固定快照，下载重新授权，24小时过期 |
 | 政策查看/修改 | GET `/api/announcements/policy`；命令 `announcement:update_policy` | policy_manage，expectedPolicyRevision；绑定新流程还需其读取/使用资格及provider验证 |
 
@@ -867,6 +868,8 @@ BPM禁用/卸载必须显式preflight：存在运行中申请/待处理任务/�
 
 ### 16.9 本轮设计自查结论与实施输入
 
+> 本节保留设计冻结时点的自查，表中“尚未编码/测试”是历史状态；当前实现和验证见 §18.26。
+
 | 自查项 | 处理结果 | 证据边界 |
 | --- | --- | --- |
 | 需求范围 | §2与D01–D15覆盖查看、发布、受众、审批、免审、定时、知悉、催办、导出与扩展 | 设计对账，非运行覆盖率 |
@@ -885,6 +888,8 @@ BPM禁用/卸载必须显式preflight：存在运行中申请/待处理任务/�
 
 
 ## 17. S1 实施契约与验证边界
+
+> 本节是 S1 时点契约。S2–S8 已接通发布、审批和运营能力，不沿用 S1 的“尚未启用”作为当前产品状态；当前入口见 §18.26。
 
 本节记录已进入实现的 S1 基础切片；§1–16 仍是完整产品目标，不代表这些功能已经全部交付。S1 仅覆盖内容草稿、受控写入、历史版本迁移及其撤回/修订、接收事实读取基础。人员/部门/角色受众编辑、免审/审批提交、定时任务、新公告发布分发、铃铛/待办接入、阅读/知悉写入、催办和统计导出按 S2–S8 实施，不能因预留字段而计为完成。
 
@@ -940,6 +945,8 @@ S1 的验收分母包括迁移新建/升级、不可变和跨租户引用、草�
 进入 S2 前须补齐受众与政策编辑/解析、授权范围证明、附件身份与强类型快照 schema。进入 S3 前须接入发布事务、任务租约、封存名单、可靠 outbox 及撤回清理；S1 的发布拒绝必须保留到这些链路真实验收。BPM 进入 S4–S6，严格遵循 §15.7 公共版本/申请/终态契约，不让 OSS 引入引擎实现依赖。
 
 ## 18. S2–S8 实施追踪与页面蓝图
+
+> §18.1–18.25 是各准确源码时点的历史记录，保留失败与修正，不作为当前待办。当前状态统一见 §18.26 和验收报告。
 
 用户已授权本节全部剩余切片的业务代码与验证，交付至已验证 PR，暂不合并。仍不开发小程序发送端，仅保留渠道接入契约；不执行生产发布。沿用 task `announcement-management`，OSS 与 aura-bpm 分仓实现；同一设计是唯一需求真源，下面的状态仅依据实际证据更新。
 
@@ -1209,3 +1216,71 @@ Core152仅新增渠道历史与待处理年龄索引，不改写公告事实。�
 854ecf0ec上133项hermetic、39项真实数据库/HTTP集成通过，无skip/retry，包含501成员目录分页完整遍历、最多50项限制和授权回显。528d9799d上的161项定向前端测试通过；其首次后端测试因新增测试括号错误未执行，修正后才形成上述后端证据。49f74a882上3条定向浏览器旅程通过（1.1分钟，无skip/retry）、23项前端测试与类型检查通过，包含正文/附件、受众搜索及重开回显、定时、全员投递、普通成员铃铛故障恢复、实际全部已读及知悉待办独立。新增3张窄屏原图已逐张复核，见[提醒入口证据](./evidence/announcement-s2-s8-2026-10-25/attachments/manifest.json)。待办按请求代次过滤迟到结果，全部已读后重新读取当前事实；Escape只在面板打开时归还焦点。1e9298341上新增27成员原生分页反例及全部17条公告浏览器回归通过（3.0分钟，无skip/retry，认证另计）：实际翻页、跨页勾选、清空、保存与重开回显均有断言；26个临时成员经正式batch-status接口停用，未用SQL制造结果。分页原图已逐张复核。
 
 OSS不包含BPM业务代码。宿主识别通用ApplicationModuleExtension，以及导入manifest的metadata.lifecycleScope=composition：此类共享应用不能通过租户插件入口停用、卸载、热停止或热替换；拒绝发生在前端资源、注册表、数据库状态等第一次变更之前，不能把拒绝写成FAILED。BPM声明composition生命周期；普通主机/整栈停止保留。模块维护与升级使用组合部署流程，移除仍需业务停用、在途处置及历史可读/迁移证明，租户插件面板不提供强制绕过。dc24c5a14上的134项定向测试通过，包含实际JAR拒绝热卸载且正常cleanup仍能停止。最新正式BPM组合和真实HTTP停用保护尚待验证。
+
+### 18.26 当前交付、组合安装与证据边界
+
+本节取代历史切片中的未完成描述；验收事实统一来自[当前报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)与[同一证据索引](./evidence/announcement-s2-s8-2026-10-25/manifest.json)。没有待用户决策的本期产品取舍。三个 PR 开放待审，不合并、不执行生产发布。
+
+#### 实施结果与所有权
+
+| 切片 | 当前实现 | 验证入口 |
+| --- | --- | --- |
+| S1–S2 | 受控命令、不可变版本/成员身份、人员/部门子树/角色/全员权限、分页选择、富文本与保留附件 | 公告生命周期及附件 browser；133 项单元与 39 项真实集成的准确源码证据 |
+| S3 | 冻结受众、立即/定时、租约 fencing、取消/撤回/修订、原发布任务显式恢复、可靠 outbox | 生命周期/催办 browser；发布竞态及 501 成员真实集成 |
+| S4 | 引擎中立五操作族、可信绑定、冻结业务预览、可靠终态及原申请核对 | platform-plugin-api；BPM 组合 9 项真实集成 |
+| S5 | 人员/角色 ANY/ALL、自审排除、无人阻断、驳回必填、撤销、原节点恢复、原任务恢复和剩余审批人替换 | 严格引擎 10 项集成；3 条严格公告 browser |
+| S6 | 纯 Core catalog、显式公告组合、校验锁/摘要、导入顺序、共享应用生命周期保护和正常整栈停机 | 正式组合构建；真实 HTTP 保护；正常停机退出 0 |
+| S7 | 我的公告、准确版本正文、首次已读/知悉、铃铛与待办独立、工作区可达、身份切换代次与窄屏/键盘反馈 | OSS 全部 17 条公告 browser；共享组件单元与原图 |
+| S8 | 手动/自动催办、每天一次/最多三次/截止停止、去重与撤权、原计划恢复、版本渠道历史、固定统计快照、异步 CSV 与下载重新授权 | 催办/统计 browser；真实时序/并发/文件/授权集成；原计划强化复验 1 条 |
+
+OSS 只拥有公告领域、通用通知/待办和公开 API/SPI，不包含 BPM 引擎、BPM 表查询、产品前端或产品迁移。BPM 只通过公开提交来源和查看资格读取冻结视图，决定审批事实；公告独立决定是否仍可发布。CRM、EDU 可以实现自己的提交来源及只读投影，消费同一五操作族，不能复制公告 mapper 或把 BPM 产品源码放入 OSS。
+
+严格审批恢复使用 BPM 的既有 DSL 页面和成员选择器：`resolve_node` 只处理未封存节点；`resume` 重排原阻断任务；`replace_assignee` 只替换未提交意见者。操作均要求当前有效管理员、`bpm.monitor.update`、operationId、state revision 和理由。已接受的 ALL 意见、原定义、原快照与原申请保持不变；恢复不会补写批准。任务查看与已办历史只读，决定入口单独打开审批表单。
+
+#### 可执行组合安装
+
+先在冻结的 OSS checkout 产出 Core catalog：
+
+```bash
+node scripts/application/stage-core-only-artifacts.mjs \
+  --repo-root . --output /absolute/path/to/new-core-catalog --skip-oci
+```
+
+再在冻结的 Aura BPM checkout 消费该构件目录：
+
+```bash
+node scripts/build-application.mjs \
+  --platform-artifacts /absolute/path/to/new-core-catalog \
+  --output /absolute/path/to/new-announcements-release \
+  --composition announcements --skip-oci --offline
+```
+
+构建前按 BPM README 提供显式 TEST 数据库参数；数据库须为本任务的开发/验证数据库。不得把示例目录直接照抄为共享目录，不从兄弟源码隐式重建 Core。输出包含 manifest、catalog、lock、SBOM、client/SSR 和 `bin/aura-bpm-env.sh`。本轮 Core 为 152 条迁移，组合增加 5 条 BPM 迁移，共 157 条；迁移按版本正常前进，不开启 out-of-order，也不手工修 schema。
+
+复用产品公开 `preflight` → 部署迁移 → `start` → 新租户显式 `init-core` → `publish` → `verify` 生命周期；准确参数与凭证注入见 BPM README/公开脚本。`init-core` 只用于明确初始化，不在每次启动或登录时执行。租户流程管理员发布受支持的人员/角色审批流程，公告政策管理员在“公告政策”绑定唯一默认流程，随后核验 readiness。普通发布者不维护流程目录；单条公告不能覆盖租户默认定义。缺提供方、缺绑定或能力不全时草稿保留、审批不可用；不自动免审。
+
+升级使用停止前预检、停止受管整栈、验证新锁与兼容性、向前迁移、显式发布配置、启动核验的顺序，保留原定义/申请/结果/附件/导出事实。共享应用不允许从租户插件面板热停用、卸载、回滚或替换；拒绝在第一次变更前发生。应用整体停机可用。移除组合仍需在途处置及历史可读/迁移证明，不能删除 BPM 后留下失联历史。
+
+#### 当前公共入口与操作核对
+
+命令目录为 `plugins/core-announcement/config/commands.json` 的 16 个命令，页面目录为同插件的 12 个页面。领域写入全部经过统一命令校验，接收者阅读/知悉使用独立受控 HTTP 入口；所有接口复核当前租户、成员身份和领域权限。
+
+| 接口族 | 当前入口/实现 |
+| --- | --- |
+| 能力、政策、受众、原操作、发布、渠道 | [AnnouncementController](../../platform/src/main/java/com/auraboot/framework/workbench/controller/AnnouncementController.java)；§16.7，另含 `/audience-option-page`、`/operations/{operationId}`、`/records/{pid}/publication` |
+| 接收、阅读、知悉、附件 | [AnnouncementReaderController](../../platform/src/main/java/com/auraboot/framework/workbench/controller/AnnouncementReaderController.java)；`/received`、`/versions/{version}/recipient`、`/read`、`/acknowledge`；附件区分接收版本与送审申请 |
+| 固定统计及分页 | [AnnouncementStatisticsController](../../platform/src/main/java/com/auraboot/framework/workbench/controller/AnnouncementStatisticsController.java)；先捕获 snapshot，再读取汇总、部门选项和 recipients，不用实时读数拼接历史 CSV |
+| 催办预览、批次和计划 | [AnnouncementReminderController](../../platform/src/main/java/com/auraboot/framework/workbench/controller/AnnouncementReminderController.java)；预览不扣额度，正式命令重算；`resume_reminders` 保留原主体/版本/额度，不补发错过的日期 |
+| 公共审批 | [ApprovalContract](../../platform/platform-plugin-api/src/main/java/com/auraboot/framework/plugin/extension/approval/ApprovalContract.java)；readiness/start/status/withdraw/viewer 五操作及 `workflow.approval.terminal.v1`，DTO 不含引擎类型 |
+
+超时先按 command+原 operationId 查询，不生成新键掩盖不确定结果。发布恢复、自动计划恢复及审批恢复是不同领域动作；均先重查原身份与当前资格，取消确认不写事实。导出与催办的成功不等于已读或知悉，发送日志不等于小程序实际送达。
+
+#### 验证裁决及未执行边界
+
+Core 实际 17 条公告 browser 通过；强化后的原计划恢复另跑 1 条，不与 17 相加。BPM 可选 profile 固定 4 条（3 条严格公告与 1 条既有项目审批），实际 4/4、单次执行、无 skip/retry，collection/result 对账通过；认证各自另计。本轮 BPM 正式构建为 `41c1ffc44022e1ef3a3634e69e850c90ff66c3e4`，消费 Core `6763dee6f2ef82c8d0a80eca4066309c378f0e1a` catalog，22 个构件 lock 为 `sha256:7b6f443f8f05137d53ad4686556b54df2bc0a6972319823946db93c4df1c773b`。完整命令、JUnit、源等价、原图及失败轮次见报告。
+
+以下不由本轮绿色外推：小程序真实发送/真机，跨服务远程 BPM，50000 人容量，BPM 独立产品 340 条 corpus，OCI/Linux 镜像、Jenkins 和生产发布。真实容量只测到 501 成员。全仓静态覆盖登记 executed=0，不能改成执行通过；公告组合的人工语义绑定也不宣称已自动执行需求级全覆盖裁决。
+
+BPM Workspace 核验仍有 `RUNTIME_MANIFEST_MISSING` 警告；本轮通过独立产品 verify、源码/构件摘要、listener/PID/cwd、BFF 实际请求及数据库身份共同证明该独立产品栈，不能写成“零 warning”。Workspace CLI 的 Gradle cache 路径前缀匹配缺陷尚未修改，两个 runtime 的生命周期和构建必须串行；此前因此中断的构建不算通过。两个任务环境已正常暂停，DB、构件和证据保留；本地地址为 OSS Web 5101/Backend 6401、BPM Web 5401/Backend 6501，暂停期间不提供在线页面。
+
+小程序快速接入的具体边界是平台公开 `NotificationDeliveryAccessor.Request(tenantId, resolutionReference, channel)` 与 host `NotificationDeliveryPlanResolver`：公告已经提供 `ann1` 准确版本/接收人解析，渠道只接受宿主解析的名单、内容与来源，不能信任客户端自报。当前 `WECHAT_SUBSCRIPTION` 明确返回未配置，capabilities 中 `wechat_mini` 不可选。后续接入仍需实现账号/订阅授权、模板与实际发送 provider，并接通渠道就绪和可选项；复用现有可靠队列、幂等键、结果审计、版本深链接及跨端 read/acknowledge，不重做公告状态机。本期没有交付微信 SDK、配置即用的真实 sender 或真机验证。

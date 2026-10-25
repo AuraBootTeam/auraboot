@@ -18,7 +18,7 @@ This directory holds engineering-facing material that ships with the repository.
 
 | Topic | Reference | Status |
 | --- | --- | --- |
-| Announcement management | [Requirements, UX, permissions, BPM composition and implementation status](./system-reference/announcement-management.md) | S1 verified; S2–S8 partial real-stack evidence and remaining work tracked in §18 and the [current acceptance record](./system-reference/2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md). Latest BPM composition and durable reminders remain unfinished; [historical S1 evidence](./system-reference/2026-10-24-announcement-s1-testing-gate-acceptance-report.md) |
+| Announcement management | [Requirements, UX, permissions, BPM composition and implementation status](./system-reference/announcement-management.md) | S1–S8 implemented and locally validated; current contracts, installation and explicit validation limits in §18.26 and the [acceptance record](./system-reference/2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md). PRs remain open; no merge or production release. [Historical S1 evidence](./system-reference/2026-10-24-announcement-s1-testing-gate-acceptance-report.md) |
 
 ## Conventions
 

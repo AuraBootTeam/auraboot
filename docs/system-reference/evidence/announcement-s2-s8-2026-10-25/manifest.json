@@ -1,9 +1,150 @@
 {
-  "schema": 1,
-  "testedSource": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
-  "claim": "targeted-tested; incomplete S2-S8 scope",
-  "evidenceRound": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990",
+  "schema": 2,
+  "testedSource": {
+    "coreBrowser": "c545bc7a037d68579e861b016d032a458efe5b8c",
+    "coreRecoveryBrowser": "6a6b2f967239b17cee666fd62466fe9285ffbf12",
+    "coreCatalogProducer": "6763dee6f2ef82c8d0a80eca4066309c378f0e1a",
+    "bpmArtifactProducer": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+    "bpmBrowser": "68a4f347b91b9152fe42811a3daaf40adbcea17e"
+  },
+  "claim": "implemented-and-local-validated-with-explicit-boundaries; no merge or production release",
+  "evidenceRound": {
+    "core": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+    "bpm": "final-visual"
+  },
   "browser": {
+    "core": {
+      "executed": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "reporter": "line; named executions and final count",
+      "evidence": "announcement-management/final-oss-regression-browser.log",
+      "setupAuthentications": 1
+    },
+    "coreRecoveryStrengthening": {
+      "executed": 1,
+      "passed": 1,
+      "overlapsCore17": true,
+      "evidence": "announcement-management/s8-reminder-golden-browser.log"
+    },
+    "bpm": {
+      "registered": 4,
+      "collected": 4,
+      "executed": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "setupAuthentications": 1,
+      "collectionExecuted": 0,
+      "reconciliation": "announcement-management-bpm/final-visual-reconciliation.json",
+      "standalone340Rerun": false,
+      "seconds": 103.524924
+    }
+  },
+  "requirementGroups": [
+    "D01",
+    "D02",
+    "D03",
+    "D04",
+    "D05",
+    "D06",
+    "D07",
+    "D08",
+    "D09",
+    "D10",
+    "D11",
+    "D12",
+    "D13",
+    "D14",
+    "D15"
+  ],
+  "visualReviews": [
+    {
+      "scenario": "statistics-overview",
+      "file": "visual/statistics-overview.png",
+      "sha256": "9627c7029b10ebc33e53ebc6d3df54f16224c27a239f95a6554ae3a2a5e75765",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    },
+    {
+      "scenario": "statistics-recipients-left",
+      "file": "visual/statistics-recipients-left.png",
+      "sha256": "e4a665bf5f650b46991726dd7ca56b0d793ed356a03a18863b6ea3fc7b8c8ecb",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    },
+    {
+      "scenario": "statistics-recipients-right",
+      "file": "visual/statistics-recipients-right.png",
+      "sha256": "0dff04557d96b2f593079e261f3f867d9a8fd9b9c5099b28a9a0579a4fc0051b",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    },
+    {
+      "scenario": "statistics-filter-open",
+      "file": "visual/statistics-filter-open.png",
+      "sha256": "3343a50f8fede7c86cc7b72c879bd8abb95f24141f07a187ea5334cb8ed0847c",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    },
+    {
+      "scenario": "statistics-filtered-empty",
+      "file": "visual/statistics-filtered-empty.png",
+      "sha256": "e9ca6b068a2d80a31ba87b885c8515a7efc3682f662ac17caf4de6027b104533",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    },
+    {
+      "scenario": "export-uncertain-network",
+      "file": "visual/export-uncertain-network.png",
+      "sha256": "dc97cfd3e4cf6c4c5dcf67d2aeb812db4a9d891adb985897e402f38f7456cb84",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    },
+    {
+      "scenario": "export-completed",
+      "file": "visual/export-completed.png",
+      "sha256": "d87a9092f09e19203f3c6e8f46648c0d949969013c815c7f8ff769c6fa3db576",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    },
+    {
+      "scenario": "export-downloaded",
+      "file": "visual/export-downloaded.png",
+      "sha256": "4feaa44bd674ce81519830b25c485e0e68140c979b14e99998165128ab5739ec",
+      "review": "reviewed_pass",
+      "scope": "This captured state only; not the complete permission/state matrix",
+      "sourceCommit": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+      "run": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990"
+    }
+  ],
+  "excludedFromPublicEvidence": [
+    "authentication states",
+    "raw CSV",
+    "private artifact descriptors and object keys",
+    "database credentials"
+  ],
+  "remainingScope": "No undecided product defaults. Actual mini-program sender, remote BPM, 50000-member capacity, standalone BPM 340-case corpus, OCI/Linux/Jenkins and production did_not_run. No 100% permutation or automatic requirement coverage claim. Shared Workspace Gradle prefix-match defect remains; lifecycle operations serialized.",
+  "historicalBrowser": {
+    "source": "cd5ce8296a6d614f031e6cb9ec04f72887463b19",
+    "round": "2026-10-25T00-11-06-682Z-d9225533-cb0a-452a-ad5a-d56af0fac990",
     "executed": 13,
     "passed": 13,
     "failed": 0,
@@ -24,74 +165,1753 @@
     ],
     "setupAuthentications": 1
   },
-  "requirementGroups": [
-    "D11",
-    "D14"
-  ],
-  "visualReviews": [
+  "sourceDerivedActions": [
     {
-      "scenario": "statistics-overview",
-      "file": "visual/statistics-overview.png",
-      "sha256": "9627c7029b10ebc33e53ebc6d3df54f16224c27a239f95a6554ae3a2a5e75765",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:archive",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "withdraw legacy content",
+      "assertion": "Native withdrawal changes root state while the sealed original version remains unchanged.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/legacy-revision.png"
+      ]
     },
     {
-      "scenario": "statistics-recipients-left",
-      "file": "visual/statistics-recipients-left.png",
-      "sha256": "e4a665bf5f650b46991726dd7ca56b0d793ed356a03a18863b6ea3fc7b8c8ecb",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:cancel_schedule",
+      "requirementId": "D04",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "scheduled audience settings",
+      "assertion": "Native cancellation ends the schedule and creates no recipients.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/scheduled-publication.png",
+        "lifecycle/canceled-publication.png"
+      ]
     },
     {
-      "scenario": "statistics-recipients-right",
-      "file": "visual/statistics-recipients-right.png",
-      "sha256": "0dff04557d96b2f593079e261f3f867d9a8fd9b9c5099b28a9a0579a4fc0051b",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:create_announcement",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "create announcement in draft status",
+      "assertion": "Native form creates a draft through the controlled command.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/create-form-guidance.png"
+      ]
     },
     {
-      "scenario": "statistics-filter-open",
-      "file": "visual/statistics-filter-open.png",
-      "sha256": "3343a50f8fede7c86cc7b72c879bd8abb95f24141f07a187ea5334cb8ed0847c",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:delete_announcement",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "delete draft through its protected command",
+      "assertion": "Confirmed native deletion removes only an eligible draft.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/confirm-announcement-delete_announcement.png",
+        "lifecycle/deleted-draft.png"
+      ]
     },
     {
-      "scenario": "statistics-filtered-empty",
-      "file": "visual/statistics-filtered-empty.png",
-      "sha256": "e9ca6b068a2d80a31ba87b885c8515a7efc3682f662ac17caf4de6027b104533",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:export_statistics",
+      "requirementId": "D11",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+      ],
+      "testIdentityContains": "fixed statistics and a browser CSV export",
+      "assertion": "Native export survives a lost response and resolves the same operation/artifact with exact CSV assertions.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "visual/export-uncertain-network.png",
+        "visual/export-completed.png",
+        "visual/export-downloaded.png"
+      ]
     },
     {
-      "scenario": "export-uncertain-network",
-      "file": "visual/export-uncertain-network.png",
-      "sha256": "dc97cfd3e4cf6c4c5dcf67d2aeb812db4a9d891adb985897e402f38f7456cb84",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:publish",
+      "requirementId": "D03",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "immediate exempt publication",
+      "assertion": "Native exemption seals the real tenant audience and independent notification/acknowledgement projections.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/published-and-projected.png",
+        "reminders/operations/approval-modes-provider-unavailable.png"
+      ]
     },
     {
-      "scenario": "export-completed",
-      "file": "visual/export-completed.png",
-      "sha256": "d87a9092f09e19203f3c6e8f46648c0d949969013c815c7f8ff769c6fa3db576",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:reconcile_approval",
+      "requirementId": "D05",
+      "source": {
+        "staticVerdict": "untested",
+        "staticAssertion": "no test references this command",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "ANY role approval",
+      "assertion": "Native reconciliation keeps the same pending submission and exactly one provider request.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json",
+        "announcement-management-bpm/final-visual-reconciliation.json"
+      ],
+      "visualEvidence": [
+        "bpm/any-submitted.png"
+      ]
     },
     {
-      "scenario": "export-downloaded",
-      "file": "visual/export-downloaded.png",
-      "sha256": "4feaa44bd674ce81519830b25c485e0e68140c979b14e99998165128ab5739ec",
-      "review": "reviewed_pass",
-      "scope": "This captured state only; not the complete permission/state matrix"
+      "id": "announcement:remind",
+      "requirementId": "D10",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+      ],
+      "testIdentityContains": "native reminder preview confirms",
+      "assertion": "Native preview/cancel/accept/replay preserves one durable batch and shared quota.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/visual/reminder-preview-ready.png",
+        "reminders/visual/reminder-confirm-open.png",
+        "reminders/visual/reminder-batch-completed.png"
+      ]
+    },
+    {
+      "id": "announcement:republish",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "withdraw legacy content / ALL named approvers",
+      "assertion": "Native revision produces a new draft/version without rewriting old submitted history.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log",
+        "announcement-management-bpm/final-visual-results.json",
+        "announcement-management-bpm/final-visual-reconciliation.json"
+      ],
+      "visualEvidence": [
+        "lifecycle/legacy-revision.png",
+        "bpm/all-rejected-history-after-revision.png"
+      ]
+    },
+    {
+      "id": "announcement:resume_reminders",
+      "requirementId": "D10",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+      ],
+      "testIdentityContains": "a recovered original member",
+      "assertion": "Native resume keeps the original plan actor/version/quota, creates no catch-up batch and reloads active.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log",
+        "announcement-management/s8-reminder-golden-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/reminder-original-plan-blocked.png",
+        "reminders/reminder-original-plan-resume-confirm.png",
+        "reminders/reminder-original-plan-resumed.png"
+      ]
+    },
+    {
+      "id": "announcement:retry_publication",
+      "requirementId": "D04",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+      ],
+      "testIdentityContains": "a recovered original member",
+      "assertion": "Native retry keeps original task/member/version/window; cancel has no write and the same task publishes once.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/recovery/publication-blocked.png",
+        "reminders/recovery/publication-retry-confirm.png",
+        "reminders/recovery/publication-recovered.png"
+      ]
+    },
+    {
+      "id": "announcement:set_pinned",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+      ],
+      "testIdentityContains": "published pinning persists",
+      "assertion": "Native pin/unpin persists root ordering without changing frozen hash or notification counts.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/management/announcement-pin-confirm.png",
+        "reminders/management/announcement-pinned.png"
+      ]
+    },
+    {
+      "id": "announcement:submit_approval",
+      "requirementId": "D05",
+      "source": {
+        "staticVerdict": "untested",
+        "staticAssertion": "no test references this command",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "ANY role approval / ALL named approvers",
+      "assertion": "Native submit creates a pending immutable submission, fixed definition and no premature recipients.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json",
+        "announcement-management-bpm/final-visual-reconciliation.json"
+      ],
+      "visualEvidence": [
+        "bpm/any-submitted.png",
+        "bpm/all-submitted.png"
+      ]
+    },
+    {
+      "id": "announcement:update_announcement",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "edit draft through the menu",
+      "assertion": "Native edit submits observed revision and persists edited values.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/edit-form-values.png",
+        "lifecycle/draft-detail.png"
+      ]
+    },
+    {
+      "id": "announcement:update_policy",
+      "requirementId": "D03",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser test reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-policy.spec.ts",
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "policy save / strict prepare",
+      "assertion": "Native policy save persists CAS/audit; cancel and invalid input do not append facts; BPM binding resolves real readiness.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log",
+        "announcement-management-bpm/final-visual-results.json",
+        "announcement-management-bpm/final-visual-reconciliation.json"
+      ],
+      "visualEvidence": [
+        "bpm/any-default-definition-selected.png"
+      ]
+    },
+    {
+      "id": "announcement:withdraw_approval",
+      "requirementId": "D05",
+      "source": {
+        "staticVerdict": "untested",
+        "staticAssertion": "no test references this command",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "ALL named approvers",
+      "assertion": "Native reasoned withdrawal terminates the new submission without recipients or changes to original history.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json",
+        "announcement-management-bpm/final-visual-reconciliation.json"
+      ],
+      "visualEvidence": [
+        "bpm/all-withdrawal-reason.png",
+        "bpm/all-rejected-history-after-revision.png"
+      ]
+    },
+    {
+      "id": "page:ab_announcement_detail",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "edit draft through the menu",
+      "assertion": "Native edit submits observed revision and persists edited values.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/edit-form-values.png",
+        "lifecycle/draft-detail.png"
+      ]
+    },
+    {
+      "id": "page:ab_announcement_form",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "untested",
+        "staticAssertion": "no browser spec names this page or its route",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "create announcement in draft status",
+      "assertion": "Native form creates a draft through the controlled command.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/create-form-guidance.png"
+      ]
+    },
+    {
+      "id": "page:ab_announcement_list",
+      "requirementId": "D01",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "create announcement in draft status",
+      "assertion": "Native form creates a draft through the controlled command.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "lifecycle/create-form-guidance.png"
+      ]
+    },
+    {
+      "id": "page:announcement_delivery_history_detail",
+      "requirementId": "D07",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+      ],
+      "testIdentityContains": "fixed statistics and a browser CSV export",
+      "assertion": "Native export survives a lost response and resolves the same operation/artifact with exact CSV assertions.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/operations/channel-history.png"
+      ]
+    },
+    {
+      "id": "page:announcement_policy_detail",
+      "requirementId": "D03",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-policy.spec.ts",
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "policy save / strict prepare",
+      "assertion": "Native policy save persists CAS/audit; cancel and invalid input do not append facts; BPM binding resolves real readiness.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log",
+        "announcement-management-bpm/final-visual-results.json",
+        "announcement-management-bpm/final-visual-reconciliation.json"
+      ],
+      "visualEvidence": [
+        "bpm/any-default-definition-selected.png"
+      ]
+    },
+    {
+      "id": "page:announcement_reader_detail",
+      "requirementId": "D09",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "immediate exempt publication",
+      "assertion": "Native exemption seals the real tenant audience and independent notification/acknowledgement projections.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "attachments/recipient-frozen-attachment.png",
+        "attachments/recipient-narrow-inbox-pending.png"
+      ]
+    },
+    {
+      "id": "page:announcement_reader_list",
+      "requirementId": "D08",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "immediate exempt publication",
+      "assertion": "Native exemption seals the real tenant audience and independent notification/acknowledgement projections.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "attachments/recipient-frozen-attachment.png",
+        "attachments/recipient-narrow-inbox-pending.png"
+      ]
+    },
+    {
+      "id": "page:announcement_reminder_batch_detail",
+      "requirementId": "D10",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+      ],
+      "testIdentityContains": "native reminder preview confirms",
+      "assertion": "Native preview/cancel/accept/replay preserves one durable batch and shared quota.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/visual/reminder-preview-ready.png",
+        "reminders/visual/reminder-confirm-open.png",
+        "reminders/visual/reminder-batch-completed.png"
+      ]
+    },
+    {
+      "id": "page:announcement_reminder_plan_detail",
+      "requirementId": "D10",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+      ],
+      "testIdentityContains": "a recovered original member",
+      "assertion": "Native resume keeps the original plan actor/version/quota, creates no catch-up batch and reloads active.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log",
+        "announcement-management/s8-reminder-golden-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/reminder-original-plan-blocked.png",
+        "reminders/reminder-original-plan-resume-confirm.png",
+        "reminders/reminder-original-plan-resumed.png"
+      ]
+    },
+    {
+      "id": "page:announcement_reminder_preview_detail",
+      "requirementId": "D10",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+      ],
+      "testIdentityContains": "native reminder preview confirms",
+      "assertion": "Native preview/cancel/accept/replay preserves one durable batch and shared quota.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "reminders/visual/reminder-preview-ready.png",
+        "reminders/visual/reminder-confirm-open.png",
+        "reminders/visual/reminder-batch-completed.png"
+      ]
+    },
+    {
+      "id": "page:announcement_statistics_detail",
+      "requirementId": "D11",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+      ],
+      "testIdentityContains": "fixed statistics and a browser CSV export",
+      "assertion": "Native export survives a lost response and resolves the same operation/artifact with exact CSV assertions.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "visual/export-uncertain-network.png",
+        "visual/export-completed.png",
+        "visual/export-downloaded.png"
+      ]
+    },
+    {
+      "id": "page:announcement_statistics_export_detail",
+      "requirementId": "D11",
+      "source": {
+        "staticVerdict": "partial",
+        "staticAssertion": "browser page reference registered; execution and assertions not verified",
+        "generatedManifest": "../../../coverage/oss-coverage-manifest.json"
+      },
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-statistics.spec.ts"
+      ],
+      "testIdentityContains": "fixed statistics and a browser CSV export",
+      "assertion": "Native export survives a lost response and resolves the same operation/artifact with exact CSV assertions.",
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "verdictSource": "Actual runner plus explicit semantic source audit; not inferred from static registration.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "visualEvidence": [
+        "visual/export-uncertain-network.png",
+        "visual/export-completed.png",
+        "visual/export-downloaded.png"
+      ]
     }
   ],
-  "artifact": "artifact-validation.json",
-  "excludedFromPublicEvidence": [
-    "authentication states",
-    "raw CSV",
-    "private artifact descriptors and object keys",
-    "database credentials"
+  "actionCount": {
+    "commands": 16,
+    "pages": 12,
+    "staticExecuted": 0,
+    "semanticAudit": "manual source and actual runner binding; no automatic requirement-level verdict engine"
+  },
+  "currentVisualReviews": [
+    {
+      "scenarioId": "lifecycle:create-form-guidance",
+      "file": "lifecycle/create-form-guidance.png",
+      "sha256": "6a0388b3c2da5ca980f176e16d43494a0a39c08ea33feef5e0b588780c2d27ac",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Empty native form has title/body guidance, grouped fields and a visible fixed save/cancel footer.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:edit-form-values",
+      "file": "lifecycle/edit-form-values.png",
+      "sha256": "fa720c93a941ba3615da09c4c04a62ef5e7bd049d5dc8bb7a8574b4062ef06e3",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Important priority, pin toggle, expiry and edited rich-text value remain visible with the save footer.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:draft-detail",
+      "file": "lifecycle/draft-detail.png",
+      "sha256": "e9c5fe9f8f537f1545be4bf22c026efac3e79e1daf459e235eca9d31938116af",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Saved draft values and status are readable; management actions are separate from content.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:permission-denied",
+      "file": "lifecycle/permission-denied.png",
+      "sha256": "8e1859d5f30f3d36ac78401264487b089c974f557347ab14d80f308c278e843b",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Read-only manager has view actions and no create/edit menu; persisted API denial is asserted by the test.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:legacy-revision",
+      "file": "lifecycle/legacy-revision.png",
+      "sha256": "ad865aff19c53c6b5acbfee5911c9b674f48c515dfebf37660332ac77d720262",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "The revised draft has draft-specific menu actions; previous publication time remains history.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:notification-settings-audience",
+      "file": "lifecycle/notification-settings-audience.png",
+      "sha256": "bfd10c4e9a055c7b8c81dbf0ea93ecf9cf177542a3c3566f1b33f03f316b4b6f",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "This scroll position shows unavailable approval reason, scheduled local time, exemption reason and acknowledgement default; it does not show the lower audience picker.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:scheduled-publication",
+      "file": "lifecycle/scheduled-publication.png",
+      "sha256": "99420a5622709865f877f1b1b3a8e72daf3faaef9402df8c8b3eece1c88c1666",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "The newly scheduled row has a human scheduled status, without a publication time.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:canceled-publication",
+      "file": "lifecycle/canceled-publication.png",
+      "sha256": "e3e2c0e2474f7fd0996d5c6916d772bd94eb0150b1817d5d902bfba5f65cca23",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "The same top row now shows withdrawn; no false published timestamp is displayed.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:published-and-projected",
+      "file": "lifecycle/published-and-projected.png",
+      "sha256": "23abb050185bfe2cc398f78f284ce89558a95e290c52070a4e0b0b8a5ee67b70",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "The newly published row has a publication time and the separate bell/inbox badges are visible.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:confirm-announcement-delete_announcement",
+      "file": "lifecycle/confirm-announcement-delete_announcement.png",
+      "sha256": "878843ce1192a575bc71d4808b641b2ed0f0bd153ca96fbb7a9ea8e98dbc2083",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Destructive confirmation is open with a visible cancel and focused confirm action.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "lifecycle:deleted-draft",
+      "file": "lifecycle/deleted-draft.png",
+      "sha256": "ade6272cc316057515eba991fc498d10fc48bba5aa9d0b0aa8b03a91c75ebd89",
+      "sourceCommit": "c545bc7a037d68579e861b016d032a458efe5b8c",
+      "run": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "The filtered empty result explains clearing filters or creating a draft; it is not a loading skeleton.",
+      "preShutterAssertionSource": "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:any-submitted",
+      "file": "bpm/any-submitted.png",
+      "sha256": "089d386d47a23315e797f93d36ebda03e55edd0b89478dbfdbb4d2ef5939661e",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Native submission returns to the filtered announcement list with pending approval and no publication timestamp.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:any-frozen-readonly-attachment",
+      "file": "bpm/any-frozen-readonly-attachment.png",
+      "sha256": "19fa9566d4abf7ea625ce1defa2ff4857cbd45de59cb0583bf559520b188c7a8",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Readonly body and retained attachment name/size are readable; no decision actions appear in view mode.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:any-decision",
+      "file": "bpm/any-decision.png",
+      "sha256": "f14026af05dbf1df6fe6cd093c2c3f8f874ac7db2ee38df392716a90e986f226",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Explicit decision mode shows frozen body, attachment, opinion controls and fixed approve/reject actions; the scroll area keeps the footer visible.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:any-completed-frozen-history",
+      "file": "bpm/any-completed-frozen-history.png",
+      "sha256": "90e70920446beeea2b019798db463e90ce58e2b118363505b251a8bb71cceb08",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Completed task is readonly, with original submitted body/file and a cancel-only footer.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-submitted",
+      "file": "bpm/all-submitted.png",
+      "sha256": "c25d52207c55c0c2b1b0eda818dc928cbb6b492f0cc9dd7b78c8fa9cf91b2307",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Named ALL request is pending; no premature published status appears.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-first-decision",
+      "file": "bpm/all-first-decision.png",
+      "sha256": "549ad4e0bc36163c8dac5d468ed882d0ec1e6b30529892db0b84fb289662102e",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "First named approver sees the original snapshot and explicit decision controls; backend assertions keep the ALL request non-terminal.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-reject-decision",
+      "file": "bpm/all-reject-decision.png",
+      "sha256": "4439687b13c8125e78993085908444b5bc86792c3bc04205b1a96294553e253a",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Reject mode and nonempty reason are visible together; the footer remains reachable.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-rejected-history-after-revision",
+      "file": "bpm/all-rejected-history-after-revision.png",
+      "sha256": "1c99e36d217994e32ea965964d80679d483b35f56fb458e86af0b0533e580be9",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Completed original task still shows its submitted body and file after a later revision; no edit/approval action is exposed.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-blocked-node-resolution",
+      "file": "bpm/all-blocked-node-resolution.png",
+      "sha256": "1e89bdd3195ff9a7ec8b67fd2c2d12fc09e5237ab59b631a44569605862e65ec",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Member picker is open with two selected reviewer chips and a checked searched option. The normal popup partly covers the reason field; this is a picker-open state, not a fully visible final confirmation.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-blocked-original-resume",
+      "file": "bpm/all-blocked-original-resume.png",
+      "sha256": "2c04dbcc2e6f311be60befa15061d0ac383f1fe0ccf1df285e1c3092439e8b0b",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Original-task recovery dialog clearly requires a reason and exposes cancel/record-and-execute actions.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-recovery-replacement-confirm",
+      "file": "bpm/all-recovery-replacement-confirm.png",
+      "sha256": "135b531bd054f374b10c5586c361f13ae605a57b2ed5d3da1d354d0459de9a4e",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Pending reviewer, selected replacement, nonempty reason and confirmation actions fit the modal.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:recovery-final-decision",
+      "file": "bpm/recovery-final-decision.png",
+      "sha256": "f98154684960d414780406e9e39a382b8c0ead394f0d4c82c17850fbdcbcab67",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "The new non-recipient approver sees the same frozen body/file and can submit a qualified decision.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:all-recovery-preserved-quorum",
+      "file": "bpm/all-recovery-preserved-quorum.png",
+      "sha256": "8c2e1f2c40dfb3db1b7e823e8d10f716afa81db9d5938d2bd9362d472c5ec1a7",
+      "sourceCommit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "run": "final-verified",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Reloaded recovery page shows approved, one-line ALL label, the two retained/current approvers and no replacement action.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "The captured state only; screenshots do not prove unobserved state permutations."
+    },
+    {
+      "scenarioId": "bpm:any-default-definition-selected",
+      "file": "bpm/any-default-definition-selected.png",
+      "sha256": "26301916325b7db3a01a25ca95a3e232fa2a4a2b7bc572ba86e8e98bc6ae4a20",
+      "sourceCommit": "68a4f347b91b9152fe42811a3daaf40adbcea17e",
+      "run": "final-visual",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Native policy modal shows a human definition name selected, readiness guidance, daily 09:00, quota 3 and shared 60-minute spacing; fixed save/cancel footer remains visible.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "Captured state and actual save/withdrawal journey only."
+    },
+    {
+      "scenarioId": "bpm:all-withdrawal-reason",
+      "file": "bpm/all-withdrawal-reason.png",
+      "sha256": "622ee2ffc9c8d2cbab2cc3cd9c1184f333041cab9d7701729206895c53ae1c97",
+      "sourceCommit": "68a4f347b91b9152fe42811a3daaf40adbcea17e",
+      "run": "final-visual",
+      "captured": true,
+      "reviewed": true,
+      "verdict": "accepted",
+      "authority": "agent-vision",
+      "finding": "Reasoned withdrawal dialog is open with required reason, cancel/submit actions and an explicit notice that acceptance still requires actual process reconciliation.",
+      "preShutterAssertionSource": "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+      "scope": "Captured state and actual save/withdrawal journey only."
+    }
   ],
-  "remainingScope": "Canonical design §16.8 and current acceptance report; this manifest is not the complete feature denominator"
+  "relatedReviewedEvidence": [
+    "attachments/manifest.json",
+    "reminders/manifest.json"
+  ],
+  "composition": {
+    "source": {
+      "repository": "git@github.com:AuraBootTeam/aura-bpm.git",
+      "commit": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4"
+    },
+    "platformSource": {
+      "repository": "git@github.com:AuraBootTeam/auraboot.git",
+      "commit": "6763dee6f2ef82c8d0a80eca4066309c378f0e1a"
+    },
+    "lockIdentity": "sha256:7b6f443f8f05137d53ad4686556b54df2bc0a6972319823946db93c4df1c773b",
+    "graphDigest": "sha256:58fcb7f322a353d3a78ecb1192753a45648ad237b0a876633688b984741c4baa",
+    "artifactCount": 22,
+    "skipOci": true,
+    "backend": {
+      "executed": 1657,
+      "passed": 1657,
+      "failed": 0,
+      "skipped": 0,
+      "junitFiles": 224,
+      "includedCompositionIT": 9,
+      "includedStrictEngineIT": 10
+    },
+    "nodeContracts": {
+      "executed": 97,
+      "passed": 97
+    },
+    "lifecycle": {
+      "businessExit": 0,
+      "stopExit": 0,
+      "evidence": "announcement-management-bpm/final-visual-exit.log"
+    },
+    "runtimeWarning": "RUNTIME_MANIFEST_MISSING; independent product verify and process/source/DB evidence retained",
+    "sourceEquivalence": {
+      "browserSource": "68a4f347b91b9152fe42811a3daaf40adbcea17e",
+      "artifactProducer": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
+      "changedFiles": [
+        "docs/README.md",
+        "e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "productionDiffEmpty": true,
+      "evidence": "announcement-management-bpm/final-visual-source-equivalence.log"
+    }
+  },
+  "documentationValidation": {
+    "status": "completed-scoped",
+    "executed": true,
+    "oss": {
+      "command": "node scripts/check-docs-governance.mjs --strict --git --changed docs/system-reference/announcement-management.md docs/system-reference/2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md docs/README.md",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0,
+      "evidence": "announcement-management/final-docs-governance.log"
+    },
+    "bpm": {
+      "kind": "scoped frontmatter and local-target review",
+      "exitCode": 0,
+      "fullGovernancePassClaim": false,
+      "runnerAvailability": "No vendored checker or .docs-governance.json; scoped existing frontmatter and local targets checked.",
+      "evidence": "announcement-management-bpm/final-docs-scoped-review.log"
+    },
+    "diffCheck": {
+      "oss": 0,
+      "bpm": 0
+    }
+  },
+  "historicalArtifact": "artifact-validation.json",
+  "supplementalActions": [
+    {
+      "id": "audience-directory",
+      "requirementId": "D02",
+      "source": "plugins/core-announcement/config/commands.json",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+      ],
+      "testIdentityContains": "scheduled audience settings",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Native 27-member paging has 25+2 results, preserves cross-page choices, clears and reloads saved membership selections.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/audience-page-two-preserved-selection.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "recipient-body-read",
+      "requirementId": "D09",
+      "source": "web-admin/app/routes/p.$pageKey.view.tsx",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts"
+      ],
+      "testIdentityContains": "native upload freezes",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Real body-image fault blocks reading; retry records the original version once and reload retains first facts.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/recipient-body-failed-read-blocked.png",
+        "attachments/recipient-frozen-attachment.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "recipient-acknowledge",
+      "requirementId": "D09",
+      "source": "plugins/core-announcement/config/pages.json",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts"
+      ],
+      "testIdentityContains": "native upload freezes",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Keyboard cancel restores focus and writes no acknowledgement; explicit confirmation persists independently of reading.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/recipient-narrow-confirmation.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "recipient-attachment",
+      "requirementId": "D12",
+      "source": "platform/src/main/java/com/auraboot/framework/workbench/controller/AnnouncementReaderController.java",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts"
+      ],
+      "testIdentityContains": "native upload freezes",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Exact frozen bytes and filename download through the qualified version URL; outsider/guessed link and retained deletion denied.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/recipient-frozen-attachment.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "draft-upload-richtext",
+      "requirementId": "D12",
+      "source": "web-admin/app/ui/smart/form/RichTextEditor.tsx",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts"
+      ],
+      "testIdentityContains": "native upload freezes",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Native upload and formatted draft persist; the unsafe HTML fixture is API setup and is not described as native editing.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/attachment-uploaded-draft.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "bell-open-retry",
+      "requirementId": "D08",
+      "source": "web-admin/app/ui/notification/NotificationDropdown.tsx",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts"
+      ],
+      "testIdentityContains": "native upload freezes",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Real GET failure exposes retry without fake empty data; retry reaches the real service.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/recipient-narrow-bell-load-error.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "bell-read-all",
+      "requirementId": "D08",
+      "source": "web-admin/app/ui/notification/NotificationHeaderWidget.tsx",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts"
+      ],
+      "testIdentityContains": "native upload freezes",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Uncertain bulk write preserves state; actual successful read-all does not complete acknowledgement.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/recipient-narrow-bell-write-error.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "inbox-open-focus",
+      "requirementId": "D08",
+      "source": "web-admin/app/ui/inbox/InboxDropdown.tsx",
+      "testSources": [
+        "web-admin/tests/e2e/announcement/announcement-attachments.spec.ts"
+      ],
+      "testIdentityContains": "native upload freezes",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Pending acknowledgement stays reachable in the shared header at 390px and Escape restores focus.",
+      "evidence": [
+        "announcement-management/final-oss-regression-browser.log"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "attachments/recipient-narrow-inbox-pending.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "strict-task-view",
+      "requirementId": "D06",
+      "source": "AuraBootTeam/aura-bpm:packages/aura-bpm-web/src/components/TaskCenter.tsx",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "ANY role approval",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "View opens frozen body/file without edit or decision controls; unrelated actor is denied.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "bpm/any-frozen-readonly-attachment.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "strict-task-approve",
+      "requirementId": "D06",
+      "source": "AuraBootTeam/aura-bpm:packages/aura-bpm-web/src/components/BpmTaskDrawer.tsx",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "ANY role approval / ALL named approvers",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Native qualified approval queues the actual vote; ANY publishes once, first ALL vote remains pending.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "bpm/any-decision.png",
+        "bpm/all-first-decision.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "strict-task-reject",
+      "requirementId": "D06",
+      "source": "AuraBootTeam/aura-bpm:packages/aura-bpm-web/src/components/BpmTaskDrawer.tsx",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "ALL named approvers",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Blank rejection is blocked without a request; reasoned native rejection terminates with zero recipients.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "bpm/all-reject-decision.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "strict-task-history",
+      "requirementId": "D05",
+      "source": "AuraBootTeam/aura-bpm:packages/aura-bpm-web/src/components/BpmTaskDrawer.tsx",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "ALL named approvers",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Refresh after durable progression opens original readonly history even after a newer revision.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "bpm/all-rejected-history-after-revision.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "strict-resolve-node",
+      "requirementId": "D06",
+      "source": "AuraBootTeam/aura-bpm:plugin/config/pages.json",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "native administrator replacement",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Native member picker resolves an applicant-only blocked node; cancellation adds no audit; original ALL mode remains.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "bpm/all-blocked-node-resolution.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "strict-resume-original",
+      "requirementId": "D06",
+      "source": "AuraBootTeam/aura-bpm:plugin/config/pages.json",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "native administrator replacement",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Reasoned native resume requeues the same submission; one provider request and no invented result.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "bpm/all-blocked-original-resume.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "strict-replace-pending",
+      "requirementId": "D06",
+      "source": "AuraBootTeam/aura-bpm:plugin/config/pages.json",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts"
+      ],
+      "testIdentityContains": "native administrator replacement",
+      "surface": "ui",
+      "dependencies": "real-stack",
+      "authority": "journey",
+      "driver": "browser",
+      "assertion": "Native replacement preserves accepted vote and ALL quorum; old actor denied, replacement approves original hash once.",
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json"
+      ],
+      "registered": true,
+      "executed": true,
+      "verdict": "pass",
+      "visualEvidence": [
+        "bpm/all-recovery-replacement-confirm.png",
+        "bpm/recovery-final-decision.png",
+        "bpm/all-recovery-preserved-quorum.png"
+      ],
+      "visualVerdict": "accepted for captured states only"
+    },
+    {
+      "id": "composition-lifecycle",
+      "requirementId": "D13",
+      "source": "platform/src/main/java/com/auraboot/framework/plugin/pf4j/AuraPluginManager.java",
+      "surface": "backend",
+      "dependencies": "real-stack",
+      "authority": "it",
+      "driver": "http+process",
+      "assertion": "Actual product disable/uninstall/hot-stop all reject before mutation; original provider remains ready; normal owned whole-application suspend exits 0.",
+      "testSources": [
+        "AuraBootTeam/aura-bpm:e2e/composition/announcements/strict-announcements.spec.ts",
+        "AuraBootTeam/aura-bpm:plugin/tests/runtime-reset-boundary.test.mjs"
+      ],
+      "evidence": [
+        "announcement-management-bpm/final-visual-results.json",
+        "announcement-management-bpm/final-visual-exit.log"
+      ],
+      "executed": true,
+      "verdict": "pass",
+      "noUi": "Host lifecycle invariant and public HTTP boundaries; native task UI is separately covered."
+    },
+    {
+      "id": "capacity-and-observability",
+      "requirementId": "D14",
+      "source": "platform/src/main/java/com/auraboot/framework/workbench/service/AnnouncementMetrics.java",
+      "surface": "backend",
+      "dependencies": "hermetic+real-stack",
+      "authority": "unit+it",
+      "driver": "test-function+worker",
+      "assertion": "Fixed low-cardinality metrics fail visibly; 501 real members cross expansion/statistics pages and produce the complete CSV. No 50000-member claim.",
+      "evidence": [
+        "announcement-management/s2-audience-paging-corrected-junit",
+        "announcement-management/measurements/announcement-capacity-501-10a8b2aaa.json"
+      ],
+      "executed": true,
+      "verdict": "pass",
+      "noUi": "Metrics and capacity are backend semantic measurements; browser statistics has separate UI evidence."
+    },
+    {
+      "id": "unconfigured-external-channel",
+      "requirementId": "D15",
+      "source": "platform/src/main/java/com/auraboot/framework/workbench/service/AnnouncementCapabilityService.java",
+      "surface": "backend",
+      "dependencies": "hermetic",
+      "authority": "unit",
+      "driver": "test-function",
+      "assertion": "Missing external provider is unavailable and cannot be submitted as sent; adapter keeps version-qualified identities.",
+      "testSources": [
+        "platform/src/test/java/com/auraboot/framework/workbench/service/AnnouncementCapabilityServiceTest.java"
+      ],
+      "evidence": [
+        "announcement-management/s2-audience-paging-corrected-junit"
+      ],
+      "executed": true,
+      "verdict": "pass",
+      "noUi": "Contract/eligibility validation only. Actual mini-program sender and native client are explicitly excluded and unexecuted."
+    }
+  ],
+  "visualCoverageLimits": [],
+  "requirementAutomation": {
+    "caseReconciliation": "BPM fixed four-case profile enforced",
+    "semanticRequirementBindings": "manual source audit",
+    "automaticRequirementLevelCoverage": "not implemented",
+    "standaloneStaticCoverageExecuted": 0
+  },
+  "finalVisualSupplement": {
+    "sourceCommit": "68a4f347b91b9152fe42811a3daaf40adbcea17e",
+    "executed": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "authenticationSeparately": 1,
+    "overlapsEarlierFour": true,
+    "evidence": "announcement-management-bpm/final-visual-browser.log",
+    "reconciliation": "announcement-management-bpm/final-visual-reconciliation.json",
+    "businessExit": 0,
+    "stopExit": 0
+  },
+  "executionReceipts": [
+    {
+      "path": "announcement-management/final-oss-regression-browser.log",
+      "sha256": "883e7332b21c32312d45348f886e96bf3b4beb961e05ffac35cad16d41f67785"
+    },
+    {
+      "path": "announcement-management/s8-reminder-golden-browser.log",
+      "sha256": "3a30de3518824e20aa7f0a0d23b6a79a47203452033dd98e850ae502025c5cd1"
+    },
+    {
+      "path": "announcement-management-bpm/final-41c-composition-build.log",
+      "sha256": "cbd353675affa511ecd78847a3fd9d54a299d79f85e69df04c15702f1ce2efcd"
+    },
+    {
+      "path": "announcement-management-bpm/final-visual-browser.log",
+      "sha256": "22edb3717354daec750f7810fe52cbc0d934ec56e2506e65034e35be74ae8523"
+    },
+    {
+      "path": "announcement-management-bpm/final-visual-reconciliation.json",
+      "sha256": "13589fefeb5cc0d33816be74f0c9efa2c7433e86797365e5aad35da7621f5047"
+    },
+    {
+      "path": "announcement-management-bpm/final-visual-exit.log",
+      "sha256": "6344fddcba17a9fb042761bc7d484f38c16bb9940dc6cc3eff9c67000713652f"
+    },
+    {
+      "path": "announcement-management-bpm/final-visual-product-verify.log",
+      "sha256": "265bcfc1b5ec6b6c0416cae62ea8862555d281c7ef11f27e8dcca559e4752d8b"
+    },
+    {
+      "path": "announcement-management-bpm/final-visual-workspace-verify.log",
+      "sha256": "ce3e990e9fc06170e6d1d67035da97a1d884b3cd0f4a39c12b0263396c23cc83"
+    }
+  ]
 }
