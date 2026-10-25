@@ -73,6 +73,16 @@ class SystemPermissionInitializerTest {
         assertThat(canonical.getStatus()).isEqualTo("active");
         assertThat(byId.get(canonical.getParentId()).getCode()).isEqualTo("system.command");
         assertThat(permissions).extracting(Permission::getCode).contains("system.command.execute");
+        Permission pageRead = permissions.stream()
+                .filter(p -> com.auraboot.framework.permission.constants.MetaPermission.PAGE_SCHEMA_READ.equals(p.getCode()))
+                .findFirst().orElseThrow(() -> new AssertionError("Native runtime page read permission is absent"));
+        assertThat(pageRead.getResourceType()).isEqualTo("page");
+        assertThat(pageRead.getResourceCode()).isEqualTo("page");
+        assertThat(pageRead.getAction()).isEqualTo("read");
+        assertThat(pageRead.getSource()).isEqualTo("system");
+        assertThat(byId.get(pageRead.getParentId()).getCode()).isEqualTo("system.page");
+        assertThat(permissions).extracting(Permission::getCode).contains("system.page.read");
+
 
         verify(permissionMapper, never()).insert(any(Permission.class));
         verify(permissionMapper, times(3)).batchInsert(anyList());
