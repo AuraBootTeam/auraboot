@@ -1,3 +1,7 @@
+import type {
+  ReportBand,
+  BandElementStyle,
+} from '../../../plugins/core-designer/components/report-designer/types';
 /**
  * Phase 3 report-export print-HTML assembler (Option A', slice 2 — see
  * DDR-2026-06-21-report-export-rendering-source-of-truth).
@@ -31,9 +35,19 @@ export interface ReportColumnDef {
   label?: string;
   format?: string;
   align?: string;
+  width?: number;
+}
+
+export interface ReportPrintSummary {
+  enabled?: boolean;
+  label?: string;
+  columns?: Array<{ field: string; aggregation?: string; format?: string }>;
 }
 
 export interface ReportPrintBlock extends ReportChartBlock {
+  summary?: ReportPrintSummary;
+  groupSubtotal?: ReportPrintSummary;
+  grandTotal?: ReportPrintSummary;
   blockType: string;
   title?: string;
   dataSource?: string;
@@ -64,6 +78,8 @@ export interface ReportPrintBlock extends ReportChartBlock {
 }
 
 export interface ReportPrintModel {
+  header?: ReportBand;
+  footer?: ReportBand;
   page?: {
     size?: string;
     orientation?: 'portrait' | 'landscape';
@@ -82,6 +98,8 @@ export interface PrintDocument {
   headerTemplate?: string;
   /** Chromium running footer fragment (from a page-footer block), if any. */
   footerTemplate?: string;
+  headerHeightMm?: number;
+  footerHeightMm?: number;
 }
 
 function escapeHtml(value: unknown): string {
@@ -133,24 +151,143 @@ function formattedValue(value: unknown, format?: string): string {
   if (value === null || value === undefined) return '';
   if (typeof value !== 'number' || !Number.isFinite(value)) return String(value);
   if (format === 'currency')
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (format === 'percent') return `${(value * 100).toFixed(1)}%`;
   if (format === 'number') return value.toLocaleString('zh-CN');
   return String(value);
 }
 
+/** Only typed DSL values may become CSS; report text is always escaped separately. */
+function alignment(value?: string): string {
+  if (value !== undefined && !['left', 'center', 'right'].includes(value))
+    throw new Error('Invalid report alignment');
+  return value || 'left';
+}
+
+function columnAttributes(column: ReportColumnDef, header = false): string {
+  const styles: string[] = [];
+  if (column.align) styles.push(`text-align:${alignment(column.align)}`);
+  if (header && column.width !== undefined) {
+    if (typeof column.width !== 'number' || !Number.isFinite(column.width) || column.width <= 0)
+      throw new Error('Invalid report column width');
+    styles.push(`width:${column.width}px`);
+  }
+  return styles.length ? ` style="${styles.join(';')}"` : '';
+}
+
+function bandStyle(style: BandElementStyle = {}): string {
+  const styles: string[] = [];
+  if (style.fontSize !== undefined) {
+    if (!Number.isFinite(style.fontSize) || style.fontSize < 6 || style.fontSize > 48)
+      throw new Error('Invalid report band font size');
+    styles.push(`font-size:${style.fontSize}pt`);
+  }
+  if (style.fontWeight) {
+    if (!['normal', 'bold'].includes(style.fontWeight))
+      throw new Error('Invalid report band font weight');
+    styles.push(`font-weight:${style.fontWeight}`);
+  }
+  if (style.color) {
+    if (!/^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(style.color))
+      throw new Error('Invalid report band color');
+    styles.push(`color:${style.color}`);
+  }
+  if (style.fontFamily) {
+    if (!/^[\p{L}\p{N} ,'-]+$/u.test(style.fontFamily))
+      throw new Error('Invalid report band font family');
+    styles.push(`font-family:${style.fontFamily}`);
+  }
+  return styles.join(';');
+}
+
+function renderBand(band: ReportBand, running: boolean): string {
+  if (
+    !Number.isFinite(band.height) ||
+    band.height < 5 ||
+    band.height > 100 ||
+    !Array.isArray(band.elements)
+  )
+    throw new Error('Invalid report band');
+  const elements = band.elements
+    .map((element) => {
+      let content: string;
+      switch (element.type) {
+        case 'text':
+          content = escapeHtml(element.content);
+          break;
+        case 'date':
+          content = escapeHtml(new Date().toLocaleDateString('zh-CN'));
+          break;
+        case 'page-number':
+          content = running ? '第 <span class="pageNumber"></span> 页' : '第 1 页';
+          break;
+        case 'image':
+          // The renderer is self-contained: never fetch an arbitrary URL from a report.
+          if (
+            !/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(element.content || '')
+          )
+            throw new Error('Report band images must be embedded raster data');
+          content = `<img alt="" style="max-height:${band.height}mm;max-width:100%" src="${escapeHtml(element.content)}" />`;
+          break;
+        default:
+          throw new Error('Unsupported report band element');
+      }
+      return `<div style="flex:1;min-width:0;text-align:${alignment(element.align)};${escapeHtml(bandStyle(element.style))}">${content}</div>`;
+    })
+    .join('');
+  return `<div style="display:flex;align-items:center;gap:16px;width:100%;height:${band.height}mm">${elements}</div>`;
+}
+
+function bandTemplate(band: ReportBand, margin?: ReportPrintModel['page']): string {
+  const left = margin?.margin?.left ?? 14;
+  const right = margin?.margin?.right ?? 14;
+  for (const value of [left, right])
+    if (!Number.isFinite(value) || value < 0 || value > 100)
+      throw new Error('Invalid report band margin');
+  return `<div style="width:100%;padding:0 ${right}mm 0 ${left}mm;font-family:Arial,sans-serif;font-size:10pt;color:#374151;box-sizing:border-box">${renderBand(band, true)}</div>`;
+}
+
+function renderSummary(
+  summary: ReportPrintSummary | undefined,
+  cols: ReportColumnDef[],
+  rows: PrintRow[],
+  css: string,
+): string {
+  if (!summary?.enabled || !cols.length) return '';
+  const cells = cols
+    .map((column, index) => {
+      const selected = summary.columns?.find((item) => item.field === column.field);
+      const value = selected
+        ? formattedValue(
+            aggregateNumbers(
+              rows.map((row) => Number(row[column.field]) || 0),
+              selected.aggregation || 'sum',
+            ),
+            selected.format || column.format,
+          )
+        : index === 0
+          ? summary.label || 'Total'
+          : '';
+      return `<td${columnAttributes(column)}>${escapeHtml(value)}</td>`;
+    })
+    .join('');
+  return `<tr class="summary-row ${css}">${cells}</tr>`;
+}
+
 function renderTable(block: ReportPrintBlock, dataSets: PrintDataSets): string {
   const rows = rowsFor(block, dataSets);
   const cols = resolveColumns(block, rows);
-  const head = cols.map((c) => `<th>${escapeHtml(c.label ?? c.field)}</th>`).join('');
+  const head = cols
+    .map((c) => `<th${columnAttributes(c, true)}>${escapeHtml(c.label ?? c.field)}</th>`)
+    .join('');
   const body = rows
     .map(
       (r) =>
-        `<tr>${cols.map((c) => `<td>${escapeHtml(formattedValue(r[c.field], c.format))}</td>`).join('')}</tr>`,
+        `<tr>${cols.map((c) => `<td${columnAttributes(c)}>${escapeHtml(formattedValue(r[c.field], c.format))}</td>`).join('')}</tr>`,
     )
     .join('');
   const empty = `<tr><td colspan="${Math.max(cols.length, 1)}">无数据</td></tr>`;
-  return `<section class="block table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body || empty}</tbody></table></section>`;
+  return `<section class="block table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body || empty}${renderSummary(block.summary, cols, rows, 'table-summary')}</tbody></table></section>`;
 }
 
 function formatNumber(n: number): string {
@@ -169,7 +306,7 @@ function renderStatCard(block: ReportPrintBlock, dataSets: PrintDataSets): strin
     aggregation,
   );
   const label = block.label ?? block.title ?? '';
-  return `<section class="block stat-card"><div class="stat-value">${escapeHtml(block.format ? formattedValue(value, block.format) : formatNumber(value))}</div><div class="stat-label">${escapeHtml(label)}</div></section>`;
+  return `<section class="block stat-card">${block.title && block.label && block.title !== block.label ? renderBlockTitle(block.title) : ''}<div class="stat-value">${escapeHtml(block.format ? formattedValue(value, block.format) : formatNumber(value))}</div><div class="stat-label">${escapeHtml(label)}</div></section>`;
 }
 
 function renderGroupedTable(block: ReportPrintBlock, dataSets: PrintDataSets): string {
@@ -189,21 +326,27 @@ function renderGroupedTable(block: ReportPrintBlock, dataSets: PrintDataSets): s
     }
   }
 
-  const head = cols.map((c) => `<th>${escapeHtml(c.label ?? c.field)}</th>`).join('');
-  const groupFieldLabel = cols.find((c) => c.field === groupBy && c.label)?.label;
+  const head = cols
+    .map((c) => `<th${columnAttributes(c, true)}>${escapeHtml(c.label ?? c.field)}</th>`)
+    .join('');
+  const groupFieldLabel = cols.find(
+    (c) => c.field === groupBy && c.label && c.label !== c.field,
+  )?.label;
   const body = [...groups.entries()]
     .map(([key, grp]) => {
       const groupHeader = `<tr class="group-header"><td colspan="${span}">${escapeHtml(groupFieldLabel ? `${groupFieldLabel}: ` : '')}${escapeHtml(key)} (${grp.length})</td></tr>`;
       const groupRows = grp
         .map(
           (r) =>
-            `<tr>${cols.map((c) => `<td>${escapeHtml(formattedValue(r[c.field], c.format))}</td>`).join('')}</tr>`,
+            `<tr>${cols.map((c) => `<td${columnAttributes(c)}>${escapeHtml(formattedValue(r[c.field], c.format))}</td>`).join('')}</tr>`,
         )
         .join('');
-      return groupHeader + groupRows;
+      return (
+        groupHeader + groupRows + renderSummary(block.groupSubtotal, cols, grp, 'group-subtotal')
+      );
     })
     .join('');
-  return `<section class="block grouped-table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></section>`;
+  return `<section class="block grouped-table">${renderBlockTitle(block.title)}<table><thead><tr>${head}</tr></thead><tbody>${body}${renderSummary(block.grandTotal, cols, rows, 'grand-total')}</tbody></table></section>`;
 }
 
 function renderCrossTab(block: ReportPrintBlock, dataSets: PrintDataSets): string {
@@ -223,7 +366,7 @@ function renderCrossTab(block: ReportPrintBlock, dataSets: PrintDataSets): strin
     const ck = String(r[columnField] ?? 'Other');
     rowKeys.add(rk);
     colKeys.add(ck);
-    const key = `${rk} ${ck}`;
+    const key = `${rk}\0${ck}`;
     const bucket = cells.get(key);
     if (bucket) {
       bucket.push(numericValue(r[valueField]));
@@ -235,7 +378,7 @@ function renderCrossTab(block: ReportPrintBlock, dataSets: PrintDataSets): strin
   const sortedRows = [...rowKeys].sort(byLabel);
   const sortedCols = [...colKeys].sort(byLabel);
   const agg = (rk: string, ck: string) =>
-    aggregateNumbers(cells.get(`${rk} ${ck}`) ?? [], aggregation);
+    aggregateNumbers(cells.get(`${rk}\0${ck}`) ?? [], aggregation);
 
   const axisLabel = (field: string) => cols.find((c) => c.field === field)?.label;
   const rowAxisLabel = block.rowLabel || axisLabel(rowField);
@@ -338,7 +481,10 @@ function runningFooter(block: ReportPrintBlock): string {
 function shell(model: ReportPrintModel, body: string, watermark: string): string {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
   * { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; box-sizing: border-box; }
-  body { margin: 0; color: #1f2937; }
+  body { margin: 0; color: #1f2937; font-size:14px; line-height:1.5; }
+  p { orphans:3; widows:3; }
+  .report-band-screen { margin-bottom:18px; }
+  @media print { .report-band-screen { display:none; } }
   .watermark { position: fixed; top: 40%; left: 18%; font-size: 64px; color: rgba(0,0,0,0.06); transform: rotate(-30deg); z-index: 0; pointer-events: none; }
   h1 { font-size: 20px; }
   .block { margin: 0 0 18px; position: relative; z-index: 1; }
@@ -353,10 +499,12 @@ function shell(model: ReportPrintModel, body: string, watermark: string): string
   .stat-value { font-size: 24px; font-weight: 600; }
   .stat-label { font-size: 12px; color: #6b7280; }
   .chart-canvas svg { max-width: 100%; height: auto; }
+.summary-row td { font-weight: 600; background: #f3f4f6; }
 </style></head><body>
   ${watermark}
-  ${model.title ? `<h1>${escapeHtml(model.title)}</h1>` : ''}
+  ${model.header ? `<header class="report-band-screen">${renderBand(model.header, false)}</header>` : model.title ? `<h1>${escapeHtml(model.title)}</h1>` : ''}
   ${body}
+  ${model.footer ? `<footer class="report-band-screen">${renderBand(model.footer, false)}</footer>` : ''}
 </body></html>`;
 }
 
@@ -370,8 +518,8 @@ export function renderReportToPrintDocument(
   model: ReportPrintModel,
   dataSets: PrintDataSets,
 ): PrintDocument {
-  let headerTemplate: string | undefined;
-  let footerTemplate: string | undefined;
+  let headerTemplate = model.header ? bandTemplate(model.header, model.page) : undefined;
+  let footerTemplate = model.footer ? bandTemplate(model.footer, model.page) : undefined;
   let watermark = '';
   const body: string[] = [];
 
@@ -399,10 +547,10 @@ export function renderReportToPrintDocument(
         body.push(renderRichText(block));
         break;
       case 'page-header':
-        headerTemplate = runningHeader(block);
+        if (!model.header) headerTemplate = runningHeader(block);
         break;
       case 'page-footer':
-        footerTemplate = runningFooter(block);
+        if (!model.footer) footerTemplate = runningFooter(block);
         break;
       case 'watermark':
         watermark = renderWatermark(block);
@@ -417,5 +565,11 @@ export function renderReportToPrintDocument(
     }
   }
 
-  return { html: shell(model, body.join('\n'), watermark), headerTemplate, footerTemplate };
+  return {
+    html: shell(model, body.join('\n'), watermark),
+    headerTemplate,
+    footerTemplate,
+    headerHeightMm: model.header?.height,
+    footerHeightMm: model.footer?.height,
+  };
 }

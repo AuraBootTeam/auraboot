@@ -15,7 +15,8 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--web-mode development|production] [--no-frontend] [--no-warm] [--no-redis] [--isolated-redis-port N] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--system-mode single|multi|hybrid] [--agent-mode with-agent|base] [--web-mode development|production] [--no-frontend] [--no-warm] [--no-redis] [--isolated-redis-port N] [--fresh-db|--require-new-db] [--ttl 6h] [--product-migration-root PATH] [--extra-plugin-root PATH] [--plugin-profile P|--plugin X]
+#       --agent-mode: backend composition (default with-agent); base omits the optional AI module.
 #       --system-mode: bootstrap mode (default single). An initialized database
 #                      must already have this mode; retained data is never converted.
 #       --isolated-redis-port: run an owned private Redis endpoint on an unused port
@@ -206,7 +207,7 @@ web_admin_node_modules_seed() {
 # Import-time handler validation is intentionally fail-closed: importing the DSL
 # first and hot-loading a jar later leaves a backend package impossible to install.
 stage_requested_backend_jars() {
-  local sd="$1" runtime_name="$2"; shift 2
+  local sd="$1" runtime_name="$2" platform_runtime_jar="$3"; shift 3
   local backend_rows backend_specs=()
   backend_rows="$(node "$SCRIPT_DIR/dev/resolve-plugin-backends.mjs" \
     --repo-root "$REPO_ROOT" --format tsv "$@")" \
@@ -256,7 +257,7 @@ stage_requested_backend_jars() {
     "$DEV" gradle "$runtime_name" --project "$backend_dir" \
       --wrapper "$REPO_ROOT/platform/gradlew" -- clean jar \
       "-PplatformPluginApiJar=$platform_plugin_api_jar" \
-      "-PplatformRuntimeJar=$REPO_ROOT/platform/build/libs/AuraBoot-1.0.0-boot.jar" --console=plain \
+      "-PplatformRuntimeJar=$platform_runtime_jar" --console=plain \
       >"$sd/logs/${plugin_name}-jar.log" 2>&1 \
       || die "plugin backend jar build failed for $plugin_name — see $sd/logs/${plugin_name}-jar.log"
     [ -f "$jar_path" ] || die "plugin backend jar missing after build for $plugin_name: $jar_path"
@@ -380,7 +381,7 @@ cmd_up() {
   local name="$1"; shift
   local requested_args=("$@") source_specs=("core=$REPO_ROOT")
   local workspace_source_root="" report_renderer=0 renderer_env_args=()
-  local slot="" ttl="6h" runtime_mode="development" system_mode="single" frontend=1 warm=1 fresh_db=0 require_new_db=0
+  local slot="" ttl="6h" runtime_mode="development" system_mode="single" agent_mode="with-agent" frontend=1 warm=1 fresh_db=0 require_new_db=0
   local plugin_profile="" import_plugins=() extra_plugin_roots=() product_migration_roots=()
   local parallel_reason="" redis_host="127.0.0.1" redis_port="6379" isolated_redis_port="" web_mode="development"
   local extra_root migration_root plugin_item
@@ -404,6 +405,7 @@ cmd_up() {
       report_renderer=1
       shift
       ;;
+    --agent-mode) agent_mode="${2:-}"; [ $# -ge 2 ] || die "--agent-mode requires a value"; shift 2;;
     --system-mode) system_mode="${2:-}"; [ $# -ge 2 ] || die "--system-mode requires a value"; shift 2;;
     --web-mode) web_mode="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
@@ -445,6 +447,7 @@ cmd_up() {
       ;;
     *) die "unknown arg: $1";;
   esac; done
+  case "$agent_mode" in with-agent|base) ;; *) die "invalid --agent-mode (expected with-agent or base)";; esac
   case "$web_mode" in development|production) ;; *) die "invalid --web-mode";; esac
   if [ "$web_mode" = production ]; then
     [ -n "${SESSION_SECRET_FILE:-}" ] && [ -r "$SESSION_SECRET_FILE" ] || die "production requires explicit SESSION_SECRET_FILE"
@@ -634,16 +637,22 @@ PYLOG
   log "3/9 verify this source's Gradle wrapper (managed CLI provisions its jar)"
   [ -x "$REPO_ROOT/platform/gradlew" ] || die "source Gradle wrapper is missing or not executable"
 
-  log "4/9 build bootJar (runtime-owned Gradle cache; --no-daemon)"
+  local assembly_task=":bootJar" assembly_suffix="" version
+  version="$(tr -d '\r\n' < "$REPO_ROOT/VERSION")"
+  if [ "$agent_mode" = base ]; then
+    assembly_task=":platform-app:bootJarBase"
+    assembly_suffix="-base"
+  fi
+  log "4/9 build $agent_mode backend (runtime-owned Gradle cache; --no-daemon)"
   # --no-build-cache: a golden stack must produce a correct, reproducible jar. The
   # shared local Gradle build cache can hand a fresh worktree a corrupt :compileJava
   # entry (observed 2026-07-23: MqProvider.class/MqMessageHandler.class missing from
   # the cached output → platform-mq-kafka fails to resolve them, masked by UP-TO-DATE),
   # so bypass it here rather than trust a cross-worktree cache for a release build.
-  "$DEV" gradle "$name" --project "$REPO_ROOT/platform" -- --no-daemon --no-build-cache :bootJar -x test --console=plain >"$sd/logs/bootjar.log" 2>&1 \
+  "$DEV" gradle "$name" --project "$REPO_ROOT/platform" -- --no-daemon --no-build-cache "$assembly_task" -x test --console=plain >"$sd/logs/bootjar.log" 2>&1 \
     || die "bootJar build failed — see $sd/logs/bootjar.log"
-  local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
-  [ -n "$jar" ] || die "boot jar not found after build"
+  local jar="$REPO_ROOT/platform/platform-app/build/libs/AuraBoot-${version}${assembly_suffix}-boot.jar"
+  [ -f "$jar" ] || die "selected $agent_mode boot jar not found after build: $jar"
   local run_jar runtime_token
   run_jar="$(golden_runtime_stage_backend "$name" "$jar" core)" \
     || die "backend artifact registration failed"
@@ -661,7 +670,7 @@ PYLOG
       staging_args+=(--plugin "$plugin_item")
     done
   fi
-  stage_requested_backend_jars "$sd" "$name" "${staging_args[@]}"
+  stage_requested_backend_jars "$sd" "$name" "$jar" "${staging_args[@]}"
 
   # Bound backend logs independently of runtime lifetime; old rounds remain in evidence.
   cat >"$sd/backend-logback.xml" <<'XML'
@@ -776,7 +785,7 @@ XML
         CI=true NPM_CONFIG_REGISTRY="$npm_registry" \
           COREPACK_NPM_REGISTRY="$npm_registry" COREPACK_DEFAULT_TO_LATEST=0 \
           "$DEV" run "$name" --workdir "$REPO_ROOT/web-admin" -- \
-            pnpm --filter auraboot-app install --frozen-lockfile --reporter=append-only \
+            pnpm --filter 'auraboot-app...' install --frozen-lockfile --reporter=append-only \
             >"$sd/logs/frontend-dependencies.log" 2>&1 \
           || die "web-admin dependency install failed — see $sd/logs/frontend-dependencies.log"
         web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT" \
@@ -788,10 +797,10 @@ XML
     # a lazily optimized react-router chunk from different generations to coexist, producing an
     # Invalid hook call in otherwise valid components. The runtime is exclusively owned here, so
     # rebuild this exact slot cache as part of every fresh stack lifecycle.
-    local vite_cache_dir="$REPO_ROOT/web-admin/.vite/$vite_port"
+    local vite_cache_dir="${AURA_VITE_CACHE_DIR:-$REPO_ROOT/web-admin/.vite/$vite_port}"
     case "$vite_cache_dir" in
       "$REPO_ROOT/web-admin/.vite/"*) rm -rf "$vite_cache_dir" ;;
-      *) die "refusing to clear unexpected Vite cache path: $vite_cache_dir" ;;
+      *) [ -n "${AURA_WEB_COMPOSITION_ROOT:-}" ] || die "external Vite cache requires an explicit thin composition" ;;
     esac
     if [ "$web_mode" = production ]; then
       log "    build production client and SSR from the frozen checkout"
@@ -799,7 +808,7 @@ XML
         || die "production Web build failed — see $sd/logs/web-build.log"
     fi
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/logs/frontend.log" \
-      env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="$REPO_ROOT/web-admin/.vite/$vite_port" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
+      env AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="${AURA_VITE_CACHE_DIR:-$REPO_ROOT/web-admin/.vite/$vite_port}" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
       BFF_INTERNAL_URL="http://127.0.0.1:$server_port" AURA_WEB_MODE="$web_mode" SESSION_SECRET_FILE="${SESSION_SECRET_FILE:-}" \
       bash "$SCRIPT_DIR/dev/start-web-stack.sh" fresh
     node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \
@@ -1123,7 +1132,7 @@ cmd_resume_retained() {
     || die "resumed backend listener identity mismatch"
   # Execute the existing frontend commands directly; dev:full would sync/generate plugins.
   spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
-    env ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="$REPO_ROOT/web-admin/.vite/$vite_port" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 \
+    env ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" AURA_VITE_CACHE_DIR="${AURA_VITE_CACHE_DIR:-$REPO_ROOT/web-admin/.vite/$vite_port}" VITE_PORT="$vite_port" VITE_HOST=127.0.0.1 BFF_PORT="$bff_port" BFF_HOST=127.0.0.1 \
       SPRING_BOOT_URL="http://127.0.0.1:$server_port" BFF_INTERNAL_URL="http://127.0.0.1:$server_port" \
       bash "$SCRIPT_DIR/dev/start-web-stack.sh" retained
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" register-supervisor "$name" "$REPO_ROOT" "$DEV" "$(cat "$sd/frontend.pid")" \

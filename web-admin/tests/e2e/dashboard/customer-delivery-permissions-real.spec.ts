@@ -70,8 +70,12 @@ test('SC04-PERMISSIONS global dashboard viewing does not grant customer-project 
   ).length;
   const key = `delivery_perm_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
   const title = `客户交付看板源权限-${key}`;
+  const monetaryDashboard = structuredClone(template.dashboard);
+  monetaryDashboard.widgets.find(
+    (widget: { id: string }) => widget.id === 'project-budget',
+  ).config.precision = 2;
   const created = await page.request.post('/api/dashboards', {
-    data: { ...template.dashboard, code: key, title, scope: 'global' },
+    data: { ...monetaryDashboard, code: key, title, scope: 'global' },
   });
   expect(created.status()).toBe(200);
   const createdBody = await created.json();

@@ -1,6 +1,7 @@
 package com.auraboot.framework.notification.sourcebinding;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,8 @@ public final class SourceBindingTypes {
             code(modelCode);
             sha(shapeSha256);
             owners = List.copyOf(owners);
-            nativeFieldPids = Set.copyOf(nativeFieldPids);
+            nativeFieldPids = java.util.Collections.unmodifiableSortedSet(
+                    new java.util.TreeSet<>(nativeFieldPids == null ? Set.of() : nativeFieldPids));
             require(!owners.isEmpty() && owners.size() <= 16);
             require(owners.stream().map(Owner::pid).distinct().count() == owners.size());
             nativeFieldPids.forEach(SourceBindingTypes::pid);
@@ -59,6 +61,7 @@ public final class SourceBindingTypes {
         }
     }
     public record Exact(String fieldCode, Scalar value) {
+        @ConstructorBinding
         public Exact {
             code(fieldCode);
             Objects.requireNonNull(value);
@@ -109,6 +112,7 @@ public final class SourceBindingTypes {
         public Target(String listField, Entity entity, String ownerField) {
             this(listField, entity, ownerField, null, null);
         }
+        @ConstructorBinding
         public Target {
             code(listField);
             Objects.requireNonNull(entity);
@@ -150,7 +154,7 @@ public final class SourceBindingTypes {
             Objects.requireNonNull(principal);
             Objects.requireNonNull(verification);
             SourceBindingTypes.code(templateCode);
-            variableToSourceField = Map.copyOf(variableToSourceField);
+            variableToSourceField = variableToSourceField == null ? Map.of() : Map.copyOf(variableToSourceField);
             require(variableToSourceField.size() <= 16);
             variableToSourceField.forEach((k, v) -> {
                 SourceBindingTypes.code(k);

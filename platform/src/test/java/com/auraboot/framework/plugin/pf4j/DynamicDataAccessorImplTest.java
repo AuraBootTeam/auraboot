@@ -42,6 +42,28 @@ class DynamicDataAccessorImplTest {
     @InjectMocks private DynamicDataAccessorImpl accessor;
 
     @Test
+    void queryPage_omitsAbsentKeywordForTheRealMachineQueryGuard() {
+        var principal=new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                1L,"inst","Integration",java.util.Set.of(),"app","inst",null,null);
+        var decision=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(
+                1L,"inst","m",java.util.Set.of("read"),java.util.Set.of("pid","name"),java.util.Set.of(),List.of());
+        when(dynamicDataService.list(eq("m"),any(DynamicQueryRequest.class))).thenAnswer(call->{
+            DynamicQueryRequest request=call.getArgument(1);
+            com.auraboot.framework.meta.service.impl.MachineDataAccessGuards.requireQueryFields("m",request);
+            assertThat(request.getKeyword()).isNull();
+            return PaginationResult.of(List.of(Map.of("pid","row","name","sample")),1L,1,20);
+        });
+        try(var machine=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var authority=com.auraboot.framework.application.security.MachineDataAccessContext.authorize(Map.of("m",decision))) {
+            assertThat(accessor.queryPage("m",new DataPageQuery(Map.of("name","sample"),Map.of(),List.of(),1,20)).records())
+                    .containsExactly(Map.of("pid","row","name","sample"));
+            org.assertj.core.api.Assertions.assertThatThrownBy(()->accessor.queryPage("m",
+                    new DataPageQuery(Map.of(),Map.of(),List.of(),1,20,"not authorized")))
+                    .isInstanceOf(DataAccessorException.class);
+        }
+    }
+
+    @Test
     void queryPage_sendsOneBoundedOrderedAndFilteredDatabaseQueryForALargeMatchSet() {
         when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
                 .thenReturn(PaginationResult.of(List.of(Map.of("pid", "B")), 100_001L, 3, 20));
@@ -114,6 +136,30 @@ class DynamicDataAccessorImplTest {
     void getById_delegates() {
         when(dynamicDataService.getById("m", "1")).thenReturn(Map.of("id", "1"));
         assertThat(accessor.getById("m", "1")).containsEntry("id", "1");
+    }
+
+    @Test
+    void getByIdOrNull_returnsRecord_whenPresent() {
+        when(dynamicDataService.getById("m", "1")).thenReturn(Map.of("id", "1"));
+        assertThat(accessor.getByIdOrNull("m", "1")).containsEntry("id", "1");
+    }
+
+    @Test
+    void getByIdOrNull_mapsTypedNotFoundToNull_regression() {
+        // 2026-10-24: the typed platform exception is the not-found contract —
+        // no coupling to the message text, so a rewording can't break lookups.
+        when(dynamicDataService.getById("m", "missing"))
+                .thenThrow(new com.auraboot.framework.meta.exception.MetaRecordNotFoundException("m", "missing"));
+        assertThat(accessor.getByIdOrNull("m", "missing")).isNull();
+    }
+
+    @Test
+    void getByIdOrNull_reraisesUnrelatedFailures() {
+        when(dynamicDataService.getById("m", "1"))
+                .thenThrow(new com.auraboot.framework.meta.exception.MetaServiceException("boom"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.getByIdOrNull("m", "1"))
+                .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class)
+                .hasMessageContaining("boom");
     }
 
     @Test

@@ -207,7 +207,7 @@ export function createDslSchemaPayload(
     blocks: schema.blocks,
     layout: schema.layout,
     kind: schema.kind,
-    schemaVersion: schema.schemaVersion,
+    schemaVersion: 4,
   };
 
   if (schema.pageKey != null) {

@@ -20,6 +20,40 @@ const view: SavedViewWire = {
   effectivePermission: 'view',
 };
 describe('SavedView wire/editor projection', () => {
+  it('accepts count kanban aggregations without a field and still rejects field-less value aggregations', () => {
+    const withCountNoField = savedViewForView({
+      ...view,
+      scope: 'global',
+      viewType: 'kanban',
+      viewConfig: {
+        groupByField: 'inv_in_status',
+        titleField: 'inv_in_code',
+        idField: 'pid',
+        kanbanAggregations: [
+          { field: null, function: 'count', label: { en: 'Count', 'zh-CN': '计数' } },
+          { field: '', function: 'count' },
+          { field: 'inv_in_total_amount', function: 'sum', label: { en: 'Total', 'zh-CN': '总金额' } },
+        ],
+      },
+    } as SavedViewWire);
+    expect(withCountNoField.viewConfig?.kanbanAggregations).toEqual([
+      { field: '', function: 'count', label: { en: 'Count', 'zh-CN': '计数' } },
+      { field: '', function: 'count' },
+      { field: 'inv_in_total_amount', function: 'sum', label: { en: 'Total', 'zh-CN': '总金额' } },
+    ]);
+    expect(() =>
+      savedViewForView({
+        ...view,
+        scope: 'global',
+        viewType: 'kanban',
+        viewConfig: {
+          groupByField: 'inv_in_status',
+          kanbanAggregations: [{ field: null, function: 'sum' }],
+        },
+      } as SavedViewWire),
+    ).toThrow('card aggregation field');
+  });
+
   it('keeps nullable settings absent while preserving false, zero, JSON null and metadata', () => {
     const result = savedViewForView({
       ...view,

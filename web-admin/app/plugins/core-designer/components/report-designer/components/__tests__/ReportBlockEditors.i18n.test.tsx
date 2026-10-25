@@ -15,6 +15,7 @@ import { ReportBandBlock } from '../../blocks/ReportBandBlock';
 import { ReportChartBlock } from '../../blocks/ReportChartBlock';
 import { ReportRichTextBlock } from '../../blocks/ReportRichTextBlock';
 import { ReportGroupedTableBlock } from '../../blocks/ReportGroupedTableBlock';
+import { ReportStatCardBlock } from '../../blocks/ReportStatCardBlock';
 
 afterEach(cleanup);
 
@@ -140,17 +141,28 @@ for (const locale of ['zh-CN', 'en-US']) {
         columns: [{ field: 'value', label: 'User Value' }],
       };
       const view = render(localized(locale, <ReportGroupedTableBlock block={block} mode="design" />));
-      expect(screen.getByText(zh ? 'owner: 分组 A' : 'owner: Group A')).toBeVisible();
-      expect(screen.getByText(zh ? 'owner: 分组 B' : 'owner: Group B')).toBeVisible();
+      expect(screen.getByText(zh ? '分组 A' : 'Group A')).toBeVisible();
+      expect(screen.getByText(zh ? '分组 B' : 'Group B')).toBeVisible();
       expect(screen.getAllByText(zh ? '示例' : 'Sample')).toHaveLength(3);
       view.unmount();
       render(localized(locale, <ReportGroupedTableBlock block={block} mode="runtime"
         data={[{ value: 'User Entry' }, { owner: 'Group A', value: 'User Sample' }]} />));
-      expect(screen.getByText(zh ? 'owner: 其它 (1)' : 'owner: Other (1)')).toBeVisible();
-      expect(screen.getByText('owner: Group A (1)')).toBeVisible();
+      expect(screen.getByText(zh ? '其它 (1)' : 'Other (1)')).toBeVisible();
+      expect(screen.getByText('Group A (1)')).toBeVisible();
       expect(screen.getByText('User Entry')).toBeVisible();
       expect(screen.getByText('User Sample')).toBeVisible();
       expect(screen.getByText('User Value')).toBeVisible();
+      expect(screen.queryByText(/owner:/)).toBeNull();
+    });
+    it('uses a configured group label and preserves the actual group value',()=>{
+      render(localized(locale,<ReportGroupedTableBlock block={{id:'friendly',blockType:'grouped-table',dataSource:'main',groupByField:'owner',columns:[{field:'owner',label:'Responsible'}]}} mode="runtime" data={[{owner:'Operations'}]} />));
+      expect(screen.getByText('Responsible: Operations (1)')).toBeVisible();expect(screen.queryByText(/owner:/)).toBeNull();
+    });
+    it('shows a configured statistic section title without duplicating a fallback metric label',()=>{
+      const block={id:'metric',blockType:'stat-card' as const,dataSource:'main',valueField:'amount',aggregation:'sum' as const,title:'Executive metric',label:'Accepted amount'};
+      const view=render(localized(locale,<ReportStatCardBlock block={block} mode="runtime" data={[{amount:10}]} />));
+      expect(screen.getByText('Executive metric')).toBeVisible();expect(screen.getByText('Accepted amount')).toBeVisible();
+      view.rerender(localized(locale,<ReportStatCardBlock block={{...block,label:''}} mode="runtime" data={[]} />));expect(screen.getAllByText('Executive metric')).toHaveLength(1);
     });
     it('initializes the report title in the active language', () => {
       render(localized(locale, <CurrentTitle />));

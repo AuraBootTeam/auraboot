@@ -105,6 +105,7 @@ class FileUploadControllerTest {
         FileEntity file = storedFile("quote.pdf", "application/pdf", "/private/storage/quote.pdf");
         file.setFileSize(123L);
         when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(fileService.getFileDownloadUrl("file-pid")).thenReturn("/api/file/download/file-pid");
         when(fileService.getFileRelations("file-pid")).thenReturn(List.of());
 
         mvc.perform(get("/api/file/file-pid").accept(MediaType.APPLICATION_JSON))
@@ -113,6 +114,7 @@ class FileUploadControllerTest {
                 .andExpect(jsonPath("$.data.originalName").value("quote.pdf"))
                 .andExpect(jsonPath("$.data.mimeType").value("application/pdf"))
                 .andExpect(jsonPath("$.data.fileSize").value(123))
+                .andExpect(jsonPath("$.data.url").value("/api/file/download/file-pid"))
                 .andExpect(jsonPath("$.data.localPath").doesNotExist());
         verifyNoInteractions(storageProvider, dataAccessAuthorizationHelper, adminEventLogService);
     }

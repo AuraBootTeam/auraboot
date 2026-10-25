@@ -27,12 +27,12 @@ class PluginResourceImporterRefTargetNormalizationTest {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> resolve(FieldDefinitionDTO dto) {
-        return (Map<String, Object>) ReflectionTestUtils.invokeMethod(importer, "resolveFieldRefTarget", dto);
+        return (Map<String, Object>) ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "resolveFieldRefTarget", dto);
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> buildFieldExtension(FieldDefinitionDTO dto) {
-        return (Map<String, Object>) ReflectionTestUtils.invokeMethod(importer, "buildFieldExtension", dto);
+        return (Map<String, Object>) ReflectionTestUtils.invokeMethod((Object) ReflectionTestUtils.invokeMethod(importer, "fieldsModelsBindings"), "buildFieldExtension", dto);
     }
 
     private FieldDefinitionDTO refField() {

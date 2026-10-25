@@ -1,251 +1,130 @@
 #!/usr/bin/env bash
-#
-# Self-contained capability-eval runner for the digital-employee agent line.
-#
-# Answers one question: **is this digital employee actually competent?** — not
-# "did it compile" or "is the page wired up". It brings up an isolated stack,
-# runs the live capability evals against a real LLM plus the plugin import seams,
-# and exits non-zero when the agent fails a capability gate.
-#
-# Owner has no CI budget, so this is the deliverable form: one command, brings up
-# its own stack, tears it down on any exit path, and its exit code IS the result.
-# Run it at release time or from cron; there is no .yml workflow.
-#
-#   ./scripts/digital-employee-capability-eval-run.sh            # full suite
-#   ./scripts/digital-employee-capability-eval-run.sh --keep     # keep stack for inspection
-#   ./scripts/digital-employee-capability-eval-run.sh --slot 83  # pick a runtime slot
-#
-# Provider-neutral live profile (credential value is never printed):
-#   AURA_LIVE_LLM_PROVIDER
-#   AURA_LIVE_LLM_MODEL
-#   AURA_LIVE_LLM_API_KEY_ENV
-#   AURA_LIVE_LLM_BASE_URL (optional when provider catalog supplies it)
-#
-# WHY A DEDICATED RUNNER (the incident this exists to prevent): the live evals are
-# excluded from every default gradle task, so for months nothing ran them. When
-# an upstream provider retired a model identifier, all live capability evals
-# broke silently — the layer that proves the agent works was itself dead, and the
-# only reason anyone found out was running it by hand. A gate nobody runs is not
-# a gate. scripts/perf-ci/cron.example wires this into the nightly rotation, and
-# scripts/release/tag-release.sh runs it on the exact commit before an OSS tag.
+# Run the existing capability-eval catalog through its physical module owners.
+# Full is the release qualification; focused is a representative live evaluation;
+# deterministic proves import/persistence plumbing and never claims model quality.
 set -euo pipefail
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORKSPACE_ROOT=""
-for workspace_candidate in \
-  "$REPO_ROOT/.." \
-  "$REPO_ROOT/../.." \
-  "$REPO_ROOT/../../.." \
-  "$REPO_ROOT/../../../.."
-do
-  workspace_candidate="$(cd "$workspace_candidate" && pwd)"
-  if [ -x "$workspace_candidate/dev.sh" ]; then
-    WORKSPACE_ROOT="$workspace_candidate"
-    break
-  fi
-done
+WORKSPACE_ROOT="${AURA_WORKSPACE_ROOT:-}"
 if [ -z "$WORKSPACE_ROOT" ]; then
-  printf '[capability-eval] FAIL: could not locate workspace dev.sh above %s\n' \
-    "$REPO_ROOT" >&2
-  exit 2
+  candidate="$REPO_ROOT"
+  for _ in 1 2 3 4; do
+    candidate="$(dirname "$candidate")"
+    if [ -x "$candidate/aura" ]; then WORKSPACE_ROOT="$candidate"; break; fi
+  done
 fi
-
+[ -x "$WORKSPACE_ROOT/aura" ] || { echo '[capability-eval] Workspace aura CLI is required' >&2; exit 2; }
+RUNTIME="${AURA_RUNTIME_NAME:-de-capability-eval}"
 SLOT="${SLOT:-83}"
+PROFILE=full
 KEEP=0
-RUNTIME_NAME="de-capability-eval-$$"
-
+source_specs=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --keep) KEEP=1; shift ;;
+    --runtime) RUNTIME="$2"; shift 2 ;;
     --slot) SLOT="$2"; shift 2 ;;
-    -h|--help) sed -n '3,30p' "$0"; exit 0 ;;
-    *) echo "unknown arg: $1" >&2; exit 2 ;;
+    --profile) PROFILE="$2"; shift 2 ;;
+    --source) source_specs+=(--source "$2"); shift 2 ;;
+    --keep) KEEP=1; shift ;;
+    --help|-h) echo 'Usage: digital-employee-capability-eval-run.sh [--runtime NAME] [--slot N] [--profile full|focused|deterministic] [--source key=path] [--keep]'; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
-
-RUN_DIR="${RUN_DIR:-$REPO_ROOT/build/capability-eval}"
-mkdir -p "$RUN_DIR"
-LOG="$RUN_DIR/capability-eval.log"
-
-log() { printf '[capability-eval] %s\n' "$*"; }
-
-# --- explicit live profile check (report SET/UNSET, never key value) --------
-for required_var in \
-  AURA_LIVE_LLM_PROVIDER \
-  AURA_LIVE_LLM_MODEL \
-  AURA_LIVE_LLM_API_KEY_ENV
-do
-  if [ -z "${!required_var:-}" ]; then
-    log "FAIL: $required_var is UNSET; refusing a live suite that would self-skip."
-    exit 2
-  fi
-done
-
-key_env="$AURA_LIVE_LLM_API_KEY_ENV"
-if [[ ! "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-  log "FAIL: AURA_LIVE_LLM_API_KEY_ENV is not a valid environment variable name."
-  exit 2
-fi
-if [ -z "${!key_env:-}" ]; then
-  log "FAIL: configured live credential variable $key_env is UNSET."
-  exit 2
-fi
-log "live profile: provider=$AURA_LIVE_LLM_PROVIDER model=$AURA_LIVE_LLM_MODEL key=$key_env=SET"
-if [ -n "${AURA_LIVE_LLM_BASE_URL:-}" ]; then
-  log "live profile base URL: SET"
-else
-  log "live profile base URL: UNSET (provider catalog must supply it)"
-fi
-
-DB_NAME="auraboot_${SLOT}"
-
-cleanup() {
-  local rc=$?
-  if [ "$KEEP" = "1" ]; then
-    log "--keep set: leaving runtime '$RUNTIME_NAME' (db=$DB_NAME) up for inspection"
-  else
-    log "tearing down runtime '$RUNTIME_NAME'"
-    (cd "$WORKSPACE_ROOT" && ./dev.sh infra cleanup "$RUNTIME_NAME" --yes >/dev/null 2>&1) || true
-    (cd "$WORKSPACE_ROOT" && ./dev.sh runtime destroy "$RUNTIME_NAME" --yes >/dev/null 2>&1) || true
-  fi
-  exit $rc
-}
-trap cleanup EXIT INT TERM
-
-# --- bring up an isolated stack ---------------------------------------------
-# Slots are shared with every other session on this machine. Never grab one that
-# is already allocated: that is someone else's running stack, and the eval would
-# either fail confusingly or trample their work. Probe upward from the requested
-# slot and take the first free one.
-allocate_on_free_slot() {
-  local slot="$1" attempts=0 out
-  while [ "$attempts" -lt 12 ]; do
-    if out=$(cd "$WORKSPACE_ROOT" && ./dev.sh runtime allocate auraboot "$RUNTIME_NAME" --slot "$slot" \
-               --purpose "digital-employee capability eval (live LLM)" --ttl 2h 2>&1); then
-      printf '%s\n' "$out" >>"$LOG"
-      SLOT="$slot"
-      DB_NAME="auraboot_${SLOT}"
-      log "allocated runtime '$RUNTIME_NAME' on slot $SLOT (db=$DB_NAME)"
-      return 0
-    fi
-    printf '%s\n' "$out" >>"$LOG"
-    case "$out" in
-      *"already allocated"*)
-        log "slot $slot is taken by another session — trying $((slot+1))"
-        slot=$((slot+1)); attempts=$((attempts+1)) ;;
-      *)
-        # Anything other than a slot clash is a real failure: surface it instead of
-        # exiting silently through the trap with the reason buried in the log.
-        log "FAIL: could not allocate a runtime:"; printf '%s\n' "$out" >&2; return 1 ;;
-    esac
+# Validate the profile before provisioning or making any model request.
+node --input-type=module - "$REPO_ROOT" "$PROFILE" <<'JS'
+const { profileSuites } = await import(process.argv[2] + '/scripts/lib/capability-eval-junit.mjs');
+profileSuites(process.argv[3]);
+JS
+if [ "$PROFILE" != deterministic ]; then
+  for name in AURA_LIVE_LLM_PROVIDER AURA_LIVE_LLM_MODEL AURA_LIVE_LLM_API_KEY_ENV; do
+    [ -n "${!name:-}" ] || { echo "[capability-eval] $name is UNSET; live profile refused" >&2; exit 2; }
   done
-  log "FAIL: no free runtime slot found starting at $1"
-  return 1
+  key_env="$AURA_LIVE_LLM_API_KEY_ENV"
+  [[ "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo 'Invalid credential environment variable name' >&2; exit 2; }
+  [ -n "${!key_env:-}" ] || { echo "[capability-eval] $key_env is UNSET" >&2; exit 2; }
+  echo "[capability-eval] provider=$AURA_LIVE_LLM_PROVIDER model=$AURA_LIVE_LLM_MODEL credential=SET profile=$PROFILE"
+fi
+# Reuse one stable runtime; no slot scanning, shared cache override or destructive trap.
+"$WORKSPACE_ROOT/aura" runtime ensure auraboot "$RUNTIME" --slot "$SLOT" --source-root "$REPO_ROOT" --purpose 'Digital employee capability evaluation' --ttl 8h
+if [ -n "${RUN_DIR:-}" ]; then
+  mkdir -p "$RUN_DIR"
+else
+  RUN_DIR="$("$WORKSPACE_ROOT/aura" runtime evidence begin "$RUNTIME" --purpose "capability evaluation $PROFILE")"
+fi
+LOG="$RUN_DIR/capability-eval.log"
+cleanup() {
+  rc=$?
+  if [ "$KEEP" != 1 ]; then
+    "$WORKSPACE_ROOT/aura" runtime suspend "$RUNTIME" >>"$LOG" 2>&1 || { echo '[capability-eval] Owned suspend failed; inspect retained runtime' >&2; [ "$rc" != 0 ] || rc=1; }
+  fi
+  exit "$rc"
 }
-
-allocate_on_free_slot "$SLOT" || exit 2
-
-if ! out=$(cd "$WORKSPACE_ROOT" && ./dev.sh infra ensure "$RUNTIME_NAME" --yes 2>&1); then
-  printf '%s\n' "$out" >>"$LOG"
-  log "FAIL: infra ensure failed for '$RUNTIME_NAME':"
-  printf '%s\n' "$out" >&2
-  exit 2
-fi
-printf '%s\n' "$out" >>"$LOG"
-
-# The integration-test profile assumes a migrated database. A freshly created one
-# is empty, so the Spring context dies on the first missing table — apply the
-# committed schema snapshot before running anything. ON_ERROR_STOP so a broken
-# snapshot fails here loudly instead of surfacing as a confusing test error.
-log "applying schema snapshot to $DB_NAME"
-PGPASSWORD="${PGPASSWORD:-postgres}" psql -v ON_ERROR_STOP=1 -h localhost -U auraboot -d "$DB_NAME" \
-  -f "$REPO_ROOT/platform/src/main/resources/db/snapshots/schema-current.sql" >>"$LOG" 2>&1
-log "schema applied ($(PGPASSWORD="${PGPASSWORD:-postgres}" psql -h localhost -U auraboot -d "$DB_NAME" \
-  -tAc "select count(*) from information_schema.tables where table_name like 'ab_%'") ab_* tables)"
-
-# --- run the capability evals ------------------------------------------------
-# Two gradle tasks are needed: `testAgent` covers **/agent/**, but the dashboard
-# generation eval lives under **/aurabot/** and is only reachable via `testAi`.
-# Running just one silently omits an eval — that is how DashboardGenerationLiveIT
-# went unrun.
-export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/${DB_NAME}?charSet=UTF8"
-export SPRING_DATA_REDIS_HOST=127.0.0.1
-export SPRING_DATA_REDIS_PORT=6379
-export SPRING_DATA_REDIS_DATABASE="${REDIS_DATABASE:-1}"
-# Keep the shared ~/.m2 and ~/.gradle: a per-runtime cache lacks the released
-# artifacts these modules need and would fail resolution, not capability.
-unset MAVEN_OPTS GRADLE_OPTS MAVEN_REPO_LOCAL GRADLE_USER_HOME || true
-
-GRADLE="$REPO_ROOT/platform/gradlew"
+trap cleanup EXIT
+AURA_WORKSPACE_ROOT="$WORKSPACE_ROOT" "$REPO_ROOT/scripts/oss-golden-stack.sh" up "$RUNTIME" --slot "$SLOT" \
+  --isolated-redis-port "${AURA_EVAL_REDIS_PORT:-$((16400 + SLOT))}" --plugin-profile default --no-frontend --no-warm ${source_specs[@]+"${source_specs[@]}"} >>"$LOG" 2>&1
+"$WORKSPACE_ROOT/aura" runtime verify "$RUNTIME" >>"$LOG" 2>&1
+mkdir -p "$RUN_DIR/native"
+node --input-type=module - "$RUN_DIR" "$PROFILE" "$RUNTIME" <<'JS'
+import fs from 'node:fs';
+fs.writeFileSync(process.argv[2] + '/run-context.json', JSON.stringify({
+  startedAt: new Date().toISOString(), profile: process.argv[3], runtime: process.argv[4],
+  provider: process.env.AURA_LIVE_LLM_PROVIDER ?? null, model: process.env.AURA_LIVE_LLM_MODEL ?? null,
+  credential: process.env.AURA_LIVE_LLM_API_KEY_ENV && process.env[process.env.AURA_LIVE_LLM_API_KEY_ENV] ? 'SET' : 'UNSET',
+}, null, 2) + '\n');
+JS
+export AURA_EVAL_REDIS_PORT="${AURA_EVAL_REDIS_PORT:-$((16400 + SLOT))}"
 rc=0
-
-log "running agent capability evals (testAgent)"
-"$GRADLE" -p "$REPO_ROOT/platform" :testAgent -PincludeLiveEvals \
-  --tests '*AgentEvalCaseImportIT' \
-  --tests '*MultiPluginEvalCaseCoexistenceIT' \
-  --tests '*DeviceAgentSeedImportIT' \
-  --tests '*AgentFormFillHardLiveIT' \
-  --tests '*AgentFormFillLiveIT' \
-  --tests '*AgentMultiStepConvergenceLiveIT' \
-  --tests '*CapabilityEvalLiveIT' \
-  --tests '*CapabilityScorecardLiveIT' \
-  --tests '*ChatBiToolIntentLiveIT' \
-  --tests '*ConversationFaqExtractionLiveIT' \
-  --tests '*CsComplaintEmailExtractionLiveIT' \
-  --tests '*DeviceAgentLiveEvalIT' \
-  --tests '*DeviceDiagnosticsFullTurnIT' \
-  --tests '*DeviceOperationsAgentLiveEvalIT' \
-  --tests '*LlmTurnQualityJudgeLiveIT' \
-  --tests '*NlModelingApplyV4LiveIT' \
-  --tests '*NlModelingLiveQualityIT' \
-  --tests '*PcbaQualityAgentLiveEvalIT' \
-  >>"$LOG" 2>&1 || rc=1
-
-log "running aurabot skill evals (testAi)"
-"$GRADLE" -p "$REPO_ROOT/platform" :testAi -PincludeLiveEvals \
-  --tests '*DashboardGenerationLiveIT' \
-  >>"$LOG" 2>&1 || rc=1
-
-# --- report from an explicit JUnit inventory, not from the exit code ----------
-# Gradle cannot distinguish "every eval skipped" from "every eval passed". A
-# broad XML glob also cannot distinguish "required suite omitted" from "suite
-# intentionally absent". The checked inventory is the authoritative receipt.
-log "results:"
-summary_rc=0
-node "$REPO_ROOT/scripts/lib/capability-eval-junit.mjs" \
-  --results-root "$REPO_ROOT/platform/build/test-results" \
-  | tee "$RUN_DIR/summary.txt" || summary_rc=$?
-
-if [ "$summary_rc" -ne 0 ] || [ "$rc" -ne 0 ]; then
-  log "FAIL: required capability eval suite is missing, skipped, or failed. Log: $LOG"
-  exit 1
-fi
-
-git_sha="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-tracked_source_dirty=false
-[[ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)" ]] \
-  && tracked_source_dirty=true
-untracked_files="$(
-  git -C "$REPO_ROOT" status --porcelain --untracked-files=all \
-    | awk '$1 == "??" { count++ } END { print count + 0 }'
-)"
-{
-  printf 'git_sha=%s\n' "$git_sha"
-  printf 'tracked_source_dirty=%s\n' "$tracked_source_dirty"
-  printf 'untracked_files=%s\n' "$untracked_files"
-  printf 'provider=%s\n' "$AURA_LIVE_LLM_PROVIDER"
-  printf 'model=%s\n' "$AURA_LIVE_LLM_MODEL"
-  printf 'api_key_env=%s\n' "$AURA_LIVE_LLM_API_KEY_ENV"
-  printf 'required_suites=19\n'
-  printf 'tests=32\n'
-  printf 'skipped=0\n'
-  printf 'failures=0\n'
-  printf 'errors=0\n'
-  printf 'completed_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf 'summary=%s\n' "$RUN_DIR/summary.txt"
-} >"$RUN_DIR/receipt.env"
-
-log "PASS: every required deterministic and live capability suite ran; 0 skipped, 0 failed."
-log "receipt: $RUN_DIR/receipt.env"
-log "log: $LOG"
-exit 0
+for module in platform-app platform-agent; do
+  selectors=()
+  while IFS= read -r class; do [ -z "$class" ] || selectors+=(--tests "$class"); done < <(
+    node --input-type=module - "$REPO_ROOT" "$PROFILE" "$module" "$RUN_DIR" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+const [repo, profile, module, output] = process.argv.slice(2);
+const { profileSuites } = await import(repo + '/scripts/lib/capability-eval-junit.mjs');
+for (const [task, name] of profileSuites(profile).filter(([task]) => task === module + '/test')) {
+  const xml = path.join(repo, 'platform', module, 'build/test-results/test', `TEST-${name}.xml`);
+  // Remove only selected generated outputs so an early build failure cannot accept stale XML.
+  if (fs.existsSync(xml)) fs.unlinkSync(xml);
+  console.log(name);
+}
+JS
+  )
+  [ "${#selectors[@]}" -gt 0 ] || continue
+  "$WORKSPACE_ROOT/aura" run "$RUNTIME" --workdir "$REPO_ROOT/platform" -- bash -c \
+    'export TEST_DATABASE_URL="$DATABASE_URL" TEST_DATABASE_USERNAME="$DATABASE_USERNAME" TEST_DATABASE_PASSWORD="${DATABASE_PASSWORD-}" SPRING_DATA_REDIS_HOST=127.0.0.1 SPRING_DATA_REDIS_PORT="$AURA_EVAL_REDIS_PORT" SPRING_DATA_REDIS_DATABASE="$REDIS_DATABASE"; exec "$@"' \
+    _ "$WORKSPACE_ROOT/aura" gradle "$RUNTIME" --project "$REPO_ROOT/platform" -- ":$module:test" --rerun -PincludeLiveEvals "${selectors[@]}" --no-daemon >>"$LOG" 2>&1 || rc=1
+  node --input-type=module - "$REPO_ROOT" "$PROFILE" "$module" "$RUN_DIR" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+const [repo, profile, module, output] = process.argv.slice(2);
+const { profileSuites } = await import(repo + '/scripts/lib/capability-eval-junit.mjs');
+for (const [task, name] of profileSuites(profile).filter(([task]) => task === module + '/test')) {
+  const source = path.join(repo, 'platform', module, 'build/test-results/test', `TEST-${name}.xml`);
+  const dest = path.join(output, 'native', task, `TEST-${name}.xml`);
+  if (fs.existsSync(source)) { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(source, dest); }
+}
+JS
+done
+node "$REPO_ROOT/scripts/lib/capability-eval-junit.mjs" --results-root "$RUN_DIR/native" --profile "$PROFILE" --json-out "$RUN_DIR/report.json" | tee "$RUN_DIR/summary.txt" || rc=1
+# Preserve the release helper's exact-source receipt, using parsed native counts.
+node --input-type=module - "$REPO_ROOT" "$PROFILE" "$RUN_DIR" "$rc" <<'JS'
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const [repo, profile, output, rc] = process.argv.slice(2);
+const report = JSON.parse(fs.readFileSync(output + '/report.json', 'utf8'));
+const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' }).trim();
+report.nativePass = report.ok;
+report.gradleSucceeded = rc === '0';
+report.ok = report.ok && report.gradleSucceeded;
+report.source = { commit: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain=v1', '--untracked-files=all') !== '' };
+report.claim = profile === 'full' ? 'full catalog qualification' : profile === 'focused' ? 'representative live evaluation only' : 'deterministic import/persistence plumbing only';
+fs.writeFileSync(output + '/report.json', JSON.stringify(report, null, 2) + '\n');
+if (report.ok) fs.writeFileSync(output + '/receipt.env', [
+  `git_sha=${report.source.commit}`, `tracked_source_dirty=${report.source.dirty}`, `profile=${profile}`,
+  `required_suites=${report.requiredSuites}`, `tests=${report.totals.tests}`, `skipped=${report.totals.skipped}`,
+  `failures=${report.totals.failures}`, `errors=${report.totals.errors}`, `completed_at=${new Date().toISOString()}`,
+].join('\n') + '\n');
+JS
+# A native suite failure remains a failed run even if older/generated receipts appear green.
+if [ "$rc" != 0 ]; then echo "[capability-eval] FAIL: profile=$PROFILE; evidence=$RUN_DIR"; exit 1; fi
+echo "[capability-eval] PASS: profile=$PROFILE; evidence=$RUN_DIR (no wider quality claim)"

@@ -1,3 +1,4 @@
+import { requireAgent } from '../../client/agent-capabilities.js';
 import chalk from 'chalk';
 import { ApiClient, EXIT } from '../../client/api-client.js';
 import { resolveOutputOptions, printOutput, printDetail, type ColumnDef } from '../../output/formatter.js';
@@ -23,6 +24,7 @@ const TOOL_COLUMNS: ColumnDef[] = [
 export async function toolListCommand(options: ToolOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const opts = resolveOutputOptions(options);
 
@@ -44,6 +46,7 @@ export async function toolListCommand(options: ToolOptions): Promise<void> {
 export async function toolTestCommand(code: string, options: ToolOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const opts = resolveOutputOptions(options);
 

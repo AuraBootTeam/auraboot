@@ -37,6 +37,7 @@ RUN if [ "$MAVEN_CENTRAL_FIRST" = "true" ]; then \
 COPY platform/gradlew gradlew
 COPY platform/gradle gradle
 COPY platform/build.gradle platform/settings.gradle platform/gradle.properties ./
+COPY platform/gradle.lockfile ./
 # Lombok controls constructor binding and copied injection qualifiers, hence the HTTP contract.
 COPY platform/lombok.config ./
 # platform/build.gradle intentionally reads ../VERSION so the platform and repository release
@@ -45,6 +46,9 @@ COPY VERSION /VERSION
 COPY scripts/ci/gradle-repositories.init.gradle /opt/aura-ci/gradle-repositories.init.gradle
 
 # Copy subproject build files for dependency resolution
+COPY platform/platform-bom/build.gradle platform-bom/build.gradle
+COPY platform/platform-app/build.gradle platform-app/build.gradle
+COPY platform/platform-agent/build.gradle platform-agent/build.gradle
 COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle
 COPY platform/platform-storage-minio/build.gradle platform-storage-minio/build.gradle
 COPY platform/platform-storage-s3/build.gradle platform-storage-s3/build.gradle
@@ -53,6 +57,17 @@ COPY platform/platform-storage-cos/build.gradle platform-storage-cos/build.gradl
 COPY platform/platform-mq-kafka/build.gradle platform-mq-kafka/build.gradle
 COPY platform/platform-mq-rabbitmq/build.gradle platform-mq-rabbitmq/build.gradle
 COPY platform/platform-scheduler-xxl/build.gradle platform-scheduler-xxl/build.gradle
+
+COPY platform/platform-plugin-api/gradle.lockfile platform-plugin-api/gradle.lockfile
+COPY platform/platform-storage-minio/gradle.lockfile platform-storage-minio/gradle.lockfile
+COPY platform/platform-storage-s3/gradle.lockfile platform-storage-s3/gradle.lockfile
+COPY platform/platform-storage-oss/gradle.lockfile platform-storage-oss/gradle.lockfile
+COPY platform/platform-storage-cos/gradle.lockfile platform-storage-cos/gradle.lockfile
+COPY platform/platform-mq-kafka/gradle.lockfile platform-mq-kafka/gradle.lockfile
+COPY platform/platform-mq-rabbitmq/gradle.lockfile platform-mq-rabbitmq/gradle.lockfile
+COPY platform/platform-scheduler-xxl/gradle.lockfile platform-scheduler-xxl/gradle.lockfile
+COPY platform/platform-app/gradle.lockfile platform-app/gradle.lockfile
+COPY platform/platform-agent/gradle.lockfile platform-agent/gradle.lockfile
 
 RUN chmod +x gradlew
 
@@ -65,6 +80,8 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
 
 # Copy source code
 COPY platform/src ./src
+COPY platform/platform-app/src platform-app/src
+COPY platform/platform-agent/src platform-agent/src
 COPY platform/platform-plugin-api/src platform-plugin-api/src
 COPY platform/platform-storage-minio/src platform-storage-minio/src
 COPY platform/platform-storage-s3/src platform-storage-s3/src

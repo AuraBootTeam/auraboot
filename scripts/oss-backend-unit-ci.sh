@@ -316,10 +316,14 @@ if [[ -n "${AURA_ALLURE_RESULTS:-}" && -d "$PROJECT_ROOT/platform/build/allure-r
 fi
 # Preserve the original test status while retaining both tasks' JUnit evidence.
 mkdir -p "$ARTIFACTS/junit"
-for task in test bootstrapBillingAccountTest; do
-  if [[ -d "$PROJECT_ROOT/platform/build/test-results/$task" ]]; then
-    cp -a "$PROJECT_ROOT/platform/build/test-results/$task" "$ARTIFACTS/junit/" || \
-      printf '[oss-backend-unit-ci] warning: unable to copy %s JUnit results\n' "$task" >&2
-  fi
+for build in "$PROJECT_ROOT/platform/build" "$PROJECT_ROOT"/platform/*/build; do
+  module="$(basename "$(dirname "$build")")"
+  for task in test bootstrapBillingAccountTest; do
+    if [[ -d "$build/test-results/$task" ]]; then
+      mkdir -p "$ARTIFACTS/junit/$module"
+      cp -a "$build/test-results/$task" "$ARTIFACTS/junit/$module/" || \
+        printf '[oss-backend-unit-ci] warning: unable to copy %s/%s JUnit results\n' "$module" "$task" >&2
+    fi
+  done
 done
 exit "$gradle_status"

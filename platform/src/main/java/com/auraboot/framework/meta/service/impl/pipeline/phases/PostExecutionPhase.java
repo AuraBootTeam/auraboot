@@ -76,7 +76,8 @@ public class PostExecutionPhase implements CommandPhase {
 
         // Side effects
         sideEffectExecutor.executeSideEffectPhase(ctx.getExecConfig(), ctx.getPayload(),
-                ctx.getTenantId(), ctx.getUserId(), ctx.getCommand(), ctx.getRequest(), ctx.getFieldMapResults());
+                ctx.getTenantId(), ctx.getUserId(), ctx.getCommand(), ctx.getRequest(), ctx.getFieldMapResults(),
+                ctx.getBeforeSnapshot());
 
         // Roll-up recalculation
         executeRollUpRecalculation(ctx.getCommand().getModelCode(), ctx.getPayload(),

@@ -26,6 +26,7 @@ import java.util.List;
 public class WatchServiceImpl implements WatchService {
 
     private final AbWatchMapper watchMapper;
+    private final com.auraboot.framework.meta.service.RecordReadAccess recordReadAccess;
 
     @Override
     @Transactional
@@ -40,6 +41,7 @@ public class WatchServiceImpl implements WatchService {
             return false;
         }
 
+        recordReadAccess.requireReadable(modelCode, String.valueOf(recordId));
         AbWatch watch = new AbWatch();
         watch.setTenantId(tenantId);
         watch.setUserId(userId);
@@ -69,6 +71,7 @@ public class WatchServiceImpl implements WatchService {
             return false;
         }
 
+        recordReadAccess.requireReadable(modelCode, recordPid);
         AbWatch watch = new AbWatch();
         watch.setTenantId(tenantId);
         watch.setUserId(userId);
@@ -101,7 +104,9 @@ public class WatchServiceImpl implements WatchService {
     @Override
     public List<Long> getWatchers(String modelCode, Long recordId) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        return watchMapper.findWatcherUserIds(tenantId, modelCode, recordId);
+        return watchMapper.findWatcherUserIds(tenantId, modelCode, recordId).stream()
+                .filter(userId -> recordReadAccess.isReadableBy(tenantId, userId, modelCode, String.valueOf(recordId)))
+                .toList();
     }
 
     @Override
@@ -110,7 +115,9 @@ public class WatchServiceImpl implements WatchService {
             return List.of();
         }
         Long tenantId = MetaContext.getCurrentTenantId();
-        return watchMapper.findWatcherUserIdsByRecordPid(tenantId, modelCode, recordPid);
+        return watchMapper.findWatcherUserIdsByRecordPid(tenantId, modelCode, recordPid).stream()
+                .filter(userId -> recordReadAccess.isReadableBy(tenantId, userId, modelCode, recordPid))
+                .toList();
     }
 
     @Override

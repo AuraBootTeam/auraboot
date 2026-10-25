@@ -102,3 +102,18 @@ describe('comparisonStatusFieldClass', () => {
     expect(comparisonStatusFieldClass(status)).toContain('emerald');
   });
 });
+
+
+describe('opt-in semantic comparison palette', () => {
+  const field = { comparisonPalette: 'semantic' };
+  it('distinguishes exact agreement, disagreement, missing and unresolved evidence', () => {
+    expect(comparisonStatusFieldClass('matched', field)).toContain('emerald');
+    expect(comparisonStatusFieldClass('mismatch', field)).toContain('red');
+    for (const status of ['missing', 'missing_source', 'missing_candidate', 'missing_both'])
+      expect(comparisonStatusFieldClass(status, field)).toContain('gray');
+    for (const status of ['unknown', 'source_conflict'])
+      expect(comparisonStatusFieldClass(status, field)).toContain('amber');
+    expect(comparisonStatusFieldClass(undefined, field)).toBe('');
+    expect(comparisonStatusFieldClass('mismatch')).toContain('amber');
+  });
+});

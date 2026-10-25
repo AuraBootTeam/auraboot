@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:32:06.753Z" hostname="Mac" time="0.061">
+  <testcase name="deniedModelNeverLoadsRecords()" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.028" />
+  <testcase name="Linear chain: A→B→C, all on critical path" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.009" />
+  <testcase name="hiddenFieldNeverLoadsRecords()" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Empty project returns empty result" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Schedule map includes ES/EF/LS/LF/slack for all nodes" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Parallel independent tasks — both are critical if same duration" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Dependencies referencing non-existent nodes are ignored" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Single task is always critical path" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Diamond: A→B,C→D — identifies longer path as critical" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Null nodes list returns empty result" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="Cycle detected returns error" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+  <testcase name="SEC-20260723-03: malicious projectIdField is rejected before any SQL runs" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.0" />
+  <testcase name="SEC-20260723-03: legitimate snake_case field identifiers pass validation" classname="com.auraboot.framework.meta.service.impl.CriticalPathServiceTest" time="0.001" />
+</testsuite>

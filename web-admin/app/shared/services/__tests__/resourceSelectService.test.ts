@@ -27,6 +27,7 @@ vi.mock('~/shared/services/http-client', () => ({
 
 import {
   fetchPageOptions,
+  fetchPageNavigationOptions,
   fetchDashboardOptions,
   fetchAutomationOptions,
   fetchCommandOptions,
@@ -69,6 +70,21 @@ describe('product-owned workflow discovery', () => {
 });
 
 describe('resourceSelectService — error propagation', () => {
+  it('navigation targets use published default model-list paths, never page PIDs', async () => {
+    fetchResultMock.mockResolvedValue({code:'0',data:{total:3,records:[
+      {pid:'page-pid',pageKey:'tpm_acceptance_list',name:'交付验收',modelCode:'tpm_acceptance',kind:'list'},
+      {pid:'form-pid',modelCode:'tpm_acceptance',kind:'form'},
+      {pid:'profile-pid',modelCode:'tpm_acceptance',kind:'list',profile:'special'},
+    ]}});
+    expect(await fetchPageNavigationOptions()).toEqual([{value:'/p/tpm_acceptance',label:'交付验收',description:'/p/tpm_acceptance'}]);
+    expect(fetchResultMock).toHaveBeenCalledWith('/api/pages?kind=list&isPublished=true&pageNum=1&pageSize=100');
+  });
+  it('navigation discovery rejects denied or incomplete inventories rather than pretending no pages exist', async () => {
+    fetchResultMock.mockResolvedValueOnce({code:'403'});
+    await expect(fetchPageNavigationOptions()).rejects.toThrow('Unable to load');
+    fetchResultMock.mockResolvedValueOnce({code:'0',data:{total:2,records:[]}});
+    await expect(fetchPageNavigationOptions()).rejects.toThrow('incomplete');
+  });
   beforeEach(() => {
     fetchResultMock.mockReset();
   });

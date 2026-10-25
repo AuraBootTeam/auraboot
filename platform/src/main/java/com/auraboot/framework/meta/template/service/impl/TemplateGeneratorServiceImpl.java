@@ -245,6 +245,9 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
         request.setSchemaVersion(pageSchema.getSchemaVersion() != null ? pageSchema.getSchemaVersion()
                 : com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         request.setProfile(pageSchema.getProfile());
+        if (pageSchema.getExtension() != null && pageSchema.getExtension().getExtension() != null) {
+            request.setExtension(new LinkedHashMap<>(pageSchema.getExtension().getExtension()));
+        }
         request.setDescription(pageSchema.getDescription() != null
                 ? pageSchema.getDescription()
                 : "Auto-generated page for " + model.getCode());
@@ -295,6 +298,7 @@ public class TemplateGeneratorServiceImpl implements TemplateGeneratorService {
             update.setSchemaVersion(request.getSchemaVersion());
             Map<String, Object> extension = new LinkedHashMap<>(existing.getExtension());
             extension.remove("auto_created");
+            if (request.getExtension() != null) extension.putAll(request.getExtension());
             update.setExtension(extension);
             page = pageSchemaService.update(existing.getPid(), update);
         }

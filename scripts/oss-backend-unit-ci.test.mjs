@@ -149,7 +149,7 @@ test('backend CI runner executes isolated bootstrap verification only after the 
   assert.match(source, /run_backend_gradle aura_boot --continue bootstrapBillingAccountTest/);
   assert.match(source, /gradle_status=\$root_test_status/);
   assert.match(source, /gradle_status=\$bootstrap_test_status/);
-  const fixture = readFileSync(path.join(here, '..', 'platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
+  const fixture = readFileSync(path.join(here, '..', 'platform/platform-app/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
   assert.match(fixture, /SELECT current_database\(\)/);
   assert.match(fixture, /bootstrap progress must not be inherited/);
   assert.doesNotMatch(fixture, /TRUNCATE TABLE|DELETE FROM|@AfterEach/);
@@ -160,7 +160,7 @@ test('backend CI runner executes isolated bootstrap verification only after the 
 
 test('bootstrap task has a separately migrated database and refuses implicit shared URLs', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
-  const fixture = readFileSync(path.join(here, '..', 'platform', 'src', 'test', 'java',
+  const fixture = readFileSync(path.join(here, '..', 'platform', 'platform-app', 'src', 'test', 'java',
     'com', 'auraboot', 'framework', 'saas', 'bootstrap', 'BootstrapBillingAccountIT.java'), 'utf8');
   assert.match(source, /createdb -U auraboot "\$BOOTSTRAP_DATABASE"/);
   assert.match(source, /run_flyway migrate "\$BOOTSTRAP_DATABASE"/);
@@ -345,7 +345,7 @@ for (const [sharedStatus, bootstrapStatus, expected] of [[0, 0, 0], [1, 0, 1], [
 }
 
 test('bootstrap fixture requires fresh state and preserves immutable tenant bindings', () => {
-  const fixture = readFileSync(path.join(here, '../platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
+  const fixture = readFileSync(path.join(here, '../platform/platform-app/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
   assert.match(fixture, /SELECT COUNT\(\*\) FROM ab_tenant/);
   assert.match(fixture, /bootstrap result: %s/);
   assert.match(fixture, /SELECT billing_account_id FROM ab_tenant WHERE id = \?/);
@@ -457,4 +457,25 @@ test('both original Gradle tasks receive the admitted argument vector without ch
   assert.deepEqual(rows[0].slice(8),['--continue','cleanTest','test']);
   assert.deepEqual(rows[1].slice(8),['--continue','bootstrapBillingAccountTest']);
   assert.doesNotMatch(rows.flat().join('\n'),/--tests|exclude|retry|ContextCache/);
+});
+
+
+test('backend CI preserves JUnit evidence from every extracted module', t => {
+  const directory=mkdtempSync(path.join(tmpdir(),'module-junit-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));
+  for(const module of ['platform','platform/platform-agent','platform/platform-app']) {
+    const output=path.join(directory,module,'build/test-results/test');mkdirSync(output,{recursive:true});
+    writeFileSync(path.join(output,'TEST-owned.xml'),module);
+  }
+  const bootstrap=path.join(directory,'platform/build/test-results/bootstrapBillingAccountTest');mkdirSync(bootstrap,{recursive:true});
+  writeFileSync(path.join(bootstrap,'TEST-bootstrap.xml'),'bootstrap');
+  const body=source.slice(source.indexOf('for build in "$PROJECT_ROOT/platform/build"'),source.lastIndexOf('exit "$gradle_status"'));
+  assert.ok(body.includes('test-results/$task'));
+  const artifacts=path.join(directory,'evidence');mkdirSync(path.join(artifacts,'junit'),{recursive:true});
+  const run=spawnSync('bash',['-c',body],{encoding:'utf8',env:{...process.env,PROJECT_ROOT:directory,ARTIFACTS:artifacts}});
+  assert.equal(run.status,0,run.stderr);
+  for(const module of ['platform','platform-agent','platform-app'])assert.equal(readFileSync(path.join(artifacts,'junit',module,'test/TEST-owned.xml'),'utf8'),module==='platform'?'platform':'platform/'+module);
+  assert.equal(readFileSync(path.join(artifacts,'junit/platform/bootstrapBillingAccountTest/TEST-bootstrap.xml'),'utf8'),'bootstrap');
+  const build=readFileSync(gradleBuild,'utf8');
+  assert.match(build,/project\(':platform-app'\)\.sourceSets\.test\.output/);
+  assert.match(build,/project\(':platform-app'\)\.sourceSets\.test\.runtimeClasspath/);
 });

@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'platform/src/main/java/**'
+      - 'platform/platform-agent/src/main/java/**'
+      - 'platform/platform-app/src/main/java/**'
       - 'web-admin/app/**'
       - 'plugins/**/config/**'
       - 'scripts/validate-public-record-id-contracts.mjs'
@@ -16,6 +18,8 @@ on:
     branches: [main]
     paths:
       - 'platform/src/main/java/**'
+      - 'platform/platform-agent/src/main/java/**'
+      - 'platform/platform-app/src/main/java/**'
       - 'web-admin/app/**'
       - 'plugins/**/config/**'
       - 'scripts/validate-public-record-id-contracts.mjs'

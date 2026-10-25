@@ -55,14 +55,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderChatWithError(content: string) {
+function renderChatWithError(content: string, type: 'error' | 'text' | 'tool_cancelled' = 'error', overrides: Record<string, unknown> = {}) {
   const ctx: any = {
     state: {
       panelState: 'open',
       sessionId: 'test-session',
       currentConversationId: null,
       messages: [
-        { id: 'err-1', type: 'error', sender: 'bot', timestamp: 0, content },
+        { id: 'err-1', type, sender: 'bot', timestamp: 0, content, ...overrides },
       ],
       isLoading: false,
       pageContext: {},
@@ -123,5 +123,58 @@ describe('AuraBotChat — error message i18n', () => {
     expect(
       screen.getByText('LLM request failed: connection timeout'),
     ).toBeInTheDocument();
+  });
+});
+
+
+it('localizes the fixed approved-tool acknowledgement in persisted text messages', () => {
+  renderChatWithError('Approved tool executed.', 'text');
+  expect(screen.getByTestId('chat-msg-agent')).toHaveTextContent('审批通过，操作已完成。');
+  expect(screen.getByTestId('chat-msg-agent')).not.toHaveTextContent('Approved tool executed.');
+});
+
+
+it('does not render an empty assistant text placeholder', () => {
+  renderChatWithError('   ', 'text');
+  expect(screen.queryByTestId('chat-msg-agent')).not.toBeInTheDocument();
+});
+
+it('announces a completed cancellation as readable status feedback', () => {
+  renderChatWithError('操作已取消', 'tool_cancelled');
+  expect(screen.getByRole('status')).toHaveTextContent('操作已取消');
+});
+
+
+describe('AuraBotChat — assistant Markdown and trusted source references', () => {
+  it('renders headings and GFM table cells instead of formatting markers', () => {
+    renderChatWithError('## Maintenance\n\n| Item | Value |\n| --- | ---: |\n| Cooling | **43 minutes** |', 'text');
+    expect(screen.getByRole('heading', { name: 'Maintenance' })).toBeInTheDocument();
+    expect(screen.getByRole('table')).toHaveTextContent('43 minutes');
+    expect(screen.getByText('43 minutes').tagName).toBe('STRONG');
+  });
+
+  it('presents only matching trusted evidence references with readable document names', () => {
+    renderChatWithError('Source: `chunk:trusted`; unknown: `chunk:unknown`', 'text', { retrievalEvidence: [{
+      evidenceId: 'chunk:trusted', chunkPid: 'trusted', chunkIndex: 0, documentName: 'policy.txt',
+      path: 'hybrid', vectorScore: 0.7, warnings: [],
+    }] });
+    const reply = screen.getByTestId('chat-msg-agent');
+    expect(reply).toHaveTextContent('policy.txt');
+    expect(reply).not.toHaveTextContent('chunk:trusted');
+    expect(reply).toHaveTextContent('chunk:unknown');
+  });
+
+  it('does not execute raw HTML or allow javascript links in generated Markdown', () => {
+    renderChatWithError('<script>window.stolen=true</script>\n\n[unsafe](javascript:alert(1))', 'text');
+    const reply = screen.getByTestId('chat-msg-agent');
+    expect(reply.querySelector('script')).toBeNull();
+    expect(reply.querySelector('a[href^="javascript:"]')).toBeNull();
+    expect(reply.textContent).not.toContain('<script>');
+  });
+
+  it('keeps human Markdown literal', () => {
+    renderChatWithError('## Literal human **text**', 'text', { sender: 'user' });
+    expect(screen.getByTestId('chat-msg-user')).toHaveTextContent('## Literal human **text**');
+    expect(screen.queryByRole('heading', { name: /Literal human/ })).not.toBeInTheDocument();
   });
 });

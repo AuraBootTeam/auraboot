@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { PropertyFieldRenderer } from '../PropertyFieldRenderer';
 import type { PropertySchema } from '../types';
 
@@ -21,6 +21,17 @@ const arraySchema: PropertySchema<string> = {
 };
 
 describe('PropertyFieldRenderer / array', () => {
+  it('reorders complete items without mutating siblings and disables boundary moves', () => {
+    const items=[{name:'alpha',count:1},{name:'beta',count:2}];const setValue=vi.fn();
+    render(<PropertyFieldRenderer schema={arraySchema} adapter={makeAdapter(items,setValue)} />);
+    const first=within(screen.getByRole('group',{name:'Rule 1'}));
+    const second=within(screen.getByRole('group',{name:'Rule 2'}));
+    expect(first.getByRole('button',{name:/Move up|上移/})).toBeDisabled();
+    expect(second.getByRole('button',{name:/Move down|下移/})).toBeDisabled();
+    fireEvent.click(second.getByRole('button',{name:/Move up|上移/}));
+    expect(setValue).toHaveBeenCalledWith([{name:'beta',count:2},{name:'alpha',count:1}]);
+    expect(items[0].name).toBe('alpha');
+  });
   it('renders empty placeholder when value is empty', () => {
     render(
       <PropertyFieldRenderer schema={arraySchema} adapter={makeAdapter([], () => {})} />,

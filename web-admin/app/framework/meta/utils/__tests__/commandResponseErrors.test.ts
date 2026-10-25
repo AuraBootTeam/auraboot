@@ -2,6 +2,26 @@ import { describe, expect, it } from 'vitest';
 import { resolveCommandErrorMessage } from '../commandResponseErrors';
 
 describe('resolveCommandErrorMessage — string context reason key', () => {
+  it('localizes the deployed HTTP 400 string context rejection', () => {
+    const response = { code: '35000', message: 'Bad parameter', data: null,
+      context: 'Plugin handler execution failed: bom.error.dielectric_alias_target' };
+    expect(resolveCommandErrorMessage(response, 'bom:create_material_rule_dict',
+      key => key === 'bom.error.dielectric_alias_target'
+        ? '别名的标准值必须是已启用的介质标准码，请先维护或启用该标准码。' : key, 'zh-CN'))
+      .toBe('别名的标准值必须是已启用的介质标准码，请先维护或启用该标准码。');
+  });
+
+  it('does not expose an untranslated dotted key from string context', () => {
+    expect(resolveCommandErrorMessage({ context: 'Plugin handler execution failed: bom.error.missing' },
+      'bom:create_material_rule_dict', key => key, 'zh-CN'))
+      .toBe('操作未完成，请检查输入后重试。');
+  });
+
+  it('removes transport wrappers from readable string context', () => {
+    expect(resolveCommandErrorMessage({ context: 'Plugin handler execution failed: Check the alias target' },
+      'bom:create_material_rule_dict')).toBe('Check the alias target');
+  });
+
   it('translates a handler reason key after removing the platform wrapper', () => {
     expect(resolveCommandErrorMessage({code:'35000', context:{
       detail:'Plugin handler execution failed: qc.error.rework_source_pair_required',

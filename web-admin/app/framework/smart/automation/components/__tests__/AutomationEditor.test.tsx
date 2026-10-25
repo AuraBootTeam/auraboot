@@ -305,6 +305,27 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
     });
   });
 
+  it('replaces a historical failure overlay with the newly completed run', async () => {
+    const historical = { id: 41, pid: 'old-failure', automationId: 'auto-1', status: 'failed' as const };
+    const successful = { id: 42, pid: 'new-success', automationId: 'auto-1', status: 'success' as const };
+    let completeLatest: ((value: unknown) => void) | undefined;
+    const latest = new Promise((resolve) => { completeLatest = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/trigger')) return { ok: true, json: async () => ({ data: successful }) };
+      if (url.includes('/by-log/41/')) return { ok: true, json: async () => ({ data: [{ nodeId: 'node_a', status: 'failed' }] }) };
+      if (url.includes('/by-log/42/')) return latest;
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+    render(<AutomationEditor automationId="auto-1" initialData={{ name: 'Recovery', flowData: buildFlowData('a') }}
+      initialRunLog={historical} nodeStatuses={{ node_a: 'failed' }} />);
+    await waitFor(() => expect(receivedFlowDesignerProps.at(-1).nodeStatuses).toEqual({ node_a: 'failed' }));
+    fireEvent.click(screen.getByTestId('btn-test-run'));
+    await waitFor(() => expect(screen.getByTestId('automation-run-status')).toHaveTextContent('Success'));
+    expect(receivedFlowDesignerProps.at(-1).nodeStatuses).toBeNull();
+    await act(async () => completeLatest?.({ ok: true, json: async () => ({ data: [{ nodeId: 'node_a', status: 'completed' }] }) }));
+    await waitFor(() => expect(receivedFlowDesignerProps.at(-1).nodeStatuses).toEqual({ node_a: 'completed' }));
+  });
+
   it('shows the latest test run result with action side effects', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

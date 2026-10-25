@@ -1,0 +1,91 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>Eight reviewed OSS defects · 验收证据索引</title><style>
+body{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:2rem;color:#1a1a1a}
+.hdr{border-bottom:2px solid #ddd;padding-bottom:.5rem;margin-bottom:1rem}
+.sum{font-size:1.1rem;margin:.5rem 0}.reds{background:#fff3f3;border:1px solid #f5c2c2;padding:.5rem 1rem;border-radius:6px;margin:1rem 0}.reds.ok{background:#f2fbf2;border-color:#bfe6bf}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid #e5e5e5;padding:.35rem .5rem;text-align:left;vertical-align:top}
+.detail{background:#fafafa;font-size:.9rem}.shots img{max-width:360px;border:1px solid #ccc;margin:.25rem}
+.badge{font-family:monospace}.b-solid{color:#1a7f37}.b-dashed{color:#9a6700}.b-hollow{color:#8a8a8a}.b-metric{color:#0a5}.red{color:#c00;font-weight:bold}
+.layer{font-family:monospace;font-size:.85rem;color:#555}.ev{font-family:monospace;font-size:.85rem;color:#555}
+</style></head><body>
+<div class="hdr"><h1>Eight reviewed OSS defects · 验收证据索引</h1>
+<div>runtime - · commit - · 2026-10-23 13:34 · 修复回路 0 轮</div>
+<div>SoT: -</div></div>
+<div class="sum">🟢 9 🟡 0 🔴 0 ⬜ 0 / 9 行动点</div>
+<div class="sum">强度: spec-assert 9 · vision 0 · exit 0 · metric 0</div>
+<div class="reds ok"><h3>全部清零(无 red、无未测)</h3></div>
+    <details open><summary>regressions Eight fixes and attachment journey</summary>
+    <table><thead><tr><th></th><th>行动点</th><th>四轴</th><th>成色/证据</th><th>断言</th></tr></thead>
+    <tbody><tr class="dot-🟢">
+    <td>🟢</td><td>Schedule reads enforce model, field and self row scope</td><td class="layer">service/real-stack/it [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Schedule reads enforce model, field and self row scope</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Schedule reads enforce model, field and self row scope</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Member removal revokes signed sessions; inactive membership is rejected</td><td class="layer">api/real-stack/it [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Member removal revokes signed sessions; inactive membership is rejected</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Member removal revokes signed sessions; inactive membership is rejected</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Subscription and delivery recheck current record authority</td><td class="layer">service/real-stack/it [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Subscription and delivery recheck current record authority</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Subscription and delivery recheck current record authority</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Batch query worker retains caller identity and tenant</td><td class="layer">service/real-stack/it [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Batch query worker retains caller identity and tenant</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Batch query worker retains caller identity and tenant</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Successful uploads appear in the current tenant file list</td><td class="layer">service/real-stack/it [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Successful uploads appear in the current tenant file list</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Successful uploads appear in the current tenant file list</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>File metadata uses the canonical download URL and exact bytes</td><td class="layer">service/real-stack/it [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">File metadata uses the canonical download URL and exact bytes</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> File metadata uses the canonical download URL and exact bytes</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Abandoned running executions require reconciliation and fence late completion</td><td class="layer">service/real-stack/it [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Abandoned running executions require reconciliation and fence late completion</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Abandoned running executions require reconciliation and fence late completion</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Terminal turn metadata expires, is bounded, and releases accumulated text</td><td class="layer">pure-logic/hermetic/unit [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Terminal turn metadata expires, is bounded, and releases accumulated text</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Terminal turn metadata expires, is bounded, and releases accumulated text</div>
+    <div class="ev">exit:gradle → exit 0</div>
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Use sidebar, reject oversized upload, preview, download and delete attachment</td><td class="layer">journey/real-stack/browser [recorded]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">No oversized POST; uploaded PID appears in list; canonical metadata URL; downloaded bytes match; deleted artifact returns 404</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> No oversized POST; uploaded PID appears in list; canonical metadata URL; downloaded bytes match; deleted artifact returns 404</div>
+    <div class="ev">playwright:upload-attachment-artifact.spec.ts::SmartUpload enforces constraints, downloads uploaded bytes, and deletes the file API record → passed</div><div class="ev">exit:browser → exit 0</div>
+  </td></tr></tbody></table></details></body></html>

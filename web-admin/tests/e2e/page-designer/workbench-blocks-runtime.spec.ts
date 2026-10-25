@@ -288,13 +288,20 @@ async function createPublishedWorkbenchPage(page: import('@playwright/test').Pag
 }
 
 test.describe('Page Designer workbench block runtime', () => {
+  test.use({ locale: 'en-US', viewport: { width: 1440, height: 1000 } });
   test('persists and renders all workbench blocks in a real dynamic custom page', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    const capture = async (id: string) => {
+      await testInfo.attach(id, { body: await page.screenshot(), contentType: 'image/png' });
+    };
     const { pageKey } = await createPublishedWorkbenchPage(page);
 
     const readbackResp = await page.request.get(`/api/pages/key/${pageKey}`);
-    expect(readbackResp.ok(), `Readback workbench page failed: ${readbackResp.status()}`).toBeTruthy();
+    expect(
+      readbackResp.ok(),
+      `Readback workbench page failed: ${readbackResp.status()}`,
+    ).toBeTruthy();
     const readback = await readbackResp.json();
     expect(readback.code, 'readback API code').toBe('0');
     expect(readback.data?.status, 'readback page status').toBe('published');
@@ -307,9 +314,10 @@ test.describe('Page Designer workbench block runtime', () => {
     expect(new Set(persistedTypes).size, 'no duplicate block type in fixture').toBe(
       WORKBENCH_BLOCK_TYPES.length,
     );
-    expect(Object.keys(readback.data?.dataSources || {}).sort(), 'workbench data sources persisted').toEqual(
-      ['ds_artifacts', 'ds_candidates', 'ds_metrics'],
-    );
+    expect(
+      Object.keys(readback.data?.dataSources || {}).sort(),
+      'workbench data sources persisted',
+    ).toEqual(['ds_artifacts', 'ds_candidates', 'ds_metrics']);
 
     await page.goto(`/p/c/${pageKey}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 15_000 });
@@ -338,6 +346,8 @@ test.describe('Page Designer workbench block runtime', () => {
     );
     await expect(page.getByTestId('evidence-panel-empty')).toContainText('Select evidence');
     await expect(page.getByTestId('review-drawer-empty')).toContainText('Select a row');
+    await expect(page.getByTestId('review-drawer')).toHaveCount(0);
+    await capture('rd-empty');
 
     await expect(page.getByTestId('artifact-timeline')).toContainText('workbench-audit.xlsx');
     await expect(page.getByTestId('artifact-timeline-item-export-100')).toContainText('Rev 3');
@@ -351,7 +361,9 @@ test.describe('Page Designer workbench block runtime', () => {
     await expect(page.getByTestId('record-inspector')).toContainText('Pending review');
     await expect(page.getByTestId('record-inspector')).toContainText('supplier-import');
 
-    await expect(page.getByTestId('evidence-panel')).toContainText('Unit price differs from contract');
+    await expect(page.getByTestId('evidence-panel')).toContainText(
+      'Unit price differs from contract',
+    );
     await expect(page.getByTestId('evidence-panel-section-raw')).toContainText(
       'supplier-audit.xlsx',
     );
@@ -362,6 +374,79 @@ test.describe('Page Designer workbench block runtime', () => {
     await expect(page.getByTestId('review-drawer-tab-candidates')).toContainText(
       'Copper audit line',
     );
+
+    await capture('rd-open');
+    const drawer = page.getByTestId('review-drawer');
+    const readLayout = () =>
+      drawer.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return Object.fromEntries(
+          ['left', 'top', 'width', 'height', 'min-width', 'max-width', 'max-height'].map(
+            (property) => [property, style.getPropertyValue(property)],
+          ),
+        );
+      });
+    const expectLayout = async (layout: Record<string, string>) => {
+      for (const [property, value] of Object.entries(layout)) {
+        await expect(drawer).toHaveCSS(property, value);
+      }
+    };
+    await drawer.getByTestId('review-drawer-candidate-C-100').click();
+    await expect(drawer.getByTestId('review-drawer-candidate-C-100')).toHaveClass(/bg-accent-weak/);
+    await expect(drawer.getByTestId('review-drawer-candidate-C-200')).not.toHaveClass(
+      /bg-accent-weak/,
+    );
+    await expect(drawer).toContainText('Review C-100 · Pending review');
+    await capture('rd-selected');
+
+    const originalLayout = await readLayout();
+    const maximize = drawer.getByRole('button', { name: /Toggle maximize|切换最大化/ });
+    await maximize.click();
+    await expect(drawer).toHaveCSS('left', '16px');
+    await expect(drawer).toHaveCSS('top', '16px');
+    await expect(drawer.getByTestId('review-drawer-candidate-C-100')).toHaveClass(/bg-accent-weak/);
+    await capture('rd-maximized');
+    await maximize.click();
+    await expectLayout(originalLayout);
+    await capture('rd-restored');
+
+    const beforeDrag = await drawer.boundingBox();
+    expect(beforeDrag).not.toBeNull();
+    const heading = await drawer
+      .getByRole('heading', { name: 'Review C-100 · Pending review' })
+      .boundingBox();
+    expect(heading).not.toBeNull();
+    const dragX = heading!.x + heading!.width / 2;
+    const dragY = heading!.y + heading!.height / 2;
+    await page.mouse.move(dragX, dragY);
+    await page.mouse.down();
+    await page.mouse.move(dragX + 40, dragY + 30, { steps: 5 });
+    await page.mouse.up();
+    await expect(drawer).toHaveCSS('left', `${beforeDrag!.x + 40}px`);
+    await expect(drawer).toHaveCSS('top', `${beforeDrag!.y + 30}px`);
+    await capture('rd-dragged');
+
+    const beforeResize = await drawer.boundingBox();
+    expect(beforeResize).not.toBeNull();
+    const resize = await drawer
+      .getByRole('button', { name: /Resize review drawer|调整复核浮层大小/ })
+      .boundingBox();
+    expect(resize).not.toBeNull();
+    const resizeX = resize!.x + resize!.width / 2;
+    const resizeY = resize!.y + resize!.height / 2;
+    await page.mouse.move(resizeX, resizeY);
+    await page.mouse.down();
+    await page.mouse.move(resizeX + 60, resizeY + 40, { steps: 5 });
+    await page.mouse.up();
+    await expect(drawer).toHaveCSS('width', `${beforeResize!.width + 60}px`);
+    await expect(drawer).toHaveCSS('height', `${beforeResize!.height + 40}px`);
+    await capture('rd-resized');
+    const storedLayout = await readLayout();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('review-drawer-empty')).toContainText('Select a row');
+    await page.getByTestId('candidate-list-item-C-100').click();
+    await expectLayout(storedLayout);
+    await capture('rd-persisted');
 
     const renderedTypes = await page.getByTestId('list-misc-blocks').evaluate((root) =>
       Array.from(root.querySelectorAll('[class*="block-"]'))
@@ -374,5 +459,10 @@ test.describe('Page Designer workbench block runtime', () => {
     expect(renderedTypes.sort(), 'all workbench block renderers mounted').toEqual(
       [...WORKBENCH_BLOCK_TYPES].sort(),
     );
+    await drawer.getByRole('button', { name: /Close review drawer|关闭复核浮层/ }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(page.getByTestId('review-drawer-empty')).toContainText('Select a row');
+    await expect(page.getByTestId('review-drawer-minimized')).toHaveCount(0);
+    await capture('rd-closed');
   });
 });

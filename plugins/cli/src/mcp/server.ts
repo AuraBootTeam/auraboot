@@ -1,3 +1,4 @@
+import { discoverAgent, type AgentState } from '../client/agent-capabilities.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import chalk from 'chalk';
@@ -53,7 +54,7 @@ import { rollbackImportTool } from './tools/write/rollbackImport.js';
  */
 export function buildToolRegistry(
   client: ApiClient,
-  opts: { profile?: McpProfileName } = {},
+  opts: { profile?: McpProfileName; agentState?: AgentState } = {},
 ): ToolRegistry {
   // Default to the full set so existing callers/tests keep every tool; the
   // user-facing `read` default is applied by startMcpServer via resolveMcpProfile.
@@ -83,6 +84,8 @@ export function buildToolRegistry(
 
   const registry = new ToolRegistry();
   for (const tool of filterToolsByProfile(tools, profile)) {
+    if (opts.agentState !== undefined && opts.agentState !== 'installed' &&
+        ['list_agents', 'list_tools', 'dispatch_agent', 'ask_aurabot'].includes(tool.name)) continue;
     registry.register(tool);
   }
   return registry;
@@ -107,7 +110,8 @@ export async function startMcpServer(options: {
     version: '2.0.0',
   });
 
-  const registry = buildToolRegistry(client, { profile });
+  const discovery = await discoverAgent(client);
+  const registry = buildToolRegistry(client, { profile, agentState: discovery.state });
   registry.attachTo(server, audit);
 
   const transport = new StdioServerTransport();

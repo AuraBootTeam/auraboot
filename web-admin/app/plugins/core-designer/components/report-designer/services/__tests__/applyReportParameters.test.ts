@@ -20,6 +20,19 @@ function report(): ReportDsl {
 }
 
 describe('report parameters', () => {
+  it('binds declared named query parameters without allowing authorization or transport overrides', () => {
+    const source = report();
+    source.dataSources.orders = { type: 'namedQuery', queryCode: 'project_facts', params: { period: 'week' } };
+    source.parameters![0].bindTo!.field = 'projectPid';
+    expect(applyReportParameters(source, { input: 'project-a' }).dataSources.orders.params).toEqual({ period: 'week', projectPid: 'project-a' });
+    expect(source.dataSources.orders.params).toEqual({ period: 'week' });
+    for (const field of ['tenantId', 'userId', 'datasourceId', 'maxItems', '../project']) {
+      source.parameters![0].bindTo!.field = field;
+      expect(() => applyReportParameters(source)).toThrow('Invalid named query');
+    }
+    source.parameters![0].bindTo = { dataSource: 'orders', field: 'projectPid', operator: 'LIKE' };
+    expect(() => applyReportParameters(source)).toThrow('Invalid named query');
+  });
   it('applies defaults and overrides while leaving the definition unchanged', () => {
     const source = report();
     expect(applyReportParameters(source).dataSources.orders.filters).toEqual([

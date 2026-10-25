@@ -23,6 +23,7 @@ describe('auraBotApi SSE requests', () => {
 
   it('requests SSE for chat streams', async () => {
     const fetchMock = vi.fn().mockResolvedValue(sseResponse());
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));
     vi.stubGlobal('fetch', fetchMock);
 
     await auraBotApi.chatStream(
@@ -47,6 +48,7 @@ describe('auraBotApi SSE requests', () => {
 
   it('requests SSE when confirming a pending tool execution', async () => {
     const fetchMock = vi.fn().mockResolvedValue(sseResponse());
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));
     vi.stubGlobal('fetch', fetchMock);
 
     await auraBotApi.executeStream(
@@ -99,7 +101,7 @@ describe('auraBotApi SSE requests', () => {
       }),
       { status: 200, statusText: 'OK' },
     );
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response).mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } }))));
     const onRetrievalEvidence = vi.fn();
 
     await auraBotApi.chatStream(
@@ -153,6 +155,7 @@ describe('auraBotApi SSE warnings (D.2)', () => {
         }),
       ),
     );
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));
     vi.stubGlobal('fetch', fetchMock);
 
     const onWarning = vi.fn();
@@ -180,6 +183,7 @@ describe('auraBotApi SSE warnings (D.2)', () => {
         }),
       ),
     );
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));
     vi.stubGlobal('fetch', fetchMock);
 
     const dispatched: Array<{ message: string; variant: string }> = [];
@@ -212,6 +216,7 @@ describe('auraBotApi SSE warnings (D.2)', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(warningThenDoneSse(JSON.stringify({ warnings: [] })));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));
     vi.stubGlobal('fetch', fetchMock);
 
     const onWarning = vi.fn();

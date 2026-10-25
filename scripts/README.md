@@ -96,7 +96,7 @@ the original review behavior; pause idle services through their product owner.
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
 | `db/check-schema-drift.sh` | 1 | 2026-06-22 | Regenerate the schema snapshot from Flyway and diff it against the committed |
 | `db/test-stage-pre1900-core-migrations.sh` | 0 | 2026-09-25 | Verify deterministic staging of immutable pre-#1900 Core migration bytes. |
-| `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Self-contained capability-eval runner for the digital-employee agent line. |
+| `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Managed capability-eval runner; full/focused/deterministic module-owned catalogs, native receipts and retained runtime. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
 | `provider-neutral-architecture-gate.sh` | 0 | 2026-07-31 | Fail closed when agent/runtime fixtures or goldens hard-code a model provider. |
 | `permission-sql-registrations.mjs` | 0 | 2026-10-20 | Resolve permission registrations from migration SQL for permission validation. |
@@ -303,6 +303,7 @@ Quickstart signing-key regression: `node --test scripts/quickstart-signing-key.t
 
 | script | purpose |
 |---|---|
+| `application/verify-agent-capabilities-http.mjs` | Targeted api / real-stack / http suite: run with explicit origin, installed/not_installed expectation, fresh evidence directory, and AURA_TEST_EMAIL/AURA_TEST_PASSWORD for the isolated bootstrap admin. Verifies six cases: auth denials, installation, no-store and a provisioned member with only the implicit baseline read permissions. Completes real business-space selection; missing prerequisites or a missing case fail. |
 | `quickstart-signing-key.test.mjs` | Hermetic key transport, private generation, no overwrite and no shared default contracts. |
 
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
@@ -337,6 +338,7 @@ T3 acceptance: `node scripts/oss-remediation-t3-run.mjs --executor /absolute/pat
 | `dev/oss-gate-results.mjs` | 0 | 2026-10-10 | Reject missing, failed, skipped or retried browser gate results. |
 | `dev/oss-runtime-contract.mjs` | 0 | 2026-10-10 | Bind and validate the OSS runtime source and artifact contract. |
 | `lib/oss-stack-identity.mjs` | 0 | 2026-10-10 | Verify runtime artifacts and listener ownership for the OSS stack. |
+| `lib/java-source-roots.mjs` | 6 | 2026-10-22 | Enumerate owned Java source roots across Gradle modules for shared scanners. |
 | `lib/oss-stack-lifecycle.mjs` | 0 | 2026-10-10 | Manage registered OSS source mappings and stack lifecycle. |
 | `lib/web-admin-lock-contract.mjs` | 0 | 2026-10-10 | Compare installed Web dependency locks with the frozen source lock. |
 | `oss-e2e-fixture-backend.sh` | 0 | 2026-10-10 | Launch the unchanged backend with separately hashed E2E fixture artifacts. |
@@ -395,3 +397,18 @@ The original qualification profile and source/builder identity must include this
 before a publisher can consume it; historical receipts without an archive cannot acquire one
 by merely editing JSON. Local file/CLI self-tests use synthetic OCI bytes without Docker and
 do not represent Linux image qualification.
+
+The independent published-library consumer in [fixtures/agent-artifact-consumer](fixtures/agent-artifact-consumer/README.md) validates core/agent/app and opt-in fixtures through actual Maven POM and Gradle metadata, without producer project substitution.
+
+| `application/verify-agent-cli-mcp.mjs` | Real-backend CLI/MCP acceptance: explicit CLI root, origin, installed/not_installed expectation, fresh evidence directory and bootstrap credentials. Runs status plus stdio and Streamable HTTP profile discovery and ordinary model queries; base also refuses direct AI actions. Registered/executed counts must match. |
+| `dev/plugin-assembly.mjs` | Shared plugin profile assembly decision: accept only verified v1 agent installation, omit declared optional AI resources from base profiles, and reject explicit/unknown required-module imports before any selected plugin writes. |
+
+| `application/verify-agent-im-history.mjs` | Real-backend retained mixed IM fixture: create under full, verify under base, then restore full against the same database. Checks member identities, nullable legacy availability, all prior human messages and a new persisted human message in each phase. Requires bootstrap credentials and a known owned-tenant agent ID for creation. |
+
+The targeted `web-admin/tests/e2e/platform/agent-assembly.spec.ts` suite uses the
+isolated bootstrap with no enabled tenant or platform LLM provider. Pin
+`AURA_TEST_AGENT_STATE=installed|not_installed` to the selected backend assembly.
+`AURA_TEST_AGENT_PROVIDER_MODE=stub` additionally verifies the designer send
+button against the original backend and its explicitly enabled local LLM stub;
+this is transport/assembly evidence, not live-provider or generated-DSL quality.
+The base run reports the full-only draft case as not applicable.

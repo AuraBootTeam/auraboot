@@ -97,6 +97,12 @@ describe('toPageMeta', () => {
 });
 
 describe('createDslSchemaPayload', () => {
+  it('writes current v4 even when editing a legacy in-memory v2 document', () => {
+    const payload = createDslSchemaPayload({ schemaVersion: 2, kind: 'form', id: 'legacy', layout: { type: 'stack' }, blocks: [], extension: { formPresentation: { columns: 2 } } } as any, 0);
+    expect(payload.schemaVersion).toBe(4);
+    expect(payload.extension).toMatchObject({ formPresentation: { columns: 2 } });
+  });
+
   it('preserves structured title objects in update payload', () => {
     const payload = createDslSchemaPayload(
       {

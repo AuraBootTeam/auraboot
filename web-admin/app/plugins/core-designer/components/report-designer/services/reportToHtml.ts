@@ -69,7 +69,7 @@ function formatCellValue(value: unknown, format?: string): string {
     return value.toLocaleString();
   }
   if (format === 'currency' && typeof value === 'number') {
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (format === 'percent' && typeof value === 'number') {
     return `${(value * 100).toFixed(1)}%`;
@@ -217,8 +217,9 @@ function renderGroupedTable(block: GroupedTableBlock, data: Record<string, unkno
   }
 
   html += '<tbody>';
+  const groupLabel=block.columns.find(column => column.field === block.groupByField && column.label && column.label !== column.field)?.label;
   for (const [groupKey, rows] of groups.entries()) {
-    html += `<tr><td colspan="${block.columns.length}" style="${cellBorder} padding: 6px 8px; background: #dbeafe; font-weight: bold; color: #1e40af;">${escapeHtml(block.groupByField)}: ${escapeHtml(groupKey)} (${rows.length})</td></tr>`;
+    html += `<tr><td colspan="${block.columns.length}" style="${cellBorder} padding: 6px 8px; background: #dbeafe; font-weight: bold; color: #1e40af;">${groupLabel ? escapeHtml(groupLabel) + ': ' : ''}${escapeHtml(groupKey)} (${rows.length})</td></tr>`;
 
     for (const row of rows) {
       html += '<tr>';
@@ -272,8 +273,9 @@ function renderStatCard(block: StatCardBlock, data: Record<string, unknown>[]): 
   const formatted = formatCellValue(value, block.format);
 
   return `
+    ${block.title && block.label && block.title !== block.label ? `<h3>${escapeHtml(block.title)}</h3>` : ''}
     <div style="display: inline-block; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 20px; margin: 4px 8px 4px 0; min-width: 120px; background: #f9fafb;">
-      <div style="font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${escapeHtml(block.label || 'Metric')}</div>
+      <div style="font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">${escapeHtml(block.label || block.title || 'Metric')}</div>
       <div style="font-size: 18pt; font-weight: bold; color: ${block.color || '#1d4ed8'};">${formatted}</div>
     </div>
   `;

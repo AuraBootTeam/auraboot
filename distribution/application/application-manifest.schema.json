@@ -62,6 +62,11 @@
       "required": ["mode", "plugins", "migrationSets"],
       "properties": {
         "mode": { "enum": ["core-only", "application"] },
+        "agent": {
+          "enum": ["with-agent", "base"],
+          "default": "with-agent",
+          "description": "Independent backend AI composition. Omission preserves the complete AI runtime."
+        },
         "plugins": {
           "type": "array",
           "items": {

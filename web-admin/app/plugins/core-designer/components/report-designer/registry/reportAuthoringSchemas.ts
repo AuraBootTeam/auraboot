@@ -72,6 +72,7 @@ export function reportAuthoringSchemas(
       dependsOn: { field: `${key}.enabled`, value: true },
     }),
     field(`${key}.columns`, '汇总列', 'Summary columns', 'array', {
+      defaultValue: [],
       dependsOn: { field: `${key}.enabled`, value: true },
       itemSchema: [
         field('field', '字段名称', 'Field', 'text', { required: true }),

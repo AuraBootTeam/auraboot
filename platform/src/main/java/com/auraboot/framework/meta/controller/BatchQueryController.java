@@ -45,8 +45,9 @@ public class BatchQueryController {
             return ApiResponse.error("Batch query limit exceeded: max " + MAX_QUERIES_PER_BATCH + " queries per request");
         }
 
+        var snapshot = com.auraboot.framework.application.tenant.MetaContext.snapshot();
         List<CompletableFuture<Map.Entry<String, Object>>> futures = request.getQueries().stream()
-                .map(q -> CompletableFuture.supplyAsync(() -> {
+                .map(q -> CompletableFuture.supplyAsync(() -> withContext(snapshot, () -> {
                     try {
                         Object result = executeQuery(q);
                         return Map.entry(q.getId(), result);
@@ -55,7 +56,7 @@ public class BatchQueryController {
                         log.warn("Batch query item '{}' failed: {}", q.getId(), e.getMessage());
                         return Map.entry(q.getId(), (Object) Map.of("error", e.getMessage()));
                     }
-                }))
+                })))
                 .collect(Collectors.toList());
 
         Map<String, Object> results = futures.stream()
@@ -63,6 +64,15 @@ public class BatchQueryController {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         return ApiResponse.success(results);
+    }
+
+    private static <T> T withContext(
+            com.auraboot.framework.application.tenant.MetaContext.Snapshot snapshot,
+            java.util.function.Supplier<T> query) {
+        var result = new java.util.concurrent.atomic.AtomicReference<T>();
+        com.auraboot.framework.application.tenant.MetaContext.runWithSnapshot(
+                snapshot, () -> result.set(query.get()));
+        return result.get();
     }
 
     private Object executeQuery(QueryItem q) {

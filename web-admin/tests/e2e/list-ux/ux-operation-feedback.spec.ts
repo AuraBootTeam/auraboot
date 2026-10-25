@@ -24,6 +24,7 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
+import { createDefaultTableView, restoreDefaultTableView, type DefaultTableViewState } from '../showcase/helpers/default-table-view';
 import { navigateToOrderViaSidebar } from '../saved-view/helpers';
 import {
   uniqueId,
@@ -121,9 +122,12 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
   const customerForCreate = `UOF Customer ${UID}`;
   const customerForDelete = `UOF Delete Cust ${UID}`;
   const customerPids = new Map<string, string>();
+  let deleteOrderPid: string;
+  let defaultTableView: DefaultTableViewState | null = null;
 
   // Seed a record that we will delete in UOF-003
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser, request }) => {
+    defaultTableView = await createDefaultTableView(request, 'e2et_order', 'e2et_order_list', 'Operation Feedback');
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
@@ -148,10 +152,37 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
         'create',
       );
       expect(result.recordId).toMatch(/^[0-9A-Z]{26}$/);
+      deleteOrderPid = result.recordId;
     } finally {
       await ctx.close();
     }
   });
+
+  test.afterAll(async ({ request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
+  });
+
+  async function searchForDeleteCandidate(page: Page) {
+    const responsePromise = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/dynamic/e2et_order/list'
+        && url.searchParams.get('keyword') === companyForDelete;
+    });
+    const search = page.getByTestId('list-search-input');
+    await search.fill(companyForDelete);
+    await search.press('Enter');
+    const response = await responsePromise;
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    expect(body.data.records).toHaveLength(1);
+    expect(body.data.records[0]).toMatchObject({ pid: deleteOrderPid, e2et_order_title: companyForDelete });
+    const targetRow = page.locator('tbody tr').filter({ hasText: companyForDelete });
+    await expect(targetRow).toHaveCount(1);
+    await expect(targetRow).toBeVisible();
+    return targetRow;
+  }
 
   // -------------------------------------------------------------------------
   // UOF-001: Create operation shows success toast
@@ -199,46 +230,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 10_000 });
 
-    // Find the row for our delete-candidate record
-    const targetRow = page.locator(`tbody tr:has-text("${companyForDelete}")`).first();
-
-    // Narrow to the candidate with keyword search first — the fixture list
-    // accumulates orders across runs, so page 1 rarely holds the row.
-    const searchInput = page
-      .locator('[data-testid="list-search-input"], input[type="search"], [placeholder*="搜索"]')
-      .first();
-    if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await searchInput.fill(companyForDelete);
-      await page
-        .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
-          timeout: 8_000,
-        })
-        .catch(() => null);
-      await page.waitForTimeout(500);
-    }
-    let rowFound = await targetRow.isVisible({ timeout: 5_000 }).catch(() => false);
-
-    if (!rowFound) {
-      // Check last page if available
-      const lastPageBtn = page.locator(
-        '[aria-label="last page"], button:has-text("Last"), .ant-pagination-last',
-      );
-      const hasLastPage = await lastPageBtn.isVisible({ timeout: 2_000 }).catch(() => false);
-      if (hasLastPage) {
-        await lastPageBtn.click();
-        await page
-          .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
-            timeout: 8_000,
-          })
-          .catch(() => null);
-        rowFound = await targetRow.isVisible({ timeout: 5_000 }).catch(() => false);
-      }
-    }
-
-    if (!rowFound) {
-      test.skip(true, 'UOF-002: delete-candidate record not found in current view — skipping');
-      return;
-    }
+    const targetRow = await searchForDeleteCandidate(page);
 
     // Click the delete action button on that row via dropdown helper
     await clickRowActionByLocator(page, targetRow, 'delete');
@@ -268,40 +260,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 10_000 });
 
-    // Find the record — keyword search first (list accumulates across runs).
-    const targetRow = page.locator(`tbody tr:has-text("${companyForDelete}")`).first();
-
-    const searchInput = page
-      .locator('[data-testid="list-search-input"], input[type="search"], [placeholder*="搜索"]')
-      .first();
-    if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await searchInput.fill(companyForDelete);
-      await page
-        .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
-          timeout: 8_000,
-        })
-        .catch(() => null);
-      await page.waitForTimeout(500);
-    }
-    let rowFound = await targetRow.isVisible({ timeout: 5_000 }).catch(() => false);
-    if (!rowFound) {
-      const lastPageBtn = page.locator('[aria-label="last page"], .ant-pagination-last');
-      const hasLastPage = await lastPageBtn.isVisible({ timeout: 2_000 }).catch(() => false);
-      if (hasLastPage) {
-        await lastPageBtn.click();
-        await page
-          .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
-            timeout: 8_000,
-          })
-          .catch(() => null);
-        rowFound = await targetRow.isVisible({ timeout: 5_000 }).catch(() => false);
-      }
-    }
-
-    if (!rowFound) {
-      test.skip(true, 'UOF-003: delete-candidate record not found in current view — skipping');
-      return;
-    }
+    const targetRow = await searchForDeleteCandidate(page);
 
     // Click the delete action button via dropdown helper
     await clickRowActionByLocator(page, targetRow, 'delete');
@@ -311,28 +270,14 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     await expect(confirmDialog).toBeVisible({ timeout: 8_000 });
 
     // Intercept delete API response
-    const deleteResponsePromise = page
-      .waitForResponse(
-        (r) =>
-          (r.url().includes('/api/meta/commands/execute/') ||
-            r.url().includes('/api/dynamic/e2et_order/')) &&
-          (r.request().method() === 'POST' || r.request().method() === 'DELETE'),
-        { timeout: 15_000 },
-      )
-      .catch(() => null);
-
-    // Layer 3 (Behavior): confirm — record disappears
+    const deleteResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/meta/commands/execute/')
+        && response.request().method() === 'POST',
+    );
     await acceptConfirmDialog(page);
-
-    // Wait for delete to complete
-    await deleteResponsePromise;
-
-    // Wait for list to refresh
-    await page
-      .waitForResponse((r) => r.url().includes('/api/dynamic/e2et_order') && r.status() === 200, {
-        timeout: 10_000,
-      })
-      .catch(() => null);
+    const deleted = await deleteResponsePromise;
+    expect(deleted.ok()).toBe(true);
+    expect(String((await deleted.json()).code)).toBe('0');
 
     // Verify record is no longer visible — poll with retries for list refresh
     await expect.poll(

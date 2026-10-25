@@ -116,7 +116,7 @@ function ChatBiChart({
   dimensions,
   metrics,
   chartConfig,
-  title,
+  labels,
 }: {
   chartType: string;
   records: Record<string, unknown>[];
@@ -124,8 +124,19 @@ function ChatBiChart({
   dimensions?: string[];
   metrics?: ChatBiMetric[];
   chartConfig?: Record<string, unknown>;
-  title?: string;
+  labels: Record<string, string>;
 }) {
+  const { locale } = useI18n();
+  const compactAxis = useMemo(() => ({
+    type: 'value' as const,
+    splitNumber: 2,
+    axisLabel: {
+      hideOverlap: true,
+      formatter: (value: number) => new Intl.NumberFormat(locale, {
+        notation: 'compact', maximumSignificantDigits: 3,
+      }).format(value),
+    },
+  }), [locale]);
   const dataSource = useMemo<ChartDataSource>(() => {
     const { labelField, valueField } = inferFields(records, columns, chartConfig);
     const effectiveDimensions =
@@ -142,10 +153,24 @@ function ChatBiChart({
     } as ChartDataSource;
   }, [chartType, records, columns, dimensions, metrics, chartConfig]);
 
+  // Keep long business labels from consuming the narrow chat plot. Preserve the
+  // original category data so the shared tooltip and persisted analysis stay exact.
+  const categoryField = dataSource.dimensions?.[0] || inferFields(records, columns, chartConfig).labelField;
+  const categoryAxis = {
+    type: 'category' as const,
+    data: records.map(record => record[categoryField]),
+    axisLabel: { width: 96, overflow: 'truncate' as const, hideOverlap: true },
+  };
+  const chartOptions = chartType === 'bar'
+    ? chartConfig?.orientation === 'vertical'
+      ? { yAxis: compactAxis, xAxis: categoryAxis }
+      : { xAxis: compactAxis, yAxis: categoryAxis }
+    : undefined;
+
   const widgetType = normalizeChartType(CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart');
   const ChartComponent = getChartComponent(widgetType);
   if (!ChartComponent) {
-    return <DataTable records={records} columns={columns} />;
+    return <DataTable records={records} columns={columns} labels={labels} />;
   }
 
   return (
@@ -157,7 +182,15 @@ function ChatBiChart({
       }
     >
       <ChartComponent
-        title={title}
+        orientation={
+          chartType === 'bar'
+            ? chartConfig?.orientation === 'vertical'
+              ? 'vertical'
+              : 'horizontal'
+            : undefined
+        }
+        chartOptions={chartOptions}
+        metricLabels={labels}
         dataSource={dataSource}
         className="h-[280px] w-full"
         style={{ height: 280 }}
@@ -175,6 +208,27 @@ function DataTable({
   columns: string[];
   labels?: Record<string, string>;
 }) {
+  const { locale } = useI18n();
+  const numeric = new Set(
+    columns.filter(
+      (column) =>
+        records.some((row) => typeof row[column] === 'number') &&
+        records.every((row) => row[column] == null || typeof row[column] === 'number'),
+    ),
+  );
+  const formats = Object.fromEntries(
+    [...numeric].map((column) => [
+      column,
+      new Intl.NumberFormat(locale, {
+        minimumFractionDigits: records.some(
+          (row) => typeof row[column] === 'number' && !Number.isInteger(row[column]),
+        )
+          ? 2
+          : 0,
+        maximumFractionDigits: 20,
+      }),
+    ]),
+  );
   return (
     <div className="max-h-[300px] overflow-auto">
       <table className="w-full text-xs text-gray-700 dark:text-gray-300">
@@ -183,7 +237,7 @@ function DataTable({
             {columns.map((col) => (
               <th
                 key={col}
-                className="px-2 py-1.5 text-left font-medium text-gray-500 dark:text-gray-400"
+                className={`px-2 py-1.5 font-medium text-gray-500 dark:text-gray-400 ${numeric.has(col) ? 'text-right' : 'text-left'}`}
               >
                 {labels[col] || col}
               </th>
@@ -197,8 +251,13 @@ function DataTable({
               className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
             >
               {columns.map((col) => (
-                <td key={col} className="px-2 py-1.5">
-                  {String(row[col] ?? '')}
+                <td
+                  key={col}
+                  className={`px-2 py-1.5 ${numeric.has(col) ? 'text-right tabular-nums' : ''}`}
+                >
+                  {typeof row[col] === 'number' && formats[col]
+                    ? formats[col].format(row[col])
+                    : String(row[col] ?? '')}
                 </td>
               ))}
             </tr>
@@ -251,7 +310,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
       : t('aurabot.chatbi.records', undefined, '条记录');
 
   // ── Ad-hoc → persisted bridge: save this chart as a dashboard widget ──
-  const { modelCode, dimensions = [], metrics = [] } = result;
+  const { dimensions = [], metrics = [] } = result;
   const [saving, setSaving] = useState(false);
   const [savedPid, setSavedPid] = useState<string | null>(null);
   const [savedCode, setSavedCode] = useState<string | null>(null);
@@ -291,9 +350,10 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
     setSavingReport(true);
     try {
       const report = createEmptyReport(
-        String(
-          interpretation || modelCode || text({ 'zh-CN': '分析报表', 'en-US': 'Analysis report' }),
-        ).slice(0, 200),
+        String(interpretation || text({ 'zh-CN': '分析报表', 'en-US': 'Analysis report' })).slice(
+          0,
+          200,
+        ),
       );
       report.dataSources = {
         analysis: { type: 'aggregate', aggregateQuery: { ...dataSource, type: 'aggregate' } },
@@ -333,7 +393,9 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      const title = String(interpretation || modelCode || 'Chart').slice(0, 200);
+      const title = String(
+        interpretation || text({ 'zh-CN': '分析看板', 'en-US': 'Analysis dashboard' }),
+      ).slice(0, 200);
       const widgetType = CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart';
       const widgets = [
         {
@@ -347,6 +409,13 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           config: {
             title,
             dataSource,
+            metricLabels: columnLabels,
+            ...(chartType === 'bar'
+              ? {
+                  orientation:
+                    result.chartConfig?.orientation === 'vertical' ? 'vertical' : 'horizontal',
+                }
+              : {}),
           },
         },
       ];
@@ -429,7 +498,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
               dimensions={dimensions}
               metrics={metrics}
               chartConfig={chartConfig}
-              title={interpretation}
+              labels={columnLabels}
             />
           ) : (
             <DataTable records={records} columns={effectiveColumns} labels={columnLabels} />

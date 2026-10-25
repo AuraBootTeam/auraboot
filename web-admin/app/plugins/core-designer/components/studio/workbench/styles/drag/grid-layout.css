@@ -1,0 +1,481 @@
+/* ===== Grid Layout Panel Styles ===== */
+
+.grid-layout-panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.grid-layout-panel-tabs {
+  display: flex;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.grid-layout-panel-tabs .tab {
+  flex: 1;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.grid-layout-panel-tabs .tab:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.grid-layout-panel-tabs .tab.active {
+  background: white;
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+.grid-layout-panel-content {
+  padding: 20px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Basic Config Panel */
+.basic-config-panel .config-section {
+  margin-bottom: 24px;
+}
+
+.basic-config-panel .config-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.basic-config-panel .config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.basic-config-panel .config-row label {
+  min-width: 80px;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.basic-config-panel .config-row input,
+.basic-config-panel .config-row select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.basic-config-panel .config-row input:focus,
+.basic-config-panel .config-row select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.basic-config-panel .config-row span {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-button {
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preset-button:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+/* Tracks Config Panel */
+.tracks-config-panel .config-section {
+  margin-bottom: 24px;
+}
+
+.tracks-config-panel .config-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tracks-list {
+  display: grid;
+  gap: 12px;
+}
+
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.track-item label {
+  min-width: 60px;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.track-item input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  transition: border-color 0.2s ease;
+}
+
+.track-item input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.template-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.template-buttons button {
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.template-buttons button:hover {
+  background: #2563eb;
+}
+
+/* Items Config Panel */
+.items-config-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.items-list h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.item-card:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+
+.item-card.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-id {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.item-position {
+  font-size: 12px;
+  color: #6b7280;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.item-delete {
+  padding: 4px 8px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.item-delete:hover {
+  background: #dc2626;
+}
+
+.item-editor h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.item-editor .config-section {
+  margin-bottom: 20px;
+}
+
+.item-editor .config-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.position-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.position-grid .config-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.position-grid .config-row label {
+  min-width: 60px;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.position-grid .config-row input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* Advanced Config Panel */
+.advanced-config-panel .config-section {
+  margin-bottom: 24px;
+}
+
+.advanced-config-panel .config-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.advanced-config-panel .config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.advanced-config-panel .config-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.advanced-config-panel .config-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b82f6;
+}
+
+.advanced-config-panel .config-row input[type='number'] {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Grid Layout Toolbar */
+.grid-layout-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 8px;
+}
+
+.grid-layout-toolbar button {
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.grid-layout-toolbar button:hover {
+  background: #2563eb;
+}
+
+.grid-layout-toolbar button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .items-config-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .position-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-layout-toolbar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .toolbar-group {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Dark mode */
+
+:where(.dark) .grid-layout-panel {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+:where(.dark) .grid-layout-panel-tabs {
+  background: #111827;
+  border-bottom-color: #374151;
+}
+
+:where(.dark) .grid-layout-panel-tabs .tab {
+  color: #9ca3af;
+}
+
+:where(.dark) .grid-layout-panel-tabs .tab:hover {
+  background: #1f2937;
+  color: #d1d5db;
+}
+
+:where(.dark) .grid-layout-panel-tabs .tab.active {
+  background: #1f2937;
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+
+:where(.dark) .basic-config-panel .config-section h3,
+:where(.dark) .tracks-config-panel .config-section h3,
+:where(.dark) .items-list h3,
+:where(.dark) .item-editor h3,
+:where(.dark) .item-editor .config-section h4,
+:where(.dark) .advanced-config-panel .config-section h3 {
+  color: #f3f4f6;
+  border-bottom-color: #374151;
+}
+
+:where(.dark) .basic-config-panel .config-row label,
+:where(.dark) .track-item label,
+:where(.dark) .item-id,
+:where(.dark) .position-grid .config-row label,
+:where(.dark) .advanced-config-panel .config-row label {
+  color: #d1d5db;
+}
+
+:where(.dark) .basic-config-panel .config-row input,
+:where(.dark) .basic-config-panel .config-row select,
+:where(.dark) .track-item input,
+:where(.dark) .position-grid .config-row input,
+:where(.dark) .advanced-config-panel .config-row input[type='number'] {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+:where(.dark) .item-card {
+  background: #374151;
+  border-color: #4b5563;
+}
+
+:where(.dark) .item-card:hover {
+  border-color: #60a5fa;
+  background: #1f2937;
+}
+
+:where(.dark) .item-card.selected {
+  border-color: #60a5fa;
+  background: #1e3a8a;
+}
+
+:where(.dark) .grid-layout-toolbar {
+  background: #111827;
+  border-color: #374151;
+}

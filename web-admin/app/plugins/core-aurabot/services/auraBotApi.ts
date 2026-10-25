@@ -1,3 +1,4 @@
+import { agentFetch } from '~/shared/services/application-capabilities';
 import type { FormFillSnapshot } from '~/framework/meta/rendering/formFill';
 /**
  * AuraBot API Service
@@ -36,6 +37,7 @@ function formatFetchError(error: unknown, scope: 'chat' | 'execute'): string {
   // The raw cause is logged to the console for debugging so we never surface
   // internal detail (or leak the BFF/backend port numbers, as the previous
   // hardcoded message did) to end users.
+  if (error instanceof Error && error.message.startsWith('$i18n:application.agent.')) return error.message;
   const raw =
     error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error';
   console.error(`[auraBotApi] ${scope} request failed:`, raw);
@@ -185,7 +187,7 @@ export interface AuraBotConversationMessage {
  */
 export const auraBotApi = {
   async listConversations(): Promise<AuraBotConversationItem[]> {
-    const response = await fetch(`${API_BASE_URL}/conversations`, {
+    const response = await agentFetch(`${API_BASE_URL}/conversations`, {
       method: 'get',
       credentials: 'include',
     });
@@ -198,7 +200,7 @@ export const auraBotApi = {
     agentCode?: string,
     newConversation = false,
   ): Promise<AuraBotConversationItem> {
-    const response = await fetch(`${API_BASE_URL}/conversations`, {
+    const response = await agentFetch(`${API_BASE_URL}/conversations`, {
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -210,7 +212,7 @@ export const auraBotApi = {
   },
 
   async getConversationMessages(conversationId: number): Promise<AuraBotConversationMessage[]> {
-    const response = await fetch(
+    const response = await agentFetch(
       `${API_BASE_URL}/conversations/${conversationId}/messages?limit=100`,
       {
         method: 'get',
@@ -236,7 +238,7 @@ export const auraBotApi = {
     context: Partial<AuraBotContext>,
     options?: ChatOptions,
   ): Promise<IntentResult> {
-    const response = await fetch(`${API_BASE_URL}/chat/sync`, {
+    const response = await agentFetch(`${API_BASE_URL}/chat/sync`, {
       method: 'post',
       headers: {
         'Content-Type': 'application/json',
@@ -263,7 +265,7 @@ export const auraBotApi = {
    * Execute planned operations
    */
   async execute(request: ExecuteRequest): Promise<ExecuteResponse> {
-    const response = await fetch(`${API_BASE_URL}/execute`, {
+    const response = await agentFetch(`${API_BASE_URL}/execute`, {
       method: 'post',
       headers: {
         'Content-Type': 'application/json',
@@ -285,7 +287,7 @@ export const auraBotApi = {
    * Undo previous operations
    */
   async undo(request: UndoRequest): Promise<UndoResponse> {
-    const response = await fetch(`${API_BASE_URL}/undo`, {
+    const response = await agentFetch(`${API_BASE_URL}/undo`, {
       method: 'post',
       headers: {
         'Content-Type': 'application/json',
@@ -317,7 +319,7 @@ export const auraBotApi = {
     },
     signal?: AbortSignal,
   ): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/wizard`, {
+    const response = await agentFetch(`${API_BASE_URL}/wizard`, {
       method: 'post',
       headers: {
         'Content-Type': 'application/json',
@@ -381,7 +383,7 @@ export const auraBotApi = {
    * Get available skills
    */
   async getSkills(): Promise<unknown[]> {
-    const response = await fetch(`${API_BASE_URL}/skills`, {
+    const response = await agentFetch(`${API_BASE_URL}/skills`, {
       method: 'get',
       headers: {
         'Content-Type': 'application/json',
@@ -404,7 +406,7 @@ export const auraBotApi = {
     type: 'model' | 'field' | 'page' | 'command' | 'dict' | 'role',
     query: string,
   ): Promise<Array<{ code: string; name: string; description?: string }>> {
-    const response = await fetch(
+    const response = await agentFetch(
       `${API_BASE_URL}/resources/search?type=${encodeURIComponent(type)}&query=${encodeURIComponent(query)}`,
       {
         method: 'get',
@@ -431,7 +433,7 @@ export const auraBotApi = {
   ): Promise<
     Array<{ id: string; skill: string; description: string; timestamp: number; undoToken?: string }>
   > {
-    const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/history`, {
+    const response = await agentFetch(`${API_BASE_URL}/sessions/${sessionId}/history`, {
       method: 'get',
       headers: {
         'Content-Type': 'application/json',
@@ -473,7 +475,7 @@ export const auraBotApi = {
     callbacks: ChatStreamOptions,
   ): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+      const response = await agentFetch(`${API_BASE_URL}/chat/stream`, {
         method: 'post',
         headers: {
           'Content-Type': 'application/json',
@@ -516,7 +518,7 @@ export const auraBotApi = {
     callbacks: ChatStreamOptions,
   ): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/execute`, {
+      const response = await agentFetch(`${API_BASE_URL}/execute`, {
         method: 'post',
         headers: {
           'Content-Type': 'application/json',

@@ -33,18 +33,20 @@ interface UseAutomationNodeStatusesResult {
  * treats as "no overlay".
  */
 export function useAutomationNodeStatuses(logId: number | string | undefined): UseAutomationNodeStatusesResult {
-  const [statuses, setStatuses] = useState<NodeStatusMap | null>(null);
+  const [snapshot, setSnapshot] = useState<{ logId: number | string; statuses: NodeStatusMap | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (logId === undefined || logId === null || logId === '') {
-      setStatuses(null);
+      setSnapshot(null);
+      setLoading(false);
       setError(null);
       return;
     }
     let cancelled = false;
+    setSnapshot(null);
     setLoading(true);
     setError(null);
 
@@ -67,12 +69,12 @@ export function useAutomationNodeStatuses(logId: number | string | undefined): U
             map[row.nodeId] = row.status;
           }
         }
-        setStatuses(Object.keys(map).length > 0 ? map : null);
+        setSnapshot({ logId, statuses: Object.keys(map).length > 0 ? map : null });
       })
       .catch((e) => {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : String(e));
-        setStatuses(null);
+        setSnapshot(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -84,7 +86,7 @@ export function useAutomationNodeStatuses(logId: number | string | undefined): U
   }, [logId, reloadKey]);
 
   return {
-    statuses,
+    statuses: snapshot && snapshot.logId === logId ? snapshot.statuses : null,
     loading,
     error,
     reload: () => setReloadKey((k) => k + 1),

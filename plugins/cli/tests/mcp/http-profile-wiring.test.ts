@@ -12,7 +12,7 @@ describe('Streamable HTTP per-request MCP profile wiring', () => {
     expect(source).toContain("req.headers['x-aura-tools']");
     expect(source).toContain('resolveRequestMcpProfile(');
     expect(source).toMatch(
-      /buildToolRegistry\(client,\s*\{\s*profile:\s*requestProfile\s*\}\)/s,
+      /buildToolRegistry\(client,\s*\{\s*profile:\s*requestProfile,\s*agentState:\s*discovery.state\s*\}\)/s,
     );
     expect(source).toContain('error.status');
   });

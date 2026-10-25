@@ -116,6 +116,7 @@ class HandlerPhaseTest {
 
     @AfterEach
     void tearDown() {
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         MetaContext.clear();
     }
 
@@ -125,7 +126,9 @@ class HandlerPhaseTest {
         var accessor = org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.AiProviderAccessor.class);
         when(factory.create(1L)).thenReturn(accessor);
         ReflectionTestUtils.setField(phase, "aiProviderAccessorFactory", factory);
-        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public boolean requiresAiProvider(String code) { return true; }
+        };
         when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
         when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
 
@@ -198,6 +201,41 @@ class HandlerPhaseTest {
         phase.execute(rejected);
 
         assertThat(stringValue.capturedContext.get().tenantProjectionAccessor()).isNull();
+    }
+
+    @Test
+    void execute_installsCurrencyReaderOnlyFromServerMetadataAndDelegatesBoundRead() {
+        MetaContext.setContext(1L,2L,"buyer-pid","Buyer");
+        var service=org.mockito.Mockito.mock(com.auraboot.framework.currency.spi.CurrencyConversionSpi.class);
+        ReflectionTestUtils.setField(phase,"currencyConversionService",service);
+        String currency="01M5DB6RC8P9DKDWT1HKSDCR7R";var date=java.time.LocalDate.of(2026,10,25);
+        var expected=new com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Snapshot(currency,"CNY",currency,"CNY",java.math.BigDecimal.ONE,date,2,java.math.RoundingMode.HALF_UP);
+        when(service.verifyDocumentSourceCurrency(currency,"CNY",java.math.BigDecimal.ONE,date)).thenReturn(expected);
+        for(Object optIn:List.of(true,false,"true")) {
+            var handler=new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            var context=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                    "handlerParams",Map.of("documentCurrencyRead",optIn)));
+            context.getPayload().put("documentCurrencyRead",true);
+            context.getPayload().put("__documentCurrencyAccessor","forged");
+            phase.execute(context);
+            var cap=handler.capturedContext.get().documentCurrencyAccessor();
+            assertThat(cap!=null).isEqualTo(Boolean.TRUE.equals(optIn));
+            if(Boolean.TRUE.equals(optIn))assertThat(cap.verifySourceRate(currency,"CNY",java.math.BigDecimal.ONE,date)).isSameAs(expected);
+        }
+        verify(service).verifyDocumentSourceCurrency(currency,"CNY",java.math.BigDecimal.ONE,date);org.mockito.Mockito.verifyNoMoreInteractions(service);
+    }
+
+    @Test
+    void execute_missingCurrencyModuleRejectsBeforeCallingThePlugin() {
+        var handler=new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var context=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                "handlerParams",Map.of("documentCurrencyRead",true)));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessage("$i18n:currency.error.document_snapshot_unavailable")
+                .hasCauseInstanceOf(com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Unavailable.class);
+        assertThat(handler.capturedContext.get()).isNull();
     }
 
     @Test
@@ -320,10 +358,87 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_preservesWrappedSerializationFailureWithoutBusinessErrorLeakage() {
+        var conflict = new org.springframework.dao.CannotSerializeTransactionException(
+                "private SQL diagnostics", new java.sql.SQLException("private table", "40001"));
+        assertWrappedPersistenceFailurePreserved(conflict);
+    }
+
+    @Test
+    void execute_preservesWrappedPersistenceFailureForSanitizedTransportHandling() {
+        assertWrappedPersistenceFailurePreserved(new org.springframework.dao.DataIntegrityViolationException(
+                "private constraint and SQL diagnostics"));
+    }
+
+    private void assertWrappedPersistenceFailurePreserved(org.springframework.dao.DataAccessException failure) {
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new com.auraboot.framework.meta.exception.MetaServiceException("Update failed: private SQL", failure);
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
+    void execute_doesNotInstallRelatedUpdatesWithoutReadableAuthorizedTarget() {
+        CommandHandlerExtension rejected = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new AssertionError("Handler must not execute without its boundary decision");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_receipt", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE, "handlerParams", Map.of(
+                        "tenantProjectionRead", true, "relatedUpdateAuthorization", true)));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Related update requires an authorized readable target and projection");
+    }
+
+    @Test
+    void execute_installsRelatedUpdatesOnlyForAnAuthorizedReadableRoot() {
+        MetaContext.setContext(1L,2L,"buyer-pid","Buyer");
+        CommandHandlerExtension recording = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                assertThat(context.settings().get(CommandHandlerExtension.DATA_ACCESSOR_KEY)).isInstanceOf(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.class);
+                assertThat(context.tenantProjectionAccessor()).isNotNull();
+                return Map.of("success",true);
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(recording));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_receipt", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE, "handlerParams", Map.of(
+                        "tenantProjectionRead", true, "relatedUpdateAuthorization", true)));
+        ctx.setTargetRecordReadable(true);
+        ctx.setPermitPlan(new com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan(
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.Decision.PERMIT,
+                null,null,"po-1",com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.ALL,0L));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("pr.purchase.manage"));
+        phase.execute(ctx);
+    }
+
+    @Test
+    void execute_rejectsRelatedUpdateAsyncBeforeSubmittingAnUnscopedTask() {
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_receipt", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE, "handlerParams", Map.of(
+                        "async", true, "relatedUpdateAuthorization", true)));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(AccessDeniedException.class)
+                .hasMessage("Related updates cannot execute asynchronously");
+        org.mockito.Mockito.verifyNoInteractions(asyncTaskService);
+    }
+
+    @Test
     void execute_preservesLocalizedPluginBusinessErrorKeyAndCause() {
         PluginCommandRejectionException overQuantity = new PluginCommandRejectionException(
                 PluginCommandRejectionException.Code.INVALID_ARGUMENT,
-                "inventory.error.putaway_quantity_exceeds_remaining");
+                "inventory.error.putaway_quantity_exceeds_remaining", "D51GT01067100");
         CommandHandlerExtension rejected = new CommandHandlerExtension() {
             @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
             @Override public Object execute(CommandContext context) { throw overQuantity; }
@@ -334,8 +449,25 @@ class HandlerPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
                 .hasMessage("$i18n:inventory.error.putaway_quantity_exceeds_remaining")
-                .hasCause(overQuantity);
+                .hasCause(overQuantity)
+                .satisfies(error -> assertThat(((BusinessException) error).getI18nArgs()).containsExactly("D51GT01067100"));
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
+    void execute_preservesTypedDomainClientRejections() {
+        for (org.springframework.http.HttpStatus status : List.of(org.springframework.http.HttpStatus.FORBIDDEN,
+                org.springframework.http.HttpStatus.NOT_FOUND, org.springframework.http.HttpStatus.CONFLICT)) {
+            var rejection = new org.springframework.web.server.ResponseStatusException(status, "Domain constraint");
+            CommandHandlerExtension handler = new CommandHandlerExtension() {
+                @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+                @Override public Object execute(CommandContext context) { throw rejection; }
+            };
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+            assertThatThrownBy(() -> phase.execute(context)).isSameAs(rejection);
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        }
     }
 
     @Test
@@ -482,6 +614,13 @@ class HandlerPhaseTest {
                 "handler", PLUGIN_HANDLER_CODE,
                 "handlerParams", Map.of("async", true)
         ));
+        var localeRequest = new org.springframework.mock.web.MockHttpServletRequest();
+        localeRequest.addHeader("X-Locale", "en-US");
+        localeRequest.addHeader("Accept-Language", "zh-CN");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(localeRequest));
+        ReflectionTestUtils.setField(phase, "i18nLocaleResolver",
+                new com.auraboot.framework.i18n.util.I18nLocaleResolver());
         ctx.getRequest().setExpectedVersion(6);
         MetaContext.setContext(1L, 2L, "user-pid", "tester");
 
@@ -502,6 +641,8 @@ class HandlerPhaseTest {
                 ArgumentCaptor.forClass(AsyncTaskSubmitRequest.class);
         verify(asyncTaskService).submitTask(taskCaptor.capture(), eq(1L), eq(2L));
         com.fasterxml.jackson.databind.JsonNode taskInput = taskCaptor.getValue().getInputParams();
+        assertThat(taskInput.path("locale").asText()).isEqualTo("en-US");
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         assertThat(taskInput.path("commandPermitScope").asText()).isEqualTo("SELF");
         assertThat(taskInput.path("commandExpectedVersion").asLong()).isEqualTo(6L);
         assertThat(taskInput.path("clientRequestId").asText()).isEqualTo("client-request-1");
@@ -798,6 +939,42 @@ class HandlerPhaseTest {
         assertThat(sql.getValue()).contains("managed_flag IS DISTINCT FROM TRUE","NOT EXISTS",
             "record_writer_parent.pid = mt_line.order_pid","record_writer_parent.tenant_id = mt_line.tenant_id");
         verify(dynamicDataMapper,never()).update(any(),any(),any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sync-ai", "async-ai", "sync-knowledge", "async-knowledge"})
+    void requiredOptionalAccessorsRejectBeforeAnyHandlerOrAsyncSubmission(String variant) {
+        boolean ai = variant.endsWith("ai");
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public boolean requiresAiProvider(String code) { return ai; }
+            @Override public boolean requiresKnowledgeBase(String code) { return !ai; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE,
+                "handlerParams", Map.of("async", variant.startsWith("async"))));
+        assertThatThrownBy(() -> phase.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not installed");
+        assertThat(handler.capturedContext.get()).isNull();
+        verify(asyncTaskService, never()).submitTask(any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, dynamicDataMapper);
+    }
+
+    @Test
+    void aSecondaryRequirementRejectsBeforeThePrimaryHandlerRuns() {
+        var primary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        RecordingPluginHandler secondary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public boolean requiresAiProvider(String code) { return true; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(primary));
+        when(extensionRegistry.getSecondaryCommandHandlers(PLUGIN_HANDLER_CODE)).thenReturn(List.of(secondary));
+        var context = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not installed");
+        assertThat(primary.capturedContext.get()).isNull();
+        assertThat(secondary.capturedContext.get()).isNull();
+        verify(asyncTaskService, never()).submitTask(any(), any(), any());
     }
 
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {

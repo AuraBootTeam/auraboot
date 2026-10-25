@@ -30,6 +30,7 @@ public class AiFieldProcessor {
     @Value("${ai.service.enabled:true}")
     private boolean aiEnabled;
 
+    @org.springframework.lang.Nullable
     private final AiFieldGenerator generator;
 
     /**
@@ -42,6 +43,10 @@ public class AiFieldProcessor {
         if (!aiEnabled) {
             return AiGenerationResult.builder().success(false)
                     .error("AI service is not enabled. Please configure ai.service.enabled=true").build();
+        }
+        if (generator == null) {
+            return AiGenerationResult.builder().success(false)
+                    .error("AI field generation is not installed").build();
         }
         return generator.generate(request);
     }

@@ -20,6 +20,7 @@ vi.mock('~/plugins/core-decisionops', () => ({ default: { manifest: { code: 'cor
 
 const pluginLoader = {
   setFeatureGate: vi.fn(),
+  setApplicationModuleGate: vi.fn(),
   list: vi.fn(() => [] as Array<{ state: string; definition: { manifest: { code: string } } }>),
   install: vi.fn(),
   enable: vi.fn(),
@@ -58,7 +59,7 @@ describe('bootCorePlugins', () => {
     expect(getKernel).toHaveBeenCalledTimes(2)
   })
 
-  it('is idempotent: a second boot short-circuits to already-active plugin codes', async () => {
+  it('reuses installed plugins and retries gated activation on a second boot', async () => {
     await bootCorePlugins()
 
     pluginLoader.list.mockReturnValue([
@@ -70,17 +71,17 @@ describe('bootCorePlugins', () => {
 
     expect(second).toEqual(['core-demo'])
     expect(pluginLoader.install).toHaveBeenCalledTimes(15) // only from the first boot
-    expect(pluginLoader.activateAll).toHaveBeenCalledTimes(1)
+    expect(pluginLoader.activateAll).toHaveBeenCalledTimes(2)
   })
 
-  it('passes the entitlement check to the loader before the short-circuit return', async () => {
+  it('passes the entitlement check to the loader before retrying activation', async () => {
     await bootCorePlugins()
 
     const hasFeature = (key: string) => key === 'bpm'
     await bootCorePlugins({ hasFeature })
 
     expect(pluginLoader.setFeatureGate).toHaveBeenCalledWith(hasFeature)
-    expect(pluginLoader.activateAll).toHaveBeenCalledTimes(1)
+    expect(pluginLoader.activateAll).toHaveBeenCalledTimes(2)
   })
 
   it('force reboot resets the kernel with the entitlement check and boots from scratch', async () => {

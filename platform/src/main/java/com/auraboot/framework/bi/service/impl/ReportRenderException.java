@@ -1,11 +1,6 @@
 package com.auraboot.framework.bi.service.impl;
 
-/**
- * Thrown when the Phase 3 WYSIWYG report renderer subprocess fails. Callers
- * (e.g. {@code ReportExportServiceImpl.exportPdf}) catch this and fall back to
- * the legacy PDFBox text export — the failure is logged, never silently
- * swallowed.
- */
+/** Failure of a configured renderer; callers must reject the export rather than degrade its layout. */
 public class ReportRenderException extends RuntimeException {
 
     public ReportRenderException(String message) {

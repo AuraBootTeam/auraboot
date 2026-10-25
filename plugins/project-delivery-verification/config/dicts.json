@@ -38,6 +38,17 @@
         "extension": {
           "color": "orange"
         }
+      },
+      {
+        "value": "stale",
+        "label": "Review updated materials",
+        "label:zh-CN": "资料已更新 · 需复核",
+        "label:en": "Review updated materials",
+        "sortNo": 3,
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
       }
     ]
   },

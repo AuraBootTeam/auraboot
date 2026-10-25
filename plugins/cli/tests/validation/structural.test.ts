@@ -32,7 +32,7 @@ describe('validateStructural plugin manifest schema', () => {
   });
 
   const publicFixture = (type: 'resource' | 'query') => JSON.parse(readFileSync(
-    resolve(import.meta.dirname, `../../../../platform/src/test/resources/plugin/public-${type}-contract.json`), 'utf8'));
+    resolve(import.meta.dirname, `../../../../platform/src/testFixtures/resources/plugin/public-${type}-contract.json`), 'utf8'));
 
   it('validates shared public contract fixtures inline and rejects malformed source pins', () => {
     const manifest = {

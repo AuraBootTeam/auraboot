@@ -13,6 +13,7 @@ const owned = vi.hoisted(() => ({
   runtime: null as any,
   manager: null as any,
   transport: vi.fn(),
+  pageLoader: null as null | ((params?: any) => Promise<void>),
 }));
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: any[]) => owned.transport(...args),
@@ -39,13 +40,16 @@ vi.mock('~/contexts/TimezoneContext', () => ({
 }));
 vi.mock('../hooks/usePageRuntime', async () => ({
   ...(await vi.importActual<any>('../hooks/usePageRuntime')),
-  usePageRuntime: () => ({
-    runtime: owned.runtime,
-    dataSourceManager: owned.manager,
-    t: (key: string) => key,
-    locale: 'en',
-    navigate: vi.fn(),
-  }),
+  usePageRuntime: (_schema: any, options: any) => {
+    owned.pageLoader = options?.loadData;
+    return {
+      runtime: owned.runtime,
+      dataSourceManager: owned.manager,
+      t: (key: string) => key,
+      locale: 'en',
+      navigate: vi.fn(),
+    };
+  },
 }));
 vi.mock('~/framework/smart/hooks/useSavedViews', () => ({
   useSavedViews: () => ({
@@ -133,16 +137,45 @@ function prepareRuntime() {
   };
   return manager;
 }
-function mount() {
+function mount(pageSchema: any = schema) {
   return render(
     <MemoryRouter>
       <ProfileProvider value={adminProfile}>
-        <ListPageContent schema={schema} tableName="owned" token="fixture" />
+        <ListPageContent schema={pageSchema} tableName="owned" token="fixture" />
       </ProfileProvider>
     </MemoryRouter>,
   );
 }
 describe('Actual ListPageContent→BlockRenderer external custom-only table', () => {
+  it('provides the latest page-owned list loader to runtime flow refresh actions', async () => {
+    prepareRuntime();
+    let title = 'Initial contact phone';
+    owned.transport.mockImplementation(async () => ({
+      code: '0',
+      data: { records: [{ pid: 'owned-123', title }], total: 1, current: 1, size: 20 },
+    }));
+    const normal = {
+      ...schema,
+      dataSources: {},
+      blocks: [{ ...table, dataSource: undefined }],
+      extension: {
+        ...schema.extension,
+        customOnly: false,
+        skipListData: false,
+        dataSource: { type: 'api', method: 'get', endpoint: '/api/example/contacts' },
+      },
+    };
+    mount(normal);
+    expect(await screen.findByText('Initial contact phone')).toBeVisible();
+    expect(owned.pageLoader).toBeTypeOf('function');
+    title = 'Persisted updated contact phone';
+    await act(async () => {
+      await owned.pageLoader!();
+    });
+    expect(await screen.findByText('Persisted updated contact phone')).toBeVisible();
+    expect(screen.queryByText('Initial contact phone')).not.toBeInTheDocument();
+  });
+
   it('renders exact owned rows once, without native model/field reads or duplicate toolbar', async () => {
     const manager = prepareRuntime();
     await manager.reload('ownedRows');
@@ -280,5 +313,63 @@ describe('Actual ListPageContent ordinary query and retry contract', () => {
     fireEvent.click(retry);
     await waitFor(() => expect(reads()).toHaveLength(prior + 1));
     expect(reads().at(-1)).toEqual(first);
+  });
+});
+
+describe('Actual generic list selection to DSL runtime seam', () => {
+  it('shows the selection-dependent toolbar and clears real checkboxes through state.set', async () => {
+    prepareRuntime();
+    const selected = { pid: 'owned-123', title: 'Actual selectable source', row_version: 3 };
+    owned.transport.mockImplementation(async () => ({
+      code: '0',
+      data: { records: [selected], total: 1, current: 1, size: 20 },
+    }));
+    mount({
+      ...schema,
+      dataSources: {},
+      extension: {
+        ...schema.extension,
+        customOnly: false,
+        skipListData: false,
+        dataSource: { type: 'api', method: 'get', endpoint: '/api/owned-sources' },
+      },
+      blocks: [
+        {
+          id: 'source-actions',
+          blockType: 'toolbar',
+          buttons: [
+            {
+              code: 'inspect-source',
+              label: 'Inspect selected source',
+              permissionCode: 'qo.srm.use',
+              visibleWhen: '${state.selectedSources && state.selectedSources.length === 1}',
+              action: { type: 'navigate', to: '/owned-review' },
+            },
+          ],
+        },
+        {
+          ...table,
+          dataSource: undefined,
+          table: { ...table.table, selection: { mode: 'multiple', bind: 'selectedSources' } },
+        },
+      ],
+    });
+    expect(await screen.findByText('Actual selectable source')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Inspect selected source' }),
+    ).not.toBeInTheDocument();
+    const checkbox = screen.getAllByRole('checkbox').at(-1)!;
+    fireEvent.click(checkbox);
+    await waitFor(() =>
+      expect(owned.runtime.getContext().state.selectedSources).toEqual([selected]),
+    );
+    expect(await screen.findByRole('button', { name: 'Inspect selected source' })).toBeVisible();
+    await act(async () => {
+      owned.runtime.getStateManager().updateState('list', 'selectedSources', []);
+    });
+    await waitFor(() => expect(checkbox).not.toBeChecked());
+    expect(
+      screen.queryByRole('button', { name: 'Inspect selected source' }),
+    ).not.toBeInTheDocument();
   });
 });

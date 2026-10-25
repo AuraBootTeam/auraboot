@@ -34,7 +34,7 @@ function computeAgg(values: number[], agg: string): number {
 function formatVal(value: number, format?: string): string {
   if (!format) return value.toLocaleString();
   if (format === 'currency')
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
+    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (format === 'percent') return `${(value * 100).toFixed(1)}%`;
   return value.toLocaleString();
 }

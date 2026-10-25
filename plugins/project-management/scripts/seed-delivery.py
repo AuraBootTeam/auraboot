@@ -26,7 +26,8 @@ def pid(v):
   if v.get(k):return str(v[k])
  raise Exception('Missing record identity: '+str(v))
 existing=req('/api/dynamic/tpm_project/list','GET',headers=h)['data']['records']
-assert len(existing)==0,'Refuse to seed an already populated project fixture'
+if existing:
+ raise SystemExit('Project delivery already contains projects. Nothing was cleared or seeded. Open the existing project list; use a separate empty local evaluation instance to recreate the samples.')
 audit_config=json.loads((resources/'scripts/field-audit-config.json').read_text())
 audit_result=req('/api/audit/field-config/bulk','POST',audit_config,h)
 assert str(audit_result['code'])=='0',audit_result
@@ -37,11 +38,12 @@ references=json.loads((resources/'scripts/reference-projects.json').read_text())
 for row in references:
  customer=row[1]
  customers[customer]=pid(cmd('tpm:create_customer',{'tpm_cu_name':customer,'tpm_cu_contact':context[customer]['contact']}))
-owners=[]
+owners=[];participants=[]
 for login,name in [('delivery-lin','林晓'),('delivery-zhou','周宁'),('delivery-chen','陈晨'),('delivery-wang','王越')]:
  v=req('/api/admin/users','POST',{'userName':login,'displayName':name,'initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_manager'],'sendInviteEmail':False},h)
  assert str(v['code'])=='0',v
  owners.append(v['data']['userPid'])
+ participants.append({'login':login,'displayName':name,'userPid':v['data']['userPid'],'memberPid':v['data']['memberPid']})
 viewer_email='delivery-viewer@example.test'
 v=req('/api/admin/users','POST',{'email':viewer_email,'displayName':'交付观察员','initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_viewer'],'sendInviteEmail':False},h)
 assert str(v['code'])=='0',v
@@ -106,4 +108,4 @@ assert str(board['code'])=='0',board
 published=req('/api/dashboards/'+board['data']['pid']+'/publish','POST',{},h)
 assert str(published['code'])=='0',published
 (out/'delivery-assets.json').write_text(json.dumps({'reportPid':report['data']['pid'],'dashboardPid':board['data']['pid']},ensure_ascii=False,indent=2))
-(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'viewerEmail':viewer_email,'customers':customers,'projects':projects},ensure_ascii=False,indent=2));print('Created the 8 reference customers/projects, 24 tasks and 32 milestones through commands')
+(out/'seed-receipts.json').write_text(json.dumps(receipts,ensure_ascii=False,indent=2));(out/'fixture.json').write_text(json.dumps({'fictional':True,'owner':owner,'owners':owners,'participants':participants,'viewerEmail':viewer_email,'customers':customers,'projects':projects},ensure_ascii=False,indent=2));print('Created the 8 reference customers/projects, 24 tasks and 32 milestones through commands')

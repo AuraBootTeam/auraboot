@@ -7,6 +7,7 @@ import LlmProvidersPage from '../pages/aurabot/providers';
 
 const state = vi.hoisted(() => ({
   platformAdmin: true,
+  canManage: true,
   post: vi.fn(),
   successToast: vi.fn(),
   errorToast: vi.fn(),
@@ -42,7 +43,7 @@ vi.mock('~/contexts/AuthContext', async (importOriginal) => {
       preferences: null,
       token: null,
       isAuthenticated: true,
-      hasPermission: () => true,
+      hasPermission: () => state.canManage,
       hasRole: () => state.platformAdmin,
       hasAnyPermission: () => true,
       hasAllPermissions: () => true,
@@ -79,6 +80,7 @@ afterEach(() => {
   state.errorToast.mockReset();
   state.toggleEnabled.mockReset();
   state.platformAdmin = true;
+  state.canManage = true;
   state.configs = [];
   state.save.mockReset().mockResolvedValue(true);
   state.useCloudConfigs.mockClear();
@@ -87,6 +89,19 @@ afterEach(() => {
 });
 
 describe('LlmProvidersPage i18n', () => {
+  it.each([
+    ['zh-CN', '无权访问', '你没有管理模型服务的权限，请联系管理员。'],
+    ['en-US', 'Access denied', 'You do not have permission to manage model services. Contact your administrator.'],
+  ])('shows a readable %s permission refusal without internal codes', (locale, title, message) => {
+    state.canManage = false;
+    render(<I18nProvider initialLocale={locale} initialData={{ application: { agent: { permissionTitle: title, providerPermission: message } } }}><LlmProvidersPage /></I18nProvider>);
+    expect(screen.getByRole('heading', { name: title })).toBeVisible();
+    expect(screen.getByText(message)).toBeVisible();
+    expect(document.body).not.toHaveTextContent('ai_center');
+    expect(screen.queryByTestId('add-provider-btn')).not.toBeInTheDocument();
+    expect(state.useCloudConfigs).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+  });
+
   it('renders zh-CN provider management copy from i18n resources', () => {
     render(
       <I18nProvider
@@ -145,12 +160,34 @@ describe('LlmProvidersPage scoped configuration', () => {
   it('uses the LLM-only API and hides global levels for a model-service member', () => {
     state.platformAdmin = false;
     render(<I18nProvider initialLocale="en-US" initialData={{}}><LlmProvidersPage /></I18nProvider>);
-    expect(state.useCloudConfigs).toHaveBeenCalledWith({ apiBase: '/api/llm-config', initialLevel: 'tenant' });
+    expect(state.useCloudConfigs).toHaveBeenCalledWith({ apiBase: '/api/llm-config', initialLevel: 'tenant', enabled: true });
     expect(screen.queryByTestId('level-toggle-platform')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('add-provider-btn'));
     fireEvent.click(screen.getByTestId('picker-preset-openai'));
     expect(screen.queryByRole('radio', { name: 'Platform' })).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Tenant' })).toBeChecked();
+  });
+
+  it('keeps one authoritative custom display name and saves its latest value', async () => {
+    render(<I18nProvider initialLocale="en-US" initialData={{}}><LlmProvidersPage /></I18nProvider>);
+    fireEvent.click(screen.getByTestId('add-provider-btn'));
+    fireEvent.click(screen.getByTestId('picker-preset-custom'));
+    expect(screen.getAllByTestId('custom-display-name')).toHaveLength(1);
+    expect(screen.queryByTestId('field-displayName')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('custom-display-name'), { target: { value: 'Initial provider' } });
+    fireEvent.change(screen.getByTestId('custom-display-name'), { target: { value: 'Final provider' } });
+    fireEvent.change(screen.getByTestId('field-apiKey'), { target: { value: 'fixture-key' } });
+    fireEvent.click(screen.getByTestId('panel-save-btn'));
+    await waitFor(() => expect(state.save).toHaveBeenCalledWith(expect.objectContaining({
+      providerCode: 'final-provider', config: expect.objectContaining({ displayName: 'Final provider' }), enabled: false,
+    })));
+  });
+
+  it('retains the optional display name for preset providers', () => {
+    render(<I18nProvider initialLocale="en-US" initialData={{}}><LlmProvidersPage /></I18nProvider>);
+    fireEvent.click(screen.getByTestId('add-provider-btn'));
+    fireEvent.click(screen.getByTestId('picker-preset-openai'));
+    expect(screen.getAllByTestId('field-displayName')).toHaveLength(1);
   });
 
   it('saves the edited PID and retains the draft panel on failure', async () => {

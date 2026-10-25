@@ -1,6 +1,7 @@
 package com.auraboot.framework.eventpolicy.executor;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyExecLogEntity;
@@ -36,6 +37,8 @@ public class EventPolicyActionRetryService {
     private final PolicyExecutor policyExecutor;
     private final com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor identities;
     private final com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper members;
+
+    private final ThreadContextScopes contextScopes;
 
     @Value("${auraboot.event-policy.retry.batch-size:50}")
     private int defaultBatchSize;
@@ -106,11 +109,7 @@ public class EventPolicyActionRetryService {
                 MetaContext.setContext(row.getTenantId(), actorId, user.pid(), user.username());
                 MetaContext.setMemberId(member.getId());
             }
-            var previousPrincipal = com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current().orElse(null);
-            var previousEnvelope = com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current().orElse(null);
-            com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear();
-            com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear();
-            try {
+            contextScopes.runCleared(() -> {
                 ResolvedActionPlan plan = actionPlan(row);
                 DecisionContext context = decisionContext(row.getContextPayload());
                 EventPolicyResult policyResult = new EventPolicyResult(
@@ -124,10 +123,7 @@ public class EventPolicyActionRetryService {
                         StringUtils.hasText(row.getDecisionTraceId()) ? List.of(row.getDecisionTraceId()) : List.of());
                 policyExecutor.execute(policyResult, context, FailureStrategy.RETRY_ASYNC,
                         row.getTenantId(), row.getDecisionTraceId(), row.getCorrelationId());
-            } finally {
-                com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.restore(previousEnvelope);
-                com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(previousPrincipal);
-            }
+            });
             return true;
         } catch (Exception e) {
             log.warn("EventPolicy retry worker failed for idempotencyKey={}: {}",

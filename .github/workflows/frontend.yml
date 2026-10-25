@@ -5,10 +5,18 @@ on:
     branches: [main]
     paths:
       - 'web-admin/**'
+      - 'plugins/cli/**'
+      - 'plugins/schemas/plugin-manifest.schema.json'
+      - 'scripts/import-plugins.sh'
+      - 'scripts/dev/plugin-assembly*'
       - 'contracts/internal-web-admin/**'
       - 'scripts/internal-api/**'
       - 'platform/src/main/java/**'
+      - 'platform/platform-agent/src/main/java/**'
+      - 'platform/platform-app/src/main/java/**'
       - 'platform/src/main/resources/**'
+      - 'platform/platform-agent/src/main/resources/**'
+      - 'platform/platform-app/src/main/resources/**'
       - 'platform/build.gradle'
       - 'packages/**'
       - 'plugins/**/config/dashboards/**'
@@ -24,10 +32,18 @@ on:
     branches: [main]
     paths:
       - 'web-admin/**'
+      - 'plugins/cli/**'
+      - 'plugins/schemas/plugin-manifest.schema.json'
+      - 'scripts/import-plugins.sh'
+      - 'scripts/dev/plugin-assembly*'
       - 'contracts/internal-web-admin/**'
       - 'scripts/internal-api/**'
       - 'platform/src/main/java/**'
+      - 'platform/platform-agent/src/main/java/**'
+      - 'platform/platform-app/src/main/java/**'
       - 'platform/src/main/resources/**'
+      - 'platform/platform-agent/src/main/resources/**'
+      - 'platform/platform-app/src/main/resources/**'
       - 'platform/build.gradle'
       - 'packages/**'
       - 'plugins/**/config/dashboards/**'
@@ -95,6 +111,16 @@ jobs:
       - name: Type-check web-admin
         working-directory: web-admin
         run: pnpm typecheck
+
+      - name: CLI capability and MCP regression
+        working-directory: plugins/cli
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          npm test
+
+      - name: Optional plugin assembly contract
+        run: node --test scripts/dev/plugin-assembly.test.mjs
 
       - name: Unit tests (vitest)
         working-directory: web-admin

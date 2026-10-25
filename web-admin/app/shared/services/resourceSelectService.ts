@@ -10,6 +10,7 @@ import { dictionaryData } from '~/shared/services/dict-adapter';
 
 import { fetchResult } from '~/shared/services/http-client';
 import { getKernel } from '~/framework/bootstrap';
+import { getLocalizedText } from '~/utils/i18n';
 
 export interface ResourceOption {
   readOnly?: boolean;
@@ -20,12 +21,16 @@ export interface ResourceOption {
 }
 
 interface PageRecord {
+  total?: number;
   records: Array<{
     title?: string;
     name?: string;
     kind: string;
     code?: string;
     pid: string;
+    modelCode?: string;
+    profile?: string;
+    pageKey?: string;
   }>;
 }
 
@@ -79,6 +84,30 @@ export async function fetchPageOptions(): Promise<ResourceOption[]> {
     value: p.code || p.pid,
     description: p.kind,
   }));
+}
+
+/** Dashboard navigation consumes runtime list routes, not page PIDs or authoring keys. */
+export async function fetchPageNavigationOptions(locale = 'zh-CN'): Promise<ResourceOption[]> {
+  const routes = new Map<string, ResourceOption>();
+  let seen = 0;
+  let pageNum = 1;
+  let total = 0;
+  do {
+    const result = await fetchResult<PageRecord>(`/api/pages?kind=list&isPublished=true&pageNum=${pageNum}&pageSize=100`);
+    if (String(result.code) !== '0' || !result.data || !Array.isArray(result.data.records))
+      throw new Error('Unable to load published navigation pages');
+    total = Number(result.data.total);
+    if (!Number.isSafeInteger(total) || total < 0 || total > 10000 || (seen < total && !result.data.records.length))
+      throw new Error('Published page inventory is incomplete or exceeds the navigation picker limit');
+    for (const page of result.data.records) {
+      if (page.kind !== 'list' || !page.modelCode || (page.profile && page.profile !== 'default')) continue;
+      const value = `/p/${encodeURIComponent(page.modelCode)}`;
+      routes.set(value, {value,label:getLocalizedText(page.name || page.title || page.modelCode,locale),description:value});
+    }
+    seen += result.data.records.length;
+    pageNum++;
+  } while (seen < total);
+  return [...routes.values()];
 }
 
 export async function fetchDashboardOptions(): Promise<ResourceOption[]> {

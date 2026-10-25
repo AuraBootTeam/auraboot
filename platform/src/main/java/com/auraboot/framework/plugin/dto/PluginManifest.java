@@ -41,6 +41,11 @@ public class PluginManifest {
      */
     private String version;
 
+    /** Verified application modules required by the entire plugin resource batch. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+    private List<String> applicationModules;
+
+
     /**
      * Human-readable display name.
      */

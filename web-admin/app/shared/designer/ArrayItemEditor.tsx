@@ -10,6 +10,9 @@ export interface ArrayItemEditorProps<T extends Record<string, unknown>> {
   onRemove: () => void;
   itemLabel: string;
   readonly?: boolean;
+  onMove?: (direction: 'up' | 'down') => void;
+  first?: boolean;
+  last?: boolean;
 }
 
 /**
@@ -26,6 +29,9 @@ export function ArrayItemEditor<T extends Record<string, unknown>>({
   onRemove,
   itemLabel,
   readonly,
+  onMove,
+  first,
+  last,
 }: ArrayItemEditorProps<T>) {
   const itemId = useId();
   const { locale } = useI18n();
@@ -79,6 +85,15 @@ export function ArrayItemEditor<T extends Record<string, unknown>>({
     <div role="group" aria-label={itemLabel} className="rounded-lg border border-gray-200 p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">{itemLabel}</span>
+        <div className="flex items-center gap-2">
+        {onMove && <>
+          <button type="button" disabled={readonly || first} onClick={()=>onMove('up')}
+            aria-label={locale.startsWith('zh') ? '上移' : 'Move up'}
+            className="text-sm text-blue-600 disabled:opacity-40">↑</button>
+          <button type="button" disabled={readonly || last} onClick={()=>onMove('down')}
+            aria-label={locale.startsWith('zh') ? '下移' : 'Move down'}
+            className="text-sm text-blue-600 disabled:opacity-40">↓</button>
+        </>}
         <button
           type="button"
           onClick={onRemove}
@@ -88,6 +103,7 @@ export function ArrayItemEditor<T extends Record<string, unknown>>({
         >
           删除
         </button>
+        </div>
       </div>
       <div className="space-y-2">
         {itemSchema.filter(isVisible).map((field) => {

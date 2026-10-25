@@ -110,3 +110,23 @@ describe('dashboard schema document properties', () => {
     ).toBeUndefined();
   });
 });
+
+it('edits monetary precision through the registered schema with undo and redo', () => {
+  const store = useDashboardStore.getState();
+  store.createDashboard('Money board');
+  const id = store.addWidget({ type: 'smart-number-card', componentType: 'smart-number-card', props: {}, x: 0, y: 0, w: 3, h: 2, config: { title: 'Budget', precision: 0, format: 'currency' } });
+  useDashboardStore.getState().selectWidget(id);
+  render(<I18nProvider initialLocale="en-US" initialData={{ fixture: 'loaded' }}><WidgetPropertyPanel /></I18nProvider>);
+  const precision = within(screen.getByTestId('schema-config-field-precision')).getByRole('spinbutton');
+  expect(precision).toHaveValue(0);
+  fireEvent.change(precision, { target: { value: '2' } });
+  const widget = () => useDashboardStore.getState().widgets.find(widget => widget.id === id)!;
+  expect(widget().config.precision).toBe(2);
+  act(() => useDashboardStore.getState().undo());
+  expect(widget().config.precision).toBe(0);
+  act(() => useDashboardStore.getState().redo());
+  expect(widget().config.precision).toBe(2);
+  fireEvent.click(within(screen.getByTestId('schema-config-field-format')).getByRole('combobox'));
+  fireEvent.click(screen.getByRole('option', { name: 'Number', exact: true }));
+  expect(widget().config.format).toBe('number');
+});

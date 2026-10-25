@@ -270,3 +270,9 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 
 Rationale: domain-specific scoping enforced at service layer; A4 census classification pending (TBD)
 - `UserNoteController.java`
+
+## Plugin REST dispatch authorization
+
+`PluginRestDispatcher.dispatch` explicitly declares `@AuthenticatedAccess` as an authorization delegation boundary. The default-deny controller interceptor admits this method so that the registered route contract can decide access; it does not grant a permission or alter the global unannotated policy. For authenticated routes the dispatcher requires a current user and the exact registered `permissionCode` before invoking the governed pipeline. Explicit PUBLIC routes retain their per-IP rate limit, default-tenant public context and audit pipeline. Unmatched routes remain absent; unregistered handlers remain denied. Upstream authentication still protects non-public paths.
+
+The combined MVC/interceptor regressions in `PluginRestDispatcherTest` verify permitted-route execution, rejection without the route permission, and public-route rate limiting with the shipped default-deny interceptor. Direct dispatcher tests alone do not cover this boundary.

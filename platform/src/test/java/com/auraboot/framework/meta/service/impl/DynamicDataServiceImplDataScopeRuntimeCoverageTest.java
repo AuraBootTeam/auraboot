@@ -507,6 +507,31 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     @Test
+    void compareAndSetBatch_bindsMachineTargetAndVersionInsteadOfRejectingThePolicy() {
+        wireModel(batchCasModel());
+        MetaContext.setContext(TENANT_ID,0L,"installation:inst","Integration");
+        var principal=new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                TENANT_ID,"inst","Integration",java.util.Set.of(),"app","inst",null,null);
+        var grant=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(TENANT_ID,"inst",MODEL_CODE,
+                java.util.Set.of("update"),java.util.Set.of("pid","status"),java.util.Set.of("status"),
+                List.of(new com.auraboot.framework.application.security.MachineDataAccessContext.Constraint("pid","pid",List.of("row-a"))));
+        when(dynamicDataMapper.updateByQuery(anyString(),anyMap())).thenReturn(1);
+        try(var machine=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var authority=com.auraboot.framework.application.security.MachineDataAccessContext.authorize(Map.of(MODEL_CODE,grant))) {
+            MetaContext.runWithCommandPermitPlan("TARGET",7L,MODEL_CODE,"row-a",()->{
+                service.compareAndSetBatch(MODEL_CODE,"status",List.of(batchCasUpdates().get(0)));return null;
+            });
+        }
+        ArgumentCaptor<String> sql=ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String,Object>> params=ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(),params.capture());
+        assertThat(sql.getValue()).contains("tenant_id = #{params.tenantId}","row_version = #{params.version0}",
+                "pid IN (#{params.machine_scope_0_0})").doesNotContain("'row-a'");
+        assertThat(params.getValue()).containsEntry("tenantId",TENANT_ID).containsEntry("id0","row-a")
+                .containsEntry("version0",7L).containsEntry("machine_scope_0_0","row-a");
+    }
+
+    @Test
     void compareAndSetBatch_keepsEveryRowGuardAndUsesOneWrite() {
         ModelDefinition model = batchCasModel();
         wireModel(model);
@@ -550,6 +575,138 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         return ModelDefinition.builder().code(MODEL_CODE).tableName("mt_phase_one_model").sourceType("physical")
                 .fields(List.of(primaryKey(), FieldDefinition.builder().code("status").columnName("status")
                         .dataType("string").build())).build();
+    }
+
+    @Test
+    void identityCasBatchLocksWithoutAuditWritesAndRetainsEveryScopeAndExpectedVersion() {
+        wireModel(batchCasModel());
+        lenient().when(dynamicDataMapper.updateByQuery(anyString(),anyMap())).thenReturn(1);
+        lenient().when(dynamicDataMapper.selectCompareAndSetLocks(anyString(),anyMap())).thenReturn(List.of(Map.of("pid","row-a")));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            MetaContext.runWithCommandPermitPlan("TARGET",7L,MODEL_CODE,"row-a",()->{
+                service.compareAndSetBatch(MODEL_CODE,"status",List.of(
+                        new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-a","accepted",Map.of("status","accepted"))));
+                assertThat(MetaContext.getCommandExpectedVersion(MODEL_CODE,"row-a")).isEqualTo(7L);
+                return null;
+            });
+        } finally {org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);}
+        ArgumentCaptor<String> sql=ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String,Object>> params=ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectCompareAndSetLocks(sql.capture(),params.capture());
+        assertThat(sql.getValue()).startsWith("SELECT pid FROM mt_phase_one_model WHERE tenant_id = #{params.tenantId}")
+                .contains("status IS NOT DISTINCT FROM #{params.expected0}","row_version = #{params.version0}","pid = 'row-a'")
+                .endsWith("ORDER BY pid FOR UPDATE").doesNotContain("updated_at","updated_by","row_version + 1");
+        assertThat(params.getValue()).containsEntry("tenantId",TENANT_ID).containsEntry("id0","row-a").containsEntry("version0",7L);
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
+    }
+
+    @Test
+    void identityCasBatchCannotPretendToHoldLocksWithoutAnActiveTransaction() {
+        wireModel(batchCasModel());
+        lenient().when(dynamicDataMapper.updateByQuery(anyString(),anyMap())).thenReturn(1);
+        assertThatThrownBy(()->service.compareAndSetBatch(MODEL_CODE,"status",List.of(
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-a","accepted",Map.of("status","accepted")))))
+                .isInstanceOf(MetaServiceException.class).hasMessageContaining("active transaction");
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
+        verify(dynamicDataMapper,never()).selectCompareAndSetLocks(anyString(),anyMap());
+    }
+
+    @Test
+    void identityCasBatchRetainsOrdinaryRowAndDomainRestrictions() {
+        wireModel(batchCasModel());
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID,MODEL_CODE,"update",USER_ID)).thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE,USER_ID)).thenReturn("AND domain_id = 7");
+        when(dynamicDataMapper.selectCompareAndSetLocks(anyString(),anyMap())).thenReturn(List.of(Map.of("pid","row-a")));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {service.compareAndSetBatch(MODEL_CODE,"status",List.of(
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-a","accepted",Map.of("status","accepted"))));}
+        finally {org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);}
+        ArgumentCaptor<String> sql=ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).selectCompareAndSetLocks(sql.capture(),anyMap());
+        assertThat(sql.getValue()).contains("created_by = 20","domain_id = 7");
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
+    }
+
+    @Test
+    void identityCasBatchMissingOrForeignTargetConflictsWithoutAnyWrite() {
+        wireModel(batchCasModel());
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            for(var result:List.<List<Map<String,Object>>>of(List.of(),List.of(Map.of("pid","foreign")))) {
+                when(dynamicDataMapper.selectCompareAndSetLocks(anyString(),anyMap())).thenReturn(result);
+                assertThatThrownBy(()->service.compareAndSetBatch(MODEL_CODE,"status",List.of(
+                        new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-a","accepted",Map.of("status","accepted")))))
+                        .isInstanceOf(MetaServiceException.class).hasMessageContaining("CAS batch conflict");
+            }
+        } finally {org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);}
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
+    }
+
+    @Test
+    void mixedIdentityAndChangingCasBatchRetainsTheAtomicWriteContract() {
+        wireModel(batchCasModel());
+        when(dynamicDataMapper.updateByQuery(anyString(),anyMap())).thenReturn(2);
+        service.compareAndSetBatch(MODEL_CODE,"status",List.of(
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-a","accepted",Map.of("status","accepted")),
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-b","pending",Map.of("status","done"))));
+        verify(dynamicDataMapper).updateByQuery(anyString(),anyMap());
+        verify(dynamicDataMapper,never()).selectCompareAndSetLocks(anyString(),anyMap());
+    }
+
+    @Test
+    void identityCasBatchRetainsTheInstallationMachinePolicyAndBoundVersion() {
+        wireModel(batchCasModel());MetaContext.setContext(TENANT_ID,0L,"installation:inst","Integration");
+        var principal=new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                TENANT_ID,"inst","Integration",java.util.Set.of(),"app","inst",null,null);
+        var grant=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(TENANT_ID,"inst",MODEL_CODE,
+                java.util.Set.of("update"),java.util.Set.of("pid","status"),java.util.Set.of("status"),
+                List.of(new com.auraboot.framework.application.security.MachineDataAccessContext.Constraint("pid","pid",List.of("row-a"))));
+        when(dynamicDataMapper.selectCompareAndSetLocks(anyString(),anyMap())).thenReturn(List.of(Map.of("pid","row-a")));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try(var machine=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var authority=com.auraboot.framework.application.security.MachineDataAccessContext.authorize(Map.of(MODEL_CODE,grant))) {
+            MetaContext.runWithCommandPermitPlan("TARGET",7L,MODEL_CODE,"row-a",()->{
+                service.compareAndSetBatch(MODEL_CODE,"status",List.of(
+                        new com.auraboot.framework.plugin.extension.CompareAndSetUpdate("row-a","accepted",Map.of("status","accepted"))));return null;
+            });
+        } finally {org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);}
+        ArgumentCaptor<String> sql=ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String,Object>> params=ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectCompareAndSetLocks(sql.capture(),params.capture());
+        assertThat(sql.getValue()).contains("pid IN (#{params.machine_scope_0_0})","row_version = #{params.version0}");
+        assertThat(params.getValue()).containsEntry("tenantId",TENANT_ID).containsEntry("version0",7L).containsEntry("machine_scope_0_0","row-a");
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
+    }
+
+    @Test
+    void identityCasUsesExactNumericEqualityAndKeepsChangingNullableValuesAsWrites() {
+        wireModel(versionCasModel("mt_phase_one_model","physical"));
+        when(dynamicDataMapper.selectCompareAndSetLocks(anyString(),anyMap())).thenReturn(List.of(Map.of("pid","row-a")));
+        when(dynamicDataMapper.updateByQuery(anyString(),anyMap())).thenReturn(1);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            service.compareAndSetBatch(MODEL_CODE,"quantity",List.of(new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(
+                    "row-a",new java.math.BigDecimal("1.0"),Map.of("quantity",new java.math.BigDecimal("1.00")))));
+            service.compareAndSetBatch(MODEL_CODE,"quantity",List.of(new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(
+                    "row-a",null,Map.of("quantity",new java.math.BigDecimal("2")))));
+        } finally {org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);}
+        verify(dynamicDataMapper).selectCompareAndSetLocks(anyString(),anyMap());
+        verify(dynamicDataMapper).updateByQuery(anyString(),anyMap());
+    }
+
+    @Test
+    void identityCasPreservesNullComparisonWithoutDroppingTheExpectedParameter() {
+        wireModel(batchCasModel());
+        when(dynamicDataMapper.selectCompareAndSetLocks(anyString(),anyMap())).thenReturn(List.of(Map.of("pid","row-a")));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {service.compareAndSetBatch(MODEL_CODE,"status",List.of(new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(
+                "row-a",null,java.util.Collections.singletonMap("status",null))));}
+        finally {org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);}
+        ArgumentCaptor<Map<String,Object>> params=ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).selectCompareAndSetLocks(anyString(),params.capture());
+        assertThat(params.getValue()).containsKey("expected0").containsEntry("expected0",null);
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
     }
 
     private List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> batchCasUpdates() {

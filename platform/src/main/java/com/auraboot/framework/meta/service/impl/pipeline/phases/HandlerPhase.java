@@ -30,6 +30,7 @@ import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
 import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
+import com.auraboot.framework.meta.service.impl.RecordMutationLockGuard;
 import com.auraboot.framework.plugin.extension.WorkflowCapability;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
@@ -92,6 +93,9 @@ public class HandlerPhase implements CommandPhase {
     private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.currency.spi.CurrencyConversionSpi currencyConversionService;
+
+    @Autowired(required = false)
     private com.auraboot.framework.auth.wechat.WechatMiniIdentityService wechatMiniIdentityService;
 
     @Autowired(required = false)
@@ -102,12 +106,18 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private AiProviderAccessorFactory aiProviderAccessorFactory;
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor knowledgeBaseAccessor;
+
 
     @Autowired(required = false)
     private FileService fileService;
 
     @Autowired(required = false)
     private AsyncTaskServiceImpl asyncTaskService;
+
+    @Autowired
+    private com.auraboot.framework.i18n.util.I18nLocaleResolver i18nLocaleResolver;
 
     @Autowired(required = false)
     private StorageProvider storageProvider;
@@ -137,7 +147,10 @@ public class HandlerPhase implements CommandPhase {
         Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
                 withCommandAuthority(ctx, () -> executeHandlerPhase(
                         handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
-                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig())));
+                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(),
+                        Boolean.TRUE.equals(ctx.getTargetRecordReadable())
+                            && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
+                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized())));
         ctx.setHandlerResults(handlerResults);
         persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
                 handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
@@ -151,7 +164,7 @@ public class HandlerPhase implements CommandPhase {
                                                      Map<String, Object> fieldMapResults,
                                                      Long tenantId, Long userId,
                                                      CommandExecuteRequest request,
-                                                     Map<String, Object> execConfig) {
+                                                     Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
         Map<String, Object> handlerResults = new HashMap<>();
         boolean dryRun = request.isDryRun();
 
@@ -202,7 +215,7 @@ public class HandlerPhase implements CommandPhase {
 
         // 2. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
-                fieldMapResults, handlerResults, execConfig);
+                fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized);
 
         // 3. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
@@ -328,7 +341,7 @@ public class HandlerPhase implements CommandPhase {
         } else {
             dynamicDataMapper.updateWithJsonb(tableName, persistable, conditions, jsonbColumns);
         }
-        log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
+        log.debug("HANDLER: wrote {} fields to {}", persistable.size(), tableName);
     }
 
     /**
@@ -410,6 +423,9 @@ public class HandlerPhase implements CommandPhase {
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
         ModelDefinition writerModel = metaModelService.getModelDefinition(modelCode).orElse(null);
+        RecordMutationLockGuard.guardTargets(dynamicDataMapper, writerModel,
+                code -> metaModelService.getModelDefinition(code).orElse(null), "update",
+                RecordMutationLockGuard.targetConditions(idEntry.getKey(), idEntry.getValue(), tenantId), data);
         RecordCommandWriterGuard.appendStoredPredicate(sql, writerModel, "update",
                 code -> metaModelService.getModelDefinition(code).orElse(null));
         RecordCommandWriterGuard.appendMarkerInvariant(sql, writerModel, data);
@@ -529,7 +545,7 @@ public class HandlerPhase implements CommandPhase {
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults,
                                               Map<String, Object> handlerResults,
-                                              Map<String, Object> execConfig) {
+                                              Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
         if (extensionRegistry == null) {
             return;
         }
@@ -564,7 +580,21 @@ public class HandlerPhase implements CommandPhase {
         // state-transition) but a downstream plugin chains a secondary onto it.
         CommandHandlerExtension handler = pluginHandler.orElse(null);
 
+        if (handler != null) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
+        for (var secondary : secondaryHandlers) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    secondary, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
+
         Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
+        if (Boolean.TRUE.equals(asyncHandlerParams.get(
+                com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))
+                && isAsyncHandler(asyncHandlerParams)) {
+            throw new AccessDeniedException("Related updates cannot execute asynchronously");
+        }
 
         // Opt-in async dispatch: commands declaring handlerParams.async run off the
         // request thread via AsyncTaskService, so long-running handlers (e.g. bulk
@@ -627,12 +657,16 @@ public class HandlerPhase implements CommandPhase {
             }
             com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.install(
                     commandCode, tenantId, pluginSettings);
+            com.auraboot.framework.plugin.pf4j.DocumentCurrencyAccessorImpl.install(
+                    pluginSettings, tenantId, currencyConversionService);
             com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                     pluginSettings, tenantId, cloudConfigService, objectMapper);
             com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
                     pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
             pluginSettings.put("__dataAccessor",
-                    new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
+                    com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                        ? new com.auraboot.framework.openplatform.service.InstalledMachineDataAccessor(dynamicDataService)
+                        : new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
                 // Q03-04: nested follow-up commands dispatch through the real
                 // pipeline (validated, invariant-checked, evented, audited)
@@ -654,6 +688,22 @@ public class HandlerPhase implements CommandPhase {
                 }
                 pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                         new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
+                                tenantId,commandCode,modelCode,effectiveRecordId,
+                                MetaContext.getCurrentUserPid(),handler,projection));
+            }
+            if (Boolean.TRUE.equals(pluginSettings.get(
+                    com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
+                if (handler == null || !relatedUpdateBoundaryAuthorized
+                        || !StringUtils.hasText(effectiveRecordId)
+                        || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                        || Boolean.TRUE.equals(pluginSettings.get(
+                            com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))
+                        || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                            instanceof TenantProjectionAccessor projection)) {
+                    throw new AccessDeniedException("Related update requires an authorized readable target and projection");
+                }
+                pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                        new com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor(dynamicDataService,
                                 tenantId,commandCode,modelCode,effectiveRecordId,
                                 MetaContext.getCurrentUserPid(),handler,projection));
             }
@@ -708,7 +758,7 @@ public class HandlerPhase implements CommandPhase {
                             handler.getClass().getName(), handlerCode);
                 } else {
                     Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
-                            : inventoryReceiptProvenance.invoke(handler, pluginContext);
+                            : inventoryReceiptProvenance.route(handler, pluginContext);
                     if (result instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -733,7 +783,7 @@ public class HandlerPhase implements CommandPhase {
                 log.info("Executing chained secondary handler {} for command {}",
                         secondary.getClass().getName(), handlerCode);
                 Object secResult = inventoryReceiptProvenance == null ? secondary.execute(pluginContext)
-                        : inventoryReceiptProvenance.invoke(secondary, pluginContext);
+                        : inventoryReceiptProvenance.route(secondary, pluginContext);
                 if (secResult instanceof Map) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> secMap = (Map<String, Object>) secResult;
@@ -746,6 +796,10 @@ public class HandlerPhase implements CommandPhase {
         } catch (Exception e) {
             log.error("Plugin command handler execution failed for {} (command={}): {}",
                     handlerCode, commandCode, e.getMessage(), e);
+            if (e instanceof org.springframework.web.server.ResponseStatusException status
+                    && status.getStatusCode().is4xxClientError()) {
+                throw status;
+            }
             if (e instanceof AccessDeniedException accessDeniedException) {
                 throw accessDeniedException;
             }
@@ -760,8 +814,17 @@ public class HandlerPhase implements CommandPhase {
             }
             // Preserve the typed persistence boundary: the global response handler
             // sanitizes database diagnostics in every profile, including dev.
-            if (e instanceof org.springframework.dao.DataAccessException persistenceFailure) {
-                throw persistenceFailure;
+            // Meta services can wrap mapper failures. Inspect typed causes rather
+            // than diagnostic text, preserving rollback/conflict transport semantics.
+            java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            for (Throwable cause = e; cause != null && seen.add(cause); cause = cause.getCause()) {
+                if (cause instanceof org.springframework.dao.DataAccessException persistenceFailure) {
+                    throw persistenceFailure;
+                }
+            }
+            if (e instanceof com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Unavailable unavailable) {
+                throw new BusinessException(ResponseCode.BadParam,
+                        "$i18n:currency.error.document_snapshot_unavailable", unavailable);
             }
             // Plugin handlers use stable, transport-neutral error keys because
             // the plugin API must not depend on host web exceptions. Preserve
@@ -775,7 +838,7 @@ public class HandlerPhase implements CommandPhase {
                 ResponseCode responseCode = switch (rejection.code()) {
                     case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
                 };
-                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection);
+                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection, rejection.messageArgs());
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {
@@ -804,6 +867,13 @@ public class HandlerPhase implements CommandPhase {
                                           String clientRequestId, Integer clientExpectedVersion) {
         Map<String, Object> input = new HashMap<>();
         input.put("handlerCode", handlerCode);
+        // Locale must survive thread hand-off and recovery, rather than use the worker default.
+        org.springframework.web.context.request.RequestAttributes attributes =
+                org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        String taskLocale = attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servlet
+                ? i18nLocaleResolver.resolveLocale(servlet.getRequest())
+                : org.springframework.context.i18n.LocaleContextHolder.getLocale().toLanguageTag();
+        input.put("locale", taskLocale);
         input.put("commandCode", commandCode);
         input.put("tenantId", tenantId);
         input.put("userId", userId);
@@ -899,8 +969,8 @@ public class HandlerPhase implements CommandPhase {
         }
 
         try {
-            log.info("BPM trigger: starting process={} for command={}, businessKey={}",
-                    processKey, command.getCode(), businessKey);
+            log.info("BPM trigger: starting process={} for command={}",
+                    processKey, command.getCode());
             Map<String, Object> started = workflowCapabilities.execute("start",
                     new WorkflowCapability.WorkflowRequest(
                             MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,

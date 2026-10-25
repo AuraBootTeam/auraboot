@@ -422,6 +422,16 @@ export function PropertyFieldRenderer({ schema, adapter, fieldId }: PropertyFiel
                 }}
                 itemLabel={resolvedLabel}
                 readonly={adapter.disabled || adapter.readOnly}
+                first={idx===0}
+                last={idx===items.length-1}
+                onMove={(direction)=>{
+                  if(adapter.disabled || adapter.readOnly) return;
+                  const target=idx+(direction==='up'?-1:1);
+                  if(target<0 || target>=items.length) return;
+                  const updated=[...items];
+                  [updated[idx],updated[target]]=[updated[target],updated[idx]];
+                  (adapter as FieldAdapter<unknown>).setValue(updated);
+                }}
               />
             );
           })}

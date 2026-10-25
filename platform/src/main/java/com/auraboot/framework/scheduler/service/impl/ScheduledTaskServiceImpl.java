@@ -1,5 +1,6 @@
 package com.auraboot.framework.scheduler.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.scheduler.dto.ScheduledTaskCreateRequest;
 import com.auraboot.framework.scheduler.entity.ScheduledTask;
@@ -39,7 +40,12 @@ public class ScheduledTaskServiceImpl implements ScheduledTaskService {
             }
         }
 
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null || tenantId <= 0) {
+            throw new IllegalStateException("Scheduled task creation requires an authenticated tenant");
+        }
         ScheduledTask entity = new ScheduledTask();
+        entity.setTenantId(tenantId);
         entity.setPid(UniqueIdGenerator.generate());
         entity.setName(request.getName());
         entity.setDescription(request.getDescription());

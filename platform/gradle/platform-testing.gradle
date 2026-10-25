@@ -1,0 +1,65 @@
+// Explicit test dependencies and JVM behavior shared by the extracted library and app.
+configurations {
+    mockitoAgent
+    aspectjAgent
+}
+dependencies {
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
+    testImplementation 'org.testcontainers:testcontainers'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'io.projectreactor:reactor-test'
+    testImplementation 'org.awaitility:awaitility:4.3.0'
+    testImplementation 'org.apache.avro:avro:1.12.2'
+    testImplementation 'net.jqwik:jqwik:1.10.1'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
+    testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
+    testRuntimeOnly 'jaxen:jaxen:2.0.6'
+    testRuntimeOnly 'net.java.dev.msv:xsdlib:2013.6.1'
+    testRuntimeOnly 'relaxngDatatype:relaxngDatatype:20020414'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    mockitoAgent('org.mockito:mockito-core') { transitive = false }
+    aspectjAgent('org.aspectj:aspectjweaver') { transitive = false }
+}
+tasks.withType(Test).configureEach {
+    workingDir rootProject.projectDir
+    useJUnitPlatform {
+        if (!project.hasProperty('includeLiveEvals')) {
+            excludeTags 'agent-eval-live'
+        }
+        excludeTags 'destructive-bootstrap'
+    }
+    maxParallelForks = 1
+    maxHeapSize = project.findProperty('auraTestMaxHeap') ?: '6g'
+    minHeapSize = project.findProperty('auraTestMinHeap') ?: '2g'
+    jvmArgs '-XX:+UseG1GC', '-Duser.timezone=UTC', '-Djdk.httpclient.allowRestrictedHeaders=host'
+    jvmArgs '-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl'
+    if (project.hasProperty('auraTestMaxMetaspace')) {
+        jvmArgs "-XX:MaxMetaspaceSize=${project.property('auraTestMaxMetaspace')}"
+    }
+    systemProperty 'allure.results.directory', providers.environmentVariable('AURA_ALLURE_RESULTS')
+            .getOrElse(layout.buildDirectory.dir('allure-results').get().asFile.absolutePath)
+    systemProperty 'spring.test.context.cache.maxSize', project.findProperty('springTestContextCacheMaxSize') ?: '8'
+    def store = layout.buildDirectory.dir("archunit/${name}").get().asFile
+    def baseline = rootProject.file('src/testFixtures/resources/archunit_store')
+    inputs.dir baseline
+    systemProperty 'archunit.freeze.store.default.path', store.absolutePath
+    systemProperty 'archunit.freeze.store.default.allowStoreCreation', 'false'
+    systemProperty 'archunit.freeze.refreeze', 'false'
+    doFirst {
+        project.delete store
+        project.copy { from baseline; into store }
+        jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+        jvmArgs "-javaagent:${configurations.aspectjAgent.singleFile}"
+    }
+    reports.junitXml {
+        includeSystemOutLog = false
+        includeSystemErrLog = false
+    }
+    testLogging { events 'passed', 'failed', 'skipped' }
+}

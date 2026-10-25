@@ -315,6 +315,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             offboardingCoordinator.prepare(member, targetMemberPid, userId,
                     TenantMemberOffboardingAction.REMOVE);
             boolean result = tenantMemberService.removeMember(member.getId());
+            revokeUserSessions(member);
             log.info("用户 {} 移除成员 {}", userId, memberPid);
             return result;
             
@@ -613,6 +614,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             }
             for (TenantMember member : removable) {
                 tenantMemberService.removeMember(member.getId());
+                revokeUserSessions(member);
             }
             
             log.info("用户 {} 批量移除成员: {}", userId, memberPids);

@@ -165,6 +165,9 @@ public class PluginImportServiceImpl implements PluginImportService {
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
 
+    @org.springframework.lang.Nullable
+    private final com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources;
+
     private final ObjectMapper objectMapper = createObjectMapper();
     private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
 
@@ -392,6 +395,10 @@ public class PluginImportServiceImpl implements PluginImportService {
                     .build();
         }
 
+        // Sanitize comment-only declarations before deciding which optional capabilities are required.
+        manifest.sanitize();
+        PluginAgentResourceGuard.requireManifest(manifest, agentDefinitionResources);
+
         String importId = UlidGenerator.generate();
         Long tenantId = requireTenantContextForImport();
 
@@ -420,9 +427,6 @@ public class PluginImportServiceImpl implements PluginImportService {
         importHistoryMapper.insert(history);
 
         try {
-            // Remove JSON comment objects (entries with only _-prefixed fields) before validation
-            manifest.sanitize();
-
         // Validate manifest — separate [WARN]-prefixed soft warnings from hard errors.
         // deferReferenceValidation downgrades cross-plugin command/binding → model refs to warnings
         // for batch cyclic cold-reset imports (re-enforced later by verifyImportReferenceIntegrity).
@@ -614,6 +618,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * rows to be visible — hence the lock must not be inside @Transactional scope.
      */
     private ImportExecuteResult executeWithLock(ImportContext context, ImportRequest request) {
+        PluginAgentResourceGuard.requireManifest(context.getManifest(), agentDefinitionResources);
         // Merge manifest importOptions as defaults before applying hard defaults.
         // Manifest options only take effect when the request field is null (i.e., not explicitly set by caller).
         mergeManifestImportOptions(context.getManifest(), request);
@@ -1479,6 +1484,17 @@ public class PluginImportServiceImpl implements PluginImportService {
             throw new PluginException("Can only rollback successful imports");
         }
 
+        if (agentDefinitionResources == null) {
+            if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
+                throw new PluginException("Rollback tenant does not match import owner");
+            }
+            PluginAgentResourceGuard.requireResources(
+                    pluginResourceMapper.findByPluginPid(history.getPluginPid()), null);
+            PluginAgentResourceGuard.requireResources(pluginResourceMapper.findCreatedResourcesForRollback(
+                    history.getTenantId(), history.getPluginPid(), importId), null);
+            PluginAgentResourceGuard.requireResources(pluginResourceMapper.findUpdatedResourcesForRollback(
+                    history.getTenantId(), history.getPluginPid(), importId), null);
+        }
         modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
         if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
             throw new PluginException("Rollback tenant does not match import owner");
@@ -1520,16 +1536,16 @@ public class PluginImportServiceImpl implements PluginImportService {
                 .build();
 
         try {
-            // Get resources in reverse order
-            List<PluginResource> createdResources = pluginResourceMapper.findCreatedResourcesForRollback(history.getTenantId(), history.getPluginPid(), importId);
-
             // Delete created resources in reverse order
+            List<PluginResource> createdResources = pluginResourceMapper.findCreatedResourcesForRollback(
+                    history.getTenantId(), history.getPluginPid(), importId);
             for (PluginResource resource : createdResources) {
                 resourceImporter.rollbackResource(resource);
             }
 
             // Restore updated resources
-            List<PluginResource> updatedResources = pluginResourceMapper.findUpdatedResourcesForRollback(history.getTenantId(), history.getPluginPid(), importId);
+            List<PluginResource> updatedResources = pluginResourceMapper.findUpdatedResourcesForRollback(
+                    history.getTenantId(), history.getPluginPid(), importId);
             for (PluginResource resource : updatedResources) {
                 resourceImporter.restoreResource(resource);
             }

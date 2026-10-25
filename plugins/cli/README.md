@@ -329,3 +329,20 @@ pnpm build       # Compile TypeScript
 pnpm lint        # Type-check without emitting
 npx tsx src/index.ts plugin validate ../pcba-base  # Run directly
 ```
+
+### Optional backend agent module
+
+`aura status` reports `installationState` independently of service health. An
+optional `not_installed` agent is not a backend/auth failure. AI commands perform
+schema-v1 application capability discovery before dispatching or opening a stream;
+unknown discovery (including legacy 404, authentication/network errors or an
+unsupported version) refuses AI actions with a retryable explanation.
+
+Both stdio and HTTP MCP discovery intersect the existing profile with the verified
+assembly. Base/unknown assemblies omit `ask_aurabot`, `dispatch_agent`, `list_agents`
+and `list_tools`; their handlers also recheck before execution. Generic queries,
+DSL authoring and local/external MCP list/add/remove/test/tools remain available.
+Only backend MCP push/pull synchronization requires the installed agent. Profiles,
+tenant pinning and backend authorization retain their existing authority; an
+installed module does not grant any of them. Reconnect after changing assemblies
+so the tool list is rediscovered; actions do not reuse persistent installation facts.

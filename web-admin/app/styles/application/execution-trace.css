@@ -1,0 +1,625 @@
+.execution-log-trace-block {
+  display: grid;
+  gap: 12px;
+  max-width: 100%;
+  color: #111827;
+  font-size: 13px;
+}
+
+.elta-filters {
+  display: grid;
+  align-items: end;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.elta-filters label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.elta-filters label span {
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.elta-filters input,
+.elta-filters select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  height: 34px;
+  padding: 6px 8px;
+}
+
+.elta-filters input:focus,
+.elta-filters select:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgb(37 99 235 / 0.15);
+}
+
+.elta-filters button,
+.elta-row-actions button,
+.elta-drawer-head button {
+  min-height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+}
+
+.elta-filters [data-testid='elta-apply'] {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.elta-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  padding: 10px 12px;
+}
+
+.elta-summary strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.elta-summary span {
+  color: #4b5563;
+}
+
+.elta-error {
+  color: #b91c1c !important;
+}
+
+.elta-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.elta-table {
+  width: 100%;
+  min-width: 1080px;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.elta-col-trace {
+  width: 180px;
+}
+
+.elta-col-decision {
+  width: 150px;
+}
+
+.elta-col-version {
+  width: 82px;
+}
+
+.elta-col-status {
+  width: 100px;
+}
+
+.elta-col-caller {
+  width: 160px;
+}
+
+.elta-col-rollout {
+  width: 120px;
+}
+
+.elta-col-duration {
+  width: 86px;
+}
+
+.elta-col-time {
+  width: 160px;
+}
+
+.elta-col-actions {
+  width: 142px;
+}
+
+.elta-table th,
+.elta-table td {
+  border-bottom: 1px solid #eef2f7;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.elta-table th {
+  background: #f8fafc;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.elta-table td {
+  color: #111827;
+  font-size: 13px;
+}
+
+.elta-cell-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elta-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
+.elta-status-MATCHED {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.elta-status-NOT_MATCHED,
+.elta-status-SKIPPED {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.elta-status-ERROR {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.elta-status-SUCCESS {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.elta-status-FAILED,
+.elta-status-NO_HANDLER,
+.elta-status-DEAD_LETTER,
+.elta-status-RETRY_PENDING {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.elta-row-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.elta-drawer-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  border: 0;
+  background: rgb(15 23 42 / 0.24);
+  cursor: pointer;
+}
+
+.elta-drawer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
+  gap: 12px;
+  position: fixed;
+  z-index: 81;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 100dvh;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 0 14px 35px rgb(15 23 42 / 0.12);
+  padding: 14px;
+}
+
+.elta-drawer[data-mode='detail'] {
+  position: static;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  scroll-margin-top: 72px;
+  border-radius: 8px;
+}
+
+.elta-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.elta-drawer-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.elta-drawer-head button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.elta-drawer-head h3 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 16px;
+}
+
+.elta-drawer-meta,
+.elta-chain-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.elta-chain {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.elta-chain li {
+  display: grid;
+  gap: 6px;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.elta-chain li.elta-chain-current {
+  border-left-color: #2563eb;
+  background: #eff6ff;
+}
+
+.elta-chain-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.elta-chain-main strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #111827;
+  font-size: 14px;
+}
+
+.elta-chain-main .elta-status {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.elta-chain-rules {
+  color: #374151;
+  font-size: 12px;
+}
+
+.elta-output-snapshot {
+  margin-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
+}
+
+.elta-output-snapshot h4 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.elta-fact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.elta-fact-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.elta-fact-card-head {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.elta-fact-card-head strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.elta-fact-card-head span {
+  min-width: 0;
+  overflow: hidden;
+  color: #475569;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elta-fact-badges,
+.elta-fact-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.elta-fact-badges span,
+.elta-fact-values span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 3px 7px;
+}
+
+.elta-fact-values span {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.elta-fact-values code {
+  color: #1d4ed8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+}
+
+.elv-fact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.elv-fact-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.elv-fact-card strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.elv-fact-card span.mono {
+  min-width: 0;
+  overflow: hidden;
+  color: #475569;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elv-fact-card small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.elv-fact-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.elv-fact-card div span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 3px 7px;
+}
+
+.elv-fact-card code {
+  color: #1d4ed8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+}
+
+.elta-chain-error {
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+.elta-action-evidence {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 12px;
+}
+
+.elta-action-evidence-head,
+.elta-action-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.elta-action-evidence-head h4 {
+  margin: 0;
+  color: #111827;
+  font-size: 14px;
+}
+
+.elta-action-evidence-head span,
+.elta-action-sub {
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.elta-action-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #64748b;
+  padding: 10px;
+}
+
+.elta-action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.elta-action-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.elta-action-card-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elta-action-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.elta-action-retry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.elta-action-retry span {
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 6px;
+}
+
+.elta-action-replay {
+  width: fit-content;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.elta-action-replay:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.elta-action-replay:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.elta-action-payload {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin: 0;
+}
+
+.elta-action-payload div {
+  min-width: 0;
+  border: 1px solid #eef2f7;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 6px 8px;
+}
+
+.elta-action-payload dt {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.elta-action-payload dd {
+  min-width: 0;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+

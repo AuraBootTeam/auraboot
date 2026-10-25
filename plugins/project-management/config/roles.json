@@ -14,7 +14,8 @@
       "tpm.task.read",
       "model.tpm_task.read",
       "tpm.acceptance.read",
-      "model.tpm_acceptance.read"
+      "model.tpm_acceptance.read",
+      "sys.file.read"
     ]
   },
   {

@@ -1,0 +1,348 @@
+.decision-field-impact {
+  display: grid;
+  gap: 12px;
+  container-type: inline-size;
+}
+
+.decision-field-impact-toolbar {
+  display: grid;
+  align-items: end;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) 180px auto;
+}
+
+.decision-field-impact label {
+  display: grid;
+  gap: 4px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.decision-field-impact input,
+.decision-field-impact select {
+  min-width: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 650;
+  padding: 8px 10px;
+}
+
+.decision-field-impact button {
+  min-height: 36px;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.decision-field-impact button:disabled {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.decision-field-impact-grid {
+  display: grid;
+  align-items: start;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+}
+
+.decision-field-impact-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.decision-field-impact-card h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.decision-field-impact-card dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.decision-field-impact-card dl > div {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.decision-field-impact-card dt,
+.decision-field-impact-card dd {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.decision-field-impact-card dd {
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.decision-field-impact-risk,
+.decision-field-impact-preflight {
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+
+.decision-field-impact-risk.is-blocking,
+.decision-field-impact-preflight.is-blocked {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.decision-field-impact-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.decision-field-impact-counts span {
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 4px 8px;
+}
+
+.decision-field-impact-inline {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.decision-field-impact-ack {
+  display: flex !important;
+  align-items: center;
+  grid-auto-flow: column;
+  justify-content: start;
+}
+
+.decision-field-impact-ack input {
+  min-width: auto;
+}
+
+.decision-integration-impact {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.decision-integration-impact-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.decision-integration-impact-head h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.decision-integration-impact-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.decision-integration-impact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.decision-integration-impact-link,
+.decision-integration-impact button {
+  min-height: 34px;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 9px 12px;
+  text-decoration: none;
+}
+
+.decision-integration-impact button:disabled {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.decision-integration-impact-body {
+  display: grid;
+  gap: 10px;
+}
+
+.decision-integration-impact-risk {
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+
+.decision-integration-impact-risk.is-blocking {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.decision-integration-impact-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.decision-integration-impact-counts span {
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 4px 8px;
+}
+
+.decision-integration-impact-refs {
+  display: grid;
+  gap: 8px;
+}
+
+.decision-integration-impact-ref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 750;
+  padding: 10px 12px;
+}
+
+.decision-integration-impact-ref span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.decision-integration-impact-ref small {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 3px 7px;
+}
+
+@container (max-width: 1120px) {
+  .rollout-monitor .rollout-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rollout-monitor .rollout-toolbar label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .rollout-monitor .rollout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rollout-monitor .rollout-side-panel {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
+  .decision-field-impact-grid,
+  .decision-field-impact-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-field-impact-inline {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-integration-impact-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decision-integration-impact-actions {
+    justify-content: flex-start;
+  }
+}
+
+@container (max-width: 620px) {
+  .rollout-monitor .rollout-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .rollout-monitor .rollout-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-field-impact-card dl > div {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1500px) {
+  .decisionops-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .decisionops-shell .doc-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+    overflow: visible;
+  }
+
+  .decisionops-shell .doc-tabs :is(button, a) {
+    min-width: 0;
+  }
+}
+

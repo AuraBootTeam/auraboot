@@ -52,6 +52,19 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public Map<String, Object> getByIdOrNull(String modelCode, String recordId) {
+        log.debug("Plugin DataAccessor: getByIdOrNull({}, {})", modelCode, recordId);
+        try {
+            return withCommandAuthority(() -> dynamicDataService.getById(modelCode, recordId));
+        } catch (com.auraboot.framework.meta.exception.MetaRecordNotFoundException e) {
+            // Typed not-found (2026-10-24): never couple to the exception's
+            // message text — MetaRecordNotFoundException is the platform's
+            // contract for "absent from this model + tenant scope".
+            return null;
+        }
+    }
+
+    @Override
     public List<Map<String, Object>> query(String modelCode, Map<String, Object> filters) {
         log.debug("Plugin DataAccessor: query({}, {})", modelCode, filters);
 
@@ -88,7 +101,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         }
         DynamicQueryRequest request = DynamicQueryRequest.builder()
                 .pageNum(query.page()).pageSize(query.size()).conditions(conditions).sortFields(sorts)
-                .keyword(query.keyword()).build();
+                .keyword(query.keyword().isEmpty() ? null : query.keyword()).build();
         PaginationResult<Map<String, Object>> result = withCommandAuthority(
                 () -> dynamicDataService.list(modelCode, request));
         if (result == null || result.getRecords() == null || result.getTotal() == null) {

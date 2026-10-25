@@ -109,3 +109,25 @@ it('rejects missing aggregate rows instead of showing a successful empty report'
   };
   await expect(fetchReportData(report)).rejects.toThrow();
 });
+
+it('binds scoped named-query parameters without allowing transport overrides', async () => {
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ code: 0, data: { records: [{ project: 'project-a' }] } }) });
+  vi.stubGlobal('fetch', fetch);
+  const report = createEmptyReport('Scoped review');
+  report.dataSources = { rows: { type: 'namedQuery', queryCode: 'project_review', params: { projectPid: 'project-a', includeCompleted: true } } };
+  expect(await fetchReportData(report)).toEqual({ rows: [{ project: 'project-a' }] });
+  const url = new URL(fetch.mock.calls[0][0], 'http://localhost');
+  expect(url.searchParams.get('projectPid')).toBe('project-a');
+  expect(url.searchParams.get('includeCompleted')).toBe('true');
+  expect(url.searchParams.get('datasourceId')).toBe('nq:project_review');
+  expect(url.searchParams.get('maxItems')).toBe('500');
+});
+
+it('rejects transport-control parameters instead of switching named queries', async () => {
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  const report = createEmptyReport('Scoped review');
+  report.dataSources = { rows: { type: 'namedQuery', queryCode: 'project_review', params: { datasourceId: 'nq:other' } } };
+  await expect(fetchReportData(report)).rejects.toThrow('Invalid named query parameter');
+  expect(fetch).not.toHaveBeenCalled();
+});

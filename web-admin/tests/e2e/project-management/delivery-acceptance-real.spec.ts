@@ -73,7 +73,7 @@ async function create(page: Page, user: any, name: string, amount: number, risk:
   await page.getByRole('button', {name:'新建验收',exact:true}).click();
   await page.locator('#tpm_ac_name').fill(name);
   await page.getByTestId('select-trigger-tpm_ac_project').click();
-  await page.getByRole('option', {name:'华辰制造 · 供应链协同平台',exact:true}).click();
+  await page.getByRole('option', {name:process.env.PW_ACCEPTANCE_PROJECT_NAME || '华辰制造 · 供应链协同平台',exact:true}).click();
   await page.locator('#tpm_ac_scope').fill('会员迁移、权限配置和培训交付完成，按清单核对验收标准。');
   await page.locator('#tpm_ac_amount').fill(String(amount));
   await page.getByTestId('select-trigger-tpm_ac_risk').click();
@@ -606,7 +606,9 @@ test('accelerated SLA uses the real scheduler and stops after approval @critical
   const change=async(value:any)=>data(await page.request.put(`/api/bpm/sla-configs/${config.pid}`,{data:value}));
   await change({...config,name:'加强审核 · 30秒加速验证',deadlineMode:'FIXED',deadlineValue:'PT30S',ruleBinding:{...config.ruleBinding,enabled:false}});
   try {
-    const name='SLA 加速验证 · 30秒交付验收';const pid=await create(page,user,name,100000,'高风险',true);
+    const prefix=process.env.PW_ACCEPTANCE_PROJECT_NAME ? `${process.env.PW_ACCEPTANCE_PROJECT_NAME} · 时限复盘` : 'SLA 加速验证 · 30秒交付验收';
+    const previous=(await dynamicRecords(page,'tpm_acceptance')).records.filter((record:any)=>record.tpm_ac_name.startsWith(prefix));
+    const name=`${prefix} · 第${previous.length+1}次`;const pid=await create(page,user,name,100000,'高风险',true);
     const sla=await submit(page,pid,0.5,'tpm_enhanced_review');await shot(page,'d10');
     let expired:any;
     await expect.poll(async()=>{expired=await data(await page.request.get(`/api/bpm/monitor/sla-records/${sla.pid}`));return expired.status;},{timeout:65000,intervals:[3000]}).toBe('overdue');
@@ -892,7 +894,10 @@ async function publishAcceptanceDesign(page: Page) {
   expect(original.status).toBe('deployed');
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
   await page.locator('.react-flow__node[data-id="tpm_enhanced_review"]').click();
-  await page.getByTestId('node-label-input').fill('验收负责人 · 加强审核');
+  const labelInput = page.getByTestId('node-label-input');
+  const reviewLabel = (await labelInput.inputValue()) === '验收负责人 · 加强审核'
+    ? '加强审核 · 验收负责人' : '验收负责人 · 加强审核';
+  await labelInput.fill(reviewLabel);
   if (await page.getByTestId('bpmn-drawer-backdrop').isVisible()) {
     await page.getByTestId('bpmn-close-inspector').click();
   }
@@ -914,7 +919,7 @@ async function publishAcceptanceDesign(page: Page) {
   expect(historical.status).toBe('deployed');
   await page.reload();
   await expect(page.locator('.react-flow__node')).toHaveCount(8);
-  await expect(page.locator('.react-flow__node[data-id="tpm_enhanced_review"]')).toContainText('验收负责人 · 加强审核');
+  await expect(page.locator('.react-flow__node[data-id="tpm_enhanced_review"]')).toContainText(reviewLabel);
   await page.getByRole('button',{name:/fit view/i}).click();
   await shot(page,'BPM01-persisted-design');
   const deployed = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bpm/process-definitions/${definitionPid}/deploy` && r.request().method()==='POST');
@@ -1010,7 +1015,9 @@ test('rule center primary and professional views remain reachable through their 
 
 test('SLA business summary exposes loading errors and empty reads and recovers explicitly @critical', async ({page}) => {
   const user=await login(page);
-  const name='交付验收 · 时限读取与恢复验证';
+  const prefix='交付验收 · 时限读取与恢复验证';
+  const previous=(await dynamicRecords(page,'tpm_acceptance')).records.filter((record:any)=>record.tpm_ac_name.startsWith(prefix));
+  const name=`${prefix} · 第${previous.length+1}次`;
   const pid=await create(page,user,name,1000,'普通',true);
   const sla=await submit(page,pid,480,'tpm_standard_review');
   const endpoint=`**/api/bpm/monitor/instances/${sla.processInstanceId}/sla`;

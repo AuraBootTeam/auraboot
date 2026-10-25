@@ -23,6 +23,7 @@ import {
   clickRowActionByLocator,
   findRowInPaginatedList,
 } from '../helpers';
+import { createDefaultTableView, restoreDefaultTableView, type DefaultTableViewState } from '../showcase/helpers/default-table-view';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 
@@ -31,8 +32,10 @@ test.describe('Action System — Action Types', () => {
 
   let orderPid: string;
   let orderTitle: string;
+  let defaultTableView: DefaultTableViewState | null = null;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser, request }) => {
+    defaultTableView = await createDefaultTableView(request, 'e2et_order', 'e2et_order_list', 'Action Types');
     const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
@@ -49,7 +52,9 @@ test.describe('Action System — Action Types', () => {
     await context.close();
   });
 
-  test.afterAll(async ({ browser }) => {
+  test.afterAll(async ({ browser, request }) => {
+    await restoreDefaultTableView(request, defaultTableView);
+    defaultTableView = null;
     const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await context.newPage();
     const order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
@@ -343,29 +348,15 @@ test.describe('Action System — Action Types', () => {
       return;
     }
 
+    await expect(targetRow).toBeVisible();
     await targetRow.scrollIntoViewIfNeeded();
     await clickRowActionByLocator(page, targetRow, 'delete');
 
-    // Confirm dialog should appear
-    const confirmDialog = page.locator(
-      '[data-testid="confirm-dialog"], [role="alertdialog"], .ant-modal-confirm',
-    );
-    const hasDialog = await confirmDialog
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    if (hasDialog) {
-      // Dismiss the dialog (don't actually delete)
-      const cancelBtn = page
-        .locator(
-          '[data-testid="confirm-cancel"], button:has-text("取消"), button:has-text("Cancel")',
-        )
-        .first();
-      await cancelBtn.click().catch(() => page.keyboard.press('Escape'));
-    }
-
-    expect(true).toBe(true);
+    const confirmDialog = page.getByTestId('confirm-dialog');
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByTestId('confirm-cancel').click();
+    await expect(confirmDialog).toBeHidden();
+    await expect(targetRow).toBeVisible();
   });
 
   /**

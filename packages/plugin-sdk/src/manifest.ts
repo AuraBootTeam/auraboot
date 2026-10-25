@@ -39,6 +39,9 @@ export interface PluginManifest {
   /** Module entry path relative to plugin root. Optional for plugins registered via setup() only. */
   entry?: string
 
+  /** Verified backend modules required for activation, independent of licensing. */
+  applicationModules?: Array<'agent'>
+
   dependencies?: PluginDependencies
   license?: PluginLicenseRequirement
   compatibility?: PluginCompatibility

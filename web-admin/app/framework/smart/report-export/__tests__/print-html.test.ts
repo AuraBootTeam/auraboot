@@ -307,3 +307,260 @@ it('honors configured chart dimensions and prints its title once', () => {
   expect(result.html).toContain('height="180"');
   expect(result.html.match(/各项目验收金额/g)).toHaveLength(1);
 });
+
+describe('configured report summary rows', () => {
+  const columns = [
+    { field: 'name', label: 'Item' },
+    { field: 'amount', label: 'Amount', format: 'currency' },
+  ];
+  const rows = [
+    { name: 'Alpha', team: 'A', amount: 10 },
+    { name: 'Beta', team: 'A', amount: 2.5 },
+    { name: 'Gamma', team: 'B', amount: 5 },
+  ];
+  it.each(['sum', 'avg', 'count', 'min', 'max'])(
+    'renders table %s using the same summary contract as the designer',
+    (aggregation) => {
+      const { html } = doc(
+        {
+          body: [
+            {
+              blockType: 'table',
+              dataSource: 'main',
+              columns,
+              summary: {
+                enabled: true,
+                label: 'Review total',
+                columns: [{ field: 'amount', aggregation, format: 'currency' }],
+              },
+            },
+          ],
+        },
+        { main: rows },
+      );
+      const expected = { sum: '17.50', avg: '5.83', count: '3.00', min: '2.50', max: '10.00' }[
+        aggregation
+      ];
+      expect(html).toContain('class="summary-row table-summary"');
+      expect(html).toContain('Review total');
+      expect(html).toContain('¥' + expected);
+    },
+  );
+  it('renders independent group subtotals and the grand total with escaped labels', () => {
+    const { html } = doc(
+      {
+        body: [
+          {
+            blockType: 'grouped-table',
+            dataSource: 'main',
+            groupByField: 'team',
+            columns,
+            groupSubtotal: {
+              enabled: true,
+              label: '<Group>',
+              columns: [{ field: 'amount', aggregation: 'sum', format: 'currency' }],
+            },
+            grandTotal: {
+              enabled: true,
+              label: 'Grand total',
+              columns: [{ field: 'amount', aggregation: 'sum', format: 'currency' }],
+            },
+          },
+        ],
+      },
+      { main: rows },
+    );
+    expect(html.match(/class="summary-row group-subtotal"/g)).toHaveLength(2);
+    expect(html).toContain('&lt;Group&gt;');
+    expect(html).toContain('¥12.50');
+    expect(html).toContain('¥5.00');
+    expect(html).toContain('¥17.50');
+    expect(html).toContain('Grand total');
+  });
+  it('omits disabled summaries and tolerates the initial empty summary configuration', () => {
+    const { html } = doc(
+      {
+        body: [
+          { blockType: 'table', dataSource: 'main', columns, summary: { enabled: false } },
+          {
+            blockType: 'grouped-table',
+            dataSource: 'main',
+            columns,
+            groupByField: 'team',
+            groupSubtotal: { enabled: true },
+            grandTotal: { enabled: false },
+          },
+        ],
+      },
+      { main: rows },
+    );
+    expect(html).not.toContain('class="summary-row table-summary"');
+    expect(html).not.toContain('class="summary-row grand-total"');
+    expect(html.match(/class="summary-row group-subtotal"/g)).toHaveLength(2);
+  });
+});
+
+it('rounds currency summaries to two decimals and keeps null or text numeric input consistent with the designer', () => {
+  const { html } = doc(
+    {
+      body: [
+        {
+          blockType: 'table',
+          dataSource: 'main',
+          columns: [{ field: 'name' }, { field: 'amount', format: 'currency' }],
+          summary: {
+            enabled: true,
+            label: 'Average',
+            columns: [{ field: 'amount', aggregation: 'avg', format: '' }],
+          },
+        },
+      ],
+    },
+    {
+      main: [
+        { name: 'Null', amount: null },
+        { name: 'Text', amount: '2.50' },
+        { name: 'Invalid', amount: 'not-number' },
+      ],
+    },
+  );
+  expect(html).toContain('Average');
+  expect(html).toContain('¥0.83');
+  expect(html).not.toContain('¥0.833');
+});
+
+it('renders an explicit metric section title separately and escapes it without duplicating fallback labels', () => {
+  const block = {
+    blockType: 'stat-card',
+    dataSource: 'main',
+    valueField: 'amount',
+    aggregation: 'sum',
+    title: '<Executive>',
+    label: 'Accepted amount',
+  };
+  const { html } = doc({ body: [block] }, { main: [{ amount: 10 }] });
+  expect(html).toContain('<h2>&lt;Executive&gt;</h2>');
+  expect(html).toContain('Accepted amount');
+  expect(html).not.toContain('<Executive>');
+  const fallback = doc({ body: [{ ...block, label: undefined }] }, { main: [] }).html;
+  expect(fallback.match(/&lt;Executive&gt;/g)).toHaveLength(1);
+});
+
+describe('canonical designer print layout', () => {
+  it('preserves widths and header, body and summary alignment', () => {
+    const result = doc(
+      {
+        body: [
+          {
+            blockType: 'table',
+            dataSource: 'rows',
+            columns: [
+              { field: 'name', label: '项目', width: 340, align: 'left' },
+              { field: 'budget', label: '预算', width: 150, align: 'right', format: 'currency' },
+            ],
+            summary: {
+              enabled: true,
+              label: '合计',
+              columns: [{ field: 'budget', aggregation: 'sum' }],
+            },
+          },
+        ],
+      },
+      { rows: [{ name: '供应链协同', budget: 132000.5 }] },
+    );
+    expect(result.html).toContain('style="text-align:left;width:340px"');
+    expect(result.html).toContain('style="text-align:right;width:150px"');
+    expect(result.html.match(/<td style="text-align:right">¥132,000.50<\/td>/g)).toHaveLength(2);
+  });
+  it('shares column layout with grouped-table details and subtotals', () => {
+    const result = doc(
+      {
+        body: [
+          {
+            blockType: 'grouped-table',
+            dataSource: 'rows',
+            groupByField: 'name',
+            columns: [
+              { field: 'name', label: '项目', width: 340 },
+              { field: 'budget', label: '预算', width: 150, align: 'right', format: 'currency' },
+            ],
+            groupSubtotal: { enabled: true, columns: [{ field: 'budget', aggregation: 'sum' }] },
+          },
+        ],
+      },
+      { rows: [{ name: '供应链', budget: 1.5 }] },
+    );
+    expect(result.html).toContain('style="text-align:right;width:150px"');
+    expect(result.html.match(/<td style="text-align:right">¥1.50<\/td>/g)).toHaveLength(2);
+  });
+  it('renders canonical bands as running templates and HTML chrome', () => {
+    const result = doc({
+      title: '标题',
+      page: { margin: { left: 15, right: 18 } },
+      header: {
+        height: 15,
+        elements: [
+          {
+            type: 'text',
+            content: '交付简报',
+            align: 'center',
+            style: { fontSize: 14, fontWeight: 'bold' },
+          },
+        ],
+      },
+      footer: {
+        height: 10,
+        elements: [
+          { type: 'text', content: '内部 <资料>' },
+          { type: 'page-number', align: 'right' },
+          { type: 'date' },
+        ],
+      },
+      body: [],
+    });
+    expect(result.headerTemplate).toContain('交付简报');
+    expect(result.headerTemplate).toContain('padding:0 18mm 0 15mm');
+    expect(result.headerTemplate).toContain('font-size:14pt;font-weight:bold');
+    expect(result.footerTemplate).toContain('第 <span class="pageNumber"></span> 页');
+    expect(result.footerTemplate).toContain('内部 &lt;资料&gt;');
+    expect(result.headerHeightMm).toBe(15);
+    expect(result.footerHeightMm).toBe(10);
+    expect(result.html).toContain('class="report-band-screen"');
+    expect(result.html).toContain('第 1 页');
+    expect(result.html).not.toContain('<h1>标题</h1>');
+  });
+  it('keeps canonical bands authoritative over legacy band blocks', () => {
+    const result = doc({
+      header: { height: 10, elements: [{ type: 'text', content: 'canonical' }] },
+      body: [{ blockType: 'page-header', content: 'legacy' }],
+    });
+    expect(result.headerTemplate).toContain('canonical');
+    expect(result.headerTemplate).not.toContain('legacy');
+  });
+  it.each([0, -1, Infinity, NaN])('rejects invalid width %s', (width) => {
+    expect(() =>
+      doc({ body: [{ blockType: 'table', columns: [{ field: 'name', width }] }] }),
+    ).toThrow('Invalid report column width');
+  });
+  it('rejects arbitrary styles and remote band images', () => {
+    expect(() =>
+      doc({
+        body: [
+          {
+            blockType: 'table',
+            columns: [{ field: 'name', align: 'right; background:url(https://example.test)' }],
+          },
+        ],
+      }),
+    ).toThrow('Invalid report alignment');
+    expect(() =>
+      doc({
+        header: {
+          height: 15,
+          elements: [{ type: 'image', content: 'https://example.test/image.png' }],
+        },
+        body: [],
+      }),
+    ).toThrow('embedded raster data');
+  });
+});

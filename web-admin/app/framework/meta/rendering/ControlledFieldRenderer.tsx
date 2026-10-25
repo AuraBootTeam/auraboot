@@ -456,7 +456,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
 
   const componentProps: Record<string, any> = {
     // Inferred presentation defaults may be overridden by an explicit DSL/component option.
-    ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
+    ...((componentLower === 'smartdatepicker' && ['datetime', 'timestamp'].includes(fieldKind)) || componentLower === 'smartdatetimepicker'
       ? { dateType: 'datetime-local' }
       : {}),
     ...restDslProps,

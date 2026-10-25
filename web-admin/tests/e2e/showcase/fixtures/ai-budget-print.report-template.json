@@ -1,0 +1,134 @@
+{
+  "format": "auraboot.report-template",
+  "version": 1,
+  "dsl": {
+    "body": [
+      {
+        "id": "analysis",
+        "border": true,
+        "stripe": true,
+        "columns": [
+          {
+            "field": "tpm_pj_name",
+            "label": "项目名称",
+            "width": 340
+          },
+          {
+            "align": "right",
+            "field": "budget_total",
+            "label": "项目预算（元）",
+            "width": 150,
+            "format": "currency"
+          }
+        ],
+        "summary": {
+          "label": "合计",
+          "columns": [],
+          "enabled": false
+        },
+        "blockType": "table",
+        "dataSource": "analysis",
+        "showHeader": true
+      },
+      {
+        "id": "analysis-summary",
+        "align": "left",
+        "style": {
+          "color": "#333333",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        },
+        "title": "分析说明",
+        "content": "AI分析（人工核对后写入；数据见上表，建议不代替审批结论）\n华辰制造（经营分析案例）\n\n按所属客户关联查询，本轮共核对到 3 个项目，预算如下（元，项目预算为计划投入，不是收入）：\n\n1. 服务交付二期：286,000.00\n2. 供应商对账升级：132,000.50\n3. 供应链协同平台：128,000.00\n\n合计：546,000.50\n\n两条仅基于预算的管理建议：\n1. 预算集中度偏高：服务交付二期单项占该客户预算合计约 52.4%，建议对该项目的预算使用单独跟踪与审批，避免单项目预算调整影响客户整体投入节奏。\n2. 三个项目分属两个金额量级，建议统一立项预算依据与审批口径，便于后续预算对比与资源分配保持一致。\n人工审阅补充：盈利判断还需核对实际收入与实际成本，不能仅凭预算与合同额的差额下结论。",
+        "blockType": "rich-text"
+      }
+    ],
+    "page": {
+      "size": "A4",
+      "margin": {
+        "top": 14,
+        "left": 15,
+        "right": 15,
+        "bottom": 14
+      },
+      "orientation": "portrait"
+    },
+    "title": "华辰制造（经营分析案例） · 项目预算与交付建议",
+    "footer": {
+      "height": 10,
+      "elements": [
+        {
+          "type": "page-number",
+          "align": "right",
+          "style": {
+            "fontSize": 9
+          }
+        },
+        {
+          "type": "date",
+          "align": "left",
+          "style": {
+            "fontSize": 9
+          }
+        }
+      ]
+    },
+    "header": {
+      "height": 15,
+      "elements": [
+        {
+          "type": "text",
+          "align": "center",
+          "style": {
+            "fontSize": 14,
+            "fontWeight": "bold"
+          },
+          "content": "华辰制造（经营分析案例） · 项目预算与交付建议"
+        }
+      ]
+    },
+    "$schema": "auraboot://schemas/report/v1",
+    "version": "1.0.0",
+    "dataSources": {
+      "analysis": {
+        "type": "aggregate",
+        "aggregateQuery": {
+          "type": "aggregate",
+          "limit": 200,
+          "filters": [
+            {
+              "field": "tpm_pj_customer_id",
+              "logic": "and",
+              "value": "CUSTOMER_PID",
+              "children": null,
+              "operator": "eq"
+            }
+          ],
+          "groupBy": null,
+          "keyword": null,
+          "metrics": [
+            {
+              "alias": "budget_total",
+              "field": "tpm_pj_budget",
+              "aggregation": "sum"
+            }
+          ],
+          "orderBy": [
+            {
+              "field": "budget_total",
+              "direction": "desc"
+            }
+          ],
+          "modelCode": "tpm_project",
+          "queryCode": null,
+          "timeRange": null,
+          "dimensions": ["tpm_pj_name"],
+          "parameters": null,
+          "drillFilters": null,
+          "semanticModelCode": null
+        }
+      }
+    },
+    "description": "采用已真实验证的AI预算分析及人工审阅文本；打印回归本身不调用模型。客户关联PID由受管场景的真实fixture绑定。"
+  }
+}

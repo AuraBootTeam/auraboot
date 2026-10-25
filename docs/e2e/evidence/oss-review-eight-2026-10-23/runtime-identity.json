@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "runtime": "oss-review-eight",
+  "generatedAt": "2026-10-23T13:31:04.190Z",
+  "frontendMode": "development",
+  "sourceCommit": "1d79315dbababeefaae5f5478d7836dd2f3f367a",
+  "artifactHash": "1a4f20e1a908e25f453eca02821247bf5c1728062111d27914b183b15ff8131d",
+  "backendPort": 6408,
+  "webPort": 5108,
+  "database": "auraboot_8",
+  "status": "Verified before browser execution; stopped after validation, database and evidence retained"
+}

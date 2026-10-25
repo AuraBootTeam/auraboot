@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 // Hermetic shell/API contract only. This fixture does not prove product installation.
-async function runQuickstart(spaces) {
+async function runQuickstart(spaces, args = []) {
   const calls = [];
   const server = http.createServer(async (req, res) => {
     let input = '';
@@ -30,7 +30,7 @@ async function runQuickstart(spaces) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try {
     const script = process.env.AURA_QUICKSTART_TEST_SCRIPT || fileURLToPath(new URL('./quickstart.sh', import.meta.url));
-    const child = spawn('bash', [script], { env: { ...process.env, BACKEND_URL: `http://127.0.0.1:${server.address().port}`, ADMIN_EMAIL: 'fixture-admin@example.test', ADMIN_PASSWORD: 'fixture-private-password', AURA_ADMIN_TENANT_ID: '', NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1' } });
+    const child = spawn('bash', [script, ...args], { env: { ...process.env, BACKEND_URL: `http://127.0.0.1:${server.address().port}`, ADMIN_EMAIL: 'fixture-admin@example.test', ADMIN_PASSWORD: 'fixture-private-password', AURA_ADMIN_TENANT_ID: '', NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1' } });
     let output = ''; child.stdout.on('data', chunk => output += chunk); child.stderr.on('data', chunk => output += chunk);
     const code = await new Promise((resolve, reject) => { child.on('exit', resolve); child.on('error', reject); });
     return { code, output, calls, baseURL: `http://127.0.0.1:${server.address().port}` };
@@ -53,4 +53,19 @@ test('quickstart refuses ambiguous business memberships before any plugin writes
   assert.match(result.output, /exactly one business space/);
   assert.equal(result.calls.filter(call => call.path.startsWith('/api/plugins/import/')).length, 0);
   assert.ok(!result.output.includes('fixture-private-password'));
+});
+
+test('project delivery opt-in imports the template with a business-space session', async () => {
+  const result = await runQuickstart([business], ['--project-delivery']);
+  assert.equal(result.code, 0, result.output);
+  const imports = result.calls.filter(call => call.path === '/api/plugins/import/import-directory-sync');
+  assert.equal(imports.length, 5);
+  assert.ok(!imports.some(call => call.body.path.endsWith('/agent-control-plane')));
+  assert.ok(imports.some(call => call.body.path.endsWith('/project-management')));
+  assert.ok(imports.every(call => call.authorization === 'Bearer fixture-business-token'));
+});
+test('unknown quickstart options are rejected before contacting the backend', async () => {
+  const result = await runQuickstart([business], ['--unknown']);
+  assert.equal(result.code, 2);
+  assert.equal(result.calls.length, 0);
 });

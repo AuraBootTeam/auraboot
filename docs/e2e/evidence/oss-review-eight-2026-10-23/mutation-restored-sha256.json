@@ -1,0 +1,10 @@
+{
+  "platform/src/main/java/com/auraboot/framework/meta/service/impl/CriticalPathService.java": "baa85bb7ead7a667ecd67665746c3a3f824710dd9725f7df0a8e45aeb9579941",
+  "platform/src/main/java/com/auraboot/framework/tenant/service/impl/TenantMemberApplicationServiceImpl.java": "1e58518d9eb5e784106cc06364584c7a7dc1191ef83f5cd4d267ae4fe93f5a1d",
+  "platform/src/main/java/com/auraboot/framework/meta/service/RecordReadAccess.java": "ca56e054c561d39554c83ad30a719e10d2126521e5775d4a577088bfde9c8144",
+  "platform/src/main/java/com/auraboot/framework/meta/controller/BatchQueryController.java": "432d72a6d69e502cd32bdcf6dbd83036386cc879f8e536f19be77698701723f6",
+  "platform/src/main/java/com/auraboot/framework/file/dao/mapper/FileMapper.java": "2d7f47fa713b6c75889367f51967338bc63ae1bf217a42710bec0a3384deab95",
+  "platform/src/main/java/com/auraboot/framework/file/controller/FileUploadController.java": "fd5f45dfaa916e7548f44f0d38b8a0a3c3532a3cad0f2089c006dea8c2a3e9c0",
+  "platform/platform-agent/src/main/java/com/auraboot/framework/agent/runtime/DurableToolExecutionRecoveryService.java": "b603a3bb4c56c10b5d9460156b4dce26cdb85c3460b9e25de17acf1d998b7af5",
+  "platform/platform-agent/src/main/java/com/auraboot/framework/conversation/turn/TurnRegistry.java": "b571e932afeb0a86c61cfa4bd7e5d93cdbcde9c72a85775048d33aa628495445"
+}

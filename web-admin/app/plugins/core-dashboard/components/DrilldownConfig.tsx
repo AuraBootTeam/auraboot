@@ -3,10 +3,13 @@
  * Configure chart click behavior: filter, navigate, modal, or dashboard
  */
 
-import React from 'react';
+import React, {useCallback} from 'react';
 import type { DrillDownConfig as DrillDownConfigType } from '~/framework/smart/types/chart';
 import { BaseResourceSelect } from '~/ui/base-fields';
-import { fetchPageOptions, fetchDashboardOptions } from '~/shared/services/resourceSelectService';
+import { fetchPageNavigationOptions, fetchDashboardOptions } from '~/shared/services/resourceSelectService';
+import { KeyValueEditor } from '~/shared/designer/datasource/KeyValueEditor';
+import { useI18n } from '~/contexts/I18nContext';
+import { useSmartText } from '~/utils/i18n';
 
 interface DrilldownConfigProps {
   value: DrillDownConfigType;
@@ -22,12 +25,26 @@ const DRILLDOWN_ACTIONS = [
 ] as const;
 
 export const DrilldownConfig: React.FC<DrilldownConfigProps> = ({ value, onChange }) => {
+  const {locale}=useI18n();
+  const text=useSmartText();
+  const fetchPages=useCallback(()=>fetchPageNavigationOptions(locale),[locale]);
+
   const handleChange = (field: keyof DrillDownConfigType, newValue: unknown) => {
     onChange({
       ...value,
       [field]: newValue,
     });
   };
+  const mappingEditor = <KeyValueEditor
+    value={value.paramMapping ?? {}}
+    onChange={mapping=>handleChange('paramMapping',mapping as Record<string,string>)}
+    testIdPrefix="dashboard-drilldown-mapping"
+    label={text({zh:'参数映射',en:'Parameter mapping'})}
+    keyPlaceholder={text({zh:'点击数据字段，例如 acceptance_pid',en:'Clicked data field, e.g. acceptance_pid'})}
+    valuePlaceholder={text({zh:'URL 参数，例如 pid',en:'URL parameter, e.g. pid'})}
+    addLabel={text({zh:'+ 添加映射',en:'+ Add mapping'})}
+    emptyHint={text({zh:'按需将点击的数据字段映射为目标页面参数。',en:'Optionally map clicked data fields to destination parameters.'})}
+  />;
 
   return (
     <div className="space-y-3">
@@ -75,29 +92,13 @@ export const DrilldownConfig: React.FC<DrilldownConfigProps> = ({ value, onChang
                 <BaseResourceSelect
                   value={value.targetPage || ''}
                   onChange={(val) => handleChange('targetPage', val)}
-                  fetchOptions={fetchPageOptions}
+                  fetchOptions={fetchPages}
                   placeholder="选择页面..."
                 />
                 <p className="mt-1 text-xs text-gray-500">选择要跳转的目标页面</p>
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">参数映射</label>
-                <input
-                  type="text"
-                  value={value.paramMapping ? JSON.stringify(value.paramMapping) : ''}
-                  onChange={(e) => {
-                    try {
-                      handleChange('paramMapping', JSON.parse(e.target.value));
-                    } catch {
-                      // Keep empty on invalid JSON
-                    }
-                  }}
-                  placeholder='{"id": "pid"}'
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-                <p className="mt-1 text-xs text-gray-500">点击数据字段到 URL 参数的映射关系</p>
-              </div>
+              {mappingEditor}
             </div>
           )}
 
@@ -115,23 +116,7 @@ export const DrilldownConfig: React.FC<DrilldownConfigProps> = ({ value, onChang
                 <p className="mt-1 text-xs text-gray-500">选择要跳转的目标仪表盘</p>
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">参数映射</label>
-                <input
-                  type="text"
-                  value={value.paramMapping ? JSON.stringify(value.paramMapping) : ''}
-                  onChange={(e) => {
-                    try {
-                      handleChange('paramMapping', JSON.parse(e.target.value));
-                    } catch {
-                      // Keep empty on invalid JSON
-                    }
-                  }}
-                  placeholder='{"id": "pid"}'
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-                <p className="mt-1 text-xs text-gray-500">点击数据字段到 URL 参数的映射关系</p>
-              </div>
+              {mappingEditor}
             </div>
           )}
 

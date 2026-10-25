@@ -6,6 +6,30 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class DynamicSqlProviderTargetLockTest {
+    @Test void identityCasLockKeepsItsBoundPredicateAndTheGenericSelectGateRemainsReadOnly() {
+        String sql="SELECT pid FROM mt_task WHERE tenant_id = #{params.tenantId} AND (pid = #{params.id0}"
+                +" AND status IS NOT DISTINCT FROM #{params.expected0}) AND (created_by = 20) ORDER BY pid FOR UPDATE";
+        assertThat(DynamicSqlProvider.selectCompareAndSetLocks(Map.of("sql",sql,"params",Map.of("tenantId",41L))))
+                .isEqualTo(sql);
+        assertThatThrownBy(()->DynamicSqlProvider.selectByQuery(Map.of("sql",sql))).hasMessageContaining("UPDATE");
+    }
+
+    @Test void identityCasLockRejectsMissingScopeExpandedProjectionOrMutationSql() {
+        String sql="SELECT pid FROM mt_task WHERE tenant_id = #{params.tenantId} AND (pid = #{params.id0}) ORDER BY pid FOR UPDATE";
+        for(Object tenant:new Object[]{"41",0L,-1L})
+            assertThatThrownBy(()->DynamicSqlProvider.selectCompareAndSetLocks(Map.of("sql",sql,"params",Map.of("tenantId",tenant))))
+                    .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->DynamicSqlProvider.selectCompareAndSetLocks(Map.of("sql",sql,"params",Map.of())))
+                .isInstanceOf(IllegalArgumentException.class);
+        for(String changed:new String[]{sql.replace("tenant_id = #{params.tenantId}","tenant_id = 41"),
+                sql.replace("SELECT pid FROM","SELECT pid, status FROM"),sql.replace("SELECT pid FROM","SELECT * FROM"),
+                sql.replace("ORDER BY pid FOR UPDATE","FOR UPDATE"),sql+"; DELETE FROM mt_task",
+                sql.replace("mt_task WHERE","mt_task; DELETE FROM mt_task WHERE"),
+                sql.replace("AND (pid = #{params.id0})","AND (pid = #{params.id0}); UPDATE mt_task SET status = 1")})
+            assertThatThrownBy(()->DynamicSqlProvider.selectCompareAndSetLocks(Map.of("sql",changed,"params",Map.of("tenantId",41L))))
+                    .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void locksOnlyTheBoundTenantAndPidWithoutInterpolatingValues() {
         String sql = DynamicSqlProvider.selectTargetVersionForUpdate(Map.of(

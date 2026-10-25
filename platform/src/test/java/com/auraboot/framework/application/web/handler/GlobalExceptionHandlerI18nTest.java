@@ -156,6 +156,34 @@ class GlobalExceptionHandlerI18nTest {
     }
 
     @Test
+    void metaSerializationConflictUsesStableConflictResponseWithoutLeakingPersistenceDetails() throws Exception {
+        var registry = mock(CommandPhaseRegistry.class);
+        when(registry.getAllPhases()).thenThrow(new org.springframework.dao.CannotSerializeTransactionException(
+                "SELECT private_table FOR UPDATE", new java.sql.SQLException("private database detail", "40001")))
+                .thenThrow(new DataAccessResourceFailureException("private_connection unavailable"))
+                .thenThrow(new org.springframework.dao.DeadlockLoserDataAccessException(
+                        "private deadlock", new java.sql.SQLException("private lock detail", "40P01")));
+        var metaAdvice = new MetaApiExceptionHandler();
+        ReflectionTestUtils.setField(metaAdvice, "globalExceptionHandler", handler);
+        var mvc = MockMvcBuilders.standaloneSetup(new CommandPipelineController(registry))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter())
+                .setControllerAdvice(metaAdvice, handler).build();
+
+        var conflict = mvc.perform(get("/api/meta/command-phases"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("40900"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(conflict).doesNotContain("private_table", "SELECT", "40001", "SQLException");
+        for (int index = 0; index < 2; index++) {
+            var unavailable = mvc.perform(get("/api/meta/command-phases"))
+                    .andExpect(status().isInternalServerError())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(unavailable).doesNotContain("private_connection", "private lock detail", "40P01");
+        }
+        org.mockito.Mockito.verify(registry, org.mockito.Mockito.times(3)).getAllPhases();
+    }
+
+    @Test
     void resolvesParameterizedBusinessException() {
         // BusinessException.i18n(key, args) carries the {0} args to the boundary.
         when(localeResolver.resolveLocale(request)).thenReturn("en-US");

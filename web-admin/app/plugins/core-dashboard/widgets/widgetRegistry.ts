@@ -83,6 +83,25 @@ const widgetDefinitions: WidgetDefinition[] = [
       },
       ...dataSourcePropertySchemas,
       {
+        key: 'format',
+        label: widgetText('registry.displayFormat'),
+        type: 'select',
+        defaultValue: 'number',
+        options: [
+          { label: widgetText('registry.numericValue'), value: 'number' },
+          { label: widgetText('registry.currencyValue'), value: 'currency' },
+          { label: widgetText('registry.percentage'), value: 'percent' },
+        ],
+      },
+      {
+        key: 'precision',
+        label: widgetText('registry.decimalPlaces'),
+        type: 'number',
+        defaultValue: 0,
+        min: 0,
+        max: 20,
+      },
+      {
         key: 'visualization.suffix',
         label: widgetText('registry.suffix'),
         type: 'text',

@@ -6,6 +6,7 @@ export async function loginDeliveryMember(
   email = process.env.ADMIN_EMAIL!,
   tenant = process.env.AURA_ADMIN_TENANT_ID,
   password = process.env.ADMIN_PASSWORD!,
+  expectedUserPid?: string,
 ) {
   expect(email, 'Configure the local delivery member').toBeTruthy();
   expect(password, 'Configure the local member password').toBeTruthy();
@@ -39,6 +40,8 @@ export async function loginDeliveryMember(
     current = await identity();
   }
   if (tenant) expect(String(current.user.tenantId)).toBe(String(tenant));
-  expect(current.user.email).toBe(email);
+  // Username-only seeded members have no email in /auth/me; bind their provisioned PID explicitly.
+  if (expectedUserPid) expect(current.user.pid).toBe(expectedUserPid);
+  else expect(current.user.email).toBe(email);
   return current;
 }

@@ -3,13 +3,12 @@ package com.auraboot.framework.openplatform.service;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.*;
-import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.Supplier;
 
 /** Host-only exact-target mutations within one verified installed process invocation. */
-final class InstalledRelatedWriteAccessor extends DynamicDataAccessorImpl {
+final class InstalledRelatedWriteAccessor extends InstalledMachineDataAccessor {
     static final String OPT_IN = "installedRelatedWriteAuthorization";
     private final InstalledIntegrationExecution.WriteProof proof;
     private final RecordReadAccessor reads;
@@ -25,14 +24,14 @@ final class InstalledRelatedWriteAccessor extends DynamicDataAccessorImpl {
 
     @Override public Map<String,Object> create(String model, Map<String,Object> data) {
         proof.verify();
-        Map<String,Object> result=super.create(model,data);
+        Map<String,Object> result=MetaContext.runWithCommandPermitPlan("ALL",null,model,null,()->super.create(model,data));
         remember(model,result);
         return result;
     }
 
     @Override public Optional<Map<String,Object>> tryCreate(String model, Map<String,Object> data) {
         proof.verify();
-        Optional<Map<String,Object>> result=super.tryCreate(model,data);
+        Optional<Map<String,Object>> result=MetaContext.runWithCommandPermitPlan("ALL",null,model,null,()->super.tryCreate(model,data));
         result.ifPresent(row->remember(model,row));
         return result;
     }
@@ -70,7 +69,15 @@ final class InstalledRelatedWriteAccessor extends DynamicDataAccessorImpl {
 
     private <T> T write(String operation,String model,String pid,Map<String,Object> input,Supplier<T> action) {
         proof.verify();
-        if (proof.rootModel().equals(model)) return action.get();
+        if (proof.rootModel().equals(model)) {
+            if (!proof.rootPid().equals(pid)) throw new SecurityException("Installed root target changed");
+            long currentVersion=version(load(model,pid));
+            if (input!=null && input.containsKey("_expectedVersion")
+                    && exactVersion(input.get("_expectedVersion"))!=currentVersion)
+                throw new com.auraboot.framework.meta.exception.RecordVersionConflictException(
+                        "Installed root expected version does not match current record");
+            return MetaContext.runWithCommandPermitPlan("TARGET",currentVersion,model,pid,action);
+        }
         Map<String,Object> root=load(proof.rootModel(),proof.rootPid());
         Map<String,Object> related=load(model,pid);
         long version=version(related);

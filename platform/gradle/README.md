@@ -54,3 +54,25 @@ and after, copies the existing managed SmartEngine dependency capsule with hashe
 uses an isolated Maven input directory and invokes the original Workspace Gradle
 runner. It does not invoke `publishToMavenLocal`, remotely publish, or alter other
 products' selected dependencies.
+
+## Extracted module compatibility
+
+Normal builds preserve `auraPlatformVersion` when explicitly selected, otherwise
+`VERSION`. Explicit library release mode uses `LIBRARY_VERSION`; combining the
+preview override with library release mode fails before task execution.
+
+The default candidate remains the Core runtime closure. For an application cohort,
+select existing Gradle roots explicitly, for example:
+
+```sh
+./platform/gradlew -p platform -Paura.library.release=true \
+  -Paura.library.roots=:platform-app,:platform-bom \
+  -Paura.library.output=/absolute/fresh/isolated-repository prepareLibraryCandidate
+```
+
+The native runtime graph supplies JAR modules; the explicit platform root supplies
+its original alignment POM and Gradle metadata. Schema 2 records the selected roots
+and each publication's `jar|pom` type. BOMs have no compiled JAR; their metadata is
+verified against original Gradle outputs. Schema 1 and the default Core-only entry
+remain supported. This command neither builds an application image nor publishes
+to a remote registry. Never reuse an immutable version for changed library bytes.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
@@ -111,10 +111,15 @@ test('image verification creates a private per-attempt encryption key and refuse
   for (const file of files) {
     const result = create(file); assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, '', 'the generated key is never printed');
-    assert.equal(statSync(file).mode & 0o777, 0o600);
-    const value = readFileSync(file, 'utf8').trim().split('=');
-    assert.equal(value[0], 'FIELD_ENCRYPTION_KEY');
-    assert.equal(Buffer.from(value.slice(1).join('='), 'base64').length, 32);
+    const descriptor = openSync(file, 'r');
+    try {
+      assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
+      const value = readFileSync(descriptor, 'utf8').trim().split('=');
+      assert.equal(value[0], 'FIELD_ENCRYPTION_KEY');
+      assert.equal(Buffer.from(value.slice(1).join('='), 'base64').length, 32);
+    } finally {
+      closeSync(descriptor);
+    }
   }
   assert.notEqual(readFileSync(files[0], 'utf8'), readFileSync(files[1], 'utf8'));
   const original = readFileSync(files[0]); assert.notEqual(create(files[0]).status, 0);
@@ -235,7 +240,7 @@ test('core deployment forces an empty PF4J directory and verifies exact runtime 
 test('core bootstrap source contains no BPM or CRM product seed content', () => {
   const categorySeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/MarketplaceCategorySeeder.java'), 'utf8');
   const solutionSeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/application/bootstrap/seeder/SolutionSeeder.java'), 'utf8');
-  const agentSeeder = readFileSync(resolve(root, 'platform/src/main/java/com/auraboot/framework/agent/integration/bootstrap/AgentTemplateSeeder.java'), 'utf8');
+  const agentSeeder = readFileSync(resolve(root, 'platform/platform-agent/src/main/java/com/auraboot/framework/agent/integration/bootstrap/AgentTemplateSeeder.java'), 'utf8');
   const bootstrap = readFileSync(resolve(root, 'platform/src/main/resources/tenant-templates/default-bootstrap.json'), 'utf8');
   for (const source of [categorySeeder, solutionSeeder, agentSeeder]) {
     assert.doesNotMatch(source, /(^|[^a-z0-9])(crm|bpm)([^a-z0-9]|$)/i);

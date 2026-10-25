@@ -7,7 +7,14 @@ if (mode != null && mode != 'true') {
     throw new GradleException('aura.library.release must be explicitly true or absent')
 }
 def applicationVersion = file('../VERSION').text.trim()
-def selectedVersion = applicationVersion
+def previewVersion = providers.gradleProperty('auraPlatformVersion').orNull
+if (previewVersion != null && !(previewVersion ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+    throw new GradleException('auraPlatformVersion must be a non-empty Maven version without path separators')
+}
+if (mode == 'true' && previewVersion != null) {
+    throw new GradleException('Library release mode and auraPlatformVersion cannot be combined')
+}
+def selectedVersion = previewVersion ?: applicationVersion
 if (mode == 'true') {
     def source = file('../LIBRARY_VERSION')
     if (!source.isFile() || Files.isSymbolicLink(source.toPath())) {

@@ -48,6 +48,21 @@ pnpm application compare-graphs \
   --artifact-graph path/to/artifact-graph.json
 ```
 
+Backend AI composition is independent of `backend.mode`:
+
+| `backend.agent` | Runtime catalog ID | Gradle executable |
+| --- | --- | --- |
+| omitted or `with-agent` | `com.auraboot:runtime` | `:platform-app:bootJar` (existing default) |
+| `base` | `com.auraboot:runtime-base` | `:platform-app:bootJarBase` |
+
+`core-only` continues to select the CRM/BPM product boundary and retains AI by default.
+The resolver requires a distinct base artifact and binds its identity into the graph and lock;
+it never substitutes the full artifact when base is missing. Artifact publishers must supply
+immutable versions and the actual selected jar digest. This backend selection does not claim
+that base frontend contributions, public images, or production releases have been validated.
+For a local backend, `oss-golden-stack.sh up ... --agent-mode base --no-frontend` uses the base
+launcher; omitting the option preserves the complete AI application.
+
 Release manifests and catalogs must not use `SNAPSHOT`, `latest`, workspace links, branch references, sibling source paths, or mutable artifact identities. `verify-artifacts` requires every lock entry to name a staged `localPath` and fails if any bytes do not match the locked digest.
 
 `retain-definitions` first verifies the complete staged release, then atomically retains only `application.lock` and
@@ -479,3 +494,38 @@ frozen lock; this option does not imply a clean Maven repository consumer.
 Omitting both options preserves the original source-build path. A changed Core
 commit requires a newly selected package; a package is not silently re-keyed to
 a new source or promoted to a qualified Release.
+
+
+## Release archive receipt identity
+
+The optional [`product_release_archive_receipt.py`](../../scripts/application/product_release_archive_receipt.py)
+CLI seals a completed product gate's archive identity; it does not run a gate, grant release
+qualification, publish a Release or deploy anything. Its currently declared product contract
+is `aura-bpm`; Quote/BOM keeps its separate receipt contract.
+
+`create` requires the original `release-image-receipt.json`, caller-selected `--ci-job-id`,
+exact source checkouts, frozen-input evidence, image identity file, archive and control bundle.
+The original gate's `job` must equal the selected job, and its `loadedImageId` and
+`ociLayoutDigest` must equal the sealed image identity. Missing, invalid, duplicate or
+conflicting identity is rejected before output. The create-once v3 receipt retains the gate's
+SHA-256 and identity facts. Its smoke field refers to the original gate; this CLI does not
+attest a new business smoke or an archive reload.
+
+`verify` requires the externally selected receipt SHA-256, release ID and **CI job ID**.
+It checks the frozen inputs and sealed image facts, then rereads the original gate under
+`--artifact-dir`, verifies its SHA-256 and checks its actual job/image/layout again. Recomputing
+the outer digest or the gate link digest cannot hide inconsistent original facts. Packages
+must retain `release-image-receipt.json` beside the archive receipt and payload files.
+
+```bash
+python3 scripts/application/product_release_archive_receipt.py verify \
+  --product aura-bpm --ci-job-id <selected-job> \
+  --file <package>/release-archive-receipt.json \
+  --expected-sha256 <externally-selected-receipt-sha256> \
+  --release-id <selected-release> --artifact-dir <package> \
+  --source core=<clean-core-checkout> --source bpm=<clean-product-checkout>
+```
+
+The archive-stage script is an unactivated Linux-only packaging utility. Its preflight
+rejects a foreign gate job before archive mutations, and its output retains the original gate.
+Local CLI contract tests do not establish Linux image qualification or a tested deployment.

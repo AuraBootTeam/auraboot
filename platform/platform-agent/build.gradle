@@ -1,0 +1,86 @@
+plugins {
+    id 'java-library'
+    id 'java-test-fixtures'
+    id 'maven-publish'
+    id 'io.spring.dependency-management'
+}
+
+group = 'com.auraboot'
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+}
+
+apply from: rootProject.file('gradle/platform-quality.gradle')
+
+apply from: rootProject.file('gradle/platform-dependency-management.gradle')
+
+dependencyManagement {
+    imports { mavenBom "io.modelcontextprotocol.sdk:mcp-bom:${mcpSdkVersion}" }
+}
+
+// The agent owns its implementation dependencies; core has no reverse project edge.
+dependencies {
+    api project(':')
+    api project(':platform-plugin-api')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-tracing'
+    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    implementation 'com.baomidou:mybatis-plus-jsqlparser'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.3.0'
+    implementation 'com.networknt:json-schema-validator:1.5.9'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
+    implementation 'org.apache.poi:poi:5.5.1'
+    implementation 'org.apache.poi:poi-ooxml:5.5.1'
+    implementation 'org.apache.poi:poi-scratchpad:5.5.1'
+    implementation 'org.apache.pdfbox:pdfbox:2.0.37'
+    implementation 'org.jsoup:jsoup:1.23.2'
+    implementation 'org.postgresql:postgresql:42.7.13'
+    implementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
+    implementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}") {
+        exclude group: 'com.networknt', module: 'json-schema-validator'
+    }
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+}
+
+apply from: rootProject.file('gradle/platform-testing.gradle')
+configurations {
+    testFixturesImplementation.extendsFrom implementation
+    testFixturesCompileOnly.extendsFrom compileOnly
+    testFixturesAnnotationProcessor.extendsFrom annotationProcessor
+}
+dependencies {
+    testImplementation testFixtures(project(':'))
+    testFixturesImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+java { withSourcesJar() }
+
+// Publish the optional implementation as a library, with actual POM and Gradle variants.
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'auraboot-agent'
+            versionMapping {
+                usage('java-api') { fromResolutionOf('runtimeClasspath') }
+                usage('java-runtime') { fromResolutionResult() }
+            }
+        }
+    }
+}
+
+['testFixturesApiElements', 'testFixturesRuntimeElements'].each { name ->
+    configurations.named(name) {
+        outgoing.capability("com.auraboot:auraboot-agent-test-fixtures:${project.version}")
+    }
+}

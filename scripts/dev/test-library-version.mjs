@@ -24,15 +24,15 @@ await writeFile(path.join(platform,'gradle/library-publication.gradle'),publicat
 await writeFile(path.join(fixture,'VERSION'),'1.0.0\n',{flag:'wx'});
 const library=path.join(fixture,'LIBRARY_VERSION');
 await writeFile(library,'1.0.1-rc.1\n',{flag:'wx'});
-await writeFile(path.join(platform,'settings.gradle'),"rootProject.name='auraboot-core'\ninclude 'platform-plugin-api', 'unused-provider'\n",{flag:'wx'});
+await writeFile(path.join(platform,'settings.gradle'),"rootProject.name='auraboot-core'\ninclude 'platform-plugin-api', 'unused-provider', 'platform-agent', 'platform-app', 'platform-bom'\n",{flag:'wx'});
 await writeFile(path.join(platform,'build.gradle'),`
 plugins { id 'java-library'; id 'maven-publish' }
 allprojects {
-    apply plugin: 'java-library'
+    apply plugin: name == 'platform-bom' ? 'java-platform' : 'java-library'
     apply plugin: 'maven-publish'
     group = 'com.auraboot'
     publishing {
-        publications { mavenJava(MavenPublication) { from components.java } }
+        publications { mavenJava(MavenPublication) { from (project.name == 'platform-bom' ? components.javaPlatform : components.java) } }
         repositories { maven { name='Fixture'; url=rootProject.file('fixture-repository') } }
     }
 }
@@ -55,6 +55,9 @@ tasks.named('prepareLibraryCandidate') {
 `,{flag:'wx'});
 const api=path.join(platform,'platform-plugin-api');await mkdir(api);
 await writeFile(path.join(api,'build.gradle'),'java { withSourcesJar(); withJavadocJar() }\n',{flag:'wx'});
+for (const [name,body] of [['platform-agent',"dependencies { api project(':') }\n"], ['platform-app',"dependencies { api project(':'); runtimeOnly project(':platform-agent') }\n"], ['platform-bom',"dependencies { constraints { api project(':'); api project(':platform-agent'); api project(':platform-app'); api project(':platform-plugin-api') } }\n"]]) {
+    await mkdir(path.join(platform,name));await writeFile(path.join(platform,name,'build.gradle'),body,{flag:'wx'});
+}
 await mkdir(path.join(platform,'unused-provider'));
 await writeFile(path.join(platform,'unused-provider/build.gradle'),'// Deliberately outside the runtime closure.\n',{flag:'wx'});
 for(const [project,name,body] of [[platform,'Core','public class Core { public Api value() { return new Api(); } }'],[api,'Api','public class Api {}']]) {
@@ -76,8 +79,12 @@ function run(name,properties=[],expectedFailure,tasks) {
     });
 }
 await run('default-application');
-const versions=version=>({'auraboot-core':version,'platform-plugin-api':version,'unused-provider':version});
+const versions=version=>Object.fromEntries(['auraboot-core','platform-plugin-api','unused-provider','platform-agent','platform-app','platform-bom'].map(name=>[name,version]));
 assert.deepEqual(JSON.parse(await readFile(path.join(platform,'versions.json'))),versions('1.0.0'));
+await run('explicit-preview',['-PauraPlatformVersion=2.0.0-preview.1']);
+assert.deepEqual(JSON.parse(await readFile(path.join(platform,'versions.json'))),versions('2.0.0-preview.1'));
+await run('ambiguous-version',['-PauraPlatformVersion=2.0.0','-Paura.library.release=true'],'cannot be combined');
+await run('invalid-preview',['-PauraPlatformVersion=../escape'],'auraPlatformVersion must be');
 await run('explicit-library',['-Paura.library.release=true']);
 assert.deepEqual(JSON.parse(await readFile(path.join(platform,'versions.json'))),versions('1.0.1-rc.1'));
 const repository=path.join(platform,'fixture-repository/com/auraboot');
@@ -129,6 +136,16 @@ await run('candidate-overwrite-denied',['-Paura.library.release=true','-Paura.li
     'A fresh absolute library output is required',['prepareLibraryCandidate']);
 await run('candidate-metadata-tampering',['-Paura.library.release=true','-Paura.library.output='+path.join(evidence,'tampered-candidate'),'-PfixtureCorruptPublication=true'],
     'Published metadata/artifact differs from native output',['prepareLibraryCandidate']);
+const expanded=path.join(evidence,'application-library-candidate');
+await run('explicit-application-roots',['-Paura.library.release=true','-Paura.library.roots=:platform-app,:platform-bom','-Paura.library.output='+expanded],undefined,['prepareLibraryCandidate']);
+const appInventory=JSON.parse(await readFile(path.join(expanded,'library-publication-inventory.json')));
+assert.equal(appInventory.schemaVersion,2);assert.deepEqual(appInventory.publicationRoots,[':platform-app',':platform-bom']);
+assert.deepEqual(appInventory.publications.map(row=>row.project).sort(),[':',':platform-agent',':platform-app',':platform-bom',':platform-plugin-api']);
+const bom=appInventory.publications.find(row=>row.packaging==='pom');assert.equal(bom.project,':platform-bom');assert.equal(bom.compiledJar,null);
+assert.deepEqual(bom.files.map(row=>path.extname(row.path)).sort(),['.module','.pom']);
+for (const roots of [':missing',':platform-app,:platform-app','']) await run('invalid-roots-'+cases.length,
+ ['-Paura.library.release=true','-Paura.library.roots='+roots,'-Paura.library.output='+path.join(evidence,'refused-'+cases.length)],
+ roots===':missing'?'Unknown native publication root':'Explicit unique native publication roots required',['prepareLibraryCandidate']);
 assert.equal(sha(await readFile(source)),sha(script),'native version recipe changed during execution');
 assert.equal(sha(await readFile(publicationSource)),sha(publicationScript),'native publication recipe changed during execution');
 const result={schemaVersion:1,status:'passed',scope:'isolated-gradle-publication-contract',recipeSha256:sha(script),

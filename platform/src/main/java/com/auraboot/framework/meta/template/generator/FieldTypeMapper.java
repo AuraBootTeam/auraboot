@@ -23,7 +23,7 @@ public class FieldTypeMapper {
             return "SmartInput";
         }
         
-        String dataType = field.getDataType().toUpperCase();
+        String dataType = field.getDataType().toLowerCase(java.util.Locale.ROOT);
         
         return switch (dataType) {
             case "string" -> "SmartInput";
@@ -32,7 +32,7 @@ public class FieldTypeMapper {
             case "money" -> "SmartMoneyInput";
             case "boolean" -> "SmartSwitch";
             case "date" -> "SmartDatePicker";
-            case "datetime", "timestamp" -> "SmartDateTimePicker";
+            case "datetime", "timestamp" -> "SmartDatePicker";
             case "enum", "reference" -> "SmartSelect";
             default -> "SmartInput";
         };
@@ -49,7 +49,7 @@ public class FieldTypeMapper {
             return "text";
         }
         
-        String dataType = field.getDataType().toUpperCase();
+        String dataType = field.getDataType().toLowerCase(java.util.Locale.ROOT);
         
         return switch (dataType) {
             case "boolean" -> "tag";
@@ -72,7 +72,7 @@ public class FieldTypeMapper {
             return false;
         }
         
-        String dataType = field.getDataType().toUpperCase();
+        String dataType = field.getDataType().toLowerCase(java.util.Locale.ROOT);
         return "integer".equals(dataType) ||
                "decimal".equals(dataType) ||
                "number".equals(dataType) ||
