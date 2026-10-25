@@ -59,8 +59,9 @@ public final class InventoryReceiptEnqueueProvenance {
 
     /** Route a pipeline-executed primary to the trusted producer entry its authorized command owns. */
     public Object route(CommandHandlerExtension handler, CommandHandlerExtension.CommandContext context) throws Exception {
-        if (FINISHED_GOODS_COMMAND.equals(MetaContext.getAuthorizedCommandCode())
-                && FINISHED_GOODS_COMMAND.equals(handler.getCommandType())) {
+        // Multi-command handlers (e.g. FinishedGoodsPackagingHandler) report one static command
+        // type; the executing context carries what the pipeline actually authorized.
+        if (FINISHED_GOODS_COMMAND.equals(context.commandType())) {
             return invokeFinishedGoodsReceipt(handler, context);
         }
         return invoke(handler, context);
