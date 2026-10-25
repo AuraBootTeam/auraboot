@@ -8,7 +8,7 @@ import { PG_CONN } from '../../helpers/environments';
 
 test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
 
-async function successful(response: APIResponse) {
+async function successful(response: Pick<APIResponse, 'status' | 'text' | 'json'>) {
   expect(response.status(), await response.text()).toBe(200);
   const body = await response.json();
   expect(body.code).toBe('0');
