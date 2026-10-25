@@ -18,6 +18,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class AnnouncementPolicyService {
+    public static final int MAX_ATTACHMENTS=10;
     public static final Map<String,String> FORM_FIELDS=Map.ofEntries(
         Map.entry("audience_kind","kind"),Map.entry("audience_users","userPids"),Map.entry("audience_departments","departmentPids"),
         Map.entry("audience_roles","rolePids"),Map.entry("ack_required","acknowledgementRequired"),Map.entry("ack_days","acknowledgementDays"),
@@ -61,7 +62,7 @@ public class AnnouncementPolicyService {
             try { schedule=Instant.parse(planned); } catch(DateTimeParseException error) { invalid(); }
         }
         List<String> attachments=strings(input.get("attachmentPids"));
-        if(attachments.size()>10) invalid();
+        if(attachments.size()>MAX_ATTACHMENTS) invalid();
         return new Policy(audience,(Boolean)required,((Number)days).intValue(),attachments,mode,
             string(input.get("definitionPid"),null,100),schedule,string(input.get("exemptionReason"),null,1000));
     }

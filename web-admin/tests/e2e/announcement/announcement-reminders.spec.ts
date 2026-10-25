@@ -191,3 +191,50 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     } finally { await db.end(); }
   }
 });
+
+test('published pinning persists through the native detail without changing its frozen version or notifications', async ({ page }, info) => {
+  test.setTimeout(45_000);
+  const db = new Client(PG_CONN); await db.connect();
+  expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(process.env.PGDATABASE || process.env.PG_DB);
+  let fixture: Awaited<ReturnType<typeof publishedFixture>> | undefined;
+  try {
+    fixture = await publishedFixture(page, db);
+    const before = (await db.query('SELECT row_version,editor_revision FROM ab_announcement WHERE tenant_id=$1 AND pid=$2', [fixture.tenant, fixture.pid])).rows[0];
+    const frozen = (await db.query('SELECT snapshot_hash,snapshot FROM ab_announcement_version WHERE tenant_id=$1 AND pid=$2', [fixture.tenant, fixture.version])).rows[0];
+    const count = async () => Number((await db.query('SELECT count(*) AS count FROM ab_announcement_delivery WHERE tenant_id=$1 AND version_pid=$2', [fixture!.tenant, fixture!.version])).rows[0].count);
+    const originalCount = await count();
+    await enterFromMenu(page, fixture.title);
+    await page.getByRole('button', { name: '置顶', exact: true }).click();
+    await expect(page.getByTestId('confirm-dialog')).toContainText('不会重新通知读者');
+    await page.screenshot({ path: info.outputPath('announcement-pin-confirm.png'), fullPage: true, animations: 'disabled' });
+    await page.getByTestId('confirm-cancel').click();
+    expect((await db.query('SELECT row_version,pinned FROM ab_announcement WHERE tenant_id=$1 AND pid=$2', [fixture.tenant, fixture.pid])).rows[0]).toEqual({ row_version: before.row_version, pinned: false });
+    await page.getByRole('button', { name: '置顶', exact: true }).click();
+    const pinned = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/commands/execute/announcement:set_pinned'));
+    await page.getByTestId('confirm-ok').click();
+    const response = await pinned;
+    expect(response.request().postDataJSON()).toMatchObject({ targetRecordPid: fixture.pid, expectedVersion: before.row_version, payload: { pinned: true } });
+    expect(Object.keys(response.request().postDataJSON().payload)).toEqual(['pinned']);
+    await successful(response);
+    await expect(page.getByRole('button', { name: '取消置顶', exact: true })).toBeVisible();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('button', { name: '取消置顶', exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('announcement-pinned.png'), fullPage: true, animations: 'disabled' });
+    expect((await successful(await page.request.get(`/api/announcements/versions/${fixture.version}/recipient`))).pinned).toBe(true);
+    await page.getByRole('button', { name: '取消置顶', exact: true }).click();
+    const unpinned = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/commands/execute/announcement:set_pinned'));
+    await page.getByTestId('confirm-ok').click(); await successful(await unpinned);
+    await expect(page.getByRole('button', { name: '置顶', exact: true })).toBeVisible();
+    expect((await db.query('SELECT snapshot_hash,snapshot FROM ab_announcement_version WHERE tenant_id=$1 AND pid=$2', [fixture.tenant, fixture.version])).rows[0]).toEqual(frozen);
+    expect((await db.query('SELECT row_version,editor_revision,pinned FROM ab_announcement WHERE tenant_id=$1 AND pid=$2', [fixture.tenant, fixture.pid])).rows[0]).toEqual({ row_version: before.row_version + 2, editor_revision: before.editor_revision, pinned: false });
+    expect(await count()).toBe(originalCount);
+    expect(Number((await db.query("SELECT count(*) AS count FROM ab_announcement_audit WHERE tenant_id=$1 AND announcement_pid=$2 AND command_code='announcement:set_pinned'", [fixture.tenant, fixture.pid])).rows[0].count)).toBe(2);
+  } finally {
+    try {
+      if (fixture) {
+        const record = (await db.query('SELECT row_version,status FROM ab_announcement WHERE tenant_id=$1 AND pid=$2', [fixture.tenant, fixture.pid])).rows[0];
+        if (record?.status === 'published') await command(page, 'announcement:archive', fixture.pid, record.row_version);
+      }
+    } finally { await db.end(); }
+  }
+});

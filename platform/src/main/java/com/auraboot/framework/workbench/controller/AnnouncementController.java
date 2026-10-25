@@ -26,6 +26,15 @@ import java.util.*;
         "recipient listing is constrained to current tenant membership and sealed recipients")
 public class AnnouncementController {
     private final AnnouncementService announcementService;
+    private final com.auraboot.framework.workbench.service.AnnouncementCapabilityService capabilities;
+
+    @GetMapping("/capabilities")
+    @RequirePermission("announcement.announcement.publish")
+    public ApiResponse<Map<String,Object>> capabilities() {return ApiResponse.success(capabilities.capabilities());}
+
+    @GetMapping("/approval-readiness")
+    @RequirePermission("announcement.announcement.submit")
+    public ApiResponse<Map<String,Object>> approvalReadiness() {return ApiResponse.success(capabilities.approvalReadiness());}
     private final com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyService operatingPolicies;
 
     @GetMapping("/policy")

@@ -167,7 +167,7 @@
     "database credentials",
     "unreviewed lifecycle/policy images"
   ],
-  "remainingScope": "Canonical design \u00a716.8 and acceptance report; this is not the complete feature denominator",
+  "remainingScope": "Canonical design §16.8 and acceptance report; this is not the complete feature denominator",
   "historyValidation": {
     "testedSource": "19fce7258",
     "productEquivalentSource": "6ab56e451",
@@ -180,7 +180,7 @@
     "mutation": {
       "executed": 2,
       "assertionFailures": 2,
-      "restoredPassed": 25
+      "restoredCachedPassed": 25
     },
     "browser": {
       "reminderPassed": 1,
@@ -213,6 +213,13 @@
         "observation": "The second page and footer, or the original completed batch, are clear and readable."
       }
     ],
-    "claim": "Targeted functional evidence; first-page region capture and full S2-S8 acceptance remain open"
+    "claim": "Targeted functional evidence; first-page region capture and full S2-S8 acceptance remain open",
+    "subsequentActualExecution": {
+      "source": "707da9c92",
+      "integrationPassed": 26,
+      "unitPassed": 98,
+      "failures": 0,
+      "skipped": 0
+    }
   }
 }

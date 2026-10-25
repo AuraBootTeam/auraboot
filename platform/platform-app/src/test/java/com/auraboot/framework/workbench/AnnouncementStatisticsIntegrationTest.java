@@ -120,6 +120,32 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(readers.detail(older)).containsEntry("pinned",false);
     }
 
+    @Test void capabilitiesExposeRealLimitsAndReadinessRequiresBothActionsWithoutInventingABpmProvider() throws Exception {
+        http.perform(get("/api/announcements/capabilities")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.attachments.maxCount").value(10))
+            .andExpect(jsonPath("$.data.channels[1].ready").value(false));
+        boolean original=permissions.hasPermission(getTestUser().getId(),"announcement.announcement.submit");
+        try {
+            removeOwnSubmitGrant();
+            http.perform(get("/api/announcements/approval-readiness")).andExpect(status().isForbidden());
+            grantCommittedPermissionToTestRole("announcement.announcement.submit","announcement","announcement:announcement","submit","Announcement submit");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            http.perform(get("/api/announcements/approval-readiness")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.ready").value(false))
+                .andExpect(jsonPath("$.data.reasonCode").value("APPROVAL_PROVIDER_UNAVAILABLE"));
+        } finally {
+            if(original) grantCommittedPermissionToTestRole("announcement.announcement.submit","announcement","announcement:announcement","submit","Announcement submit");
+            else removeOwnSubmitGrant();
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+        }
+    }
+
+    private void removeOwnSubmitGrant() {
+        jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code='announcement.announcement.submit')",
+            getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId());
+        permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+    }
+
     private String recordOf(String version) {
         return jdbc.queryForObject("SELECT announcement_pid FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
     }
