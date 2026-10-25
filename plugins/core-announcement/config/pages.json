@@ -1275,24 +1275,23 @@
       },
       {
         "id": "announcement_publisher",
-        "blockType": "record-inspector",
+        "blockType": "table",
         "title": {
           "zh-CN": "发布信息",
           "en-US": "Publication information"
         },
         "dataSource": "announcementPublisher",
-        "fields": [
+        "columns": [
           {
             "field": "publisherName",
             "label": {
               "zh-CN": "上次发布人",
               "en-US": "Last publisher"
             },
-            "valueMap": {
-              "__empty": {
-                "zh-CN": "暂无可显示发布人",
-                "en-US": "No publisher available"
-              }
+            "width": 240,
+            "emptyText": {
+              "zh-CN": "暂无可显示发布人",
+              "en-US": "No publisher available"
             }
           },
           {
@@ -1302,14 +1301,23 @@
               "en-US": "Last published at"
             },
             "valueType": "datetime",
-            "valueMap": {
-              "__empty": {
-                "zh-CN": "尚未发布",
-                "en-US": "Not published"
-              }
+            "width": 240,
+            "emptyText": {
+              "zh-CN": "尚未发布",
+              "en-US": "Not published"
             }
           }
-        ]
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无发布信息",
+            "en-US": "No publication information"
+          },
+          "description": {
+            "zh-CN": "请刷新；发布人仅显示有权查看的账户名称。",
+            "en-US": "Refresh to view authorized publisher names."
+          }
+        }
       }
     ],
     "extension": {

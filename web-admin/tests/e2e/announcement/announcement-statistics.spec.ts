@@ -49,7 +49,9 @@ async function publishedFixture(page: Page, db: Client) {
     "SELECT status FROM ab_announcement_delivery WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3 AND kind='publication' AND channel='in_app'",
     [actor.tenantId, accepted.versionPid, actor.pid],
   )).rows[0]?.status, { timeout: 20_000 }).toBe('completed');
-  return { pid: created.pid as string, title, tenant: actor.tenantId };
+  const actorName = (await db.query(`SELECT COALESCE(NULLIF(nick_name,''),user_name) AS name FROM ab_user WHERE pid=$1`, [actor.pid])).rows[0]?.name;
+  expect(actorName).toEqual(expect.any(String));
+  return { actorName: actorName as string, pid: created.pid as string, title, tenant: actor.tenantId };
 }
 
 async function enterFromMenu(page: Page, title: string) {
@@ -196,11 +198,13 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
     await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: fixture.actorName, exact: true })).toBeVisible();
     await page.getByRole('button', { name: '接收统计', exact: true }).click();
     await expect(page.getByTestId('metric-strip-item-actualRecipients')).toContainText('1');
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
     await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: fixture.actorName, exact: true })).toBeVisible();
   } finally {
     try {
       if (fixture) {
