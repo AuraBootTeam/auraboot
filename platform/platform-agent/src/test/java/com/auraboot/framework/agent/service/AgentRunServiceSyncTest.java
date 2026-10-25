@@ -661,6 +661,63 @@ class AgentRunServiceSyncTest {
     }
 
     @Test
+    @DisplayName("approval resume restores only the exact visible skill omitted by discovery limits")
+    void resumeRestoresExactVisibleSkill() throws Exception {
+        assertResumedSkillDiscovery(true, false);
+    }
+
+    @Test
+    @DisplayName("approval resume cannot restore a skill hidden by current permissions")
+    void resumeCannotRestoreRevokedSkill() throws Exception {
+        assertResumedSkillDiscovery(false, false);
+    }
+
+    @Test
+    @DisplayName("approval resume preserves current agent scope restrictions")
+    void resumePreservesAgentScope() throws Exception {
+        assertResumedSkillDiscovery(true, true);
+    }
+
+    private void assertResumedSkillDiscovery(boolean visible, boolean restricted) throws Exception {
+        primeHappyPath();
+        String exact = "aurabot:model:create";
+        AgentPlanStep pending = new AgentPlanStep(0, "create approved model");
+        pending.setStatus(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
+        pending.setOutput(Map.of("approvalToolName", exact, "approvalPreviewToken", "saved-preview"));
+        when(planService.loadPlanFromRun("RUN_PENDING")).thenReturn(List.of(pending));
+        when(toolProviderRegistry.discoverByProvider(eq("aurabot"), any())).thenReturn(visible
+                ? List.of(ToolDefinition.builder().toolCode(exact).toolType("AURABOT_SKILL")
+                        .sourceCode("model:create").modelCode("restricted_model").operationKind("create").build(),
+                        ToolDefinition.builder().toolCode("aurabot:field:add").toolType("AURABOT_SKILL").build())
+                : List.of());
+        if (restricted) {
+            Map<String, Object> agent = baseAgentDef();
+            agent.put("allowed_operations", "[\"query\"]");
+            when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                    anyMap())).thenReturn(List.of(agent));
+        }
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "done";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenAnswer(this::persistLoopResult);
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, "RUN_PENDING");
+
+        ArgumentCaptor<List<AgentToolDefinition>> captured = ArgumentCaptor.forClass(List.class);
+        verify(stepLoopService).executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), captured.capture(), any(), any(), any(), any(), any(), eq(true));
+        if (visible && !restricted) {
+            assertThat(captured.getValue()).extracting(AgentToolDefinition::getName).containsExactly(exact);
+        } else {
+            assertThat(captured.getValue()).isEmpty();
+        }
+        verify(planService, never()).generatePlan(any(), any(), any(), anyString(), anyString(), any());
+    }
+
+    @Test
     @DisplayName("stub-routed provider config -> uses stub provider bean, not preferred provider")
     void stubRoutedConfigUsesStubProviderBean() throws Exception {
         primeHappyPath();

@@ -701,6 +701,35 @@ public class AgentRunService {
                 tools = merged;
             }
 
+            // Resume the saved skill, independent of the model-facing discovery budget.
+            // Resolve its current definition under the current actor's permissions, then
+            // apply the same scope filter below; a checkpoint never grants visibility.
+            List<AgentPlanStep> resumedPlan = resumeFromRunPid == null
+                    ? null : planService.loadPlanFromRun(resumeFromRunPid);
+            if (resumedPlan != null) {
+                int pendingIndex = planService.findFirstPendingStep(resumedPlan);
+                if (pendingIndex < resumedPlan.size()) {
+                    AgentPlanStep pending = resumedPlan.get(pendingIndex);
+                    Map<String, Object> saved = pending.getOutput();
+                    if (pending.getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL && saved != null
+                            && saved.get("approvalPreviewToken") instanceof String token && !token.isBlank()
+                            && saved.get("approvalToolName") instanceof String exactTool
+                            && exactTool.startsWith("aurabot:")
+                            && tools.stream().noneMatch(tool -> exactTool.equals(tool.getName()))) {
+                        ToolDiscoveryContext confirmationContext = ToolDiscoveryContext.builder()
+                                .tenantId(tenantId).userId(currentActorUserId()).agentCode(agentCode)
+                                .maxResults(Integer.MAX_VALUE).build();
+                        List<AgentToolDefinition> confirmed = toAgentToolDefinitions(
+                                toolProviderRegistry.discoverByProvider("aurabot", confirmationContext).stream()
+                                        .filter(tool -> exactTool.equals(tool.getToolCode())
+                                                && "AURABOT_SKILL".equals(tool.getToolType())).toList());
+                        List<AgentToolDefinition> merged = new ArrayList<>(tools);
+                        merged.addAll(confirmed);
+                        tools = merged;
+                    }
+                }
+            }
+
             // B4: the allowed_models / allowed_operations guardrails restrict what the
             // assembled tool list may contain. The tool list is the enforcement
             // boundary on this engine — ToolLoopService rejects any call not in it —
@@ -737,7 +766,7 @@ public class AgentRunService {
             int startStep = 0;
 
             if (resumeFromRunPid != null) {
-                plan = planService.loadPlanFromRun(resumeFromRunPid);
+                plan = resumedPlan;
                 startStep = planService.findFirstPendingStep(plan);
                 boolean resumedAwaitingApproval = startStep < plan.size()
                         && plan.get(startStep).getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL;
