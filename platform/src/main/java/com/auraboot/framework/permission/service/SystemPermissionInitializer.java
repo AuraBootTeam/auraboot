@@ -64,7 +64,7 @@ public class SystemPermissionInitializer {
      */
     public static final String[] RESOURCE_TYPES = {
         // Meta resources
-        "model", "page", "component", "dict", "field",
+        "meta", "model", "page", "component", "dict", "field",
         "query", "command", "form", "menu", "template",
         // RBAC resources
         "permission", "rbac",
@@ -256,6 +256,11 @@ public class SystemPermissionInitializer {
                 }
             }
         }
+
+        // The native command HTTP boundary uses this canonical code. Keep legacy definitions and grants intact.
+        createOrSkipPermission(tenantId, "meta", "command", "execute",
+            "Execute Business Commands", "Invoke native business commands; domain authorization remains mandatory",
+            LEVEL_ACTION, buildCode("system", "command", null), catalog, allPermissions, counts, pendingByLevel, parentCodes);
 
         String platformModuleCode = buildCode("module", "platform", null);
         for (InternalSystemModel model : INTERNAL_SYSTEM_MODELS) {

@@ -10,6 +10,7 @@ import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Executes one consumer effect and its receipt in the same independent transaction. */
 @Component
@@ -67,6 +68,14 @@ public class ReliableEventDeliveryExecutor {
                 && consumer.getClass().getClassLoader() == getClass().getClassLoader()
                 && hostConsumer.requiresSerializableTransaction(envelope);
         (hostSerializable ? serializableTransaction : transaction).executeWithoutResult(status -> {
+            if (!TransactionSynchronizationManager.isActualTransactionActive()
+                    || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+                throw new SecurityException("Reliable delivery requires an active writable transaction before taking its lease");
+            }
+            if (outboxEventMapper.lockActiveDeliveryLease(envelope.tenantId(), envelope.eventId(), leaseToken) == null) {
+                metrics.record("lease_fence_lost");
+                throw new IllegalStateException("Reliable integration delivery lease is not active");
+            }
             int claimed = outboxEventMapper.claimReceipt(
                     envelope.tenantId(), envelope.eventId(), consumer.consumerCode(), leaseToken);
             if (claimed == 0) {
@@ -79,6 +88,10 @@ public class ReliableEventDeliveryExecutor {
                 InventoryOwnerCommandScope.consume(envelope, consumer, pluginManager, modelAuthority,
                         () -> ProcurementReceiptCommandScope.consume(envelope, consumer, pluginManager, modelAuthority,
                                 provenance, leaseToken, () -> consumer.consume(envelope)));
+                if (outboxEventMapper.countActiveDeliveryLease(envelope.tenantId(), envelope.eventId(), leaseToken) != 1) {
+                    metrics.record("lease_fence_lost");
+                    throw new IllegalStateException("Reliable integration delivery lease expired before effect commit");
+                }
                 int applied = outboxEventMapper.markReceiptApplied(
                         envelope.tenantId(), envelope.eventId(), consumer.consumerCode(), leaseToken);
                 if (applied != 1) {

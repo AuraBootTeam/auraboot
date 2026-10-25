@@ -85,6 +85,21 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             String operationCode,
             Map<String, Object> payload,
             Long tenantId) {
+        return claimScoped(clientRequestId, operationCode, payload, tenantId, false);
+    }
+
+    @Override
+    public Map<String, Object> claimRetainedScopedIdempotency(
+            String clientRequestId, String operationCode, Map<String, Object> payload, Long tenantId) {
+        if (clientRequestId == null || clientRequestId.isBlank()
+                || operationCode == null || operationCode.isBlank()) {
+            throw new IllegalArgumentException("Retained idempotency requires a request key and operation");
+        }
+        return claimScoped(clientRequestId, operationCode, payload, tenantId, true);
+    }
+
+    private Map<String, Object> claimScoped(String clientRequestId, String operationCode,
+            Map<String, Object> payload, Long tenantId, boolean retained) {
         if (clientRequestId == null || clientRequestId.isBlank()
                 || operationCode == null || operationCode.isBlank()) {
             return null;
@@ -100,7 +115,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
         // The unique constraint also covers expired rows. Remove only this expired key inside the
         // same transaction before claiming; concurrent reclaimers still serialize on the insert.
-        idempotencyRecordMapper.deleteExpiredByClientRequestId(tenantId, storageKey);
+        if (!retained) idempotencyRecordMapper.deleteExpiredByClientRequestId(tenantId, storageKey);
 
         IdempotencyRecord claim = new IdempotencyRecord();
         claim.setTenantId(tenantId);
@@ -109,10 +124,12 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         claim.setCommandCode(normalizedOperation);
         claim.setOutcome(null);
         claim.setStatus(STATUS_PROCESSING);
-        claim.setExpiresAt(Instant.now().plusSeconds(DEFAULT_EXPIRY_SECONDS));
+        if (!retained) claim.setExpiresAt(Instant.now().plusSeconds(DEFAULT_EXPIRY_SECONDS));
         claim.setCreatedAt(Instant.now());
 
-        if (idempotencyRecordMapper.insertIdempotent(claim) > 0) {
+        int inserted = retained ? idempotencyRecordMapper.insertRetainedIdempotent(claim)
+                : idempotencyRecordMapper.insertIdempotent(claim);
+        if (inserted > 0) {
             log.debug("Claimed scoped idempotency key for operation={} clientRequestId={}",
                     normalizedOperation, clientRequestId);
             return null;
@@ -121,10 +138,12 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         // PostgreSQL's unique-index check waits for the owning transaction. At READ COMMITTED this
         // statement therefore sees either its committed COMPLETED row, or no row after rollback.
         IdempotencyRecord existing =
-                idempotencyRecordMapper.findByClientRequestId(tenantId, storageKey);
+                retained ? idempotencyRecordMapper.findRetainedByClientRequestId(tenantId, storageKey)
+                        : idempotencyRecordMapper.findByClientRequestId(tenantId, storageKey);
         if (existing == null) {
             throw new IdempotentException(
-                    "Idempotency request changed while being claimed; retry the request");
+                    retained ? "Idempotency claim is unavailable or uses a different retention contract"
+                            : "Idempotency request changed while being claimed; retry the request");
         }
         assertMatchingIntent(existing, normalizedOperation, requestHash);
         if (StatusConstants.COMPLETED.equals(existing.getStatus())) {

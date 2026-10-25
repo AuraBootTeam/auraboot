@@ -195,7 +195,7 @@ class ProcurementReceiptCommandScopeTest {
     @Test void missingExactLeaseRowRejectsBeforeConsumerOrDataEffect() {
         when(receipts.lockActiveDeliveryLease(anyLong(),anyString(),anyString())).thenReturn(null);
         effect = event -> accessor.compareAndSet(31,"pr_purchase_order_line","line","row_version",7,Map.of("pr_pol_received_qty",25));
-        assertThatThrownBy(this::deliver).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(this::deliver).isInstanceOf(IllegalStateException.class).hasMessageContaining("lease");
         verifyNoInteractions(data);
         verify(receipts,never()).markReceiptApplied(anyLong(),anyString(),anyString(),anyString());
         verify(transactions).rollback(any());

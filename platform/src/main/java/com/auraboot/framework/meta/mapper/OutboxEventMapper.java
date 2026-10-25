@@ -30,6 +30,22 @@ public interface OutboxEventMapper {
             "THEN split_part(earlier.event_source, '/', 2) ELSE '' END " +
             "= CASE WHEN o.event_source LIKE 'open-platform/%/%' " +
             "THEN split_part(o.event_source, '/', 2) ELSE '' END ";
+    // An expired processing lease consumed an attempt even if its worker never recorded a failure.
+    String EXHAUSTED_CLAIM = "o.retry_count::bigint + CASE WHEN o.status = 'processing' THEN 1 ELSE 0 END >= o.max_retries";
+    String CLAIM_STATE = "UPDATE ab_outbox o SET retry_count = CASE WHEN o.status = 'processing' " +
+            "THEN LEAST(o.retry_count::bigint + 1, 2147483647)::integer ELSE o.retry_count END, " +
+            "status = CASE WHEN " + EXHAUSTED_CLAIM + " THEN 'failed' ELSE 'processing' END, " +
+            "lease_owner = CASE WHEN " + EXHAUSTED_CLAIM + " THEN NULL ELSE #{leaseOwner} END, " +
+            "lease_token = CASE WHEN " + EXHAUSTED_CLAIM + " THEN NULL ELSE #{leaseToken} END, " +
+            "lease_until = CASE WHEN " + EXHAUSTED_CLAIM + " THEN NULL ELSE #{leaseUntil}::timestamptz END, " +
+            "last_error = CASE WHEN o.status = 'processing' THEN 'Recovered expired dispatcher lease' " +
+            "ELSE o.last_error END, claimed_at = NOW() ";
+    String CLAIM_DEAD_LETTER = ") , dead_lettered AS (INSERT INTO ab_integration_dead_letter " +
+            "(outbox_id, tenant_id, event_id, event_type, payload, error_detail, failed_at, status) " +
+            "SELECT id, tenant_id, event_id, event_type, payload, last_error, NOW(), 'open' " +
+            "FROM claimed WHERE status = 'failed' ON CONFLICT (outbox_id) DO UPDATE " +
+            "SET error_detail = EXCLUDED.error_detail, failed_at = EXCLUDED.failed_at, status = 'open') " +
+            "SELECT * FROM claimed</script>";
 
     @Insert("INSERT INTO ab_outbox (tenant_id, event_id, event_type, command_code, payload, " +
             "status, retry_count, max_retries, next_retry_at, created_at) " +
@@ -89,14 +105,34 @@ public interface OutboxEventMapper {
             ORDERING_NAMESPACE_MATCH +
             "AND earlier.event_sequence &lt; o.event_sequence " +
             "AND earlier.status IN ('pending', 'processing'))) " +
-            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT #{limit}) " +
-            "UPDATE ab_outbox o SET status = 'processing', lease_owner = #{leaseOwner}, " +
-            "lease_token = #{leaseToken}, lease_until = #{leaseUntil}, claimed_at = NOW() " +
-            "FROM candidates c WHERE o.id = c.id RETURNING o.*</script>")
+            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT #{limit}), " +
+            "claimed AS (" + CLAIM_STATE +
+            "FROM candidates c WHERE o.id = c.id RETURNING o.*" + CLAIM_DEAD_LETTER)
     List<OutboxEvent> claimReadyEvents(@Param("limit") int limit,
                                       @Param("leaseOwner") String leaseOwner,
                                       @Param("leaseToken") String leaseToken,
                                       @Param("leaseUntil") Instant leaseUntil);
+
+    /** A host-authorized current-tenant dispatch cannot claim another source or an unversioned event. */
+    @Select("<script>WITH candidates AS (SELECT o.id FROM ab_outbox o WHERE " +
+            "o.tenant_id = #{tenantId} AND o.event_source = #{source} AND o.schema_version IS NOT NULL " +
+            "AND o.event_type IN <foreach collection='eventTypes' item='type' open='(' separator=',' close=')'>#{type}</foreach> " +
+            "AND ((o.status = 'pending' AND o.next_retry_at &lt;= NOW()) " +
+            "OR (o.status = 'processing' AND o.lease_until &lt; NOW())) " +
+            "AND (o.ordering_key IS NULL OR NOT EXISTS (SELECT 1 FROM ab_outbox earlier " +
+            "WHERE earlier.tenant_id = o.tenant_id AND earlier.ordering_key = o.ordering_key " +
+            "AND earlier.event_sequence &lt; o.event_sequence AND earlier.status IN ('pending', 'processing'))) " +
+            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT #{limit}), " +
+            "claimed AS (" + CLAIM_STATE +
+            "FROM candidates c WHERE o.id = c.id AND o.tenant_id = #{tenantId} " +
+            "AND o.event_source = #{source} RETURNING o.*" + CLAIM_DEAD_LETTER)
+    List<OutboxEvent> claimReadyEventsForTenant(@Param("tenantId") long tenantId,
+                                              @Param("source") String source,
+                                              @Param("eventTypes") List<String> eventTypes,
+                                              @Param("limit") int limit,
+                                              @Param("leaseOwner") String leaseOwner,
+                                              @Param("leaseToken") String leaseToken,
+                                              @Param("leaseUntil") Instant leaseUntil);
 
     /** Internal exact-event lease claim; never polls or claims another tenant's queue. */
     @Select("<script>WITH candidate AS (" +
@@ -108,10 +144,9 @@ public interface OutboxEventMapper {
             ORDERING_NAMESPACE_MATCH +
             "AND earlier.event_sequence &lt; o.event_sequence " +
             "AND earlier.status IN ('pending', 'processing'))) " +
-            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT 1) " +
-            "UPDATE ab_outbox o SET status = 'processing', lease_owner = #{leaseOwner}, " +
-            "lease_token = #{leaseToken}, lease_until = #{leaseUntil}, claimed_at = NOW() " +
-            "FROM candidate c WHERE o.id = c.id AND o.tenant_id = #{tenantId} AND o.event_id = #{eventId} RETURNING o.*</script>")
+            "ORDER BY o.created_at, o.id FOR UPDATE SKIP LOCKED LIMIT 1), " +
+            "claimed AS (" + CLAIM_STATE +
+            "FROM candidate c WHERE o.id = c.id AND o.tenant_id = #{tenantId} AND o.event_id = #{eventId} RETURNING o.*" + CLAIM_DEAD_LETTER)
     List<OutboxEvent> claimKnownEvent(@Param("tenantId") Long tenantId,
                                      @Param("eventId") String eventId,
                                      @Param("leaseOwner") String leaseOwner,
@@ -123,7 +158,8 @@ public interface OutboxEventMapper {
 
     @Update("UPDATE ab_outbox SET status = 'delivered', delivered_at = NOW(), " +
             "lease_owner = NULL, lease_token = NULL, lease_until = NULL " +
-            "WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken}")
+            "WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken} " +
+            "AND lease_until > clock_timestamp()")
     int markDeliveredFenced(@Param("id") Long id, @Param("leaseToken") String leaseToken);
 
     @Update("UPDATE ab_outbox SET status = 'delivered', delivered_at = NOW() WHERE id = #{id}")
@@ -139,7 +175,8 @@ public interface OutboxEventMapper {
     @Update("UPDATE ab_outbox SET retry_count = retry_count + 1, next_retry_at = #{nextRetryAt}, " +
             "last_error = #{lastError}, status = CASE WHEN retry_count + 1 >= max_retries " +
             "THEN 'failed' ELSE 'pending' END, lease_owner = NULL, lease_token = NULL, " +
-            "lease_until = NULL WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken}")
+            "lease_until = NULL WHERE id = #{id} AND status = 'processing' AND lease_token = #{leaseToken} " +
+            "AND lease_until > clock_timestamp()")
     int recordFailureFenced(@Param("id") Long id, @Param("leaseToken") String leaseToken,
                             @Param("nextRetryAt") Instant nextRetryAt,
                             @Param("lastError") String lastError);
@@ -182,9 +219,12 @@ public interface OutboxEventMapper {
             "lease_until = NULL, replay_count = replay_count + 1 FROM replayed r WHERE o.id = r.outbox_id")
     int replayDeadLetter(@Param("id") Long id, @Param("replayedBy") String replayedBy);
 
-    @Update("UPDATE ab_outbox SET status = 'pending', next_retry_at = NOW(), lease_owner = NULL, " +
-            "lease_token = NULL, lease_until = NULL, last_error = 'Recovered expired dispatcher lease' " +
-            "WHERE status = 'processing' AND lease_until < #{expiredBefore}")
+    @Update("WITH expired AS (SELECT id FROM ab_outbox WHERE status = 'processing' " +
+            "AND lease_until < #{expiredBefore} ORDER BY lease_until, id FOR UPDATE SKIP LOCKED LIMIT 100) " +
+            "UPDATE ab_outbox o SET status = CASE WHEN o.retry_count::bigint + 1 >= o.max_retries " +
+            "THEN 'failed' ELSE 'pending' END, retry_count = LEAST(o.retry_count::bigint + 1, 2147483647)::integer, " +
+            "next_retry_at = NOW(), lease_owner = NULL, lease_token = NULL, lease_until = NULL, " +
+            "last_error = 'Recovered expired dispatcher lease' FROM expired e WHERE o.id = e.id")
     int recoverExpiredLeases(@Param("expiredBefore") Instant expiredBefore);
 
     @Insert("INSERT INTO ab_integration_dead_letter (outbox_id, tenant_id, event_id, event_type, payload, " +

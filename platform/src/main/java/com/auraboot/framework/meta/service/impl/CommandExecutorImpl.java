@@ -205,6 +205,10 @@ public class CommandExecutorImpl implements CommandExecutor {
                         null, false, auditError, executionTimeMs, phaseReached, phaseTimings);
             }
 
+            if (e instanceof org.springframework.web.server.ResponseStatusException status
+                    && status.getStatusCode().is4xxClientError()) {
+                throw status;
+            }
             if (e instanceof BusinessException || e instanceof ValidationException
                     || e instanceof com.auraboot.framework.exception.ConflictException
                     || e instanceof org.springframework.dao.DataAccessException
