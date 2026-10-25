@@ -97,6 +97,7 @@ public class AnnouncementReleaseService {
         var job=releases.lock(tenant,record.getCurrentVersionPid());
         var control=releases.version(tenant,record.getCurrentVersionPid());
         if(!retryable(record,job,control,Instant.now())) invalid("publication_not_retryable");
+        if(!originalMemberAvailable(tenant,job)) invalid("authorization_changed");
         if(releases.retry(tenant,(String)job.get("pid"),((Number)job.get("fence")).longValue())!=1
             || releases.bumpRetry(tenant,record.getPid(),record.getCurrentVersionPid(),actor,record.getRowVersion())!=1) conflict();
         return new LinkedHashMap<>(Map.of("pid",record.getPid(),"recordPid",record.getPid(),"versionPid",record.getCurrentVersionPid(),
@@ -116,8 +117,13 @@ public class AnnouncementReleaseService {
         view.put("latestAllowedAt",job.get("latest_allowed_at"));view.put("attempts",job.get("attempts"));
         view.put("errorCode",job.get("error_code")==null ? null : publicFailureCode(job.get("error_code")));
         view.put("canRetry",deliveryEnabled && permissions.hasPermission(MetaContext.getCurrentUserId(),"announcement.announcement.publish")
-            && retryable(record,job,control,Instant.now()));
+            && retryable(record,job,control,Instant.now()) && originalMemberAvailable(tenant,job));
         return Map.of("records",List.of(view),"total",1);
+    }
+
+    private boolean originalMemberAvailable(Long tenant,Map<String,Object> job) {
+        var actor=releases.actor(tenant,((Number)job.get("actor_user_id")).longValue());
+        return actor!=null && Objects.equals(actor.get("member_pid"),job.get("actor_member_pid"));
     }
 
     private static boolean retryable(Announcement record,Map<String,Object> job,Map<String,Object> control,Instant now) {

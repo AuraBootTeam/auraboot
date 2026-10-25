@@ -251,6 +251,26 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         }
     }
 
+    @Test void aReplacementMembershipCannotResumeThePreviousMembersPublicationEvenWithTheSameGrants() {
+        var accepted=acceptRecoveryFixture();String record=(String)accepted.get("recordPid"),version=(String)accepted.get("versionPid");
+        releases.fail(claimRecoveryFixture(version),"blocked","ACTOR_INACTIVE");
+        try {
+            new TransactionTemplate(transactions).executeWithoutResult(state->{
+                jdbc.update("UPDATE ab_tenant_member SET deleted_flag=TRUE,status='inactive' WHERE tenant_id=? AND id=?",getTestTenant().getId(),getTestTenantMember().getId());
+                var replacement=memberships.addMember(getTestUser().getId(),getTestTenant().getId(),"active");
+                assertThat(replacement.getPid()).isNotEqualTo(getTestTenantMember().getPid());
+                assertThat(roles.assignRolesToMember(replacement.getId(),List.of(getTestRole().getId()),getTestTenant().getId(),null)).isTrue();
+                MetaContext.setMemberId(replacement.getId());permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+                assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.publish")).isTrue();
+                assertThat(((List<Map<String,Object>>)releases.summary(record).get("records")).getFirst()).containsEntry("canRetry",false);
+                assertThatThrownBy(()->releases.execute(AnnouncementReleaseService.RETRY,record,Map.of(),UniqueIdGenerator.generate(),2)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+                state.setRollbackOnly();
+            });
+        } finally {applyTestMetaContext();permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());}
+        assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,getTestTenant().getId(),version)).isEqualTo("blocked");
+        releases.execute(AnnouncementReleaseService.CANCEL,record,Map.of(),UniqueIdGenerator.generate(),2);
+    }
+
     private String recordOf(String version) {
         return jdbc.queryForObject("SELECT announcement_pid FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
     }
