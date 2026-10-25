@@ -4,6 +4,8 @@ import { ReportQueryError } from '../ReportQueryError';
 import { useReportQuery } from '../useReportQuery';
 import { fetchReportData } from '../fetchReportData';
 import { createEmptyReport } from '../../types';
+import { useMemo } from 'react';
+import { reportWithRouteParameters } from '../reportRouteParameters';
 
 vi.mock('../fetchReportData', () => ({ fetchReportData: vi.fn() }));
 const fetchData = vi.mocked(fetchReportData);
@@ -20,6 +22,24 @@ function deferred() {
 
 beforeEach(() => vi.resetAllMocks());
 describe('report query snapshots', () => {
+  it('hides the old project result and export snapshot while a different route scope loads', async () => {
+    const definition = createEmptyReport('Project review');
+    definition.parameters = [{ name: 'projectPid', label: 'Project', type: 'text', inputSource: 'route' }];
+    fetchData.mockResolvedValueOnce({ rows: [{ project: 'A', amount: 18000 }] });
+    const { result, rerender } = renderHook(({ search }) => {
+      const scoped = useMemo(() => reportWithRouteParameters(definition, search), [search]);
+      return useReportQuery(scoped);
+    }, { initialProps: { search: '?projectPid=A' } });
+    await waitFor(() => expect(result.current.canExport).toBe(true));
+    const next = deferred();
+    fetchData.mockReturnValueOnce(next.promise);
+    rerender({ search: '?projectPid=B' });
+    expect(result.current.dataSets).toEqual({});
+    expect(result.current.canExport).toBe(false);
+    await act(async () => next.resolve({ rows: [{ project: 'B', amount: 42000 }] }));
+    expect(result.current.appliedParameters).toEqual({ projectPid: 'B' });
+    expect(result.current.dataSets.rows).toEqual([{ project: 'B', amount: 42000 }]);
+  });
   it('commits submitted inputs with data and keeps them after draft edits or failure', async () => {
     const report = createEmptyReport('Query');
     fetchData.mockResolvedValueOnce({ rows: [{ value: 'A' }] });

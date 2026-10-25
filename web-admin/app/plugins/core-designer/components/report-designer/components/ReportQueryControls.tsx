@@ -46,6 +46,14 @@ export function ReportQueryControls({ report, query }: { report: ReportDsl; quer
                     en: 'Query failed. Retry, or contact your administrator if the problem persists.',
                   })}
           </p>
+          {query.failure === 'parameters' && report.parameters?.some(parameter => parameter.inputSource === 'route') && (
+            <p className="mt-1">
+              {text({
+                zh: '此报告的业务范围由入口确定。请返回原业务页面，选择记录后重新打开报告。',
+                en: 'This report takes its scope from the originating page. Return there, select a record and reopen the report.',
+              })}
+            </p>
+          )}
           <p className="mt-1">
             {query.hasResult
               ? text({
