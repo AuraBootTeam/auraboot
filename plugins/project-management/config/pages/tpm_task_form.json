@@ -123,7 +123,7 @@
               "en": "e.g. Review acceptance checklist, attachments and training"
             },
             "helpText": {
-              "zh-CN": "用于记录完成标准；演示归档自动化会覆盖所选任务的说明。",
+              "zh-CN": "记录完成标准、验收依据与交接说明；自动化写入时应先确认目标字段和命中范围。",
               "en": "Record completion criteria; the demo archival automation replaces this description."
             }
           }

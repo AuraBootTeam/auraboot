@@ -49,7 +49,24 @@ public final class ReliableIntegrationOperatorContracts {
     public record DeadLetterDetail(
             DeadLetterSummary deadLetter,
             List<ReceiptView> receipts,
-            List<ReplayHistoryView> replayHistory) {
+            List<ReplayHistoryView> replayHistory,
+            QuarantineResult quarantine) {
+    }
+
+    public record QuarantineRequest(
+            @NotBlank @Size(max = 512) String reason,
+            @NotNull @PositiveOrZero Integer expectedReplayCount) {
+    }
+
+    public record QuarantineResult(
+            String recordPid,
+            String eventId,
+            String status,
+            int replayCount,
+            String requestedBy,
+            String reason,
+            String correlationId,
+            Instant requestedAt) {
     }
 
     public record ReplayRequest(

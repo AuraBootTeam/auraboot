@@ -7,6 +7,10 @@
  * result cards so the raw command code never reappears after approval.
  */
 export function formatToolDisplayName(name: string, isZh: boolean): string {
+  if (['model:create', 'aurabot:model:create', 'aurabot_model_create'].includes(name)) {
+    return isZh ? '新建业务模型' : 'Create business model';
+  }
+
   const localizeWords = (value: string) => {
     const words = value.split(/[_\s]+/).filter(Boolean);
     if (!isZh) {

@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,12 +77,21 @@ public class AuraBotConversationService {
 
         List<Long> conversationIds = newConversation ? List.of() : memberMapper.findConversationIdsByMember(
                 tenantId, ImConstants.MEMBER_TYPE_HUMAN, memberId);
+        List<ImConversation> matching = new ArrayList<>();
         for (Long conversationId : conversationIds) {
             ImConversation existing = conversationMapper.selectById(conversationId);
             if (existing != null && isAuraBotConversation(existing)
                     && resolvedAgentCode.equals(readMetadata(existing).get(AGENT_CODE_KEY))) {
-                return toConversationItem(existing, tenantId);
+                matching.add(existing);
             }
+        }
+        // Membership rows have no ordering contract. Reopen the most recently
+        // active transcript, with a stable tie-break for newly created chats.
+        var latest = matching.stream().max(Comparator
+                .comparing(AuraBotConversationService::lastActivity)
+                .thenComparing(ImConversation::getId));
+        if (latest.isPresent()) {
+            return toConversationItem(latest.get(), tenantId);
         }
 
         ImConversation conversation = new ImConversation();
@@ -136,6 +146,11 @@ public class AuraBotConversationService {
         }
 
         return toConversationItem(conversation, tenantId);
+    }
+
+    private static Instant lastActivity(ImConversation conversation) {
+        if (conversation.getLastMessageAt() != null) return conversation.getLastMessageAt();
+        return conversation.getUpdatedAt() != null ? conversation.getUpdatedAt() : Instant.EPOCH;
     }
 
     public List<AuraBotConversationMessage> getMessages(Long conversationId, Long tenantId, Long memberId, int limit) {

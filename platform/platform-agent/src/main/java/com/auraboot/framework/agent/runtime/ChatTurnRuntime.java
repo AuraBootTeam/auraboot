@@ -746,8 +746,16 @@ public class ChatTurnRuntime {
                         runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
                                 round, toolId, toolName, input));
                         lastRuntimeState = runtimeState;
+                        Map<String, Object> confirmationMetadata = new LinkedHashMap<>();
+                        if (result.get("previewToken") instanceof String token && !token.isBlank()
+                                && result.get("skillName") instanceof String skill && !skill.isBlank()) {
+                            confirmationMetadata.put("_aurabot_skill", true);
+                        }
+                        for (String key : List.of("skillName", "riskLevel", "preview", "previewToken")) {
+                            if (result.get(key) != null) confirmationMetadata.put(key, result.get(key));
+                        }
                         spec.sink().onConfirmRequired(toolId, toolName,
-                                callbacks.buildToolDescription(toolName, input), input, spec.ctx().turnId());
+                                callbacks.buildToolDescription(toolName, input), input, spec.ctx().turnId(), confirmationMetadata);
                         callbacks.storeToolResultConfirmationPending(pendingContext(spec, callbacks, roundContext,
                                 toolId, toolName, input, effectiveSystemPrompt, toolChoice, null), result);
                         if (spec.persistTape()) {

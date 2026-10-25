@@ -188,6 +188,9 @@ public interface OutboxEventMapper {
     @Select("SELECT COUNT(*) FROM ab_integration_dead_letter WHERE status = 'open'")
     long countOpenDeadLetters();
 
+    @Select("SELECT COUNT(*) FROM ab_integration_dead_letter WHERE status = 'quarantined'")
+    long countQuarantinedDeadLetters();
+
     @Select("SELECT COUNT(*) FROM ab_outbox WHERE status = 'processing' AND lease_until < NOW()")
     long countExpiredLeases();
 

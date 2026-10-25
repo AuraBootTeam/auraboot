@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-08-23
-updated: 2026-09-04
+updated: 2026-10-25
 ---
 
 # Reliable Integration Runtime v1
@@ -60,6 +60,37 @@ replacement payload, so operators can only retry the immutable original envelope
 replay appends one `ab_integration_dead_letter_replay` row with a ULID record id, tenant, public
 event id, correlation id, monotonic attempt, actor PID, mandatory reason, and request timestamp.
 Cross-tenant and missing event ids have the same not-found response.
+
+### Audited quarantine
+
+`POST /api/admin/reliable-integration/dead-letters/{eventId}/quarantine` accepts a nonblank
+`reason` (at most 512 characters) and nonnegative `expectedReplayCount`. It atomically changes only
+an `open` dead letter whose matching tenant/event outbox remains `failed` at that replay count.
+The same SQL statement inserts one immutable `ab_integration_dead_letter_quarantine` disposition
+with public record PID, tenant/event/correlation, actor PID, reason, replay version and timestamp.
+The detail response includes that disposition; the list supports `status=quarantined`.
+
+Quarantine preserves the outbox failure, payload, headers, errors and existing receipts. It does not
+send, requeue, delete or manufacture delivery success. Replay of a quarantined failure is rejected,
+including a retry of an older replay request. An exact actor/reason/version retry returns the
+original disposition without duplicating its audit or metric. Stale or conflicting requests return
+409; missing or foreign-tenant events return 404. Concurrent replay/quarantine permits exactly one
+state transition. This version has no reactivation endpoint.
+
+Platform operators have a separate quarantine-only control-plane endpoint:
+`POST /api/admin/infrastructure/reliable-integration/dead-letters/quarantine`. Its request identifies
+the target with public `tenantPid` and `eventId`, plus the same reason/version fence. It requires a
+non-impersonated platform execution session and the platform-admin role; a business execution scope
+is rejected even for a platform role holder. It does not add cross-tenant payload inspection or
+replay. The atomic disposition remains the authoritative audit. Successful requests additionally
+use the existing best-effort platform admin-action log to link the target tenant and disposition;
+exact retries may have separate access logs but never repeat the disposition.
+
+Health and metrics separate unresolved `openDeadLetters` from `quarantinedDeadLetters` and the
+`auraboot_reliable_delivery_quarantined` gauge. Quarantined failures no longer trigger the unresolved
+open-DLQ alarm. An aggregate `UP` therefore does not mean that historical failures were delivered.
+Keep the additive schema and failed originals during application rollback; never rewrite quarantine
+as delivered or automatically reactivate it.
 
 ## Procurement to Inventory pilot
 

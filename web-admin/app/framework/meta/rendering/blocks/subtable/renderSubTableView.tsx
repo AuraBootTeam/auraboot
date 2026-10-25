@@ -9,7 +9,7 @@ import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecor
 import { ToolbarBlockRenderer } from '../ToolbarBlockRenderer';
 import { Select } from '~/ui/smart/form/Select';
 import type { EnrichedColumnConfig, ResolvedSubTableViewerProps } from './subTableTypes';
-import { formatCellValue, isNumericField } from './subTableValues';
+import { formatCellValue } from './subTableValues';
 import type { useSubTableState } from './useSubTableState';
 
 import type { useSubTableTreeSorting } from './useSubTableTreeSorting';
@@ -642,43 +642,30 @@ export function renderSubTableView({
                             }}
                           />
                         ) : (
-                          <input
-                            type={isNumericField(col) ? 'number' : 'text'}
-                            maxLength={isNumericField(col) ? undefined : col.maxLength}
+                          <InlineEditableCell
+                            col={col}
+                            maxLength={col.maxLength}
                             value={newRowData[col.field] ?? ''}
-                            onChange={(e) => {
-                              const val =
-                                isNumericField(col) && e.target.value
-                                  ? Number(e.target.value)
-                                  : e.target.value;
-                              setNewRowData((prev) => ({ ...prev, [col.field]: val }));
-                              if (addErrors[col.field]) {
-                                setAddErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next[col.field];
-                                  return next;
-                                });
+                            displayValue=""
+                            isEditing
+                            testId={`subtable-add-${col.field}`}
+                            placeholder={`${resolveColumnLabel(col.field)}${col.required ? ' *' : ''}`}
+                            error={addErrors[col.field]}
+                            showErrorTooltip={false}
+                            dictOptions={col.dictCode ? (getDictItems(col.dictCode) || []).map(item => ({ value: item.value, label: item.label })) : undefined}
+                            onChange={(value) => {
+                              setNewRowData(previous => ({ ...previous, [col.field]: value }));
+                              if (addErrors[col.field]) setAddErrors(previous => {
+                                const next = { ...previous }; delete next[col.field]; return next;
+                              });
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') handleAddRow();
+                              if (event.key === 'Escape') {
+                                setIsAdding(false); setNewRowData({}); setAddErrors({});
                               }
                             }}
-                            placeholder={
-                              col.required
-                                ? `${resolveColumnLabel(col.field)} *`
-                                : resolveColumnLabel(col.field)
-                            }
-                            data-testid={`subtable-add-${col.field}`}
-                            className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
-                              addErrors[col.field]
-                                ? 'border-status-red focus:ring-status-red'
-                                : 'border-border-strong focus:ring-accent'
-                            }`}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleAddRow();
-                              if (e.key === 'Escape') {
-                                setIsAdding(false);
-                                setNewRowData({});
-                                setAddErrors({});
-                              }
-                            }}
+                            t={t}
                           />
                         )}
                         {addErrors[col.field] && (

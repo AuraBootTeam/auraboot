@@ -105,6 +105,13 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
     }
 
     @Override
+    public void onConfirmRequired(String toolId, String toolName, String description,
+                                  Map<String, Object> input, String pendingTurnId,
+                                  Map<String, Object> extension) {
+        delegate.onConfirmRequired(toolId, toolName, description, input, pendingTurnId, extension);
+    }
+
+    @Override
     public void onError(String message, String traceId) {
         delegate.onError(message, traceId);
     }

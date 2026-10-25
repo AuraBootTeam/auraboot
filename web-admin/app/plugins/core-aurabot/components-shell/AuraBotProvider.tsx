@@ -349,8 +349,14 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
         ),
       };
 
-    case 'add_tool_message':
-      return { ...state, messages: [...state.messages, action.payload] };
+    case 'add_tool_message': {
+      const toolId = action.payload.toolId;
+      const existing = toolId ? state.messages.findIndex(message => message.toolId === toolId) : -1;
+      if (existing < 0) return { ...state, messages: [...state.messages, action.payload] };
+      return { ...state, messages: state.messages.map((message, index) =>
+        index === existing ? action.payload : message).filter((message, index) =>
+        !toolId || message.toolId !== toolId || index === existing) };
+    }
 
     case 'update_tool_message':
       return {
@@ -1035,6 +1041,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   // Confirm a tool execution (user approved)
   const confirmTool = useCallback(
     async (toolId: string) => {
+      const failDecision = (error: string, traceId?: string) => {
+        const feedback = approvalDecisionFeedback(error);
+        dispatch({ type: 'update_tool_message', payload: { toolId, updates: {
+          type: 'error', content: t(feedback.key, undefined, locale.startsWith('zh') ? feedback.zh : feedback.en), traceId,
+        } } });
+        dispatch({ type: 'set_loading', payload: false });
+      };
       // Update confirm card to show "executing"
       dispatch({
         type: 'update_tool_message',
@@ -1059,17 +1072,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       );
       const pendingTurnId = confirmCard?.pendingTurnId ?? '';
       if (!pendingTurnId) {
-        // Defensive: should never happen because the card was just rendered
-        // by the SSE handler that set pendingTurnId.
-        dispatch({
-          type: 'update_message',
-          payload: {
-            id: botMsgId,
-            type: 'error',
-            content: 'Missing pendingTurnId for confirmTool',
-          },
-        });
-        dispatch({ type: 'set_loading', payload: false });
+        failDecision('Missing pending approval');
         return;
       }
 
@@ -1174,25 +1177,11 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               }
               dispatch({ type: 'set_loading', payload: false });
             },
-            onError: (err: string, traceId?: string) => {
-              const feedback = approvalDecisionFeedback(err);
-              dispatch({ type: 'update_tool_message', payload: { toolId, updates: { type: 'tool_cancelled', content: t('ai.approval.notCompleted', undefined, locale.startsWith('zh') ? '审批未完成' : 'Approval not completed') } } });
-              dispatch({
-                type: 'update_message',
-                payload: { id: botMsgId, content: t(feedback.key, undefined, locale.startsWith('zh') ? feedback.zh : feedback.en), type: 'error', traceId },
-              });
-              dispatch({ type: 'set_loading', payload: false });
-            },
+            onError: failDecision,
           },
         );
-      } catch (e: any) {
-        const feedback = approvalDecisionFeedback(e.message || 'Execute failed');
-        dispatch({ type: 'update_tool_message', payload: { toolId, updates: { type: 'tool_cancelled', content: t('ai.approval.notCompleted', undefined, locale.startsWith('zh') ? '审批未完成' : 'Approval not completed') } } });
-        dispatch({
-          type: 'update_message',
-          payload: { id: botMsgId, type: 'error', content: t(feedback.key, undefined, locale.startsWith('zh') ? feedback.zh : feedback.en) },
-        });
-        dispatch({ type: 'set_loading', payload: false });
+      } catch (error: unknown) {
+        failDecision(error instanceof Error ? error.message : 'Execute failed');
       }
     },
     [state.currentConversationId, state.sessionId, state.messages, locale, t],

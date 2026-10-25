@@ -15,17 +15,20 @@ import { get } from '~/shared/services/http-client';
 import { listInboxItems } from '~/shared/services/inboxService';
 import { fetchRecentVisits } from '~/plugins/core-dashboard/widgets/workbench/useRecentVisits';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { useSmartText } from '~/utils/i18n';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const result = await fetchResult<Dashboard>('/api/dashboards/workbench', {}, request);
   return result.code === '0' && result.data
-    ? { dashboard: normalizeDashboard(result.data), loadError: null }
-    : { dashboard: null, loadError: result.message || 'Unable to load workbench' };
+    ? { dashboard: normalizeDashboard(result.data), loadError: null, accessDenied: false }
+    : { dashboard: null, loadError: result.message || 'Unable to load workbench', accessDenied: result.httpStatus === 403 };
 }
 
 export default function WorkbenchPage() {
   const initialData = useLoaderData<typeof loader>();
   const { t, locale } = useI18n();
+  const text = useSmartText();
+  const accessDenied = initialData.accessDenied;
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [retryDashboard, setDashboard] = useState<Dashboard | null | undefined>(undefined);
   const dashboard = retryDashboard === undefined ? initialData.dashboard : retryDashboard;
@@ -155,7 +158,7 @@ export default function WorkbenchPage() {
           {todayLabel && `${todayLabel} · `}{t('workbench.subline', undefined, '概览')}
         </div>
       </div>
-      <div className="flex gap-2">
+      {!accessDenied && <div className="flex gap-2">
         <Link
           to="/home/settings"
           data-testid="workbench-open-in-dashboard"
@@ -175,12 +178,23 @@ export default function WorkbenchPage() {
         <button type="button" className="px-3.5 py-2 rounded-md bg-[#635bff] text-[13px] font-medium text-white hover:bg-[#534eeb]">
           + {t('workbench.new', undefined, '新建')}
         </button>
-      </div>
+      </div>}
     </header>
   );
 
   let body: React.ReactNode;
-  if (loading) {
+  if (accessDenied) {
+    body = (
+      <div role="status" className="rounded-[10px] border border-[#e3e8ee] bg-white px-6 py-8 dark:bg-gray-900 dark:border-gray-700">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+          {text({ zh: '当前账号未开通个人工作台', en: 'Your account does not have a personal workbench' })}
+        </h2>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          {text({ zh: '请从左侧菜单访问已授权的业务功能。如需个人工作台，请联系管理员。', en: 'Use the sidebar to open your permitted business features. Contact an administrator if you need a personal workbench.' })}
+        </p>
+      </div>
+    );
+  } else if (loading) {
     body = (
       <div className="flex h-[40vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#635bff] border-t-transparent" />

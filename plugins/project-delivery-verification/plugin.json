@@ -35,7 +35,8 @@
     "pages": "config/pages",
     "permissions": "config/permissions.json",
     "roles": "config/roles.json",
-    "menus": "config/menus.json"
+    "menus": "config/menus.json",
+    "namedQueries": "config/named-queries.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

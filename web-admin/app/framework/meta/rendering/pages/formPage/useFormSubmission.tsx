@@ -363,7 +363,7 @@ export function useFormSubmission({
                 throw new Error(
                   getLocalizedText(
                     {
-                      'zh-CN': '项目已保存，但未取得附件关联目标。请重新打开项目检查。',
+                      'zh-CN': '记录已保存，但未取得附件关联目标。请重新打开记录检查。',
                       en: 'Saved, but attachment target is missing. Reopen the record to check.',
                     },
                     locale,
@@ -383,7 +383,7 @@ export function useFormSubmission({
                   throw new Error(
                     getLocalizedText(
                       {
-                        'zh-CN': '项目已保存，但附件信息不完整。请重新上传附件。',
+                        'zh-CN': '记录已保存，但附件信息不完整。请重新上传附件。',
                         en: 'Saved, but attachment metadata is incomplete. Upload the files again.',
                       },
                       locale,
@@ -405,7 +405,7 @@ export function useFormSubmission({
                   throw new Error(
                     getLocalizedText(
                       {
-                        'zh-CN': '项目已保存，但附件共享关联失败。请重新打开项目检查附件。',
+                        'zh-CN': '记录已保存，但附件共享关联失败。请重新打开记录检查附件。',
                         en: 'Saved, but attachment sharing failed. Reopen the record to check files.',
                       },
                       locale,

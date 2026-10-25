@@ -221,7 +221,21 @@
           "label": {
             "zh-CN": "保存项目",
             "en": "Save project"
-          }
+          },
+          "permissionCode": "model.tpm_project.create",
+          "visibleWhen": "!form.pid"
+        },
+        {
+          "code": "update",
+          "action": "save",
+          "commandCode": "tpm:update_project",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存项目",
+            "en": "Save project"
+          },
+          "permissionCode": "model.tpm_project.update",
+          "visibleWhen": "!!form.pid"
         },
         {
           "code": "cancel",

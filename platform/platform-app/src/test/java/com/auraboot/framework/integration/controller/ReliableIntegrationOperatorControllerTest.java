@@ -7,6 +7,8 @@ import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.D
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.DeadLetterSummary;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayRequest;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayResult;
+import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.QuarantineRequest;
+import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.QuarantineResult;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +70,7 @@ class ReliableIntegrationOperatorControllerTest {
 
     @Test
     void detailUsesPublicEventIdInsideCurrentTenant() {
-        DeadLetterDetail detail = new DeadLetterDetail(null, List.of(), List.of());
+        DeadLetterDetail detail = new DeadLetterDetail(null, List.of(), List.of(), null);
         when(service.detail(TENANT_ID, "evt-1")).thenReturn(detail);
 
         ApiResponse<DeadLetterDetail> response = controller.detail("evt-1");
@@ -114,5 +116,30 @@ class ReliableIntegrationOperatorControllerTest {
 
         assertThat(response.getCode()).isEqualTo("409");
         assertThat(response.getMessage()).isEqualTo("dead letter changed or is not open");
+    }
+
+    @Test
+    void quarantineUsesAuthenticatedTenantAndActor() {
+        QuarantineResult result = new QuarantineResult("audit-pid", "evt-1", "quarantined", 2,
+                USER_PID, "invalid fixture", "corr-1", Instant.EPOCH);
+        when(service.quarantine(TENANT_ID, "evt-1", USER_PID, "invalid fixture", 2)).thenReturn(result);
+
+        var response = controller.quarantine("evt-1", new QuarantineRequest("invalid fixture", 2));
+
+        assertThat(response.getData()).isEqualTo(result);
+        verify(service).quarantine(TENANT_ID, "evt-1", USER_PID, "invalid fixture", 2);
+    }
+
+    @Test
+    void quarantineReturnsNotFoundAndConflictWithoutBypassingService() {
+        when(service.quarantine(TENANT_ID, "missing", USER_PID, "fixture", 0))
+                .thenThrow(new NoSuchElementException("dead letter not found"));
+        when(service.quarantine(TENANT_ID, "stale", USER_PID, "fixture", 0))
+                .thenThrow(new IllegalStateException("dead letter changed"));
+
+        assertThat(controller.quarantine("missing", new QuarantineRequest("fixture", 0)).getCode())
+                .isEqualTo("404");
+        assertThat(controller.quarantine("stale", new QuarantineRequest("fixture", 0)).getCode())
+                .isEqualTo("409");
     }
 }

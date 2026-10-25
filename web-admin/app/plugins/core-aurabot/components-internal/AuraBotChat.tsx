@@ -7,6 +7,8 @@
  * @since 1.0.0
  */
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import React, { useState, useCallback, useRef, useEffect, type KeyboardEvent } from 'react';
 import {
   useAuraBot,
@@ -131,8 +133,17 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
   const { t, locale } = useI18n();
   const displayContent = !isUser && message.content === 'Approved tool executed.'
     ? t('ai.approval.approved', undefined, locale.startsWith('zh') ? '审批通过，操作已完成。' : message.content)
-    : message.content;
+    : !isUser && message.content === 'User denied the operation'
+      ? t('ai.approval.cancelled', undefined, locale.startsWith('zh') ? '操作已取消' : 'Operation cancelled')
+      : message.content;
   const st = useSmartText();
+
+  // Text placeholders reserve streaming state, not an empty message bubble.
+  // Keep an available trace reachable even when this turn has no prose yet.
+  if (message.type === 'text' && !isUser && !displayContent.trim()
+    && !message.retrievalEvidence?.length) {
+    return message.traceId ? <TraceLink traceId={message.traceId} /> : null;
+  }
 
   // Error message. Backend streams user-facing errors as a `$i18n:<key>` sentinel
   // (e.g. "$i18n:aurabot.error.no_llm_provider") because the service layer has no
@@ -141,7 +152,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
   if (message.type === 'error') {
     return (
       <div className="mb-3 flex justify-start">
-        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+        <div className="min-w-0 max-w-[85%] rounded-2xl rounded-bl-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 text-red-500">!</span>
             <p className="text-sm text-red-600">{st(message.content, message.content)}</p>
@@ -174,7 +185,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
   if (message.type === 'result_contract' && message.resultContract) {
     return (
       <div className="mb-3 flex justify-start">
-        <div className="max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3 py-2 shadow-sm dark:bg-gray-700">
+        <div className="min-w-0 max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3 py-2 shadow-sm dark:bg-gray-700">
           <ResultContractView contract={message.resultContract} />
         </div>
       </div>
@@ -212,6 +223,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
         toolId={message.toolId}
         skillName={message.skillName || message.toolName || 'unknown'}
         preview={message.skillPreview || {}}
+        input={message.toolInput}
         previewToken={message.previewToken || ''}
         riskLevel={message.riskLevel || 'MEDIUM'}
         onConfirm={onConfirm || (() => {})}
@@ -256,12 +268,12 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     );
   }
 
-  // Tool cancelled — grey italic text
+  // Cancellation is a completed decision and needs readable status feedback.
   if (message.type === 'tool_cancelled') {
     return (
-      <div className="mb-3 flex justify-start">
-        <div className="rounded-2xl rounded-bl-md bg-gray-50 px-4 py-2.5 dark:bg-gray-700/30">
-          <span className="text-sm text-gray-400 italic dark:text-gray-500">{message.content}</span>
+      <div className="mb-3 flex justify-start" role="status" data-testid="chat-tool-cancelled">
+        <div className="rounded-2xl rounded-bl-md border border-gray-200 bg-gray-100 px-4 py-2.5 dark:border-gray-600 dark:bg-gray-700">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-100">{message.content}</span>
         </div>
       </div>
     );
@@ -278,7 +290,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
       data-testid={isUser ? 'chat-msg-user' : 'chat-msg-agent'}
     >
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
+        className={`min-w-0 max-w-[85%] rounded-2xl px-4 py-2.5 ${
           isUser
             ? 'rounded-br-md bg-blue-600 text-white'
             : 'rounded-bl-md bg-gray-100 text-gray-900'
@@ -299,6 +311,8 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
 // Bot Message Content — renders trusted retrieval evidence from the SSE event.
 // ============================================================================
 
+type MarkdownTextNode = { type: string; value?: string; children?: MarkdownTextNode[] };
+
 function BotMessageContent({
   content,
   evidence,
@@ -306,9 +320,33 @@ function BotMessageContent({
   content: string;
   evidence?: import('../services/auraBotApi').RetrievalEvidence[];
 }) {
+  const { t, locale } = useI18n();
+  // Replace exact trusted references after parsing so document names stay literal,
+  // including Markdown punctuation in filenames and references inside inline code.
+  const resolveReferences = () => (tree: MarkdownTextNode) => {
+    const visit = (node: MarkdownTextNode) => {
+      if ((node.type === 'text' || node.type === 'inlineCode') && node.value) {
+        for (const item of evidence || []) {
+          if (!item.evidenceId) continue;
+          const label = item.documentName || item.kbName || t('ai.knowledge.detail.tab.documents', undefined, 'Documents');
+          node.value = node.value.split(item.evidenceId).join(label);
+        }
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
   return (
     <div className="space-y-2 text-sm">
-      <p className="break-words whitespace-pre-wrap">{content}</p>
+      <div className="break-words space-y-2 [&_p]:my-2 [&_h1]:text-lg [&_h2]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-black/5 [&_pre]:p-2 [&_code]:font-mono [&_code]:text-xs">
+        <ReactMarkdown remarkPlugins={[remarkGfm, resolveReferences]} skipHtml components={{
+          table: ({ children }) => <div className="max-w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-300" role="region" tabIndex={0} aria-label={t('aurabot.chat.resultTable', undefined, locale.startsWith('zh') ? '结果表格' : 'Result table')}><table className="min-w-[22rem] w-full table-fixed border-collapse text-left text-xs">{children}</table></div>,
+          th: ({ children, style }) => <th className="min-w-[6rem] border border-gray-300 bg-black/5 p-2 font-semibold dark:border-gray-600" style={style}>{children}</th>,
+          td: ({ children, style }) => <td className="min-w-[6rem] whitespace-normal break-words [&_code]:whitespace-normal border border-gray-300 p-2 align-top [overflow-wrap:anywhere] dark:border-gray-600" style={style}>{children}</td>,
+          a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-400">{children}</a>,
+          img: ({ alt }) => <span>{alt}</span>,
+        }}>{content}</ReactMarkdown>
+      </div>
       {evidence && evidence.length > 0 ? <EvidencePanel evidence={evidence} /> : null}
     </div>
   );

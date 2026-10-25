@@ -16,7 +16,7 @@ public class ReliableIntegrationMetrics {
 
     private static final Set<String> OUTCOMES = Set.of(
             "enqueued", "claimed", "delivered", "lease_fence_lost", "dead_lettered", "retry_scheduled",
-            "replayed", "lease_recovered", "duplicate_suppressed", "receipt_applied", "other");
+            "replayed", "quarantined", "lease_recovered", "duplicate_suppressed", "receipt_applied", "other");
 
     private final MeterRegistry registry;
     private final ConcurrentMap<String, Counter> counters = new ConcurrentHashMap<>();
@@ -34,6 +34,10 @@ public class ReliableIntegrationMetrics {
         Gauge.builder("auraboot_reliable_delivery_oldest_pending_age_seconds", outboxEventMapper,
                         mapper -> readGauge(mapper::oldestUndeliveredAgeSeconds))
                 .description("Age in seconds of the oldest undelivered reliable event")
+                .register(registry);
+        Gauge.builder("auraboot_reliable_delivery_quarantined", outboxEventMapper,
+                        mapper -> readGauge(mapper::countQuarantinedDeadLetters))
+                .description("Explicitly quarantined failures retained without successful delivery")
                 .register(registry);
         Gauge.builder("auraboot_reliable_delivery_unhealthy", outboxEventMapper,
                         ReliableIntegrationMetrics::unhealthy)

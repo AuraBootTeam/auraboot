@@ -18,10 +18,13 @@ import type { ColumnConfig } from '~/framework/meta/schemas/types';
 
 export interface InlineEditableCellProps {
   col: ColumnConfig;
+  testId?: string;
+  placeholder?: string;
   value: any;
   displayValue: string;
   isEditing: boolean;
   error?: string;
+  showErrorTooltip?: boolean;
   onChange: (value: any) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   referenceDataSource?: DataSourceConfig;
@@ -34,10 +37,13 @@ export interface InlineEditableCellProps {
 
 export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
   col,
+  testId,
+  placeholder,
   value,
   displayValue,
   isEditing,
   error,
+  showErrorTooltip = true,
   onChange,
   onKeyDown,
   dictOptions,
@@ -81,7 +87,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
           dataSource={referenceDataSource}
           context={referenceContext}
         />
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -96,7 +102,8 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
           className={baseInputClass}
-          data-testid={`inline-edit-${col.field}`}
+          data-testid={testId ?? `inline-edit-${col.field}`}
+          aria-label={placeholder ?? col.field}
         >
           <option value="">—</option>
           {dictOptions.map((opt) => (
@@ -105,7 +112,7 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
             </option>
           ))}
         </select>
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -121,9 +128,10 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
           className={baseInputClass}
-          data-testid={`inline-edit-${col.field}`}
+          data-testid={testId ?? `inline-edit-${col.field}`}
+          aria-label={placeholder ?? col.field}
         />
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -145,9 +153,10 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
           max={col.max}
           step="any"
           className={baseInputClass}
-          data-testid={`inline-edit-${col.field}`}
+          data-testid={testId ?? `inline-edit-${col.field}`}
+          aria-label={placeholder ?? col.field}
         />
-        {error && <ErrorTooltip message={error} />}
+        {error && showErrorTooltip && <ErrorTooltip message={error} />}
       </div>
     );
   }
@@ -158,14 +167,16 @@ export const InlineEditableCell: React.FC<InlineEditableCellProps> = ({
       <input
         ref={inputRef as React.RefObject<HTMLInputElement>}
         type="text"
+        placeholder={placeholder}
         maxLength={maxLength}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         className={baseInputClass}
-        data-testid={`inline-edit-${col.field}`}
+        data-testid={testId ?? `inline-edit-${col.field}`}
+          aria-label={placeholder ?? col.field}
       />
-      {error && <ErrorTooltip message={error} />}
+      {error && showErrorTooltip && <ErrorTooltip message={error} />}
     </div>
   );
 };
