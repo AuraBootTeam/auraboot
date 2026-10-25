@@ -32,4 +32,18 @@ class NativeProcurementWorkspaceTest {
         assertThat(NativeProcurementWorkspace.runtime(Map.of("PROCUREMENT_NATIVE_RUNTIME", "procurement-main-validation")))
                 .isEqualTo("procurement-main-validation");
     }
+    @Test void currentOwnedScopeRuntimeIsAdmittedWithoutLegacyRuntimeSubstitution() {
+        assertThat(NativeProcurementWorkspace.runtime(Map.of("PROCUREMENT_NATIVE_RUNTIME", "procurement-scope-gaps")))
+                .isEqualTo("procurement-scope-gaps");
+    }
+    @Test void ownedRuntimeHasOneExactDatabaseAndRedisPair() {
+        assertThat(NativeProcurementWorkspace.profile(Map.of("PROCUREMENT_NATIVE_RUNTIME", "procurement-scope-gaps")))
+                .isEqualTo(new NativeProcurementWorkspace.Profile("enterprise_1", 7));
+        for (String legacy : java.util.List.of("procurement-web-stack-20261010", "procurement-main-validation")) {
+            assertThat(NativeProcurementWorkspace.profile(Map.of("PROCUREMENT_NATIVE_RUNTIME", legacy)))
+                    .isEqualTo(new NativeProcurementWorkspace.Profile("enterprise_22", 13));
+        }
+        assertThatThrownBy(() -> NativeProcurementWorkspace.profile(Map.of("PROCUREMENT_NATIVE_RUNTIME", "unowned")))
+                .hasMessage("PROCUREMENT_NATIVE_RUNTIME_NOT_OWNED");
+    }
 }

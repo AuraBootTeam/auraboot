@@ -81,8 +81,7 @@ class ProcurementReminderTickContractTest {
 
     @Test
     void allExistingFacetSourceRemainsByteIdenticalAfterRemovingOnlyTheAddedFactory() throws Exception {
-        Path source = Path.of("src/test/java/com/auraboot/framework/notification/sourcebinding/ProductQuoteReminderNativeFacet.java");
-        if (!Files.exists(source)) source = Path.of("platform").resolve(source);
+        Path source = sourceDirectory().resolve("ProductQuoteReminderNativeFacet.java");
         String current = Files.readString(source);
         String start = "    // BEGIN additive controlled-tick setup. Existing facet methods remain unchanged.\n";
         String end = "    // END additive controlled-tick setup.\n\n";
@@ -239,8 +238,7 @@ class ProcurementReminderTickContractTest {
         assertThat(java.util.Arrays.stream(ProcurementReminderTickNativeIT.class.getDeclaredClasses())
                 .noneMatch(type -> org.springframework.core.annotation.AnnotatedElementUtils.hasAnnotation(type,
                         org.springframework.context.annotation.Configuration.class))).isTrue();
-        Path root = Path.of("src/test/java/com/auraboot/framework/notification/sourcebinding");
-        if (!Files.isDirectory(root)) root = Path.of("platform").resolve(root);
+        Path root = sourceDirectory();
         Map<String, String> originalHashes = Map.of(
                 // Frozen source51751c9c already included prior Native runner fixes.
                 "ProcurementReminderTickNativeIT.java", "3a6e7aeda36155148abc29521b2ab3ba5f72f4c666880ccd31933179ce17f866",
@@ -263,9 +261,18 @@ class ProcurementReminderTickContractTest {
                     .digest(original.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).isEqualTo(entry.getValue());
         }
     }
-    /** Only the reviewed runtime-path generalization is reversed; all other legacy bytes stay checked. */
+    private static Path sourceDirectory() throws Exception {
+        Path classes = Path.of(ProcurementReminderTickContractTest.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Path module = classes.getParent().getParent().getParent().getParent();
+        Path source = module.resolve("src/test/java/com/auraboot/framework/notification/sourcebinding");
+        assertThat(Files.isRegularFile(source.resolve("ProcurementReminderTickContractTest.java"))).isTrue();
+        return source;
+    }
+    /** Only reviewed runtime-path and fixed-profile selections are reversed; other legacy bytes stay checked. */
     private static String restoreLiteralRuntimePathsForLegacyByteProof(String value) {
-        return value.replace("resolve(\".workspace/runtimes\").resolve(NativeProcurementWorkspace.runtime())",
+        return value.replace("isEqualTo(NativeProcurementWorkspace.profile().database())", "isEqualTo(\"enterprise_22\")")
+                .replace("isEqualTo(NativeProcurementWorkspace.profile().redisDatabase())", "isEqualTo(13)")
+                .replace("resolve(\".workspace/runtimes\").resolve(NativeProcurementWorkspace.runtime())",
                         "resolve(\".workspace/runtimes/procurement-web-stack-20261010\")")
                 .replace("resolve(\".workspace/evidence\").resolve(NativeProcurementWorkspace.runtime())",
                         "resolve(\".workspace/evidence/procurement-web-stack-20261010\")")
