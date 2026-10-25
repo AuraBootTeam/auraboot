@@ -333,6 +333,7 @@ test('a recovered original member resumes its original publication and automatic
     await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, {data: [{permissionId: reminderPermission[0].id, granted: true}]}));
     await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/scope`, {data: {resourceCode: 'ab_announcement', actionCode: 'remind', scopeType: 'self', mergeStrategy: 'MAX'}}));
     await authenticateBffSession(context.request, baseURL!, email, 'Test2026x');
+    await publisher.setViewportSize({width: 1440, height: 1100});
     await enterFromMenu(publisher, title);
     await publisher.getByRole('button', {name: '\u81ea\u52a8\u50ac\u529e\u8ba1\u5212', exact: true}).click();
     await expect(publisher).toHaveURL(new RegExp(`/p/announcement_reminder_plan/view/${versionPid}$`));
@@ -350,7 +351,10 @@ test('a recovered original member resumes its original publication and automatic
     expect(resumedPlanResult.data).toMatchObject({operationState: 'resumed'});
     expect(resumedPlanResult.data).not.toHaveProperty('actorMemberPid');
     await expect.poll(async () => (await plan()).status).toBe('active');
-    await publisher.reload({waitUntil: 'domcontentloaded'});await expect(resumePlan).toHaveCount(0);
+    await publisher.reload({waitUntil: 'domcontentloaded'});
+    await expect(publisher.getByText('\u8fd0\u884c\u4e2d', {exact: true})).toBeVisible();
+    await expect(publisher.getByRole('columnheader', {name: '\u989d\u5ea6\u4e0a\u9650', exact: true})).toBeVisible();
+    await expect(resumePlan).toHaveCount(0);
     expect((await plan()).automatic_batches).toBe(0);
     expect(Number((await db.query('SELECT count(*) AS count FROM ab_announcement_reminder_batch WHERE version_pid=$1', [versionPid])).rows[0].count)).toBe(0);
     expect((await query()).actor_member_pid).toBe(user.memberPid);
