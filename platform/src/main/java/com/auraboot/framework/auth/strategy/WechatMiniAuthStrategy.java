@@ -12,12 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * WeChat mini-program login (channel wechat_mini).
- *
- * The request `code` field carries the wx.login() code. The WeChat identity must
- * already be bound to a platform user (bind happens after an authenticated
- * password login via /api/auth/wechat/mini/bind) — an unbound code is rejected
- * with a bind-first hint rather than silently creating an account.
+ * WeChat mini-program login. A configured product policy requires phone admission;
+ * other installations keep their own platform onboarding flow.
  */
 @Component
 @RequiredArgsConstructor
@@ -27,6 +23,7 @@ public class WechatMiniAuthStrategy implements AuthStrategy {
 
     private final WechatMiniIdentityService wechatMiniIdentityService;
     private final LoginCompletionHelper loginCompletionHelper;
+    private final com.auraboot.framework.auth.wechat.WechatMiniPhoneEnrollmentService phoneEnrollment;
 
     @Override
     public String getChannelCode() {
@@ -35,6 +32,7 @@ public class WechatMiniAuthStrategy implements AuthStrategy {
 
     @Override
     public AuthenticationResponse authenticate(AuthStrategyRequest request) {
+        if(phoneEnrollment.isConfigured() || request.getEnrollmentCode()!=null || request.getPhoneCode()!=null) return phoneEnrollment.login(request);
         String code = request.getCode();
         if (code == null || code.isBlank()) {
             throw new BusinessException(ResponseCode.CommonValidationFailed, "wx.login code is required");

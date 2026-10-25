@@ -77,7 +77,7 @@ final class PluginResourceLifecycleImporter {
             PageSchemaMapper pageSchemaMapper,
             DictMapper dictMapper,
             NamedQueryMapper namedQueryMapper,
-            com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources,
+            @org.springframework.lang.Nullable com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources,
             MetaFieldMapper metaFieldMapper,
             PluginResourceMapper pluginResourceMapper,
             PluginPublicPublicationLifecycle publicPublicationLifecycle,
@@ -110,11 +110,13 @@ final class PluginResourceLifecycleImporter {
     }
 
     public boolean checkAgentDefinitionExists(Long tenantId, String agentCode) {
+        PluginAgentResourceGuard.requireInstalled(agentDefinitionResources);
         return agentDefinitionResources.exists(tenantId, agentCode);
     }
 
     public PluginResource importAgentDefinition(AgentDefinitionDTO dto, String pluginPid, String importId,
                                                 Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
+        PluginAgentResourceGuard.requireInstalled(agentDefinitionResources);
         return agentDefinitionResources.importAgentDefinition(dto, pluginPid, importId, tenantId, conflictStrategy);
     }
 
@@ -134,6 +136,7 @@ final class PluginResourceLifecycleImporter {
      */
     public void rollbackResource(PluginResource resource) {
         ResourceType type = resource.getResourceTypeEnum();
+        PluginAgentResourceGuard.requireType(type, agentDefinitionResources);
 
         switch (type) {
             case PUBLIC_RESOURCE, PUBLIC_QUERY -> publicPublicationLifecycle.restore(resource);
@@ -239,6 +242,7 @@ final class PluginResourceLifecycleImporter {
     }
 
     public void restoreResource(PluginResource resource) {
+        PluginAgentResourceGuard.requireType(resource.getResourceTypeEnum(), agentDefinitionResources);
         log.info("Restoring resource: {} ({})", PluginImportSupport.logSafe(resource.getResourceCode()), resource.getResourceType());
         ResourceType type = resource.getResourceTypeEnum();
         if (type.isPublicPublication()) {

@@ -3,4 +3,5 @@ const logger = require("./logger.js");
 const session = require("./session.js");
 const environment = require("./environment.js");
 const http = require("./http.js");
-module.exports = { ...logger, ...session, ...environment, ...http };
+const connectivity = require("./device-connectivity.js");
+module.exports = { ...logger, ...session, ...environment, ...http, ...connectivity };

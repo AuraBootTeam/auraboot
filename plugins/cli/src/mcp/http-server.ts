@@ -1,3 +1,4 @@
+import { discoverAgent } from '../client/agent-capabilities.js';
 import http from 'http';
 import chalk from 'chalk';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -78,7 +79,8 @@ export async function startHttpMcpServer(opts: {
       const audit = makeAuditWrapper(auth.ctx, { remoteClient: client });
 
       const mcpServer = new McpServer({ name: 'aura', version: '2.0.0' });
-      buildToolRegistry(client, { profile: requestProfile }).attachTo(mcpServer, audit);
+      const discovery = await discoverAgent(client);
+      buildToolRegistry(client, { profile: requestProfile, agentState: discovery.state }).attachTo(mcpServer, audit);
 
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on('close', () => {

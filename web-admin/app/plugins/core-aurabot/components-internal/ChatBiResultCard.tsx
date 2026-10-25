@@ -137,9 +137,6 @@ function ChatBiChart({
       }).format(value),
     },
   }), [locale]);
-  const chartOptions = chartType === 'bar'
-    ? chartConfig?.orientation === 'vertical' ? { yAxis: compactAxis } : { xAxis: compactAxis }
-    : undefined;
   const dataSource = useMemo<ChartDataSource>(() => {
     const { labelField, valueField } = inferFields(records, columns, chartConfig);
     const effectiveDimensions =
@@ -155,6 +152,20 @@ function ChatBiChart({
       metrics: effectiveMetrics,
     } as ChartDataSource;
   }, [chartType, records, columns, dimensions, metrics, chartConfig]);
+
+  // Keep long business labels from consuming the narrow chat plot. Preserve the
+  // original category data so the shared tooltip and persisted analysis stay exact.
+  const categoryField = dataSource.dimensions?.[0] || inferFields(records, columns, chartConfig).labelField;
+  const categoryAxis = {
+    type: 'category' as const,
+    data: records.map(record => record[categoryField]),
+    axisLabel: { width: 96, overflow: 'truncate' as const, hideOverlap: true },
+  };
+  const chartOptions = chartType === 'bar'
+    ? chartConfig?.orientation === 'vertical'
+      ? { yAxis: compactAxis, xAxis: categoryAxis }
+      : { xAxis: compactAxis, yAxis: categoryAxis }
+    : undefined;
 
   const widgetType = normalizeChartType(CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart');
   const ChartComponent = getChartComponent(widgetType);

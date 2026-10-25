@@ -218,7 +218,13 @@ export function savedViewConfigForView(
     })),
     kanbanAggregations: config.kanbanAggregations?.map((item) => ({
       ...presentFields(item),
-      field: text(item.field, 'card aggregation field'),
+      // A count aggregation legitimately carries no field (useKanbanData aggregates the card
+      // count); plugin-imported kanban presets ship exactly that shape. Only field-carrying
+      // functions must name their column.
+      field:
+        item.function === 'count' && (item.field == null || item.field === '')
+          ? ''
+          : text(item.field, 'card aggregation field'),
       label: localized(item.label),
       function: choice(
         item.function,

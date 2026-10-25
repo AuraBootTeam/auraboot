@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * Member info returned by GET /api/im/conversations/{id}/members.
- * Joins im_conversation_member with ab_user (for human) or ab_agent_definition (for agent).
+ * IM owns membership and human identity; the optional agent directory adds agent details.
  */
 @Data
 @Builder
@@ -26,4 +26,6 @@ public class ConversationMemberInfo {
     // Agent-specific fields (null for human members)
     private String agentCode;
     private String employeeTitle;
+    // Only emitted when an agent membership cannot be used without the optional module.
+    private Boolean agentAvailable;
 }

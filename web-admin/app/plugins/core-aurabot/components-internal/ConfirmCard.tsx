@@ -29,11 +29,17 @@ interface ConfirmCardProps {
 // Helpers
 // ============================================================================
 
-function formatParamName(key: string, isZh: boolean): string {
+export function formatParamName(key: string, isZh: boolean): string {
   const words = key.split(/[_\s]+/).filter(Boolean);
   const last = words.at(-1)?.toLowerCase() ?? key;
   const labels: Record<string, [string, string]> = {
     name: ['名称', 'Name'],
+    displayname: ['显示名称', 'Display name'],
+    modelcode: ['模型编码', 'Model code'],
+    modelcategory: ['模型类别', 'Model category'],
+    tablename: ['数据表名', 'Table name'],
+    pid: ['记录标识', 'Record identifier'],
+    id: ['编号', 'Identifier'],
     title: ['标题', 'Title'],
     description: ['描述', 'Description'],
     industry: ['行业', 'Industry'],
@@ -76,23 +82,30 @@ export function ConfirmCard({
 }: ConfirmCardProps) {
   const { t, locale } = useI18n();
   const isZh = locale.toLowerCase().startsWith('zh');
+  const isApproval = toolName === 'agent_approval_gate';
+  const businessInput = isApproval && input.input && typeof input.input === 'object' && !Array.isArray(input.input)
+    ? input.input as Record<string, unknown> : input;
   const isAnalyticsSuggestion = [
     'cmd_core_dashboard_propose_suggestion',
     'cmd:core_dashboard:propose_suggestion',
   ].includes(toolName);
-  const displayName = isAnalyticsSuggestion
+  const displayName = isApproval
+    ? t('ai.approval.operation', undefined, isZh ? '审批业务操作' : 'Approve business operation')
+    : isAnalyticsSuggestion
     ? isZh
       ? '保存建议版本'
       : 'Save suggestion version'
     : formatToolDisplayName(toolName, isZh);
 
   // Filter input params for display
-  const visibleParams = Object.entries(input).filter(([key]) =>
+  const visibleParams = Object.entries(businessInput).filter(([key]) =>
     isAnalyticsSuggestion
       ? ['title', 'content', 'executionIntent'].includes(key)
       : !EXCLUDED_KEYS.has(key),
   );
-  const safeDescription = isAnalyticsSuggestion
+  const safeDescription = isApproval
+    ? t('ai.approval.reviewParameters', undefined, isZh ? '请核对以下参数。确认后执行本次操作，取消则不执行。' : 'Review the parameters. Confirm to execute this operation, or cancel to leave data unchanged.')
+    : isAnalyticsSuggestion
     ? isZh
       ? '将以下建议关联到本次分析并保存。保存不代表采纳，也不会执行后续业务操作。'
       : 'Save this suggestion with the current analysis. Saving does not adopt it or execute business actions.'

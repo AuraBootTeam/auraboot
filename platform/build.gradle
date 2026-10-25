@@ -1,5 +1,6 @@
 plugins {
-    id 'java'
+    id 'java-library'
+    id 'java-test-fixtures'
     id 'org.springframework.boot' version '3.5.16'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'maven-publish'
@@ -20,9 +21,7 @@ plugins {
 // After changing dependencies in build.gradle, regenerate:
 //   ./gradlew dependencies --write-locks
 allprojects {
-    dependencyLocking {
-        lockAllConfigurations()
-    }
+    apply from: rootProject.file('gradle/java-conventions.gradle')
 }
 
 // Publish plain jar (not fat boot jar) for downstream modules
@@ -33,14 +32,6 @@ jar {
 
 bootJar {
     archiveClassifier = 'boot'
-}
-
-// Runtime identity is content-addressed; repeated builds of one source must agree.
-allprojects {
-    tasks.withType(AbstractArchiveTask).configureEach {
-        preserveFileTimestamps = false
-        reproducibleFileOrder = true
-    }
 }
 
 // Fixture endpoints are a separate opt-in artifact, never production classes.
@@ -81,6 +72,8 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
             artifactId = 'auraboot-core'
+            // Fixture endpoints remain an explicit classifier, never a production dependency.
+            artifact tasks.named('testApiJar')
             // Consumers must receive the versions selected by the producer's BOMs.
             versionMapping {
                 usage('java-api') { fromResolutionOf('runtimeClasspath') }
@@ -234,10 +227,22 @@ repositories {
 
 // 项目基本信息
 group = 'com.auraboot'
-version = file('../VERSION').text.trim()
+// Explicit isolated-consumer builds can select one aligned, immutable preview version.
+// The default product version continues to come from the canonical VERSION file.
+version = providers.gradleProperty('auraPlatformVersion').getOrElse(file('../VERSION').text.trim())
+if (!(version ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+    throw new GradleException('auraPlatformVersion must be a non-empty Maven version without path separators')
+}
 
 allprojects {
     version = rootProject.version
+}
+
+// Preserve project fixture consumers and expose the published artifact capability as well.
+['testFixturesApiElements', 'testFixturesRuntimeElements'].each { name ->
+    configurations.named(name) {
+        outgoing.capability("com.auraboot:auraboot-core-test-fixtures:${project.version}")
+    }
 }
 
 // Java工具链配置
@@ -285,58 +290,14 @@ allure {
     }
 }
 
-dependencyManagement {
-    imports {
-        mavenBom "io.sentry:sentry-bom:${sentryVersion}"
-        mavenBom "com.baomidou:mybatis-plus-bom:${mybatisPlusVersion}"
-        mavenBom "io.modelcontextprotocol.sdk:mcp-bom:${mcpSdkVersion}"
-
-    }
-
-    dependencies {
-        dependency "com.baomidou:mybatis-plus-spring-boot3-starter:${mybatisPlusVersion}"
-
-        // Force jsqlparser 5.3 over the 5.2 pinned by mybatis-plus 3.5.x. 5.2
-        // catastrophically backtracks on large analytical named queries (e.g. the
-        // BOM price waterfall) and exceeds the 8s parser timeout, which turns every
-        // execution into "Cannot establish named query source tables". 5.3 parses
-        // the same SQL in ~1.1s. 5.4 would be faster (~130ms) but treats column
-        // names such as ab_tenant_member.permissions as reserved words, breaking
-        // every MyBatis-Plus query that selects them at runtime.
-        dependency 'com.github.jsqlparser:jsqlparser:5.3'
-
-        dependency "io.jsonwebtoken:jjwt-api:${jwtVersion}"
-        dependency "io.jsonwebtoken:jjwt-impl:${jwtVersion}"
-        dependency "io.jsonwebtoken:jjwt-jackson:${jwtVersion}"
-
-        dependency "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jacksonVersion}"
-        dependency "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
-
-        dependency "org.projectlombok:lombok:${lombokVersion}"
-        dependency "org.aspectj:aspectjweaver:${aspectjVersion}"
-    }
-}
+apply from: rootProject.file('gradle/platform-dependency-management.gradle')
 
 configurations {
     mockitoAgent
     jacocoAnt
     jacocoRuntime
 
-    // Exclude conflicting logging implementations globally
-    all {
-        exclude group: 'org.slf4j', module: 'slf4j-reload4j'
-        exclude group: 'org.slf4j', module: 'slf4j-log4j12'
-        exclude group: 'log4j', module: 'log4j'
-        // The ancient XPP pull parsers (org.gjt.xpp, from xmlpull/pull-parser/xpp3) register
-        // org.gjt.xpp.sax2.Driver as the SAX driver but reject SAX properties Apache POI/xmlbeans
-        // require ("not supported setting property lexical-handler") — OOXML ingestion then throws
-        // "Failed to parse PPTX" in the assembled app (unit tests pass on the JDK parser, so only a
-        // real-stack golden catches it). The JDK SAX parser + stax2-api/woodstox handle XML; drop them.
-        exclude group: 'pull-parser', module: 'pull-parser'
-        exclude group: 'xpp3', module: 'xpp3'
-        exclude group: 'stax', module: 'stax-api'
-        exclude group: 'javax.xml.stream', module: 'stax-api'
-    }
+
 }
 
 def jacocoToolVersion = '0.8.14'
@@ -351,24 +312,6 @@ dependencies {
     // or kafka-clients inside a plugin causes split-package classloader errors.
     implementation "org.springframework.kafka:spring-kafka:${springKafkaVersion}"
     implementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
-    runtimeOnly project(':platform-mq-kafka')
-
-    // Storage providers are runtime-selected by aura.storage.type. Keep every shipped
-    // implementation in the assembled application so a non-local configuration cannot
-    // silently degrade to process-local disk.
-    runtimeOnly project(':platform-storage-minio')
-    runtimeOnly project(':platform-storage-s3')
-    runtimeOnly project(':platform-storage-oss')
-    runtimeOnly project(':platform-storage-cos')
-
-    // XXL-JOB scheduler engine is opt-in only (-PwithSchedulerXxl=true): xxl-job-core
-    // is GPL-3.0 and must never enter the default distribution. See
-    // platform/platform-scheduler-xxl/README.md. aura.scheduler.engine=xxl without
-    // this module fails fast on the missing SchedulerEngine bean.
-    if (providers.gradleProperty('withSchedulerXxl').isPresent()) {
-        runtimeOnly project(':platform-scheduler-xxl')
-    }
-
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
 
@@ -407,10 +350,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
-    implementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
-    implementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}") {
-        exclude group: 'com.networknt', module: 'json-schema-validator'
-    }
 
     // MyBatis Plus
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
@@ -580,7 +519,22 @@ compileJava {
 
 // 配置Spring Boot Maven Plugin等效功能
 bootJar {
-    enabled = true
+    enabled = false
+    dependsOn 'stageCompatibilityBootJar'
+}
+
+tasks.register('stageCompatibilityBootJar') {
+    dependsOn ':platform-app:bootJar'
+    def applicationJar = layout.projectDirectory.file("platform-app/build/libs/AuraBoot-${version}-boot.jar")
+    def compatibilityJar = layout.buildDirectory.file("libs/AuraBoot-${version}-boot.jar")
+    inputs.file applicationJar
+    outputs.file compatibilityJar
+    doLast {
+        def target = compatibilityJar.get().asFile.toPath()
+        java.nio.file.Files.createDirectories(target.parent)
+        java.nio.file.Files.copy(applicationJar.asFile.toPath(), target,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    }
 }
 
 bootRun {
@@ -612,7 +566,7 @@ tasks.withType(Test).configureEach {
     }
     // Frozen architecture rules may remove resolved violations from their store.
     // Give each task a fresh writable copy, never the versioned source baseline.
-    def architectureBaseline = file('src/test/resources/archunit_store')
+    def architectureBaseline = file('src/testFixtures/resources/archunit_store')
     def architectureStore = layout.buildDirectory.dir("archunit/${name}").get().asFile
     inputs.dir architectureBaseline
     systemProperty 'archunit.freeze.store.default.path', architectureStore.absolutePath
@@ -673,7 +627,7 @@ test {
     doFirst {
         delete runtimeArchunitStore
         copy {
-            from file('src/test/resources/archunit_store')
+            from file('src/testFixtures/resources/archunit_store')
             into runtimeArchunitStore
         }
     }
@@ -1167,29 +1121,7 @@ tasks.named('build') {
     finalizedBy 'checkSnapshotDependencies'
 }
 
-// ========== Checkstyle (warn-only) ==========
-checkstyle {
-    toolVersion = '10.21.4'
-    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
-    ignoreFailures = true
-    maxWarnings = Integer.MAX_VALUE
-}
-
-// ========== PMD (warn-only) ==========
-pmd {
-    toolVersion = '7.10.0'
-    consoleOutput = true
-    ignoreFailures = true
-    ruleSetFiles = files("${rootDir}/config/pmd/pmd-rules.xml")
-    ruleSets = [] // use only our custom ruleset
-}
-
-tasks.withType(Pmd).configureEach {
-    // Analyze only main source, not test
-    if (name.contains('Test')) {
-        enabled = false
-    }
-}
+apply from: rootProject.file('gradle/platform-quality.gradle')
 
 // ========== Aggregated code quality task ==========
 tasks.register('codeQuality') {
@@ -1318,4 +1250,31 @@ tasks.register('controllerAuthzCheck', Exec) {
 }
 tasks.named('check').configure {
     dependsOn 'controllerAuthzCheck'
+}
+
+// Core boundary tests inspect the actual plain jar, without agent/app test dependencies.
+tasks.named('test', Test) {
+    dependsOn 'jar'
+    inputs.file tasks.named('jar').flatMap { it.archiveFile }
+    systemProperty 'auraboot.core.jar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+}
+
+java { withSourcesJar() }
+
+// Resolve compatibility bridges before task-graph construction, including configuration-on-demand.
+// These are task bridges, not core library or core-unit-test dependencies on app.
+evaluationDependsOn(':platform-app')
+def applicationProject = project(':platform-app')
+tasks.named('bootRun') {
+    dependsOn applicationProject.tasks.named('classes')
+    classpath = applicationProject.sourceSets.main.runtimeClasspath
+    mainClass = 'com.auraboot.framework.application.PlatformApplication'
+}
+tasks.named('compileIntegrationTestJava') {
+    dependsOn applicationProject.tasks.named('compileIntegrationTestJava')
+}
+tasks.named('integrationTest', Test) {
+    dependsOn applicationProject.tasks.named('integrationTestClasses')
+    testClassesDirs = applicationProject.sourceSets.integrationTest.output.classesDirs
+    classpath = applicationProject.sourceSets.integrationTest.runtimeClasspath
 }

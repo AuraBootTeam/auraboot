@@ -1,0 +1,1288 @@
+package com.auraboot.framework.agent.runtime;
+
+import com.auraboot.framework.agent.dto.LlmChatRequest;
+import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChunk;
+import com.auraboot.framework.agent.provider.LlmProvider;
+import com.auraboot.framework.agent.provider.ModelCapabilityProfile;
+import com.auraboot.framework.agent.provider.ToolDefinition;
+import com.auraboot.framework.agent.runtime.policy.ExecutionEnvelope;
+import com.auraboot.framework.agent.runtime.policy.ExecutionEnvelopePlanner;
+import com.auraboot.framework.agent.runtime.policy.AgentProfile;
+import com.auraboot.framework.agent.runtime.policy.AgentTenantPolicy;
+import com.auraboot.framework.agent.runtime.policy.ToolMetadata;
+import com.auraboot.framework.agent.runtime.policy.ToolMetadataRegistry;
+import com.auraboot.framework.agent.runtime.policy.ToolMetadataTrustLevel;
+import com.auraboot.framework.agent.runtime.policy.ToolPolicyActor;
+import com.auraboot.framework.agent.runtime.policy.ToolPolicyCall;
+import com.auraboot.framework.agent.runtime.policy.ToolPolicyDecision;
+import com.auraboot.framework.agent.runtime.policy.ToolPolicyEngine;
+import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
+import com.auraboot.framework.agent.runtime.context.ConversationContextWindowManager;
+import com.auraboot.framework.agent.runtime.context.RuntimeBudgetGuard;
+import com.auraboot.framework.agent.util.ReasoningTagSanitizer;
+import com.auraboot.framework.common.util.LogSanitizer;
+import com.auraboot.framework.conversation.ResponseSink;
+import com.auraboot.framework.conversation.TurnContext;
+import com.auraboot.framework.conversation.TurnOutcome;
+import com.auraboot.framework.conversation.TurnOutcomeMeta;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
+
+/**
+ * Shared runtime helpers for single-turn chat loops and resumable chat-tool
+ * continuations.
+ */
+@Slf4j
+@Component
+public class ChatTurnRuntime {
+
+    public static final int DEFAULT_MAX_TOOL_ROUNDS = 5;
+
+    private final ExecutionEnvelopePlanner executionEnvelopePlanner;
+    private final ToolMetadataRegistry toolMetadataRegistry;
+    private final ToolPolicyEngine toolPolicyEngine;
+    private final ConversationContextWindowManager contextWindowManager;
+
+    public ChatTurnRuntime() {
+        this(
+                new ExecutionEnvelopePlanner(),
+                new ToolMetadataRegistry(),
+                new ToolPolicyEngine(),
+                new ConversationContextWindowManager());
+    }
+
+    public ChatTurnRuntime(ExecutionEnvelopePlanner executionEnvelopePlanner,
+                           ToolMetadataRegistry toolMetadataRegistry,
+                           ToolPolicyEngine toolPolicyEngine) {
+        this(
+                executionEnvelopePlanner,
+                toolMetadataRegistry,
+                toolPolicyEngine,
+                new ConversationContextWindowManager());
+    }
+
+    @Autowired
+    public ChatTurnRuntime(
+            ExecutionEnvelopePlanner executionEnvelopePlanner,
+            ToolMetadataRegistry toolMetadataRegistry,
+            ToolPolicyEngine toolPolicyEngine,
+            ConversationContextWindowManager contextWindowManager) {
+        this.executionEnvelopePlanner = executionEnvelopePlanner != null
+                ? executionEnvelopePlanner
+                : new ExecutionEnvelopePlanner();
+        this.toolMetadataRegistry = toolMetadataRegistry != null
+                ? toolMetadataRegistry
+                : new ToolMetadataRegistry();
+        this.toolPolicyEngine = toolPolicyEngine != null
+                ? toolPolicyEngine
+                : new ToolPolicyEngine();
+        this.contextWindowManager = contextWindowManager != null
+                ? contextWindowManager
+                : new ConversationContextWindowManager();
+    }
+
+    public record ChatToolLoopSpec(
+            TurnContext ctx,
+            String agentCode,
+            LlmProvider provider,
+            String providerCode,
+            String apiKey,
+            String baseUrl,
+            String operation,
+            String model,
+            String systemPrompt,
+            int maxTokens,
+            List<LlmChatRequest.Message> messages,
+            List<LlmChatRequest.Tool> tools,
+            List<ToolDefinition> toolDefinitions,
+            Set<String> actorPermissions,
+            AgentProfile agentProfile,
+            String sessionId,
+            ResponseSink sink,
+            boolean persistTape,
+            boolean requireInitialToolCall,
+            int maxToolRounds,
+            String handoffToolName,
+            String traceId,
+            ObjectMapper objectMapper) {
+        public ChatToolLoopSpec {
+            operation = operation == null || operation.isBlank() ? "chat tool-loop" : operation;
+            messages = messages == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(messages);
+            tools = tools == null ? List.of() : tools;
+            toolDefinitions = toolDefinitions == null ? List.of() : toolDefinitions;
+            actorPermissions = actorPermissions == null ? Set.of() : Set.copyOf(actorPermissions);
+            maxToolRounds = maxToolRounds <= 0 ? DEFAULT_MAX_TOOL_ROUNDS : maxToolRounds;
+            objectMapper = objectMapper == null ? new ObjectMapper() : objectMapper;
+        }
+    }
+
+    public record ChatToolLoopRound(
+            TurnContext ctx,
+            String agentCode,
+            String sessionId,
+            String providerCode,
+            String model,
+            int round,
+            String toolChoice,
+            String effectiveSystemPrompt,
+            int maxTokens,
+            List<LlmChatRequest.Message> messages,
+            List<LlmChatRequest.Tool> tools,
+            List<ToolDefinition> toolDefinitions) {
+    }
+
+    public record ChatToolCall(
+            TurnContext ctx,
+            String agentCode,
+            String toolId,
+            String toolName,
+            Map<String, Object> input,
+            List<ToolDefinition> toolDefinitions) {
+    }
+
+    public record PendingChatTool(
+            TurnContext ctx,
+            String agentCode,
+            String sessionId,
+            String toolId,
+            String toolName,
+            Map<String, Object> input,
+            String toolVersion,
+            String argsHash,
+            String idempotencyKey,
+            Instant expiresAt,
+            String policyDecisionReason,
+            String toolSchemaHash,
+            String preview,
+            List<ToolDefinition> toolDefinitions,
+            List<AgentContextBlock> contextBlocks,
+            List<LlmChatRequest.Message> messages,
+            String providerCode,
+            String model,
+            String systemPrompt,
+            String runtimeSystemPrompt,
+            int maxTokens,
+            int round,
+            String toolChoice,
+            boolean persistTape) {
+    }
+
+    public enum ToolResultDisposition {
+        CONTINUE,
+        REQUIRE_USER_CONFIRMATION,
+        REQUIRE_APPROVAL
+    }
+
+    public interface ChatToolLoopCallbacks {
+        AgentExecutionState buildRoundState(ChatToolLoopRound round);
+
+        AgentExecutionState reduce(AgentExecutionState state, AgentRuntimeEvent event);
+
+        Map<String, Object> executeTool(ChatToolCall call);
+
+        void storeConfirmationPending(PendingChatTool pending);
+
+        void storeApprovalPending(PendingChatTool pending, Map<String, Object> result);
+
+        void persistMessages(String sessionId, List<LlmChatRequest.Message> messages);
+
+        TurnOutcome buildApprovalRequiredOutcome(Map<String, Object> result,
+                                                 String toolName,
+                                                 Map<String, Object> input,
+                                                 ResponseSink sink);
+
+        TurnOutcome buildHandoffOutcome(LlmChatResponse response,
+                                        ResponseSink sink,
+                                        Map<String, Object> input);
+
+        String buildToolDescription(String toolName, Map<String, Object> input);
+
+        default Object beforeProviderCall(ChatToolLoopRound round, LlmChatRequest request) {
+            return null;
+        }
+
+        default void afterProviderResponse(ChatToolLoopRound round, Object span, LlmChatResponse response) {
+        }
+
+        default void afterProviderFailure(ChatToolLoopRound round, Object span, String message, Exception error) {
+        }
+
+        default String providerFailureMessage(ChatToolLoopRound round, Exception error, AgentErrorFrame errorFrame) {
+            return errorFrame.userSafeMessage();
+        }
+
+        default ExecutionEnvelope executionEnvelope(ChatToolLoopRound round) {
+            return null;
+        }
+
+        default boolean allowToolInCatalog(ChatToolLoopRound round, ToolDefinition definition) {
+            return true;
+        }
+
+        default boolean allowToolExecution(ChatToolCall call, ToolDefinition definition) {
+            return true;
+        }
+
+        default boolean deferPolicyUntilToolResult(ChatToolCall call, ToolDefinition definition) {
+            return false;
+        }
+
+        default ToolResultDisposition classifyToolResult(ChatToolCall call, Map<String, Object> result) {
+            return result != null && Boolean.TRUE.equals(result.get("approvalRequired"))
+                    ? ToolResultDisposition.REQUIRE_APPROVAL
+                    : ToolResultDisposition.CONTINUE;
+        }
+
+        default void storeToolResultConfirmationPending(PendingChatTool pending, Map<String, Object> result) {
+            storeConfirmationPending(pending);
+        }
+
+        default List<AgentContextBlock> contextBlocks(ChatToolLoopRound round) {
+            return List.of();
+        }
+
+        default void onFinalResponse(ChatToolLoopRound round, LlmChatResponse response) {
+        }
+
+        default void onLoopExhausted(String message) {
+        }
+    }
+
+    public LlmChatResponse callProvider(LlmProvider provider,
+                                        LlmChatRequest request,
+                                        String apiKey,
+                                        String baseUrl,
+                                        String operation) throws Exception {
+        return LlmResponseGuard.requireContent(
+                provider.chat(request, apiKey, baseUrl),
+                operation);
+    }
+
+    public TurnOutcome streamFinalResponse(LlmChatResponse response, ResponseSink sink, String traceId) {
+        String text = finalResponseText(response);
+        if (!text.isEmpty()) {
+            sink.onTextChunk(text);
+        }
+        sink.onDone(text, traceId);
+        return new TurnOutcome.Success(text, Map.of());
+    }
+
+    public TurnOutcome completeFinalResponse(LlmChatResponse response,
+                                             List<LlmChatRequest.Message> messages,
+                                             Consumer<List<LlmChatRequest.Message>> persistMessages,
+                                             ResponseSink sink,
+                                             String traceId) {
+        return completeFinalResponse(response, messages, persistMessages, sink, traceId, false);
+    }
+
+    /**
+     * F7 (execution-architecture review, 2026-07-20): {@code anyToolFailed} marks
+     * a turn whose answer was composed AFTER at least one tool call failed. Such
+     * an answer is guidance/speculation, not an established fact — persisting it
+     * as memory lets a hallucination be recalled on later turns as if it were
+     * ground truth (live-reproduced: an invented navigation path was written back
+     * as an L1 memory and then repeated verbatim across sessions, overriding the
+     * prompt guardrail). Surfaced in the Success meta so the memory listener can
+     * refuse it; the user still gets the answer.
+     */
+    public TurnOutcome completeFinalResponse(LlmChatResponse response,
+                                             List<LlmChatRequest.Message> messages,
+                                             Consumer<List<LlmChatRequest.Message>> persistMessages,
+                                             ResponseSink sink,
+                                             String traceId,
+                                             boolean anyToolFailed) {
+        if (messages != null) {
+            messages.add(LlmMessageTapeSupport.buildAssistantMessage(response.getContent()));
+        }
+        if (persistMessages != null) {
+            persistMessages.accept(messages != null ? messages : List.of());
+        }
+        TurnOutcome outcome = streamFinalResponse(response, sink, traceId);
+        if (anyToolFailed && outcome instanceof TurnOutcome.Success success) {
+            // Decorate rather than branch inside streamFinalResponse: that method is
+            // shared by paths with no tool loop at all, and it should stay unaware
+            // of tool semantics.
+            Map<String, Object> meta = new LinkedHashMap<>(success.meta());
+            meta.put(TurnOutcomeMeta.TOOL_FAILURE, Boolean.TRUE);
+            return new TurnOutcome.Success(success.finalResponse(), Map.copyOf(meta));
+        }
+        return outcome;
+    }
+
+    public void recordToolUseResponse(LlmChatResponse response,
+                                      List<LlmChatRequest.Message> messages) {
+        if (messages != null) {
+            messages.add(LlmMessageTapeSupport.buildAssistantMessage(response.getContent()));
+        }
+    }
+
+    public void completeToolResultRound(List<LlmChatRequest.ContentBlock> toolResultBlocks,
+                                        List<LlmChatRequest.Message> messages,
+                                        Consumer<List<LlmChatRequest.Message>> persistMessages) {
+        if (messages != null) {
+            messages.add(LlmMessageTapeSupport.buildToolResultMessage(toolResultBlocks));
+        }
+        if (persistMessages != null) {
+            persistMessages.accept(messages != null ? messages : List.of());
+        }
+    }
+
+    public String finalResponseText(LlmChatResponse response) {
+        String text = LlmMessageTapeSupport.extractTextFromResponse(response);
+        return text == null ? "" : text;
+    }
+
+    public TurnOutcome streamProviderResponse(LlmProvider provider,
+                                              LlmChatRequest request,
+                                              String apiKey,
+                                              String baseUrl,
+                                              ResponseSink sink,
+                                              String traceId) throws Exception {
+        if (provider == null) {
+            String msg = "LLM provider not available";
+            sink.onError(msg, traceId);
+            return new TurnOutcome.Failed(msg, null);
+        }
+        request.setMessages(compileContextWindow(
+                request.getMessages(),
+                request.getMaxTokens()));
+        RuntimeBudgetGuard budgetGuard = RuntimeBudgetGuard.current(
+                provider, request.getModel());
+        try {
+            budgetGuard.beforeStep(0);
+        } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+            return budgetFailure(sink, traceId, e);
+        }
+
+        ReasoningTagSanitizer textSanitizer = new ReasoningTagSanitizer();
+        StringBuilder accumulated = new StringBuilder();
+        StringBuilder thinkingFallback = new StringBuilder();
+        LlmChatResponse aggregate = null;
+        for (LlmChunk chunk : provider.streamChat(request, apiKey, baseUrl).toIterable()) {
+            try {
+                budgetGuard.checkDeadline();
+            } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+                return budgetFailure(sink, traceId, e);
+            }
+            if (chunk == null) {
+                continue;
+            }
+            if (chunk.thinkingDelta() != null && !chunk.thinkingDelta().isBlank()) {
+                thinkingFallback.append(chunk.thinkingDelta());
+            }
+            if (chunk.delta() != null && !chunk.delta().isEmpty()) {
+                String visible = textSanitizer.filterChunk(chunk.delta());
+                if (!visible.isEmpty()) {
+                    accumulated.append(visible);
+                    sink.onTextChunk(visible);
+                }
+            }
+            if (chunk.done()) {
+                aggregate = chunk.aggregateResponse();
+            }
+        }
+        String tail = textSanitizer.finish();
+        if (!tail.isEmpty()) {
+            accumulated.append(tail);
+            sink.onTextChunk(tail);
+        }
+
+        if (aggregate != null && aggregate.getWarnings() != null && !aggregate.getWarnings().isEmpty()) {
+            sink.onWarnings(aggregate.getWarnings());
+        }
+        emitThinkingBlocks(aggregate, thinkingFallback, sink);
+        try {
+            budgetGuard.record(aggregate);
+        } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+            return budgetFailure(sink, traceId, e);
+        }
+
+        String finalText = accumulated.isEmpty()
+                ? LlmMessageTapeSupport.extractTextFromResponse(aggregate)
+                : accumulated.toString();
+        if (finalText == null) {
+            String msg = "Stream ended without response";
+            sink.onError(msg, traceId);
+            return new TurnOutcome.Failed(msg, null);
+        }
+        if (accumulated.isEmpty() && !finalText.isEmpty()) {
+            sink.onTextChunk(finalText);
+        }
+        sink.onDone(finalText, traceId);
+        return new TurnOutcome.Success(finalText, Map.of());
+    }
+
+    public TurnOutcome runToolLoop(ChatToolLoopSpec spec, ChatToolLoopCallbacks callbacks) {
+        if (spec == null || callbacks == null) {
+            throw new IllegalArgumentException("Chat tool-loop spec and callbacks are required");
+        }
+        List<LlmChatRequest.Message> compiledMessages =
+                compileContextWindow(spec.messages(), spec.maxTokens());
+        spec.messages().clear();
+        spec.messages().addAll(compiledMessages);
+
+        // The per-round setCapabilityCeiling below publishes the planner-resolved
+        // ceiling so the authorization record matches what this loop enforces. That
+        // thread-local is loop-scoped and MUST NOT outlive the loop: worker threads are
+        // pooled (SSE handlers, async executors, the single test worker), so a leaked
+        // NO_TOOLS / READ_ONLY ceiling would spuriously deny the next turn's writes on
+        // the same thread. Capture the caller's ceiling and restore it on every exit.
+        String previousCapabilityCeiling =
+                com.auraboot.framework.agent.service.StepContext.getCapabilityCeiling();
+        try {
+        AgentExecutionState lastRuntimeState = null;
+        boolean anyToolFailed = false;   // F7: any failed tool call in this turn
+        RuntimeBudgetGuard budgetGuard = RuntimeBudgetGuard.current(
+                spec.provider(), spec.model());
+        for (int round = 0; round < spec.maxToolRounds(); round++) {
+            try {
+                budgetGuard.beforeStep(round);
+            } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+                return budgetFailure(spec.sink(), spec.traceId(), e);
+            }
+            ChatToolLoopRound preliminaryRound = new ChatToolLoopRound(
+                    spec.ctx(),
+                    spec.agentCode(),
+                    spec.sessionId(),
+                    spec.providerCode(),
+                    spec.model(),
+                    round,
+                    null,
+                    spec.systemPrompt(),
+                    spec.maxTokens(),
+                    spec.messages(),
+                    spec.tools(),
+                    spec.toolDefinitions());
+            List<ToolDefinition> catalogAllowedDefinitions = filterCatalogAllowedToolDefinitions(
+                    preliminaryRound, spec.toolDefinitions(), callbacks);
+            ExecutionEnvelope envelope = executionEnvelopePlanner.plan(new ExecutionEnvelopePlanner.Request(
+                    callbacks.executionEnvelope(preliminaryRound),
+                    !catalogAllowedDefinitions.isEmpty(),
+                    // G10: read-only triage verdict feeds the planner directly. Note the
+                    // explicit envelope above short-circuits this input for the default
+                    // aurabot adapter (which caps in toolLoopEnvelope); this path matters
+                    // for callback impls that return a null explicit envelope.
+                    spec.ctx() != null && spec.ctx().readOnlyContextualTurn(),
+                    false,
+                    spec.agentProfile(),
+                    tenantPolicyFromCatalog(catalogAllowedDefinitions)));
+            // Publish the ceiling the planner just resolved, so the authorization
+            // record is computed against the same constraint this loop enforces
+            // rather than the two agreeing only by coincidence.
+            com.auraboot.framework.agent.service.StepContext.setCapabilityCeiling(
+                    envelope.capabilityCeiling() == null ? null : envelope.capabilityCeiling().name());
+
+            List<ToolDefinition> roundToolDefinitions = filterToolDefinitions(
+                    envelope, catalogAllowedDefinitions, spec.ctx(), spec.actorPermissions());
+            List<LlmChatRequest.Tool> roundTools = filterLlmTools(spec.tools(), roundToolDefinitions);
+                String toolChoice = resolveToolChoiceForRound(
+                        spec.provider(),
+                        spec.model(),
+                        roundTools,
+                        spec.messages(),
+                        spec.requireInitialToolCall());
+            String effectiveSystemPrompt = applyToolChoicePrompt(spec.systemPrompt(), toolChoice, roundTools);
+            ChatToolLoopRound roundContext = new ChatToolLoopRound(
+                    spec.ctx(),
+                    spec.agentCode(),
+                    spec.sessionId(),
+                    spec.providerCode(),
+                    spec.model(),
+                    round,
+                    toolChoice,
+                    effectiveSystemPrompt,
+                    spec.maxTokens(),
+                    spec.messages(),
+                    roundTools,
+                    roundToolDefinitions);
+            AgentExecutionState runtimeState = callbacks.buildRoundState(roundContext);
+            lastRuntimeState = runtimeState;
+            if (runtimeState != null) {
+                log.debug("Chat tool-loop runtime state: agent={}, turn={}, round={}, stateHash={}",
+                        spec.agentCode(), spec.ctx().turnId(), round, runtimeState.stateHash());
+            }
+
+            LlmChatRequest req = LlmChatRequest.builder()
+                    .model(spec.model())
+                    .systemPrompt(effectiveSystemPrompt)
+                    .messages(new ArrayList<>(spec.messages()))
+                    .tools(roundTools.isEmpty() ? null : roundTools)
+                    .toolChoice(toolChoice)
+                    .maxTokens(spec.maxTokens())
+                    .build();
+
+            Object providerSpan = callbacks.beforeProviderCall(roundContext, req);
+            LlmChatResponse response;
+            try {
+                response = callProvider(spec.provider(), req, spec.apiKey(), spec.baseUrl(), spec.operation());
+            } catch (LlmResponseGuard.EmptyLlmResponseException e) {
+                runtimeState = reduceRuntimeState(callbacks, runtimeState,
+                        AgentRuntimeEvent.turnFailed(round, "empty_response"));
+                lastRuntimeState = runtimeState;
+                String msg = "Empty response from LLM";
+                callbacks.afterProviderFailure(roundContext, providerSpan, msg, e);
+                spec.sink().onError(msg, spec.traceId());
+                return new TurnOutcome.Failed(msg, e);
+            } catch (Exception e) {
+                AgentErrorFrame errorFrame = providerErrorFrame(spec.providerCode(), spec.model(), e);
+                reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnFailed(round, errorFrame));
+                log.error("Chat tool-loop LLM call failed: agent={}, round={}, errorType={}, message={}",
+                        spec.agentCode(), round, e.getClass().getSimpleName(), safeExceptionMessage(e));
+                String msg = callbacks.providerFailureMessage(roundContext, e, errorFrame);
+                callbacks.afterProviderFailure(roundContext, providerSpan, msg, e);
+                spec.sink().onError(msg, spec.traceId());
+                return new TurnOutcome.Failed(msg, e);
+            }
+            callbacks.afterProviderResponse(roundContext, providerSpan, response);
+            try {
+                budgetGuard.record(response);
+            } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+                reduceRuntimeState(callbacks, runtimeState,
+                        AgentRuntimeEvent.turnFailed(round, e.reasonCode()));
+                return budgetFailure(spec.sink(), spec.traceId(), e);
+            }
+            if (response.getWarnings() != null && !response.getWarnings().isEmpty()) {
+                spec.sink().onWarnings(response.getWarnings());
+            }
+
+            String stopReason = response.getStopReason();
+            boolean responseHasToolUse = hasToolUse(response);
+            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.modelResponse(
+                    round, stopReason, Map.of("contentBlockCount", response.getContent().size())));
+            lastRuntimeState = runtimeState;
+            if ("required".equals(toolChoice) && !responseHasToolUse) {
+                runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnFailed(
+                        round, "required_tool_call_missing"));
+                lastRuntimeState = runtimeState;
+                String msg = requiredToolCallMissingMessage(spec.providerCode(), stopReason, spec.tools());
+                callbacks.afterProviderFailure(roundContext, providerSpan, msg, null);
+                spec.sink().onError(msg, spec.traceId());
+                return new TurnOutcome.Failed(msg, null);
+            }
+
+            if (!responseHasToolUse
+                    && ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null)) {
+                reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnCompleted(round));
+                callbacks.onFinalResponse(roundContext, response);
+                return completeFinalResponse(response, spec.messages(),
+                        spec.persistTape()
+                                ? finalMessages -> callbacks.persistMessages(spec.sessionId(), finalMessages)
+                                : null,
+                        spec.sink(), spec.traceId(), anyToolFailed);
+            }
+
+            if (responseHasToolUse) {
+                recordToolUseResponse(response, spec.messages());
+
+                List<LlmChatRequest.ContentBlock> toolResultBlocks = new ArrayList<>();
+                boolean confirmationRequired = false;
+                String pendingToolId = null;
+
+                for (LlmChatResponse.ContentBlock block : response.getContent()) {
+                    if (!"tool_use".equals(block.getType())) {
+                        continue;
+                    }
+
+                    String toolId = block.getId();
+                    String toolName = block.getName();
+                    Map<String, Object> input = block.getInput() != null ? block.getInput() : Map.of();
+                    ToolDefinition def = findToolDef(roundContext.toolDefinitions(), toolName);
+                    ToolDefinition originalDef = findToolDef(spec.toolDefinitions(), toolName);
+                    ToolDefinition policyDef = def != null ? def : originalDef;
+                    ChatToolCall toolCall = new ChatToolCall(spec.ctx(), spec.agentCode(), toolId, toolName, input,
+                            spec.toolDefinitions());
+                    if (!callbacks.allowToolExecution(toolCall, policyDef)) {
+                        Map<String, Object> denied = deniedToolResult(ToolPolicyDecision.deny(
+                                "server_tool_boundary", "This tool is not permitted by the channel's query boundary."));
+                        spec.sink().onToolResult(toolId, denied, false);
+                        toolResultBlocks.add(LlmMessageTapeSupport.buildToolResultBlock(spec.objectMapper(), toolId, denied));
+                        continue;
+                    }
+                    boolean policyDeferredUntilResult = callbacks.deferPolicyUntilToolResult(toolCall, policyDef);
+                    if (spec.handoffToolName() != null && spec.handoffToolName().equals(toolName)) {
+                        runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolUseRequested(
+                                round, toolId, toolName, input, def != null && def.isRequiresConfirmation()));
+                        runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.handoffRequested(
+                                round, stringValue(input.get("agent_code"))));
+                        lastRuntimeState = runtimeState;
+                        if (spec.persistTape()) {
+                            callbacks.persistMessages(spec.sessionId(), spec.messages());
+                        }
+                        return callbacks.buildHandoffOutcome(response, spec.sink(), input);
+                    }
+                    if (!policyDeferredUntilResult && policyDef != null) {
+                        ToolPolicyDecision policyDecision = evaluateToolPolicy(
+                                envelope,
+                                roundContext,
+                                toolName,
+                                input,
+                                policyDef,
+                                spec.actorPermissions(),
+                                callbacks.contextBlocks(roundContext));
+                        if (policyDecision.type() == ToolPolicyDecision.Type.DENY) {
+                            Map<String, Object> deniedResult = deniedToolResult(policyDecision);
+                            spec.sink().onToolResult(toolId, deniedResult, false);
+                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
+                                    round, toolId, toolName, deniedResult));
+                            lastRuntimeState = runtimeState;
+                            toolResultBlocks.add(LlmMessageTapeSupport.buildToolResultBlock(
+                                    spec.objectMapper(), toolId, deniedResult));
+                            continue;
+                        }
+                        if (policyDecision.type() == ToolPolicyDecision.Type.REQUIRE_USER_CONFIRMATION) {
+                            String description = policyDecision.pendingSpec() != null
+                                    ? policyDecision.pendingSpec().preview()
+                                    : callbacks.buildToolDescription(toolName, input);
+                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolUseRequested(
+                                    round, toolId, toolName, input, def != null && def.isRequiresConfirmation()));
+                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                    round, toolId, toolName, input));
+                            lastRuntimeState = runtimeState;
+                            spec.sink().onConfirmRequired(toolId, toolName, description, input, spec.ctx().turnId());
+                            callbacks.storeConfirmationPending(pendingContext(spec, callbacks, roundContext, toolId, toolName, input,
+                                    effectiveSystemPrompt, toolChoice, policyDecision));
+                            if (spec.persistTape()) {
+                                callbacks.persistMessages(spec.sessionId(), spec.messages());
+                            }
+                            confirmationRequired = true;
+                            pendingToolId = toolId;
+                            break;
+                        }
+                        if (policyDecision.type() == ToolPolicyDecision.Type.ESCALATE_DURABLE_WORKFLOW) {
+                            // G12 (execution-architecture review): this used to suspend the turn
+                            // into an approval-pending state whose durableWorkflowRequired flag
+                            // had no consumer anywhere — an un-resumable dead end. Until a real
+                            // chat→durable handoff exists, surface the block like a DENY: the
+                            // tool does NOT execute and the model receives a structured result
+                            // to relay, so the turn ends in a coherent answer instead of limbo.
+                            Map<String, Object> escalatedResult = escalatedDurableResult(policyDecision);
+                            spec.sink().onToolResult(toolId, escalatedResult, false);
+                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
+                                    round, toolId, toolName, escalatedResult));
+                            lastRuntimeState = runtimeState;
+                            toolResultBlocks.add(LlmMessageTapeSupport.buildToolResultBlock(
+                                    spec.objectMapper(), toolId, escalatedResult));
+                            continue;
+                        }
+                        if (policyDecision.type() == ToolPolicyDecision.Type.REQUIRE_HUMAN_APPROVAL) {
+                            if (policyDef.isRequiresApproval()) {
+                                // Existing approved-tool path owns approvalPid creation until DurableWorkflowEngine
+                                // becomes the execution substrate for all human approvals.
+                                //
+                                // Milestone-gated and deliberate — do not migrate this piecemeal. Converging
+                                // approvals onto the durable engine needs two capabilities it lacks today:
+                                // named-agent runs (AcpDurableWorkflowEngine pins the run assignee to the default
+                                // agent) and a mid-flight chat -> durable handoff. Those same two gaps are why a
+                                // named agent rejects explicit durable flags outright, and why a durable-required
+                                // tool is denied with feedback here instead of escalated (escalatedDurableResult).
+                                //
+                                // Matching invariant: TurnExecutionPlanner does NOT route on requiresApproval alone
+                                // (it only contributes DURABLE_LIFECYCLE_SIGNAL), and TurnExecutionPlannerTest pins
+                                // that. Flipping it belongs to the convergence milestone — it is not a stray bug.
+                            } else {
+                                runtimeState = reduceRuntimeState(callbacks, runtimeState,
+                                        AgentRuntimeEvent.confirmationRequired(round, toolId, toolName, input));
+                                lastRuntimeState = runtimeState;
+                                Map<String, Object> approvalResult = approvalRequiredResult(policyDecision);
+                                callbacks.storeApprovalPending(pendingContext(spec, callbacks, roundContext, toolId, toolName, input,
+                                        effectiveSystemPrompt, toolChoice, policyDecision), approvalResult);
+                                if (spec.persistTape()) {
+                                    callbacks.persistMessages(spec.sessionId(), spec.messages());
+                                }
+                                return callbacks.buildApprovalRequiredOutcome(approvalResult, toolName, input, spec.sink());
+                            }
+                        }
+                    }
+                    boolean requiresConfirmation = !policyDeferredUntilResult
+                            && def != null
+                            && def.isRequiresConfirmation();
+                    runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolUseRequested(
+                            round, toolId, toolName, input, requiresConfirmation));
+                    lastRuntimeState = runtimeState;
+
+                    if (requiresConfirmation) {
+                        String description = callbacks.buildToolDescription(toolName, input);
+                        runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                round, toolId, toolName, input));
+                        lastRuntimeState = runtimeState;
+                        spec.sink().onConfirmRequired(toolId, toolName, description, input, spec.ctx().turnId());
+                        callbacks.storeConfirmationPending(pendingContext(spec, callbacks, roundContext, toolId, toolName, input,
+                                effectiveSystemPrompt, toolChoice, null));
+                        if (spec.persistTape()) {
+                            callbacks.persistMessages(spec.sessionId(), spec.messages());
+                        }
+
+                        confirmationRequired = true;
+                        pendingToolId = toolId;
+                        break;
+                    }
+
+                    spec.sink().onToolStart(toolId, toolName, input);
+                    Map<String, Object> result = callbacks.executeTool(toolCall);
+                    boolean success = Boolean.TRUE.equals(result.get("success"));
+                    if (!success) {
+                        anyToolFailed = true;   // F7: taints memory writeback for this turn
+                    }
+                    spec.sink().onToolResult(toolId, result, success);
+                    runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
+                            round, toolId, toolName, result));
+                    lastRuntimeState = runtimeState;
+                    ToolResultDisposition resultDisposition = callbacks.classifyToolResult(toolCall, result);
+                    if (resultDisposition == ToolResultDisposition.REQUIRE_USER_CONFIRMATION) {
+                        runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                round, toolId, toolName, input));
+                        lastRuntimeState = runtimeState;
+                        Map<String, Object> confirmationMetadata = new LinkedHashMap<>();
+                        if (result.get("previewToken") instanceof String token && !token.isBlank()
+                                && result.get("skillName") instanceof String skill && !skill.isBlank()) {
+                            confirmationMetadata.put("_aurabot_skill", true);
+                        }
+                        for (String key : List.of("skillName", "riskLevel", "preview", "previewToken")) {
+                            if (result.get(key) != null) confirmationMetadata.put(key, result.get(key));
+                        }
+                        spec.sink().onConfirmRequired(toolId, toolName,
+                                callbacks.buildToolDescription(toolName, input), input, spec.ctx().turnId(), confirmationMetadata);
+                        callbacks.storeToolResultConfirmationPending(pendingContext(spec, callbacks, roundContext,
+                                toolId, toolName, input, effectiveSystemPrompt, toolChoice, null), result);
+                        if (spec.persistTape()) {
+                            callbacks.persistMessages(spec.sessionId(), spec.messages());
+                        }
+                        confirmationRequired = true;
+                        pendingToolId = toolId;
+                        break;
+                    }
+                    if (resultDisposition == ToolResultDisposition.REQUIRE_APPROVAL) {
+                        runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.confirmationRequired(
+                                round, toolId, toolName, input));
+                        lastRuntimeState = runtimeState;
+                        callbacks.storeApprovalPending(pendingContext(spec, callbacks, roundContext, toolId, toolName, input,
+                                effectiveSystemPrompt, toolChoice, null), result);
+                        if (spec.persistTape()) {
+                            callbacks.persistMessages(spec.sessionId(), spec.messages());
+                        }
+                        return callbacks.buildApprovalRequiredOutcome(result, toolName, input, spec.sink());
+                    }
+                    toolResultBlocks.add(LlmMessageTapeSupport.buildToolResultBlock(
+                            spec.objectMapper(), toolId, result));
+                }
+
+                if (confirmationRequired) {
+                    spec.sink().onDone("", spec.traceId());
+                    return new TurnOutcome.PendingConfirmation(spec.ctx().turnId(), "", pendingToolId);
+                }
+
+                completeToolResultRound(toolResultBlocks, spec.messages(),
+                        spec.persistTape()
+                                ? roundMessages -> callbacks.persistMessages(spec.sessionId(), roundMessages)
+                                : null);
+                lastRuntimeState = runtimeState;
+                continue;
+            }
+
+            reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnCompleted(round));
+            callbacks.onFinalResponse(roundContext, response);
+            return completeFinalResponse(response, spec.messages(),
+                    spec.persistTape()
+                            ? finalMessages -> callbacks.persistMessages(spec.sessionId(), finalMessages)
+                            : null,
+                    spec.sink(), spec.traceId());
+        }
+
+        String exhaustedMsg = "Chat tool loop exceeded maximum rounds (" + spec.maxToolRounds() + ")";
+        reduceRuntimeState(callbacks, lastRuntimeState,
+                AgentRuntimeEvent.turnFailed(spec.maxToolRounds(), "max_tool_rounds_exceeded"));
+        callbacks.onLoopExhausted(exhaustedMsg);
+        spec.sink().onError(exhaustedMsg, spec.traceId());
+        return new TurnOutcome.Failed(exhaustedMsg, null);
+        } finally {
+            if (previousCapabilityCeiling == null) {
+                com.auraboot.framework.agent.service.StepContext.clearCapabilityCeiling();
+            } else {
+                com.auraboot.framework.agent.service.StepContext.setCapabilityCeiling(previousCapabilityCeiling);
+            }
+        }
+    }
+
+    private TurnOutcome budgetFailure(
+            ResponseSink sink,
+            String traceId,
+            RuntimeBudgetGuard.RuntimeBudgetExceededException error) {
+        String message = error.getMessage() + " (" + error.reasonCode() + ")";
+        log.warn(
+                "Agent runtime budget stopped turn: reason={}, tokens={}, costMicros={}",
+                error.reasonCode(),
+                error.consumedTokens(),
+                error.consumedCostMicros());
+        sink.onError(message, traceId);
+        return new TurnOutcome.Failed(message, error);
+    }
+
+    private List<LlmChatRequest.Message> compileContextWindow(
+            List<LlmChatRequest.Message> messages,
+            int fallbackTokenBudget) {
+        Long envelopeTokenBudget = ContextEnvelopeContext.current()
+                .map(envelope -> envelope.tokenBudget())
+                .filter(value -> value != null && value > 0)
+                .orElse(null);
+        Integer tokenBudget = null;
+        if (envelopeTokenBudget != null) {
+            tokenBudget = (int) Math.min(
+                    Integer.MAX_VALUE, envelopeTokenBudget);
+        } else if (fallbackTokenBudget > 0) {
+            tokenBudget = fallbackTokenBudget;
+        }
+        ConversationContextWindowManager.CompactionResult result =
+                contextWindowManager.compact(messages, tokenBudget);
+        if (result.compacted()) {
+            log.info(
+                    "Conversation context compacted: version={}, sourceMessages={}, "
+                            + "inputChars={}, outputChars={}, budgetChars={}, sourceHash={}",
+                    result.summaryVersion(),
+                    result.sourceMessageCount(),
+                    result.inputChars(),
+                    result.outputChars(),
+                    result.charBudget(),
+                    result.sourceHash());
+        }
+        return new ArrayList<>(result.messages());
+    }
+
+    private PendingChatTool pendingContext(ChatToolLoopSpec spec,
+                                           ChatToolLoopCallbacks callbacks,
+                                           ChatToolLoopRound roundContext,
+                                           String toolId,
+                                           String toolName,
+                                           Map<String, Object> input,
+                                           String runtimeSystemPrompt,
+                                           String toolChoice,
+                                           ToolPolicyDecision policyDecision) {
+        return new PendingChatTool(
+                spec.ctx(),
+                spec.agentCode(),
+                spec.sessionId(),
+                toolId,
+                toolName,
+                input,
+                pendingToolVersion(policyDecision),
+                pendingArgsHash(policyDecision),
+                pendingIdempotencyKey(policyDecision),
+                pendingExpiresAt(policyDecision),
+                pendingPolicyReason(policyDecision),
+                null,
+                pendingPreview(policyDecision),
+                spec.toolDefinitions(),
+                callbacks.contextBlocks(roundContext),
+                spec.messages(),
+                spec.providerCode(),
+                spec.model(),
+                spec.systemPrompt(),
+                runtimeSystemPrompt,
+                spec.maxTokens(),
+                roundContext.round(),
+                toolChoice,
+                spec.persistTape());
+    }
+
+    private String pendingToolVersion(ToolPolicyDecision decision) {
+        return decision != null && decision.pendingSpec() != null
+                ? decision.pendingSpec().toolVersion()
+                : null;
+    }
+
+    private String pendingArgsHash(ToolPolicyDecision decision) {
+        return decision != null && decision.pendingSpec() != null
+                ? decision.pendingSpec().argsHash()
+                : null;
+    }
+
+    private String pendingIdempotencyKey(ToolPolicyDecision decision) {
+        return decision != null && decision.pendingSpec() != null
+                ? decision.pendingSpec().idempotencyKey()
+                : null;
+    }
+
+    private Instant pendingExpiresAt(ToolPolicyDecision decision) {
+        return decision != null && decision.pendingSpec() != null
+                ? decision.pendingSpec().expiresAt()
+                : null;
+    }
+
+    private String pendingPolicyReason(ToolPolicyDecision decision) {
+        if (decision == null) {
+            return null;
+        }
+        if (decision.pendingSpec() != null) {
+            return decision.pendingSpec().reasonCode();
+        }
+        return decision.reasonCode();
+    }
+
+    private String pendingPreview(ToolPolicyDecision decision) {
+        return decision != null && decision.pendingSpec() != null
+                ? decision.pendingSpec().preview()
+                : null;
+    }
+
+    private List<ToolDefinition> filterCatalogAllowedToolDefinitions(ChatToolLoopRound round,
+                                                                     List<ToolDefinition> definitions,
+                                                                     ChatToolLoopCallbacks callbacks) {
+        if (definitions == null || definitions.isEmpty()) {
+            return List.of();
+        }
+        List<ToolDefinition> result = new ArrayList<>();
+        for (ToolDefinition definition : definitions) {
+            if (definition == null) {
+                continue;
+            }
+            if (callbacks != null && !callbacks.allowToolInCatalog(round, definition)) {
+                continue;
+            }
+            result.add(definition);
+        }
+        return List.copyOf(result);
+    }
+
+    private AgentTenantPolicy tenantPolicyFromCatalog(List<ToolDefinition> definitions) {
+        if (definitions == null || definitions.isEmpty()) {
+            return AgentTenantPolicy.fromCatalog(List.of());
+        }
+        List<ToolMetadata> metadata = new ArrayList<>();
+        for (ToolDefinition definition : definitions) {
+            if (definition == null) {
+                continue;
+            }
+            metadata.add(toolMetadataRegistry.from(definition, trustLevelFor(definition)));
+        }
+        return AgentTenantPolicy.fromCatalog(metadata);
+    }
+
+    private List<ToolDefinition> filterToolDefinitions(ExecutionEnvelope envelope,
+                                                       List<ToolDefinition> definitions,
+                                                       TurnContext ctx,
+                                                       Set<String> actorPermissions) {
+        if (definitions == null || definitions.isEmpty()) {
+            return List.of();
+        }
+        Map<String, ToolDefinition> byName = new LinkedHashMap<>();
+        List<ToolMetadata> metadata = new ArrayList<>();
+        for (ToolDefinition definition : definitions) {
+            if (definition == null) {
+                continue;
+            }
+            ToolMetadata toolMetadata = toolMetadataRegistry.from(definition, trustLevelFor(definition));
+            metadata.add(toolMetadata);
+            byName.put(toolMetadata.getToolName(), definition);
+        }
+        List<ToolMetadata> filtered = toolPolicyEngine.filterToolCatalog(
+                metadata,
+                envelope,
+                new ToolPolicyActor(
+                        ctx != null ? ctx.tenantId() : null,
+                        ctx != null ? ctx.userId() : null,
+                        actorPermissions));
+        List<ToolDefinition> result = new ArrayList<>();
+        for (ToolMetadata toolMetadata : filtered) {
+            ToolDefinition definition = byName.get(toolMetadata.getToolName());
+            if (definition != null) {
+                result.add(definition);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private List<LlmChatRequest.Tool> filterLlmTools(List<LlmChatRequest.Tool> tools,
+                                                     List<ToolDefinition> definitions) {
+        if (tools == null || tools.isEmpty()) {
+            return List.of();
+        }
+        if (definitions == null || definitions.isEmpty()) {
+            return List.of();
+        }
+        List<LlmChatRequest.Tool> result = new ArrayList<>();
+        for (LlmChatRequest.Tool tool : tools) {
+            if (tool != null && llmToolAllowed(tool.getName(), definitions)) {
+                result.add(tool);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private boolean llmToolAllowed(String llmToolName, List<ToolDefinition> definitions) {
+        if (llmToolName == null || definitions == null) {
+            return false;
+        }
+        for (ToolDefinition definition : definitions) {
+            if (definition == null) {
+                continue;
+            }
+            if (llmToolName.equals(definition.getToolCode())
+                    || llmToolName.equals(definition.getToolName())
+                    || llmToolName.equals(sanitizeToolName(definition.getToolCode()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String sanitizeToolName(String toolCode) {
+        if (toolCode == null) {
+            return null;
+        }
+        return toolCode.replace(':', '_').replace('.', '_');
+    }
+
+    private ToolPolicyDecision evaluateToolPolicy(ExecutionEnvelope envelope,
+                                                  ChatToolLoopRound round,
+                                                  String toolName,
+                                                  Map<String, Object> input,
+                                                  ToolDefinition def,
+                                                  Set<String> actorPermissions,
+                                                  List<AgentContextBlock> contextBlocks) {
+        if (def == null) {
+            return ToolPolicyDecision.deny("missing_tool_metadata",
+                    "Tool is not available in the current execution envelope: " + toolName);
+        }
+        ToolMetadata metadata = toolMetadataRegistry.from(def, trustLevelFor(def));
+        return toolPolicyEngine.evaluate(
+                new ToolPolicyCall(toolName, input, contextBlocks),
+                envelope,
+                metadata,
+                new ToolPolicyActor(
+                        round.ctx() != null ? round.ctx().tenantId() : null,
+                        round.ctx() != null ? round.ctx().userId() : null,
+                        actorPermissions));
+    }
+
+    private ToolMetadataTrustLevel trustLevelFor(ToolDefinition def) {
+        if (def == null) {
+            return ToolMetadataTrustLevel.INFERRED;
+        }
+        String toolType = def.getToolType() != null ? def.getToolType().trim().toLowerCase() : "";
+        if ("mcp".equals(toolType) || "custom".equals(toolType) || "api_call".equals(toolType)) {
+            return ToolMetadataTrustLevel.PROVIDER_DECLARED;
+        }
+        return ToolMetadataTrustLevel.ADMIN_APPROVED;
+    }
+
+    private Map<String, Object> deniedToolResult(ToolPolicyDecision decision) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", false);
+        result.put("error", decision.userSafeMessage() != null
+                ? decision.userSafeMessage()
+                : "Tool call denied by policy.");
+        result.put("reasonCode", decision.reasonCode());
+        return result;
+    }
+
+    private Map<String, Object> approvalRequiredResult(ToolPolicyDecision decision) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", false);
+        result.put("approvalRequired", true);
+        result.put("reasonCode", decision.reasonCode());
+        result.put("message", "This action requires human approval.");
+        return result;
+    }
+
+    /**
+     * G12: structured tool feedback for a durable-required tool blocked in
+     * chat. Fed back to the model (deny-style), NOT stored as a pending
+     * approval — the old suspended state was un-resumable because its
+     * {@code durableWorkflowRequired} flag had no consumer.
+     */
+    private Map<String, Object> escalatedDurableResult(ToolPolicyDecision decision) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", false);
+        result.put("durableWorkflowRequired", true);
+        result.put("reasonCode", decision.reasonCode());
+        result.put("message", "This action requires durable background execution and cannot run inside a"
+                + " chat turn. Tell the user it needs to run as a background task and how to proceed;"
+                + " do not retry the tool in this conversation.");
+        return result;
+    }
+
+    private AgentExecutionState reduceRuntimeState(ChatToolLoopCallbacks callbacks,
+                                                   AgentExecutionState state,
+                                                   AgentRuntimeEvent event) {
+        if (state == null || event == null) {
+            return state;
+        }
+        try {
+            AgentExecutionState reduced = callbacks.reduce(state, event);
+            return reduced != null ? reduced : state;
+        } catch (RuntimeException e) {
+            log.debug("Chat tool-loop reducer failed: event={}, error={}", event.type(), e.getMessage());
+            return state;
+        }
+    }
+
+    private String resolveToolChoiceForRound(LlmProvider provider,
+                                             String model,
+                                             List<LlmChatRequest.Tool> tools,
+                                             List<LlmChatRequest.Message> messages,
+                                             boolean requireInitialToolCall) {
+        if (!requireInitialToolCall) {
+            return null;
+        }
+        if (provider == null) {
+            return null;
+        }
+        ModelCapabilityProfile capabilities = provider.modelCapabilities(model);
+        if (capabilities == null || !capabilities.requiredToolChoice()) {
+            return null;
+        }
+        if (tools == null || tools.isEmpty()) {
+            return null;
+        }
+        return latestMessageIsToolResult(messages) ? null : "required";
+    }
+
+    private boolean latestMessageIsToolResult(List<LlmChatRequest.Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+        LlmChatRequest.Message latest = messages.get(messages.size() - 1);
+        Object content = latest != null ? latest.getContent() : null;
+        if (!(content instanceof List<?> blocks)) {
+            return false;
+        }
+        for (Object block : blocks) {
+            if (block instanceof LlmChatRequest.ContentBlock cb && "tool_result".equals(cb.getType())) {
+                return true;
+            }
+            if (block instanceof Map<?, ?> raw && "tool_result".equals(String.valueOf(raw.get("type")))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String applyToolChoicePrompt(String systemPrompt,
+                                         String toolChoice,
+                                         List<LlmChatRequest.Tool> tools) {
+        if (!"required".equals(toolChoice)) {
+            return systemPrompt;
+        }
+        String base = systemPrompt == null ? "" : systemPrompt.stripTrailing();
+        String toolNames = tools.stream()
+                .map(LlmChatRequest.Tool::getName)
+                .limit(10)
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("<none>");
+        String directive = "Tool-use requirement: call one of the available tools before giving the final answer. "
+                + "Use the most relevant tool for the user's request. Available tools: " + toolNames + ".";
+        return base.isBlank() ? directive : base + "\n\n" + directive;
+    }
+
+    private boolean hasToolUse(LlmChatResponse response) {
+        if (response == null || response.getContent() == null) {
+            return false;
+        }
+        for (LlmChatResponse.ContentBlock block : response.getContent()) {
+            if (block != null && "tool_use".equals(block.getType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String requiredToolCallMissingMessage(String providerCode,
+                                                  String stopReason,
+                                                  List<LlmChatRequest.Tool> tools) {
+        String available = tools == null || tools.isEmpty()
+                ? "<none>"
+                : tools.stream()
+                .map(LlmChatRequest.Tool::getName)
+                .limit(10)
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("<none>");
+        return "LLM provider " + providerCode + " returned " + (stopReason == null ? "<null>" : stopReason)
+                + " without a required tool call. tool_choice=required was sent. Available tools: " + available;
+    }
+
+    private ToolDefinition findToolDef(List<ToolDefinition> defs, String toolName) {
+        if (defs == null || toolName == null) {
+            return null;
+        }
+        for (ToolDefinition def : defs) {
+            if (def == null) {
+                continue;
+            }
+            if (toolName.equals(def.getToolCode())
+                    || toolName.equals(def.getToolName())
+                    || toolName.equals(sanitizeToolName(def.getToolCode()))) {
+                return def;
+            }
+        }
+        return null;
+    }
+
+    private void emitThinkingBlocks(LlmChatResponse aggregate, StringBuilder fallback, ResponseSink sink) {
+        boolean emitted = false;
+        if (aggregate != null && aggregate.getContent() != null) {
+            for (LlmChatResponse.ContentBlock block : aggregate.getContent()) {
+                if (block == null || !"thinking".equals(block.getType())) {
+                    continue;
+                }
+                String thinking = block.getThinking();
+                if (thinking != null && !thinking.isBlank()) {
+                    sink.onThinking(thinking, -1, block.getSignature());
+                    emitted = true;
+                }
+            }
+        }
+        if (!emitted && fallback != null && !fallback.isEmpty()) {
+            sink.onThinking(fallback.toString(), -1, null);
+        }
+    }
+
+    private AgentErrorFrame providerErrorFrame(String providerCode, String model, Exception e) {
+        Map<String, Object> args = new LinkedHashMap<>();
+        if (providerCode != null && !providerCode.isBlank()) {
+            args.put("providerCode", providerCode);
+        }
+        if (model != null && !model.isBlank()) {
+            args.put("model", model);
+        }
+        return AgentErrorFrame.of(
+                AgentErrorFrame.CATEGORY_PROVIDER,
+                null,
+                args,
+                e != null ? e.getClass().getSimpleName() : "ProviderError",
+                false,
+                "LLM provider request failed.",
+                "Stop the turn and ask an operator to check provider configuration.");
+    }
+
+    private String safeExceptionMessage(Exception e) {
+        if (e == null) {
+            return "Unknown error";
+        }
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+        return LogSanitizer.safe(message);
+    }
+
+    private String stringValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value);
+        return text.isBlank() ? null : text;
+    }
+}

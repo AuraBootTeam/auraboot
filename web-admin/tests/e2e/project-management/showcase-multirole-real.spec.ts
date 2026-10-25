@@ -1,8 +1,9 @@
-import {test, expect, type Page, type Locator, type Response, type APIResponse} from '@playwright/test';
+import {test, expect, type Page, type Response, type APIResponse} from '@playwright/test';
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {loginDeliveryMember} from '../../helpers/delivery-session';
+import {dashboardRow} from '../../helpers/delivery-dashboard';
 import {completeDeliveryApproval} from '../../helpers/delivery-approval';
 
 const evidence=process.env.AURA_EVIDENCE_DIR!;
@@ -15,24 +16,13 @@ async function menu(page:Page,name:string) {
 }
 async function open(page:Page,menuName:string,name:string) {
   await menu(page,menuName);const row=page.getByRole('row').filter({hasText:name});await expect(row).toHaveCount(1);
-  await row.getByRole('button',{name:/查看|详情/}).click();await expect(page.getByRole('main')).toContainText(name);
-}
-async function dashboardRow(block:Locator,name:string) {
-  // Follow the actual configured pagination; unrelated retained deliveries may precede this batch.
-  for(let visited=0;visited<100;visited++) {
-    await expect(block.getByRole('cell').first()).toBeVisible();
-    const row=block.getByRole('row').filter({hasText:name});
-    if(await row.count()) {await expect(row).toHaveCount(1);return row;}
-    const next=block.getByRole('button',{name:'下一页',exact:true});
-    await expect(next).toBeEnabled();
-    const before=await block.innerText();await next.click();
-    await expect.poll(()=>block.innerText()).not.toBe(before);
-  }
-  throw Error(`Delivery was not found within 100 dashboard pages: ${name}`);
+  await row.getByRole('button',{name:/查看|详情/}).click();await expect(page.getByRole('heading',{name,exact:true})).toBeVisible();await expect(page.getByRole('main')).toContainText(name);
 }
 async function shot(page:Page,id:string) {
   await mkdir(join(evidence,'screenshots'),{recursive:true});
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0,{timeout:15000});
+  // Dynamic detail blocks load independently of the persistent object header.
+  await expect(page.getByRole('main').getByText(/^(加载中(?:\.{3}|…)|加载活动记录)$/)).toHaveCount(0);
   await page.screenshot({path:join(evidence,'screenshots',id+'.png'),fullPage:true});
 }
 async function command(page:Page,code:string,trigger:()=>Promise<unknown>) {
@@ -94,8 +84,15 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     await owner.getByTestId(`user-select-option-tpm_pj_owner_user-${lin.userPid}`).click();
     await owner.locator('#tpm_pj_description').fill('林晓负责客户门户交付，周宁独立审核材料，完成补正、重新核验与验收归档。');
     await owner.locator('#tpm_pj_budget').fill('286000');await owner.locator('#tpm_pj_start_date').fill('2026-10-01');await owner.locator('#tpm_pj_end_date').fill('2026-12-20');
+    await owner.getByRole('heading',{name:'新建项目',exact:true}).scrollIntoViewIfNeeded();await shot(owner,'MR00-project-new');
     const createdProject=await command(owner,'tpm:create_project',()=>owner.getByTestId('form-btn-submit').click());
     const projectPid=createdProject.data.recordPid;expect(projectPid).toBeTruthy();await owner.reload();
+    await open(owner,'项目',projectName);await expect(owner).toHaveURL(new RegExp(`/p/tpm_project/view/${projectPid}$`));await expect(owner.getByTestId('object-summary')).toContainText('286,000');await expect(owner.getByRole('main')).not.toContainText(/加载中\.\.\.|加载活动记录/);await shot(owner,'MR00b-project-created');
+    await owner.getByTestId('toolbar-btn-edit').click();
+    const confirmedScope='林晓负责客户门户交付，周宁独立审核材料；客户已确认门户、权限与培训交付范围。';
+    await owner.locator('#tpm_pj_description').fill(confirmedScope);await shot(owner,'MR00c-project-edit');
+    await command(owner,'tpm:update_project',()=>owner.getByTestId('form-btn-submit').click());
+    await open(owner,'项目',projectName);await owner.reload();await expect(owner.getByRole('main')).toContainText(confirmedScope);await expect(owner.getByTestId('object-summary')).toContainText('286,000');await expect(owner.getByRole('main')).not.toContainText(/加载中\.\.\.|加载活动记录/);await shot(owner,'MR00d-project-reopened');
     await menu(owner,'交付验收');await owner.getByRole('button',{name:'新建验收',exact:true}).click();const name=`华辰制造 · 第${batch}批交接验收`;
     await owner.locator('#tpm_ac_name').fill(name);await owner.getByTestId('select-trigger-tpm_ac_project').click();await owner.getByRole('option',{name:projectName,exact:true}).click();
     await owner.locator('#tpm_ac_scope').fill('客户门户、权限配置与培训交付完成，提交材料由周宁独立核对。');await owner.locator('#tpm_ac_amount').fill('68000');
@@ -154,7 +151,7 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     await verify();const finalFact=await fact(owner,pid);expect(finalFact).toMatchObject({reviewer_name:'周宁',acceptance_label:'已通过',approval_result:'同意',verification_result:'核验通过'});
     await menu(owner,'交付经营看板');const finalRow=await dashboardRow(owner.getByTestId('dashboard-block-delivery-actions'),name);await expect(finalRow).toContainText('周宁');await expect(finalRow).toContainText('已通过');await finalRow.scrollIntoViewIfNeeded();await shot(owner,'MR07-business-result');
     await menu(reviewer,'开始体验');await reviewer.getByRole('main').getByRole('button',{name:'打开复盘报告',exact:true}).click();
-    await reviewer.getByRole('row').filter({hasText:'客户交付经营复盘'}).getByRole('button',{name:/打开|Open/}).click();
+    await reviewer.getByRole('row').filter({has:reviewer.getByRole('cell',{name:'客户交付经营复盘 · 周会',exact:true})}).getByRole('button',{name:/打开|Open/}).click();
     const toolbar=reviewer.getByTestId('report-reader-toolbar');await expect(toolbar).toBeVisible();
     await expect(toolbar.getByRole('button',{name:'预览',exact:true})).toHaveCount(0);
     await expect(reviewer.getByTestId('report-designer-toolbar-btn-save')).toHaveCount(0);

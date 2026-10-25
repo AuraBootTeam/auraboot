@@ -33,5 +33,8 @@
     "validateReferences": true,
     "autoPublishPages": true,
     "createResourcePermissions": true
-  }
+  },
+  "applicationModules": [
+    "agent"
+  ]
 }

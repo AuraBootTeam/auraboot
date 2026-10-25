@@ -178,7 +178,9 @@ public class InstalledIntegrationService {
             verifyEnvelope(resolved,envelope); verifyReceipt(resolved,envelope,r,false);
             if ("completed".equals(r.state())) return null;
             if (!"accepted".equals(r.state()) || r.requestPid() == null) throw denied();
-            execute(resolved,candidate.processCommand(),Map.of("requestPid",r.requestPid()),r.requestPid(),false,envelope);
+            try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+                execute(resolved,candidate.processCommand(),Map.of("requestPid",r.requestPid()),r.requestPid(),false,envelope);
+            }
             if (receipts.completed(r.tenantId(),installation,source,external,r.requestPid()) != 1) throw denied();
             return null;
         });

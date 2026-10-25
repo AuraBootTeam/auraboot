@@ -1,0 +1,53 @@
+{
+  "sourceCommit": "1d79315dbababeefaae5f5478d7836dd2f3f367a",
+  "gradle": {
+    "core-unit": {
+      "tests": 85,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "agent-unit": {
+      "tests": 24,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "real-stack": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "playwright": {
+    "startTime": "2026-10-23T13:31:31.348Z",
+    "duration": 13775.738000000001,
+    "expected": 14,
+    "skipped": 3,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "nativeEvidenceSHA256": {
+    "platform/build/test-results/test/TEST-com.auraboot.framework.meta.controller.BatchQueryControllerTest.xml": "de4dcec1eeaabbff62ee0e11d0a617c1eeef076034cb42e24b518f603b985cb0",
+    "platform/build/test-results/test/TEST-com.auraboot.framework.meta.service.impl.CriticalPathServiceTest.xml": "d81f28529745eb328e18e2bb09f94b87c8112fcf448cac39f9b09d3363fa95b5",
+    "platform/build/test-results/test/TEST-com.auraboot.framework.file.controller.FileUploadControllerTest.xml": "e552ccca923819b3b8fa6edec73bd717081e67a91aad7f26ef9d1081de634ec2",
+    "platform/build/test-results/test/TEST-com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest.xml": "0bc74ad91383156f186ba68272aeefcece8fe31fd3b6a126565cfa42637fccfd",
+    "platform/build/test-results/test/TEST-com.auraboot.framework.tenant.service.impl.TenantMemberApplicationServiceImplTest.xml": "1b5a41090abfe6646353b21c1f424a7640950affe6c26549def3d9cf129ab953",
+    "platform/platform-agent/build/test-results/test/TEST-com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest.xml": "1812c8de942da4e75147bd5b6f376d6697201d02ede0f2311cc9bab0fa47fae6",
+    "platform/platform-agent/build/test-results/test/TEST-com.auraboot.framework.conversation.turn.TurnRegistryTest.xml": "2c54afb50c3329fc7dba1f9c5fdbcbb898ab3224efe6df6964c965ec9806f769",
+    "platform/platform-agent/build/test-results/test/TEST-com.auraboot.framework.agent.runtime.DurableToolExecutionRecoveryServiceTest.xml": "f8f01725261e8e1a00656c83e1e0ce13987ab1629f2e425299ca1cb3156b4966",
+    "platform/platform-app/build/test-results/integrationTest/TEST-com.auraboot.framework.integration.OssReviewRegressionIT.xml": "2f1fc95f2ea69d7ca8d457c47035e26139a8fd0e4fbe8a71dbdff573e4373c97",
+    "platform/platform-app/build/test-results/integrationTest/TEST-com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT.xml": "6ae4a8407d3529c9857859a2d89d813c1046e902b92600d19536592daf7fa2a7",
+    "final-executed-green.log": "ddc1b4a7ac77b351661c097c42cc6ab39503f03b974338c9ce85a997eb109430",
+    "browser-run.log": "a807fc928903939366ea855ed8d7f33959cc4567ad52a9a9e7d12d1ad2f8808b",
+    "report-generator-check.log": "6fd0c42c8273096214df1d1a61ca11cd855a834ae5dffc4a131ebd24ac3e8298"
+  },
+  "mutation": {
+    "expectedExitCode": 1,
+    "actualExitCode": 1,
+    "failedAssertions": 13,
+    "protectionsDetected": 8
+  },
+  "coveragePercentage": "not measured; targeted regression only"
+}

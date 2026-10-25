@@ -51,6 +51,9 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final MetaModelFieldBindingMapper bindingMapper;
     private final NamedQueryMapper namedQueryMapper;
+    @org.springframework.lang.Nullable
+    private final com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources;
+
     private final ObjectMapper objectMapper;
     // JdbcTemplate retained only for getCurrentDatabaseState() which requires dynamic table/column queries
     private final JdbcTemplate jdbcTemplate;
@@ -207,6 +210,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
 
     @Override
     public Map<String, Object> getCurrentDatabaseState(Long tenantId, ResourceType type, String code) {
+        PluginAgentResourceGuard.requireType(type, agentDefinitionResources);
         if (type.isPublicPublication()) {
             return publicPublicationLifecycle.currentState(tenantId, type, code);
         }
@@ -291,6 +295,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         }
 
         List<PluginResource> resources = findByPluginPid(pluginPid);
+        PluginAgentResourceGuard.requireResources(resources, agentDefinitionResources);
 
         List<ResourceUninstallInfo> willDelete = new ArrayList<>();
         List<ResourceUninstallInfo> needsDecision = new ArrayList<>();
@@ -442,6 +447,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     @Override
     @Transactional
     public void deleteResource(PluginResource resource) {
+        PluginAgentResourceGuard.requireType(resource.getResourceTypeEnum(), agentDefinitionResources);
         ResourceType type = resource.getResourceTypeEnum();
         String resourcePid = resource.getResourcePid();
         if (type.isPublicPublication()) {
@@ -486,6 +492,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     @Override
     @Transactional
     public void detachResource(PluginResource resource) {
+        PluginAgentResourceGuard.requireType(resource.getResourceTypeEnum(), agentDefinitionResources);
         // Update ownership to USER_CLAIMED via mapper
         resource.setOwnershipTypeEnum(OwnershipType.USER_CLAIMED);
         resource.setUpdatedAt(Instant.now());

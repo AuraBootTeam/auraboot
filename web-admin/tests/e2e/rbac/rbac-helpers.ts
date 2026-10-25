@@ -3,7 +3,7 @@
  *
  * The B-layer (browser) counterpart to the backend A-layer
  * (platform/.../integration/security/rbac/RbacEnforcementMatrixIT.java). Both read the SAME SOT
- * matrix (platform/src/test/resources/rbac/rbac-access-matrix.json) so the browser golden and the
+ * matrix (platform/src/testFixtures/resources/rbac/rbac-access-matrix.json) so the browser golden and the
  * enforcement IT can never drift.
  *
  * Deliberately self-contained (only reuses the canonical `loginViaUI`) — it does NOT import the heavy
@@ -22,7 +22,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** SOT matrix — shared with the backend A-layer. Repo-root relative: rbac → e2e → tests → web-admin → root. */
 const MATRIX_PATH = path.resolve(
   __dirname,
-  '../../../../platform/src/test/resources/rbac/rbac-access-matrix.json',
+  '../../../../platform/src/testFixtures/resources/rbac/rbac-access-matrix.json',
 );
 
 export const RBAC_TEST_PASSWORD = 'Test2026x';

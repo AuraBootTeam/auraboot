@@ -13,28 +13,40 @@ import { fileURLToPath } from 'node:url';
 
 export const REQUIRED_SUITES = Object.freeze([
   // Deterministic plugin -> DB -> eval-engine seams.
-  ['testAgent', 'com.auraboot.framework.agent.AgentEvalCaseImportIT'],
-  ['testAgent', 'com.auraboot.framework.agent.MultiPluginEvalCaseCoexistenceIT'],
-  ['testAgent', 'com.auraboot.framework.agent.DeviceAgentSeedImportIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.AgentEvalCaseImportIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.MultiPluginEvalCaseCoexistenceIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.DeviceAgentSeedImportIT'],
 
   // Real-model agent capability gates.
-  ['testAgent', 'com.auraboot.framework.agent.AgentFormFillHardLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.AgentFormFillLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.AgentMultiStepConvergenceLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.CapabilityEvalLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.CapabilityScorecardLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.ChatBiToolIntentLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.ConversationFaqExtractionLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.CsComplaintEmailExtractionLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.DeviceAgentLiveEvalIT'],
-  ['testAgent', 'com.auraboot.framework.agent.DeviceDiagnosticsFullTurnIT'],
-  ['testAgent', 'com.auraboot.framework.agent.DeviceOperationsAgentLiveEvalIT'],
-  ['testAgent', 'com.auraboot.framework.agent.LlmTurnQualityJudgeLiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.NlModelingApplyV4LiveIT'],
-  ['testAgent', 'com.auraboot.framework.agent.NlModelingLiveQualityIT'],
-  ['testAgent', 'com.auraboot.framework.agent.PcbaQualityAgentLiveEvalIT'],
-  ['testAi', 'com.auraboot.framework.aurabot.skill.builtin.DashboardGenerationLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.AgentFormFillHardLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.AgentFormFillLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.AgentMultiStepConvergenceLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.CapabilityEvalLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.CapabilityScorecardLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.ChatBiToolIntentLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.ConversationFaqExtractionLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.CsComplaintEmailExtractionLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.DeviceAgentLiveEvalIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.DeviceDiagnosticsFullTurnIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.DeviceOperationsAgentLiveEvalIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.LlmTurnQualityJudgeLiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.NlModelingApplyV4LiveIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.NlModelingLiveQualityIT'],
+  ['platform-app/test', 'com.auraboot.framework.agent.PcbaQualityAgentLiveEvalIT'],
+  ['platform-app/test', 'com.auraboot.framework.aurabot.skill.builtin.DashboardGenerationLiveIT'],
+  ['platform-agent/test', 'com.auraboot.framework.aurabot.service.FormDraftExtractionLiveTest'],
 ]);
+
+export const EVAL_PROFILES = Object.freeze({
+  full: REQUIRED_SUITES,
+  focused: REQUIRED_SUITES.filter(([, name]) => ['CapabilityEvalLiveIT', 'CapabilityScorecardLiveIT', 'AgentMultiStepConvergenceLiveIT'].some(suffix => name.endsWith('.' + suffix))),
+  deterministic: REQUIRED_SUITES.slice(0, 3),
+});
+
+export function profileSuites(profile = 'full') {
+  if (!Object.hasOwn(EVAL_PROFILES, profile)) throw new Error(`Unknown capability profile: ${profile}`);
+  return EVAL_PROFILES[profile];
+}
 
 function integerAttribute(attributes, name) {
   const match = attributes.match(new RegExp(`\\b${name}=["'](\\d+)["']`));
@@ -54,11 +66,12 @@ function readSuiteStats(xml) {
   return Object.values(stats).some((value) => value === null) ? null : stats;
 }
 
-export function summarizeCapabilityEvalResults(resultsRoot, write = (line) => console.log(line)) {
+export function summarizeCapabilityEvalResults(resultsRoot, write = (line) => console.log(line), profile = 'full') {
+  const required = profileSuites(profile);
   const totals = { suites: 0, tests: 0, skipped: 0, failures: 0, errors: 0 };
   const violations = [];
 
-  for (const [task, className] of REQUIRED_SUITES) {
+  for (const [task, className] of required) {
     const xmlPath = path.join(resultsRoot, task, `TEST-${className}.xml`);
     if (!fs.existsSync(xmlPath)) {
       violations.push(`MISSING ${task}/${className}`);
@@ -91,14 +104,14 @@ export function summarizeCapabilityEvalResults(resultsRoot, write = (line) => co
 
   write('  ----');
   write(
-    `  suites=${totals.suites}/${REQUIRED_SUITES.length} tests=${totals.tests} ` +
+    `  suites=${totals.suites}/${required.length} tests=${totals.tests} ` +
     `skipped=${totals.skipped} failures=${totals.failures} errors=${totals.errors}`,
   );
 
   if (violations.length > 0) {
     for (const violation of violations) write(`  VIOLATION ${violation}`);
   }
-  return { ok: violations.length === 0, totals, violations };
+  return { ok: violations.length === 0, profile, requiredSuites: required.length, totals, violations };
 }
 
 function parseResultsRoot(argv) {
@@ -111,10 +124,14 @@ function parseResultsRoot(argv) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   try {
-    const report = summarizeCapabilityEvalResults(parseResultsRoot(process.argv.slice(2)));
+    const profileIndex = process.argv.indexOf('--profile');
+    const profile = profileIndex < 0 ? 'full' : process.argv[profileIndex + 1];
+    const report = summarizeCapabilityEvalResults(parseResultsRoot(process.argv.slice(2)), undefined, profile);
+    const jsonIndex = process.argv.indexOf('--json-out');
+    if (jsonIndex >= 0) fs.writeFileSync(process.argv[jsonIndex + 1], JSON.stringify(report, null, 2) + '\n');
     if (report.ok) {
       console.log(
-        `[capability-eval-junit] PASS: all ${REQUIRED_SUITES.length} required suites ran without skips or failures.`,
+        `[capability-eval-junit] PASS: all ${report.requiredSuites} required ${profile} suites ran without skips or failures.`,
       );
     } else {
       console.error(

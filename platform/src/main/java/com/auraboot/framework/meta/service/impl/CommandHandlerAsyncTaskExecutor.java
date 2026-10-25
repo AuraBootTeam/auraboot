@@ -70,6 +70,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
 
+    @Autowired
+    private com.auraboot.framework.i18n.service.I18nService i18nService;
+
     @Autowired(required = false)
     private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
 
@@ -77,6 +80,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private BiTemporalService biTemporalService;
     @Autowired(required = false)
     private AiProviderAccessorFactory aiProviderAccessorFactory;
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor knowledgeBaseAccessor;
+
     @Autowired(required = false)
     private FileService fileService;
     @Autowired(required = false)
@@ -158,6 +164,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             MetaContext.setContext(tenantId, userId, currentUserPid, String.valueOf(userId),
                     roles == null ? java.util.Set.of() : new java.util.HashSet<>(roles));
             MetaContext.setMemberId(member.getId());
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>(handlerParams);
             pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);
@@ -286,7 +294,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             Throwable cause = wrapped.getCause();
             recordAsyncAudit(tenantId, userId, commandCode != null ? commandCode : handlerCode, payload,
                     Map.of(), false, cause.getMessage(), startedAt);
-            return failureResult(cause);
+            return failureResult(cause, text(inputParams, "locale"));
         } catch (Exception ex) {
             // Async-task boundary: any handler failure (CommandHandlerExtension.execute
             // declares `throws Exception`) must be reported as a task failure result —
@@ -295,7 +303,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             log.error("Async command handler {} failed", handlerCode, ex);
             recordAsyncAudit(tenantId, userId, commandCode != null ? commandCode : handlerCode, payload,
                     Map.of(), false, ex.getMessage(), startedAt);
-            return failureResult(ex);
+            return failureResult(ex, text(inputParams, "locale"));
         } finally {
             queryScope.close();
             MetaContext.clear();
@@ -313,8 +321,14 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 "async_handler", Map.of());
     }
 
-    private AsyncTaskResult failureResult(Throwable failure) {
+    private AsyncTaskResult failureResult(Throwable failure, String locale) {
         String message = failure.getMessage() != null ? failure.getMessage() : failure.toString();
+        if (failure instanceof com.auraboot.framework.plugin.extension.PluginCommandRejectionException rejection) {
+            String effectiveLocale = locale == null || locale.isBlank() ? "zh-CN" : locale;
+            message = java.util.Objects.requireNonNull(
+                    i18nService.getMessage(effectiveLocale, rejection.messageKey(), rejection.messageArgs()),
+                    "Missing translation for plugin rejection: " + rejection.messageKey());
+        }
         return AsyncTaskFailureClassifier.isRetryable(failure)
                 ? AsyncTaskResult.retryableFailure(message)
                 : AsyncTaskResult.nonRetryableFailure(message);

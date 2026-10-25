@@ -24,6 +24,8 @@ export function comparisonStatusLabel(
 ): string {
   const text = String(status ?? '');
   const labels: Record<string, { 'zh-CN': string; en: string }> = {
+    unknown: { 'zh-CN': '未收录，待核实', en: 'Unknown, Review Required' },
+    source_conflict: { 'zh-CN': '原始信息冲突', en: 'Source Conflict' },
     matched: { 'zh-CN': '一致', en: 'Matched' },
     mismatch: { 'zh-CN': '不一致', en: 'Mismatch' },
     missing: { 'zh-CN': '证据缺失', en: 'Evidence Missing' },

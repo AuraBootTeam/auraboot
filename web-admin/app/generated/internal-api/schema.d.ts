@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 2c07f437edb77a7954e4825a9391aef1255f9233f2e07e80a539c74befe8ec77
+ * Contract SHA-256: 13e282679d3a008b8528e25413bda985a877e100c816c6d9dfdc2fc16e6de46f
  */
 export interface paths {
     "/api/activities": {
@@ -1171,6 +1171,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/infrastructure/reliable-integration/dead-letters/quarantine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["quarantine_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/infrastructure/status": {
         parameters: {
             query?: never;
@@ -1421,6 +1437,22 @@ export interface paths {
         get: operations["detail_2"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/reliable-integration/dead-letters/{eventId}/quarantine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["quarantine"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3615,6 +3647,26 @@ export interface paths {
         put: operations["update_22"];
         post?: never;
         delete: operations["delete_23"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/application/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover verified application composition
+         * @description Installation facts only; does not report provider configuration, entitlement or execution permission. Responses must not be cached.
+         */
+        get: operations["capabilities_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -22780,6 +22832,10 @@ export interface components {
             pid?: string;
             primaryObject?: string;
         };
+        AgentCapability: {
+            /** @enum {string} */
+            state: "installed" | "not_installed";
+        };
         AgentConversationMessageItem: {
             cardPayload?: string;
             clientMsgId?: string;
@@ -27005,6 +27061,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseQuarantineResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["QuarantineResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseReadReceiptSummary: {
             code?: string;
             context?: unknown;
@@ -27708,6 +27772,11 @@ export interface components {
             id?: number;
             name?: string;
         };
+        ApplicationCapabilities: {
+            agent: components["schemas"]["AgentCapability"];
+            /** Format: int32 */
+            schemaVersion: number;
+        };
         ApplicationIdentity: {
             applicationId?: string;
             applicationVersion?: string;
@@ -27958,10 +28027,12 @@ export interface components {
             channelCode?: string;
             code?: string;
             email?: string;
+            enrollmentCode?: string;
             identifier?: string;
             ipAddress?: string;
             mobile?: string;
             password?: string;
+            phoneCode?: string;
             userAgent?: string;
         };
         AutomationAction: {
@@ -29289,6 +29360,7 @@ export interface components {
             unreadCount?: number;
         };
         ConversationMemberInfo: {
+            agentAvailable?: boolean;
             agentCode?: string;
             avatarUrl?: string;
             displayName?: string;
@@ -29334,6 +29406,7 @@ export interface components {
             behaviorEvents?: components["schemas"]["BehaviorEvent"][];
             commandAudits?: components["schemas"]["CommandAuditLogDTO"][];
             llmUsage?: components["schemas"]["LlmUsageView"][];
+            llmUsageAvailable?: boolean;
             permissionDenials?: components["schemas"]["PermissionDenialView"][];
             traceId?: string;
         };
@@ -29487,6 +29560,8 @@ export interface components {
             enableExport?: boolean;
             enableImport?: boolean;
             formFields?: string[];
+            formGroups?: components["schemas"]["FormGroup"][];
+            formPresentation?: components["schemas"]["FormPresentation"];
             generateDetail?: boolean;
             generateForm?: boolean;
             generateList?: boolean;
@@ -29763,6 +29838,7 @@ export interface components {
         };
         DeadLetterDetail: {
             deadLetter?: components["schemas"]["DeadLetterSummary"];
+            quarantine?: components["schemas"]["QuarantineResult"];
             receipts?: components["schemas"]["ReceiptView"][];
             replayHistory?: components["schemas"]["ReplayHistoryView"][];
         };
@@ -32085,6 +32161,26 @@ export interface components {
             modelCode?: string;
             targetId?: string;
             timeZone?: string;
+        };
+        FormGroup: {
+            collapsible?: boolean;
+            defaultCollapsed?: boolean;
+            fields?: string[];
+            title?: string;
+        };
+        FormPresentation: {
+            /** @enum {string} */
+            actions?: "sticky" | "inline" | "fixed";
+            /** Format: int32 */
+            columns?: number;
+            /** @enum {string} */
+            density?: "comfortable" | "compact";
+            /** @enum {string} */
+            guidance?: "none" | "aside";
+            /** @enum {string} */
+            surface?: "card" | "plain";
+            /** @enum {string} */
+            width?: "comfortable" | "wide" | "full";
         };
         FormSchema: {
             defaultValues?: {
@@ -36425,6 +36521,13 @@ export interface components {
             /** Format: int32 */
             totalOutputTokens?: number;
         };
+        PlatformQuarantineRequest: {
+            eventId: string;
+            /** Format: int32 */
+            expectedReplayCount: number;
+            reason: string;
+            tenantPid: string;
+        };
         PluginCompatibilityDTO: {
             compatibilityMessage?: string;
             compatibilityStatus?: string;
@@ -36554,6 +36657,7 @@ export interface components {
         };
         PluginManifestExtended: {
             agentDefinitions?: components["schemas"]["AgentDefinitionDTO"][];
+            applicationModules?: string[];
             author?: string;
             automations?: components["schemas"]["AutomationDefinitionDTO"][];
             bindingRules?: components["schemas"]["BindingRuleDTO"][];
@@ -36889,6 +36993,23 @@ export interface components {
             unmatchedStageEvents?: number;
             /** Format: int64 */
             withoutWindowEntryTasks?: number;
+        };
+        QuarantineRequest: {
+            /** Format: int32 */
+            expectedReplayCount: number;
+            reason: string;
+        };
+        QuarantineResult: {
+            correlationId?: string;
+            eventId?: string;
+            reason?: string;
+            recordPid?: string;
+            /** Format: int32 */
+            replayCount?: number;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
         };
         QueryBuilderDTO: {
             aggregations?: components["schemas"]["AggregationConfig"][];
@@ -42104,6 +42225,30 @@ export interface operations {
             };
         };
     };
+    quarantine_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformQuarantineRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseQuarantineResult"];
+                };
+            };
+        };
+    };
     status_2: {
         parameters: {
             query?: never;
@@ -42516,6 +42661,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseDeadLetterDetail"];
+                };
+            };
+        };
+    };
+    quarantine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuarantineRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseQuarantineResult"];
                 };
             };
         };
@@ -45978,6 +46149,47 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
                 };
+            };
+        };
+    };
+    capabilities_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified installation facts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationCapabilities"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication context rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assembly not yet verified; retry later */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

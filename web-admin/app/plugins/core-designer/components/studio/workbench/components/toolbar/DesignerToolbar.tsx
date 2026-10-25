@@ -1,3 +1,4 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 /**
  * DesignerToolbar Component
  *
@@ -162,6 +163,7 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
   const [showCreateFromTemplate, setShowCreateFromTemplate] = useState(false);
+  const { agent, loading: agentLoading } = useApplicationCapabilities();
   const [showAiGenerate, setShowAiGenerate] = useState(false);
 
   const { hasPermission } = usePermissions();
@@ -336,9 +338,10 @@ export const DesignerToolbar: React.FC<DesignerToolbarProps> = ({
             <ToolbarButton
               icon={<span className="text-sm">&#x2728;</span>}
               label={l('AI 助手', 'AI Assistant')}
-              title={l('切换 AI 助手面板', 'Toggle AI assistant panel')}
+              title={!agentLoading && agent === 'installed' ? l('切换 AI 助手面板', 'Toggle AI assistant panel') : t(`application.agent.${agentLoading ? 'loading' : agent}`)}
               onClick={onToggleAiPanel || (() => setShowAiGenerate(true))}
               active={aiPanelOpen}
+              disabled={agent !== 'installed' || agentLoading}
               data-testid="toolbar-ai-generate"
             />
             {pageMeta && (

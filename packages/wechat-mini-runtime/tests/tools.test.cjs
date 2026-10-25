@@ -418,3 +418,13 @@ test("route waiting reacquires the top page and rejects a missing transition", a
     /transition timed out/,
   );
 });
+
+test('explicit real-stack device bootstrap packaging keeps phone verification false and business blocked', (t) => {
+ const f=fixture(t);f.mode='real-stack';f.config={...f.config,apiBaseUrl:'https://dev.bootnap.com',target:'device',deviceHealthVerified:false,deviceHealthBootstrap:true};
+ const manifest=tools.prepareProject(f);assert.equal(manifest.config.deviceHealthVerified,false);assert.equal(tools.readProject(f.out,{mode:'real-stack'}).config.deviceHealthBootstrap,true);
+ assert.throws(()=>require('../runtime').target(manifest.config),{code:'CONFIGURATION_REQUIRED'});
+});
+test('bootstrap packaging does not allow loopback or fixture device admission', (t) => {
+ const f=fixture(t);f.config={...f.config,target:'device',deviceHealthVerified:false,deviceHealthBootstrap:true};assert.throws(()=>tools.prepareProject(f));
+ f.config.apiBaseUrl='https://dev.bootnap.com';assert.throws(()=>tools.prepareProject(f));
+});

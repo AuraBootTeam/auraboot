@@ -87,6 +87,37 @@ replay appends one `ab_integration_dead_letter_replay` row with a ULID record id
 event id, correlation id, monotonic attempt, actor PID, mandatory reason, and request timestamp.
 Cross-tenant and missing event ids have the same not-found response.
 
+### Audited quarantine
+
+`POST /api/admin/reliable-integration/dead-letters/{eventId}/quarantine` accepts a nonblank
+`reason` (at most 512 characters) and nonnegative `expectedReplayCount`. It atomically changes only
+an `open` dead letter whose matching tenant/event outbox remains `failed` at that replay count.
+The same SQL statement inserts one immutable `ab_integration_dead_letter_quarantine` disposition
+with public record PID, tenant/event/correlation, actor PID, reason, replay version and timestamp.
+The detail response includes that disposition; the list supports `status=quarantined`.
+
+Quarantine preserves the outbox failure, payload, headers, errors and existing receipts. It does not
+send, requeue, delete or manufacture delivery success. Replay of a quarantined failure is rejected,
+including a retry of an older replay request. An exact actor/reason/version retry returns the
+original disposition without duplicating its audit or metric. Stale or conflicting requests return
+409; missing or foreign-tenant events return 404. Concurrent replay/quarantine permits exactly one
+state transition. This version has no reactivation endpoint.
+
+Platform operators have a separate quarantine-only control-plane endpoint:
+`POST /api/admin/infrastructure/reliable-integration/dead-letters/quarantine`. Its request identifies
+the target with public `tenantPid` and `eventId`, plus the same reason/version fence. It requires a
+non-impersonated platform execution session and the platform-admin role; a business execution scope
+is rejected even for a platform role holder. It does not add cross-tenant payload inspection or
+replay. The atomic disposition remains the authoritative audit. Successful requests additionally
+use the existing best-effort platform admin-action log to link the target tenant and disposition;
+exact retries may have separate access logs but never repeat the disposition.
+
+Health and metrics separate unresolved `openDeadLetters` from `quarantinedDeadLetters` and the
+`auraboot_reliable_delivery_quarantined` gauge. Quarantined failures no longer trigger the unresolved
+open-DLQ alarm. An aggregate `UP` therefore does not mean that historical failures were delivered.
+Keep the additive schema and failed originals during application rollback; never rewrite quarantine
+as delivered or automatically reactivate it.
+
 ## Procurement to Inventory pilot
 
 The first contract is `procurement.purchase-order.receipt-requested.v1`. Procurement remains the
@@ -216,3 +247,21 @@ before returning a cached outcome, bind server-derived actor/resource context in
 and keep raw credentials out of keys and stored outcomes. Callers own retention and privacy policy;
 the internal expiry marker is not a business deadline. This API does not authorize carts or change
 event receipts, subscriber policy or physical inventory.
+
+## Installed integration machine data authority
+
+Installed command identity and command permits do not substitute for machine data authority.
+The verified command configuration may declare `handlerParams.installedMachineData` as a finite
+map keyed by model code. Each model declares explicit `read`, `create`, and/or `update` field
+arrays; `read` must include `pid` and every writable field. Wildcards, physical deletion,
+unknown actions, and malformed contracts are rejected. An absent contract grants no machine
+model access. Installation bindings and inbound payloads cannot supply this contract.
+
+The host checks tenant, application, and installation against the authenticated machine before
+opening a lexical read scope. Mutations additionally require the verified command and handler,
+its published permit, an explicit model/action/field declaration, and an exact target and physical
+row version for updates. Related writes still require the handler's existing lineage authorization.
+Each related or root operation reloads the authorized record version before the native CAS; this
+supports multiple operations in one transaction without reusing the first operation's old version.
+The reliable consumer reconstructs the same machine principal after verifying the original durable
+receipt and envelope. Neither path clears machine context or impersonates a human member.

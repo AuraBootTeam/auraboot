@@ -102,12 +102,18 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private AiProviderAccessorFactory aiProviderAccessorFactory;
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.KnowledgeBaseAccessor knowledgeBaseAccessor;
+
 
     @Autowired(required = false)
     private FileService fileService;
 
     @Autowired(required = false)
     private AsyncTaskServiceImpl asyncTaskService;
+
+    @Autowired
+    private com.auraboot.framework.i18n.util.I18nLocaleResolver i18nLocaleResolver;
 
     @Autowired(required = false)
     private StorageProvider storageProvider;
@@ -328,7 +334,7 @@ public class HandlerPhase implements CommandPhase {
         } else {
             dynamicDataMapper.updateWithJsonb(tableName, persistable, conditions, jsonbColumns);
         }
-        log.debug("HANDLER: wrote {} fields to {} (pid={})", persistable.size(), tableName, recordIdStr);
+        log.debug("HANDLER: wrote {} fields to {}", persistable.size(), tableName);
     }
 
     /**
@@ -564,6 +570,15 @@ public class HandlerPhase implements CommandPhase {
         // state-transition) but a downstream plugin chains a secondary onto it.
         CommandHandlerExtension handler = pluginHandler.orElse(null);
 
+        if (handler != null) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
+        for (var secondary : secondaryHandlers) {
+            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                    secondary, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+        }
+
         Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
 
         // Opt-in async dispatch: commands declaring handlerParams.async run off the
@@ -632,7 +647,9 @@ public class HandlerPhase implements CommandPhase {
             com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
                     pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
             pluginSettings.put("__dataAccessor",
-                    new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
+                    com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                        ? new com.auraboot.framework.openplatform.service.InstalledMachineDataAccessor(dynamicDataService)
+                        : new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
                 // Q03-04: nested follow-up commands dispatch through the real
                 // pipeline (validated, invariant-checked, evented, audited)
@@ -708,7 +725,7 @@ public class HandlerPhase implements CommandPhase {
                             handler.getClass().getName(), handlerCode);
                 } else {
                     Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
-                            : inventoryReceiptProvenance.invoke(handler, pluginContext);
+                            : inventoryReceiptProvenance.route(handler, pluginContext);
                     if (result instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -733,7 +750,7 @@ public class HandlerPhase implements CommandPhase {
                 log.info("Executing chained secondary handler {} for command {}",
                         secondary.getClass().getName(), handlerCode);
                 Object secResult = inventoryReceiptProvenance == null ? secondary.execute(pluginContext)
-                        : inventoryReceiptProvenance.invoke(secondary, pluginContext);
+                        : inventoryReceiptProvenance.route(secondary, pluginContext);
                 if (secResult instanceof Map) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> secMap = (Map<String, Object>) secResult;
@@ -779,7 +796,7 @@ public class HandlerPhase implements CommandPhase {
                 ResponseCode responseCode = switch (rejection.code()) {
                     case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
                 };
-                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection);
+                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection, rejection.messageArgs());
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {
@@ -808,6 +825,13 @@ public class HandlerPhase implements CommandPhase {
                                           String clientRequestId, Integer clientExpectedVersion) {
         Map<String, Object> input = new HashMap<>();
         input.put("handlerCode", handlerCode);
+        // Locale must survive thread hand-off and recovery, rather than use the worker default.
+        org.springframework.web.context.request.RequestAttributes attributes =
+                org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        String taskLocale = attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servlet
+                ? i18nLocaleResolver.resolveLocale(servlet.getRequest())
+                : org.springframework.context.i18n.LocaleContextHolder.getLocale().toLanguageTag();
+        input.put("locale", taskLocale);
         input.put("commandCode", commandCode);
         input.put("tenantId", tenantId);
         input.put("userId", userId);
@@ -903,8 +927,8 @@ public class HandlerPhase implements CommandPhase {
         }
 
         try {
-            log.info("BPM trigger: starting process={} for command={}, businessKey={}",
-                    processKey, command.getCode(), businessKey);
+            log.info("BPM trigger: starting process={} for command={}",
+                    processKey, command.getCode());
             Map<String, Object> started = workflowCapabilities.execute("start",
                     new WorkflowCapability.WorkflowRequest(
                             MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,

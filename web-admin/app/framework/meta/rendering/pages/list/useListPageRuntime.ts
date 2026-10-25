@@ -66,11 +66,19 @@ export function useListPageRuntime({
   listExtensions,
   skipListData,
 }: ListPageRuntimeInput) {
+  // Flow refreshes must use the current loader after list filters change.
+  const loadDataRef = useRef<((params?: ListLoadDataParams) => Promise<void>) | null>(null);
+  const reloadListStrict = useCallback(async (params?: ListLoadDataParams) => {
+    const loader = loadDataRef.current;
+    if (!loader) throw new Error('List page loader is unavailable');
+    await loader(params);
+  }, []);
   const listRuntimeContext = useMemo(() => ({ filters }), [filters]);
   // Use usePageRuntime instead of useDynamicPageSetup
   const { runtime, dataSourceManager, t, locale, navigate } = usePageRuntime(schema, {
     token: token || undefined,
     additionalContext: listRuntimeContext,
+    loadData: reloadListStrict,
   });
   useRuntimeStateSubscription(runtime);
   const tableEmptyState = useMemo(() => {
@@ -168,7 +176,6 @@ export function useListPageRuntime({
   // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
   const skipFirstSortFilterEffectRef = useRef(false);
   const lastScheduledSortFilterValuesRef = useRef<ListSortFilterQuery | undefined>(undefined);
-  const loadDataRef = useRef<((params?: ListLoadDataParams) => Promise<void>) | null>(null);
   // Monotonic sequence for loadData invocations. Concurrent triggers (debounced
   // keyword auto-search, URL-sync effect, Enter commit, pagination) can overlap;
   // responses must apply only when their request is still the newest one, or a

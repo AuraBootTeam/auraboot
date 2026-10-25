@@ -2975,3 +2975,40 @@ session_security:
 "permission.capability.preset.admin": "管理员"
 
 "about.menuLabel": "关于 {productName}"
+
+# Optional application assembly feedback
+application.agent.loading: "正在检查 AI 可用性…"
+application.agent.not_installed: "此应用未安装 AI 模块"
+application.agent.unknown: "暂时无法确认 AI 可用性"
+application.agent.guidance: "工作区的其他功能仍可使用。可重试检查或返回首页。"
+application.agent.retry: "重试"
+application.agent.home: "返回首页"
+application.agent.member: "AI 成员"
+
+application.agent.permissionTitle: "无权访问"
+application.agent.providerPermission: "你没有管理模型服务的权限，请联系管理员。"
+
+im.conversation.memberCount.one: "{count} 位成员"
+im.conversation.memberCount.other: "{count} 位成员"
+
+im.conversations.title: "会话"
+im.conversations.newGroup: "+ 新建群聊"
+im.conversations.loading: "正在加载会话…"
+im.conversations.empty: "暂无会话。"
+im.conversations.emptyHint: "创建群聊，开始协作。"
+im.conversations.select: "选择会话，开始交流"
+im.conversation.title: "会话"
+im.messages.empty: "暂无消息，开始交流吧。"
+im.input.placeholder: "输入消息，使用 @ 提及成员"
+im.input.send: "发送消息"
+im.agent.thinking: "{name} 正在思考"
+im.agent.generic: "AI 同事"
+im.sender.user: "用户"
+im.sender.system: "系统"
+im.agent.type.reactive: "按需响应"
+im.agent.type.proactive: "主动履职"
+
+im.agent.welcome: "我是{name}，{role}。@我开始协作。"
+im.agent.role.employee: "AI 员工"
+im.agent.role.assistant: "AI 助手"
+im.agent.replyFailed: "AI 回复未能完成，请重试或联系管理员。"

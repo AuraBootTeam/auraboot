@@ -1,3 +1,4 @@
+import { requireAgent } from '../client/agent-capabilities.js';
 import chalk from 'chalk';
 import { ApiClient, EXIT } from '../client/api-client.js';
 import { streamSse } from '../client/sse-client.js';
@@ -34,6 +35,7 @@ interface PlanOptions {
 export async function planCommand(message: string, options: PlanOptions): Promise<void> {
   const client = new ApiClient(options);
   await client.requireAuth();
+  await requireAgent(client);
 
   const token = client.getToken()!;
   const baseUrl = client.getBaseUrl();

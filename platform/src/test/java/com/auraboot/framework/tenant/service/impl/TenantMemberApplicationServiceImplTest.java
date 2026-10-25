@@ -437,6 +437,7 @@ class TenantMemberApplicationServiceImplTest {
         when(tenantMemberService.removeMember(1L)).thenReturn(true);
 
         assertTrue(service.removeMember("p", 7L));
+        verify(sessionManagementService).revokeAllSessions(5L);
         verify(offboardingCoordinator).prepare(m, null, 7L,
                 com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingAction.REMOVE);
     }

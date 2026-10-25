@@ -11,6 +11,9 @@ pluginManagement {
 rootProject.name = 'AuraBoot'
 
 include 'platform-plugin-api'
+include 'platform-agent'
+include 'platform-app'
+include 'platform-bom'
 
 // Infrastructure provider modules (add to platform/build.gradle dependencies as needed)
 include 'platform-storage-minio'

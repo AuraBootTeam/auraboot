@@ -1,3 +1,4 @@
+import { comparisonStatusLabel } from './ReviewDrawerEvidence';
 import type React from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -297,7 +298,7 @@ export function ReviewDrawerCandidatesPanel({
                           if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
                           const value = formatConfiguredValue(rawValue, field, locale, t);
                           const comparisonStatus = comparisonStatusForField(candidate, field);
-                          const comparisonClass = comparisonStatusFieldClass(comparisonStatus);
+                          const comparisonClass = comparisonStatusFieldClass(comparisonStatus, field);
                           return (
                             <div
                               key={key}
@@ -316,6 +317,9 @@ export function ReviewDrawerCandidatesPanel({
                             >
                               <dt className="text-text-2 min-w-0 break-words" title={label}>
                                 {label}
+                                {field.comparisonShowStatus && comparisonStatus && (
+                                  <span className="ml-1 text-[10px]">· {comparisonStatusLabel(comparisonStatus, locale, t)}</span>
+                                )}
                               </dt>
                               <dd
                                 className="text-text min-w-0 break-words whitespace-normal"

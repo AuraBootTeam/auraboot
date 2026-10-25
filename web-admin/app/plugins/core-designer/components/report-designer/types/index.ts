@@ -45,6 +45,8 @@ export interface ReportDataSource {
   aggregateQuery?: AggregateQueryRequest;
   modelCode?: string;
   queryCode?: string;
+  /** Fixed business scope for named-query data sources; authorization remains server-side. */
+  params?: Record<string, string | number | boolean | null>;
   url?: string;
   data?: Record<string, unknown>[];
   filters?: Array<{ field: string; operator: string; value?: string | number; values?: string[] }>;
@@ -61,6 +63,8 @@ export interface ReportParameter {
   label: string;
   required?: boolean;
   defaultValue?: string;
+  /** Explicit route context; not an editable technical identifier. */
+  inputSource?: 'route';
   /** For 'select' type: list of options */
   options?: Array<{ label: string; value: string }>;
   /** Bind to data source filter field */

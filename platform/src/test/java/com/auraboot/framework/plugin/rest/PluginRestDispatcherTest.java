@@ -208,6 +208,51 @@ class PluginRestDispatcherTest {
         assertThat(res.getStatus()).isEqualTo(404);
     }
 
+    private MockMvc defaultDenyMvc() {
+        var interceptor = new com.auraboot.framework.permission.interceptor.PermissionInterceptor(
+                perms, mock(com.auraboot.framework.menu.mapper.MenuMapper.class),
+                mock(com.auraboot.framework.application.security.AdminRoleChecker.class),
+                mock(com.auraboot.framework.meta.mapper.PageSchemaMapper.class));
+        return MockMvcBuilders.standaloneSetup(dispatcher).addInterceptors(interceptor).build();
+    }
+
+    @Test
+    void authenticatedRoutePassesDefaultDenyOnlyThroughItsDeclaredPermission() throws Exception {
+        permit();
+        RestEndpointExtension ext = mock(RestEndpointExtension.class);
+        when(registry.match("probe", "GET", "/whoami")).thenReturn(Optional.of(whoamiMatch(ext)));
+        when(pipeline.execute(any(), any(), any())).thenReturn(okBuffer());
+
+        defaultDenyMvc().perform(get("/api/ext/probe/whoami"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.ok").value(true));
+        verify(perms).hasPermission(42L, "probe.probe.read");
+        verify(pipeline).execute(any(), any(), any());
+    }
+
+    @Test
+    void defaultDenyAdmissionDoesNotBypassThePluginRoutePermission() {
+        MetaContext.setContext(1L, 42L, "u-pid", "user");
+        RestEndpointExtension ext = mock(RestEndpointExtension.class);
+        when(registry.match("probe", "GET", "/whoami")).thenReturn(Optional.of(whoamiMatch(ext)));
+        when(perms.hasPermission(42L, "probe.probe.read")).thenReturn(false);
+
+        assertThatThrownBy(() -> defaultDenyMvc().perform(get("/api/ext/probe/whoami")))
+                .hasRootCauseInstanceOf(AccessDeniedException.class)
+                .hasStackTraceContaining("Missing permission for plugin route: probe.probe.read");
+        verify(pipeline, never()).execute(any(), any(), any());
+    }
+
+    @Test
+    void publicRouteKeepsItsRateLimitUnderDefaultDeny() throws Exception {
+        RestEndpointExtension ext = mock(RestEndpointExtension.class);
+        when(registry.match("probe", "POST", "/public/checkin")).thenReturn(Optional.of(publicMatch(ext)));
+        when(rateLimiter.isAllowed(anyString(), anyInt())).thenReturn(false);
+
+        defaultDenyMvc().perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/ext/probe/public/checkin")).andExpect(status().isTooManyRequests());
+        verify(pipeline, never()).execute(any(), any(), any());
+    }
+
     @Test
     void matchedWithPermission_delegatesToGovernedPipelineAndFlushesBuffer() throws Exception {
         permit();

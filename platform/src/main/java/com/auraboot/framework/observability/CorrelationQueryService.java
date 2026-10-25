@@ -28,6 +28,7 @@ public class CorrelationQueryService {
     private static final int ADMIN_ACTION_LIMIT = 50;
 
     private final CommandAuditLogMapper commandAuditLogMapper;
+    @org.springframework.lang.Nullable
     private final LlmUsageQuery llmUsageQuery;
     private final BehaviorEventMapper behaviorEventMapper;
     private final AdminEventLogMapper adminEventLogMapper;
@@ -41,7 +42,11 @@ public class CorrelationQueryService {
         view.setCommandAudits(commandAuditLogMapper.findByTraceId(tenantId, traceId).stream()
                 .map(CommandAuditLogDTO::from)
                 .toList());
-        view.setLlmUsage(llmUsageQuery.findByTrace(tenantId, traceId));
+        if (llmUsageQuery == null) {
+            view.setLlmUsageAvailable(false);
+        } else {
+            view.setLlmUsage(llmUsageQuery.findByTrace(tenantId, traceId));
+        }
         view.setBehaviorEvents(behaviorEventMapper.selectList(new LambdaQueryWrapper<BehaviorEvent>()
                 .eq(BehaviorEvent::getTenantId, tenantId)
                 .eq(BehaviorEvent::getTraceId, traceId)));

@@ -1,3 +1,4 @@
+import { requireAgent } from '../../../client/agent-capabilities.js';
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
 import type { Tool } from '../../registry.js';
@@ -19,6 +20,7 @@ export function dispatchAgentTool(client: ApiClient): Tool<Params> {
     annotations: { idempotentHint: true, openWorldHint: true },
     handler: async (params) => {
       try {
+        await requireAgent(client);
         const resp = await client.post('/api/agent/dispatch', { taskPid: params.taskPid });
         if (!resp.ok) {
           return {

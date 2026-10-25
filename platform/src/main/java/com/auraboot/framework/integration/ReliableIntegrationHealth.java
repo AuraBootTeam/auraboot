@@ -27,6 +27,7 @@ public class ReliableIntegrationHealth implements HealthIndicator {
                 .withDetail("ready", ready)
                 .withDetail("expiredLeases", expiredLeases)
                 .withDetail("openDeadLetters", openDeadLetters)
+                .withDetail("quarantinedDeadLetters", outboxEventMapper.countQuarantinedDeadLetters())
                 .withDetail("oldestUndeliveredAgeSeconds", oldestAge)
                 .build();
     }

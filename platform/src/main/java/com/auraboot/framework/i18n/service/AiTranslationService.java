@@ -46,6 +46,7 @@ public class AiTranslationService {
     private static final int MAX_KEYS_LIMIT = 200;
 
     private final I18nResourceMapper i18nResourceMapper;
+    @org.springframework.lang.Nullable
     private final TranslationGenerator translationGenerator;
 
     /**
@@ -56,6 +57,11 @@ public class AiTranslationService {
      */
     @Transactional(rollbackFor = Exception.class)
     public AiTranslationResult translate(AiTranslateRequest request) {
+        if (translationGenerator == null) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.UnsupportedFeature,
+                    "AI translation is not installed");
+        }
         Long tenantId = MetaContext.getCurrentTenantId();
         String targetLocale = request.getTargetLocale();
         String sourceLocale = request.getSourceLocale() != null ? request.getSourceLocale() : "zh-CN";

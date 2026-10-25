@@ -98,6 +98,8 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     @Mock private PayloadTemporalNormalizer payloadTemporalNormalizer;
     @Mock private FieldPermissionService fieldPermissionService;
     @Mock private ExecutorRegistry executorRegistry;
+    @org.mockito.Spy private com.auraboot.framework.event.context.ThreadContextScopes threadContexts =
+            new com.auraboot.framework.event.context.ThreadContextScopes(List.of());
     @Mock private QueryBuilderService.QueryBuilder queryBuilder;
 
     @InjectMocks
@@ -500,6 +502,31 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
 
     private FieldDefinition quantityField() {
         return FieldDefinition.builder().code("quantity").columnName("quantity").dataType("decimal").build();
+    }
+
+    @Test
+    void compareAndSetBatch_bindsMachineTargetAndVersionInsteadOfRejectingThePolicy() {
+        wireModel(batchCasModel());
+        MetaContext.setContext(TENANT_ID,0L,"installation:inst","Integration");
+        var principal=new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                TENANT_ID,"inst","Integration",java.util.Set.of(),"app","inst",null,null);
+        var grant=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(TENANT_ID,"inst",MODEL_CODE,
+                java.util.Set.of("update"),java.util.Set.of("pid","status"),java.util.Set.of("status"),
+                List.of(new com.auraboot.framework.application.security.MachineDataAccessContext.Constraint("pid","pid",List.of("row-a"))));
+        when(dynamicDataMapper.updateByQuery(anyString(),anyMap())).thenReturn(1);
+        try(var machine=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var authority=com.auraboot.framework.application.security.MachineDataAccessContext.authorize(Map.of(MODEL_CODE,grant))) {
+            MetaContext.runWithCommandPermitPlan("TARGET",7L,MODEL_CODE,"row-a",()->{
+                service.compareAndSetBatch(MODEL_CODE,"status",List.of(batchCasUpdates().get(0)));return null;
+            });
+        }
+        ArgumentCaptor<String> sql=ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String,Object>> params=ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sql.capture(),params.capture());
+        assertThat(sql.getValue()).contains("tenant_id = #{params.tenantId}","row_version = #{params.version0}",
+                "pid IN (#{params.machine_scope_0_0})").doesNotContain("'row-a'");
+        assertThat(params.getValue()).containsEntry("tenantId",TENANT_ID).containsEntry("id0","row-a")
+                .containsEntry("version0",7L).containsEntry("machine_scope_0_0","row-a");
     }
 
     @Test

@@ -8,6 +8,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReportParameterBindingsTest {
+    @Test void bindsNamedQueryScopeWithoutAllowingTransportOrAuthorizationOverrides() {
+        for (String field : List.of("projectPid", "tenantId", "datasourceId", "userId", "../project")) {
+            Map<String, Object> definition = Map.of("parameters", List.of(Map.of("name", "project", "type", "text", "required", true,
+                    "bindTo", Map.of("dataSource", "facts", "field", field, "operator", "EQ"))),
+                    "dataSources", Map.of("facts", Map.of("type", "namedQuery", "queryCode", "project_facts", "params", Map.of("period", "week"))));
+            if ("projectPid".equals(field)) {
+                Map<String, Object> resolved = ReportParameterBindings.apply(definition, Map.of("project", "project-a"));
+                Map<?, ?> actualSource = (Map<?, ?>) ((Map<?, ?>) resolved.get("dataSources")).get("facts");
+                Map<?, ?> originalSource = (Map<?, ?>) ((Map<?, ?>) definition.get("dataSources")).get("facts");
+                assertThat(actualSource.get("params")).isEqualTo(Map.of("period", "week", "projectPid", "project-a"));
+                assertThat(originalSource.get("params")).isEqualTo(Map.of("period", "week"));
+            } else assertThatThrownBy(() -> ReportParameterBindings.apply(definition, Map.of("project", "project-a")))
+                    .isInstanceOf(ValidationException.class).hasMessageContaining("Invalid named query");
+        }
+    }
     private Map<String, Object> report(String type, boolean required) {
         return Map.of("parameters", List.of(Map.of("name", "input", "type", type,
                 "required", required, "defaultValue", type.equals("text") ? "default" : "",

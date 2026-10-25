@@ -105,6 +105,7 @@ public class ImConversationController {
         }
         List<Long> memberIds = readIdList(body, "memberIds", body.isArray());
         List<Long> agentIds = readIdList(body, "agentIds", false);
+        conversationService.assertAgentMembersAvailable(agentIds);
         conversationService.addMembers(id, memberIds, tenantId);
         conversationService.addAgentMembers(id, agentIds, tenantId);
 

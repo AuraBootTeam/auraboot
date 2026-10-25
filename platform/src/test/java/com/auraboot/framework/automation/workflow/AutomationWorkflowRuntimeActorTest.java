@@ -27,7 +27,10 @@ import static org.mockito.Mockito.*;
 class AutomationWorkflowRuntimeActorTest {
     private final WorkflowCapabilityRegistry registry = mock(WorkflowCapabilityRegistry.class);
     private final AutomationFlowCompiler compiler = mock(AutomationFlowCompiler.class);
-    private final AutomationWorkflowRuntime runtime = new AutomationWorkflowRuntime(compiler, registry, new ObjectMapper());
+    private final AutomationWorkflowRuntime runtime = new AutomationWorkflowRuntime(compiler, registry, new ObjectMapper(),
+            new org.springframework.beans.factory.support.StaticListableBeanFactory(Map.of("actions",
+                    mock(com.auraboot.framework.automation.executor.ActionExecutor.class)))
+                    .getBeanProvider(com.auraboot.framework.automation.executor.ActionExecutor.class));
 
     @AfterEach void clear() { MetaContext.clear(); }
 

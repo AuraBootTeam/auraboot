@@ -116,7 +116,7 @@ public class FileEntity implements Serializable {
      * 文件状态
      */
     @TableField("status")
-    private String status; // 'active' | 'deleted'
+    private String status; // UploadStatus code.
 
     /**
      * 创建时间

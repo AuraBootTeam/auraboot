@@ -1,3 +1,5 @@
+import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
 import React, { useMemo, useRef, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
@@ -268,6 +270,7 @@ export function UnifiedDesignerWorkbench({
     selectFromMarquee: handleMarqueeSelect,
     clearMultiSelection,
   } = useDesignerSelection();
+  const { agent, loading: agentLoading } = useApplicationCapabilities();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const contextualRestricted = contextualEditablePropertyPaths !== undefined;
@@ -599,7 +602,10 @@ export function UnifiedDesignerWorkbench({
     () => (selectedBlockId ? findBlockById(document.blocks, selectedBlockId) : null),
     [document.blocks, selectedBlockId],
   );
-  const selectedBlock = selectedBlockResult?.block ?? null;
+  const rawSelectedBlock = selectedBlockResult?.block ?? null;
+  const selectedBlock = rawSelectedBlock?.blockType === 'form' && rawSelectedBlock.id === document.blocks[0]?.id
+    ? { ...rawSelectedBlock, extension: { ...document.extension, formPresentation: resolveFormPresentation(document.extension) } }
+    : rawSelectedBlock;
   const selectedModelCode =
     findModelCodeForSelection(selectedBlockResult?.path.map((item) => item.block) ?? []) ??
     document.modelCode ??
@@ -659,6 +665,10 @@ export function UnifiedDesignerWorkbench({
         contextualEditablePropertyPaths?.[selectedBlock?.blockType ?? ''] ?? [],
       )
     ) {
+      return;
+    }
+    if (selectedBlock?.blockType === 'form' && selectedBlock.id === document.blocks[0]?.id && path.startsWith('extension.formPresentation.')) {
+      updateDocument((current) => setByPath(current as unknown as Record<string, unknown>, path, value) as unknown as typeof current);
       return;
     }
     updateDocument((current) => ({
@@ -1423,7 +1433,7 @@ export function UnifiedDesignerWorkbench({
   const governedAiCopilotEnabled = Boolean(
     governedAiCopilot && contextualRestricted && !contextualReadOnly,
   );
-  const aiCopilotEnabled = legacyAiCopilotEnabled || governedAiCopilotEnabled;
+  const aiCopilotEnabled = agent === 'installed' && !agentLoading && (legacyAiCopilotEnabled || governedAiCopilotEnabled);
   const aiDomainGuidance =
     typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
   const aiKindPolicy = getKindPolicy(document.kind);

@@ -47,6 +47,7 @@ class ImMessageServiceImplTest {
     @Mock private ImConversationMemberMapper memberMapper;
     @Mock private ImMessageMapper messageMapper;
     @Mock private ImConversationService conversationService;
+    @Mock private org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.im.service.ImAiResponder> aiResponder;
 
     private ImMessageServiceImpl service;
 
@@ -57,7 +58,7 @@ class ImMessageServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ImMessageServiceImpl(conversationMapper, memberMapper, messageMapper,
-                conversationService, new ObjectMapper());
+                conversationService, new ObjectMapper(), aiResponder);
     }
 
     private ImConversation conversationWithSeq(long seq) {
@@ -74,6 +75,32 @@ class ImMessageServiceImplTest {
         r.setContent(content);
         r.setClientMsgId(clientMsgId);
         return r;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"ai", "AI", "agent:123", "AGENT:123"})
+    void missingAiRejectsExplicitTargetsBeforeSequenceOrMessageWrites(String mention) {
+        when(conversationService.isMember(CONV_ID, USER_ID, TENANT_ID)).thenReturn(true);
+        var request = sendRequest("question", null);
+        request.setMentions(List.of(mention));
+        assertThatThrownBy(() -> service.sendMessage(request, USER_ID, TENANT_ID))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                .hasMessageContaining("not installed");
+        org.mockito.Mockito.verifyNoInteractions(conversationMapper, messageMapper, memberMapper);
+    }
+
+    @Test
+    void missingAiRejectsStructuredAgentTargetsBeforeMessageWrites() {
+        when(conversationService.isMember(CONV_ID, USER_ID, TENANT_ID)).thenReturn(true);
+        var request = sendRequest("question", null);
+        var target = new SendMessageRequest.MentionTarget();
+        target.setType("agent");
+        target.setId(123L);
+        request.setMentionTargets(List.of(target));
+        assertThatThrownBy(() -> service.sendMessage(request, USER_ID, TENANT_ID))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                .hasMessageContaining("not installed");
+        org.mockito.Mockito.verifyNoInteractions(conversationMapper, messageMapper, memberMapper);
     }
 
     // ============== sendMessage ==============
@@ -110,6 +137,7 @@ class ImMessageServiceImplTest {
         SendMessageRequest req = sendRequest("hello", null);
         req.setMessageType("text");
         req.setReplyToId(7L);
+        when(aiResponder.getIfAvailable()).thenReturn(org.mockito.Mockito.mock(com.auraboot.framework.im.service.ImAiResponder.class));
         req.setMentions(List.of("ai"));
         req.setAttachments(List.of(Map.of("url", "u")));
         req.setCardPayload(Map.of("type", "card"));

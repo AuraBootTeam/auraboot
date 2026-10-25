@@ -2784,3 +2784,40 @@ session_security:
 "permission.capability.preset.admin": "Administrator"
 
 "about.menuLabel": "About {productName}"
+
+# Optional application assembly feedback
+application.agent.loading: "Checking AI availability…"
+application.agent.not_installed: "AI is not installed in this application"
+application.agent.unknown: "AI availability could not be verified"
+application.agent.guidance: "Your other workspace features remain available. Retry discovery or return home."
+application.agent.retry: "Retry"
+application.agent.home: "Back to home"
+application.agent.member: "AI member"
+
+application.agent.permissionTitle: "Access denied"
+application.agent.providerPermission: "You do not have permission to manage model services. Contact your administrator."
+
+im.conversation.memberCount.one: "{count} member"
+im.conversation.memberCount.other: "{count} members"
+
+im.conversations.title: "Conversations"
+im.conversations.newGroup: "+ New Group"
+im.conversations.loading: "Loading conversations…"
+im.conversations.empty: "No conversations yet."
+im.conversations.emptyHint: "Create a group to get started."
+im.conversations.select: "Select a conversation to start chatting"
+im.conversation.title: "Conversation"
+im.messages.empty: "No messages yet. Start the conversation!"
+im.input.placeholder: "Type a message... Use @ to mention"
+im.input.send: "Send message"
+im.agent.thinking: "{name} is thinking"
+im.agent.generic: "AI colleague"
+im.sender.user: "User"
+im.sender.system: "System"
+im.agent.type.reactive: "On-demand"
+im.agent.type.proactive: "Proactive"
+
+im.agent.welcome: "I'm {name}, {role}. @me to start collaborating."
+im.agent.role.employee: "AI Employee"
+im.agent.role.assistant: "AI Assistant"
+im.agent.replyFailed: "The AI reply could not be completed. Please retry or contact an administrator."

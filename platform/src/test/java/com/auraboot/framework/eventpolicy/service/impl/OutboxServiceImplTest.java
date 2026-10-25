@@ -24,7 +24,7 @@ class OutboxServiceImplTest {
     private final TenantMemberMapper members = mock(TenantMemberMapper.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final ObjectMapper json = new ObjectMapper();
-    private final OutboxServiceImpl service = new OutboxServiceImpl(rows, runtime, json, transactions, members);
+    private final OutboxServiceImpl service = new OutboxServiceImpl(rows, runtime, json, transactions, members, new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
     private DrtOutboxEntity row;
     private TenantMember member;
 

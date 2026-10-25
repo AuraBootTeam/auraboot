@@ -1,0 +1,40 @@
+plugins {
+    id 'java-platform'
+    id 'maven-publish'
+}
+
+group = 'com.auraboot'
+
+// Application consumers need the complete approved runtime alignment, including
+// managed transitive versions that a library POM alone cannot impose on a graph.
+// Derive it from the reviewed lock instead of maintaining another version list.
+def runtimeLock = rootProject.file('platform-app/gradle.lockfile')
+def alignedModules = runtimeLock.readLines().findAll { line ->
+    !line.startsWith('#') && line.contains('=')
+        && line.substring(line.indexOf('=') + 1).split(',').contains('runtimeClasspath')
+}.collect { it.substring(0, it.indexOf('=')) }.findAll { it.count(':') == 2 }.unique().sort()
+if (alignedModules.empty) throw new GradleException('Application runtime lock is empty; cannot publish alignment')
+
+dependencies {
+    constraints {
+        alignedModules.each { coordinate -> api coordinate }
+        ['auraboot-core', 'auraboot-agent', 'auraboot-app', 'platform-plugin-api',
+         'platform-mq-kafka', 'platform-storage-minio', 'platform-storage-s3',
+         'platform-storage-oss', 'platform-storage-cos'].each { artifact ->
+            api "com.auraboot:${artifact}:${project.version}"
+        }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.javaPlatform
+            artifactId = 'auraboot-platform'
+            pom {
+                name = 'AuraBoot application alignment'
+                description = 'Approved core, optional agent and application dependency alignment'
+            }
+        }
+    }
+}

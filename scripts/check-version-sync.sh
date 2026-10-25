@@ -4,7 +4,7 @@
 # Bump both together via scripts/release/bump-version.sh. Run before push.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APPYML="$ROOT/platform/src/main/resources/application.yml"
+APPYML="$ROOT/platform/platform-app/src/main/resources/application.yml"
 
 [[ -f "$ROOT/VERSION" ]] || { echo "[version-sync] VERSION missing at repo root" >&2; exit 1; }
 v_file="$(tr -d ' \r\n' < "$ROOT/VERSION")"

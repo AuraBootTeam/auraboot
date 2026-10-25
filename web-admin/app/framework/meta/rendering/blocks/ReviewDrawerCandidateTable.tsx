@@ -504,7 +504,7 @@ export function CandidateFieldTable({
           if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
           const value = formatConfiguredValue(rawValue, field, locale, t);
           const comparisonStatus = comparisonStatusForField(candidate, field);
-          const comparisonClass = comparisonStatusFieldClass(comparisonStatus);
+          const comparisonClass = comparisonStatusFieldClass(comparisonStatus, field);
           return (
             <div
               key={key}
@@ -517,6 +517,9 @@ export function CandidateFieldTable({
             >
               <dt className="text-text-2 min-w-0 truncate" title={label}>
                 {label}
+                {field.comparisonShowStatus && comparisonStatus && (
+                  <span className="ml-1 text-[10px]">· {comparisonStatusLabel(comparisonStatus, locale, t)}</span>
+                )}
               </dt>
               <dd className="text-text min-w-0 font-medium" title={value}>
                 {field.format === 'price-comparison' ? (

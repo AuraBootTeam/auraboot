@@ -1,3 +1,4 @@
+import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import type { FormValidationResult } from './formPageTypes';
 
 export function resolveValidationToastMessage(
@@ -23,4 +24,16 @@ export function parseValidationSummaryMessages(message?: string | null): string[
     .map((item) => item.trim())
     .filter(Boolean)
     .filter((item, index, arr) => arr.indexOf(item) === index);
+}
+
+/** Localize handler validation reasons before presenting the form summary. */
+export function resolveCommandValidationSummary(
+  message: string,
+  commandCode: string,
+  translate: (key: string, params?: Record<string, string>) => string,
+  locale: string,
+): string[] {
+  return parseValidationSummaryMessages(message).map((reason) =>
+    resolveCommandErrorMessage({ context: { detail: reason } }, commandCode, translate, locale),
+  );
 }

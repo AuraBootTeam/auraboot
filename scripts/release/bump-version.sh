@@ -35,7 +35,7 @@ esac
 printf '%s\n' "$new" > "$VFILE"
 
 # Keep auraboot.platform.version in sync (only if this repo has application.yml).
-APPYML="$ROOT/platform/src/main/resources/application.yml"
+APPYML="$ROOT/platform/platform-app/src/main/resources/application.yml"
 SYNCED=""
 if [[ -f "$APPYML" ]]; then
   NEW="$new" python3 - "$APPYML" <<'PY'

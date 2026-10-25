@@ -10,6 +10,7 @@ async function main() {
   if (!path) throw new Error('AURA_APPROVAL_ROLLBACK_FIXTURES is required');
   const request = await requestFactory.newContext({
     baseURL: requireRuntimeUrl('base'),
+    extraHTTPHeaders: { Origin: new URL(requireRuntimeUrl('base')).origin },
     storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
   });
   const db = new Client(PG_CONN);

@@ -135,6 +135,29 @@ class WechatMiniClientTest {
         assertThat(grant.path("openid").asText()).isEqualTo("authenticated-openid");
     }
 
+    @Test
+    void sendsFixedLengthJsonForWechatTokenAndPhoneGateways() throws Exception {
+        var accepted = new java.util.concurrent.atomic.AtomicInteger();
+        com.sun.net.httpserver.HttpHandler requireFixedLength = exchange -> {
+            byte[] body = exchange.getRequestBody().readAllBytes();
+            String length = exchange.getRequestHeaders().getFirst("Content-Length");
+            boolean fixed = Integer.toString(body.length).equals(length)
+                    && exchange.getRequestHeaders().getFirst("Transfer-Encoding") == null;
+            if (!fixed) {
+                respond(exchange, 412, "");
+                return;
+            }
+            accepted.incrementAndGet();
+            respond(exchange, 200, exchange.getRequestURI().getPath().endsWith("stable_token")
+                    ? "{\"access_token\":\"synthetic-token\",\"expires_in\":7200}" : PHONE);
+        };
+        server.createContext("/cgi-bin/stable_token", requireFixedLength);
+        server.createContext("/wxa/business/getuserphonenumber", requireFixedLength);
+        var phone = client.verifyPhoneGrant("synthetic-grant", "authenticated-openid");
+        assertThat(phone.nationalNumber()).isEqualTo("13800138000");
+        assertThat(accepted.get()).isEqualTo(2);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "{\"errcode\":40029,\"errmsg\":\"private-provider-detail\"}",

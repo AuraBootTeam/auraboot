@@ -21,6 +21,13 @@ async function shot(page: Page, id: string) {
     await expect(error).toBeVisible();
     expect(await error.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   }
+  const title=page.getByRole('heading',{name:/^编辑自动化:/});
+  const actions=page.getByRole('button',{name:'导入流程',exact:true});
+  await expect(title).toBeVisible();
+  await expect.poll(async()=>{
+    const heading=await title.boundingBox();const button=await actions.boundingBox();
+    return Boolean(heading&&button&&(heading.y+heading.height<=button.y || heading.x+heading.width<=button.x));
+  }).toBe(true);
   await page.screenshot({ path: join(evidence, 'screenshots', id + '.png') });
 }
 

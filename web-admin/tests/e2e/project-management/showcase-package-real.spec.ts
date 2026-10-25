@@ -14,7 +14,32 @@ async function start(page: Page) {
 }
 async function shot(page: Page, id: string) {
   await mkdir(evidence!, { recursive: true });
+  await expect(page.getByRole('main')).not.toContainText(/加载中|加载活动记录/);
   await page.screenshot({ path: join(evidence!, id + '.png'), fullPage: true });
+}
+
+async function cleanSnapshot(page: Page) {
+  if (process.env.PW_REQUIRE_CLEAN_SHOWCASE !== '1') return undefined;
+  const fixture = JSON.parse(await readFile(process.env.DELIVERY_FIXTURE_PATH!, 'utf8'));
+  const snapshot: Record<string, unknown> = {};
+  for (const [model, total] of [['tpm_customer', 8], ['tpm_project', 8], ['tpm_task', 24], ['tpm_milestone', 32]] as const) {
+    const response = await page.request.get(`/api/dynamic/${model}/list?pageSize=100`);
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    expect(body.data.total, model).toBe(total);
+    expect(body.data.records).toHaveLength(total);
+    snapshot[model] = body.data.records.map((row: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(row).filter(([key]) => key === 'pid' || key.startsWith('tpm_'))),
+    ).sort((a: { pid: string }, b: { pid: string }) => a.pid.localeCompare(b.pid));
+    if (model === 'tpm_project') {
+      expect(body.data.records.map((row: { pid: string }) => row.pid).sort())
+        .toEqual(fixture.projects.map((row: { pid: string }) => row.pid).sort());
+      expect(body.data.records.map((row: { tpm_pj_name: string }) => row.tpm_pj_name).sort())
+        .toEqual(fixture.projects.map((row: { name: string }) => row.name).sort());
+    }
+  }
+  return snapshot;
 }
 
 
@@ -78,8 +103,13 @@ test('PK complete business entry and secondary professional actions navigate thr
   page,
 }) => {
   await loginDeliveryMember(page);
+  const before = await cleanSnapshot(page);
   await start(page);
+  await expect(page.getByRole('main')).toContainText('04 AI 整理与经营分析');
   await shot(page, 'PK01');
+  await page.getByRole('main').getByRole('button', { name: '专业配置与诊断', exact: true }).scrollIntoViewIfNeeded();
+  await shot(page, 'PK10');
+  await page.getByRole('main').getByRole('heading', { name: '客户交付 · 从项目到复盘', exact: true }).scrollIntoViewIfNeeded();
   const business: [string, string][] = [
     ['查看项目', '/p/tpm_project'],
     ['查看交付工作台', '/p/c/cde_delivery_workspace'],
@@ -89,6 +119,9 @@ test('PK complete business entry and secondary professional actions navigate thr
     ['查看交付经营看板', '/dashboards/view/tdo_delivery_operations'],
     ['查看超时与催办', '/bpm/sla-monitor'],
     ['打开复盘报告', '/p/c/report_management'],
+    ['整理客户资料', '/p/c/tpm_customer_ai_intake'],
+    ['整理交付需求', '/p/c/tpm_project_ai_intake'],
+    ['打开项目并分析', '/p/tpm_project'],
   ];
   for (const [name, route] of business) {
     await page.getByRole('main').getByRole('button', { name, exact: true }).click();
@@ -98,6 +131,19 @@ test('PK complete business entry and secondary professional actions navigate thr
     if (name === '查看项目') {
       await expect(page.getByRole('main')).toContainText('华辰制造 · 供应链协同平台');
       await shot(page, 'PK02');
+      const project = page.getByRole('row').filter({ hasText: '华辰制造 · 供应链协同平台' });
+      await project.getByRole('button', { name: '查看', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '华辰制造 · 供应链协同平台', exact: true })).toBeVisible();
+      await expect(page.getByRole('main')).toContainText('林晓');
+      await shot(page, 'PK09');
+      await page.getByRole('button', { name: '编辑项目', exact: true }).click();
+      await expect(page.getByRole('textbox', { name: '项目名称', exact: true })).toHaveValue('华辰制造 · 供应链协同平台');
+      await expect(page.getByRole('textbox', { name: '项目预算', exact: true })).toHaveValue('128,000.00');
+      await expect(page.getByRole('combobox', { name: '所属客户', exact: true })).toContainText('华辰制造');
+      await expect(page.getByRole('main').getByText('林晓', { exact: true }).first()).toBeVisible();
+      await shot(page, 'PK08');
+      await page.getByRole('button', { name: '取消', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '华辰制造 · 供应链协同平台', exact: true })).toBeVisible();
     }
     if (name === '查看交付经营看板') {
       await expect(page.getByRole('main')).toContainText('交付行动清单');
@@ -106,6 +152,13 @@ test('PK complete business entry and secondary professional actions navigate thr
     }
     if (name === '打开复盘报告')
       await expect(page.getByRole('main')).toContainText('客户交付经营复盘');
+    if (name === '整理客户资料' || name === '整理交付需求') {
+      await expect(page.getByTestId('ai-fill-trigger')).toBeVisible();
+      await expect(page.getByRole('textbox', { name: name === '整理客户资料' ? '客户名称' : '项目名称', exact: true })).toBeEditable();
+      await expect(page.getByRole('main')).toContainText('核对');
+      await expect(page.getByRole('main')).toContainText('保存');
+      await shot(page, name === '整理客户资料' ? 'PK06' : 'PK07');
+    }
     await start(page);
   }
   await page.getByRole('main').getByRole('button', { name: '专业配置与诊断', exact: true }).click();
@@ -123,6 +176,8 @@ test('PK complete business entry and secondary professional actions navigate thr
     ['插件与扩展', '/plugins'],
     ['外部集成', '/p/c/open_platform_publications'],
     ['故障定位', '/ops/troubleshooting'],
+    ['配置模型服务', '/aurabot/providers'],
+    ['查看 AI 运行记录', '/aurabot/runs'],
   ];
   for (const [name, route] of professional) {
     await page
@@ -139,6 +194,11 @@ test('PK complete business entry and secondary professional actions navigate thr
   await page.reload();
   await expect(page.getByRole('main')).toContainText('把一次客户交付完整跑通');
   await restoredBusiness(page,false);
+  if (before) {
+    const after = await cleanSnapshot(page);
+    expect(after).toEqual(before);
+    await writeFile(join(evidence!, 'clean-experience.json'), JSON.stringify({ status: 'passed', totals: { customers: 8, projects: 8, tasks: 24, milestones: 32 }, before, after, navigationMutatedBusiness: false }, null, 2));
+  }
 });
 
 test('PK viewer gets readable business entry without installation or professional mutation authority', async ({
@@ -158,6 +218,8 @@ test('PK viewer gets readable business entry without installation or professiona
   await expect(
     page.getByRole('main').getByRole('button', { name: '处理我的审批', exact: true }),
   ).toHaveCount(0);
+  for (const name of ['整理客户资料', '整理交付需求'])
+    await expect(page.getByRole('main').getByRole('button', { name, exact: true })).toHaveCount(0);
   await shot(page, 'PK05');
   await page.getByRole('main').getByRole('button',{name:'查看交付工作台',exact:true}).click();
   await expect(page).toHaveURL(url=>url.pathname==='/p/c/cde_delivery_workspace');

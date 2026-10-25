@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="com.auraboot.framework.conversation.turn.TurnRegistryTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:31:58.067Z" hostname="Mac" time="0.08">
+  <testcase name="cancellationCannotBeOverwrittenByLateCompletionOrFailure()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.042" />
+  <testcase name="lateCancellationDoesNotRewriteAnAlreadyCompletedOrFailedTurn()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.002" />
+  <testcase name="registerAndGet()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.001" />
+  <testcase name="getActiveByConversationFiltersTerminal()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.002" />
+  <testcase name="markCompletedChangesStatus()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.001" />
+  <testcase name="terminalRetentionIsBoundedAndNeverEvictsActiveTurns()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.01" />
+  <testcase name="markFailedAndCancelled()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.0" />
+  <testcase name="cumulativeBufferAppendAndRead()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.0" />
+  <testcase name="concurrentTerminalSignalsHaveOneStableWinner()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.005" />
+  <testcase name="markCancelledFlipsCancelledFlag()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.0" />
+  <testcase name="getOnUnknownTurnReturnsEmpty()" classname="com.auraboot.framework.conversation.turn.TurnRegistryTest" time="0.0" />
+</testsuite>

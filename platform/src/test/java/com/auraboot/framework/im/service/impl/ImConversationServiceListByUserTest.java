@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test for the batched {@code listByUser} (deep-review DR-20260701 W2-perf-002):
  * four batched queries (selectBatchIds + findMembersByConversationIds + findLastMessagesByConversationIds
- * + countHumanMembersByConversationIds) instead of the previous 1+4N per-conversation loop.
+ * + countMembersByConversationIds) instead of the previous 1+4N per-conversation loop.
  */
 @ExtendWith(MockitoExtension.class)
 class ImConversationServiceListByUserTest {
@@ -79,7 +79,7 @@ class ImConversationServiceListByUserTest {
                 .thenReturn(List.of(ConversationLastMessageRow.builder()
                         .conversationId(100L).content("hi").messageType("TEXT")
                         .createdAt(Instant.parse("2026-01-01T00:00:00Z")).build())); // 200 has no message
-        when(memberMapper.countHumanMembersByConversationIds(eq(1L), eq(convIds)))
+        when(memberMapper.countMembersByConversationIds(eq(1L), eq(convIds)))
                 .thenReturn(List.of(
                         ConversationMemberCountRow.builder().conversationId(100L).memberCount(3L).build(),
                         ConversationMemberCountRow.builder().conversationId(200L).memberCount(2L).build()));

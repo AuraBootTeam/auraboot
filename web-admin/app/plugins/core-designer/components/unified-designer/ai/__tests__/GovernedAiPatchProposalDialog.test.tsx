@@ -58,7 +58,7 @@ describe('GovernedAiPatchProposalDialog', () => {
     vi.clearAllMocks();
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
+      vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } }))).mockResolvedValue({
         ok: true,
         json: async () => ({
           content:

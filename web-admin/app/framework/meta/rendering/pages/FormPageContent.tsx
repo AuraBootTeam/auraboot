@@ -253,6 +253,7 @@ export function FormPageContent(props: PageContentProps) {
     locale,
     t,
     onCancelOverride,
+    onSubmitOverride,
     summaryErrors,
     error,
     restorableDraft,

@@ -1,0 +1,22 @@
+// Shared language, locking and reproducible archive contract for platform projects.
+dependencyLocking {
+    lockAllConfigurations()
+}
+plugins.withId('java') {
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.compilerArgs.add('-parameters')
+    }
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+    }
+}
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}

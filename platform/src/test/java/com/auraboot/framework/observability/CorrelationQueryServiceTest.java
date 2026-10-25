@@ -8,6 +8,7 @@ import com.auraboot.framework.audit.mapper.AdminEventLogMapper;
 import com.auraboot.framework.behavior.entity.BehaviorEvent;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.auraboot.framework.meta.entity.CommandAuditLog;
+import com.auraboot.framework.meta.dto.CommandAuditLogDTO;
 import com.auraboot.framework.meta.mapper.CommandAuditLogMapper;
 import com.auraboot.framework.observability.dto.CorrelationView;
 import com.auraboot.framework.permission.entity.PermissionAuditLog;
@@ -80,6 +81,41 @@ class CorrelationQueryServiceTest {
     }
 
     @Test
+    void usageSerializationKeepsFullShapeAndOmitsUnqueriedUsageInsteadOfInventingANullArray() {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var full = new CorrelationView();
+        full.setLlmUsage(List.of());
+        var fullJson = mapper.valueToTree(full);
+        assertThat(fullJson.path("llmUsage").isArray()).isTrue();
+        assertThat(fullJson.has("llmUsageAvailable")).isFalse();
+        var absent = new CorrelationView();
+        absent.setLlmUsageAvailable(false);
+        var baseJson = mapper.valueToTree(absent);
+        assertThat(baseJson.path("llmUsageAvailable").booleanValue()).isFalse();
+        assertThat(baseJson.has("llmUsage")).isFalse();
+    }
+
+    @Test
+    void missingLlmCapabilityKeepsOrdinaryTraceDomainsAndDistinguishesUnqueriedUsage() {
+        var ordinary = new CommandAuditLog();
+        ordinary.setCommandCode("ordinary.create");
+        when(commandAuditLogMapper.findByTraceId(7L, "trace-base")).thenReturn(List.of(ordinary));
+        when(behaviorEventMapper.selectList(any())).thenReturn(List.of(new BehaviorEvent()));
+        when(adminEventLogMapper.selectList(any())).thenReturn(List.of(new AdminEventLog()));
+        when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("trace-base"), anyInt())).thenReturn(List.of());
+        when(adminAuditService.findByTraceId(eq(7L), eq("trace-base"), anyInt())).thenReturn(List.of());
+        var withoutLlm = new CorrelationQueryService(commandAuditLogMapper, null, behaviorEventMapper,
+                adminEventLogMapper, permissionAuditLogMapper, adminAuditService);
+        var view = withoutLlm.byTrace("trace-base");
+        assertThat(view.getCommandAudits()).extracting(CommandAuditLogDTO::getCommandCode).containsExactly("ordinary.create");
+        assertThat(view.getBehaviorEvents()).hasSize(1);
+        assertThat(view.getAuditEvents()).hasSize(1);
+        assertThat(view.getLlmUsageAvailable()).isFalse();
+        assertThat(view.getLlmUsage()).isNull();
+        verify(llmUsageQuery, never()).findByTrace(any(), any());
+    }
+
+    @Test
     @DisplayName("byTrace assembles all six domains for the given trace id")
     void byTraceAssemblesAllDomains() {
         CommandAuditLog cmd = new CommandAuditLog();
@@ -101,6 +137,7 @@ class CorrelationQueryServiceTest {
         assertThat(view.getCommandAudits().get(0).getCommandCode()).isEqualTo("demo.create");
         assertThat(view.getCommandAudits().get(0).getTraceId()).isEqualTo("trace-abc");
         assertThat(view.getLlmUsage()).hasSize(1);
+        assertThat(view.getLlmUsageAvailable()).isNull();
         assertThat(view.getBehaviorEvents()).hasSize(1);
         assertThat(view.getAuditEvents()).hasSize(1);
         assertThat(view.getPermissionDenials()).hasSize(1);

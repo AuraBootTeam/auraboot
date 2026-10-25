@@ -28,7 +28,8 @@ public final class InstalledIntegrationExecution {
                      String target, InstalledIntegrationEvent event, Supplier<T> work) {
         if (CURRENT.get() != null) throw new SecurityException("Nested installed integration invocation denied");
         CURRENT.set(new Invocation(command, config, binding, query, handler, target, event));
-        try { return work.get(); } finally { VERIFIED_HANDLER.remove(); VERIFIED.remove(); CURRENT.remove(); }
+        try (var authority = InstalledMachineAuthority.open(binding, config, query)) { return work.get(); }
+        finally { VERIFIED_HANDLER.remove(); VERIFIED.remove(); CURRENT.remove(); }
     }
 
     public static void verify(String command, Long tenant, String config, Map<String,Object> params) {
@@ -119,6 +120,16 @@ public final class InstalledIntegrationExecution {
             settings.put(com.auraboot.framework.plugin.extension.CommandHandlerExtension.DATA_ACCESSOR_KEY,
                     InstalledIntegrationReadOnly.wrap(accessor));
         }
+    }
+
+    static void verifyDataAuthority() {
+        Invocation invocation=CURRENT.get();
+        if (invocation==null || VERIFIED.get()!=invocation || VERIFIED_HANDLER.get()!=invocation
+                || !Objects.equals(MetaContext.getCurrentTenantId(),invocation.binding().tenantId())
+                || !Objects.equals(MetaContext.getCurrentUserId(),0L)
+                || !("installation:"+invocation.binding().installationPid()).equals(MetaContext.getCurrentUserPid())
+                || !invocation.command().equals(MetaContext.getAuthorizedCommandCode()))
+            throw new org.springframework.security.access.AccessDeniedException("Verified installed data invocation required");
     }
 
     public static boolean active() { return CURRENT.get() != null; }

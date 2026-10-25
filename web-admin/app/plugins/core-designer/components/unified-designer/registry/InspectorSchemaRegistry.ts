@@ -1,3 +1,4 @@
+import { formPresentationProperties } from '~/shared/designer/formPresentationSchema';
 import type { PropertySchema } from '~/shared/designer';
 import type { DslBlockV3 } from '../types';
 
@@ -67,10 +68,13 @@ const modelContainerFields: PropertySchema<string>[] = [
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
+const formPresentationFields: PropertySchema<string>[] = [...modelContainerFields, ...formPresentationProperties];
+
 const formSectionFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'props.description', label: 'Description', type: 'text' },
   { key: 'props.collapsible', label: 'Collapsible', type: 'boolean' },
+  { key: 'props.defaultCollapsed', label: 'Default collapsed', type: 'boolean' },
   { key: 'props.visibleWhen', label: 'Visible when JSON', type: 'json' },
   { key: 'layout.columns', label: 'Columns', type: 'number' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
@@ -1078,7 +1082,7 @@ const gerberViewerFields: PropertySchema<string>[] = [
 export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry {
   const registry = new InspectorSchemaRegistry(defaultFields);
   registry.registerAll({
-    form: modelContainerFields,
+    form: formPresentationFields,
     'form-section': formSectionFields,
     detail: modelContainerFields,
     'detail-section': formSectionFields,

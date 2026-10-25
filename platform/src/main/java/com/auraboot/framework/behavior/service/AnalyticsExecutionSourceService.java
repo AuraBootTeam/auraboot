@@ -22,6 +22,7 @@ public class AnalyticsExecutionSourceService {
     private final ReportAggregateQueryService queries;
     private final UserPermissionService permissions;
     private final ObjectMapper json;
+    @org.springframework.lang.Nullable
     private final AnalyticsExecutionContext executionContext;
     private static final String PREFIX = "core_dashboard_";
     public record Source(String goal, Map<String, Object> binding) {}
@@ -45,7 +46,7 @@ public class AnalyticsExecutionSourceService {
         if (user == null || tenant == null || !permissions.hasPermission(user, permission)) {
             throw new AccessDeniedException("Analytics source permission required");
         }
-        executionContext.principal().ifPresent(principal -> {
+        if (executionContext != null) executionContext.principal().ifPresent(principal -> {
             if (principal.sandbox()
                     || principal.tenantId() != tenant || principal.actorUserId() != user) {
                 throw new AccessDeniedException("Execution principal cannot use a formal analytics adoption");

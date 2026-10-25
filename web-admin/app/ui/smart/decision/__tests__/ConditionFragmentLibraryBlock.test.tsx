@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { ConditionFragmentLibraryBlock } from '../ConditionFragmentLibraryBlock';
 
 const auth = vi.hoisted(() => ({
@@ -573,6 +574,11 @@ describe('ConditionFragmentLibraryBlock', () => {
     await screen.findByTestId('cfl-row-leave_sla_node_match');
     await waitFor(() => expect(screen.getByTestId('cfl-impact-ack')).toBeInTheDocument());
 
+    // Detail hydration resets consent for a new version/impact set. Interact only
+    // after its readback settles, using the browser event sequence.
+    await waitFor(() => expect(screen.queryByText('加载影响面...')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('cfl-versions')).toHaveTextContent('v2已校验'));
+    const user = userEvent.setup();
     const publish = screen.getByTestId('cfl-publish-selected');
     expect(screen.getByTestId('cfl-open-version')).toBeDisabled();
     expect(screen.getByTestId('cfl-validate-selected')).not.toBeDisabled();
@@ -581,11 +587,11 @@ describe('ConditionFragmentLibraryBlock', () => {
 
     const ack = screen.getByTestId('cfl-impact-ack') as HTMLInputElement;
     expect(ack.checked).toBe(false);
-    fireEvent.click(ack);
-    await waitFor(() => expect(ack.checked).toBe(true));
+    await user.click(ack);
+    await waitFor(() => expect(screen.getByTestId('cfl-impact-ack')).toBeChecked());
     await waitFor(() => expect(publish).not.toBeDisabled());
 
-    fireEvent.click(publish);
+    await user.click(screen.getByTestId('cfl-publish-selected'));
     await waitFor(() =>
       expect(post).toHaveBeenCalledWith(
         '/decision/condition-fragment-versions/frag-pid-2/publish',

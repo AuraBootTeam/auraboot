@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:31:55.316Z" hostname="Mac" time="3.632">
+  <testcase name="expiredRunCannotDispatchRetry()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="2.344" />
+  <testcase name="successfulSideEffectIsStableDespiteLateFailureAndCompensationSignals()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.193" />
+  <testcase name="stalePollCannotBypassNewBackoffOrAttemptBudget()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.284" />
+  <testcase name="twoWorkersCanClaimOneRetryOnly()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.115" />
+  <testcase name="crashedWorkerIsFencedIntoReconciliationWithoutRepeatingItsExternalEffect()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.147" />
+  <testcase name="tamperedEnvelopeCannotBorrowAnotherActor()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.096" />
+  <testcase name="cancelledRunCannotDispatchRetry()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.086" />
+  <testcase name="sameExecutionKeyIsIndependentAcrossTenants()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.039" />
+  <testcase name="realRetryRestoresActorAndCannotReexecuteAfterAuditFailure()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.149" />
+  <testcase name="currentAclDenialPreventsHistoricalRetry()" classname="com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT" time="0.101" />
+</testsuite>

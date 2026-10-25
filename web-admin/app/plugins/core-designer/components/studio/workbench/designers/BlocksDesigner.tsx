@@ -1,3 +1,4 @@
+import { StudioFormPresentationContext } from '../StudioFormPresentation';
 /**
  * Blocks Designer
  *
@@ -130,6 +131,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   previewMode = false,
   isCustomApiMode,
 }) => {
+  const { presentation } = React.useContext(StudioFormPresentationContext);
   const { locale } = useI18n();
   const l = useCallback(
     (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
@@ -606,12 +608,12 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
 
         {/* Center: Blocks Canvas */}
         <div className="flex-1 overflow-auto bg-gray-50" data-testid="designer-canvas">
-          <div className="space-y-4 p-6">
+          <div className={`mx-auto w-full space-y-4 p-6 ${schema.kind === 'form' ? presentation.width === 'comfortable' ? 'max-w-4xl' : presentation.width === 'wide' ? 'max-w-6xl' : '' : ''}`}>
             {/* Page header */}
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-medium text-gray-900">{schema.id}</h2>
+                  <h2 className="text-lg font-medium text-gray-900">{resolveLocalizedText(schema.title, locale) || kindLabel}</h2>
                   <p className="text-sm text-gray-500">
                     {kindLabel} — {schema.modelCode}
                   </p>
