@@ -42,8 +42,8 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await page.getByRole('button',{name:'新建公告',exact:true}).click();
     await page.getByTestId('form-field-title').locator('input').fill(title);
     await page.getByTestId('form-field-content').locator('textarea').fill('<p>Attachment review text.</p><img src="/announcement-unsafe-image" onerror="window.__announcementXss=7"><script>window.__announcementXss=9</script>');
-    const uploaded=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/file/upload');
     await expect(page.getByTestId('attachment-file-input')).toBeEnabled();
+    const uploaded=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/file/upload');
     await page.getByTestId('attachment-file-input').setInputFiles({name:fileName,mimeType:'text/plain',buffer:bytes});
     const file=await successful(await uploaded);expect(file.fileId).toEqual(expect.any(String));
     await expect(page.getByText(fileName,{exact:true})).toBeVisible();

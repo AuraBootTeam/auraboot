@@ -635,7 +635,6 @@
             "colSpan": 12,
             "defaultValue": [],
             "props": {
-              "renderComponent": "fileattachment",
               "multiple": true,
               "maxCount": 10,
               "limitsEndpoint": "/api/file/limits"
@@ -643,7 +642,8 @@
             "helpText": {
               "zh-CN": "最多 10 个附件；单文件限制以服务器当前上传配置为准。",
               "en-US": "Up to 10 attachments. The current server upload configuration determines the file-size limit."
-            }
+            },
+            "component": "fileattachment"
           }
         ]
       },
