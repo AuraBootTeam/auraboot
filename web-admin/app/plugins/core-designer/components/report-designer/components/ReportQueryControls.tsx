@@ -29,8 +29,8 @@ export function ReportQueryControls({ report, query }: { report: ReportDsl; quer
         </p>
       )}
       {query.failed && (
-        <div role="alert" className="mb-3 text-sm text-red-700">
-          <p>
+        <div role="alert" className="mb-4 space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-6 text-sm text-slate-600 shadow-sm">
+          <p className="font-semibold text-slate-900">
             {query.failure === 'access'
               ? text({
                   zh: '查询未成功：当前账号无权读取报表数据，或登录已失效。请确认登录和访问权限。',
@@ -69,7 +69,7 @@ export function ReportQueryControls({ report, query }: { report: ReportDsl; quer
             type="button"
             onClick={query.apply}
             disabled={query.loading}
-            className="mt-2 rounded border border-current px-3 py-1 disabled:opacity-50"
+            className="mt-2 rounded-md border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
           >
             {text({ zh: '重新查询', en: 'Retry query' })}
           </button>
