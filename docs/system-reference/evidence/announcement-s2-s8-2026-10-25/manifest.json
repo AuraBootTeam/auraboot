@@ -192,7 +192,14 @@
       ],
       "visualEvidence": [
         "lifecycle/legacy-revision.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:cancel_schedule",
@@ -221,7 +228,14 @@
       "visualEvidence": [
         "lifecycle/scheduled-publication.png",
         "lifecycle/canceled-publication.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:create_announcement",
@@ -249,7 +263,14 @@
       ],
       "visualEvidence": [
         "lifecycle/create-form-guidance.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:delete_announcement",
@@ -278,7 +299,14 @@
       "visualEvidence": [
         "lifecycle/confirm-announcement-delete_announcement.png",
         "lifecycle/deleted-draft.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:export_statistics",
@@ -308,7 +336,14 @@
         "visual/export-uncertain-network.png",
         "visual/export-completed.png",
         "visual/export-downloaded.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:publish",
@@ -337,7 +372,14 @@
       "visualEvidence": [
         "lifecycle/published-and-projected.png",
         "reminders/operations/approval-modes-provider-unavailable.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:reconcile_approval",
@@ -366,7 +408,14 @@
       ],
       "visualEvidence": [
         "bpm/any-submitted.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:remind",
@@ -396,7 +445,14 @@
         "reminders/visual/reminder-preview-ready.png",
         "reminders/visual/reminder-confirm-open.png",
         "reminders/visual/reminder-batch-completed.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:republish",
@@ -428,7 +484,14 @@
       "visualEvidence": [
         "lifecycle/legacy-revision.png",
         "bpm/all-rejected-history-after-revision.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:resume_reminders",
@@ -459,7 +522,14 @@
         "reminders/reminder-original-plan-blocked.png",
         "reminders/reminder-original-plan-resume-confirm.png",
         "reminders/reminder-original-plan-resumed.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:retry_publication",
@@ -489,7 +559,14 @@
         "reminders/recovery/publication-blocked.png",
         "reminders/recovery/publication-retry-confirm.png",
         "reminders/recovery/publication-recovered.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:set_pinned",
@@ -518,7 +595,14 @@
       "visualEvidence": [
         "reminders/management/announcement-pin-confirm.png",
         "reminders/management/announcement-pinned.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:submit_approval",
@@ -548,7 +632,14 @@
       "visualEvidence": [
         "bpm/any-submitted.png",
         "bpm/all-submitted.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:update_announcement",
@@ -577,7 +668,14 @@
       "visualEvidence": [
         "lifecycle/edit-form-values.png",
         "lifecycle/draft-detail.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:update_policy",
@@ -608,7 +706,14 @@
       ],
       "visualEvidence": [
         "bpm/any-default-definition-selected.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "announcement:withdraw_approval",
@@ -638,7 +743,14 @@
       "visualEvidence": [
         "bpm/all-withdrawal-reason.png",
         "bpm/all-rejected-history-after-revision.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:ab_announcement_detail",
@@ -667,7 +779,14 @@
       "visualEvidence": [
         "lifecycle/edit-form-values.png",
         "lifecycle/draft-detail.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:ab_announcement_form",
@@ -695,7 +814,14 @@
       ],
       "visualEvidence": [
         "lifecycle/create-form-guidance.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:ab_announcement_list",
@@ -723,7 +849,14 @@
       ],
       "visualEvidence": [
         "lifecycle/create-form-guidance.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_delivery_history_detail",
@@ -751,7 +884,14 @@
       ],
       "visualEvidence": [
         "reminders/operations/channel-history.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_policy_detail",
@@ -782,7 +922,14 @@
       ],
       "visualEvidence": [
         "bpm/any-default-definition-selected.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_reader_detail",
@@ -811,7 +958,14 @@
       "visualEvidence": [
         "attachments/recipient-frozen-attachment.png",
         "attachments/recipient-narrow-inbox-pending.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_reader_list",
@@ -840,7 +994,14 @@
       "visualEvidence": [
         "attachments/recipient-frozen-attachment.png",
         "attachments/recipient-narrow-inbox-pending.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_reminder_batch_detail",
@@ -870,7 +1031,14 @@
         "reminders/visual/reminder-preview-ready.png",
         "reminders/visual/reminder-confirm-open.png",
         "reminders/visual/reminder-batch-completed.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_reminder_plan_detail",
@@ -901,7 +1069,14 @@
         "reminders/reminder-original-plan-blocked.png",
         "reminders/reminder-original-plan-resume-confirm.png",
         "reminders/reminder-original-plan-resumed.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_reminder_preview_detail",
@@ -931,7 +1106,14 @@
         "reminders/visual/reminder-preview-ready.png",
         "reminders/visual/reminder-confirm-open.png",
         "reminders/visual/reminder-batch-completed.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_statistics_detail",
@@ -961,7 +1143,14 @@
         "visual/export-uncertain-network.png",
         "visual/export-completed.png",
         "visual/export-downloaded.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "page:announcement_statistics_export_detail",
@@ -991,7 +1180,14 @@
         "visual/export-uncertain-network.png",
         "visual/export-completed.png",
         "visual/export-downloaded.png"
-      ]
+      ],
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     }
   ],
   "actionCount": {
@@ -1433,6 +1629,16 @@
     "diffCheck": {
       "oss": 0,
       "bpm": 0
+    },
+    "mainIntegration": {
+      "status": "completed-scoped",
+      "command": "node scripts/check-docs-governance.mjs --strict --git --changed docs/system-reference/announcement-management.md docs/system-reference/2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md docs/README.md",
+      "exitCode": 0,
+      "checkedCanonicalDocuments": 2,
+      "errors": 0,
+      "warnings": 0,
+      "diffCheckExitCode": 0,
+      "evidence": "announcement-management/main-integration-docs-governance.log"
     }
   },
   "historicalArtifact": "artifact-validation.json",
@@ -1459,7 +1665,14 @@
       "visualEvidence": [
         "attachments/audience-page-two-preserved-selection.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "recipient-body-read",
@@ -1484,7 +1697,14 @@
         "attachments/recipient-body-failed-read-blocked.png",
         "attachments/recipient-frozen-attachment.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "recipient-acknowledge",
@@ -1508,7 +1728,14 @@
       "visualEvidence": [
         "attachments/recipient-narrow-confirmation.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "recipient-attachment",
@@ -1532,7 +1759,14 @@
       "visualEvidence": [
         "attachments/recipient-frozen-attachment.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "draft-upload-richtext",
@@ -1556,7 +1790,14 @@
       "visualEvidence": [
         "attachments/attachment-uploaded-draft.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "bell-open-retry",
@@ -1580,7 +1821,14 @@
       "visualEvidence": [
         "attachments/recipient-narrow-bell-load-error.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "bell-read-all",
@@ -1604,7 +1852,14 @@
       "visualEvidence": [
         "attachments/recipient-narrow-bell-write-error.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "inbox-open-focus",
@@ -1628,7 +1883,14 @@
       "visualEvidence": [
         "attachments/recipient-narrow-inbox-pending.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "strict-task-view",
@@ -1652,7 +1914,14 @@
       "visualEvidence": [
         "bpm/any-frozen-readonly-attachment.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "strict-task-approve",
@@ -1677,7 +1946,14 @@
         "bpm/any-decision.png",
         "bpm/all-first-decision.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "strict-task-reject",
@@ -1701,7 +1977,14 @@
       "visualEvidence": [
         "bpm/all-reject-decision.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "strict-task-history",
@@ -1725,7 +2008,14 @@
       "visualEvidence": [
         "bpm/all-rejected-history-after-revision.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "strict-resolve-node",
@@ -1749,7 +2039,14 @@
       "visualEvidence": [
         "bpm/all-blocked-node-resolution.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "strict-resume-original",
@@ -1773,7 +2070,14 @@
       "visualEvidence": [
         "bpm/all-blocked-original-resume.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "strict-replace-pending",
@@ -1799,7 +2103,14 @@
         "bpm/recovery-final-decision.png",
         "bpm/all-recovery-preserved-quorum.png"
       ],
-      "visualVerdict": "accepted for captured states only"
+      "visualVerdict": "accepted for captured states only",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "composition-lifecycle",
@@ -1820,7 +2131,14 @@
       ],
       "executed": true,
       "verdict": "pass",
-      "noUi": "Host lifecycle invariant and public HTTP boundaries; native task UI is separately covered."
+      "noUi": "Host lifecycle invariant and public HTTP boundaries; native task UI is separately covered.",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "capacity-and-observability",
@@ -1837,7 +2155,14 @@
       ],
       "executed": true,
       "verdict": "pass",
-      "noUi": "Metrics and capacity are backend semantic measurements; browser statistics has separate UI evidence."
+      "noUi": "Metrics and capacity are backend semantic measurements; browser statistics has separate UI evidence.",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     },
     {
       "id": "unconfigured-external-channel",
@@ -1856,7 +2181,14 @@
       ],
       "executed": true,
       "verdict": "pass",
-      "noUi": "Contract/eligibility validation only. Actual mini-program sender and native client are explicitly excluded and unexecuted."
+      "noUi": "Contract/eligibility validation only. Actual mini-program sender and native client are explicitly excluded and unexecuted.",
+      "mainIntegrationEvidence": {
+        "coreSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "bpmSource": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "coreResult": "announcement-management/main-integration-final-core-results.json",
+        "bpmResult": "announcement-management-bpm/main-integration-results.json",
+        "semanticBinding": "manual audit retained from original assertion; not an automatic requirement-level verdict"
+      }
     }
   ],
   "visualCoverageLimits": [],
@@ -1913,5 +2245,367 @@
       "path": "announcement-management-bpm/final-visual-workspace-verify.log",
       "sha256": "ce3e990e9fc06170e6d1d67035da97a1d884b3cd0f4a39c12b0263396c23cc83"
     }
-  ]
+  ],
+  "activeValidation": "mainIntegrationValidation",
+  "featureBaselineFields": [
+    "testedSource",
+    "browser",
+    "composition",
+    "currentVisualReviews",
+    "finalVisualSupplement"
+  ],
+  "featureBaselineNotice": "These immutable pre-main fields apply to their original inputs only. Current validation is mainIntegrationValidation.",
+  "mainIntegrationValidation": {
+    "claim": "main-integrated-and-locally-validated-with-explicit-boundaries; PR open, no merge/deployment",
+    "absorbedMain": "9aab94663e73deaf9aab4594f27a5c4fa9bf11a3",
+    "mergeCommitPrefix": "8b81ed4591ee",
+    "testedSource": {
+      "core": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+      "bpm": "3861a3146caf07a16b0937971e4cba5c2433e8de"
+    },
+    "deliverySourceEquivalence": "Subsequent Core commit changes only docs/index/public evidence; artifact producer remains exact tested source.",
+    "coreCatalog": {
+      "directory": "announcement-management/core-catalog-main-5f11717d0",
+      "producer": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+      "artifacts": 15,
+      "entries": 18,
+      "lock": "sha256:4b2aed4bcd046413456a1c0a5608b29e43bae31c6429a88e7f4647268ef22d92",
+      "graph": "sha256:fb308ab0b0ed17c3cf2d8c7410b8cfad954cee1905cf303de78419389fd1b136"
+    },
+    "bpmComposition": {
+      "directory": "announcement-management/bpm-composition-main-5f11717d0-scheduler",
+      "producer": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+      "platformSource": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+      "artifacts": 22,
+      "lock": "sha256:e1532f66c916ffd4eee31324aa818482f02825ab9c09f99735e6bc83fc8fb898",
+      "graph": "sha256:58fcb7f322a353d3a78ecb1192753a45648ad237b0a876633688b984741c4baa",
+      "skipOci": true
+    },
+    "counts": {
+      "apiFoundation": 38,
+      "frontendUnits": 184,
+      "coreBackendUnits": 292,
+      "applicationBackend": {
+        "total": 93,
+        "units": 31,
+        "realStackIntegrations": 62
+      },
+      "bpmNodeContracts": 97,
+      "bpmBackend": 1657,
+      "bpmJunitFiles": 224
+    },
+    "database": {
+      "coreMigrations": 153,
+      "bpmMigrations": 158,
+      "emptyControlMigrations": 153,
+      "emptyControlTables": 389,
+      "emptyControlProductTables": 0,
+      "schemaDrift": "match",
+      "manualSchemaRepair": false
+    },
+    "browser": {
+      "core": {
+        "source": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "registeredProfile": "playwright.oss.config.ts tests/e2e/announcement --project oss",
+        "collected": 17,
+        "executed": 17,
+        "passed": 17,
+        "failed": 0,
+        "skipped": 0,
+        "retries": 0,
+        "identitySetMatch": true,
+        "seconds": 181.28204200000002,
+        "setupAuthenticationSeparate": 1,
+        "businessExit": 0,
+        "stopExit": 0
+      },
+      "bpm": {
+        "collected": 4,
+        "executed": 4,
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0,
+        "retries": 0,
+        "authenticationSeparate": 1,
+        "reconciliation": "announcement-management-bpm/main-integration-reconciliation.json",
+        "businessExit": 0,
+        "stopExit": 0
+      }
+    },
+    "retainedFailures": [
+      {
+        "evidence": "announcement-management/main-integration-core-results.json",
+        "verdict": "environment-invalid",
+        "reason": "core-announcement not imported; 7 failed/10 not run"
+      },
+      {
+        "evidence": "announcement-management/main-integration-corrected-core-results.json",
+        "verdict": "failed",
+        "passed": 16,
+        "failed": 1,
+        "reason": "Ambiguous global title after main form presentation"
+      },
+      {
+        "evidence": "announcement-management/main-integration-backend.log",
+        "verdict": "partial root passed; app failed",
+        "reason": "private Redis stopped by official suspend"
+      },
+      {
+        "evidence": "announcement-management/main-integration-corrected-app-backend.log",
+        "verdict": "failed",
+        "passed": 91,
+        "failed": 2,
+        "reason": "private file storage path missing"
+      },
+      {
+        "evidence": "announcement-management-bpm/main-integration-composition-build.log",
+        "verdict": "failed-and-interrupted",
+        "reason": "SLA26 assertion failed; exit137 cause unproven"
+      },
+      {
+        "evidence": "announcement-management-bpm/main-integration-sla26-scheduler-counterexample.log",
+        "verdict": "expected-counterexample-failure",
+        "passed": 0,
+        "failed": 1
+      }
+    ],
+    "warnings": [
+      "BPM RUNTIME_MANIFEST_MISSING; independent product verify and process/DB/BFF evidence passed",
+      "Shared CLI Gradle prefix-match defect unchanged; lifecycle/build serialized"
+    ],
+    "remainingScope": "No undecided product defaults. Actual mini-program sender, remote BPM, 50000-member capacity, standalone BPM 340-case corpus, OCI/Linux/Jenkins and production did_not_run. No 100% permutation or automatic requirement coverage claim. Shared Workspace Gradle prefix-match defect remains; lifecycle operations serialized.",
+    "staticExecuted": 0,
+    "visualReviews": [
+      {
+        "file": "main-integration/core-create-form-guidance.png",
+        "sha256": "d506a4d1ffd1779e6360f3c98c3ca2181dc77c0061dfa251d736fbf18e4739bc",
+        "sourceCommit": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "run": "main-integration-final-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Empty form retains grouped guidance and fixed save/cancel footer.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/core-edit-form-values.png",
+        "sha256": "f977ab80f72ada15d5786f6bc9339c7a590c181ff8728ccba2a5e256e25c3091",
+        "sourceCommit": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "run": "main-integration-final-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Saved importance, pin, expiry and body values are readable.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/core-recipient-frozen-attachment.png",
+        "sha256": "0d019776c2d0c932fbab597cb0691fa408c18ddf1b691ca420e3c31cff2a44a7",
+        "sourceCommit": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "run": "main-integration-final-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Frozen recipient body and named sized attachment render before acknowledgement.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/core-notification-settings-audience.png",
+        "sha256": "abd31ab1607477d3a2fa6f72f7e737be4a737b7e8700726a2268bbd9d0c1a592",
+        "sourceCommit": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "run": "main-integration-final-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Exemption selection and unavailable approval reason remain legible; lower audience control is outside this captured scroll.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/core-recipient-narrow-confirmation.png",
+        "sha256": "808c499a0436159a631bdf0c157e8dedacc26ab9a654184b79ac0000c95494f7",
+        "sourceCommit": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "run": "main-integration-final-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "390px confirmation fits; focus, cancel and confirm are visible without horizontal overflow.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/core-recipient-narrow-bell-load-error.png",
+        "sha256": "b96b1459e41b623881306ce192e05bc4c2cf14f4cfa0be941a948b6358931e00",
+        "sourceCommit": "5f11717d0a55dfd70c8988045055430cd6c3ce07",
+        "run": "main-integration-final-core",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Actual network failure exposes retry while preserving unread count; no fake empty state.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/bpm-any-default-definition-selected.png",
+        "sha256": "965a467653c36bd3f44c6914b805a99fed96ba906f62487d1ec6772c4857e9c8",
+        "sourceCommit": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "run": "main-integration",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Tenant policy selects the strict default flow with guidance and accessible fixed save footer.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/bpm-any-frozen-readonly-attachment.png",
+        "sha256": "9df7fa0352003b665cf248208e9ff81489e3b9c555a7727bbe72d6d2be62a153",
+        "sourceCommit": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "run": "main-integration",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Task drawer presents qualified frozen body and named sized attachment as read-only.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/bpm-any-decision.png",
+        "sha256": "6d59af4fd326573a2dc99c62cbf12da2b031ea3c074602fc0cd85ed566ee4adf",
+        "sourceCommit": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "run": "main-integration",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Decision and comment controls remain visible with distinct approve/reject actions.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/bpm-all-withdrawal-reason.png",
+        "sha256": "493bbcb34195a333ced348e0ecf2da7afe65e29ae3478035009110e68966c557",
+        "sourceCommit": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "run": "main-integration",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Withdrawal reason is required and cancellation/publication consequences are explained.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/bpm-all-recovery-replacement-confirm.png",
+        "sha256": "adb65c77d1da1ec2f066854654b806cbd412c4939980aa4765f5059be8728f8e",
+        "sourceCommit": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "run": "main-integration",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Pending replacement, qualified new approver and required audit reason are explicit.",
+        "scope": "Captured state only"
+      },
+      {
+        "file": "main-integration/bpm-all-recovery-preserved-quorum.png",
+        "sha256": "573a37f79091c55a7523f7ef6e232a3dbd5d4f8e510a071ab51cce6731f02db0",
+        "sourceCommit": "3861a3146caf07a16b0937971e4cba5c2433e8de",
+        "run": "main-integration",
+        "authority": "agent-vision",
+        "reviewed": true,
+        "verdict": "accepted",
+        "finding": "Passed status retains ALL rule and accepted plus replacement approvers after completion.",
+        "scope": "Captured state only"
+      }
+    ],
+    "executionReceipts": [
+      {
+        "path": "announcement-management/main-integration-api-foundation.log",
+        "sha256": "49a1f4eaa205c9bf36a10e5d21734e907430fd26aeb474939fff109dfdbcc80d"
+      },
+      {
+        "path": "announcement-management/main-integration-frontend-units.log",
+        "sha256": "a35b24198413680cd12ed7688683f1516f77ece6c399bfbab73ef054af8a3d76"
+      },
+      {
+        "path": "announcement-management/main-integration-typecheck.log",
+        "sha256": "7792f7d2f1a83907a64779aba24833ef84545b73c6566c80aca5b4021cc20664"
+      },
+      {
+        "path": "announcement-management/main-integration-passed-backend-junit/core/summary.json",
+        "sha256": "77a7459f2b243bd6127c8e6a529c7f245bc834afff545982be2cf2e0def8b84b"
+      },
+      {
+        "path": "announcement-management/main-integration-passed-backend-junit/application/summary.json",
+        "sha256": "1ad34afbbe1f2c1f1ad049b27faeab59df60cd42c2554d6ddbedc5753eeed45f"
+      },
+      {
+        "path": "announcement-management/main-integration-owned-app-backend.log",
+        "sha256": "55d0a8b9089d62fce04b0b0f1e68e4dd199a81783f50b246df51496a40f9c8cf"
+      },
+      {
+        "path": "announcement-management/main-integration-schema-drift.log",
+        "sha256": "6a6bafc0a58ed32e08b5eab079bf5c768ad51bfbf8708e06bec541d169e3359c"
+      },
+      {
+        "path": "announcement-management/main-integration-core-schema-audit.log",
+        "sha256": "b2fb0e90162fe58bc459415cb3ddc07225a1613e8531a5f44aa2a0764bcfae8a"
+      },
+      {
+        "path": "announcement-management/main-integration-test-system.log",
+        "sha256": "4b010a4941e30921263e165ea4f6b9ac04423b10c67a04b0fbb19ab149ff0d53"
+      },
+      {
+        "path": "announcement-management/main-integration-final-core-browser.log",
+        "sha256": "e672174e051459aba24cb008e22aec9cc1be7e2c09010100f933d0ab2336bc6b"
+      },
+      {
+        "path": "announcement-management/main-integration-final-core-collection.json",
+        "sha256": "beb4614edd569f6016e87d7545fc371552be3d8c096c687e09c8e8a1e99a2d2b"
+      },
+      {
+        "path": "announcement-management/main-integration-final-core-results.json",
+        "sha256": "648b194977897efe8daab3090d4e35c61660d98324e194cd458c2fdbc35f72d4"
+      },
+      {
+        "path": "announcement-management/main-integration-core-reconciliation.json",
+        "sha256": "41139f513df933100f32f2e9e4eb5957a0227ef0411537517b840b541d642c45"
+      },
+      {
+        "path": "announcement-management/main-integration-final-core-exit.log",
+        "sha256": "6344fddcba17a9fb042761bc7d484f38c16bb9940dc6cc3eff9c67000713652f"
+      },
+      {
+        "path": "announcement-management/main-integration-core-catalog-build.log",
+        "sha256": "f07e77a6502be03ee8eec01c8552c4294e3db8a7ff0c0e048e84d1b041bdd0f2"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-scheduler-composition-build.log",
+        "sha256": "59ff4a3aefd1ff2e09fda8af68cc8e544c1c4b698bacbf8c1c0d077604ee3073"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-full-junit/summary.json",
+        "sha256": "f983286e1001af2b00244a4252115a1af47c3d26e21d7f4c823844efdd83cf11"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-browser.log",
+        "sha256": "ed258cb00d324a891331c2b256f2053773df7dc68ba4f9bf260d71a053b06bbb"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-collection.json",
+        "sha256": "86c723342c43159bb3cbc97e085d0b5e899609036130308a8e93c9cdaad708f9"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-results.json",
+        "sha256": "cfb8ea23ea6863ea3a34f9363e3d23129d2edace748aac5d826dab63930b3200"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-reconciliation.json",
+        "sha256": "13589fefeb5cc0d33816be74f0c9efa2c7433e86797365e5aad35da7621f5047"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-exit.log",
+        "sha256": "6344fddcba17a9fb042761bc7d484f38c16bb9940dc6cc3eff9c67000713652f"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-sla26-scheduler-counterexample.log",
+        "sha256": "b70fa3192348bd788b870878aff1ec888d2e8cc6b8da89ee39f1045ec045b646"
+      },
+      {
+        "path": "announcement-management-bpm/main-integration-sla26-scheduler-fixed.log",
+        "sha256": "10a64a1737798c027c36568f4f55118e234588112191c2cf2a9954777b0ce961"
+      }
+    ]
+  }
 }

@@ -18,7 +18,7 @@ implementation_status: implemented-local-validated-pr-open
 
 ## 1. 定位与文档状态
 
-本文是 OSS 公告管理的需求、UX、权限及集成契约的唯一入口。需求讨论采用的默认规则已落入 S1–S8 实现；**本期实现与本地分层验证已完成，三个关联 PR 保持开放，未合并、未发布生产**。当前裁决以 §18.26、[验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)及其同一证据 manifest 为准。S1 历史证据见 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)。阶段是依赖顺序，不是等待用户逐阶段确认的闸门。§14 是实施前盘点，§17 和 §18.1–18.25 是历史切片；其“待完成”描述由当前裁决取代。测试数量不等于功能覆盖率，未执行边界不会因实现完成而消失。
+本文是 OSS 公告管理的需求、UX、权限及集成契约的唯一入口。需求讨论采用的默认规则已落入 S1–S8 实现；**本期实现与本地分层验证已完成，三个关联 PR 保持开放，未合并、未发布生产**。当前裁决以 §18.27、[验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)及其同一证据 manifest 为准。S1 历史证据见 [S1 验收记录](./2026-10-24-announcement-s1-testing-gate-acceptance-report.md)。阶段是依赖顺序，不是等待用户逐阶段确认的闸门。§14 是实施前盘点，§17 和 §18.1–18.26 是历史切片；其“待完成”描述由当前裁决取代。测试数量不等于功能覆盖率，未执行边界不会因实现完成而消失。
 
 目标是为当前租户提供“编写 → 免审或审批 → 立即或定时发布 → 多渠道提醒 → 阅读与确认知悉 → 催办与统计导出”闭环。
 
@@ -1284,3 +1284,28 @@ Core 实际 17 条公告 browser 通过；强化后的原计划恢复另跑 1 �
 BPM Workspace 核验仍有 `RUNTIME_MANIFEST_MISSING` 警告；本轮通过独立产品 verify、源码/构件摘要、listener/PID/cwd、BFF 实际请求及数据库身份共同证明该独立产品栈，不能写成“零 warning”。Workspace CLI 的 Gradle cache 路径前缀匹配缺陷尚未修改，两个 runtime 的生命周期和构建必须串行；此前因此中断的构建不算通过。两个任务环境已正常暂停，DB、构件和证据保留；本地地址为 OSS Web 5101/Backend 6401、BPM Web 5401/Backend 6501，暂停期间不提供在线页面。
 
 小程序快速接入的具体边界是平台公开 `NotificationDeliveryAccessor.Request(tenantId, resolutionReference, channel)` 与 host `NotificationDeliveryPlanResolver`：公告已经提供 `ann1` 准确版本/接收人解析，渠道只接受宿主解析的名单、内容与来源，不能信任客户端自报。当前 `WECHAT_SUBSCRIPTION` 明确返回未配置，capabilities 中 `wechat_mini` 不可选。后续接入仍需实现账号/订阅授权、模板与实际发送 provider，并接通渠道就绪和可选项；复用现有可靠队列、幂等键、结果审计、版本深链接及跨端 read/acknowledge，不重做公告状态机。本期没有交付微信 SDK、配置即用的真实 sender 或真机验证。
+
+### 18.27 授权吸收 main 后的当前集成裁决
+
+本节取代 §18.26 的“当前验证版本”，不改变公告业务契约。用户明确授权在当前任务分支吸收最新 main、完成集成回归并更新 PR，暂不合并。OSS 任务分支已合入 main `9aab94663e73deaf9aab4594f27a5c4fa9bf11a3`，merge commit `8b81ed4591ee`；未追随验证期间的新 main。三个冲突分别是中英文语言资源和生成的内部 API 类型：语言键保留双方并集，类型从合并后的 OpenAPI 正式重生成并通过一致性校验。上游 `HandlerPhase`、表单呈现、可靠队列和文件租户隔离的自动合并也已纳入影响检查。
+
+| 当前输入 | 确切身份与结果 |
+| --- | --- |
+| OSS 源码 / Core catalog producer | `5f11717d0a55dfd70c8988045055430cd6c3ce07`；后续交付提交仅补充本文、报告、索引及公开证据 |
+| Core catalog | `core-catalog-main-5f11717d0`；15 artifacts / 18 catalog entries；lock `sha256:4b2aed4bcd046413456a1c0a5608b29e43bae31c6429a88e7f4647268ef22d92`；graph `sha256:fb308ab0b0ed17c3cf2d8c7410b8cfad954cee1905cf303de78419389fd1b136` |
+| BPM producer / browser source | `3861a3146caf07a16b0937971e4cba5c2433e8de`；组合显式消费上行 Core catalog，不隐式构建兄弟源码 |
+| BPM 组合 | `bpm-composition-main-5f11717d0-scheduler`；22 artifacts；lock `sha256:e1532f66c916ffd4eee31324aa818482f02825ab9c09f99735e6bc83fc8fb898`；graph `sha256:58fcb7f322a353d3a78ecb1192753a45648ad237b0a876633688b984741c4baa` |
+| 当前数据库 | OSS 公开 fresh reset 后纯 Core 153 条迁移；BPM 新构件公开 reset 后 158 条；独立保留空库对照 `aura_announcement_main_schema_5f11717` 正常迁移 153 条、389 表、无产品表/行且 schema drift 匹配 |
+| 生命周期 | 原有 OSS/BPM runtime、端口及数据库复用；两者 business_exit=0 / stop_exit=0，现已 suspended，保留 DB、构件、备份和证据 |
+
+安装方法沿用 §18.26 的冻结 catalog → 显式 announcements composition → 公共迁移/reset/init-core/publish/verify 生命周期，版本与迁移数以上表为准。Core 启动使用公开启动器明确选择 `--plugin-profile core --plugin core-announcement`，仅 `core` profile 不代表已导入公告。新组合在正式 reset 后重新初始化本任务租户、发布应用配置并通过产品核验；没有手工修表、迁移历史回填或 out-of-order。开发库备份保留，不涉及生产环境。
+
+集成回归结果：Core 后端 292 单元；应用后端 93 项（31 单元、62 真实 PostgreSQL/HTTP/worker/插件集成）；相关前端 184 项和 typecheck；内部 API foundation 38 项、类型重生成一致性；Core 17 条原生公告 browser。BPM 正式构建通过 97 Node 契约、1657 后端测试（224 份 JUnit，含 9 公告组合 IT、10 strict IT 和 27 SLA 测试）、Web typecheck/client/SSR/摘要/单 React/图一致性；同一确切组合 4 条 native browser 通过。两端 browser 均无 skip/retry，认证各 1 条另计，collection/result 的身份集合一致。结构静态门通过但 executed=0，不是业务执行覆盖。不同面和历史重复轮次不累加。
+
+主干表单现在同时在页头和字段显示标题；OSS 两份浏览器 spec 的 5 处标题断言改为字段作用域。BPM 仅补充测试配置：后台重试定时器初次触发延后至一天，SLA 测试仍主动驱动真实队列；生产定时器逻辑与默认值未变。加速定时器反例稳定得到 `RETRY_PENDING` 被后台推进成 `DEAD_LETTER` 的断言失败，同一反例在修正配置后通过，随后整个 1657 项正式构建通过。该测试竞争与首次构建 exit 137 是不同事实；137 原因未证明，不能写为 OOM 或成功。
+
+保留的失败记录包括：未导入公告导致的首轮环境无效、首次 16/17 browser 标题重复定位、Redis 随暂停关闭导致应用测试启动失败、私有文件路径未注入导致的两项 IT 失败，以及首次 BPM 构建的 SLA 失败和中断。更正前提与断言后才运行上述最终绿色轮次；原日志不覆盖、不改标。
+
+12 张本次原图已逐张复核，位于[同一证据清单](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `mainIntegrationValidation.visualReviews`；对应表单、接收版本附件、窄屏确认/铃铛错误态、默认流程、冻结送审、决策、撤销原因及恢复替换。图片只裁决捕获状态，不外推全部排列。
+
+验证边界维持 §18.26：未追加小程序实际发送、远程 BPM、50000 人容量、独立 BPM 340 条 corpus、OCI/Linux/Jenkins 或生产验证。BPM Workspace 仍有 `RUNTIME_MANIFEST_MISSING` warning，产品独立 verify 与真实 BFF/DB/进程身份另行通过；共享 CLI Gradle 路径前缀匹配问题未修，本轮串行构建与生命周期操作。上游全部 147 个文件不等于都经本次业务回归。当前仅提交开放 PR，不合并、不部署；完整账本见[验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)。

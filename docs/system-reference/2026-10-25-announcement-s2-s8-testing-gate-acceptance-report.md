@@ -7,9 +7,42 @@ updated: 2026-10-25
 
 # 公告 S2–S8 本地分层验收记录
 
-## 当前结论
+## 当前 main 集成回归（取代下方历史功能基线）
 
-本期 S1–S8 业务实现、OSS/BPM 组合和本地分层验证已完成，交付到开放 PR；未合并、未发布生产。需求唯一真源为[公告设计](./announcement-management.md)，实际契约以其 §18.26 为准。[同一证据 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)关联生成的行动点、具体断言、准确运行和逐图裁决。本报告取代此前各增量报告中的“最新”口径；设计 §18.1–18.25 和不可变原始日志仍保留历史失败。
+本轮在用户明确授权下吸收 main `9aab94663e73deaf9aab4594f27a5c4fa9bf11a3`，不合并 PR、不发布。当前设计裁决为 [§18.27](./announcement-management.md#1827-授权吸收-main-后的当前集成裁决)，确切源码、构件 lock/graph 和 12 张复核原图见[同一 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `mainIntegrationValidation`。下方“当前结论”、运行身份和旧执行表是原功能基线记录，只对原确切输入有效；不代表本轮重复运行。
+
+OSS 最终被测源码及 catalog producer 为 `5f11717d0a55dfd70c8988045055430cd6c3ce07`；BPM 为 `3861a3146caf07a16b0937971e4cba5c2433e8de`，正式消费上述 catalog。后续 OSS 交付提交只更新文档/证据，未重编译或冒称新二进制。合并语言键取双方并集；OpenAPI 类型正式重生成，digest `ab2f3c3c89b7cbd7dcdea82e3998a4e7226808475be6a97242261edf4b772f54`。
+
+路径以下均相对 Workspace `.workspace/evidence/`，日志、JUnit、collection/result 原件保留，未公开认证、数据库备份、原始 CSV 或私有对象地址。
+
+| 测试面 / 实际范围 | 本轮结果与 receipt |
+| --- | --- |
+| Core API foundation / script + contract | 38 实际通过，exit 0；`announcement-management/main-integration-api-foundation.log`，生成类型一致性及独立 schema 类型检查通过；不是 browser |
+| 前端 / hermetic / unit | 15 文件 184 项通过，typecheck exit 0；`main-integration-frontend-units.log`、`main-integration-typecheck.log`；执行于 merge 输入，后续只改两份 browser spec 的标题定位，production TS 相同 |
+| Core 后端 / hermetic / unit | 292 项通过；`main-integration-passed-backend-junit/core/summary.json`；不把原组合命令随后失败的 app 阶段算通过 |
+| 应用后端 / mixed unit+real-stack IT | 93 项全部通过（31 单元、62 真实集成），fail/error/skip 0；`main-integration-owned-app-backend.log`、`main-integration-passed-backend-junit/application/summary.json`；含公告、文件租户边界、可靠集成、真实插件导入 |
+| Core schema / real-stack migration | 空库实际 153 条迁移、389 表、产品表/行 0，schema drift 一致；`main-integration-schema-drift.log`、`main-integration-core-schema-audit.log`；独立库保留 |
+| Core 结构静态门 | `main-integration-test-system.log` exit 0，251 脚本已索引，既有 2 项 handwritten matrix debt；静态 executed=0 |
+| Core 原生 browser / real-stack journey | 17 collected/executed/passed，fail/skip/retry 0，181.282 秒，认证另 1；`main-integration-final-core-browser.log`、`main-integration-final-core-collection.json`、`main-integration-final-core-results.json`、`main-integration-core-reconciliation.json`；唯一 case identity 集合逐项匹配 |
+| Core catalog / 正式构建 | 15 artifacts / 18 entries，typecheck/client/SSR/checksum/graph/单 React 通过；`main-integration-core-catalog-build.log`、`core-catalog-main-5f11717d0` receipt |
+| BPM 正式组合 / script + mixed backend | 97 Node 契约、1657 backend（224 XML）全通过，fail/error/skip 0；含 9 公告组合 IT、10 strict IT、27 SLA；这些是子集不另加；`announcement-management-bpm/main-integration-scheduler-composition-build.log`、`main-integration-full-junit/summary.json` |
+| BPM Web 构件 | 同正式构建 typecheck/client/SSR/单 React/摘要/图一致性全部通过；22 artifacts，组合为 `bpm-composition-main-5f11717d0-scheduler`，skip OCI |
+| BPM 原生 browser / real-stack journey | 固定 4 条（ANY、ALL、恢复替换、既有项目审批）全部单次通过，fail/skip/retry 0，约 1.3 分钟，认证另 1；`main-integration-browser.log`、`main-integration-collection.json`、`main-integration-results.json`、`main-integration-reconciliation.json`，精确集合对账 PASS |
+| 环境和正常退出 | Core 正式 fresh reset 后 153，BPM 新构件公开 reset 后 158；独立 product verify 与 Workspace verify 已执行；`main-integration-final-core-exit.log`、BPM `main-integration-exit.log` 均 business_exit=0 / stop_exit=0；原 runtime suspended，DB/构件/证据保留 |
+
+同一实际范围不同轮次不累计。新 UI 图片复核涵盖 6 张 Core、6 张 BPM，逐图 findings/摘要/源码/运行指针见 manifest。本轮并未复验独立产品 340 条或上游全部 147 个文件。
+
+失败与修正：初始 Core 未导入 core-announcement 为 environment-invalid（7 failed/10 not run）；导入后 16 pass/1 fail 是主干标题双显示触发宽泛定位，5 处断言限定字段后完整 17 通过。首次后端 root 292 通过而 app Redis 启动前提失败；再轮 app 91/93，缺文件存储路径导致两项失败；注入任务私有路径后最终 93 全通过。旧失败日志独立保留，不算本轮绿色。
+
+BPM 首次构建 SLA 断言失败并最终 exit 137；137 原因未证。对 SLA26 的单项、加速后台定时器反例和修正后相同反例分别保留 `main-integration-sla26-{diagnostic,scheduler-counterexample,scheduler-fixed}.log`：加速反例 1 fail（预期 RETRY_PENDING 实为 DEAD_LETTER），修正测试配置后同反例 1 pass，随后完整构建 1657 通过。`plugin/backend/build.gradle` 只为 test 设置 retry initial delay 86400000ms，让测试显式驱动真实队列；生产定时器默认值/实现未改。不得把失败、中断和最终通过混为同轮。
+
+本轮 allowed_claim 为 **main-integrated-and-locally-validated-with-explicit-boundaries**。BPM 仍有 Workspace `RUNTIME_MANIFEST_MISSING` warning；独立产品及实际 BFF/DB/PID/cwd/source/artifact 证据通过，未声称零 warning。共享 CLI 前缀匹配缺陷未修，生命周期与构建串行。实际小程序 sender、远程 BPM、50000 人、独立 340 corpus、OCI/Linux/Jenkins、生产及自动需求级覆盖裁决 did_not_run；原容量 501 成员属于历史功能基线。没有新增待产品决定项。
+
+## 历史功能基线（吸收 main 前）
+
+### 原基线结论
+
+本期 S1–S8 业务实现、OSS/BPM 组合和本地分层验证已完成，交付到开放 PR；未合并、未发布生产。需求唯一真源为[公告设计](./announcement-management.md)，原基线契约见其 §18.26，当前以 §18.27 为准。[同一证据 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)关联生成的行动点、具体断言、准确运行和逐图裁决。本报告取代此前各增量报告中的“最新”口径；设计 §18.1–18.25 和不可变原始日志仍保留历史失败。
 
 **allowed_claim: implemented-and-local-validated-with-explicit-boundaries。** 这不等于所有状态排列、全产品 corpus、功能覆盖率 100%、OCI/Linux 或生产验收。小程序实际发送端不在本期；渠道适配与同一版本/知悉事实的公共边界已纳入实现。
 
