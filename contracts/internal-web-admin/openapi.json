@@ -14068,6 +14068,32 @@
         },
         "type": "object"
       },
+      "ApiResponseQuarantineResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuarantineResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseReadReceiptSummary": {
         "properties": {
           "code": {
@@ -22338,6 +22364,9 @@
         "properties": {
           "deadLetter": {
             "$ref": "#/components/schemas/DeadLetterSummary"
+          },
+          "quarantine": {
+            "$ref": "#/components/schemas/QuarantineResult"
           },
           "receipts": {
             "items": {
@@ -40964,6 +40993,36 @@
         },
         "type": "object"
       },
+      "PlatformQuarantineRequest": {
+        "properties": {
+          "eventId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "expectedReplayCount": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantPid": {
+            "maxLength": 26,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "expectedReplayCount",
+          "reason",
+          "tenantPid"
+        ],
+        "type": "object"
+      },
       "PluginCompatibilityDTO": {
         "properties": {
           "compatibilityMessage": {
@@ -42353,6 +42412,56 @@
           "withoutWindowEntryTasks": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "QuarantineRequest": {
+        "properties": {
+          "expectedReplayCount": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedReplayCount",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "QuarantineResult": {
+        "properties": {
+          "correlationId": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordPid": {
+            "type": "string"
+          },
+          "replayCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -54857,6 +54966,36 @@
         ]
       }
     },
+    "/api/admin/infrastructure/reliable-integration/dead-letters/quarantine": {
+      "post": {
+        "operationId": "quarantine_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformQuarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseQuarantineResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "platform-reliable-integration-controller"
+        ]
+      }
+    },
     "/api/admin/infrastructure/status": {
       "get": {
         "operationId": "status_2",
@@ -55427,6 +55566,46 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDeadLetterDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "reliable-integration-operator-controller"
+        ]
+      }
+    },
+    "/api/admin/reliable-integration/dead-letters/{eventId}/quarantine": {
+      "post": {
+        "operationId": "quarantine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseQuarantineResult"
                 }
               }
             },
