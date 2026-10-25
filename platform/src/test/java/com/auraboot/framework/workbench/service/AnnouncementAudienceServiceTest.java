@@ -132,7 +132,7 @@ class AnnouncementAudienceServiceTest {
         assertThatThrownBy(()->service.optionPage("person","",0,25,List.of())).isInstanceOf(BusinessException.class);
         assertThatThrownBy(()->service.optionPage("person","",1,51,List.of())).isInstanceOf(BusinessException.class);
         assertThatThrownBy(()->service.optionPage("person","a".repeat(101),1,25,List.of())).isInstanceOf(BusinessException.class);
-        assertThatThrownBy(()->service.optionPage("person","",1,50,Collections.nCopies(51,"employee")))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->service.optionPage("person","",1,50,Collections.nCopies(51,"employee"))).isInstanceOf(BusinessException.class);
         verifyNoInteractions(directory);
     }
 
