@@ -134,6 +134,17 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     expect(fact.first_read_at).toEqual(firstRead);expect(firstRead).toBeTruthy();expect(fact.acknowledged_at).toBeNull();
     expect((await db.query('SELECT snapshot::text,snapshot_hash FROM ab_announcement_version WHERE tenant_id=$1 AND pid=$2',[tenant,version])).rows[0]).toEqual(frozen);
     await reader.screenshot({path:info.outputPath('recipient-frozen-attachment.png'),fullPage:true,animations:'disabled'});
+    await reader.setViewportSize({width:390,height:844});
+    const acknowledge=reader.getByRole('button',{name:'确认已知悉',exact:true});
+    await expect(acknowledge).toBeVisible();
+    expect(await reader.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+    await reader.screenshot({path:info.outputPath('recipient-narrow-attachment.png'),fullPage:true,animations:'disabled'});
+    await acknowledge.focus();await reader.keyboard.press('Enter');
+    await expect(reader.getByTestId('confirm-dialog')).toBeVisible();
+    await reader.screenshot({path:info.outputPath('recipient-narrow-confirmation.png'),fullPage:true,animations:'disabled'});
+    await reader.keyboard.press('Escape');
+    await expect(reader.getByTestId('confirm-dialog')).toBeHidden();await expect(acknowledge).toBeFocused();
+    expect((await db.query('SELECT acknowledged_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[tenant,version,identities[0].userPid])).rows[0].acknowledged_at).toBeNull();
     writeFileSync(info.outputPath('attachment-validation.json'),JSON.stringify({fileName,byteCount:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),retentionDeletionDenied:true,ordinaryRecipientDownload:true,outsiderDenied:true,downloadDidNotMarkRead:true,acknowledgementRemainsIndependent:true,xssDidNotExecute:true},null,2));
   } finally {
     try {
