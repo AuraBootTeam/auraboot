@@ -1653,6 +1653,7 @@
             },
             "filter": {
               "field": "filter",
+              "operator": "EQ",
               "value": "unread"
             }
           },
@@ -1664,6 +1665,7 @@
             },
             "filter": {
               "field": "filter",
+              "operator": "EQ",
               "value": "pending_ack"
             }
           }
@@ -1795,7 +1797,7 @@
               "zh-CN": "返回我的公告",
               "en-US": "Back to my announcements"
             },
-            "variant": "secondary",
+            "variant": "default",
             "action": {
               "type": "navigate",
               "to": "/p/announcement_reader"
