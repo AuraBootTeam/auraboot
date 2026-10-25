@@ -93,6 +93,9 @@ public class HandlerPhase implements CommandPhase {
     private com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.currency.spi.CurrencyConversionSpi currencyConversionService;
+
+    @Autowired(required = false)
     private com.auraboot.framework.auth.wechat.WechatMiniIdentityService wechatMiniIdentityService;
 
     @Autowired(required = false)
@@ -639,6 +642,8 @@ public class HandlerPhase implements CommandPhase {
             }
             com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.install(
                     commandCode, tenantId, pluginSettings);
+            com.auraboot.framework.plugin.pf4j.DocumentCurrencyAccessorImpl.install(
+                    pluginSettings, tenantId, currencyConversionService);
             com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                     pluginSettings, tenantId, cloudConfigService, objectMapper);
             com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
@@ -797,6 +802,10 @@ public class HandlerPhase implements CommandPhase {
                 if (cause instanceof org.springframework.dao.DataAccessException persistenceFailure) {
                     throw persistenceFailure;
                 }
+            }
+            if (e instanceof com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Unavailable unavailable) {
+                throw new BusinessException(ResponseCode.BadParam,
+                        "$i18n:currency.error.document_snapshot_unavailable", unavailable);
             }
             // Plugin handlers use stable, transport-neutral error keys because
             // the plugin API must not depend on host web exceptions. Preserve

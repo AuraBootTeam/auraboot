@@ -312,6 +312,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             return accessor instanceof TenantRoleAssignmentAccessor value ? value : null;
         }
 
+        /** Present only for an explicitly opted-in host-owned financial reader. */
+        public DocumentCurrencyAccessor documentCurrencyAccessor() {
+            Object accessor=settings!=null?settings.get(DocumentCurrencyAccessor.SETTINGS_KEY):null;
+            return accessor instanceof DocumentCurrencyAccessor value?value:null;
+        }
+
         /** Available only through explicit server-owned secret scope metadata. */
         public TenantSecretAccessor tenantSecretAccessor() {
             Object accessor = settings != null ? settings.get(TenantSecretAccessor.SETTINGS_KEY) : null;

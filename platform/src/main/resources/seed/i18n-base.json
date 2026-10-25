@@ -6361,5 +6361,12 @@
     "key": "auth.phone_enrollment.rejected",
     "zh-CN": "手机号授权登录未完成，请联系管理员核对入驻信息。",
     "en-US": "Phone authorization login could not complete. Ask the administrator to check your enrollment details."
+  },
+  {
+    "key": "currency.error.document_snapshot_unavailable",
+    "zh-CN": "无法读取有效的币种与汇率配置，请联系管理员核对后重试。",
+    "en-US": "Valid currency and exchange-rate configuration is unavailable. Ask an administrator to check it and try again.",
+    "ja-JP": "有効な通貨・為替レート設定を読み込めません。管理者に設定の確認を依頼してください。",
+    "ko-KR": "유효한 통화 및 환율 설정을 읽을 수 없습니다. 관리자에게 설정 확인을 요청하세요."
   }
 ]

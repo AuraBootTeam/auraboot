@@ -201,6 +201,41 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_installsCurrencyReaderOnlyFromServerMetadataAndDelegatesBoundRead() {
+        MetaContext.setContext(1L,2L,"buyer-pid","Buyer");
+        var service=org.mockito.Mockito.mock(com.auraboot.framework.currency.spi.CurrencyConversionSpi.class);
+        ReflectionTestUtils.setField(phase,"currencyConversionService",service);
+        String currency="01M5DB6RC8P9DKDWT1HKSDCR7R";var date=java.time.LocalDate.of(2026,10,25);
+        var expected=new com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Snapshot(currency,"CNY",currency,"CNY",java.math.BigDecimal.ONE,date,2,java.math.RoundingMode.HALF_UP);
+        when(service.verifyDocumentSourceCurrency(currency,"CNY",java.math.BigDecimal.ONE,date)).thenReturn(expected);
+        for(Object optIn:List.of(true,false,"true")) {
+            var handler=new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            var context=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                    "handlerParams",Map.of("documentCurrencyRead",optIn)));
+            context.getPayload().put("documentCurrencyRead",true);
+            context.getPayload().put("__documentCurrencyAccessor","forged");
+            phase.execute(context);
+            var cap=handler.capturedContext.get().documentCurrencyAccessor();
+            assertThat(cap!=null).isEqualTo(Boolean.TRUE.equals(optIn));
+            if(Boolean.TRUE.equals(optIn))assertThat(cap.verifySourceRate(currency,"CNY",java.math.BigDecimal.ONE,date)).isSameAs(expected);
+        }
+        verify(service).verifyDocumentSourceCurrency(currency,"CNY",java.math.BigDecimal.ONE,date);org.mockito.Mockito.verifyNoMoreInteractions(service);
+    }
+
+    @Test
+    void execute_missingCurrencyModuleRejectsBeforeCallingThePlugin() {
+        var handler=new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var context=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                "handlerParams",Map.of("documentCurrencyRead",true)));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessage("$i18n:currency.error.document_snapshot_unavailable")
+                .hasCauseInstanceOf(com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Unavailable.class);
+        assertThat(handler.capturedContext.get()).isNull();
+    }
+
+    @Test
     void execute_installsTenantSecretOnlyForExplicitServerScope() {
         for (Object optIn : List.of(true, false, "true")) {
             RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
