@@ -35,7 +35,7 @@ public interface AnnouncementReminderMapper {
     @Update("UPDATE ab_announcement_reminder_plan SET status='active',error_code=NULL,resume_after=#{now},next_scan_at=#{now} WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status='blocked'")
     int resume(@Param("tenant") Long tenant,@Param("version") String version,@Param("now") Instant now);
 
-    @Update("UPDATE ab_announcement_reminder_plan SET status='blocked',error_code=#{error},next_scan_at=clock_timestamp()+INTERVAL '5 minutes' WHERE tenant_id=#{tenant} AND version_pid=#{version} ")
+    @Update("UPDATE ab_announcement_reminder_plan SET status='blocked',error_code=#{error},next_scan_at=clock_timestamp()+INTERVAL '5 minutes' WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status='active' AND resume_after=#{resumeAfter}")
     int blockPlan(@Param("tenant") Long tenant,@Param("version") String version,@Param("resumeAfter") Instant resumeAfter,@Param("error") String error);
 
     @Update("UPDATE ab_announcement_reminder_plan SET status='canceled',error_code=NULL WHERE tenant_id=#{tenant} AND version_pid=#{version} AND status IN('active','blocked')")
