@@ -45,16 +45,20 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     expect(limits.maxFileBytes).toBeGreaterThan(0);
     await expect(page.getByText(`当前单文件上限：${limits.maxFileBytes/(1024*1024)} MB`,{exact:true})).toBeVisible();
     await page.getByTestId('form-field-title').locator('input').fill(title);
-    await page.getByTestId('form-field-content').locator('textarea').fill('<p>Attachment review text.</p><img src="/android-chrome-192x192.png" width="32" height="32" alt="Policy illustration" onerror="window.__announcementXss=7"><script>window.__announcementXss=9</script>');
+    const editor=page.getByTestId('form-field-content').getByRole('textbox');
+    await editor.fill('Attachment review text.');await editor.press('ControlOrMeta+A');
+    await page.getByRole('button',{name:'加粗',exact:true}).click();
     await expect(page.getByTestId('attachment-file-input')).toBeEnabled();
     const uploaded=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/file/upload');
     await page.getByTestId('attachment-file-input').setInputFiles({name:fileName,mimeType:'text/plain',buffer:bytes});
     const file=await successful(await uploaded);expect(file.fileId).toEqual(expect.any(String));
     await expect(page.getByText(fileName,{exact:true})).toBeVisible();
+    await page.getByText(fileName,{exact:true}).scrollIntoViewIfNeeded();await expect(page.getByText(fileName,{exact:true})).toBeInViewport();
     await page.screenshot({path:info.outputPath('attachment-uploaded-draft.png'),fullPage:true,animations:'disabled'});
     const creating=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith('/api/meta/commands/execute/announcement:create_announcement'));
     await page.getByRole('button',{name:'保存',exact:true}).click();
     const createResponse=await creating;
+    expect(createResponse.request().postDataJSON().payload.content).toBe('<p><strong>Attachment review text.</strong></p>');
     expect(JSON.parse(createResponse.request().postDataJSON().payload.attachments)).toEqual([
       expect.objectContaining({fileId:file.fileId,name:fileName,size:bytes.length}),
     ]);
@@ -71,7 +75,14 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await settings.getByLabel('要求确认已知悉',{exact:true}).check();
     await settings.getByLabel('免审原因',{exact:true}).fill('Authorized retained attachment acceptance.');
     const saving=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith('/api/meta/commands/execute/announcement:update_announcement'));
-    await settings.getByTestId('form-dialog-submit').click();await successful(await saving);await expect(settings).toBeHidden();
+    await settings.getByTestId('form-dialog-submit').click();const configured=await successful(await saving);await expect(settings).toBeHidden();
+    // Exercise hostile stored input through the real protected API, independently of the native formatting editor.
+    await successful(await page.request.post('/api/meta/commands/execute/announcement:update_announcement',{data:{
+      targetRecordPid:recordPid,expectedVersion:configured.data.row_version,clientRequestId:randomUUID(),payload:{
+        content:'<p>Attachment review text.</p><img src="/android-chrome-192x192.png?announcement-body=1" width="32" height="32" alt="Policy illustration" onerror="window.__announcementXss=7"><script>window.__announcementXss=9</script>',
+      },
+    }}));
+    await page.reload({waitUntil:'domcontentloaded'});await expect(row).toHaveCount(1);
     await row.getByTestId('row-action-more').click();
     await page.getByTestId('row-action-dropdown').getByRole('menuitem',{name:'免审发布',exact:true}).click();
     const publishing=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith('/api/meta/commands/execute/announcement:publish'));
@@ -98,7 +109,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     expect((await contexts[0].request.get(`/api/announcements/versions/${version}/attachments/guessed-unrelated-file`)).status()).toBe(403);
     const reader=await contexts[0].newPage();
     await reader.addInitScript(()=>{(window as any).__announcementXss=0;});
-    await reader.route('**/android-chrome-192x192.png',route=>route.abort('failed'));
+    await reader.route('**/android-chrome-192x192.png?announcement-body=1',route=>route.abort('failed'));
     await enter(reader,true);
     const received=reader.locator('table tbody tr').filter({hasText:title});await expect(received).toHaveCount(1);
     await received.getByRole('button',{name:'查看公告',exact:true}).click();
@@ -121,7 +132,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     const beforeRecovery=(await db.query('SELECT first_read_at,acknowledged_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[tenant,version,identities[0].userPid])).rows[0];
     expect(beforeRecovery).toEqual({first_read_at:null,acknowledged_at:null});
     await reader.screenshot({path:info.outputPath('recipient-body-failed-read-blocked.png'),fullPage:true,animations:'disabled'});
-    await reader.unroute('**/android-chrome-192x192.png');
+    await reader.unroute('**/android-chrome-192x192.png?announcement-body=1');
     const recording=reader.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname===`/api/announcements/versions/${version}/read`);
     await reader.getByRole('button',{name:'重试',exact:true}).click();
     const recorded=await recording;await successful(recorded);

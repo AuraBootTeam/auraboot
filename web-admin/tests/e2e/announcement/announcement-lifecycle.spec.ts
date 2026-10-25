@@ -126,9 +126,9 @@ test('create announcement in draft status', async ({ page }) => {
   await page.getByRole('button', { name: '新建公告', exact: true }).click();
   await expect(page.getByText('公告内容', { exact: true })).toBeVisible();
   const title = page.getByTestId('form-field-title').locator('input');
-  const content = page.getByTestId('form-field-content').locator('textarea');
+  const content = page.getByTestId('form-field-content').getByRole('textbox');
   await expect(title).toHaveAttribute('placeholder', '例如：10 月 12 日系统维护通知');
-  await expect(content).toHaveAttribute('placeholder', '说明适用对象、具体事项和生效时间');
+  await expect(content.locator('p').first()).toHaveAttribute('data-placeholder', '说明适用对象、具体事项和生效时间');
   await expect(
     page.getByText('可先保存未完成的草稿，再从公告列表的“通知设置”选择受众、发布方式和知悉要求。', { exact: true }),
   ).toBeVisible();
@@ -158,7 +158,7 @@ test('create announcement in draft status', async ({ page }) => {
   expect(request.clientRequestId).toBeTruthy();
   expect(request.expectedVersion).toBeUndefined();
   expect(request.payload.title).toBe(TITLE);
-  expect(request.payload.content).toBe(CONTENT);
+  expect(request.payload.content).toBe(`<p>${CONTENT}</p>`);
   const body = await response.json();
   expect(String(body.code)).toBe('0');
   recordPid = extractRecordId(body);
@@ -168,7 +168,7 @@ test('create announcement in draft status', async ({ page }) => {
   const savedBody = await saved.json();
   expect(String(savedBody.code)).toBe('0');
   expect(savedBody.data.title).toBe(TITLE);
-  expect(savedBody.data.content).toBe(CONTENT);
+  expect(savedBody.data.content).toBe(`<p>${CONTENT}</p>`);
   expect(savedBody.data.status).toBe('draft');
   expect(savedBody.data.announcement_priority).toBe('normal');
   expect(savedBody.data.pinned).toBe(false);
@@ -234,7 +234,8 @@ test('edit draft through the menu and retain the observed revision', async ({ pa
     .getByRole('menuitem', { name: '编辑', exact: true })
     .click();
   await expect(page.getByTestId('form-field-title').locator('input')).toHaveValue(TITLE);
-  await page.getByTestId('form-field-content').locator('textarea').fill(`${CONTENT} edited`);
+  await expect(page.getByTestId('form-field-content').getByRole('textbox')).toHaveText(CONTENT);
+  await page.getByTestId('form-field-content').getByRole('textbox').fill(`${CONTENT} edited`);
   await page.getByTestId('form-field-announcement_priority').getByRole('combobox').click();
   await page.getByRole('option', { name: '重要', exact: true }).click();
   await page.getByTestId('form-field-pinned').getByRole('switch').click();
