@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl.pipeline;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.AssertPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.AutoSetPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandAuthorizationPhase;
+import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandInvocationAuthorizationPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetScopePhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetVersionLockPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhase;
@@ -40,6 +41,7 @@ class CommandPipelinePhaseOrderTest {
     private static final List<Class<? extends CommandPhase>> CONFIGURED_ORDER = List.of(
             LoadPhase.class,
             CommandAuthorizationPhase.class,
+            CommandInvocationAuthorizationPhase.class,
             CommandTargetScopePhase.class,
             SchemaValidatePhase.class,
             EntitlementPhase.class,
