@@ -40,7 +40,7 @@ dependencies {
     // deliberately NOT part of the default AuraBoot bootJar. Adding it to a
     // distribution makes the combined work subject to GPL-3.0; review the
     // AuraBoot License FAQ before shipping it commercially.
-    implementation 'com.xuxueli:xxl-job-core:3.4.2'
+    implementation 'com.xuxueli:xxl-job-core:3.5.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
 
     // Lombok
