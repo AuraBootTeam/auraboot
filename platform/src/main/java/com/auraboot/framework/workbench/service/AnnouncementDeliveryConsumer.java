@@ -22,17 +22,19 @@ public class AnnouncementDeliveryConsumer implements ReliableEventConsumerExtens
     private final AnnouncementDeliveryMapper deliveries;
     private final AnnouncementDeliveryPlanResolver plans;
     private final AnnouncementCodec codec;
+    private final AnnouncementReminderService reminders;
     private final StrictInAppDeliveryWriter writer;
     private final ReliableIntegrationAccessor outbox;
     private final InboxService inbox;
     @Value("${aura.notification.plugin-delivery.enabled:false}") private boolean enabled;
     public String consumerCode(){return "core.announcement.delivery.v1";}
-    public Set<String> subscribedEventTypes(){return Set.of(AnnouncementReleaseService.RELEASED_EVENT,EXPAND,DELIVER,ACK);}
+    public Set<String> subscribedEventTypes(){return Set.of(AnnouncementReleaseService.RELEASED_EVENT,EXPAND,DELIVER,ACK,AnnouncementReminderService.EXPAND);}
 
     public void consume(IntegrationEventEnvelope event) {
         if(!enabled) throw new IllegalStateException("Announcement notification bridge is disabled");
         if(!Objects.equals(MetaContext.getCurrentTenantId(),event.tenantId()) || !"auraboot.announcement".equals(event.source()))
             throw new SecurityException("Announcement delivery context is invalid");
+        if(AnnouncementReminderService.EXPAND.equals(event.eventType())) {reminders.expand(event);return;}
         String version=required(event,"versionPid"),batch=required(event,"batchPid");
         if(!DELIVER.equals(event.eventType()) && !ACK.equals(event.eventType())) {
             if(!"succeeded".equals(deliveries.releaseState(event.tenantId(),batch,version)))
@@ -57,6 +59,11 @@ public class AnnouncementDeliveryConsumer implements ReliableEventConsumerExtens
         Map<String,Object> row=deliveries.plan(event.tenantId(),batch,user);
         if(row==null) {deliveries.complete(event.tenantId(),batch,user,"canceled","RECIPIENT_OR_VERSION_INACTIVE");return;}
         if(!version.equals(row.get("version_pid"))) throw new SecurityException("Announcement delivery binding changed");
+        if("reminder".equals(row.get("kind"))) {
+            if(ACK.equals(event.eventType())) throw new SecurityException("Reminders cannot create acknowledgement tasks");
+            String reason=reminders.deliveryEligibility(event.tenantId(),batch,version,row);
+            if(reason!=null) {deliveries.complete(event.tenantId(),batch,user,"skipped",reason);return;}
+        }
         if(!ACK.equals(event.eventType()) && !"queued".equals(row.get("status"))) return;
         var plan=plans.resolve(event.tenantId(),"ann1."+batch+"."+user).orElseThrow();
         if(DELIVER.equals(event.eventType())) {

@@ -75,5 +75,19 @@
     "handlerClass": "announcementCommandHandler",
     "sequence": 10,
     "enabled": true
+  },
+  {
+    "commandCode": "announcement:remind",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:resume_reminders",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
   }
 ]

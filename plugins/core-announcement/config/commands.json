@@ -153,5 +153,31 @@
     "executionConfig": {
       "requireIdempotencyKey": true
     }
+  },
+  {
+    "code": "announcement:remind",
+    "displayName:zh-CN": "提交催办",
+    "displayName:en": "Submit reminder",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.remind"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:resume_reminders",
+    "displayName:zh-CN": "恢复自动催办",
+    "displayName:en": "Resume automatic reminders",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.remind"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
   }
 ]

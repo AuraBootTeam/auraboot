@@ -26,6 +26,7 @@ public class AnnouncementReleaseService {
     private final AnnouncementAudienceService audiences;
     private final AnnouncementLifecycleMapper records;
     private final AnnouncementReleaseMapper releases;
+    private final AnnouncementReminderMapper reminders;
     private final AnnouncementCodec codec;
     private final AnnouncementPreparationService preparation;
     private final AnnouncementTenantPolicyService tenantPolicies;
@@ -167,6 +168,7 @@ public class AnnouncementReleaseService {
                 ) conflict();
             if(releases.finish(tenant,release,fence,"succeeded",null)!=1)
                 throw new org.springframework.dao.CannotAcquireLockException("Announcement release lease was lost before commit");
+            if(reminders.createPlan(tenant,version,release)!=1) throw new IllegalStateException("Reminder plan was not persisted");
             records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,version,"announcement:publication_completed",release,record.getRowVersion(),record.getRowVersion()+1);
             outbox.enqueueIdempotent(new IntegrationEventEnvelope("1.0",release,RELEASED_EVENT,"auraboot.announcement",version,now,tenant,
                 release,null,"announcement:"+version,1,Map.of("versionPid",version,"batchPid",release,"recipientSnapshotPid",recipientSnapshot,"announcementPid",pid),Map.of()));

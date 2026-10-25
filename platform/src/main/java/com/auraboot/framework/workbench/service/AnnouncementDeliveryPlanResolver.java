@@ -13,12 +13,14 @@ import java.util.*;
 public class AnnouncementDeliveryPlanResolver implements NotificationDeliveryPlanResolver {
     private final AnnouncementDeliveryMapper deliveries;
     private final AnnouncementCodec codec;
+    private final AnnouncementReminderService reminders;
     @Override public Optional<Plan> resolve(long tenant,String reference) {
         if(reference==null || !reference.startsWith("ann1.")) return Optional.empty();
         String[] parts=reference.split("\\.");
         if(parts.length!=3 || !parts[1].matches("[A-Za-z0-9_-]{1,36}") || !parts[2].matches("[A-Za-z0-9_-]{1,36}")) return Optional.empty();
         Map<String,Object> row=deliveries.plan(tenant,parts[1],parts[2]);
         if(row==null) return Optional.empty();
+        if("reminder".equals(row.get("kind")) && reminders.deliveryEligibility(tenant,parts[1],(String)row.get("version_pid"),row)!=null) return Optional.empty();
         var snapshot=codec.object(row.get("snapshot").toString());
         String title=(String)snapshot.get("title");
         // A bell entry is a navigation hint; protected content is fetched only by the version view.

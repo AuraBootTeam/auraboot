@@ -33,7 +33,7 @@ public interface AnnouncementDeliveryMapper {
 
     @Select("""
         SELECT d.*,v.snapshot::text AS snapshot,c.published_at,c.expires_at,a.pid AS announcement_pid,
-            r.member_pid,r.acknowledged_at,u.id AS user_id
+            r.member_pid,r.first_read_at,r.acknowledged_at,u.id AS user_id
         FROM ab_announcement_delivery d JOIN ab_announcement_version v ON v.tenant_id=d.tenant_id AND v.pid=d.version_pid
         JOIN ab_announcement_version_control c ON c.tenant_id=d.tenant_id AND c.version_pid=d.version_pid
         JOIN ab_announcement_recipient r ON r.tenant_id=d.tenant_id AND r.version_pid=d.version_pid AND r.user_pid=d.user_pid

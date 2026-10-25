@@ -48,6 +48,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired com.auraboot.module.exchange.service.ExecutionJobQueryService executionJobs;
     @Autowired com.auraboot.framework.infrastructure.storage.StorageProperties storageProperties;
     @Autowired AnnouncementStatisticsExportCommand exportCommand;
+    @Autowired AnnouncementReminderService reminders;
     @Autowired com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl backgroundTasks;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
@@ -65,7 +66,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(expected);
     }
     @BeforeEach void grantAndAuthenticate() {
-        for(String action:List.of("edit","publish","publish_all","exempt","stats","export","withdraw"))
+        for(String action:List.of("edit","publish","publish_all","exempt","stats","export","withdraw","remind"))
             grantCommittedPermissionToTestRole("announcement.announcement."+action,"announcement","announcement:announcement",action,"Announcement "+action);
         applyTestMetaContext();
         var authorities=AuthorityUtils.createAuthorityList("role_admin");
@@ -84,6 +85,62 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         MetaContext.clear();new AnnouncementReleaseWorker(releases).tick();applyTestMetaContext();
         assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid)).isEqualTo("published");
         return (String)accepted.get("versionPid");
+    }
+    private String recordOf(String version) {
+        return jdbc.queryForObject("SELECT announcement_pid FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
+    }
+    @Test void actualReminderCreatesOneIndependentNotificationWithoutDuplicatingAcknowledgement() throws Exception {
+        String version=publish(),record=recordOf(version);
+        var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        assertThat(preview.get("eligible")).isEqualTo(1L);
+        String operation=UniqueIdGenerator.generate();var payload=Map.<String,Object>of("previewToken",preview.get("previewToken"));
+        var accepted=reminders.execute(AnnouncementReminderService.SUBMIT,record,payload,operation);
+        assertThat(accepted.get("actualCount")).isEqualTo(1);assertThat(accepted).doesNotContainKey("actorMemberPid");
+        assertThat(reminders.execute(AnnouncementReminderService.SUBMIT,record,payload,operation)).isEqualTo(accepted);
+        String batch=(String)accepted.get("batchPid");
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->
+            assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
+                getTestTenant().getId(),batch,getTestUser().getPid())).isEqualTo("completed"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND user_id=? AND source_type='announcement' AND source_id=?",Long.class,
+            getTestTenant().getId(),getTestUser().getId(),version)).isEqualTo(2L);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=? AND user_id=? AND item_type='announcement_ack' AND source_id=?",Long.class,
+            getTestTenant().getId(),getTestUser().getId(),version)).isEqualTo(1L);
+        var second=reminders.preview(record,version,new AnnouncementStatistics.Filters("","unread",null));
+        assertThat(second.get("eligible")).isEqualTo(0L);assertThat(second.get("throttled")).isEqualTo(1L);
+        var skipped=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",second.get("previewToken")),UniqueIdGenerator.generate());
+        assertThat(skipped.get("actualCount")).isEqualTo(0);assertThat(skipped.get("operationState")).isEqualTo("skipped");
+        assertThat(jdbc.queryForObject("SELECT automatic_batches FROM ab_announcement_reminder_plan WHERE tenant_id=? AND version_pid=?",Integer.class,
+            getTestTenant().getId(),version)).isZero();
+    }
+    @Test void reminderRecalculatesPreviewAndSkipsWorkCompletedBeforeAcceptance() {
+        String version=publish(),record=recordOf(version);var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        var detail=readers.detail(version);var mark=Map.<String,Object>of("snapshotHash",detail.get("snapshotHash"));
+        readers.mark(version,mark,false);readers.mark(version,mark,true);
+        var result=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());
+        assertThat(result.get("previewCount")).isEqualTo(1);assertThat(result.get("actualCount")).isEqualTo(0);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=?",Long.class,
+            getTestTenant().getId(),result.get("batchPid"))).isZero();
+    }
+    @Test void completionAfterAcceptanceButBeforeOutboxCommitSkipsReminderConsumption() {
+        String version=publish(),record=recordOf(version);var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        var accepted=new TransactionTemplate(transactions).execute(state->{
+            var result=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());
+            var detail=readers.detail(version);var mark=Map.<String,Object>of("snapshotHash",detail.get("snapshotHash"));
+            readers.mark(version,mark,false);readers.mark(version,mark,true);return result;
+        });
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->
+            assertThat(jdbc.queryForMap("SELECT status,error_code FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=?",getTestTenant().getId(),accepted.get("batchPid")))
+                .containsEntry("status","skipped").containsEntry("error_code","ALREADY_COMPLETE"));
+    }
+    @Test void reminderPreviewCannotCrossRecordAndChangedOperationCannotReplay() {
+        String version=publish(),record=recordOf(version);var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        String other=recordOf(publish());
+        assertThatThrownBy(()->reminders.execute(AnnouncementReminderService.SUBMIT,other,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate()))
+            .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        String operation=UniqueIdGenerator.generate();reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),operation);
+        var next=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        assertThatThrownBy(()->reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",next.get("previewToken")),operation))
+            .isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
     }
     @Test void httpSummaryAndDetailsRemainAtTheSameInstantAfterNaturalReadAndAcknowledgementChanges() throws Exception {
         String version=publish();

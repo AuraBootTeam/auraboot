@@ -572,5 +572,40 @@
     "en-US": "Version {0}",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_legacy_unknown",
+    "zh-CN": "历史迁移公告缺少原始阅读依据，请修订并重新发布后使用催办。",
+    "en-US": "Historical migration has no original reading evidence. Publish a reviewed revision before sending reminders.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_policy_unavailable",
+    "zh-CN": "该版本未冻结催办政策，请修订并重新发布。",
+    "en-US": "This version has no frozen reminder policy. Publish a reviewed revision.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_version_inactive",
+    "zh-CN": "公告已撤回或失效，无法继续催办。",
+    "en-US": "This announcement is withdrawn or expired. Reminders are unavailable.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_preview_expired",
+    "zh-CN": "催办预览已过期或不属于当前身份，请重新预览。",
+    "en-US": "The reminder preview has expired or belongs to another identity. Preview again.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_not_blocked",
+    "zh-CN": "自动催办计划无需恢复，请刷新状态。",
+    "en-US": "The automatic reminder plan is not blocked. Refresh its status.",
+    "source": "import",
+    "refType": "message"
   }
 ]
