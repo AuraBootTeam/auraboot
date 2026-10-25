@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '../../fixtures';
-import type { APIResponse } from '@playwright/test';
+import type { APIResponse, Download } from '@playwright/test';
 import { randomUUID, createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Client } from 'pg';
@@ -107,9 +107,14 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await expect(reader.getByText('Attachment review text.',{exact:true})).toBeVisible();
     expect(await reader.evaluate(()=>(window as any).__announcementXss)).toBe(0);
     await expect(reader.locator('img[onerror],a[href^="javascript:"]')).toHaveCount(0);
-    const download=reader.waitForEvent('download');await link.click();const actual=await download;
-    expect(actual.suggestedFilename()).toBe(fileName);
-    const saved=info.outputPath('retained-attachment.txt');await actual.saveAs(saved);expect(readFileSync(saved)).toEqual(bytes);
+    let actual:Download|undefined;
+    const capture=(download:Download)=>{actual=download;};
+    reader.on('download',capture);
+    contexts[0].on('page',popup=>popup.on('download',capture));
+    await link.click();
+    await expect.poll(()=>actual?.suggestedFilename(),{timeout:15_000}).toBe(fileName);
+    expect(actual).toBeDefined();
+    const saved=info.outputPath('retained-attachment.txt');await actual!.saveAs(saved);expect(readFileSync(saved)).toEqual(bytes);
     await reader.reload({waitUntil:'domcontentloaded'});
     await expect(link).toHaveAttribute('href',path);await expect(reader.getByRole('button',{name:'确认已知悉',exact:true})).toBeVisible();
     const fact=(await db.query('SELECT first_read_at,acknowledged_at FROM ab_announcement_recipient WHERE tenant_id=$1 AND version_pid=$2 AND user_pid=$3',[tenant,version,identities[0].userPid])).rows[0];
