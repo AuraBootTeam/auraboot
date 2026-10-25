@@ -198,16 +198,17 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         var accepted=acceptRecoveryFixture();String record=(String)accepted.get("recordPid"),version=(String)accepted.get("versionPid");
         Long tenant=getTestTenant().getId();var stale=claimRecoveryFixture(version);
         releases.fail(stale,"blocked","DELIVERY_DISABLED");
-        var original=jdbc.queryForMap("SELECT pid,actor_user_id,actor_member_pid,authorization_hash,scheduled_at,latest_allowed_at,attempts FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",tenant,version);
+        var original=jdbc.queryForMap("SELECT pid,actor_user_id,actor_member_pid,authorization_hash,scheduled_at,latest_allowed_at,attempts,finished_at FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",tenant,version);
         String hash=jdbc.queryForObject("SELECT snapshot_hash FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,tenant,version);
         http.perform(get("/api/announcements/records/"+record+"/publication")).andExpect(status().isOk())
             .andExpect(jsonPath("$.data.records[0].canRetry").value(true))
+            .andExpect(jsonPath("$.data.records[0].lastAttemptFinishedAt").isNotEmpty())
             .andExpect(jsonPath("$.data.records[0].errorCode").value("DELIVERY_DISABLED"));
         String operation=UniqueIdGenerator.generate();
         var retried=releases.execute(AnnouncementReleaseService.RETRY,record,Map.of(),operation,2);
         assertThat(retried).containsEntry("releaseAttemptPid",accepted.get("releaseAttemptPid")).containsEntry("row_version",3).containsEntry("status","unpublished");
         assertThat(releases.execute(AnnouncementReleaseService.RETRY,record,Map.of(),operation,2)).isEqualTo(retried);
-        assertThat(jdbc.queryForMap("SELECT pid,actor_user_id,actor_member_pid,authorization_hash,scheduled_at,latest_allowed_at,attempts FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",tenant,version)).isEqualTo(original);
+        assertThat(jdbc.queryForMap("SELECT pid,actor_user_id,actor_member_pid,authorization_hash,scheduled_at,latest_allowed_at,attempts,finished_at FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",tenant,version)).isEqualTo(original);
         assertThat(jdbc.queryForObject("SELECT fencing_token FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",Long.class,tenant,version)).isGreaterThan(((Number)stale.get("fencing_token")).longValue());
         releases.perform(stale);releases.fail(stale,"blocked","LATE_FAILURE");
         assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_release WHERE tenant_id=? AND version_pid=?",String.class,tenant,version)).isEqualTo("queued");

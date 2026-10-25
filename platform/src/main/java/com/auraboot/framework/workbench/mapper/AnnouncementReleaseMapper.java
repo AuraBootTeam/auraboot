@@ -83,7 +83,7 @@ public interface AnnouncementReleaseMapper {
 
     @Update("""
         UPDATE ab_announcement_release SET status='queued',next_attempt_at=clock_timestamp(),fencing_token=fencing_token+1,
-            lease_until=NULL,error_code=NULL,finished_at=NULL
+            lease_until=NULL,error_code=NULL
         WHERE tenant_id=#{tenant} AND pid=#{release} AND fencing_token=#{fence}
             AND status IN ('blocked','retryable_failed') AND latest_allowed_at>=clock_timestamp()
         """)

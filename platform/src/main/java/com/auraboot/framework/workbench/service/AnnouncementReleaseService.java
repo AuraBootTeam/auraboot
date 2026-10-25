@@ -115,6 +115,7 @@ public class AnnouncementReleaseService {
         view.put("versionPid",record.getCurrentVersionPid());view.put("recordRevision",record.getRowVersion());
         view.put("status",job.get("status"));view.put("plannedAt",job.get("scheduled_at"));
         view.put("latestAllowedAt",job.get("latest_allowed_at"));view.put("attempts",job.get("attempts"));
+        view.put("lastAttemptFinishedAt",job.get("finished_at"));
         view.put("errorCode",job.get("error_code")==null ? null : publicFailureCode(job.get("error_code")));
         view.put("canRetry",deliveryEnabled && permissions.hasPermission(MetaContext.getCurrentUserId(),"announcement.announcement.publish")
             && retryable(record,job,control,Instant.now()) && originalMemberAvailable(tenant,job));

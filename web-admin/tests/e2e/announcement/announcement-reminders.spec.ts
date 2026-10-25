@@ -153,7 +153,8 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     await history.scrollIntoViewIfNeeded();
     await expect(history.getByRole('row')).toHaveCount(21);
     await expect(page.getByTestId('table-server-pagination')).toContainText('共 26 条');
-    await screenshot('reminder-history-page-one');
+    await history.screenshot({ path: info.outputPath('reminder-history-page-one.png'), animations: 'disabled' });
+    await page.getByTestId('table-server-pagination').screenshot({ path: info.outputPath('reminder-history-page-one-pagination.png'), animations: 'disabled' });
     const secondPage = page.waitForResponse(r => r.request().method() === 'GET' && new URL(r.url()).pathname.endsWith('/reminders/batches') && new URL(r.url()).searchParams.get('pageNum') === '2');
     await page.getByTestId('table-server-pagination').getByRole('button', { name: '下一页', exact: true }).click();
     const historyData = await successful(await secondPage);
@@ -248,13 +249,18 @@ test('a recovered original member retries the same blocked publication through i
   expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(process.env.PGDATABASE || process.env.PG_DB);
   const code = `notice_recover_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
   const role = await successful(await page.request.post('/api/roles', { data: {
-    code, name: 'Publication recovery publisher', type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'all',
+    code, name: 'Publication recovery publisher', type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'self',
   } }));
   const codes = ['announcement.announcement.edit', 'announcement.announcement.publish', 'announcement.announcement.exempt',
     'announcement.announcement.read', 'announcement.announcement.withdraw', 'model.ab_announcement.read', 'meta.command.execute'];
   const permissions = (await db.query('SELECT p.id,p.code FROM ab_permission p JOIN ab_role r ON r.tenant_id=p.tenant_id WHERE r.pid=$1 AND p.code=ANY($2::text[]) AND p.deleted_flag=FALSE', [role.pid, codes])).rows;
   expect(permissions.map(p => p.code).sort()).toEqual([...codes].sort());
   await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, { data: permissions.map(p => ({ permissionId: p.id, granted: true })) }));
+  for (const actionCode of ['read', 'publish']) {
+    await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/scope`, {
+      data: { resourceCode: 'ab_announcement', actionCode, scopeType: 'self', mergeStrategy: 'MAX' },
+    }));
+  }
   const email = `${code}@example.com`;
   const user = await successful(await page.request.post('/api/admin/users', { data: {
     email, displayName: 'Publication recovery publisher', initialPassword: 'Test2026x', roleCodes: [code], sendInviteEmail: false,
@@ -278,6 +284,8 @@ test('a recovered original member retries the same blocked publication through i
       audience_kind: 'selected', audience_users: [user.userPid], approval_mode: 'exempt',
       exemption_reason: 'Authorized original-member publication recovery fixture.', scheduled_at: new Date(Date.now() + 20_000).toISOString(),
     });
+    const preview = await successful(await publisher.request.post('/api/announcements/audience-preview', { data: { recordPid } }));
+    expect(preview.scopeType).toBe('self');expect(preview.recipients.map((recipient: any) => recipient.userPid)).toEqual([user.userPid]);
     const accepted = await command(publisher, 'announcement:publish', recordPid!, saved.row_version);
     versionPid = accepted.versionPid;const original = await query();
     expect(original.actor_member_pid).toBe(user.memberPid);
@@ -313,6 +321,8 @@ test('a recovered original member retries the same blocked publication through i
     expect(finished.attempts).toBe(2);expect(Number(finished.fencing_token)).toBeGreaterThan(Number(blocked.fencing_token));
     expect(Number((await db.query("SELECT count(*) AS count FROM ab_announcement_audit WHERE announcement_pid=$1 AND command_code='announcement:publication_completed'", [recordPid])).rows[0].count)).toBe(1);
     expect(Number((await db.query('SELECT count(*) AS count FROM ab_announcement_recipient WHERE version_pid=$1', [versionPid])).rows[0].count)).toBe(1);
+    await expect.poll(async () => (await db.query("SELECT status FROM ab_announcement_delivery WHERE version_pid=$1 AND kind='publication' AND channel='in_app'", [versionPid])).rows[0]?.status, { timeout: 20_000 }).toBe('completed');
+    expect(Number((await db.query("SELECT count(*) AS count FROM ab_announcement_delivery WHERE version_pid=$1 AND kind='publication' AND channel='in_app'", [versionPid])).rows[0].count)).toBe(1);
     await publisher.screenshot({ path: info.outputPath('publication-recovered.png'), fullPage: true, animations: 'disabled' });
   } finally {
     try {

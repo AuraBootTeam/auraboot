@@ -1376,7 +1376,7 @@
               "en-US": "Task state"
             },
             "dictCode": "announcement_publication_job",
-            "width": 130
+            "width": 110
           },
           {
             "field": "plannedAt",
@@ -1385,7 +1385,7 @@
               "en-US": "Planned publication"
             },
             "valueType": "datetime",
-            "width": 190
+            "width": 176
           },
           {
             "field": "latestAllowedAt",
@@ -1394,7 +1394,16 @@
               "en-US": "Latest execution"
             },
             "valueType": "datetime",
-            "width": 190
+            "width": 176
+          },
+          {
+            "field": "lastAttemptFinishedAt",
+            "label": {
+              "zh-CN": "上次尝试结束",
+              "en-US": "Last attempt finished"
+            },
+            "valueType": "datetime",
+            "width": 176
           },
           {
             "field": "attempts",
@@ -1407,11 +1416,11 @@
           {
             "field": "errorCode",
             "label": {
-              "zh-CN": "处理提示",
-              "en-US": "Attention"
+              "zh-CN": "上次异常",
+              "en-US": "Last issue"
             },
             "dictCode": "announcement_publication_issue",
-            "width": 300
+            "width": 240
           }
         ],
         "rowActions": [
