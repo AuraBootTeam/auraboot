@@ -27,7 +27,7 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/api/admin/reliable-integration/dead-letters")
 @RequiredArgsConstructor
-@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; inspects and replays the tenant's integration dead-letter messages")
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor tenant-admin check; inspects and disposes only the current tenant's integration dead letters")
 public class ReliableIntegrationOperatorController {
 
     private final ReliableIntegrationOperatorService service;
