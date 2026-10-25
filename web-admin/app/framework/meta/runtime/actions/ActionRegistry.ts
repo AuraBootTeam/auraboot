@@ -1105,10 +1105,19 @@ function resolveRequestKeyArgs(context: ActionContext): Record<string, any> | un
   return { ...args, field: expressionEvaluator.evaluateTemplate(args.field, expressionContext) };
 }
 
+function requestKeyOutputField(context: ActionContext): string | undefined {
+  const field = context.stepTarget;
+  if (field === undefined) return undefined;
+  if (typeof field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(field)
+    || ['__proto__', 'prototype', 'constructor'].includes(field)) throw new Error('Invalid request key output field');
+  return field;
+}
+
 /** Allocate one domain request key in the existing scoped state, never per click. */
 actionRegistry.register('state.ensureRequestKey', (context) => {
   const { stateManager, scopeId, requestKeySession } = context;
   const args = resolveRequestKeyArgs(context);
+  const outputField = requestKeyOutputField(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).some(key => !['field','persistence'].includes(key)) || typeof args.field !== 'string'
     || (args.persistence !== undefined && args.persistence !== 'session')
@@ -1118,25 +1127,30 @@ actionRegistry.register('state.ensureRequestKey', (context) => {
   const current = stateManager.getContext(scopeId).state[args.field];
   if (args.persistence === 'session') {
     if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
-    stateManager.updateState(scopeId, args.field, requestKeySession.ensure(args.field, current));
+    const key = requestKeySession.ensure(args.field, current);
+    stateManager.updateState(scopeId, args.field, key);
+    if (outputField) stateManager.updateState(scopeId, outputField, key);
     return;
   }
   if (current !== undefined && current !== null) {
     if (typeof current !== 'string' || !current.length || current.length > 128
       || current.trim() !== current || /[\x00-\x1f\x7f]/.test(current))
       throw new Error('Invalid existing request key');
+    if (outputField) stateManager.updateState(scopeId, outputField, current);
     return;
   }
   if (typeof globalThis.crypto?.randomUUID !== 'function')
     throw new Error('Secure request key generation is unavailable');
   const key = globalThis.crypto.randomUUID();
   stateManager.updateState(scopeId, args.field, key);
+  if (outputField) stateManager.updateState(scopeId, outputField, key);
 });
 
 /** Restore only an existing authenticated session UUID; never allocate or persist one. */
 actionRegistry.register('state.peekRequestKey', (context) => {
   const { stateManager, scopeId, requestKeySession } = context;
   const args = resolveRequestKeyArgs(context);
+  const outputField = requestKeyOutputField(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).length !== 2 || Object.keys(args).some(key => !['field','persistence'].includes(key))
     || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
@@ -1145,12 +1159,14 @@ actionRegistry.register('state.peekRequestKey', (context) => {
   if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
   const restored = requestKeySession.peek(args.field, stateManager.getContext(scopeId).state[args.field]);
   stateManager.updateState(scopeId, args.field, restored);
+  if (outputField) stateManager.updateState(scopeId, outputField, restored);
 });
 
 /** Explicit completion/next-attempt transition; ordinary state.set never clears persisted intent. */
 actionRegistry.register('state.clearRequestKey', (context) => {
   const { stateManager, scopeId, requestKeySession } = context;
   const args = resolveRequestKeyArgs(context);
+  const outputField = requestKeyOutputField(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).some(key => !['field','persistence'].includes(key))
     || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
@@ -1161,6 +1177,7 @@ actionRegistry.register('state.clearRequestKey', (context) => {
     requestKeySession.clear(args.field, stateManager.getContext(scopeId).state[args.field]);
   }
   stateManager.updateState(scopeId, args.field, null);
+  if (outputField) stateManager.updateState(scopeId, outputField, null);
 });
 
 /**

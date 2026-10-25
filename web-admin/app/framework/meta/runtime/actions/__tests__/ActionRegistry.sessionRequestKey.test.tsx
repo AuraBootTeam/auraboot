@@ -71,16 +71,18 @@ function Page({ record = 'p1', revision = 1, revisionScoped = false }: { record?
                   {
                     action: 'state.ensureRequestKey',
                     args: { field: revisionScoped ? 'requestKey_${record.revision}' : 'requestKey', persistence: 'session' },
+                    target: revisionScoped ? 'resolvedRequestKey' : undefined,
                   },
                   {
                     action: 'api.request',
                     endpoint: '/api/example/ship',
                     method: 'post',
-                    body: { requestKey: revisionScoped ? "${state['requestKey_' + record.revision]}" : '${state.requestKey}', quantity: '${form.quantity}' },
+                    body: { requestKey: revisionScoped ? '${state.resolvedRequestKey}' : '${state.requestKey}', quantity: '${form.quantity}' },
                   },
                   {
                     action: 'state.clearRequestKey',
                     args: { field: revisionScoped ? 'requestKey_${record.revision}' : 'requestKey', persistence: 'session' },
+                    target: revisionScoped ? 'resolvedRequestKey' : undefined,
                   },
                 ],
               },

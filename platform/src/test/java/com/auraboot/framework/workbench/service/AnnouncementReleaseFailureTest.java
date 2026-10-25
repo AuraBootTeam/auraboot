@@ -10,7 +10,9 @@ class AnnouncementReleaseFailureTest {
         assertThat(AnnouncementReleaseWorker.failureCode(BusinessException.i18n("announcement.error.delivery_disabled"))).isEqualTo("DELIVERY_DISABLED");
         assertThat(AnnouncementReleaseWorker.failureCode(new AccessDeniedException("private authority evidence"))).isEqualTo("AUTHORIZATION_DENIED");
         assertThat(AnnouncementReleaseWorker.failureCode(new BusinessException("private storage credential"))).isEqualTo("PUBLICATION_BLOCKED");
-        assertThat(AnnouncementReleaseWorker.failureCode(new BusinessException((String)null))).isEqualTo("PUBLICATION_BLOCKED");
+        assertThat(AnnouncementReleaseWorker.failureCode(new BusinessException("Empty message") {
+            @Override public String getMessage(){return null;}
+        })).isEqualTo("PUBLICATION_BLOCKED");
     }
     @Test void unknownPersistedDiagnosticsNeverBecomePublicMessages() {
         assertThat(AnnouncementReleaseService.publicFailureCode(null)).isEqualTo("PUBLICATION_BLOCKED");
