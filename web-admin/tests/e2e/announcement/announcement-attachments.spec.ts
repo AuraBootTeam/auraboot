@@ -7,7 +7,7 @@ import { PG_CONN } from '../../helpers/environments';
 import { authenticateBffSession } from '../../helpers/bff-auth-session';
 
 test.use({ locale: 'zh-CN' });
-async function successful(response: APIResponse) {
+async function successful(response: Pick<APIResponse, 'status' | 'json'>) {
   expect(response.status()).toBe(200);
   const body=await response.json();expect(String(body.code)).toBe('0');return body.data;
 }
