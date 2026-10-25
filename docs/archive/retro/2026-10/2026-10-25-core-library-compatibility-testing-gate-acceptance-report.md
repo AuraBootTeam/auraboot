@@ -29,8 +29,8 @@ Workspace 配套只修改原 Maven 暂存器及原测试，校验显式根、平
 | Gradle 原生版本/发布合同 | 25 场景通过；含默认、预览、库版本、非法组合、显式 roots、篡改与重复输出反例 | core2371-version-v2/result.json |
 | Core 原 Node 套集 | 61 通过，0 失败/跳过 | core2371-merge-node-v4.log |
 | Workspace 原 Maven 套集扩展 | 18 通过，0 失败/跳过；假 BOM JAR、缺失 BOM、类型/根/约束/生产依赖漂移仍拒绝 | core2371-staging-v4.log |
-| 原 Java 定向复验 | 最终保存 JUnit：Core 70、Agent 7、App 53、Bootstrap 1，合计 131 通过，0 失败/跳过 | core2371-final-junit.json 及 core2371-final-junit/ |
-| App 测试隔离/调度等 | 原 Java v2 中 3 类独立断言通过；同轮 2 类 DB 用例因缺省库缺失失败，纠正为本任务库后原样通过 | core2371-original-java-v2.log、core2371-original-app-v3.log |
+| 原 Java 定向复验 | 最终保存 JUnit：Core 70、Agent 7、App 91、Bootstrap 1，合计 169 通过，0 失败/跳过 | core2371-final-junit.json 及 core2371-final-junit/ |
+| App 测试隔离/调度等 | 原 Java v2 中 3 类独立断言通过；在提交 74fd7ecef 和受管 source-set 上再核验通过。同轮 2 类 DB 用例因缺省库缺失失败，纠正为本任务库后原样通过 | core2371-original-app-hermetic-v4.log、core2371-original-app-v3.log |
 | 原生库候选 | 隔离目录实际生成 9 个 JAR 模块和 1 个 BOM，37 个原始文件；无远端发布 | core2371-actual-candidate-v3/library-publication-inventory.json |
 | 实际消费 | 原 agent-artifact-consumer 六种模式，Gradle module 与 Maven POM 两种解析均通过；只用隔离库，拒绝 producer project 与其他版本 | core2371-original-consumer-module-v1.log、core2371-original-consumer-pom-v1.log |
 | Bootstrap 真实 DB | 新建专用 aura_boot_bootstrap_core2371，经原 Flyway 迁移和校验 143 条，原单用例真实执行通过 | core2371-bootstrap-migrate-v1.log、core2371-original-bootstrap-v1.log |
