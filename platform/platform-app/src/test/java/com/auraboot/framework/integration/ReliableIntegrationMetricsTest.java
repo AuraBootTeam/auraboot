@@ -49,4 +49,22 @@ class ReliableIntegrationMetricsTest {
 
         assertThat(registry.get("auraboot_reliable_delivery_pending").gauge().value()).isNaN();
     }
+
+    @Test
+    void quarantinedFailureIsVisibleSeparatelyFromOpenDlqAndDeliverySuccess() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        OutboxEventMapper mapper = mock(OutboxEventMapper.class);
+        when(mapper.countQuarantinedDeadLetters()).thenReturn(2L);
+        ReliableIntegrationMetrics metrics = new ReliableIntegrationMetrics(registry, mapper);
+        metrics.record("quarantined");
+
+        assertThat(registry.get("auraboot_reliable_delivery_quarantined").gauge().value()).isEqualTo(2);
+        assertThat(registry.get("auraboot_reliable_delivery_dlq").gauge().value()).isZero();
+        assertThat(registry.get("auraboot_integration_events_total").tag("outcome", "delivered")
+                .counter().count()).isZero();
+        assertThat(new ReliableIntegrationHealth(mapper).health().getDetails())
+                .containsEntry("quarantinedDeadLetters", 2L).containsEntry("openDeadLetters", 0L);
+        when(mapper.countOpenDeadLetters()).thenReturn(1L);
+        assertThat(new ReliableIntegrationHealth(mapper).health().getStatus().getCode()).isEqualTo("DOWN");
+    }
 }

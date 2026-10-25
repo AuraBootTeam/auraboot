@@ -7,6 +7,8 @@ import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.D
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.DeadLetterSummary;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayRequest;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayResult;
+import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.QuarantineRequest;
+import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.QuarantineResult;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorService;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.validation.Valid;
@@ -55,6 +57,19 @@ public class ReliableIntegrationOperatorController {
                                             @Valid @RequestBody ReplayRequest request) {
         try {
             return ApiResponse.success(service.replay(MetaContext.getCurrentTenantId(), eventId,
+                    MetaContext.getCurrentUserPid(), request.reason(), request.expectedReplayCount()));
+        } catch (NoSuchElementException exception) {
+            return ApiResponse.error(404, exception.getMessage());
+        } catch (IllegalStateException exception) {
+            return ApiResponse.error(409, exception.getMessage());
+        }
+    }
+
+    @PostMapping("/{eventId}/quarantine")
+    public ApiResponse<QuarantineResult> quarantine(@PathVariable String eventId,
+                                                   @Valid @RequestBody QuarantineRequest request) {
+        try {
+            return ApiResponse.success(service.quarantine(MetaContext.getCurrentTenantId(), eventId,
                     MetaContext.getCurrentUserPid(), request.reason(), request.expectedReplayCount()));
         } catch (NoSuchElementException exception) {
             return ApiResponse.error(404, exception.getMessage());

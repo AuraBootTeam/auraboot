@@ -8,6 +8,7 @@ import com.auraboot.framework.integration.mapper.ReliableIntegrationOperatorMapp
 import com.auraboot.framework.integration.mapper.ReliableIntegrationOperatorRow;
 import com.auraboot.framework.integration.mapper.ReliableIntegrationReceiptRow;
 import com.auraboot.framework.integration.mapper.ReliableIntegrationReplayHistoryRow;
+import com.auraboot.framework.integration.mapper.ReliableIntegrationQuarantineRow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -54,6 +56,15 @@ class ReliableIntegrationOperatorServiceTest {
         assertThat(result.getCurrent()).isEqualTo(1L);
         assertThat(result.getSize()).isEqualTo(100L);
         assertThat(result.getRecords()).extracting(DeadLetterSummary::eventId).containsExactly("evt-1");
+    }
+
+    @Test
+    void listSupportsQuarantinedStatusWithoutCallingItDelivered() {
+        when(mapper.count(TENANT_ID, "quarantined", null, null)).thenReturn(0L);
+        when(mapper.list(TENANT_ID, "quarantined", null, null, 20, 0)).thenReturn(List.of());
+
+        assertThat(service.list(TENANT_ID, "quarantined", null, null, 1, 20).getTotal()).isZero();
+        verify(mapper).count(TENANT_ID, "quarantined", null, null);
     }
 
     @Test
@@ -160,5 +171,70 @@ class ReliableIntegrationOperatorServiceTest {
         row.setFailedAt(Instant.EPOCH);
         row.setReplayCount(replayCount);
         return row;
+    }
+
+    @Test
+    void quarantineRecordsDispositionAndReturnsOriginalAuditForExactRetry() {
+        when(mapper.find(TENANT_ID, "evt-1")).thenReturn(row("evt-1", "open", 2));
+        when(mapper.quarantine(anyString(), eq(TENANT_ID), eq("evt-1"), eq("operator"),
+                eq("invalid fixture"), eq(2), any(Instant.class))).thenReturn(1, 0);
+        ReliableIntegrationQuarantineRow audit = quarantineAudit();
+        when(mapper.quarantineAudit(TENANT_ID, "evt-1")).thenReturn(audit);
+
+        var first = service.quarantine(TENANT_ID, "evt-1", "operator", "invalid fixture", 2);
+        var retry = service.quarantine(TENANT_ID, "evt-1", "operator", "invalid fixture", 2);
+
+        assertThat(first).isEqualTo(retry);
+        assertThat(first.status()).isEqualTo("quarantined");
+        assertThat(first.replayCount()).isEqualTo(2);
+        assertThat(first.recordPid()).isEqualTo(audit.getRecordPid());
+        verify(metrics).record("quarantined");
+    }
+
+    @Test
+    void quarantineDeniesMissingTenantRowAndInvalidReasonBeforeWriting() {
+        assertThatThrownBy(() -> service.quarantine(TENANT_ID, "other", "operator", "fixture", 0))
+                .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> service.quarantine(TENANT_ID, "evt-1", "operator", " ", 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.quarantine(TENANT_ID, "evt-1", "operator", "x".repeat(513), 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.quarantine(TENANT_ID, "evt-1", "operator", "fixture", -1))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void quarantineRejectsStaleActorReasonOrVersionWithoutCountingSuccess() {
+        when(mapper.find(TENANT_ID, "evt-1")).thenReturn(row("evt-1", "quarantined", 2));
+        when(mapper.quarantineAudit(TENANT_ID, "evt-1")).thenReturn(quarantineAudit());
+        for (String actor : List.of("operator", "another")) {
+            assertThatThrownBy(() -> service.quarantine(TENANT_ID, "evt-1", actor, "different", 2))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        assertThatThrownBy(() -> service.quarantine(TENANT_ID, "evt-1", "operator", "invalid fixture", 1))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void quarantineBlocksHistoricalReplayRetryBeforeLookingUpOldPendingResult() {
+        when(mapper.find(TENANT_ID, "evt-1")).thenReturn(row("evt-1", "quarantined", 2));
+        assertThatThrownBy(() -> service.replay(TENANT_ID, "evt-1", "operator", "old recovery", 1))
+                .isInstanceOf(IllegalStateException.class);
+        verify(mapper, never()).replayHistory(TENANT_ID, "evt-1");
+        verifyNoInteractions(metrics);
+    }
+
+    private ReliableIntegrationQuarantineRow quarantineAudit() {
+        ReliableIntegrationQuarantineRow audit = new ReliableIntegrationQuarantineRow();
+        audit.setRecordPid("01M1QUARANTINE000000000000");
+        audit.setEventId("evt-1");
+        audit.setReplayCount(2);
+        audit.setRequestedBy("operator");
+        audit.setReason("invalid fixture");
+        audit.setCorrelationId("corr-1");
+        audit.setRequestedAt(Instant.EPOCH);
+        return audit;
     }
 }
