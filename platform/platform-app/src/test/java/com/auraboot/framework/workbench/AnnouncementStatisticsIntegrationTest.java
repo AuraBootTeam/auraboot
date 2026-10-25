@@ -194,8 +194,12 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             assertThat(exported.getRequestParams().required("checksumSha256").textValue()).isEqualTo(
                 java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
             long exportMs=(System.nanoTime()-exportAt)/1_000_000;
-            System.out.println("ANNOUNCEMENT_CAPACITY "+json.writeValueAsString(Map.of("recipients",501,"expansionPageSize",500,
-                "publicationMs",publicationMs,"projectionMs",projectionMs,"statisticsMs",statisticsMs,"exportMs",exportMs,"csvBytes",bytes.length)));
+            String evidenceRoot=System.getenv("AURA_EVIDENCE_ROOT");assertThat(evidenceRoot).isNotBlank();
+            var evidence=java.nio.file.Path.of(evidenceRoot);assertThat(evidence.isAbsolute()).isTrue();
+            java.nio.file.Files.createDirectories(evidence.resolve("measurements"));
+            java.nio.file.Files.writeString(evidence.resolve("measurements/announcement-capacity-501.json"),json.writeValueAsString(
+                Map.of("recipients",501,"expansionPageSize",500,"publicationMs",publicationMs,"projectionMs",projectionMs,
+                    "statisticsMs",statisticsMs,"exportMs",exportMs,"csvBytes",bytes.length)));
         } finally {
             org.springframework.test.util.ReflectionTestUtils.setField(audiences,"maximumRecipients",originalLimit);applyTestMetaContext();
             if(record!=null) {
@@ -883,18 +887,24 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Test void privateHttpDownloadRejectsMissingTruncatedOversizedAndChangedObjectsBeforeReturningCsvBytes() throws Exception {
         importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
         var stored=completedPrivateExport();String key=stored.getFileKey(),url="/api/exports/domain/"+stored.getPid()+"/download";
+        assertThat(storageProperties.getType()).isEqualTo("local");
+        var root=java.nio.file.Path.of(storageProperties.getLocal().getBasePath()).toAbsolutePath().normalize();
+        assertThat(root.toString()).isEqualTo(System.getenv("AURA_FILE_STORAGE_PATH"));
+        var object=root.resolve(key).normalize();assertThat(object.startsWith(root)).isTrue();
+        assertThat(java.nio.file.Files.isSymbolicLink(object)).isFalse();
         byte[] original;try(var stream=privateStorage.download(key)){original=stream.readAllBytes();}
         byte[] changed=original.clone();changed[changed.length-3]^=1;
         try {
             for(byte[] corrupted:List.of(Arrays.copyOf(original,original.length-1),Arrays.copyOf(original,original.length+1),changed)) {
-                privateStorage.upload(key,new java.io.ByteArrayInputStream(corrupted),corrupted.length,"text/csv; charset=UTF-8");
+                // Fault injection damages only this owned fixture object; the real provider intentionally forbids overwrites.
+                java.nio.file.Files.write(object,corrupted,java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,java.nio.file.StandardOpenOption.WRITE,java.nio.file.LinkOption.NOFOLLOW_LINKS);
                 var denied=http.perform(get(url)).andExpect(status().isUnprocessableEntity()).andReturn().getResponse();
                 assertThat(denied.getContentType()).startsWith("application/json");
                 assertThat(new String(denied.getContentAsByteArray(),java.nio.charset.StandardCharsets.UTF_8)).doesNotStartWith("\uFEFF");
             }
             privateStorage.delete(key);assertThat(privateStorage.exists(key)).isFalse();
             http.perform(get(url)).andExpect(status().isUnprocessableEntity());
-        } finally {privateStorage.upload(key,new java.io.ByteArrayInputStream(original),original.length,"text/csv; charset=UTF-8");}
+        } finally {java.nio.file.Files.write(object,original);}
         var restored=http.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse();
         assertThat(restored.getContentAsByteArray()).isEqualTo(original);
         assertThat(exportRegistry.findByPid(stored.getPid()).getRequestParams()).isEqualTo(stored.getRequestParams());

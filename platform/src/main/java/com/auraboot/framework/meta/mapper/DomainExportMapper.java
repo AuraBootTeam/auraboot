@@ -41,7 +41,7 @@ public interface DomainExportMapper {
     List<Map<String,Object>> dueCleanup(@Param("now") Instant now);
     @Update("""
         UPDATE ab_domain_export_attempt SET cleanup_count=cleanup_count+1,cleanup_error=#{error},
-            cleaned_at=CASE WHEN #{error} IS NULL THEN #{now} ELSE cleaned_at END,
+            cleaned_at=CASE WHEN CAST(#{error} AS text) IS NULL THEN #{now} ELSE cleaned_at END,
             next_cleanup_at=CAST(#{now} AS timestamptz)+INTERVAL '1 hour'
         WHERE tenant_id=#{tenant} AND pid=#{pid}
         """)
