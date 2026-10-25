@@ -257,6 +257,11 @@ public class SystemPermissionInitializer {
             }
         }
 
+        // The native command HTTP boundary uses this canonical code. Keep legacy definitions and grants intact.
+        createOrSkipPermission(tenantId, "meta", "command", "execute",
+            "Execute Business Commands", "Invoke native business commands; domain authorization remains mandatory",
+            LEVEL_ACTION, buildCode("system", "command", null), catalog, allPermissions, counts, pendingByLevel, parentCodes);
+
         String platformModuleCode = buildCode("module", "platform", null);
         for (InternalSystemModel model : INTERNAL_SYSTEM_MODELS) {
             String resourcePermissionCode = buildCode("model", model.code(), null);
