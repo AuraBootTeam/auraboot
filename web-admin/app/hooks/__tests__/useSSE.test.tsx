@@ -99,6 +99,24 @@ describe('useSSE', () => {
     expect(es.closed).toBe(true);
   });
 
+  it('replaces the connection at an identity boundary and ignores late frames and errors', () => {
+    const first = vi.fn(), second = vi.fn();
+    const { rerender } = renderHook(({ identity, handler }) => useSSE({
+      url: '/api/notifications/stream', connectionKey: identity,
+      listeners: [{ event: 'unread-count', handler }],
+    }), { initialProps: { identity: 'tenant-a:actor', handler: first } });
+    const old = MockEventSource.instances[0];
+    rerender({ identity: 'tenant-b:actor', handler: second });
+    const current = MockEventSource.instances[1];
+    expect(old.closed).toBe(true);
+    act(() => { old.emit('unread-count', { count: 99 }); old.triggerError(); });
+    expect(first).not.toHaveBeenCalled();expect(second).not.toHaveBeenCalled();
+    expect(current.closed).toBe(false);
+    act(() => current.emit('unread-count', { count: 2 }));
+    expect(second).toHaveBeenCalledExactlyOnceWith({ count: 2 });
+    expect(MockEventSource.instances).toHaveLength(2);
+  });
+
   it('calls listener handler when event is received', () => {
     const handler = vi.fn();
     renderHook(() =>

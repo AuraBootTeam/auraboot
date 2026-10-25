@@ -15,6 +15,8 @@ interface SSEListener {
 }
 
 interface UseSSEOptions {
+  /** Identity boundary; changing tenant or actor must replace the connection. */
+  connectionKey?: string;
   /** SSE endpoint URL */
   url: string;
   /** Event listeners to register */
@@ -36,6 +38,7 @@ interface UseSSEOptions {
 }
 
 export function useSSE({
+  connectionKey,
   url,
   listeners,
   enabled = true,
@@ -54,6 +57,7 @@ export function useSSE({
     if (!enabled) return;
 
     disposed.current = false;
+    retryCount.current = 0;
 
     function resetHeartbeat() {
       if (heartbeatTimeoutMs <= 0) return;
@@ -85,6 +89,7 @@ export function useSSE({
 
       for (const { event, handler } of listeners) {
         es.addEventListener(event, (ev: MessageEvent) => {
+          if (disposed.current || esRef.current !== es) return;
           resetHeartbeat();
           try {
             handler(JSON.parse(ev.data));
@@ -95,20 +100,24 @@ export function useSSE({
       }
 
       es.addEventListener('connected', () => {
+        if (disposed.current || esRef.current !== es) return;
         retryCount.current = 0;
         resetHeartbeat();
       });
 
       // Any incoming message resets the heartbeat timer
       es.onmessage = () => {
+        if (disposed.current || esRef.current !== es) return;
         resetHeartbeat();
       };
 
       es.onopen = () => {
+        if (disposed.current || esRef.current !== es) return;
         resetHeartbeat();
       };
 
       es.onerror = () => {
+        if (disposed.current || esRef.current !== es) return;
         close();
         scheduleReconnect();
       };
@@ -166,5 +175,5 @@ export function useSSE({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, enabled]);
+  }, [url, enabled, connectionKey]);
 }

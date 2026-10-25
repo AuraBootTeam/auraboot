@@ -49,6 +49,8 @@ export default function Header({
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
+  const notificationScope = `${user?.tenantId ?? ''}:${user?.pid ?? user?.id ?? ''}`;
+  const [notificationCount, setNotificationCount] = useState<{ scope: string; count: number } | null>(null);
   const deploymentBranding = rootData?.branding ?? COMMUNITY_BRANDING;
   // Tenant-level skin (ui.theme) wins over deployment branding when configured.
   const tenantTheme = useTenantTheme();
@@ -100,8 +102,16 @@ export default function Header({
   // (provides exponential backoff, tab visibility pause, and proper cleanup)
   useSSE({
     url: '/api/notifications/stream',
+    connectionKey: notificationScope,
     enabled: !!user,
     listeners: [
+      {
+        event: 'unread-count',
+        handler: (data: { count?: number }) => {
+          if (Number.isSafeInteger(data.count) && data.count! >= 0)
+            setNotificationCount({ scope: notificationScope, count: data.count! });
+        },
+      },
       {
         event: 'data-sync-connected',
         handler: (data: { connectionId?: number }) => {
@@ -245,7 +255,8 @@ export default function Header({
             {!simplified && showNotifications && <InboxHeaderWidget />}
 
             {/* Notification centre bell (unread badge + SSE live updates) */}
-            {!simplified && showNotifications && <NotificationHeaderWidget />}
+            {!simplified && showNotifications && <NotificationHeaderWidget key={notificationScope}
+              streamCount={notificationCount?.scope === notificationScope ? notificationCount.count : undefined} />}
 
             {/* Language switch — only shown in non-compact mode */}
             {!workspace && !simplified && showLanguageSwitch && (
