@@ -725,7 +725,7 @@ public class HandlerPhase implements CommandPhase {
                             handler.getClass().getName(), handlerCode);
                 } else {
                     Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
-                            : inventoryReceiptProvenance.invoke(handler, pluginContext);
+                            : inventoryReceiptProvenance.route(handler, pluginContext);
                     if (result instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -750,7 +750,7 @@ public class HandlerPhase implements CommandPhase {
                 log.info("Executing chained secondary handler {} for command {}",
                         secondary.getClass().getName(), handlerCode);
                 Object secResult = inventoryReceiptProvenance == null ? secondary.execute(pluginContext)
-                        : inventoryReceiptProvenance.invoke(secondary, pluginContext);
+                        : inventoryReceiptProvenance.route(secondary, pluginContext);
                 if (secResult instanceof Map) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> secMap = (Map<String, Object>) secResult;

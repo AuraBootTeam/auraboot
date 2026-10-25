@@ -431,8 +431,7 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
   if (isEmpty) {
     return (
       <ChartEmptyState
-        title={title || 'No bar data yet'}
-        description="This chart will render once the first matching records are created."
+        title={title}
         variant="bar"
         className={className}
       />

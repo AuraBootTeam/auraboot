@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Real PostgreSQL proof that ab_file_relation carries tenant_id so the
@@ -77,6 +78,40 @@ class FileRelationTenantScopeIT {
                 fileId, filePid, TENANT_A, "relation-scope.bin", "relation-scope.bin", 10L,
                 "application/octet-stream", "local", databaseNow, USER_A, "success",
                 databaseNow, databaseNow);
+    }
+
+    @Test
+    @DisplayName("another editor retains the same attachment but cannot copy it across records or fields")
+    void anotherEditorRetainsOnlyTheExistingTarget() {
+        FileRelationRequestDTO request = new FileRelationRequestDTO();
+        request.setFileIds(new String[]{filePid});
+        request.setEntityType(ENTITY_TYPE);
+        request.setEntityId("shared-record");
+        request.setFieldName(FIELD_NAME);
+        MetaContext.setContext(TENANT_A, USER_A, "owner", "owner");
+        assertThat(fileService.createFileRelation(request, USER_A)).isTrue();
+
+        long editor = USER_A + 1;
+        MetaContext.setContext(TENANT_A, editor, "editor", "editor");
+        assertThat(fileService.createFileRelation(request, editor)).isTrue();
+        assertThat(fileRelationMapper.findFileIdsByEntityAndField(
+                ENTITY_TYPE, "shared-record", FIELD_NAME)).containsExactly(fileId);
+
+        request.setEntityId("another-record");
+        assertThatThrownBy(() -> fileService.createFileRelation(request, editor))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        request.setEntityId("shared-record");
+        request.setFieldName("another_field");
+        assertThatThrownBy(() -> fileService.createFileRelation(request, editor))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThat(fileRelationMapper.findFileIdsByEntityAndField(
+                ENTITY_TYPE, "shared-record", FIELD_NAME)).containsExactly(fileId);
+
+        MetaContext.setContext(TENANT_B, USER_B, "other-tenant", "other-tenant");
+        request.setFieldName(FIELD_NAME);
+        assertThatThrownBy(() -> fileService.createFileRelation(request, USER_B))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThat(fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "shared-record")).isEmpty();
     }
 
     @Test

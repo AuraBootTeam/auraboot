@@ -120,6 +120,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     referenceDisplayByField,
   });
   const { validateFieldValue, validateCrossRowRules } = useSubTableValidation({
+    locale,
     t,
     config,
     parentRecordData,

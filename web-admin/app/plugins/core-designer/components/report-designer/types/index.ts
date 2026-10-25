@@ -45,6 +45,8 @@ export interface ReportDataSource {
   aggregateQuery?: AggregateQueryRequest;
   modelCode?: string;
   queryCode?: string;
+  /** Fixed business scope for named-query data sources; authorization remains server-side. */
+  params?: Record<string, string | number | boolean | null>;
   url?: string;
   data?: Record<string, unknown>[];
   filters?: Array<{ field: string; operator: string; value?: string | number; values?: string[] }>;
