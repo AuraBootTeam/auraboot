@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applySettingsToSchema,
   readEnableMultiView,
+  parseImportedPageSchema,
 } from '~/plugins/core-designer/components/studio/workbench/PageDesignerEditorImpl';
 import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
@@ -141,5 +142,30 @@ describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', ()
       const next = applySettingsToSchema(baseSchema(), { page: { enableMultiView: false } });
       expect(readEnableMultiView(next)).toBe(false);
     });
+  });
+});
+
+
+describe('Studio form presentation bridge', () => {
+  it('persists orthogonal layout options without replacing legacy guidance or bindings', () => {
+    const schema = baseSchema({ kind: 'form', extension: { presentation: 'workspace', attachmentFields: ['files'], formGuidance: { title: 'Guidance' } } });
+    const presentation = { width: 'comfortable' as const, columns: 1 as const, surface: 'card' as const, density: 'comfortable' as const, actions: 'inline' as const, guidance: 'none' as const };
+    const next = applySettingsToSchema(schema, { page: { enableMultiView: false, formPresentation: presentation } });
+    expect(next.extension).toMatchObject({ presentation: 'workspace', attachmentFields: ['files'], formGuidance: { title: 'Guidance' }, formPresentation: presentation });
+    expect(schema.extension?.formPresentation).toBeUndefined();
+    expect(next.blocks).toBe(schema.blocks);
+  });
+});
+
+
+describe('Studio legacy import compatibility', () => {
+  it.each([2, 4])('opens flat schema v%s without losing presentation or fields', version => {
+    const raw = { ...baseSchema({ kind: 'form', extension: { formPresentation: { columns: 2 } } }), schemaVersion: version };
+    const opened = parseImportedPageSchema({ schema: raw });
+    expect(opened.extension?.formPresentation?.columns).toBe(2);
+    expect(opened.blocks).toEqual(raw.blocks);
+  });
+  it('rejects recursive v3 instead of flattening it silently', () => {
+    expect(() => parseImportedPageSchema({ ...baseSchema(), schemaVersion: 3 })).toThrow('expected v2 or v4');
   });
 });

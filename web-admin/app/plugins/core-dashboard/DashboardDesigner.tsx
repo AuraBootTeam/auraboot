@@ -366,7 +366,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
 
       {/* Main content area */}
       <DesignerWorkspace
-        compactWidth={900}
+        compactWidth={1200}
         testIdPrefix="dashboard"
         palette={<WidgetPalette onWidgetClick={handleWidgetClick} />}
         canvas={<div ref={canvasRef} className="flex min-w-0 flex-1 flex-col"><DesignerCanvas /></div>}
