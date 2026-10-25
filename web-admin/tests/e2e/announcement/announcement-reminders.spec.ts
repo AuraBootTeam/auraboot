@@ -101,7 +101,7 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     }, { times: 1 });
     await page.getByRole('button', { name: '确认催办', exact: true }).click(); await expect(dialog).toBeVisible();
     await page.getByTestId('confirm-ok').click();
-    await expect(page.getByText(/连接中断.*无法确认/)).toBeVisible();
+    await expect(page.getByTestId('ab:detail:ab_announcement:action-error')).toContainText('网络连接中断，暂时无法确认操作结果。');
     expect(await count()).toBe(1); await screenshot('reminder-uncertain-response');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: '确认催办', exact: true }).click(); await expect(dialog).toBeVisible();

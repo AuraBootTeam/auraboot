@@ -4020,8 +4020,8 @@
                 "en-US": "Active"
               },
               "blocked": {
-                "zh-CN": "已阻断，需恢复原权限",
-                "en-US": "Blocked; restore original authority"
+                "zh-CN": "计划已阻断",
+                "en-US": "Plan blocked"
               },
               "completed": {
                 "zh-CN": "已结束",
@@ -4030,6 +4030,27 @@
               "canceled": {
                 "zh-CN": "公告已撤回或失效",
                 "en-US": "Announcement withdrawn or expired"
+              }
+            }
+          },
+          {
+            "field": "errorCode",
+            "label": {
+              "zh-CN": "处理说明",
+              "en-US": "Recovery guidance"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "无需处理",
+                "en-US": "No action required"
+              },
+              "ACTOR_OR_VERSION_UNAVAILABLE": {
+                "zh-CN": "请核实原操作者权限、租户成员状态和公告有效性；恢复后由原操作者显式恢复计划。",
+                "en-US": "Check the original actor permissions, membership and announcement validity, then explicitly resume as the original actor."
+              },
+              "EXECUTION_FAILURE": {
+                "zh-CN": "执行失败，请联系管理员排查后，由原操作者恢复计划。",
+                "en-US": "Execution failed. Ask an administrator to investigate before the original actor resumes the plan."
               }
             }
           }

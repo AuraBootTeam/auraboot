@@ -13,7 +13,7 @@ updated: 2026-10-25
 
 最新仓库浏览器验收的源码为`cd5ce8296a6d614f031e6cb9ec04f72887463b19`，使用同一隔离数据库、独占Redis及公开启动器的Web/BFF/后端。启动器产品构件核验及完成启动后的Workspace核验通过。源码、端口、监听进程与连接身份同源；health不独立充当身份凭证。网络提示与时间列修正已在该源码复验，应用代码与efaa3e65c相同；后端Java代码与50项单测、2项真实集成所验证的a1b827a69相同。后续差异及未执行矩阵仍分开记录。
 
-新增持久催办在b258e9c21执行19项真实PostgreSQL/HTTP/outbox集成，无skip，包括9项催办与10项既有统计/导出场景；规则层55f63c026执行19项单测。Core151空库迁移、独立drift及150→151升级通过。恢复、完整权限与原生催办页面仍待验证，不能套用cd5的浏览器证据；实现边界见设计§18.16–18.17。
+新增持久催办在f5efd77be执行21项真实PostgreSQL/HTTP/outbox集成，无skip，包括11项催办与10项既有统计/导出场景；规则层55f63c026执行19项单测。Core151空库迁移、独立drift及150→151升级通过。恢复及历史状态接口已有真实证据；完整权限与原生催办页面仍待验证，不能套用cd5的浏览器证据；实现边界见设计§18.16–18.17。
 
 ## 本轮实际证据
 
@@ -43,7 +43,7 @@ updated: 2026-10-25
 | S5严格BPM | partial | 恢复/重分配页面、完整严格业务浏览器矩阵 |
 | S6组合安装/联动 | partial | 最新BPM构件、普通停止、附件及业务审批UI；历史构件组合证据不代表最新源码 |
 | S7接收者/铃铛/待办 | partial | 最新候选完整复验、附件及完整错误状态；既有核心菜单旅程有真实证据 |
-| S8催办 | missing implementation | 持久手动/自动批次、共享去重/额度、消费前授权、日历/截止、恢复和运营反馈 |
+| S8催办 | backend targeted-tested；UI candidate | 持久批次、共享去重/额度、并发、消费前撤权及恢复已有真实证据；原生页面完整旅程、完整权限/状态、观测与容量仍待验证 |
 | S8统计/导出 | targeted-tested | 真正跨页、版本切换、零分母/迁移、各任务/权限状态、上传取消并发、清理失败重试及完整视觉复核 |
 
 任何missing、partial或未执行行都阻止“全部完成、黄金通过、覆盖率100%”结论。历史S1与早期S2–S8证据不重复计数；完整逐行动点的D01–D15仍以设计§16.8为分母。
@@ -73,7 +73,7 @@ artifact_evidence: actual browser CSV, independent parser, fixed-capture binding
 permission_negative: current-authority HTTP denial tested; full browser/owner/member matrix remains partial
 visual_feedback: filter/empty/download and uncertain network observed; identified corrections reverified; full state/permission visual matrix remains partial
 skip_fixme_threshold_retry_audit: scoped normal runs report zero skips/retries; mutation filters and no-tests attempts are separate
-did_not_run: complete S2–S8 coverage, remaining BPM UI/composition and reminder validation
+did_not_run: complete S2–S8 coverage, remaining BPM UI/composition, reminder browser/state/security and observability validation
 remaining_blockers: outstanding scope and state/visual rows above
 allowed_claim: targeted-tested; incomplete S2–S8 delivery, no merge or production release
 ```
