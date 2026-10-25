@@ -80,7 +80,7 @@ class CommandInvocationAuthorizationPhaseTest {
         assertThat(actual.modelCode()).isEqualTo("app_workspace");
         assertThat(actual.targetRecordPid()).isNull();
         nested.put("name", "Changed");
-        assertThat((Map<?, ?>) actual.payload().get("nested")).containsEntry("name", "Before");
+        assertThat(((Map<?, ?>) actual.payload().get("nested")).get("name")).isEqualTo("Before");
         assertThatThrownBy(() -> actual.payload().put("storePid", "forged")).isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> ((Map<?, ?>) actual.payload().get("nested")).clear()).isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> ((List<?>) actual.payload().get("values")).clear()).isInstanceOf(UnsupportedOperationException.class);
