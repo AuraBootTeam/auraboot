@@ -1,6 +1,9 @@
 package com.auraboot.framework.tenant.service.impl;
 
+import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.entity.Permission;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.Validation;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.tenant.dto.bootstrap.PermissionTemplate;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,30 @@ class TenantBootstrapTemplatePermissionBatchTest {
     private final PermissionMapper mapper = mock(PermissionMapper.class);
     private final TenantBootstrapServiceImpl service = new TenantBootstrapServiceImpl(
             null, null, null, null, null, null, null, null, null, mapper, null, null, null, null);
+
+    @Test
+    void everyDefaultTemplatePermissionCanUseTheOriginalCreationApi() throws Exception {
+        try (var input = getClass().getResourceAsStream("/tenant-templates/default-bootstrap.json");
+             var factory = Validation.buildDefaultValidatorFactory()) {
+            assertThat(input).isNotNull();
+            var permissions = new ObjectMapper().readTree(input).get("permissions");
+            assertThat(permissions.isArray()).isTrue();
+            assertThat(permissions.size()).isPositive();
+            var validator = factory.getValidator();
+            var codes = new java.util.HashSet<String>();
+            for (var entry : permissions) {
+                var request = new PermissionCreateRequest();
+                request.setCode(entry.path("code").asText(null));
+                request.setName(entry.path("name").asText(null));
+                request.setResourceType(entry.path("resourceType").asText(null));
+                request.setResourceCode(entry.path("resource").asText(null));
+                request.setAction(entry.path("action").asText(null));
+                assertThat(validator.validate(request)).as("API fields for %s", request.getCode()).isEmpty();
+                assertThat(codes.add(request.getCode().trim().toLowerCase(java.util.Locale.ROOT)))
+                        .as("unique template code %s", request.getCode()).isTrue();
+            }
+        }
+    }
 
     private PermissionTemplate template(String code) {
         var template = new PermissionTemplate();
