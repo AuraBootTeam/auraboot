@@ -1099,8 +1099,16 @@ actionRegistry.register('form.set', ({ stateManager, scopeId, args, expressionEv
   Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
 });
 
+function resolveRequestKeyArgs(context: ActionContext): Record<string, any> | undefined {
+  const { args, expressionEvaluator, expressionContext } = context;
+  if (!args || typeof args.field !== 'string' || !expressionEvaluator || !expressionContext) return args;
+  return { ...args, field: expressionEvaluator.evaluateTemplate(args.field, expressionContext) };
+}
+
 /** Allocate one domain request key in the existing scoped state, never per click. */
-actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+actionRegistry.register('state.ensureRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).some(key => !['field','persistence'].includes(key)) || typeof args.field !== 'string'
     || (args.persistence !== undefined && args.persistence !== 'session')
@@ -1126,7 +1134,9 @@ actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args
 });
 
 /** Restore only an existing authenticated session UUID; never allocate or persist one. */
-actionRegistry.register('state.peekRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+actionRegistry.register('state.peekRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).length !== 2 || Object.keys(args).some(key => !['field','persistence'].includes(key))
     || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
@@ -1138,7 +1148,9 @@ actionRegistry.register('state.peekRequestKey', ({ stateManager, scopeId, args, 
 });
 
 /** Explicit completion/next-attempt transition; ordinary state.set never clears persisted intent. */
-actionRegistry.register('state.clearRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+actionRegistry.register('state.clearRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).some(key => !['field','persistence'].includes(key))
     || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
