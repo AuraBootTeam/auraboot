@@ -133,7 +133,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
           placeholder: placeholderText || '',
         }),
       ],
-      content: sanitizeHtml(field.value || ''),
+      content: typeof window === 'undefined' ? '' : sanitizeHtml(field.value || ''),
       editorProps: { attributes: { role: 'textbox', 'aria-label': labelText || placeholderText || name, 'aria-multiline': 'true' } },
       editable: !disabledValue,
       onUpdate: handleUpdate,
