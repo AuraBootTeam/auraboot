@@ -193,6 +193,40 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());assertThat(preview.get("eligible")).isEqualTo(1L);
         var result=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());assertThat(result.get("actualCount")).isEqualTo(1);
     }
+    @Test void concurrentAutomaticScansShareTheRootLockAndDailyUniqueFence() throws Exception {
+        String version=publish();var reference=reminderPlan(version);reminderClock.instant=reminderSlot(version,2);
+        var ready=new java.util.concurrent.CountDownLatch(2);var start=new java.util.concurrent.CountDownLatch(1);
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first=pool.submit(()->{ready.countDown();if(!start.await(5,java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("Missing concurrent start");reminders.scan(reference);return true;});
+            var second=pool.submit(()->{ready.countDown();if(!start.await(5,java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("Missing concurrent start");reminders.scan(reference);return true;});
+            assertThat(ready.await(5,java.util.concurrent.TimeUnit.SECONDS)).isTrue();start.countDown();
+            assertThat(first.get(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();assertThat(second.get(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(reminderPlan(version).get("automatic_batches")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_reminder_batch WHERE tenant_id=? AND version_pid=? AND mode='AUTO'",Long.class,getTestTenant().getId(),version)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=? AND kind='reminder'",Long.class,getTestTenant().getId(),version)).isEqualTo(1L);
+    }
+    @Test void authorityRevokedAfterAcceptanceBlocksTheBatchBeforeNotificationPersistence() {
+        String version=publish(),record=recordOf(version);var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        try {
+            var accepted=new TransactionTemplate(transactions).execute(state->{
+                var result=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());
+                assertThat(jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND permission_id IN (SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                    getTestTenant().getId(),getTestRole().getId(),getTestTenant().getId(),"announcement.announcement.remind")).isEqualTo(1);return result;
+            });
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->{
+                outboxWorker.pollAndDispatch();applyTestMetaContext();
+                assertThat(jdbc.queryForMap("SELECT status,error_code FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=?",getTestTenant().getId(),accepted.get("batchPid")))
+                    .containsEntry("status","skipped").containsEntry("error_code","ACTOR_OR_VERSION_UNAVAILABLE");});
+            assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_reminder_batch WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),accepted.get("batchPid"))).isEqualTo("blocked");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND user_id=? AND source_type='announcement' AND source_id=?",Long.class,
+                getTestTenant().getId(),getTestUser().getId(),version)).isEqualTo(1L);
+        } finally {
+            grantCommittedPermissionToTestRole("announcement.announcement.remind","announcement","announcement:announcement","remind","Announcement remind");
+            permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
+        }
+    }
     @Test void httpSummaryAndDetailsRemainAtTheSameInstantAfterNaturalReadAndAcknowledgementChanges() throws Exception {
         String version=publish();
         var response=http.perform(post("/api/announcements/versions/"+version+"/statistics/snapshots")
