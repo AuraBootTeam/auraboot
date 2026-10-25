@@ -83,7 +83,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(expected);
     }
     @BeforeEach void grantAndAuthenticate() {
-        for(String action:List.of("read","edit","publish","publish_all","exempt","stats","export","withdraw","remind"))
+        for(String action:List.of("read","edit","delete","publish","publish_all","exempt","stats","export","withdraw","remind"))
             grantCommittedPermissionToTestRole("announcement.announcement."+action,"announcement","announcement:announcement",action,"Announcement "+action);
         applyTestMetaContext();
         var authorities=AuthorityUtils.createAuthorityList("role_admin");

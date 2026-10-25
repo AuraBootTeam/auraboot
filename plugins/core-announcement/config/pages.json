@@ -2368,7 +2368,7 @@
             "permissionCodes": [
               "announcement.announcement.stats"
             ],
-            "variant": "secondary",
+            "variant": "default",
             "action": {
               "type": "flow",
               "steps": [
@@ -2711,7 +2711,7 @@
               "zh-CN": "渠道记录",
               "en-US": "Channel history"
             },
-            "variant": "secondary",
+            "variant": "default",
             "permissionCode": "announcement.announcement.stats",
             "action": {
               "type": "flow",
@@ -4688,7 +4688,7 @@
               "zh-CN": "刷新记录",
               "en-US": "Refresh history"
             },
-            "variant": "secondary",
+            "variant": "default",
             "permissionCode": "announcement.announcement.stats",
             "action": {
               "type": "flow",
@@ -4714,7 +4714,7 @@
               "zh-CN": "返回公告",
               "en-US": "Back to announcement"
             },
-            "variant": "secondary",
+            "variant": "default",
             "action": {
               "type": "flow",
               "steps": [

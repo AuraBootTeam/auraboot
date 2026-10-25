@@ -47,6 +47,7 @@ describe('Native announcement operational lookups',()=>{
   it('uses the native exact-version history detail and server paging schema',()=>{
     const history=pages.find((page:any)=>page.pageKey==='announcement_delivery_history_detail');
     expect(validateStructure(canonicalizePageSchemaDto(history))).toEqual([]);
+    expect(validateStructure(canonicalizePageSchemaDto(schema))).toEqual([]);
     expect(history.extension.dataSource.detailEndpoint).toBe('/api/announcements/versions/{recordPid}/delivery-summary');
     expect(history.blocks.find((block:any)=>block.id==='delivery_rows').table.pagination.mode).toBe('server');
   });

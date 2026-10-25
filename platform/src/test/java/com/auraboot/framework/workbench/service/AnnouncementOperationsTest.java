@@ -32,6 +32,7 @@ class AnnouncementOperationsTest {
     }
     @Test void missingOrUncommittedIsUnknownRatherThanFailedAndNeverQueriesAnotherActor() {
         when(access.actor("publish")).thenReturn(7L);
+        when(operations.operation(1L,7L,9L,"announcement:publish","key")).thenReturn(null);
         assertThat(service.operation("announcement:publish","key")).containsExactlyInAnyOrderEntriesOf(Map.of("found",false,"operationState","unknown"));
         verify(operations).operation(1L,7L,9L,"announcement:publish","key");
     }
