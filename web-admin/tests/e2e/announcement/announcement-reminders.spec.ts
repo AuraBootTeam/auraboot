@@ -251,7 +251,7 @@ test('a recovered original member retries the same blocked publication through i
     code, name: 'Publication recovery publisher', type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'all',
   } }));
   const codes = ['announcement.announcement.edit', 'announcement.announcement.publish', 'announcement.announcement.exempt',
-    'announcement.announcement.read', 'announcement.announcement.withdraw', 'model.ab_announcement.read'];
+    'announcement.announcement.read', 'announcement.announcement.withdraw', 'model.ab_announcement.read', 'meta.command.execute'];
   const permissions = (await db.query('SELECT p.id,p.code FROM ab_permission p JOIN ab_role r ON r.tenant_id=p.tenant_id WHERE r.pid=$1 AND p.code=ANY($2::text[]) AND p.deleted_flag=FALSE', [role.pid, codes])).rows;
   expect(permissions.map(p => p.code).sort()).toEqual([...codes].sort());
   await successful(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`, { data: permissions.map(p => ({ permissionId: p.id, granted: true })) }));
