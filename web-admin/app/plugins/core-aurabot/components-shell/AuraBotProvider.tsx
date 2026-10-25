@@ -1109,6 +1109,16 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               const data = result?.data || result;
               // Form filling is draft-only and never resumes through business approval.
             },
+            onResultContract: (contract) => {
+              dispatch({
+                type: 'add_tool_message',
+                payload: {
+                  id: `rc-${generateUniqueSuffix()}`,
+                  type: 'result_contract', sender: 'bot', timestamp: Date.now(),
+                  content: contract.textSummary ?? '', resultContract: contract,
+                },
+              });
+            },
             onConfirmRequired: (
               tid: string,
               tname: string,

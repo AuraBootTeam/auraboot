@@ -37,6 +37,8 @@ export function formatParamName(key: string, isZh: boolean): string {
     displayname: ['显示名称', 'Display name'],
     modelcode: ['模型编码', 'Model code'],
     modelcategory: ['模型类别', 'Model category'],
+    datasensitivity: ['数据敏感度', 'Data sensitivity'],
+    semanticdescription: ['业务语义', 'Business meaning'],
     tablename: ['数据表名', 'Table name'],
     pid: ['记录标识', 'Record identifier'],
     id: ['编号', 'Identifier'],

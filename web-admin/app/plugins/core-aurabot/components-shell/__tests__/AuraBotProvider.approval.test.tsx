@@ -34,6 +34,19 @@ async function propose() {
   await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('confirm_card'));
 }
 describe('approval decision feedback', () => {
+  it('renders the resumed structured result before any history reload', async () => {
+    await propose(); fireEvent.click(screen.getByText('Approve'));
+    await waitFor(() => expect(auraBotApi.executeStream).toHaveBeenCalled());
+    await act(async () => {
+      callbacks.onResultContract?.({ outputType: 'structured_result', actionability: 'write', status: 'success',
+        skillCode: 'aurabot:model:create', renderHint: 'card', data: { data: { displayName: 'Ledger', modelCode: 'ledger' } } });
+      callbacks.onDone('', 'trace-result'); finish();
+    });
+    const messages = JSON.parse(screen.getByTestId('state').textContent || '{}').messages;
+    expect(messages.filter((message: any) => message.type === 'result_contract')).toHaveLength(1);
+    expect(messages.find((message: any) => message.type === 'result_contract').resultContract.data.data.displayName).toBe('Ledger');
+  });
+
   it('replaces the same pending tool instead of duplicating its decision feedback', async () => {
     vi.mocked(auraBotApi.chatStream).mockImplementation(async (_request, c) => {
       c.onToolStart?.('decision', 'aurabot_model_create', { code: 'approval_visual_case' });

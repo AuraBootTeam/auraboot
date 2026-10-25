@@ -163,7 +163,7 @@ export function SkillPreviewCard({
         <div className="space-y-2 px-3 py-2">
           <dl className="grid grid-cols-[minmax(4rem,0.3fr)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="skill-parameters">
             {Object.entries(input ?? preview).map(([key, value]) => <React.Fragment key={key}>
-              <dt className="font-medium text-gray-600 dark:text-gray-300">{formatParamName(key, locale.startsWith('zh'))}</dt>
+              <dt className="min-w-0 break-words font-medium text-gray-600 [overflow-wrap:anywhere] dark:text-gray-300">{formatParamName(key, locale.startsWith('zh'))}</dt>
               <dd className="min-w-0 break-words text-gray-900 [overflow-wrap:anywhere] dark:text-gray-100">{typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')}</dd>
             </React.Fragment>)}
           </dl>

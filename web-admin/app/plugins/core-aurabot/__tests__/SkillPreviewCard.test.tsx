@@ -30,6 +30,15 @@ const BASE_PROPS = {
 };
 
 describe('SkillPreviewCard', () => {
+  it('labels complete model semantics in the confirmation card', () => {
+    render(<SkillPreviewCard turnId="turn" toolId="tool" skillName="model:create" riskLevel="HIGH"
+      preview={{}} input={{ dataSensitivity: 'INTERNAL', semanticDescription: 'Acceptance process and outcome' }}
+      previewToken="preview" onConfirm={() => {}} onCancel={() => {}} />);
+    expect(screen.getByTestId('skill-parameters')).toHaveTextContent('数据敏感度');
+    expect(screen.getByTestId('skill-parameters')).toHaveTextContent('业务语义');
+    expect(screen.getByTestId('skill-parameters')).not.toHaveTextContent('SemanticDescription');
+  });
+
   it('rendersSkillNameRiskBadgeAndPreviewJson — LOW tier', () => {
     render(
       <SkillPreviewCard

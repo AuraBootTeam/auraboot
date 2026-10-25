@@ -84,7 +84,9 @@ class AcpDurableWorkflowEngineTest {
                 .thenReturn(new RunOutcome.PendingApproval("run", "approval", "Review operation", review, "trace-1"));
         var sink = mock(com.auraboot.framework.conversation.ResponseSink.class);
         var engine = new AcpDurableWorkflowEngine(runs, mock(DynamicDataMapper.class), new ObjectMapper());
-        assertThat(engine.resumeConversationRun(ctx, "task", "run", sink)).isInstanceOf(TurnOutcome.PendingConfirmation.class);
+        assertThat(engine.resumeConversationRun(ctx, "task", "run", sink))
+                .isInstanceOfSatisfying(TurnOutcome.PendingConfirmation.class,
+                        pending -> assertThat(pending.partialResponse()).isEmpty());
         verify(sink).onConfirmRequired("approval", "agent_approval_gate", "Review operation", input, "approval", review);
         verify(sink).onDone("", "trace-1");
         assertThat(review).doesNotContainKey("previewToken");

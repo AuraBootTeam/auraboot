@@ -196,7 +196,8 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
                 sink.onDone("", pa.traceId());
                 yield new TurnOutcome.PendingConfirmation(
                         approvalPid,
-                        pa.message() != null ? pa.message() : "Approval required",
+                        pa.review() != null && Boolean.TRUE.equals(pa.review().get("_aurabot_skill"))
+                                ? "" : pa.message() != null ? pa.message() : "Approval required",
                         approvalPid);
             }
             case RunOutcome.Cancelled c -> {
