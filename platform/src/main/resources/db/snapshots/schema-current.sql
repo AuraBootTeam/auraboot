@@ -871,6 +871,18 @@ END $$;
 
 
 --
+-- Name: prevent_wechat_subscription_observation_change(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prevent_wechat_subscription_observation_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'WeChat client subscription observations are immutable';
+END $$;
+
+
+--
 -- Name: protect_notification_durable_intent(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -17642,6 +17654,33 @@ COMMENT ON TABLE public.ab_wechat_subscription_grant IS 'One-time provider-confi
 
 
 --
+-- Name: ab_wechat_subscription_observation; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_wechat_subscription_observation (
+    tenant_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    app_id character varying(64) NOT NULL,
+    identity_pid character varying(26) NOT NULL,
+    idempotency_key character varying(120) NOT NULL,
+    request_hash character(64) NOT NULL,
+    results jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT ab_wechat_subscription_observation_request_hash_check CHECK ((request_hash ~ '^[a-f0-9]{64}$'::text)),
+    CONSTRAINT ab_wechat_subscription_observation_results_check CHECK (((jsonb_typeof(results) = 'array'::text) AND ((jsonb_array_length(results) >= 1) AND (jsonb_array_length(results) <= 20)))),
+    CONSTRAINT ab_wechat_subscription_observation_tenant_id_check CHECK ((tenant_id > 0)),
+    CONSTRAINT ab_wechat_subscription_observation_user_id_check CHECK ((user_id > 0))
+);
+
+
+--
+-- Name: TABLE ab_wechat_subscription_observation; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_wechat_subscription_observation IS 'Tenant/user-owned client observations; never trusted provider authorization or delivery proof';
+
+
+--
 -- Name: ab_wechat_subscription_state; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -23788,6 +23827,14 @@ ALTER TABLE ONLY public.ab_wechat_subscription_grant
 
 ALTER TABLE ONLY public.ab_wechat_subscription_grant
     ADD CONSTRAINT ab_wechat_subscription_grant_pkey PRIMARY KEY (grant_reference);
+
+
+--
+-- Name: ab_wechat_subscription_observation ab_wechat_subscription_observation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_wechat_subscription_observation
+    ADD CONSTRAINT ab_wechat_subscription_observation_pkey PRIMARY KEY (tenant_id, user_id, app_id, idempotency_key);
 
 
 --
@@ -31109,6 +31156,13 @@ CREATE TRIGGER trg_wechat_subscription_event_immutable BEFORE UPDATE ON public.a
 --
 
 CREATE TRIGGER trg_wechat_subscription_grant_immutable BEFORE UPDATE ON public.ab_wechat_subscription_grant FOR EACH ROW EXECUTE FUNCTION public.prevent_wechat_subscription_fact_change();
+
+
+--
+-- Name: ab_wechat_subscription_observation trg_wechat_subscription_observation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_wechat_subscription_observation_immutable BEFORE UPDATE ON public.ab_wechat_subscription_observation FOR EACH ROW EXECUTE FUNCTION public.prevent_wechat_subscription_observation_change();
 
 
 --
