@@ -35,7 +35,8 @@ interface FileAttachmentFieldProps {
 
 export function attachmentDownloadUrl(value: string): string | null {
   if (/^\/download\/[A-Za-z0-9_-]+$/.test(value)) return `/api/file${value}`;
-  if (/^\/api\/file\/download\/[A-Za-z0-9_-]+$/.test(value)) return value;
+  // Same-origin controlled download references remain subject to server-side authorization.
+  if (/^\/api\/(?:[A-Za-z0-9_-]+\/)*(?:download|attachments)\/[A-Za-z0-9_-]+$/.test(value)) return value;
   try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; } catch { return null; }
 }
 
