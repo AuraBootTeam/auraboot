@@ -21,7 +21,7 @@ dependencies {
     compileOnly project(':')
 
     // Tencent official COS Java SDK: https://cloud.tencent.com/document/product/436/10199
-    implementation 'com.qcloud:cos_api:5.6.227'
+    implementation 'com.qcloud:cos_api:5.6.283'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.48'
