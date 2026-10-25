@@ -54,7 +54,11 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await page.screenshot({path:info.outputPath('attachment-uploaded-draft.png'),fullPage:true,animations:'disabled'});
     const creating=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith('/api/meta/commands/execute/announcement:create_announcement'));
     await page.getByRole('button',{name:'保存',exact:true}).click();
-    const created=await successful(await creating);recordPid=created.data.pid;
+    const createResponse=await creating;
+    expect(JSON.parse(createResponse.request().postDataJSON().payload.attachments)).toEqual([
+      expect.objectContaining({fileId:file.fileId,name:fileName,size:bytes.length}),
+    ]);
+    const created=await successful(createResponse);recordPid=created.data.pid;
     await enter(page);
     await page.getByTestId('filters-toggle').click();
     await page.getByTestId('search-area').getByPlaceholder('例如：周末系统维护',{exact:true}).fill(title);
