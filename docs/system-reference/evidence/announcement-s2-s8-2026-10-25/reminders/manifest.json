@@ -296,5 +296,47 @@
       }
     ],
     "claim": "Targeted publication recovery and existing announcement regression; full S2-S8 acceptance remains open. New tenant-default approval changes are not covered by this round."
+  },
+  "operationsValidation": {
+    "browserTestedSource": "c5b1fe1dd",
+    "backendTestedSource": "3bf2fdfd10693edd8c12205e5ed3565cfb3b6129",
+    "unitPassed": 117,
+    "integrationPassed": 35,
+    "frontendUnitPassed": 17,
+    "browserPassed": 16,
+    "authenticationPassedSeparately": 1,
+    "skipped": 0,
+    "retries": 0,
+    "sourceEquivalence": "Backend source is unchanged from 3bf to c5b; later changes adjust only DSL channel width, browser geometry assertion and docs. Typecheck passed at 43d with equivalent production TypeScript.",
+    "visualReviews": [
+      {
+        "scenario": "approval-modes-provider-unavailable",
+        "file": "operations/approval-modes-provider-unavailable.png",
+        "sha256": "1c56432eae3a38e22056d3b430cdd17aa64c3efcedd73245a1deac2d775e4edd",
+        "testedSource": "3bf2fdfd10693edd8c12205e5ed3565cfb3b6129",
+        "evidenceRound": "2026-10-25T02-59-16-614Z-0a275c0f-2e1e-4629-b10b-19ba75e39a66",
+        "review": "reviewed_pass",
+        "observation": "Exempt mode is selected and enabled. Approval is visibly disabled with a readable provider-unavailable reason."
+      },
+      {
+        "scenario": "statistics-overview",
+        "file": "operations/statistics-overview.png",
+        "sha256": "b71897d0556eba7dbb8de42bb2eed11ab9ecc1b642ff7d318b2d00a235fc0cb6",
+        "testedSource": "3bf2fdfd10693edd8c12205e5ed3565cfb3b6129",
+        "evidenceRound": "2026-10-25T02-59-16-614Z-0a275c0f-2e1e-4629-b10b-19ba75e39a66",
+        "review": "reviewed_pass",
+        "observation": "All nine actions fit the toolbar; original-export lookup and channel history are visible, and statistics guidance and denominators are clear."
+      },
+      {
+        "scenario": "channel-history",
+        "file": "operations/channel-history.png",
+        "sha256": "aa109331fba29c468d1929beb439fc0054529e2763762f70b42d70de8ec4ceda",
+        "testedSource": "c5b1fe1dd",
+        "evidenceRound": "2026-10-25T03-04-06-365Z-d8df0603-743f-4971-9e88-6eb88365b647",
+        "review": "reviewed_pass",
+        "observation": "Channel, notification kind, persistence state and both dates are single-line and legible; footer and refresh/back actions are visible. The prior channel wrapping defect is resolved."
+      }
+    ],
+    "claim": "Targeted current announcement regression; attachment, full BPM composition, export races, capacity and remaining D01-D15 coverage are still open."
   }
 }
