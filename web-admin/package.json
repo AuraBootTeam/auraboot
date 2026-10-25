@@ -205,7 +205,7 @@
     "use-immer": "^0.11.0",
     "vconsole": "^3.15.1",
     "xlsx": "npm:@e965/xlsx@^0.20.3",
-    "zod": "^4.3.6",
+    "zod": "^4.6.6",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
