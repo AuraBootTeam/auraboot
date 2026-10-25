@@ -8,7 +8,7 @@ const endpoint='/api/meta/commands/execute/announcement:update_policy';
 const success='公告政策已保存；已有公告的提醒时间保持不变。';
 let db:Client;
 test.beforeEach(async()=>{
-  const expected=process.env.PGDATABASE||process.env.PG_DB;
+  const expected=PG_CONN.database;
   expect(expected,'Explicit owned database is required before policy UI writes').toMatch(/^[a-z][a-z0-9_]*$/);
   db=new Client(PG_CONN);await db.connect();
   expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(expected);

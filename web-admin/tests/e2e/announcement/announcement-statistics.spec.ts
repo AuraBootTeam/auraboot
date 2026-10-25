@@ -71,7 +71,7 @@ async function enterFromMenu(page: Page, title: string) {
 
 test('fixed statistics and a browser CSV export survive an uncertain response and reload', async ({ page }, info) => {
   test.setTimeout(60_000);
-  const expectedDatabase = process.env.PGDATABASE || process.env.PG_DB;
+  const expectedDatabase = PG_CONN.database;
   expect(expectedDatabase, 'An explicit owned test database is required').toMatch(/^[a-z][a-z0-9_]*$/);
   const db = new Client(PG_CONN);
   await db.connect();

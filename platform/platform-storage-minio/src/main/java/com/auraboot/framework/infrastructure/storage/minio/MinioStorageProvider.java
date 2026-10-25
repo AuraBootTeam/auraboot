@@ -81,7 +81,7 @@ public class MinioStorageProvider implements StorageProvider, DisposableBean {
                     .stream(input, size, -1)
                     .contentType(contentType)
                     .build());
-            log.debug("File uploaded to MinIO: bucket={}, key={}", bucket, key);
+            log.debug("File uploaded to MinIO (bytes={})", size);
             return key;
         } catch (Exception e) {
             throw new StorageException("Failed to upload file to MinIO: " + key, e);

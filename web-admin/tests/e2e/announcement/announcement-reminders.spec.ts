@@ -72,7 +72,7 @@ async function enterFromMenu(page: Page, title: string) {
 
 test('native reminder preview confirms, replays a lost response, and shows persisted batch and plan facts', async ({ page }, info) => {
   test.setTimeout(60_000);
-  const expectedDatabase = process.env.PGDATABASE || process.env.PG_DB;
+  const expectedDatabase = PG_CONN.database;
   expect(expectedDatabase, 'An explicit owned test database is required').toMatch(/^[a-z][a-z0-9_]*$/);
   const db = new Client(PG_CONN); await db.connect();
   expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(expectedDatabase);
@@ -197,7 +197,7 @@ test('native reminder preview confirms, replays a lost response, and shows persi
 test('published pinning persists through the native detail without changing its frozen version or notifications', async ({ page }, info) => {
   test.setTimeout(45_000);
   const db = new Client(PG_CONN); await db.connect();
-  expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(process.env.PGDATABASE || process.env.PG_DB);
+  expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(PG_CONN.database);
   let fixture: Awaited<ReturnType<typeof publishedFixture>> | undefined;
   try {
     fixture = await publishedFixture(page, db);
@@ -246,7 +246,7 @@ test('a recovered original member resumes its original publication and automatic
   expect(baseURL).toBeTruthy();
   const db = new Client(PG_CONN);await db.connect();
   try {
-  expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(process.env.PGDATABASE || process.env.PG_DB);
+  expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(PG_CONN.database);
   const code = `notice_recover_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
   const role = await successful(await page.request.post('/api/roles', { data: {
     code, name: 'Publication recovery publisher', type: 'custom', status: 'active', scopeType: 'tenant', defaultDataScopeType: 'self',

@@ -20,7 +20,7 @@ async function enter(page: Page, reader=false) {
 
 test('native upload freezes retained bytes and an ordinary recipient downloads through the controlled version link',async({page,browser},info)=>{
   test.setTimeout(90_000);
-  const database=process.env.PGDATABASE||process.env.PG_DB;
+  const database=PG_CONN.database;
   expect(database,'An explicit owned database is required').toBe('auraboot_1');
   const db=new Client(PG_CONN);await db.connect();
   expect((await db.query('SELECT current_database() AS name')).rows[0].name).toBe(database);
