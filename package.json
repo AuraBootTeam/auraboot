@@ -40,7 +40,7 @@
       "brace-expansion": "1.1.21",
       "dompurify": "3.4.16",
       "esbuild": "0.28.1",
-      "fast-uri": "3.1.8",
+      "fast-uri": "3.1.9",
       "hono": "4.13.12",
       "postcss": "8.5.23",
       "qs": "6.16.0",
