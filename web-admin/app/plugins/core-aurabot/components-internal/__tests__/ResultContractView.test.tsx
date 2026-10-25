@@ -27,6 +27,12 @@ const baseContract: ResultContract = {
 };
 
 describe('ResultContractView', () => {
+  it('preserves the complete business code in a result table', () => {
+    const code = 'long_' + 'business'.repeat(8);
+    render(<ResultContractView contract={{ ...baseContract, renderHint: 'table', table: [{ code }] }} />);
+    expect(screen.getByTestId('rc-table')).toHaveTextContent(code);
+  });
+
   it('keeps protocol metadata in expandable execution details', () => {
     render(<ResultContractView contract={{ ...baseContract, renderHint: 'summary', textSummary: 'Ready' }} />);
     const metadata = screen.getByTestId('rc-protocol-meta');
@@ -69,7 +75,7 @@ describe('ResultContractView', () => {
     expect(screen.getByText('Globex')).toBeInTheDocument();
     // Headers
     const headers = screen.getAllByRole('columnheader');
-    expect(headers.map((h: HTMLElement) => h.textContent)).toEqual(['pid', 'name', 'total']);
+    expect(headers.map((h: HTMLElement) => h.textContent)).toEqual(['记录标识', '名称', 'Total']);
   });
 
   it('renders protocol metadata for operator inspection', () => {

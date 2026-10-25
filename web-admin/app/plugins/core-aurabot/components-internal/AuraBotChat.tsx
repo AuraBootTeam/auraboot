@@ -320,7 +320,7 @@ function BotMessageContent({
   content: string;
   evidence?: import('../services/auraBotApi').RetrievalEvidence[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   // Replace exact trusted references after parsing so document names stay literal,
   // including Markdown punctuation in filenames and references inside inline code.
   const resolveReferences = () => (tree: MarkdownTextNode) => {
@@ -340,9 +340,9 @@ function BotMessageContent({
     <div className="space-y-2 text-sm">
       <div className="break-words space-y-2 [&_p]:my-2 [&_h1]:text-lg [&_h2]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-black/5 [&_pre]:p-2 [&_code]:font-mono [&_code]:text-xs">
         <ReactMarkdown remarkPlugins={[remarkGfm, resolveReferences]} skipHtml components={{
-          table: ({ children }) => <div className="max-w-full overflow-x-auto" role="region" tabIndex={0} aria-label={t('aurabot.chat.resultTable', undefined, 'Result table')}><table className="min-w-[22rem] w-full border-collapse text-left text-xs">{children}</table></div>,
+          table: ({ children }) => <div className="max-w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-300" role="region" tabIndex={0} aria-label={t('aurabot.chat.resultTable', undefined, locale.startsWith('zh') ? '结果表格' : 'Result table')}><table className="min-w-[22rem] w-full table-fixed border-collapse text-left text-xs">{children}</table></div>,
           th: ({ children, style }) => <th className="min-w-[6rem] border border-gray-300 bg-black/5 p-2 font-semibold dark:border-gray-600" style={style}>{children}</th>,
-          td: ({ children, style }) => <td className="min-w-[6rem] break-words border border-gray-300 p-2 align-top [overflow-wrap:anywhere] dark:border-gray-600" style={style}>{children}</td>,
+          td: ({ children, style }) => <td className="min-w-[6rem] whitespace-normal break-words [&_code]:whitespace-normal border border-gray-300 p-2 align-top [overflow-wrap:anywhere] dark:border-gray-600" style={style}>{children}</td>,
           a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-400">{children}</a>,
           img: ({ alt }) => <span>{alt}</span>,
         }}>{content}</ReactMarkdown>

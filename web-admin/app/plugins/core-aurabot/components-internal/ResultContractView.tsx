@@ -17,6 +17,7 @@
 
 import { ChatBiResultCard, type ChatBiResult } from './ChatBiResultCard';
 import { useSmartText } from '~/utils/i18n';
+import { formatParamName } from './ConfirmCard';
 import { CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
 import type { ResultContract, ResultContractStatus } from '../types/ResultContract';
 
@@ -63,19 +64,19 @@ function contractMetric(contract: ResultContract): string | null {
 // Variant renderers
 // ============================================================================
 
-function TableView({ rows }: { rows: Array<Record<string, unknown>> }) {
+function TableView({ rows, label, structuredLabel }: { rows: Array<Record<string, unknown>>; label: (key: string) => string; structuredLabel: string }) {
   if (rows.length === 0) {
     return <div className="text-sm text-gray-500">(no rows)</div>;
   }
   const cols = Object.keys(rows[0]);
   return (
-    <div className="overflow-x-auto" data-testid="rc-table">
-      <table className="min-w-full border border-gray-200 text-sm">
+    <div className="max-w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-300" data-testid="rc-table" role="region" tabIndex={0} aria-label={structuredLabel}>
+      <table className="w-full table-fixed border border-gray-200 text-sm" style={{ minWidth: `${cols.length * 8}rem` }}>
         <thead className="bg-gray-50">
           <tr>
             {cols.map((c) => (
               <th key={c} className="border-b border-gray-200 px-2 py-1 text-left font-medium">
-                {c}
+                {label(c)}
               </th>
             ))}
           </tr>
@@ -84,8 +85,11 @@ function TableView({ rows }: { rows: Array<Record<string, unknown>> }) {
           {rows.slice(0, 20).map((row, i) => (
             <tr key={i} className={i % 2 ? 'bg-gray-50' : ''}>
               {cols.map((c) => (
-                <td key={c} className="border-b border-gray-100 px-2 py-1">
-                  {truncate(row[c])}
+                <td key={c} className="break-words border-b border-gray-100 px-2 py-1 align-top [overflow-wrap:anywhere]">
+                  {row[c] != null && typeof row[c] === 'object' ? <details>
+                    <summary className="cursor-pointer">{structuredLabel}</summary>
+                    <pre className="max-w-full whitespace-pre-wrap break-words">{JSON.stringify(row[c], null, 2)}</pre>
+                  </details> : row[c] == null ? '—' : String(row[c])}
                 </td>
               ))}
             </tr>
@@ -326,7 +330,7 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
       </details>
 
       {contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
-        <TableView rows={resolveTableRows(contract)} />
+        <TableView rows={resolveTableRows(contract)} label={(key) => text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })} structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })} />
       ) : contract.renderHint === 'summary' ? (
         <SummaryView contract={contract} />
       ) : contract.renderHint === 'card' ? (
