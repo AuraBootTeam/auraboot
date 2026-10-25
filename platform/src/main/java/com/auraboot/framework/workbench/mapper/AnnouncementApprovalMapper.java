@@ -75,6 +75,14 @@ public interface AnnouncementApprovalMapper {
     int withdraw(@Param("tenant") Long tenant,@Param("submission") String submission,@Param("actor") Long actor,
         @Param("member") String member,@Param("reason") String reason);
 
+    @Update("""
+        UPDATE ab_announcement_approval_submission SET sync_state='queued',next_sync_at=CURRENT_TIMESTAMP,
+            fence=fence+1,lease_until=NULL,failure_count=0,last_error=NULL,updated_at=CURRENT_TIMESTAMP
+        WHERE tenant_id=#{tenant} AND pid=#{submission} AND state IN ('pending_dispatch','running','withdraw_requested')
+            AND terminal_result_pid IS NULL AND sync_state IN ('queued','waiting','blocked','polling')
+        """)
+    int reconcile(@Param("tenant") Long tenant,@Param("submission") String submission);
+
     @Update("UPDATE ab_announcement SET row_version=row_version+1,lifecycle_revision=lifecycle_revision+1,updated_at=CURRENT_TIMESTAMP,updated_by=#{actor} WHERE tenant_id=#{tenant} AND pid=#{pid} AND row_version=#{expected} AND status='pending_approval'")
     int bump(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("actor") Long actor,@Param("expected") int expected);
 

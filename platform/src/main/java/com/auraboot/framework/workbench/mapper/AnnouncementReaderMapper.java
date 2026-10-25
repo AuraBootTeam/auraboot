@@ -25,9 +25,9 @@ public interface AnnouncementReaderMapper {
     String COLUMNS="""
         SELECT v.pid,v.announcement_pid,v.version_no,v.snapshot_hash,v.snapshot::text AS snapshot,s.origin,
             c.published_at,c.expires_at,c.ack_due_at,r.first_read_at,r.acknowledged_at,r.acknowledged_hash,
-            a.row_version,COALESCE(NULLIF(p.nick_name,''),p.user_name) AS publisher_name
+            a.row_version,a.pinned,COALESCE(NULLIF(p.nick_name,''),p.user_name) AS publisher_name
         """;
-    @Select("<script>"+COLUMNS+FROM+FILTER+" ORDER BY COALESCE((v.snapshot->>'pinned')::boolean,FALSE) DESC,c.published_at DESC,v.pid LIMIT #{size} OFFSET #{offset}</script>")
+    @Select("<script>"+COLUMNS+FROM+FILTER+" ORDER BY a.pinned DESC,c.published_at DESC,v.pid LIMIT #{size} OFFSET #{offset}</script>")
     List<Map<String,Object>> list(@Param("tenant") Long tenant,@Param("actor") Long actor,@Param("user") String user,
         @Param("query") String query,@Param("filter") String filter,@Param("size") int size,@Param("offset") int offset);
     @Select("<script>SELECT count(*) "+FROM+FILTER+"</script>")

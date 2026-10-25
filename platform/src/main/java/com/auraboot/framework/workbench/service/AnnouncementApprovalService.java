@@ -22,7 +22,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class AnnouncementApprovalService {
-    public static final String SUBMIT="announcement:submit_approval",WITHDRAW="announcement:withdraw_approval";
+    public static final String SUBMIT="announcement:submit_approval",WITHDRAW="announcement:withdraw_approval",RECONCILE="announcement:reconcile_approval";
     private final AnnouncementAccessService access;
     private final AnnouncementApprovalMapper submissions;
     private final AnnouncementLifecycleMapper records;
@@ -40,16 +40,16 @@ public class AnnouncementApprovalService {
     @Value("${aura.notification.plugin-delivery.enabled:false}") private boolean deliveryEnabled;
 
     public long authorizeTarget(String command,String pid) {
-        var record=access.manage(pid,WITHDRAW.equals(command) ? "withdraw" : "submit",false);
+        var record=access.manage(pid,action(command),false);
         if(SUBMIT.equals(command)) access.actor("publish");
         return record.getRowVersion();
     }
 
     @Transactional
     public Map<String,Object> execute(String command,String pid,Map<String,Object> payload,String operation,Integer expected) {
-        var record=access.manage(pid,WITHDRAW.equals(command) ? "withdraw" : "submit",true);
+        var record=access.manage(pid,action(command),true);
         if(SUBMIT.equals(command)) access.actor("publish");
-        if(!Set.of(SUBMIT,WITHDRAW).contains(command)) throw new IllegalArgumentException("Unsupported announcement approval command");
+        if(!Set.of(SUBMIT,WITHDRAW,RECONCILE).contains(command)) throw new IllegalArgumentException("Unsupported announcement approval command");
         if(operation==null || operation.isBlank() || operation.length()>100) invalid("operation_required");
         Map<String,Object> input=payload==null ? Map.of() : payload;
         if(!input.isEmpty() && !(WITHDRAW.equals(command) && input.keySet().equals(Set.of("reason")))) invalid("protected_input");
@@ -63,11 +63,30 @@ public class AnnouncementApprovalService {
         }
         if(expected==null) throw new CasVersionRequiredException("Announcement revision required",Map.of("recordPid",pid));
         if(!expected.equals(record.getRowVersion())) conflict();
-        var result=SUBMIT.equals(command) ? submit(record,operation) : requestWithdrawal(record,input);
+        var result=SUBMIT.equals(command) ? submit(record,operation) : RECONCILE.equals(command) ? reconcile(record) : requestWithdrawal(record,input);
         result.put("operationId",operation);
         records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,(String)result.get("versionPid"),command,operation,expected,expected+1);
         if(records.finish(tenant,actor,command,operation,pid,codec.encode(result))!=1) throw new IllegalStateException("Approval operation ledger lost");
         return result;
+    }
+
+    private static String action(String command) {
+        return WITHDRAW.equals(command) ? "withdraw" : RECONCILE.equals(command) ? "manage" : "submit";
+    }
+
+    private Map<String,Object> reconcile(Announcement record) {
+        if (!"pending_approval".equals(record.getStatus()) || record.getCurrentVersionPid()==null) invalid("not_editable");
+        if (!catalog.available()) invalid("approval_not_ready");
+        Long tenant=MetaContext.getCurrentTenantId(),actor=MetaContext.getCurrentUserId();
+        var control=releases.version(tenant,record.getCurrentVersionPid());
+        var row=control==null ? null : submissions.lock(tenant,(String)control.get("current_submission_pid"));
+        if (row==null || !Set.of("pending_dispatch","running","withdraw_requested").contains(row.get("state"))) invalid("not_editable");
+        binding(row);
+        if (!Objects.equals(row.get("provider_id"),workflows.providerId(ApprovalContract.STATUS))) invalid("approval_provider_changed");
+        if (submissions.reconcile(tenant,(String)row.get("pid"))!=1
+            || submissions.bump(tenant,record.getPid(),actor,record.getRowVersion())!=1) conflict();
+        return new LinkedHashMap<>(Map.of("recordPid",record.getPid(),"pid",record.getPid(),"versionPid",record.getCurrentVersionPid(),
+            "submissionId",row.get("pid"),"row_version",record.getRowVersion()+1,"status","pending_approval","operationState","queued"));
     }
 
     private Map<String,Object> submit(Announcement record,String operation) {

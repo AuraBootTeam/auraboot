@@ -89,5 +89,19 @@
     "handlerClass": "announcementCommandHandler",
     "sequence": 10,
     "enabled": true
+  },
+  {
+    "commandCode": "announcement:set_pinned",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:reconcile_approval",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
   }
 ]

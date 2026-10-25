@@ -34,6 +34,7 @@ import java.util.*;
 public class AnnouncementLifecycleService {
     private static final Set<String> EDITABLE =
             Set.of("title", "content", "announcement_priority", "pinned", "expires_at", "policy");
+    public static final String PIN = "announcement:set_pinned";
     private static final String CREATE = "announcement:create_announcement";
     private static final String UPDATE = "announcement:update_announcement";
     private static final String REVISE = "announcement:republish";
@@ -89,8 +90,10 @@ public class AnnouncementLifecycleService {
         for (String field : payload.keySet())
             if (!EDITABLE.contains(field) && !AnnouncementPolicyService.FORM_FIELDS.containsKey(field))
                 throw BusinessException.i18n("announcement.error.protected_input");
-        if (!Set.of(CREATE, UPDATE, DELETE, REVISE, WITHDRAW).contains(command))
+        if (!Set.of(CREATE, UPDATE, DELETE, REVISE, WITHDRAW, PIN).contains(command))
             throw BusinessException.i18n("announcement.error.publication_unavailable");
+        if (PIN.equals(command) && (!payload.keySet().equals(Set.of("pinned")) || !(payload.get("pinned") instanceof Boolean)))
+            throw BusinessException.i18n("announcement.error.protected_input");
         Announcement record = null;
         if (!CREATE.equals(command)) {
             if (target == null || target.isBlank())
@@ -140,7 +143,11 @@ public class AnnouncementLifecycleService {
             if (Boolean.TRUE.equals(record.getDeletedFlag()))
                 throw BusinessException.i18n("announcement.error.not_found");
             pid = record.getPid();
-            if (WITHDRAW.equals(command)) {
+            if (PIN.equals(command)) {
+                if (!"published".equals(record.getStatus()) || record.getActiveVersionPid() == null)
+                    throw BusinessException.i18n("announcement.error.not_editable");
+                if (mapper.setPinned(tenant, actor, pid, expectedVersion, (Boolean) payload.get("pinned")) != 1) throw conflict();
+            } else if (WITHDRAW.equals(command)) {
                 if (!payload.isEmpty()
                         || record.getActiveVersionPid() == null
                         || !"published".equals(record.getStatus()))
@@ -201,11 +208,12 @@ public class AnnouncementLifecycleService {
         result.put("recordPid", pid);
         result.put("row_version", after);
         result.put("operationId", operationId);
+        if (PIN.equals(command)) result.put("pinned", payload.get("pinned"));
         result.put(
                 "status",
                 DELETE.equals(command)
                         ? "deleted"
-                        : WITHDRAW.equals(command) ? "withdrawn" : "draft");
+                        : WITHDRAW.equals(command) ? "withdrawn" : PIN.equals(command) ? record.getStatus() : "draft");
         if (mapper.audit(
                                 UniqueIdGenerator.generate(),
                                 tenant,

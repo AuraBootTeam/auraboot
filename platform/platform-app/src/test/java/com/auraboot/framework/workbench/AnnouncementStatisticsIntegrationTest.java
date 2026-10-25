@@ -100,6 +100,26 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid)).isEqualTo("published");
         return (String)accepted.get("versionPid");
     }
+    @Test void publishedPinningChangesOnlyRootOrderingAndRetainsFrozenPublicationFacts() {
+        String older=publish(),record=recordOf(older);publish();
+        Long tenant=getTestTenant().getId();
+        var frozen=jdbc.queryForMap("SELECT snapshot_hash,snapshot::text AS snapshot FROM ab_announcement_version WHERE tenant_id=? AND pid=?",tenant,older);
+        var root=jdbc.queryForMap("SELECT row_version,editor_revision FROM ab_announcement WHERE tenant_id=? AND pid=?",tenant,record);
+        long deliveries=jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=?",Long.class,tenant,older);
+        int revision=((Number)root.get("row_version")).intValue();String operation=UniqueIdGenerator.generate();
+        var result=lifecycle.execute(AnnouncementLifecycleService.PIN,record,Map.of("pinned",true),operation,revision);
+        assertThat(result).containsEntry("status","published").containsEntry("pinned",true).containsEntry("row_version",revision+1);
+        assertThat(lifecycle.execute(AnnouncementLifecycleService.PIN,record,Map.of("pinned",true),operation,revision)).isEqualTo(result);
+        assertThat(readers.list("","all",1,100).get("records")).asList().first().isInstanceOfSatisfying(Map.class,row->assertThat(row).containsEntry("versionPid",older).containsEntry("pinned",true));
+        assertThat(jdbc.queryForMap("SELECT snapshot_hash,snapshot::text AS snapshot FROM ab_announcement_version WHERE tenant_id=? AND pid=?",tenant,older)).isEqualTo(frozen);
+        assertThat(jdbc.queryForObject("SELECT editor_revision FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,tenant,record)).isEqualTo(root.get("editor_revision"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=?",Long.class,tenant,older)).isEqualTo(deliveries);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audit WHERE tenant_id=? AND announcement_pid=? AND command_code='announcement:set_pinned'",Long.class,tenant,record)).isEqualTo(1L);
+        assertThatThrownBy(()->lifecycle.execute(AnnouncementLifecycleService.PIN,record,Map.of("pinned",false),UniqueIdGenerator.generate(),revision)).isInstanceOf(com.auraboot.framework.exception.ConflictException.class);
+        lifecycle.execute(AnnouncementLifecycleService.PIN,record,Map.of("pinned",false),UniqueIdGenerator.generate(),revision+1);
+        assertThat(readers.detail(older)).containsEntry("pinned",false);
+    }
+
     private String recordOf(String version) {
         return jdbc.queryForObject("SELECT announcement_pid FROM ab_announcement_version WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),version);
     }

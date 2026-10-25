@@ -39,6 +39,18 @@ public interface AnnouncementLifecycleMapper {
     @Select("SELECT * FROM ab_announcement WHERE tenant_id=#{tenant} AND pid=#{pid}")
     Announcement readTarget(@Param("tenant") Long tenant, @Param("pid") String pid);
 
+    @Update("""
+        UPDATE ab_announcement SET pinned=#{pinned},row_version=row_version+1,lifecycle_revision=lifecycle_revision+1,
+            updated_by=#{actor},updated_at=CURRENT_TIMESTAMP
+        WHERE tenant_id=#{tenant} AND pid=#{pid} AND row_version=#{expected} AND status='published'
+            AND active_version_pid IS NOT NULL AND deleted_flag=FALSE
+            AND EXISTS(SELECT 1 FROM ab_announcement_version_control c WHERE c.tenant_id=#{tenant}
+                AND c.version_pid=ab_announcement.active_version_pid AND c.publication_state='published'
+                AND (c.expires_at IS NULL OR c.expires_at>clock_timestamp()))
+        """)
+    int setPinned(@Param("tenant") Long tenant,@Param("actor") Long actor,@Param("pid") String pid,
+        @Param("expected") int expected,@Param("pinned") boolean pinned);
+
     @Insert(
             """
         INSERT INTO ab_announcement(pid,tenant_id,owner_user_id,title,content,announcement_priority,priority,

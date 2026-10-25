@@ -614,5 +614,47 @@
     "en-US": "No published reminder plan is available yet. View the plan after publication.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "message.announcement.pin.confirm.title",
+    "zh-CN": "置顶",
+    "en-US": "Pin announcement",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.pin.confirm.content",
+    "zh-CN": "仅调整公告列表的置顶排序，不改动已发布正文，也不会重新通知读者。确认置顶？",
+    "en-US": "Adjust list ordering only. The published content and notification history stay unchanged.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.unpin.confirm.title",
+    "zh-CN": "取消置顶",
+    "en-US": "Unpin announcement",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.unpin.confirm.content",
+    "zh-CN": "取消置顶，不改动已发布正文，也不会重新通知读者。确认取消置顶？",
+    "en-US": "Remove pinning without changing published content or generating notifications.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.reconcile_approval.confirm.title",
+    "zh-CN": "核对审批结果",
+    "en-US": "Reconcile approval",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.reconcile_approval.confirm.content",
+    "zh-CN": "将同一审批申请重新排队，从审批服务核对真实结果；不会直接批准公告或新建流程。确认核对？",
+    "en-US": "Queue the same approval for authoritative result verification. This does not approve or create a new process.",
+    "source": "import",
+    "refType": "action"
   }
 ]

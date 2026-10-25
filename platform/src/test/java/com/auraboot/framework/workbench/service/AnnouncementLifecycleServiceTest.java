@@ -337,6 +337,15 @@ class AnnouncementLifecycleServiceTest {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @Test
+    void pinningCannotSmuggleContentOrPolicyChanges() {
+        assertThatThrownBy(() -> service.execute(AnnouncementLifecycleService.PIN, "n-1",
+                Map.of("pinned", true, "content", "Changed after approval"), "pin-1", 1))
+                .isInstanceOf(BusinessException.class);
+        verify(mapper, never()).claim(any(), any(), any(), any(), any());
+        verify(mapper, never()).setPinned(any(), any(), any(), anyInt(), anyBoolean());
+    }
+
     private Announcement draft() {
         Announcement row = new Announcement();
         row.setPid("n-1");

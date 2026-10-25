@@ -179,5 +179,31 @@
     "executionConfig": {
       "requireIdempotencyKey": true
     }
+  },
+  {
+    "code": "announcement:set_pinned",
+    "displayName:zh-CN": "置顶",
+    "displayName:en": "Pin announcement",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.edit"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:reconcile_approval",
+    "displayName:zh-CN": "核对审批结果",
+    "displayName:en": "Reconcile approval",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.manage"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
   }
 ]

@@ -1182,6 +1182,57 @@
                 }
               ]
             }
+          },
+          {
+            "code": "pin",
+            "label": {
+              "zh-CN": "置顶",
+              "en-US": "Pin announcement"
+            },
+            "permissionCode": "announcement.announcement.edit",
+            "visibleWhen": "record.status === 'published' && record.pinned !== true",
+            "confirm": "announcement.pin.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:set_pinned",
+              "operationType": "UPDATE",
+              "payload": {
+                "pinned": true
+              }
+            }
+          },
+          {
+            "code": "unpin",
+            "label": {
+              "zh-CN": "取消置顶",
+              "en-US": "Unpin announcement"
+            },
+            "permissionCode": "announcement.announcement.edit",
+            "visibleWhen": "record.status === 'published' && record.pinned === true",
+            "confirm": "announcement.unpin.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:set_pinned",
+              "operationType": "UPDATE",
+              "payload": {
+                "pinned": false
+              }
+            }
+          },
+          {
+            "code": "reconcile_approval",
+            "label": {
+              "zh-CN": "核对审批结果",
+              "en-US": "Reconcile approval"
+            },
+            "permissionCode": "announcement.announcement.manage",
+            "visibleWhen": "record.status === 'pending_approval'",
+            "confirm": "announcement.reconcile_approval.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:reconcile_approval",
+              "operationType": "UPDATE"
+            }
           }
         ]
       },
@@ -1357,6 +1408,13 @@
             "reason"
           ],
           "inputFieldsOnly": true
+        },
+        "announcement:set_pinned": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "pinned"
+          ]
         }
       },
       "showInlineApprovalPanel": false,

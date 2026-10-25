@@ -51,7 +51,7 @@ public class AnnouncementCommandHandler
     }
 
     private static boolean isApproval(String code) {
-        return AnnouncementApprovalService.SUBMIT.equals(code) || AnnouncementApprovalService.WITHDRAW.equals(code);
+        return AnnouncementApprovalService.SUBMIT.equals(code) || AnnouncementApprovalService.WITHDRAW.equals(code) || AnnouncementApprovalService.RECONCILE.equals(code);
     }
 
     private static boolean isRelease(String code) {

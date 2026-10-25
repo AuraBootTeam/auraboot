@@ -45,7 +45,7 @@ public class AnnouncementReaderService {
         result.put("acknowledgementState",!required ? "not_required" : row.get("acknowledged_at")==null ? "pending" : "completed");
         result.put("lateAcknowledgement",row.get("acknowledged_at")!=null && row.get("ack_due_at")!=null && instant(row.get("acknowledged_at")).isAfter(instant(row.get("ack_due_at"))));
         result.put("ackOverdue",required && row.get("acknowledged_at")==null && row.get("ack_due_at")!=null && Instant.now().isAfter(instant(row.get("ack_due_at"))));
-        result.put("snapshotOrigin",row.get("origin"));
+        result.put("snapshotOrigin",row.get("origin"));result.put("pinned",Boolean.TRUE.equals(row.get("pinned")));
         if(body) {
             List<Map<String,Object>> attachments=new ArrayList<>();
             if(policy.get("attachmentMetadata") instanceof List<?> files) for(Object item:files) {
