@@ -74,7 +74,19 @@ public final class InventoryReceiptEnqueueProvenance {
      * remains a pipeline authorize fact - the caller supplies no stamp values.
      */
     public Object invokeFinishedGoodsReceipt(CommandHandlerExtension handler, CommandHandlerExtension.CommandContext context) throws Exception {
-        if (current.get() != null || !FINISHED_GOODS_IMPLEMENTATION.equals(handler.getClass().getName())
+        if (!FINISHED_GOODS_IMPLEMENTATION.equals(handler.getClass().getName())
+                || !FINISHED_GOODS_COMMAND.equals(context.commandType()) || !FINISHED_GOODS_MODEL.equals(context.modelCode())
+                || context.tenantId() == null || !context.tenantId().equals(MetaContext.getCurrentTenantId())
+                || context.recordId() == null
+                || !context.recordId().equals(MetaContext.getCommandPermitTargetFor(FINISHED_GOODS_MODEL))) {
+            org.slf4j.LoggerFactory.getLogger(InventoryReceiptEnqueueProvenance.class).warn(
+                "[fg-provenance-diagnostic] handler={}, commandType={}, modelCode={}, recordId={}, tenant={}, currentTenant={}, authorizedCode={}, permitTarget={}",
+                handler.getClass().getSimpleName(), context.commandType(), context.modelCode(), context.recordId(),
+                context.tenantId(), MetaContext.getCurrentTenantId(), MetaContext.getAuthorizedCommandCode(),
+                MetaContext.getCommandPermitTargetFor(FINISHED_GOODS_MODEL));
+            throw denied();
+        }
+        if (current.get() != null
                 || !plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class, handler)
                 || !FINISHED_GOODS_COMMAND.equals(context.commandType()) || !FINISHED_GOODS_MODEL.equals(context.modelCode())
                 || context.tenantId() == null || !context.tenantId().equals(MetaContext.getCurrentTenantId())
