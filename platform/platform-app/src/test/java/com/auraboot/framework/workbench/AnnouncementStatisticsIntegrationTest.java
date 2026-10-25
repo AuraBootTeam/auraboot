@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @org.springframework.context.annotation.Import(AnnouncementStatisticsIntegrationTest.ReminderTimeConfiguration.class)
 @TestPropertySource(properties={"aura.notification.plugin-delivery.enabled=true","auraboot.announcement.worker-enabled=false",
-    "auraboot.announcement.approval.worker-enabled=false"})
+    "auraboot.announcement.approval.worker-enabled=false","aura.export.domain.cleanup-initial-ms=3600000"})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired JdbcTemplate jdbc;
@@ -55,18 +55,33 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         @org.springframework.context.annotation.Bean
         @org.springframework.context.annotation.Primary
         ControlledReminderClock controlledReminderClock() {return new ControlledReminderClock();}
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        ControlledExportClock controlledExportClock() {return new ControlledExportClock();}
     }
     static class ControlledReminderClock extends AnnouncementReminderClock {
         volatile Instant instant;
         @Override public Instant now() {return instant==null ? Instant.now() : instant;}
     }
     @Autowired ControlledReminderClock reminderClock;
+    static class ControlledExportClock extends com.auraboot.framework.meta.service.impl.DomainExportClock {
+        volatile Instant instant;
+        @Override public Instant now(){return instant==null ? Instant.now() : instant;}
+    }
+    @Autowired ControlledExportClock exportClock;
     @Autowired AnnouncementReminderService reminders;
     @Autowired com.auraboot.framework.workbench.mapper.AnnouncementReminderMapper reminderPlans;
     @Autowired com.auraboot.framework.meta.service.impl.OutboxWorkerImpl outboxWorker;
     @Autowired com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl backgroundTasks;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
+    @Autowired AnnouncementAudienceService audiences;
+    @Autowired com.auraboot.framework.user.mapper.UserMapper userDirectory;
+    @Autowired com.auraboot.framework.meta.service.impl.DomainExportArtifactCleanup exportCleanup;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    com.auraboot.framework.infrastructure.storage.StorageProvider privateStorage;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    com.auraboot.framework.meta.service.impl.AsyncTaskCompletionService queueCompletion;
     @Autowired AnnouncementOperationsService operations;
     @Autowired com.auraboot.framework.workbench.mapper.AnnouncementMetricsMapper metrics;
     @Autowired UserPermissionService permissions;
@@ -91,7 +106,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user,null,authorities));
         http=MockMvcBuilders.webAppContextSetup(context).build();
     }
-    @AfterEach void clearAuthentication(){reminderClock.instant=null;SecurityContextHolder.clearContext();}
+    @AfterEach void clearAuthentication(){reminderClock.instant=null;exportClock.instant=null;org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();SecurityContextHolder.clearContext();}
     private String publish() {
         String operation=UniqueIdGenerator.generate();
         var policy=Map.of("audience",Map.of("kind","selected","userPids",List.of(getTestUser().getPid())),
@@ -103,6 +118,95 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid)).isEqualTo("published");
         return (String)accepted.get("versionPid");
     }
+    @Test void emptyRichHtmlCannotPublishOrLeaveAnAcceptedOperationBehind() {
+        Long tenant=getTestTenant().getId();
+        for(String body:List.of("<p><br></p>","<script>alert(1)</script>")) {
+            String create=UniqueIdGenerator.generate(),operation=UniqueIdGenerator.generate();
+            String record=(String)lifecycle.execute("announcement:create_announcement",null,Map.of("title","Incomplete rich body",
+                "content",body,"policy",Map.of("audience",Map.of("kind","selected","userPids",List.of(getTestUser().getPid())),
+                    "exemptionReason","Required body verification")),create,null).get("pid");
+            assertThatThrownBy(()->releases.execute("announcement:publish",record,Map.of(),operation,1))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("content_required");
+            assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,tenant,record)).isEqualTo("draft");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_version WHERE tenant_id=? AND announcement_pid=?",Long.class,tenant,record)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_operation WHERE tenant_id=? AND operation_id=?",Long.class,tenant,operation)).isZero();
+        }
+    }
+
+    @Test void fiveHundredAndOneRealMembersCrossExpansionAndStatisticsPagesWithoutLosingARecipient() throws Exception {
+        importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
+        Long tenant=getTestTenant().getId();String suffix=UUID.randomUUID().toString().replace("-","").substring(0,16);
+        var users=new ArrayList<String>();var members=new ArrayList<Long>();String record=null;
+        int originalLimit=(Integer)org.springframework.test.util.ReflectionTestUtils.getField(audiences,"maximumRecipients");
+        try {
+            assertThat(getTestUser().getPassword()).isNotBlank();
+            for(int index=0;index<501;index++) {
+                var user=new com.auraboot.framework.user.dao.entity.User();user.setPid(UniqueIdGenerator.generate());
+                user.setUserName("cap-"+suffix+"-"+index);user.setEmail("cap-"+suffix+"-"+index+"@example.com");
+                user.setNickName(index==0 ? "=1+1" : "Capacity member "+index);user.setPassword(getTestUser().getPassword());
+                assertThat(userDirectory.insert(user)).isEqualTo(1);
+                var member=memberships.addMember(user.getId(),tenant,"active");members.add(member.getId());users.add(user.getPid());
+            }
+            String create=UniqueIdGenerator.generate(),operation=UniqueIdGenerator.generate();
+            record=(String)lifecycle.execute("announcement:create_announcement",null,Map.of("title","Measured 501-recipient announcement "+suffix,
+                "content","<p>Measured publication and paging.</p>","policy",Map.of("audience",Map.of("kind","selected","userPids",users),
+                    "exemptionReason","Controlled owned-runtime capacity measurement","acknowledgementRequired",true)),create,null).get("pid");
+            String recordPid=record;
+            org.springframework.test.util.ReflectionTestUtils.setField(audiences,"maximumRecipients",500);
+            assertThatThrownBy(()->releases.execute("announcement:publish",recordPid,Map.of(),operation,1))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("audience_capacity_exceeded");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_version WHERE tenant_id=? AND announcement_pid=?",Long.class,tenant,record)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_operation WHERE tenant_id=? AND operation_id=?",Long.class,tenant,operation)).isZero();
+            org.springframework.test.util.ReflectionTestUtils.setField(audiences,"maximumRecipients",originalLimit);
+            long start=System.nanoTime();
+            var accepted=releases.execute("announcement:publish",record,Map.of(),operation,1);String version=(String)accepted.get("versionPid");
+            MetaContext.clear();new AnnouncementReleaseWorker(releases).tick();applyTestMetaContext();
+            long publicationMs=(System.nanoTime()-start)/1_000_000;
+            assertThat(jdbc.queryForObject("SELECT sealed FROM ab_announcement_recipient_snapshot WHERE tenant_id=? AND version_pid=?",Boolean.class,tenant,version)).isTrue();
+            assertThat(jdbc.queryForObject("SELECT count(DISTINCT user_pid) FROM ab_announcement_recipient WHERE tenant_id=? AND version_pid=?",Long.class,tenant,version)).isEqualTo(501);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audience_estimate WHERE tenant_id=? AND version_pid=?",Long.class,tenant,version)).isEqualTo(501);
+            long projections=System.nanoTime();
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(90)).untilAsserted(()->{
+                outboxWorker.pollAndDispatch();
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND source_type='announcement' AND source_id=?",Long.class,tenant,version)).isEqualTo(501);
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=? AND source_type='announcement' AND source_id=? AND item_type='announcement_ack' AND status='pending'",Long.class,tenant,version)).isEqualTo(501);
+            });
+            long projectionMs=(System.nanoTime()-projections)/1_000_000;
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_outbox WHERE tenant_id=? AND event_source='auraboot.announcement' AND event_type=? AND payload->>'versionPid'=?",Long.class,
+                tenant,AnnouncementDeliveryConsumer.EXPAND,version)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=? AND status='completed'",Long.class,tenant,version)).isEqualTo(501);
+            outboxWorker.pollAndDispatch();applyTestMetaContext();
+            long captureAt=System.nanoTime();var captured=statistics.capture(version,AnnouncementStatistics.Filters.all());
+            long statisticsMs=(System.nanoTime()-captureAt)/1_000_000;String token=(String)captured.get("snapshotToken");
+            assertThat(json.valueToTree(captured).path("summary").path("actualRecipients").longValue()).isEqualTo(501);
+            assertThat(statistics.page(token,1,100).get("records")).asList().hasSize(100);
+            assertThat(statistics.page(token,6,100).get("records")).asList().hasSize(1);
+            assertThat(statistics.page(token,7,100).get("records")).asList().isEmpty();
+            long exportAt=System.nanoTime();
+            var submitted=new TransactionTemplate(transactions).execute(state->exportTasks.submit(AnnouncementStatisticsExportSource.CODE,token));
+            org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(30)).untilAsserted(()->
+                assertThat(exportTasks.status(submitted.getPid()).getStatus()).isEqualTo("completed"));
+            var response=http.perform(get("/api/exports/domain/"+submitted.getPid()+"/download")).andExpect(status().isOk()).andReturn().getResponse();
+            byte[] bytes=response.getContentAsByteArray();String csv=new String(bytes,java.nio.charset.StandardCharsets.UTF_8);
+            assertThat(csv.lines().count()).isEqualTo(502);assertThat(csv).contains("'=1+1");
+            var exported=exportRegistry.findByPid(submitted.getPid());
+            assertThat(exported.getFileSize()).isEqualTo((long)bytes.length);
+            assertThat(exported.getRequestParams().required("checksumSha256").textValue()).isEqualTo(
+                java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
+            long exportMs=(System.nanoTime()-exportAt)/1_000_000;
+            System.out.println("ANNOUNCEMENT_CAPACITY "+json.writeValueAsString(Map.of("recipients",501,"expansionPageSize",500,
+                "publicationMs",publicationMs,"projectionMs",projectionMs,"statisticsMs",statisticsMs,"exportMs",exportMs,"csvBytes",bytes.length)));
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(audiences,"maximumRecipients",originalLimit);applyTestMetaContext();
+            if(record!=null) {
+                var root=jdbc.queryForMap("SELECT status,row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",tenant,record);
+                if("published".equals(root.get("status"))) lifecycle.execute("announcement:archive",record,Map.of(),UniqueIdGenerator.generate(),((Number)root.get("row_version")).intValue());
+            }
+            for(Long member:members) assertThat(memberships.deactivateMember(member)).isTrue();
+            org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
+        }
+    }
+
     @Test void publishedPinningChangesOnlyRootOrderingAndRetainsFrozenPublicationFacts() {
         String older=publish(),record=recordOf(older);publish();
         Long tenant=getTestTenant().getId();
@@ -214,6 +318,8 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             assertThat(metrics.publicationAge()).isGreaterThanOrEqualTo(0);assertThat(metrics.publicationDelay()).isGreaterThanOrEqualTo(0);
             assertThat(metrics.approvalPending()).isGreaterThanOrEqualTo(0);assertThat(metrics.approvalFailures()).isGreaterThanOrEqualTo(0);
             assertThat(metrics.approvalAge()).isGreaterThanOrEqualTo(0);
+            assertThat(metrics.exportPending()).isGreaterThanOrEqualTo(0);assertThat(metrics.exportFailures()).isGreaterThanOrEqualTo(0);
+            assertThat(metrics.exportAge()).isGreaterThanOrEqualTo(0);assertThat(metrics.exportCleanupFailures()).isGreaterThanOrEqualTo(0);
             for(String event:List.of(AnnouncementReleaseService.RELEASED_EVENT,AnnouncementDeliveryConsumer.EXPAND,
                     AnnouncementDeliveryConsumer.DELIVER,AnnouncementDeliveryConsumer.ACK,AnnouncementReminderService.EXPAND)) {
                 assertThat(metrics.projectionPending(event)).isGreaterThanOrEqualTo(0);
@@ -764,6 +870,105 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(backgroundTasks.getTask(code).getStatus()).isEqualTo("cancelled");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_domain_export_attempt WHERE tenant_id=? AND export_task_pid=?",Long.class,
                 getTestTenant().getId(),pid)).isZero();
+    }
+
+    private com.auraboot.framework.meta.entity.ExportTask completedPrivateExport() {
+        String version=publish();String token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+        var submitted=new TransactionTemplate(transactions).execute(state->exportTasks.submit(AnnouncementStatisticsExportSource.CODE,token));
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(30)).untilAsserted(()->
+            assertThat(exportTasks.status(submitted.getPid()).getStatus()).isEqualTo("completed"));
+        return exportRegistry.findByPid(submitted.getPid());
+    }
+
+    @Test void privateHttpDownloadRejectsMissingTruncatedOversizedAndChangedObjectsBeforeReturningCsvBytes() throws Exception {
+        importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
+        var stored=completedPrivateExport();String key=stored.getFileKey(),url="/api/exports/domain/"+stored.getPid()+"/download";
+        byte[] original;try(var stream=privateStorage.download(key)){original=stream.readAllBytes();}
+        byte[] changed=original.clone();changed[changed.length-3]^=1;
+        try {
+            for(byte[] corrupted:List.of(Arrays.copyOf(original,original.length-1),Arrays.copyOf(original,original.length+1),changed)) {
+                privateStorage.upload(key,new java.io.ByteArrayInputStream(corrupted),corrupted.length,"text/csv; charset=UTF-8");
+                var denied=http.perform(get(url)).andExpect(status().isUnprocessableEntity()).andReturn().getResponse();
+                assertThat(denied.getContentType()).startsWith("application/json");
+                assertThat(new String(denied.getContentAsByteArray(),java.nio.charset.StandardCharsets.UTF_8)).doesNotStartWith("\uFEFF");
+            }
+            privateStorage.delete(key);assertThat(privateStorage.exists(key)).isFalse();
+            http.perform(get(url)).andExpect(status().isUnprocessableEntity());
+        } finally {privateStorage.upload(key,new java.io.ByteArrayInputStream(original),original.length,"text/csv; charset=UTF-8");}
+        var restored=http.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(restored.getContentAsByteArray()).isEqualTo(original);
+        assertThat(exportRegistry.findByPid(stored.getPid()).getRequestParams()).isEqualTo(stored.getRequestParams());
+    }
+
+    @Test void canceledUploadCannotPublishAndRetainedCleanupRetriesRemoveAnObjectThatArrivesAfterCleanup() throws Exception {
+        importExportTranslations();org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.US);
+        var paused=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
+        var completed=new java.util.concurrent.CountDownLatch(1);var uploaded=new java.util.concurrent.CountDownLatch(1);
+        var armed=new java.util.concurrent.atomic.AtomicBoolean(true);var key=new java.util.concurrent.atomic.AtomicReference<String>();
+        var completionAccepted=new java.util.concurrent.atomic.AtomicReference<Boolean>();
+        String prefix="exports/"+getTestTenant().getId()+"/"+getTestUser().getId()+"/";
+        org.mockito.Mockito.doAnswer(call->{
+            String candidate=call.getArgument(0);
+            if(!candidate.startsWith(prefix) || !armed.compareAndSet(true,false)) return call.callRealMethod();
+            key.set(candidate);paused.countDown();long deadline=System.nanoTime()+Duration.ofSeconds(60).toNanos();
+            // Fault injection: model an object store that ignores cancellation after accepting the stream.
+            try {
+                boolean released=false;
+                while(!released && System.nanoTime()<deadline) {
+                    try {released=release.await(Math.max(1,deadline-System.nanoTime()),java.util.concurrent.TimeUnit.NANOSECONDS);}
+                    catch(InterruptedException ignored) { /* The simulated provider deliberately ignores cancellation. */ }
+                }
+                if(!released) throw new IllegalStateException("The owned upload barrier was not released");
+                Object result=call.callRealMethod();Thread.interrupted();return result;
+            } finally {uploaded.countDown();}
+        }).when(privateStorage).upload(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(java.io.InputStream.class),
+            org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.anyString());
+        org.mockito.Mockito.doAnswer(call->{
+            var task=(com.auraboot.framework.meta.entity.AsyncTask)call.getArgument(0);
+            boolean owned=key.get()!=null && key.get().contains("/"+task.getInputParams().path("exportTaskPid").asText()+"/");
+            try {Object result=call.callRealMethod();if(owned) completionAccepted.set((Boolean)result);return result;}
+            finally {if(owned) completed.countDown();}
+        }).when(queueCompletion).complete(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(Runnable.class));
+        try {
+            String version=publish(),token=(String)statistics.capture(version,AnnouncementStatistics.Filters.all()).get("snapshotToken");
+            var submitted=new TransactionTemplate(transactions).execute(state->exportTasks.submit(AnnouncementStatisticsExportSource.CODE,token));
+            assertThat(paused.await(20,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var task=exportRegistry.findByPid(submitted.getPid());String code=task.getRequestParams().required("asyncTaskCode").textValue();
+            assertThat(key.get()).contains("/"+task.getPid()+"/");assertThat(privateStorage.exists(key.get())).isFalse();
+            assertThat(metrics.exportPending()).isGreaterThanOrEqualTo(1);assertThat(metrics.exportAge()).isGreaterThanOrEqualTo(0);
+            http.perform(post("/api/async-tasks/"+code+"/cancel")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("cancelled"));
+            assertThat(exportTasks.status(task.getPid()).getDownloadUrl()).isNull();
+            var attempt=jdbc.queryForMap("SELECT pid,temp_path,expires_at FROM ab_domain_export_attempt WHERE tenant_id=? AND export_task_pid=?",
+                getTestTenant().getId(),task.getPid());String attemptPid=(String)attempt.get("pid");
+            assertThat(java.nio.file.Files.isRegularFile(java.nio.file.Path.of((String)attempt.get("temp_path")))).isTrue();
+            byte[] expectedBytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of((String)attempt.get("temp_path")));
+            assertThat(expectedBytes).startsWith((byte)0xef,(byte)0xbb,(byte)0xbf);
+            exportClock.instant=task.getExpiresAt().plusSeconds(1);
+            var failOnce=new java.util.concurrent.atomic.AtomicBoolean(true);
+            org.mockito.Mockito.doAnswer(call->{
+                if(key.get().equals(call.getArgument(0)) && failOnce.compareAndSet(true,false)) throw new IllegalStateException("Owned storage cleanup fault");
+                return call.callRealMethod();
+            }).when(privateStorage).delete(org.mockito.ArgumentMatchers.anyString());
+            exportCleanup.cleanup();
+            assertThat(jdbc.queryForMap("SELECT cleanup_count,cleanup_error FROM ab_domain_export_attempt WHERE tenant_id=? AND pid=?",getTestTenant().getId(),attemptPid))
+                .containsEntry("cleanup_count",1).containsEntry("cleanup_error","ARTIFACT_DELETE_FAILED");
+            assertThat(metrics.exportCleanupFailures()).isGreaterThanOrEqualTo(1);
+            exportClock.instant=exportClock.instant.plus(Duration.ofHours(1));exportCleanup.cleanup();
+            assertThat(java.nio.file.Files.exists(java.nio.file.Path.of((String)attempt.get("temp_path")))).isFalse();
+            assertThat(jdbc.queryForObject("SELECT cleanup_count FROM ab_domain_export_attempt WHERE tenant_id=? AND pid=?",Integer.class,getTestTenant().getId(),attemptPid)).isEqualTo(2);
+            release.countDown();assertThat(uploaded.await(15,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(completed.await(15,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(completionAccepted.get()).isFalse();assertThat(privateStorage.exists(key.get())).isTrue();
+            try(var lateObject=privateStorage.download(key.get())) {assertThat(lateObject.readAllBytes()).isEqualTo(expectedBytes);}
+            assertThat(exportRegistry.findByPid(task.getPid()).getFileKey()).isNull();
+            assertThat(exportTasks.status(task.getPid()).getStatus()).isEqualTo("cancelled");
+            http.perform(get("/api/exports/domain/"+task.getPid()+"/download")).andExpect(status().isUnprocessableEntity());
+            exportClock.instant=exportClock.instant.plus(Duration.ofHours(1));exportCleanup.cleanup();
+            assertThat(privateStorage.exists(key.get())).isFalse();
+            assertThat(jdbc.queryForMap("SELECT cleanup_count,cleanup_error FROM ab_domain_export_attempt WHERE tenant_id=? AND pid=?",getTestTenant().getId(),attemptPid))
+                .containsEntry("cleanup_count",3).containsEntry("cleanup_error",null);
+        } finally {release.countDown();if(key.get()!=null) assertThat(uploaded.await(15,java.util.concurrent.TimeUnit.SECONDS)).isTrue();}
     }
 
     @Test void durableExportCompletesWithPrivateArtifactAndEveryReadSurfaceRechecksCurrentSourceAuthority() throws Exception {

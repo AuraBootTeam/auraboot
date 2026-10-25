@@ -48,4 +48,37 @@ public interface AnnouncementMetricsMapper {
     @Select("SELECT COALESCE(MAX(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-created_at)),0) FROM ab_outbox WHERE event_source='auraboot.announcement' AND event_type=#{event} AND status IN ('pending','processing')")
     @InterceptorIgnore(tenantLine="true")
     double projectionAge(@Param("event") String event);
+
+    @Select("""
+        SELECT count(*) FROM ab_export_task e JOIN ab_async_task q ON q.tenant_id=e.tenant_id
+            AND q.created_by=e.created_by AND q.task_code=e.request_params->>'asyncTaskCode'
+        WHERE e.query_code='domain:announcement.statistics.v1' AND q.task_type='domain-export'
+            AND e.expires_at>CURRENT_TIMESTAMP AND e.status<>'completed' AND q.status IN ('pending','running')
+        """)
+    @InterceptorIgnore(tenantLine="true")
+    long exportPending();
+    @Select("""
+        SELECT count(*) FROM ab_export_task e JOIN ab_async_task q ON q.tenant_id=e.tenant_id
+            AND q.created_by=e.created_by AND q.task_code=e.request_params->>'asyncTaskCode'
+        WHERE e.query_code='domain:announcement.statistics.v1' AND q.task_type='domain-export'
+            AND e.expires_at>CURRENT_TIMESTAMP AND q.status='failed'
+        """)
+    @InterceptorIgnore(tenantLine="true")
+    long exportFailures();
+    @Select("""
+        SELECT COALESCE(MAX(GREATEST(0,EXTRACT(EPOCH FROM CURRENT_TIMESTAMP-e.created_at))),0)
+        FROM ab_export_task e JOIN ab_async_task q ON q.tenant_id=e.tenant_id AND q.created_by=e.created_by
+            AND q.task_code=e.request_params->>'asyncTaskCode'
+        WHERE e.query_code='domain:announcement.statistics.v1' AND q.task_type='domain-export'
+            AND e.expires_at>CURRENT_TIMESTAMP AND e.status<>'completed' AND q.status IN ('pending','running')
+        """)
+    @InterceptorIgnore(tenantLine="true")
+    double exportAge();
+    @Select("""
+        SELECT count(*) FROM ab_domain_export_attempt a JOIN ab_export_task e
+            ON e.tenant_id=a.tenant_id AND e.pid=a.export_task_pid
+        WHERE e.query_code='domain:announcement.statistics.v1' AND a.cleanup_error IS NOT NULL
+        """)
+    @InterceptorIgnore(tenantLine="true")
+    long exportCleanupFailures();
 }

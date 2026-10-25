@@ -670,5 +670,12 @@
     "en-US": "Announcements must use the tenant default approval workflow. Explicitly select the tenant default in notification settings first.",
     "source": "import",
     "refType": "message"
+  },
+  {
+    "key": "announcement.error.audience_capacity_exceeded",
+    "zh-CN": "受众人数超过当前公告处理容量，发布尚未受理。请缩小范围或联系管理员调整容量。",
+    "en-US": "The audience exceeds the configured announcement capacity. Publication was not accepted. Reduce the audience or contact an administrator.",
+    "source": "import",
+    "refType": "message"
   }
 ]

@@ -21,6 +21,10 @@ public class AnnouncementMetrics {
         register(registry,"auraboot_announcement_oldest_pending_age_seconds","delivery",facts::deliveryAge);
         register(registry,"auraboot_announcement_publication_delay_24h_seconds","publication",facts::publicationDelay);
         register(registry,"auraboot_announcement_oldest_pending_age_seconds","approval",facts::approvalAge);
+        register(registry,"auraboot_announcement_pending","export",facts::exportPending);
+        register(registry,"auraboot_announcement_failures","export",facts::exportFailures);
+        register(registry,"auraboot_announcement_oldest_pending_age_seconds","export",facts::exportAge);
+        register(registry,"auraboot_announcement_failures","export_cleanup",facts::exportCleanupFailures);
         Map.of("publication_expansion",AnnouncementReleaseService.RELEASED_EVENT,"recipient_expansion",AnnouncementDeliveryConsumer.EXPAND,
             "notification_projection",AnnouncementDeliveryConsumer.DELIVER,"inbox_projection",AnnouncementDeliveryConsumer.ACK,
             "reminder_expansion",AnnouncementReminderService.EXPAND).forEach((stage,event)->{

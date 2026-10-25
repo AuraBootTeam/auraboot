@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.service.*;
 import com.auraboot.framework.workbench.mapper.AnnouncementAudienceMapper;
@@ -98,6 +99,17 @@ class AnnouncementAudienceServiceTest {
         when(scopes.resolveAudienceScope(any(),any(),any())).thenReturn(DataScopeCondition.all());
         assertThatThrownBy(()->service.resolve(new AnnouncementAudienceService.Rule("selected",List.of("author"),null,null)))
             .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void theSharedCapacityBoundsUniqueRecipientsBeforeAnyPublicationCanBePrepared() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"maximumRecipients",2);
+        var selected=new AnnouncementAudienceService.Rule("selected",List.of("author","employee"),List.of("dept"),List.of("operators"));
+        assertThat(service.resolve(selected).recipients()).hasSize(2);
+        when(permissions.hasPermission(7L,"announcement.announcement.publish_all")).thenReturn(true);
+        assertThatThrownBy(()->service.resolve(new AnnouncementAudienceService.Rule("all",null,null,null)))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("audience_capacity_exceeded");
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"maximumRecipients",0);
+        assertThatThrownBy(()->service.resolve(selected)).isInstanceOf(BusinessException.class);
     }
 
 }

@@ -21,6 +21,8 @@ public class AnnouncementAudienceService {
     private final DataScopeService scopes;
     private final UserPermissionService permissions;
     private final AnnouncementCodec codec;
+    @org.springframework.beans.factory.annotation.Value("${auraboot.announcement.statistics-max-recipients:50000}")
+    private int maximumRecipients=50000;
 
     public record Rule(String kind, List<String> userPids, List<String> departmentPids, List<String> rolePids) {
         public Rule {
@@ -47,6 +49,7 @@ public class AnnouncementAudienceService {
     @Transactional(readOnly=true)
     public Resolution resolve(Rule rule) {
         ScopeView view=scopeView();
+        if(maximumRecipients<1) capacityExceeded();
         Long tenant=view.tenant(); boolean all=view.all(); DataScopeCondition scope=view.scope();
         List<Map<String,Object>> memberRows=view.members(),departments=view.departments();
         Set<String> allowedDepartments=view.allowedDepartments(),allowedUsers=view.allowedUsers();
@@ -80,6 +83,7 @@ public class AnnouncementAudienceService {
             roleUsers.forEach((role,users)->{if(users.contains(user)) matches.add("role:"+role);});
             if(matches.isEmpty()) continue;
             Recipient existing=recipients.get(user);
+            if(existing==null && recipients.size()>=maximumRecipients) capacityExceeded();
             Set<String> combined=new TreeSet<>(matches);
             if(existing!=null) combined.addAll(existing.matchedRuleRefs());
             recipients.put(user,new Recipient(user,existing==null ? (String)m.get("member_pid") : existing.memberPid(),
@@ -197,4 +201,5 @@ public class AnnouncementAudienceService {
     }
     private static void denied(){throw new AccessDeniedException("Announcement audience exceeds the current management scope");}
     private static void invalid(){throw BusinessException.i18n("announcement.error.invalid_input");}
+    private static void capacityExceeded(){throw BusinessException.i18n("announcement.error.audience_capacity_exceeded");}
 }

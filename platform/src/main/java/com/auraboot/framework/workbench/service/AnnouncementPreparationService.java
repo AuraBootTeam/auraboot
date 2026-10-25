@@ -29,7 +29,7 @@ public class AnnouncementPreparationService {
 
     public Prepared prepare(Announcement record) {
         var policy=policies.load(record.getPid());
-        if(record.getTitle()==null || record.getTitle().isBlank() || record.getContent()==null || record.getContent().isBlank()) invalid("content_required");
+        if(record.getTitle()==null || record.getTitle().isBlank() || !hasBody(record.getContent())) invalid("content_required");
         Instant now=Instant.now(),planned=policy.scheduledAt()==null ? now : policy.scheduledAt();
         if(policy.scheduledAt()!=null && !planned.isAfter(now)) invalid("schedule_invalid");
         if(record.getExpiresAt()!=null && (!record.getExpiresAt().isAfter(planned)
@@ -79,4 +79,13 @@ public class AnnouncementPreparationService {
         return codec.hash(proof);
     }
     private static void invalid(String reason){throw BusinessException.i18n("announcement.error."+reason);}
+
+    static boolean hasBody(String content) {
+        if(content==null || content.isBlank()) return false;
+        var body=org.jsoup.Jsoup.parseBodyFragment(content).body();
+        body.select("script,style,template").remove();
+        if(!body.text().replaceAll("[\\p{Z}\\p{C}]","").isEmpty()) return true;
+        return body.select("img[src]").stream().map(image->image.attr("src"))
+            .anyMatch(source->source.matches("(?i)https?://[^\\s]+") || (source.startsWith("/") && !source.startsWith("//")));
+    }
 }

@@ -17,6 +17,7 @@ public class DomainExportArtifactCleanup {
     private final DomainExportMapper attempts;
     private final ExportArtifactStore artifacts;
     private final MeterRegistry metrics;
+    private final DomainExportClock clock;
     @Scheduled(fixedDelayString="${aura.export.domain.cleanup-ms:60000}",initialDelayString="${aura.export.domain.cleanup-initial-ms:60000}")
     public void tick() {
         try {cleanup();}
@@ -27,7 +28,8 @@ public class DomainExportArtifactCleanup {
         }
     }
     public void cleanup() {
-        for(var attempt:attempts.dueCleanup()) {
+        var now=clock.now();
+        for(var attempt:attempts.dueCleanup(now)) {
             Long tenant=((Number)attempt.get("tenant_id")).longValue();String pid=(String)attempt.get("pid");
             String failureCode=null;
             try {
@@ -39,7 +41,7 @@ public class DomainExportArtifactCleanup {
                 log.error("Domain export artifact cleanup failed: attempt={}",pid,failure);
                 failureCode="ARTIFACT_DELETE_FAILED";metrics.counter("export.domain.cleanup","result","failure").increment();
             }
-            if(attempts.cleaned(tenant,pid,failureCode)!=1) throw new IllegalStateException("Domain export cleanup receipt was not persisted");
+            if(attempts.cleaned(tenant,pid,failureCode,now)!=1) throw new IllegalStateException("Domain export cleanup receipt was not persisted");
         }
     }
 }

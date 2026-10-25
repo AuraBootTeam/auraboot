@@ -36,14 +36,14 @@ public interface DomainExportMapper {
         @Param("size") long size,@Param("checksum") String checksum);
     @Select("""
         SELECT pid,tenant_id,export_task_pid,file_key,temp_path FROM ab_domain_export_attempt
-        WHERE next_cleanup_at<=clock_timestamp() AND expires_at<=clock_timestamp() ORDER BY next_cleanup_at,pid LIMIT 100
+        WHERE next_cleanup_at<=#{now} AND expires_at<=#{now} ORDER BY next_cleanup_at,pid LIMIT 100
         """)
-    List<Map<String,Object>> dueCleanup();
+    List<Map<String,Object>> dueCleanup(@Param("now") Instant now);
     @Update("""
         UPDATE ab_domain_export_attempt SET cleanup_count=cleanup_count+1,cleanup_error=#{error},
-            cleaned_at=CASE WHEN #{error} IS NULL THEN clock_timestamp() ELSE cleaned_at END,
-            next_cleanup_at=clock_timestamp()+INTERVAL '1 hour'
+            cleaned_at=CASE WHEN #{error} IS NULL THEN #{now} ELSE cleaned_at END,
+            next_cleanup_at=CAST(#{now} AS timestamptz)+INTERVAL '1 hour'
         WHERE tenant_id=#{tenant} AND pid=#{pid}
         """)
-    int cleaned(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("error") String error);
+    int cleaned(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("error") String error,@Param("now") Instant now);
 }

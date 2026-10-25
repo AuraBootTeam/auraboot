@@ -801,6 +801,13 @@
         "label:zh-CN": "发布条件未满足，请核对后恢复",
         "sortNo": 120,
         "status": "enabled"
+      },
+      {
+        "value": "AUDIENCE_CAPACITY_EXCEEDED",
+        "label": "Audience exceeds capacity; contact an administrator before retrying",
+        "label:zh-CN": "名单超过处理容量，请联系管理员调整后恢复",
+        "sortNo": 125,
+        "status": "enabled"
       }
     ]
   },
