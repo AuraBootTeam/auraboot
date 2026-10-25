@@ -29,6 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -85,6 +88,7 @@ class ReliableIntegrationRuntimeIT {
     }
 
     private void cleanupRows() {
+        jdbc.update("DELETE FROM ab_integration_dead_letter_quarantine WHERE tenant_id = ?", TENANT_ID);
         jdbc.update("DELETE FROM ab_integration_dead_letter_replay WHERE tenant_id = ?", TENANT_ID);
         jdbc.update("DELETE FROM ab_integration_dead_letter WHERE tenant_id = ?", TENANT_ID);
         jdbc.update("DELETE FROM ab_integration_receipt WHERE tenant_id = ?", TENANT_ID);
@@ -214,6 +218,95 @@ class ReliableIntegrationRuntimeIT {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("active business transaction");
         assertThat(count("ab_outbox", "evt-no-tx")).isZero();
+    }
+
+    @Test
+    void quarantinePreservesFailedPayloadAndDeniesReplayOrDifferentRetry() {
+        double beforeQuarantined = counter("quarantined");
+        pilotConsumer.poisonEnabled.set(true);
+        enqueue(new TransactionTemplate(transactionManager), envelope("evt-quarantine", "PO-QUARANTINE", 1, true));
+        jdbc.update("UPDATE ab_outbox SET max_retries = 1 WHERE tenant_id = ? AND event_id = ?",
+                TENANT_ID, "evt-quarantine");
+        worker.pollAndDispatch();
+        String payload = jdbc.queryForObject("SELECT payload::text FROM ab_outbox WHERE tenant_id = ? AND event_id = ?",
+                String.class, TENANT_ID, "evt-quarantine");
+        assertThat(countDeadLetter("evt-quarantine", "open")).isEqualTo(1);
+        operatorService.replay(TENANT_ID, "evt-quarantine", "operator", "first recovery", 0);
+        worker.pollAndDispatch();
+        assertStatus("evt-quarantine", "failed");
+        assertThatThrownBy(() -> operatorService.quarantine(TENANT_ID + 1, "evt-quarantine", "operator", "fixture", 0))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+        assertThatThrownBy(() -> operatorService.quarantine(TENANT_ID, "evt-quarantine", "operator", "fixture", 0))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(countDeadLetter("evt-quarantine", "open")).isEqualTo(1);
+
+        var result = operatorService.quarantine(TENANT_ID, "evt-quarantine", "operator", "invalid test fixture", 1);
+        var retry = operatorService.quarantine(TENANT_ID, "evt-quarantine", "operator", "invalid test fixture", 1);
+        assertThat(retry).isEqualTo(result);
+        assertThat(result.status()).isEqualTo("quarantined");
+        assertThat(result.replayCount()).isEqualTo(1);
+        assertThat(countDeadLetter("evt-quarantine", "quarantined")).isEqualTo(1);
+        assertThat(count("ab_integration_dead_letter_quarantine", "evt-quarantine")).isEqualTo(1);
+        assertThat(operatorService.detail(TENANT_ID, "evt-quarantine").quarantine()).isEqualTo(result);
+        assertThatThrownBy(() -> operatorService.quarantine(TENANT_ID, "evt-quarantine", "another", "invalid test fixture", 1))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> operatorService.replay(TENANT_ID, "evt-quarantine", "operator", "retry", 1))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> operatorService.replay(TENANT_ID, "evt-quarantine", "operator", "first recovery", 0))
+                .isInstanceOf(IllegalStateException.class);
+        pilotConsumer.poisonEnabled.set(false);
+        worker.pollAndDispatch();
+        assertStatus("evt-quarantine", "failed");
+        assertThat(countReceipt("evt-quarantine")).isZero();
+        assertThat(countProjection("evt-quarantine")).isZero();
+        assertThat(jdbc.queryForObject("SELECT payload::text FROM ab_outbox WHERE tenant_id = ? AND event_id = ?",
+                String.class, TENANT_ID, "evt-quarantine")).isEqualTo(payload);
+        assertThat(counter("quarantined")).isEqualTo(beforeQuarantined + 1.0);
+    }
+
+    @Test
+    void concurrentReplayAndQuarantineHaveExactlyOneWinner() throws Exception {
+        pilotConsumer.poisonEnabled.set(true);
+        enqueue(new TransactionTemplate(transactionManager), envelope("evt-disposition-race", "PO-RACE", 1, true));
+        jdbc.update("UPDATE ab_outbox SET max_retries = 1 WHERE tenant_id = ? AND event_id = ?",
+                TENANT_ID, "evt-disposition-race");
+        worker.pollAndDispatch();
+        CyclicBarrier start = new CyclicBarrier(2);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var replay = executor.submit(() -> {
+                start.await(10, TimeUnit.SECONDS);
+                try {
+                    return operatorService.replay(TENANT_ID, "evt-disposition-race", "operator", "recover", 0).status();
+                } catch (IllegalStateException conflict) {
+                    assertThat(conflict).hasMessage("dead letter changed or is not open");
+                    return "conflict";
+                }
+            });
+            var quarantine = executor.submit(() -> {
+                start.await(10, TimeUnit.SECONDS);
+                try {
+                    return operatorService.quarantine(TENANT_ID, "evt-disposition-race", "operator", "invalid fixture", 0).status();
+                } catch (IllegalStateException conflict) {
+                    assertThat(conflict).hasMessage("dead letter changed or is not an open failed delivery");
+                    return "conflict";
+                }
+            });
+            assertThat(List.of(replay.get(20, TimeUnit.SECONDS), quarantine.get(20, TimeUnit.SECONDS)))
+                    .containsOnlyOnce("conflict");
+        }
+        var detail = operatorService.detail(TENANT_ID, "evt-disposition-race");
+        if (detail.quarantine() == null) {
+            assertThat(detail.deadLetter().status()).isEqualTo("replayed");
+            assertThat(detail.replayHistory()).hasSize(1);
+            assertStatus("evt-disposition-race", "pending");
+        } else {
+            assertThat(detail.deadLetter().status()).isEqualTo("quarantined");
+            assertThat(detail.replayHistory()).isEmpty();
+            assertStatus("evt-disposition-race", "failed");
+        }
+        assertThat(countReceipt("evt-disposition-race")).isZero();
+        pilotConsumer.poisonEnabled.set(false);
+        worker.pollAndDispatch();
     }
 
     private void enqueue(TransactionTemplate transaction, IntegrationEventEnvelope envelope) {

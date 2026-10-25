@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 6360aa9bf46d867973722d571e0312d822e3278a302d947bd607ffdbfef5b3da
+ * Contract SHA-256: 13e282679d3a008b8528e25413bda985a877e100c816c6d9dfdc2fc16e6de46f
  */
 export interface paths {
     "/api/activities": {
@@ -1171,6 +1171,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/infrastructure/reliable-integration/dead-letters/quarantine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["quarantine_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/infrastructure/status": {
         parameters: {
             query?: never;
@@ -1421,6 +1437,22 @@ export interface paths {
         get: operations["detail_2"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/reliable-integration/dead-letters/{eventId}/quarantine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["quarantine"];
         delete?: never;
         options?: never;
         head?: never;
@@ -27029,6 +27061,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseQuarantineResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["QuarantineResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseReadReceiptSummary: {
             code?: string;
             context?: unknown;
@@ -29798,6 +29838,7 @@ export interface components {
         };
         DeadLetterDetail: {
             deadLetter?: components["schemas"]["DeadLetterSummary"];
+            quarantine?: components["schemas"]["QuarantineResult"];
             receipts?: components["schemas"]["ReceiptView"][];
             replayHistory?: components["schemas"]["ReplayHistoryView"][];
         };
@@ -36480,6 +36521,13 @@ export interface components {
             /** Format: int32 */
             totalOutputTokens?: number;
         };
+        PlatformQuarantineRequest: {
+            eventId: string;
+            /** Format: int32 */
+            expectedReplayCount: number;
+            reason: string;
+            tenantPid: string;
+        };
         PluginCompatibilityDTO: {
             compatibilityMessage?: string;
             compatibilityStatus?: string;
@@ -36945,6 +36993,23 @@ export interface components {
             unmatchedStageEvents?: number;
             /** Format: int64 */
             withoutWindowEntryTasks?: number;
+        };
+        QuarantineRequest: {
+            /** Format: int32 */
+            expectedReplayCount: number;
+            reason: string;
+        };
+        QuarantineResult: {
+            correlationId?: string;
+            eventId?: string;
+            reason?: string;
+            recordPid?: string;
+            /** Format: int32 */
+            replayCount?: number;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            status?: string;
         };
         QueryBuilderDTO: {
             aggregations?: components["schemas"]["AggregationConfig"][];
@@ -42160,6 +42225,30 @@ export interface operations {
             };
         };
     };
+    quarantine_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformQuarantineRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseQuarantineResult"];
+                };
+            };
+        };
+    };
     status_2: {
         parameters: {
             query?: never;
@@ -42572,6 +42661,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseDeadLetterDetail"];
+                };
+            };
+        };
+    };
+    quarantine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuarantineRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseQuarantineResult"];
                 };
             };
         };

@@ -64,6 +64,31 @@ public interface ReliableIntegrationOperatorMapper {
     List<ReliableIntegrationReplayHistoryRow> replayHistory(@Param("tenantId") long tenantId,
                                                             @Param("eventId") String eventId);
 
+    @Select("SELECT pid AS recordPid, event_id AS eventId, correlation_id AS correlationId, "
+            + "replay_count AS replayCount, requested_by_pid AS requestedBy, reason, "
+            + "requested_at AS requestedAt FROM ab_integration_dead_letter_quarantine "
+            + "WHERE tenant_id = #{tenantId} AND event_id = #{eventId}")
+    ReliableIntegrationQuarantineRow quarantineAudit(@Param("tenantId") long tenantId,
+                                                     @Param("eventId") String eventId);
+
+    @Insert("WITH quarantined AS (UPDATE ab_integration_dead_letter d SET status = 'quarantined' "
+            + "FROM ab_outbox o WHERE d.outbox_id = o.id AND d.tenant_id = o.tenant_id "
+            + "AND d.event_id = o.event_id AND d.tenant_id = #{tenantId} AND d.event_id = #{eventId} "
+            + "AND d.status = 'open' AND o.status = 'failed' AND o.replay_count = #{expectedReplayCount} "
+            + "RETURNING d.outbox_id, d.tenant_id, d.event_id, o.correlation_id, o.replay_count) "
+            + "INSERT INTO ab_integration_dead_letter_quarantine "
+            + "(pid, outbox_id, tenant_id, event_id, correlation_id, replay_count, "
+            + "requested_by_pid, reason, requested_at) SELECT #{recordPid}, outbox_id, tenant_id, "
+            + "event_id, correlation_id, replay_count, #{requestedBy}, #{reason}, #{requestedAt} "
+            + "FROM quarantined")
+    int quarantine(@Param("recordPid") String recordPid,
+                   @Param("tenantId") long tenantId,
+                   @Param("eventId") String eventId,
+                   @Param("requestedBy") String requestedBy,
+                   @Param("reason") String reason,
+                   @Param("expectedReplayCount") int expectedReplayCount,
+                   @Param("requestedAt") Instant requestedAt);
+
     @Insert("WITH replayed AS (UPDATE ab_integration_dead_letter d SET status = 'replayed', "
             + "replayed_at = #{requestedAt}, replayed_by = #{requestedBy} FROM ab_outbox o "
             + "WHERE d.outbox_id = o.id AND d.tenant_id = #{tenantId} AND d.event_id = #{eventId} "

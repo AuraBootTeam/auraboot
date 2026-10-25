@@ -7,6 +7,8 @@ import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.D
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.DeadLetterSummary;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayRequest;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayResult;
+import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.QuarantineRequest;
+import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.QuarantineResult;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorService;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import jakarta.validation.Valid;
@@ -25,7 +27,7 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/api/admin/reliable-integration/dead-letters")
 @RequiredArgsConstructor
-@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor platform-admin check; inspects and replays the tenant's integration dead-letter messages")
+@AuthenticatedAccess("admin-surface operations; guarded by AdminRoleInterceptor tenant-admin check; inspects and disposes only the current tenant's integration dead letters")
 public class ReliableIntegrationOperatorController {
 
     private final ReliableIntegrationOperatorService service;
@@ -55,6 +57,19 @@ public class ReliableIntegrationOperatorController {
                                             @Valid @RequestBody ReplayRequest request) {
         try {
             return ApiResponse.success(service.replay(MetaContext.getCurrentTenantId(), eventId,
+                    MetaContext.getCurrentUserPid(), request.reason(), request.expectedReplayCount()));
+        } catch (NoSuchElementException exception) {
+            return ApiResponse.error(404, exception.getMessage());
+        } catch (IllegalStateException exception) {
+            return ApiResponse.error(409, exception.getMessage());
+        }
+    }
+
+    @PostMapping("/{eventId}/quarantine")
+    public ApiResponse<QuarantineResult> quarantine(@PathVariable String eventId,
+                                                   @Valid @RequestBody QuarantineRequest request) {
+        try {
+            return ApiResponse.success(service.quarantine(MetaContext.getCurrentTenantId(), eventId,
                     MetaContext.getCurrentUserPid(), request.reason(), request.expectedReplayCount()));
         } catch (NoSuchElementException exception) {
             return ApiResponse.error(404, exception.getMessage());
