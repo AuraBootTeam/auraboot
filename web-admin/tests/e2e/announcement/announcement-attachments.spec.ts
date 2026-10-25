@@ -39,7 +39,11 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
       identities.push({email,userPid:user.userPid,name:`Attachment ${kind} ${suffix.slice(0,8)}`});
     }
     await enter(page);
+    const readingLimits=page.waitForResponse(response=>response.request().method()==='GET'&&new URL(response.url()).pathname==='/api/file/limits');
     await page.getByRole('button',{name:'新建公告',exact:true}).click();
+    const limits=await successful(await readingLimits);
+    expect(limits.maxFileBytes).toBeGreaterThan(0);
+    await expect(page.getByText(`当前单文件上限：${limits.maxFileBytes/(1024*1024)} MB`,{exact:true})).toBeVisible();
     await page.getByTestId('form-field-title').locator('input').fill(title);
     await page.getByTestId('form-field-content').locator('textarea').fill('<p>Attachment review text.</p><img src="/announcement-unsafe-image" onerror="window.__announcementXss=7"><script>window.__announcementXss=9</script>');
     await expect(page.getByTestId('attachment-file-input')).toBeEnabled();
