@@ -1125,6 +1125,57 @@
               ]
             },
             "permissionCode": "announcement.announcement.stats"
+          },
+          {
+            "code": "management_preview_reminder",
+            "label": {
+              "zh-CN": "预览催办",
+              "en-US": "Preview reminder"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.pid}/versions/${record.current_version_pid}/reminders/preview",
+                  "body": {
+                    "query": "",
+                    "state": "all",
+                    "departmentPid": null
+                  },
+                  "target": "reminderPreview"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_preview/view/${state.reminderPreview.previewToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "visibleWhen": "record.status === 'published'"
+          },
+          {
+            "code": "management_reminder_plan",
+            "label": {
+              "zh-CN": "自动催办计划",
+              "en-US": "Automatic reminder plan"
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "visibleWhen": "record.current_version_pid != null",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_plan/view/${record.current_version_pid}"
+                  }
+                }
+              ]
+            }
           }
         ]
       },
