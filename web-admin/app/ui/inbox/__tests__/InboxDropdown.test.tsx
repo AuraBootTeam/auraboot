@@ -1,12 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InboxHeaderWidget } from '../InboxDropdown';
 
-const state=vi.hoisted(()=>({listInboxItems:vi.fn(),markAllRead:vi.fn(),markRead:vi.fn()}));
+const state=vi.hoisted(()=>({listInboxItems:vi.fn(),markAllRead:vi.fn(),markRead:vi.fn(),t:(key:string)=>key}));
 vi.mock('~/shared/services/inboxService',()=>state);
 vi.mock('~/contexts/AuthContext',()=>({useAuth:()=>({user:{tenantId:1,pid:'reader'}})}));
-vi.mock('~/contexts/I18nContext',()=>({useI18n:()=>({locale:'en-US',t:(key:string)=>key})}));
+vi.mock('~/contexts/I18nContext',()=>({useI18n:()=>({locale:'en-US',t:state.t})}));
 vi.mock('~/contexts/TimezoneContext',()=>({useTimezone:()=>({timezone:'UTC'})}));
 vi.mock('../InboxBadge',()=>({InboxBadge:({onClick}:any)=><button data-testid="inbox-badge" onClick={onClick}>Inbox</button>}));
 const item={id:'pending',title:'Pending policy acknowledgement',itemType:'announcement_ack',priority:'normal',
@@ -23,8 +23,9 @@ describe('inbox request ordering and read facts',()=>{
     await waitFor(()=>expect(state.listInboxItems).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByTestId('inbox-badge'));fireEvent.click(screen.getByTestId('inbox-badge'));
     await waitFor(()=>expect(screen.getByText(item.title)).toBeVisible());
-    release(page('Old delayed row'));
-    await waitFor(()=>expect(screen.queryByText('Old delayed row')).not.toBeInTheDocument());
+    await act(async()=>{release(page('Old delayed row'));});
+    expect(screen.queryByText('Old delayed row')).not.toBeInTheDocument();
+    expect(screen.getByText(item.title)).toBeVisible();
     screen.getByTestId('inbox-mark-all-read').focus();fireEvent.keyDown(document,{key:'Escape'});
     expect(screen.queryByTestId('inbox-dropdown')).not.toBeInTheDocument();expect(screen.getByTestId('inbox-badge')).toHaveFocus();
   });

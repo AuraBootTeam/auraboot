@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PagedChoiceField from '../PagedChoiceField';
 
@@ -51,8 +51,8 @@ describe('bounded authorized choice field', () => {
     state.user = { tenantId: 2, pid: 'publisher' };
     view.rerender(<PagedChoiceField endpoint="/api/choices" value={[]} label="People" onChange={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('checkbox', { name: beta.label })).toBeVisible());
-    release(response([alpha]));
-    await waitFor(() => expect(screen.queryByRole('checkbox', { name: alpha.label })).not.toBeInTheDocument());
+    await act(async () => { release(response([alpha])); });
+    expect(screen.queryByRole('checkbox', { name: alpha.label })).not.toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: beta.label })).toBeVisible();
   });
 

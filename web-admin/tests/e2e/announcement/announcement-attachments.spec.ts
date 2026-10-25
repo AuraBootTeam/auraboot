@@ -32,7 +32,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     const actor=(await successful(await page.request.get('/api/auth/me'))).user;tenant=actor.tenantId;
     const roleCode=`attachment_reader_${suffix.replaceAll('-','').slice(0,12)}`;
     await successful(await page.request.post('/api/roles',{data:{code:roleCode,name:'Attachment recipient',type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'self'}}));
-    const identities=[];
+    const identities:Array<{email:string;userPid:string;name:string}>=[];
     for(const kind of ['recipient','outsider']) {
       const email=`att-${kind[0]}-${suffix.replaceAll('-','').slice(0,16)}@example.com`;
       const user=await successful(await page.request.post('/api/admin/users',{data:{email,displayName:`Attachment ${kind} ${suffix.slice(0,8)}`,initialPassword:'Test2026x',roleCodes:[roleCode],sendInviteEmail:false}}));
