@@ -1,14 +1,24 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationHeaderWidget } from '../NotificationHeaderWidget';
 
 const http = vi.hoisted(() => ({ fetchResult: vi.fn() }));
 vi.mock('~/shared/services/http-client', () => http);
-vi.mock('../NotificationDropdown', () => ({ NotificationDropdown: ({ unreadCount }: { unreadCount: number }) =>
-  <output data-testid="count">{unreadCount}</output> }));
+vi.mock('../NotificationDropdown', () => ({ NotificationDropdown: ({ unreadCount, onMarkAllRead }: { unreadCount: number; onMarkAllRead: () => Promise<void> }) =>
+  <><output data-testid="count">{unreadCount}</output><button onClick={() => void onMarkAllRead().catch(() => {})}>Mark all</button></> }));
 
 describe('notification count identity and ordering', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('does not fabricate a zero badge when marking all fails and verification is unavailable', async () => {
+    http.fetchResult.mockResolvedValueOnce({ code: '0', data: { count: 7 } })
+      .mockResolvedValueOnce({ code: 'FORBIDDEN', data: null }).mockRejectedValueOnce(new Error('offline'));
+    render(<NotificationHeaderWidget />);
+    await waitFor(() => expect(screen.getByTestId('count')).toHaveTextContent('7'));
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => expect(http.fetchResult).toHaveBeenCalledTimes(3));
+    expect(screen.getByTestId('count')).toHaveTextContent('7');
+  });
 
   it('uses the shared header frame without opening a second EventSource', async () => {
     const eventSource = vi.fn();vi.stubGlobal('EventSource', eventSource);

@@ -17,6 +17,8 @@ import { useAuth } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { InboxBadge } from './InboxBadge';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import FEEDBACK from '../notification/NotificationFeedback.i18n.json';
 
 
 function itemIcon(type: string) {
@@ -128,7 +130,7 @@ export function InboxHeaderWidget() {
       await markAllRead();
       setItems((prev) => prev.map((i) => ({ ...i, isRead: true })));
     } catch {
-      // Non-critical
+      setError(getLocalizedText(FEEDBACK.markAllFailed, locale));
     }
   };
 
@@ -139,7 +141,7 @@ export function InboxHeaderWidget() {
       {open && (
         <div
           data-testid="inbox-dropdown"
-          className="absolute end-0 z-50 mt-2 w-96 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800"
+          className="fixed inset-x-4 top-14 z-50 mt-2 rounded-xl border border-gray-200 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:top-auto sm:end-0 sm:w-96 dark:border-gray-700 dark:bg-gray-800"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700">

@@ -51,6 +51,10 @@ export default function Header({
   const user = rootData?.user ?? null;
   const notificationScope = `${user?.tenantId ?? ''}:${user?.pid ?? user?.id ?? ''}`;
   const [notificationCount, setNotificationCount] = useState<{ scope: string; count: number } | null>(null);
+  useEffect(() => {
+    delete (window as any).__auraSSEConnectionId;
+    return () => { delete (window as any).__auraSSEConnectionId; };
+  }, [notificationScope]);
   const deploymentBranding = rootData?.branding ?? COMMUNITY_BRANDING;
   // Tenant-level skin (ui.theme) wins over deployment branding when configured.
   const tenantTheme = useTenantTheme();
@@ -252,7 +256,7 @@ export default function Header({
             )}
 
             {/* Unified inbox entry point */}
-            {!simplified && showNotifications && <InboxHeaderWidget />}
+            {!simplified && showNotifications && <InboxHeaderWidget key={notificationScope} />}
 
             {/* Notification centre bell (unread badge + SSE live updates) */}
             {!simplified && showNotifications && <NotificationHeaderWidget key={notificationScope}

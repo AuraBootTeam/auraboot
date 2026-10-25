@@ -27,10 +27,12 @@ import { useHydrated } from '~/hooks/useHydrated';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { Notification } from '~/hooks/useNotificationList';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import FEEDBACK from './NotificationFeedback.i18n.json';
 
 interface NotificationDropdownProps {
   unreadCount: number;
-  onMarkAllRead: () => void;
+  onMarkAllRead: () => void | Promise<void>;
   onCountChange?: (count: number) => void;
 }
 
@@ -96,13 +98,19 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<'loadFailed' | 'markAllFailed' | null>(null);
+  const [marking, setMarking] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const generation = useRef(0);
+  const active = useRef(true);
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  useEffect(() => { active.current = true; return () => { active.current = false; generation.current++; }; }, []);
 
   // Fetch latest 5 unread notifications when dropdown opens
   const fetchLatest = useCallback(async () => {
-    setLoading(true);
+    const requestGeneration = ++generation.current;setLoading(true);setError(null);
     try {
       const result = await fetchResult('/api/notifications', {
         method: 'get',
@@ -112,31 +120,30 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
           isRead: 'false',
         },
       });
-      if (ResultHelper.isSuccess(result)) {
+      if (!active.current || requestGeneration !== generation.current) return;
+      if (ResultHelper.isSuccess(result) && result.data) {
         const data = result.data as { records: Notification[]; total: number } | Notification[];
         if (Array.isArray(data)) {
           setNotifications(data.slice(0, 5));
-        } else {
-          setNotifications(data?.records?.slice(0, 5) || []);
-        }
-      }
+        } else if (Array.isArray(data.records)) setNotifications(data.records.slice(0, 5));
+        else throw new Error('Notification list is unavailable');
+      } else throw new Error('Notification list is unavailable');
     } catch (error) {
       console.error('Failed to fetch latest notifications:', error);
+      if (active.current && requestGeneration === generation.current) setError('loadFailed');
     } finally {
-      setLoading(false);
+      if (active.current && requestGeneration === generation.current) setLoading(false);
     }
   }, []);
 
   // Toggle dropdown and fetch when opening
   const toggleDropdown = useCallback(() => {
-    setOpen((prev) => {
-      const nextOpen = !prev;
-      if (nextOpen) {
-        fetchLatest();
-      }
-      return nextOpen;
-    });
-  }, [fetchLatest]);
+    setOpen((prev) => !prev);
+  }, []);
+  useEffect(() => {
+    if (open) void fetchLatest();
+    else { generation.current++;setLoading(false); }
+  }, [open, fetchLatest]);
 
   // Close on click outside
   useEffect(() => {
@@ -148,6 +155,7 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpen(false);
+        triggerRef.current?.focus();
       }
     };
 
@@ -177,17 +185,22 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
   );
 
   // Handle mark all read from dropdown
-  const handleMarkAllRead = useCallback(() => {
-    onMarkAllRead();
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, isRead: true, readAt: new Date().toISOString() })),
-    );
-  }, [onMarkAllRead]);
+  const handleMarkAllRead = useCallback(async () => {
+    if (marking) return;
+    setMarking(true);setError(null);
+    try {
+      await onMarkAllRead();
+      if (active.current) setNotifications(prev => prev.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })));
+    } catch {
+      if (active.current) setError('markAllFailed');
+    } finally { if (active.current) setMarking(false); }
+  }, [onMarkAllRead, marking]);
 
   return (
     <div className="relative" ref={dropdownRef} data-testid="notification-dropdown">
       {/* Bell icon button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={toggleDropdown}
         disabled={!hydrated}
@@ -208,7 +221,7 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
       {/* Dropdown panel */}
       {open && (
         <div
-          className="absolute right-0 z-50 mt-2 w-96 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800"
+          className="fixed inset-x-4 top-14 z-50 mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:w-96 dark:border-gray-700 dark:bg-gray-800"
           data-testid="notification-dropdown-panel"
         >
           {/* Header */}
@@ -224,6 +237,8 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
+                disabled={marking}
+                aria-busy={marking}
                 className="text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
                 data-testid="mark-all-read-btn"
               >
@@ -232,6 +247,11 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
             )}
           </div>
 
+          {error && <div role="alert" className="border-status-amber bg-status-amber-bg p-3 text-sm">
+            {getLocalizedText(FEEDBACK[error], locale)}
+            <button type="button" onClick={() => void fetchLatest()} className="ms-2 underline">{getLocalizedText(FEEDBACK.retry, locale)}</button>
+          </div>}
+
           {/* Notification list */}
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
@@ -239,7 +259,7 @@ export function NotificationDropdown({ unreadCount, onMarkAllRead }: Notificatio
                 <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-indigo-600"></div>
                 <span className="ml-2 text-sm text-gray-500">{t('common.loading')}</span>
               </div>
-            ) : notifications.length === 0 ? (
+            ) : error === 'loadFailed' ? null : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-gray-400">
                 <BellIcon className="mb-2 h-10 w-10" />
                 <p className="text-sm">{t('notification.center.empty')}</p>

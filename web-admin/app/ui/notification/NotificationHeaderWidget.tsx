@@ -55,9 +55,11 @@ export function NotificationHeaderWidget({ streamCount }: { streamCount?: number
 
   const handleMarkAllRead = useCallback(async () => {
     try {
-      await fetchResult('/api/notifications/read-all', { method: 'put' });
+      const result = await fetchResult('/api/notifications/read-all', { method: 'put' });
+      if (!ResultHelper.isSuccess(result)) throw new Error('Notification read state was not confirmed');
+      revision.current++;
+      if (active.current) setUnreadCount(0);
     } finally {
-      setUnreadCount(0);
       await refreshUnreadCount();
     }
   }, [refreshUnreadCount]);
