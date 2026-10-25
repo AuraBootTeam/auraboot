@@ -219,7 +219,9 @@ public class AnnouncementReminderService {
         view.put("expiresAt",time(row.get("expires_at")));view.put("filters",codec.object(row.get("filter_json").toString()));
         boolean valid=source.policy().versionActive() && (source.policy().expiresAt()==null || source.now().isBefore(source.policy().expiresAt()))
             && source.now().isBefore(time(row.get("expires_at"))) && source.record().getRowVersion()==((Number)row.get("record_revision")).intValue();
-        view.put("status",valid ? "ready" : "expired");return view;
+        String state=!valid ? "expired" : ((Number)row.get("eligible_count")).intValue()>0 ? "ready"
+            : current.throttled()>0 ? "throttled" : "empty";
+        view.put("status",state);return view;
     }
     @Transactional(readOnly=true)
     public Map<String,Object> batchStatus(String batch) {

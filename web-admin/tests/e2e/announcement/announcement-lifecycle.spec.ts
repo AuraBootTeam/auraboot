@@ -434,10 +434,11 @@ test('read-only manager cannot create or modify notices', async ({ page, browser
   try {
     permissions = (
       await db.query(
-        "SELECT id FROM ab_permission WHERE code IN ('announcement.announcement.read','model.ab_announcement.read') AND deleted_flag=FALSE",
+        "SELECT p.id,p.code FROM ab_permission p JOIN ab_role r ON r.tenant_id=p.tenant_id WHERE r.pid=$1 AND p.code IN ('announcement.announcement.read','model.ab_announcement.read') AND p.deleted_flag=FALSE",
+        [rolePid],
       )
     ).rows;
-    expect(permissions).toHaveLength(2);
+    expect(permissions.map((permission) => permission.code).sort()).toEqual(['announcement.announcement.read', 'model.ab_announcement.read']);
   } finally {
     await db.end();
   }

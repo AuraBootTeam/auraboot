@@ -122,6 +122,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             getTestTenant().getId(),getTestUser().getId(),version)).isEqualTo(1L);
         var second=reminders.preview(record,version,new AnnouncementStatistics.Filters("","unread",null));
         assertThat(second.get("eligible")).isEqualTo(0L);assertThat(second.get("throttled")).isEqualTo(1L);
+        assertThat(reminders.previewStatus((String)second.get("previewToken"))).containsEntry("status","throttled");
         var skipped=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",second.get("previewToken")),UniqueIdGenerator.generate());
         assertThat(skipped.get("actualCount")).isEqualTo(0);assertThat(skipped.get("operationState")).isEqualTo("skipped");
         assertThat(jdbc.queryForObject("SELECT automatic_batches FROM ab_announcement_reminder_plan WHERE tenant_id=? AND version_pid=?",Integer.class,
@@ -133,6 +134,8 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         readers.mark(version,mark,false);readers.mark(version,mark,true);
         var result=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());
         assertThat(result.get("previewCount")).isEqualTo(1);assertThat(result.get("actualCount")).isEqualTo(0);
+        var fresh=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+        assertThat(reminders.previewStatus((String)fresh.get("previewToken"))).containsEntry("status","empty");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=?",Long.class,
             getTestTenant().getId(),result.get("batchPid"))).isZero();
     }

@@ -3430,6 +3430,14 @@
               "expired": {
                 "zh-CN": "已失效，请重新预览",
                 "en-US": "Expired; preview again"
+              },
+              "throttled": {
+                "zh-CN": "去重窗口内，暂无新增提醒",
+                "en-US": "Deduplicated; no new reminders"
+              },
+              "empty": {
+                "zh-CN": "当前无需催办",
+                "en-US": "No reminder needed"
               }
             }
           },
