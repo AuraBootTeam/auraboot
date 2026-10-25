@@ -7,6 +7,7 @@ import React from 'react';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
+import { attachmentDownloadUrl } from '~/ui/smart/display/FileAttachmentField';
 
 // 导入并重新导出统一的 i18n 实现
 import {
@@ -682,8 +683,10 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
             {files.map((f, i) => (
               <a
                 key={i}
-                href={f.url}
-                target="_blank"
+                href={typeof f.url === 'string' ? attachmentDownloadUrl(f.url) || undefined : undefined}
+                aria-disabled={typeof f.url !== 'string' || !attachmentDownloadUrl(f.url)}
+                download={f.name}
+                target="_self"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
               >
