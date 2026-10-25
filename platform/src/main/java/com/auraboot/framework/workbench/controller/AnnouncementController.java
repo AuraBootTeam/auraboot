@@ -72,7 +72,17 @@ public class AnnouncementController {
     @RequirePermission("announcement.announcement.publish")
     public ApiResponse<List<com.auraboot.framework.workbench.service.AnnouncementAudienceService.Option>> audienceOptions(
             @RequestParam String kind) {
+        if(!"kind".equals(kind)) throw BusinessException.i18n("announcement.error.invalid_input");
         return ApiResponse.success(audiences.options(kind));
+    }
+
+    @GetMapping("/audience-option-page")
+    @RequirePermission("announcement.announcement.publish")
+    public ApiResponse<com.auraboot.framework.workbench.service.AnnouncementAudienceService.OptionPage> audienceOptionPage(
+            @RequestParam String kind,@RequestParam(defaultValue="") String query,
+            @RequestParam(defaultValue="1") int pageNum,@RequestParam(defaultValue="25") int pageSize,
+            @RequestParam(required=false) List<String> values) {
+        return ApiResponse.success(audiences.optionPage(kind,query,pageNum,pageSize,values==null ? List.of() : values));
     }
 
 

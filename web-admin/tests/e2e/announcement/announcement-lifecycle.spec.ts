@@ -543,6 +543,7 @@ test('scheduled audience settings preserve important acknowledgement and cancell
     await expect(modes.getByRole('radio', { name: /^审批后发布/ })).toContainText(/未接入可用审批服务|需要相应权限/);
     await modes.screenshot({ path: test.info().outputPath('approval-modes-provider-unavailable.png'), animations: 'disabled' });
     await expect(dialog.getByLabel('要求确认已知悉', { exact: true })).toBeChecked();
+    await dialog.getByTestId('form-dialog-field-audience_users').getByRole('searchbox').fill(recipientName);
     await dialog.getByTestId('form-dialog-field-audience_users').getByRole('checkbox', { name: recipientName, exact: true }).check();
     await dialog.getByTestId('form-dialog-field-audience_kind').scrollIntoViewIfNeeded();
     await dialog.screenshot({ path: test.info().outputPath('notification-settings-recipient.png'), animations: 'disabled' });

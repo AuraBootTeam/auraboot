@@ -112,4 +112,28 @@ class AnnouncementAudienceServiceTest {
         assertThatThrownBy(()->service.resolve(selected)).isInstanceOf(BusinessException.class);
     }
 
+    @Test void pagedChoicesSearchAndHydrateOnlyTheCurrentlyAuthorizedDirectory() {
+        var first=service.optionPage("person","",1,1,List.of());
+        assertThat(first.total()).isEqualTo(2);
+        assertThat(first.records()).extracting(AnnouncementAudienceService.Option::value).containsExactly("author");
+        assertThat(service.optionPage("person","",2,1,List.of()).records())
+            .extracting(AnnouncementAudienceService.Option::value).containsExactly("employee");
+        assertThat(service.optionPage("person","EMP",1,25,List.of()).records())
+            .extracting(AnnouncementAudienceService.Option::value).containsExactly("employee");
+        assertThat(service.optionPage("person","",1,50,List.of("employee","outside")).records())
+            .extracting(AnnouncementAudienceService.Option::value).containsExactly("employee");
+        when(scopes.resolveAudienceScope(70L,"ab_announcement","publish"))
+            .thenReturn(new DataScopeCondition("self","created_by",7L,null,List.of(),List.of()));
+        assertThat(service.optionPage("person","",1,50,List.of("employee")).records()).isEmpty();
+    }
+
+    @Test void optionPagingRejectsUnboundedRequestsBeforeReadingTheDirectory() {
+        clearInvocations(directory);
+        assertThatThrownBy(()->service.optionPage("person","",0,25,List.of())).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->service.optionPage("person","",1,51,List.of())).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->service.optionPage("person","a".repeat(101),1,25,List.of())).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->service.optionPage("person","",1,50,Collections.nCopies(51,"employee")))).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(directory);
+    }
+
 }

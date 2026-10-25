@@ -1,6 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
+
+it('defers paged choices to the rendered dialog without eagerly downloading the full directory', async () => {
+  const fetchResult = vi.fn();
+  window.addEventListener('dialog:form', event => {
+    const detail = (event as CustomEvent).detail;
+    expect(detail.fields[0].dataSource).toMatchObject({ pagination: true, endpoint: '/api/choices/record' });
+    expect(detail.fieldOptions).toEqual({});
+    detail.onSubmit({ people: ['chosen'] });
+  }, { once: true });
+  await expect(promptInputForm([{ field: 'people', type: 'multiselect', dataSource: {
+    type: 'api', endpoint: '/api/choices/${record.pid}', pagination: true,
+  } }], 'Select people', fetchResult, undefined, { record: { pid: 'record' } })).resolves.toEqual({ people: ['chosen'] });
+  expect(fetchResult).not.toHaveBeenCalled();
+});
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
 import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';

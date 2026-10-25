@@ -20,6 +20,7 @@ import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-rende
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import MemberPicker from '~/ui/smart/picker/MemberPicker';
 import BomUploadReviewField, { type BomUploadReviewValue } from './BomUploadReviewField';
+import PagedChoiceField from './PagedChoiceField';
 
 interface VisibilityRule {
   field: string;
@@ -71,6 +72,7 @@ interface FormFieldConfig {
   dataSource?: {
     type: 'api' | 'static';
     endpoint?: string;
+    pagination?: boolean;
     data?: FormOptionConfig[];
   };
 }
@@ -573,6 +575,13 @@ export default function FormDialog() {
                           </fieldset>
                         );
                       })}
+                    </div>
+                  ) : fieldType === 'multiselect' && field.dataSource?.pagination && field.dataSource.endpoint ? (
+                    <div data-testid={`form-dialog-field-${field.field}`}>
+                      <PagedChoiceField endpoint={field.dataSource.endpoint}
+                        label={getLocalizedText(field.label, locale, t)}
+                        value={Array.isArray(formData[field.field]) ? formData[field.field] : []}
+                        onChange={value => updateField(field.field, value)} />
                     </div>
                   ) : fieldType === 'multiselect' ? (
                     <div

@@ -71,6 +71,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await row.getByTestId('row-action-more').click();
     await page.getByTestId('row-action-dropdown').getByRole('menuitem',{name:'通知设置',exact:true}).click();
     const settings=page.getByRole('dialog');
+    await settings.getByTestId('form-dialog-field-audience_users').getByRole('searchbox').fill(identities[0].name);
     await settings.getByTestId('form-dialog-field-audience_users').getByRole('checkbox',{name:identities[0].name,exact:true}).check();
     await settings.getByLabel('要求确认已知悉',{exact:true}).check();
     await settings.getByLabel('免审原因',{exact:true}).fill('Authorized retained attachment acceptance.');

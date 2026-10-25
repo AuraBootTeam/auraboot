@@ -742,6 +742,15 @@ export async function promptInputForm(
     Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any; options?: Array<{ value: string; disabled?: boolean }>; defaultValues?: unknown }>
   > = {};
   for (const field of normalizedFields) {
+    if (field.dataSource?.pagination === true) {
+      if (field.type !== 'multiselect' || field.dataSource.type !== 'api' || !field.dataSource.endpoint) {
+        throw new Error('Paged choices require an API multiselect endpoint');
+      }
+      field.dataSource = { ...field.dataSource, endpoint: String(field.dataSource.endpoint).replace(
+        /\$\{([^}]+)\}/g, (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
+      ) };
+      continue;
+    }
     if (field.dictCode && fetchResult) {
       const result = await fetchPromptChoices(fetchResult,
         `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,

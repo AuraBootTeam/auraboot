@@ -147,6 +147,25 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
                 assertThat(userDirectory.insert(user)).isEqualTo(1);
                 var member=memberships.addMember(user.getId(),tenant,"active");members.add(member.getId());users.add(user.getPid());
             }
+            Set<String> selectable=new HashSet<>();
+            int optionTotal=-1;
+            for(int page=1;optionTotal<0 || selectable.size()<optionTotal;page++) {
+                var response=http.perform(get("/api/announcements/audience-option-page")
+                    .param("kind","person").param("pageNum",Integer.toString(page)).param("pageSize","25"))
+                    .andExpect(status().isOk()).andReturn().getResponse();
+                var data=json.readTree(response.getContentAsString()).required("data");
+                optionTotal=data.required("total").intValue();var choices=data.required("records");
+                assertThat(choices.size()).isBetween(1,25);
+                for(var choice:choices) assertThat(selectable.add(choice.required("value").textValue())).isTrue();
+                assertThat(page).isLessThan(30);
+            }
+            assertThat(selectable).containsAll(users);
+            http.perform(get("/api/announcements/audience-option-page").param("kind","person").param("pageSize","51"))
+                .andExpect(status().isUnprocessableEntity());
+            var selected=http.perform(get("/api/announcements/audience-option-page").param("kind","person")
+                .param("values",users.getFirst()+","+users.getLast()))
+                .andExpect(status().isOk()).andReturn().getResponse();
+            assertThat(json.readTree(selected.getContentAsString()).required("data").required("records").size()).isEqualTo(2);
             String create=UniqueIdGenerator.generate(),operation=UniqueIdGenerator.generate();
             record=(String)lifecycle.execute("announcement:create_announcement",null,Map.of("title","Measured 501-recipient announcement "+suffix,
                 "content","<p>Measured publication and paging.</p>","policy",Map.of("audience",Map.of("kind","selected","userPids",users),

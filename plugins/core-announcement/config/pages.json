@@ -161,7 +161,8 @@
                   "defaultValue": "${record.audience_users}",
                   "dataSource": {
                     "type": "api",
-                    "endpoint": "/api/announcements/audience-options?kind=person"
+                    "endpoint": "/api/announcements/audience-option-page?kind=person",
+                    "pagination": true
                   },
                   "helpText": {
                     "zh-CN": "仅可选择当前发布管理范围内的有效成员。",
@@ -186,7 +187,8 @@
                   "defaultValue": "${record.audience_departments}",
                   "dataSource": {
                     "type": "api",
-                    "endpoint": "/api/announcements/audience-options?kind=department"
+                    "endpoint": "/api/announcements/audience-option-page?kind=department",
+                    "pagination": true
                   },
                   "helpText": {
                     "zh-CN": "包含下级；仅列出整个子树均已授权的部门。",
@@ -211,7 +213,8 @@
                   "defaultValue": "${record.audience_roles}",
                   "dataSource": {
                     "type": "api",
-                    "endpoint": "/api/announcements/audience-options?kind=role"
+                    "endpoint": "/api/announcements/audience-option-page?kind=role",
+                    "pagination": true
                   },
                   "helpText": {
                     "zh-CN": "仅通知当前管理范围内的该角色成员，发布时重新解析。",
@@ -749,7 +752,8 @@
                   "defaultValue": "${record.audience_users}",
                   "dataSource": {
                     "type": "api",
-                    "endpoint": "/api/announcements/audience-options?kind=person"
+                    "endpoint": "/api/announcements/audience-option-page?kind=person",
+                    "pagination": true
                   },
                   "helpText": {
                     "zh-CN": "仅可选择当前发布管理范围内的有效成员。",
@@ -774,7 +778,8 @@
                   "defaultValue": "${record.audience_departments}",
                   "dataSource": {
                     "type": "api",
-                    "endpoint": "/api/announcements/audience-options?kind=department"
+                    "endpoint": "/api/announcements/audience-option-page?kind=department",
+                    "pagination": true
                   },
                   "helpText": {
                     "zh-CN": "包含下级；仅列出整个子树均已授权的部门。",
@@ -799,7 +804,8 @@
                   "defaultValue": "${record.audience_roles}",
                   "dataSource": {
                     "type": "api",
-                    "endpoint": "/api/announcements/audience-options?kind=role"
+                    "endpoint": "/api/announcements/audience-option-page?kind=role",
+                    "pagination": true
                   },
                   "helpText": {
                     "zh-CN": "仅通知当前管理范围内的该角色成员，发布时重新解析。",

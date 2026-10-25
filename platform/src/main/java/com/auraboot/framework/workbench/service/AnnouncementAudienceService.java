@@ -174,6 +174,23 @@ public class AnnouncementAudienceService {
     public record Option(String value,Map<String,String> label) {
         public Option(String value,String name) {this(value,Map.of("zh-CN",name,"en-US",name));}
     }
+    public record OptionPage(List<Option> records,int total,int pageNum,int pageSize) {}
+
+    @Transactional(readOnly=true)
+    public OptionPage optionPage(String kind,String query,int pageNum,int pageSize,List<String> values) {
+        if(pageNum<1 || pageNum>100000 || pageSize<1 || pageSize>50 || query==null || query.length()>100
+                || values==null || values.size()>50
+                || values.stream().anyMatch(value->value==null || value.isBlank() || value.length()>36)) invalid();
+        String search=query.strip().toLowerCase(Locale.ROOT);
+        // Recompute current authorization for both search and selected-label hydration.
+        List<Option> filtered=options(kind).stream()
+            .filter(option->values.isEmpty() || values.contains(option.value()))
+            .filter(option->search.isEmpty() || option.label().values().stream()
+                .anyMatch(label->label.toLowerCase(Locale.ROOT).contains(search)))
+            .sorted(Comparator.comparing(Option::value)).toList();
+        int start=(int)Math.min((long)(pageNum-1)*pageSize,filtered.size());
+        return new OptionPage(filtered.subList(start,Math.min(start+pageSize,filtered.size())),filtered.size(),pageNum,pageSize);
+    }
     @Transactional(readOnly=true)
     public List<Option> options(String kind) {
         ScopeView view=scopeView();
