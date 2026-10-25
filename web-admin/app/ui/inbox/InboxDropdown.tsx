@@ -54,12 +54,15 @@ export function InboxHeaderWidget() {
   const scopeRef = useRef(scope); scopeRef.current = scope;
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const openRef = useRef(open); openRef.current = open;
+  const generation = useRef(0);
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   const fetchItems = useCallback(async () => {
+    const requestGeneration = ++generation.current;
     setLoading(true); setError(null);
     try {
       const page = await listInboxItems({
@@ -67,18 +70,20 @@ export function InboxHeaderWidget() {
         pageNum: 1,
         pageSize: 5,
       });
-      if (scopeRef.current === scope) setItems(page.records);
+      if (scopeRef.current === scope && requestGeneration === generation.current) setItems(page.records);
     } catch {
-      if (scopeRef.current === scope) setError(t('inbox.loadFailed'));
+      if (scopeRef.current === scope && requestGeneration === generation.current) setError(t('inbox.loadFailed'));
     } finally {
-      if (scopeRef.current === scope) setLoading(false);
+      if (scopeRef.current === scope && requestGeneration === generation.current) setLoading(false);
     }
   }, [scope, t]);
   useEffect(() => {setItems([]);setOpen(false);setError(null);}, [scope]);
 
   useEffect(() => {
     if (open) fetchItems();
+    else { generation.current++; setLoading(false); }
   }, [open, fetchItems]);
+  useEffect(() => () => { generation.current++; }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -88,7 +93,10 @@ export function InboxHeaderWidget() {
       }
     };
     const escHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape' && openRef.current) {
+        setOpen(false);
+        dropdownRef.current?.querySelector<HTMLButtonElement>('[data-testid="inbox-badge"]')?.focus();
+      }
     };
     document.addEventListener('mousedown', handler);
     document.addEventListener('keydown', escHandler);
@@ -128,9 +136,9 @@ export function InboxHeaderWidget() {
   const handleMarkAllRead = async () => {
     try {
       await markAllRead();
-      setItems((prev) => prev.map((i) => ({ ...i, isRead: true })));
+      if (scopeRef.current === scope && openRef.current) await fetchItems();
     } catch {
-      setError(getLocalizedText(FEEDBACK.markAllFailed, locale));
+      if (scopeRef.current === scope && openRef.current) setError(getLocalizedText(FEEDBACK.markAllFailed, locale));
     }
   };
 
