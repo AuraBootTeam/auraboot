@@ -1104,3 +1104,16 @@ Core 新增 `V20261025030000__announcement_operating_policy.sql`，由145条迁�
 
 
 原生旅程已固化为`web-admin/tests/e2e/announcement/announcement-statistics.spec.ts`，自行通过正式API创建仅面向当前用户的发布/已读前置数据，统计、筛选、导出与下载使用实际页面按钮；完成后走正式撤回命令清理前置公告。cd5ce8296上该用例与既有12条公告/政策回归全部通过，共13条、无跳过或重试，认证setup不计入业务数量。仓库用例下载为15列1行，并核对固定状态、时区、持久摘要及同快照仅一条任务；8张合成数据原图已逐张复核，见[公开验收裁决](./evidence/announcement-s2-s8-2026-10-25/manifest.json)。这些证据只关闭D11/D14的上述行动点，不替代剩余催办、BPM组合、附件及权限/异常矩阵。
+
+
+### 18.16 持久催办候选与精确接口
+
+催办资格与既有日历在55f63c026通过19项单测（9项资格、10项日历，无跳过）。资格层明确：迁移未知状态不作未读；OUTSTANDING合并未读与未确认；两种模式从意图受理时共同去重；受理后完成或成员失效在消费时跳过；消费自己的意图不再次被窗口拦截；知悉截止相等停止自动，公告有效时仍可手动。此为规则层证据，不代表持久催办或页面验收完成。
+
+持久候选新增Core151迁移：`ab_announcement_reminder_plan`绑定原发布任务、原主体与自动额度；`preview`绑定当前用户/member、版本、root revision、筛选、人数和30分钟有效期；`batch`固定AUTO/MANUAL、当地日期、目标、筛选、policy/scope hash、受理人数及预览差额；`guard`以tenant/version/user主键存最后意图时间。批次身份不可变，只有accepted→blocked控制转换；自动日唯一键包含skipped扫描，零受理不消耗三次额度。新发布同事务建立计划；升级只为有正式发布原主体及冻结政策的活跃publication版本登记计划，不迁移未知阅读事实、不补发历史提醒。
+
+预览接口为`POST /api/announcements/records/{recordPid}/versions/{versionPid}/reminders/preview`，请求复用`query/state/departmentPid`；返回previewToken、revision、filters、eligible、throttled、evaluatedAt、expiresAt，不接受客户端名单。受理走统一命令`announcement:remind`，只接收previewToken，root锁内复核当前动作/范围、原member、有效版本、revision和资格，再返回previewCount/actualCount/throttled、batchPid及accepted/skipped。`announcement:resume_reminders`只接收versionPid，仅原主体当前同member可显式恢复blocked计划；达到额度/截止或失效时不可恢复。两命令operationId沿用现有事务账本和审计，重放前仍检查当前身份与范围，重放不增加提醒与额度。
+
+自动扫描复用根锁、原发布主体和冻结时区/政策，只处理当天到期时间；恢复记录resume_after，早于恢复时点的周期不追补。当前管理范围必须覆盖整个固定受众；消费复查当前原member、动作和精确scope hash，范围收缩、变化或失权阻断原批次，不能悄悄缩小受众或切为系统身份。管理员可用自己的权限创建手动批次，但不能接管原自动主体。接收执行使用既有`ab_announcement_delivery`，500人分页扩展至同一可靠outbox，催办不重复创建知悉Inbox任务；通知持久化成功显示“提醒已生成”，不是已读或用户收到。
+
+Core151已从空库实际执行151条迁移并生成快照；增量升级、独立drift、真实受理/消费、自动并发额度、撤权/恢复和原生页面证据仍在本任务内补齐，当前候选不得记为S8完成。BPM职责和公共审批契约不变，催办运营不进入流程引擎。

@@ -604,6 +604,22 @@ $$;
 
 
 --
+-- Name: ab_guard_announcement_reminder_batch(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_guard_announcement_reminder_batch() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+ IF TG_OP='DELETE' OR (to_jsonb(NEW)-ARRAY['status','error_code']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['status','error_code'])
+ THEN RAISE EXCEPTION 'Announcement reminder batch identity is immutable'; END IF;
+ IF OLD.status<>NEW.status AND NOT(OLD.status='accepted' AND NEW.status='blocked')
+ THEN RAISE EXCEPTION 'Announcement reminder batch transition is invalid'; END IF;
+ RETURN NEW;
+END $$;
+
+
+--
 -- Name: ab_guard_domain_export_attempt(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -4047,6 +4063,88 @@ CREATE TABLE public.ab_announcement_release (
     finished_at timestamp with time zone,
     CONSTRAINT ab_announcement_release_check CHECK ((latest_allowed_at >= scheduled_at)),
     CONSTRAINT ab_announcement_release_status_check CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying, 'succeeded'::character varying, 'retryable_failed'::character varying, 'blocked'::character varying, 'canceled'::character varying, 'missed'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_announcement_reminder_batch; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_reminder_batch (
+    tenant_id bigint NOT NULL,
+    pid character varying(36) NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    actor_user_id bigint NOT NULL,
+    actor_member_pid character varying(36) NOT NULL,
+    mode character varying(12) NOT NULL,
+    local_date date NOT NULL,
+    target character varying(24) NOT NULL,
+    filters jsonb NOT NULL,
+    policy_hash character varying(64) NOT NULL,
+    scope_hash character varying(64) NOT NULL,
+    status character varying(24) NOT NULL,
+    evaluated_at timestamp with time zone NOT NULL,
+    intention_count integer NOT NULL,
+    throttled_count integer NOT NULL,
+    preview_count integer,
+    error_code character varying(100),
+    CONSTRAINT ab_announcement_reminder_batch_check CHECK ((((mode)::text <> 'AUTO'::text) OR (preview_count IS NULL))),
+    CONSTRAINT ab_announcement_reminder_batch_intention_count_check CHECK ((intention_count >= 0)),
+    CONSTRAINT ab_announcement_reminder_batch_mode_check CHECK (((mode)::text = ANY ((ARRAY['AUTO'::character varying, 'MANUAL'::character varying])::text[]))),
+    CONSTRAINT ab_announcement_reminder_batch_status_check CHECK (((status)::text = ANY ((ARRAY['accepted'::character varying, 'skipped'::character varying, 'blocked'::character varying])::text[]))),
+    CONSTRAINT ab_announcement_reminder_batch_target_check CHECK (((target)::text = ANY ((ARRAY['UNREAD'::character varying, 'UNACKNOWLEDGED'::character varying, 'OUTSTANDING'::character varying])::text[]))),
+    CONSTRAINT ab_announcement_reminder_batch_throttled_count_check CHECK ((throttled_count >= 0))
+);
+
+
+--
+-- Name: ab_announcement_reminder_guard; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_reminder_guard (
+    tenant_id bigint NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    user_pid character varying(36) NOT NULL,
+    last_intention_at timestamp with time zone NOT NULL,
+    batch_pid character varying(36) NOT NULL
+);
+
+
+--
+-- Name: ab_announcement_reminder_plan; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_reminder_plan (
+    tenant_id bigint NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    release_pid character varying(36) NOT NULL,
+    status character varying(24) DEFAULT 'active'::character varying NOT NULL,
+    automatic_batches integer DEFAULT 0 NOT NULL,
+    resume_after timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    next_scan_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    error_code character varying(100),
+    CONSTRAINT ab_announcement_reminder_plan_automatic_batches_check CHECK (((automatic_batches >= 0) AND (automatic_batches <= 3))),
+    CONSTRAINT ab_announcement_reminder_plan_status_check CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'blocked'::character varying, 'completed'::character varying, 'canceled'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_announcement_reminder_preview; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_reminder_preview (
+    tenant_id bigint NOT NULL,
+    pid character varying(36) NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    owner_user_id bigint NOT NULL,
+    owner_member_pid character varying(36) NOT NULL,
+    record_revision integer NOT NULL,
+    filters jsonb NOT NULL,
+    eligible_count integer NOT NULL,
+    evaluated_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    CONSTRAINT ab_announcement_reminder_preview_check CHECK ((expires_at > evaluated_at)),
+    CONSTRAINT ab_announcement_reminder_preview_eligible_count_check CHECK ((eligible_count >= 0))
 );
 
 
@@ -20300,6 +20398,38 @@ ALTER TABLE ONLY public.ab_announcement_release
 
 
 --
+-- Name: ab_announcement_reminder_batch ab_announcement_reminder_batch_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_batch
+    ADD CONSTRAINT ab_announcement_reminder_batch_pkey PRIMARY KEY (tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_reminder_guard ab_announcement_reminder_guard_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_guard
+    ADD CONSTRAINT ab_announcement_reminder_guard_pkey PRIMARY KEY (tenant_id, version_pid, user_pid);
+
+
+--
+-- Name: ab_announcement_reminder_plan ab_announcement_reminder_plan_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_plan
+    ADD CONSTRAINT ab_announcement_reminder_plan_pkey PRIMARY KEY (tenant_id, version_pid);
+
+
+--
+-- Name: ab_announcement_reminder_preview ab_announcement_reminder_preview_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_preview
+    ADD CONSTRAINT ab_announcement_reminder_preview_pkey PRIMARY KEY (tenant_id, pid);
+
+
+--
 -- Name: ab_announcement_statistics_row ab_announcement_statistics_row_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -24700,6 +24830,14 @@ ALTER TABLE ONLY public.ab_agent_task
 
 
 --
+-- Name: ab_announcement_release uq_announcement_release_version_pid; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_release
+    ADD CONSTRAINT uq_announcement_release_version_pid UNIQUE (tenant_id, version_pid, pid);
+
+
+--
 -- Name: ab_announcement_version uq_announcement_version_owner; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -26878,6 +27016,20 @@ CREATE INDEX idx_announcement_recipient_user ON public.ab_announcement_recipient
 --
 
 CREATE INDEX idx_announcement_release_claim ON public.ab_announcement_release USING btree (scheduled_at, next_attempt_at) WHERE ((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying, 'retryable_failed'::character varying])::text[]));
+
+
+--
+-- Name: idx_announcement_reminder_scan; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_announcement_reminder_scan ON public.ab_announcement_reminder_plan USING btree (next_scan_at) WHERE ((status)::text = 'active'::text);
+
+
+--
+-- Name: idx_announcement_reminder_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_announcement_reminder_version ON public.ab_announcement_reminder_batch USING btree (tenant_id, version_pid, evaluated_at DESC);
 
 
 --
@@ -31011,6 +31163,13 @@ CREATE UNIQUE INDEX uq_ai_token_tenant_user_provider ON public.ab_ai_provider_to
 
 
 --
+-- Name: uq_announcement_reminder_auto_day; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_announcement_reminder_auto_day ON public.ab_announcement_reminder_batch USING btree (tenant_id, version_pid, local_date) WHERE ((mode)::text = 'AUTO'::text);
+
+
+--
 -- Name: uq_announcement_tenant_pid; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -31452,6 +31611,13 @@ CREATE TRIGGER ab_announcement_recipient_insert_guard BEFORE INSERT ON public.ab
 
 
 --
+-- Name: ab_announcement_reminder_batch ab_announcement_reminder_batch_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_reminder_batch_guard BEFORE DELETE OR UPDATE ON public.ab_announcement_reminder_batch FOR EACH ROW EXECUTE FUNCTION public.ab_guard_announcement_reminder_batch();
+
+
+--
 -- Name: ab_announcement_recipient_snapshot ab_announcement_sealed_audience_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -31865,6 +32031,54 @@ ALTER TABLE ONLY public.ab_announcement_recipient
 
 ALTER TABLE ONLY public.ab_announcement_release
     ADD CONSTRAINT ab_announcement_release_tenant_id_announcement_pid_version_fkey FOREIGN KEY (tenant_id, announcement_pid, version_pid) REFERENCES public.ab_announcement_version(tenant_id, announcement_pid, pid);
+
+
+--
+-- Name: ab_announcement_reminder_batch ab_announcement_reminder_batch_tenant_id_version_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_batch
+    ADD CONSTRAINT ab_announcement_reminder_batch_tenant_id_version_pid_fkey FOREIGN KEY (tenant_id, version_pid) REFERENCES public.ab_announcement_version(tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_reminder_guard ab_announcement_reminder_guar_tenant_id_version_pid_user_p_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_guard
+    ADD CONSTRAINT ab_announcement_reminder_guar_tenant_id_version_pid_user_p_fkey FOREIGN KEY (tenant_id, version_pid, user_pid) REFERENCES public.ab_announcement_recipient(tenant_id, version_pid, user_pid);
+
+
+--
+-- Name: ab_announcement_reminder_guard ab_announcement_reminder_guard_tenant_id_batch_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_guard
+    ADD CONSTRAINT ab_announcement_reminder_guard_tenant_id_batch_pid_fkey FOREIGN KEY (tenant_id, batch_pid) REFERENCES public.ab_announcement_reminder_batch(tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_reminder_plan ab_announcement_reminder_plan_tenant_id_version_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_plan
+    ADD CONSTRAINT ab_announcement_reminder_plan_tenant_id_version_pid_fkey FOREIGN KEY (tenant_id, version_pid) REFERENCES public.ab_announcement_version(tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_reminder_plan ab_announcement_reminder_plan_tenant_id_version_pid_releas_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_plan
+    ADD CONSTRAINT ab_announcement_reminder_plan_tenant_id_version_pid_releas_fkey FOREIGN KEY (tenant_id, version_pid, release_pid) REFERENCES public.ab_announcement_release(tenant_id, version_pid, pid);
+
+
+--
+-- Name: ab_announcement_reminder_preview ab_announcement_reminder_preview_tenant_id_version_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_reminder_preview
+    ADD CONSTRAINT ab_announcement_reminder_preview_tenant_id_version_pid_fkey FOREIGN KEY (tenant_id, version_pid) REFERENCES public.ab_announcement_version(tenant_id, pid);
 
 
 --

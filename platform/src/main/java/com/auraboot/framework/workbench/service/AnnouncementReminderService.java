@@ -148,7 +148,7 @@ public class AnnouncementReminderService {
         }
         if(!users.isEmpty()) outbox.enqueueIdempotent(envelope(tenant,batch,version,"",source.now()));
         var result=new LinkedHashMap<String,Object>();result.put("recordPid",source.record().getPid());result.put("versionPid",version);
-        result.put("batchPid",batch);result.put("actualCount",users.size());result.put("throttled",selection.throttled());result.put("previewCount",preview);
+        result.put("batchPid",batch);result.put("actualCount",users.size());result.put("throttled",Math.toIntExact(selection.throttled()));result.put("previewCount",preview);
         result.put("operationState",users.isEmpty() ? "skipped" : "accepted");return result;
     }
     private String scopeHash(AnnouncementManagementScope scope) {
