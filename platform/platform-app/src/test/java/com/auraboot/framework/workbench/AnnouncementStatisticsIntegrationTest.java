@@ -49,6 +49,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired com.auraboot.framework.infrastructure.storage.StorageProperties storageProperties;
     @Autowired AnnouncementStatisticsExportCommand exportCommand;
     @Autowired AnnouncementReminderService reminders;
+    @Autowired com.auraboot.framework.meta.service.impl.OutboxWorkerImpl outboxWorker;
     @Autowired com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl backgroundTasks;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
@@ -98,9 +99,10 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(accepted.get("actualCount")).isEqualTo(1);assertThat(accepted).doesNotContainKey("actorMemberPid");
         assertThat(reminders.execute(AnnouncementReminderService.SUBMIT,record,payload,operation)).isEqualTo(accepted);
         String batch=(String)accepted.get("batchPid");
-        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->{
+            outboxWorker.pollAndDispatch();applyTestMetaContext();
             assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
-                getTestTenant().getId(),batch,getTestUser().getPid())).isEqualTo("completed"));
+                getTestTenant().getId(),batch,getTestUser().getPid())).isEqualTo("completed");});
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND user_id=? AND source_type='announcement' AND source_id=?",Long.class,
             getTestTenant().getId(),getTestUser().getId(),version)).isEqualTo(2L);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=? AND user_id=? AND item_type='announcement_ack' AND source_id=?",Long.class,
@@ -128,9 +130,10 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             var detail=readers.detail(version);var mark=Map.<String,Object>of("snapshotHash",detail.get("snapshotHash"));
             readers.mark(version,mark,false);readers.mark(version,mark,true);return result;
         });
-        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->{
+            outboxWorker.pollAndDispatch();applyTestMetaContext();
             assertThat(jdbc.queryForMap("SELECT status,error_code FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=?",getTestTenant().getId(),accepted.get("batchPid")))
-                .containsEntry("status","skipped").containsEntry("error_code","ALREADY_COMPLETE"));
+                .containsEntry("status","skipped").containsEntry("error_code","ALREADY_COMPLETE");});
     }
     @Test void reminderPreviewCannotCrossRecordAndChangedOperationCannotReplay() {
         String version=publish(),record=recordOf(version);var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());

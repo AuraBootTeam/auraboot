@@ -46,18 +46,18 @@ public interface AnnouncementReminderMapper {
     Map<String,Object> previewByOwner(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("actor") Long actor,@Param("member") String member);
 
     @Select("SELECT user_pid,last_intention_at FROM ab_announcement_reminder_guard WHERE tenant_id=#{tenant} AND version_pid=#{version}")
-    List<Map<String,Object>> guards(@Param("tenant") Long tenant,@Param("version") String version);
+    List<Map<String,Object>> readGuards(@Param("tenant") Long tenant,@Param("version") String version);
 
     @Insert("""
         INSERT INTO ab_announcement_reminder_batch(tenant_id,pid,version_pid,actor_user_id,actor_member_pid,mode,local_date,target,filters,policy_hash,scope_hash,status,evaluated_at,intention_count,throttled_count,preview_count)
         VALUES(#{tenant},#{pid},#{version},#{actor},#{member},#{mode},#{day},#{target},#{filters}::jsonb,#{policy},#{scope},#{status},#{now},#{count},#{throttled},#{preview})
         """)
-    int batch(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version,@Param("actor") Long actor,@Param("member") String member,
+    int insertBatch(@Param("tenant") Long tenant,@Param("pid") String pid,@Param("version") String version,@Param("actor") Long actor,@Param("member") String member,
         @Param("mode") String mode,@Param("day") LocalDate day,@Param("target") String target,@Param("filters") String filters,@Param("policy") String policy,
         @Param("scope") String scope,@Param("status") String status,@Param("now") Instant now,@Param("count") int count,@Param("throttled") int throttled,@Param("preview") Integer preview);
 
     @Select("SELECT *,filters::text AS filter_json FROM ab_announcement_reminder_batch WHERE tenant_id=#{tenant} AND pid=#{batch}")
-    Map<String,Object> batch(@Param("tenant") Long tenant,@Param("batch") String batch);
+    Map<String,Object> findBatch(@Param("tenant") Long tenant,@Param("batch") String batch);
 
     @Select("SELECT EXISTS(SELECT 1 FROM ab_announcement_reminder_batch WHERE tenant_id=#{tenant} AND version_pid=#{version} AND mode='AUTO' AND local_date=#{day})")
     boolean scanned(@Param("tenant") Long tenant,@Param("version") String version,@Param("day") LocalDate day);
@@ -67,7 +67,7 @@ public interface AnnouncementReminderMapper {
         <foreach collection='users' item='user' separator=','>(#{tenant},#{version},#{user},#{now},#{batch})</foreach>
         ON CONFLICT(tenant_id,version_pid,user_pid) DO UPDATE SET last_intention_at=EXCLUDED.last_intention_at,batch_pid=EXCLUDED.batch_pid</script>
         """)
-    int guards(@Param("tenant") Long tenant,@Param("version") String version,@Param("users") List<String> users,@Param("now") Instant now,@Param("batch") String batch);
+    int writeGuards(@Param("tenant") Long tenant,@Param("version") String version,@Param("users") List<String> users,@Param("now") Instant now,@Param("batch") String batch);
 
     @Insert("""
         <script>INSERT INTO ab_announcement_delivery(tenant_id,batch_pid,version_pid,user_pid,channel,kind) VALUES

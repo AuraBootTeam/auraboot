@@ -59,7 +59,7 @@ public class AnnouncementReminderService {
         var raw=facts.facts(MetaContext.getCurrentTenantId(),(String)source.version().get("version_pid"));
         if(raw.size()!=((Number)source.version().get("recipient_count")).longValue()) throw new IllegalStateException("Sealed reminder recipient count changed");
         var guards=new HashMap<String,Instant>();
-        reminders.guards(MetaContext.getCurrentTenantId(),(String)source.version().get("version_pid"))
+        reminders.readGuards(MetaContext.getCurrentTenantId(),(String)source.version().get("version_pid"))
             .forEach(row->guards.put((String)row.get("user_pid"),time(row.get("last_intention_at"))));
         List<Recipient> recipients=new ArrayList<>();
         for(var row:raw) {
@@ -137,13 +137,13 @@ public class AnnouncementReminderService {
         var selection=selection(source,filters,automatic);String batch=UniqueIdGenerator.generate();
         Long tenant=MetaContext.getCurrentTenantId();
         var day=source.now().atZone(ZoneId.of((String)source.snapshot().get("timezone"))).toLocalDate();
-        if(reminders.batch(tenant,batch,version,MetaContext.getCurrentUserId(),currentMember(),automatic ? "AUTO" : "MANUAL",day,target(filters).name(),codec.encode(filters),
+        if(reminders.insertBatch(tenant,batch,version,MetaContext.getCurrentUserId(),currentMember(),automatic ? "AUTO" : "MANUAL",day,target(filters).name(),codec.encode(filters),
             codec.hash(source.frozen()),scopeHash(source.scope()),selection.eligible()>0 ? "accepted" : "skipped",source.now(),Math.toIntExact(selection.eligible()),Math.toIntExact(selection.throttled()),preview)!=1)
             throw new IllegalStateException("Reminder batch was not persisted");
         var users=selection.recipients().stream().map(Recipient::userPid).toList();
         for(int start=0;start<users.size();start+=500) {
             var chunk=users.subList(start,Math.min(users.size(),start+500));
-            if(reminders.guards(tenant,version,chunk,source.now(),batch)!=chunk.size() || reminders.intentions(tenant,batch,version,chunk)!=chunk.size())
+            if(reminders.writeGuards(tenant,version,chunk,source.now(),batch)!=chunk.size() || reminders.intentions(tenant,batch,version,chunk)!=chunk.size())
                 throw new IllegalStateException("Reminder intentions were not persisted");
         }
         if(!users.isEmpty()) outbox.enqueueIdempotent(envelope(tenant,batch,version,"",source.now()));
@@ -184,7 +184,7 @@ public class AnnouncementReminderService {
         MetaContext.runWithoutTenantFilter(()->reminders.updatePlan(((Number)plan.get("tenant_id")).longValue(),(String)plan.get("version_pid"),"blocked",error,0));
     }
     public String deliveryEligibility(Long tenant,String batch,String version,Map<String,Object> recipient) {
-        var accepted=reminders.batch(tenant,batch);
+        var accepted=reminders.findBatch(tenant,batch);
         if(accepted==null || !version.equals(accepted.get("version_pid"))) throw new SecurityException("Reminder batch binding is invalid");
         if(!"accepted".equals(accepted.get("status"))) return "BATCH_BLOCKED";
         // This is a nonthrowing denial outcome inside the receipt transaction; no protected notification is written.
@@ -204,7 +204,7 @@ public class AnnouncementReminderService {
     }
     public void expand(IntegrationEventEnvelope event) {
         String version=required(event,"versionPid"),batch=required(event,"batchPid");
-        var accepted=reminders.batch(event.tenantId(),batch);
+        var accepted=reminders.findBatch(event.tenantId(),batch);
         if(accepted==null || !version.equals(accepted.get("version_pid"))) throw new SecurityException("Reminder expansion binding is invalid");
         if(!"accepted".equals(accepted.get("status"))) return;
         String after=Objects.toString(event.payload().get("after"),"");var users=reminders.users(event.tenantId(),batch,after);
