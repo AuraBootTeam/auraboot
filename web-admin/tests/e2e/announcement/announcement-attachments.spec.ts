@@ -34,7 +34,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await successful(await page.request.post('/api/roles',{data:{code:roleCode,name:'Attachment recipient',type:'custom',status:'active',scopeType:'tenant',defaultDataScopeType:'self'}}));
     const identities=[];
     for(const kind of ['recipient','outsider']) {
-      const email=`attachment-${kind}-${suffix}@example.com`;
+      const email=`att-${kind[0]}-${suffix.replaceAll('-','').slice(0,16)}@example.com`;
       const user=await successful(await page.request.post('/api/admin/users',{data:{email,displayName:`Attachment ${kind} ${suffix.slice(0,8)}`,initialPassword:'Test2026x',roleCodes:[roleCode],sendInviteEmail:false}}));
       identities.push({email,userPid:user.userPid,name:`Attachment ${kind} ${suffix.slice(0,8)}`});
     }
@@ -43,6 +43,7 @@ test('native upload freezes retained bytes and an ordinary recipient downloads t
     await page.getByTestId('form-field-title').locator('input').fill(title);
     await page.getByTestId('form-field-content').locator('textarea').fill('<p>Attachment review text.</p><img src="/announcement-unsafe-image" onerror="window.__announcementXss=7"><script>window.__announcementXss=9</script>');
     const uploaded=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname==='/api/file/upload');
+    await expect(page.getByTestId('attachment-file-input')).toBeEnabled();
     await page.getByTestId('attachment-file-input').setInputFiles({name:fileName,mimeType:'text/plain',buffer:bytes});
     const file=await successful(await uploaded);expect(file.fileId).toEqual(expect.any(String));
     await expect(page.getByText(fileName,{exact:true})).toBeVisible();
