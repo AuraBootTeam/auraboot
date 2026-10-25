@@ -156,6 +156,7 @@ public class AnnouncementApprovalService {
                 }
                 status=asActor(row,false,()->{
                     access.manage(record.getPid(),"submit",false);access.actor("publish");
+                    if(!deliveryEnabled) invalid("delivery_disabled");
                     var frozen=codec.object(releases.version(tenant,binding.businessRef().versionPid()).get("snapshot").toString());
                     @SuppressWarnings("unchecked") var policy=policies.parseStored((Map<String,Object>)frozen.get("policy"));
                     var member=releases.actor(tenant,MetaContext.getCurrentUserId());

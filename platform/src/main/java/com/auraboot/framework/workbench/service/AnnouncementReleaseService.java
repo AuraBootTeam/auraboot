@@ -136,6 +136,7 @@ public class AnnouncementReleaseService {
                 records.audit(UniqueIdGenerator.generate(),tenant,actor,pid,version,"announcement:publication_missed",release,record.getRowVersion(),record.getRowVersion()+1);
                 fail(claim,"missed","SCHEDULE_MISSED");return;
             }
+            if(!deliveryEnabled) invalid("delivery_disabled");
             Map<String,Object> snapshot=codec.object(frozen.get("snapshot").toString());
             @SuppressWarnings("unchecked") var policy=policies.parseStored((Map<String,Object>)snapshot.get("policy"));
             if("approved".equals(frozen.get("authorization_basis"))) {
