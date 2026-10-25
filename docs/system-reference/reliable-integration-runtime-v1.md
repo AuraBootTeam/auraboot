@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-08-23
-updated: 2026-10-24
+updated: 2026-10-25
 ---
 
 # Reliable Integration Runtime v1
@@ -195,3 +195,24 @@ metadata cannot authorize these reads. Product reads retain their actual legitim
 this change does not require product models to belong to Procurement. Standalone counterexamples
 cover wrong PR ownership and invalid current definitions; assembled tenant metadata and PG
 permission acceptance still require native verification.
+
+## Transactional command replay retention
+
+`IdempotencyService.claimScopedIdempotency` keeps its existing 24-hour policy.
+`claimRetainedScopedIdempotency(key, operation, canonicalPayload, tenantId)` requests a claim
+without automatic expiry. Both require an active transaction and a trusted non-null tenant; the
+retained entry point rejects blank keys and operations. Its default interface implementation throws
+`UnsupportedOperationException`, so older providers cannot silently downgrade to finite retention.
+
+The implementation reuses the tenant/request unique fence, canonical JSON hash, transactional
+ownership and stored completion outcome in `ab_idempotency_record`. Retained rows use PostgreSQL
+`'infinity'::timestamptz` in the existing `expires_at` column and survive ordinary expiry cleanup.
+A retained claimant does not delete or upgrade existing finite claims, including expired rows.
+Use a dedicated operation namespace. Rollback leaves no committed claim; a concurrent claimant
+waits for the unique fence and observes the original committed outcome. Changed intent conflicts.
+
+A replay key is not authorization. Callers must authorize the current actor and target resource
+before returning a cached outcome, bind server-derived actor/resource context into canonical intent,
+and keep raw credentials out of keys and stored outcomes. Callers own retention and privacy policy;
+the internal expiry marker is not a business deadline. This API does not authorize carts or change
+event receipts, subscriber policy or physical inventory.
