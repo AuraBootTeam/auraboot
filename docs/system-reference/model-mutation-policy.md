@@ -111,10 +111,14 @@ this generic contract and retains complete write-path coverage gaps.
 
 Example root declaration:
 
-    "recordMutationLock": {
-      "field": "inventory_request",
-      "commands": {"create": [], "update": ["receipt:request"], "delete": []}
-    }
+```json
+{
+  "recordMutationLock": {
+    "field": "inventory_request",
+    "commands": {"create": [], "update": ["receipt:request"], "delete": []}
+  }
+}
+```
 
 Candidate round118 compiles and passes223 targeted tests without skips, including
 the explicitly bound enterprise_22/Redis13 Spring suite. Removing the parent-claim
