@@ -67,6 +67,8 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Autowired com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl backgroundTasks;
     @Autowired AnnouncementStatisticsMapper mapper;
     @Autowired AnnouncementCodec codec;
+    @Autowired AnnouncementOperationsService operations;
+    @Autowired com.auraboot.framework.workbench.mapper.AnnouncementMetricsMapper metrics;
     @Autowired UserPermissionService permissions;
     @Autowired com.auraboot.framework.tenant.service.TenantMemberService memberships;
     @Autowired com.auraboot.framework.rbac.service.UserRoleService roles;
@@ -155,6 +157,79 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             .isInstanceOf(com.auraboot.framework.exception.BusinessException.class).hasMessageContaining("tenant_default_required");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_operation WHERE tenant_id=? AND operation_id=?",
             Integer.class,getTestTenant().getId(),operation)).isZero();
+    }
+
+    @Test void operationLookupIsCommandScopedReadOnlyAndCannotPassToAReplacementMembership() throws Exception {
+        String key=UniqueIdGenerator.generate();
+        String record=(String)lifecycle.execute("announcement:create_announcement",null,Map.of("title","Operation lookup"),key,null).get("pid");
+        long audits=jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audit WHERE tenant_id=? AND announcement_pid=?",Long.class,getTestTenant().getId(),record);
+        http.perform(get("/api/announcements/operations/"+key).param("commandCode","announcement:create_announcement"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.found").value(true))
+            .andExpect(jsonPath("$.data.recordPid").value(record)).andExpect(jsonPath("$.data.operationState").value("completed"))
+            .andExpect(jsonPath("$.data.request_hash").doesNotExist()).andExpect(jsonPath("$.data.result").doesNotExist());
+        assertThat(operations.operation("announcement:update_announcement",key)).containsEntry("found",false).containsEntry("operationState","unknown");
+        try {
+            new TransactionTemplate(transactions).executeWithoutResult(state->{
+                jdbc.update("UPDATE ab_tenant_member SET deleted_flag=TRUE,status='inactive' WHERE tenant_id=? AND id=?",getTestTenant().getId(),getTestTenantMember().getId());
+                var replacement=memberships.addMember(getTestUser().getId(),getTestTenant().getId(),"active");
+                assertThat(roles.assignRolesToMember(replacement.getId(),List.of(getTestRole().getId()),getTestTenant().getId(),null)).isTrue();
+                MetaContext.setMemberId(replacement.getId());permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+                assertThat(permissions.hasPermission(getTestUser().getId(),"announcement.announcement.edit")).isTrue();
+                assertThat(operations.operation("announcement:create_announcement",key)).containsEntry("found",false);
+                state.setRollbackOnly();
+            });
+        } finally {applyTestMetaContext();permissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());}
+        assertThat(operations.operation("announcement:create_announcement",key)).containsEntry("found",true);
+        lifecycle.execute("announcement:delete_announcement",record,Map.of(),UniqueIdGenerator.generate(),1);
+        assertThat(operations.operation("announcement:create_announcement",key)).containsEntry("recordPid",record);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audit WHERE tenant_id=? AND announcement_pid=?",Long.class,getTestTenant().getId(),record)).isEqualTo(audits+1);
+    }
+
+    @Test void exactVersionChannelHistoryPagesPersistedPublicationAndReminderIntentionsWithoutSendingAgain() throws Exception {
+        String version=publish(),record=recordOf(version);Long tenant=getTestTenant().getId();
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(20)).untilAsserted(()->{
+            outboxWorker.pollAndDispatch();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=? AND kind='publication'",Integer.class,tenant,version)).isEqualTo(1);
+        });
+        try {
+            Instant base=Instant.now();
+            for(int index=0;index<25;index++) {
+                reminderClock.instant=base.plus(java.time.Duration.ofMinutes(61L*index));
+                var preview=reminders.preview(record,version,AnnouncementStatistics.Filters.all());
+                var accepted=reminders.execute(AnnouncementReminderService.SUBMIT,record,Map.of("previewToken",preview.get("previewToken")),UniqueIdGenerator.generate());
+                assertThat(accepted).containsEntry("actualCount",1);
+            }
+            var first=operations.deliveries(version,1,20);var second=operations.deliveries(version,2,20);
+            assertThat(first).containsEntry("total",26L).containsEntry("versionPid",version).containsEntry("recordPid",record);
+            assertThat((List<?>)first.get("records")).hasSize(20);assertThat((List<?>)second.get("records")).hasSize(6);
+            var unique=new java.util.HashSet<String>();
+            for(var response:List.of(first,second)) for(var row:(List<Map<String,Object>>)response.get("records")) {
+                assertThat(row).containsEntry("channel","in_app").containsKey("recipientName").doesNotContainKeys("member_pid","user_id","scope_hash");
+                assertThat(unique.add((String)row.get("pid"))).isTrue();
+            }
+            http.perform(get("/api/announcements/versions/"+version+"/deliveries").param("pageNum","2").param("pageSize","20"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.records.length()").value(6)).andExpect(jsonPath("$.data.total").value(26));
+            assertThat(operations.deliveries(version,3,20).get("records")).asList().isEmpty();
+            assertThat(metrics.publicationPending()).isGreaterThanOrEqualTo(0);assertThat(metrics.publicationFailures()).isGreaterThanOrEqualTo(0);
+            assertThat(metrics.publicationAge()).isGreaterThanOrEqualTo(0);assertThat(metrics.publicationDelay()).isGreaterThanOrEqualTo(0);
+            assertThat(metrics.approvalPending()).isGreaterThanOrEqualTo(0);assertThat(metrics.approvalFailures()).isGreaterThanOrEqualTo(0);
+            assertThat(metrics.approvalAge()).isGreaterThanOrEqualTo(0);
+            for(String event:List.of(AnnouncementReleaseService.RELEASED_EVENT,AnnouncementDeliveryConsumer.EXPAND,
+                    AnnouncementDeliveryConsumer.DELIVER,AnnouncementDeliveryConsumer.ACK,AnnouncementReminderService.EXPAND)) {
+                assertThat(metrics.projectionPending(event)).isGreaterThanOrEqualTo(0);
+                assertThat(metrics.projectionFailures(event)).isGreaterThanOrEqualTo(0);
+                assertThat(metrics.projectionAge(event)).isGreaterThanOrEqualTo(0);
+            }
+            assertThat(metrics.deliveryPending()).isGreaterThanOrEqualTo(0);assertThat(metrics.deliveryFailures()).isGreaterThanOrEqualTo(0);
+            assertThat(metrics.deliveryAge()).isGreaterThanOrEqualTo(0);assertThat(metrics.reminderFailures()).isGreaterThanOrEqualTo(0);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=?",Integer.class,tenant,version)).isEqualTo(26);
+        } finally {
+            reminderClock.instant=null;
+            int revision=jdbc.queryForObject("SELECT row_version FROM ab_announcement WHERE tenant_id=? AND pid=?",Integer.class,tenant,record);
+            lifecycle.execute("announcement:archive",record,Map.of(),UniqueIdGenerator.generate(),revision);
+        }
+        assertThat(operations.deliverySummary(version)).containsEntry("versionPid",version).containsEntry("recordPid",record);
+        assertThat(operations.deliveries(version,1,20)).containsEntry("total",26L);
     }
 
     private void removeOwnSubmitGrant() {

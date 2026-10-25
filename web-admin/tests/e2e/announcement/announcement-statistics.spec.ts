@@ -51,7 +51,7 @@ async function publishedFixture(page: Page, db: Client) {
   )).rows[0]?.status, { timeout: 20_000 }).toBe('completed');
   const actorName = (await db.query(`SELECT COALESCE(NULLIF(nick_name,''),user_name) AS name FROM ab_user WHERE pid=$1`, [actor.pid])).rows[0]?.name;
   expect(actorName).toEqual(expect.any(String));
-  return { actorName: actorName as string, pid: created.pid as string, title, tenant: actor.tenantId };
+  return { actorName: actorName as string, pid: created.pid as string, version: accepted.versionPid as string, title, tenant: actor.tenantId };
 }
 
 async function enterFromMenu(page: Page, title: string) {
@@ -93,6 +93,8 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     await expect(page.getByTestId('table-server-pagination')).toBeVisible();
     await expect(page.getByText('Page Unavailable', { exact: true })).toHaveCount(0);
     await screenshot('statistics-overview');
+    await page.getByRole('button', { name: '核对导出请求', exact: true }).click();
+    await expect(page.getByText('当前没有待核对的导出请求。', { exact: true })).toBeVisible();
     const table = page.getByTestId('table-block');
     await table.scrollIntoViewIfNeeded();
     await expect(table.getByText('无可显示部门', { exact: true })).toHaveCount(1);
@@ -111,7 +113,7 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     await table.evaluate(element => { element.scrollLeft = element.scrollWidth; });
     await expect(table.getByRole('columnheader', { name: '成员资格', exact: true })).toBeInViewport();
     await expect(table.getByRole('cell', { name: '有效', exact: true })).toHaveCount(1);
-    await expect(table.getByRole('cell', { name: '已投递', exact: true })).toHaveCount(1);
+    await expect(table.getByRole('cell', { name: '提醒已生成', exact: true })).toHaveCount(1);
     await screenshot('statistics-recipients-right');
 
     await page.getByRole('button', { name: '筛选明细', exact: true }).click();
@@ -154,6 +156,15 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     await expect(actionError).toContainText('网络连接中断，暂时无法确认操作结果。');
     await expect(actionError).not.toContainText('Failed to fetch');
     await actionError.scrollIntoViewIfNeeded(); await screenshot('export-uncertain-network');
+    const checked=response(`/operations/${firstWire.clientRequestId}`, 'GET');
+    await page.getByRole('button', { name: '核对导出请求', exact: true }).click();
+    const check=await checked;
+    expect(new URL(check.url()).searchParams.get('commandCode')).toBe('announcement:export_statistics');
+    expect(await successful(check)).toMatchObject({found:true,operationState:'accepted',exportTaskPid:firstAccepted.data.data.exportTaskPid});
+    await expect(page).toHaveURL(new RegExp(`/p/announcement_statistics_export/view/${firstAccepted.data.data.exportTaskPid}$`));
+    expect((await db.query("SELECT count(*)::int AS count FROM ab_export_task WHERE tenant_id=$1 AND request_params->'prepared'->>'reference'=$2",[fixture.tenant,clear.snapshotToken])).rows[0].count).toBe(1);
+    await page.goBack({waitUntil:'domcontentloaded'});
+    await expect(page).toHaveURL(new RegExp(`/p/announcement_statistics/view/${clear.snapshotToken}$`));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('metric-strip-item-filteredRows')).toContainText('1');
     const accepted = response('/api/meta/commands/execute/announcement:export_statistics');
@@ -201,6 +212,22 @@ test('fixed statistics and a browser CSV export survive an uncertain response an
     await expect(page.getByRole('cell', { name: fixture.actorName, exact: true })).toBeVisible();
     await page.getByRole('button', { name: '接收统计', exact: true }).click();
     await expect(page.getByTestId('metric-strip-item-actualRecipients')).toContainText('1');
+    const historyResponse=response(`/versions/${fixture.version}/delivery-summary`,'GET');
+    await page.getByRole('button', { name: '渠道记录', exact: true }).click();
+    expect(await successful(await historyResponse)).toMatchObject({recordPid:fixture.pid,versionPid:fixture.version});
+    await expect(page).toHaveURL(new RegExp(`/p/announcement_delivery_history/view/${fixture.version}$`));
+    const history=page.getByTestId('table-block');
+    await expect(history.getByRole('row')).toHaveCount(2);
+    await expect(history.getByRole('cell', {name:'站内通知',exact:true})).toBeVisible();
+    await expect(history.getByRole('cell', {name:'发布通知',exact:true})).toBeVisible();
+    await expect(history.getByRole('cell', {name:'提醒已生成',exact:true})).toBeVisible();
+    await screenshot('channel-history');
+    await page.reload({waitUntil:'domcontentloaded'});
+    await expect(history.getByRole('row')).toHaveCount(2);
+    const historyReload=response(`/versions/${fixture.version}/deliveries`,'GET');
+    await page.getByRole('button', {name:'刷新记录',exact:true}).click();
+    expect((await successful(await historyReload)).total).toBe(1);
+    expect((await db.query('SELECT count(*)::int AS count FROM ab_announcement_delivery WHERE tenant_id=$1 AND version_pid=$2',[fixture.tenant,fixture.version])).rows[0].count).toBe(1);
     await page.getByRole('button', { name: '返回公告', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/p/ab_announcement/view/${fixture.pid}$`));
     await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();

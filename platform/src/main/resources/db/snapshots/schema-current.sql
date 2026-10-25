@@ -26998,6 +26998,20 @@ CREATE INDEX idx_analytics_deleted_record_target ON public.ab_analytics_deleted_
 
 
 --
+-- Name: idx_announcement_delivery_history; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_announcement_delivery_history ON public.ab_announcement_delivery USING btree (tenant_id, version_pid, created_at DESC, batch_pid, user_pid, channel);
+
+
+--
+-- Name: idx_announcement_delivery_pending_age; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_announcement_delivery_pending_age ON public.ab_announcement_delivery USING btree (created_at) WHERE ((status)::text = 'queued'::text);
+
+
+--
 -- Name: idx_announcement_due; Type: INDEX; Schema: public; Owner: -
 --
 

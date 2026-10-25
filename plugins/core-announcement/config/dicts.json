@@ -518,8 +518,8 @@
       },
       {
         "value": "completed",
-        "label": "Delivered",
-        "label:zh-CN": "已投递",
+        "label": "Notification created",
+        "label:zh-CN": "提醒已生成",
         "sortNo": 20,
         "status": "enabled",
         "extension": {
@@ -551,6 +551,16 @@
         "label": "Not generated",
         "label:zh-CN": "未生成",
         "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "skipped",
+        "label": "Skipped",
+        "label:zh-CN": "已跳过",
+        "sortNo": 60,
         "status": "enabled",
         "extension": {
           "color": "gray"
@@ -791,6 +801,170 @@
         "label:zh-CN": "发布条件未满足，请核对后恢复",
         "sortNo": 120,
         "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_delivery_channel",
+    "name": "Notification channel",
+    "name:zh-CN": "通知渠道",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "in_app",
+        "label": "In-app",
+        "label:zh-CN": "站内通知",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "wechat_mini",
+        "label": "Mini-program",
+        "label:zh-CN": "小程序",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_delivery_kind",
+    "name": "Notification kind",
+    "name:zh-CN": "通知类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "publication",
+        "label": "Publication",
+        "label:zh-CN": "发布通知",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "reminder",
+        "label": "Reminder",
+        "label:zh-CN": "催办提醒",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_delivery_reason",
+    "name": "Reason not created",
+    "name:zh-CN": "通知未生成原因",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "VERSION_INACTIVE",
+        "label": "Version inactive",
+        "label:zh-CN": "版本已失效",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "RECIPIENT_OR_VERSION_INACTIVE",
+        "label": "Recipient or version inactive",
+        "label:zh-CN": "接收成员或版本已失效",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "BATCH_BLOCKED",
+        "label": "Reminder batch blocked",
+        "label:zh-CN": "催办批次被阻断",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "ACTOR_OR_VERSION_UNAVAILABLE",
+        "label": "Original actor or version unavailable",
+        "label:zh-CN": "原操作者或版本不可用",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "LEGACY_UNKNOWN",
+        "label": "Legacy facts unknown",
+        "label:zh-CN": "历史接收事实未知",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "MEMBERSHIP_INACTIVE",
+        "label": "Original membership inactive",
+        "label:zh-CN": "原接收成员已失效",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "ALREADY_COMPLETE",
+        "label": "No longer outstanding",
+        "label:zh-CN": "已无需催办",
+        "sortNo": 70,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "THROTTLED",
+        "label": "Within deduplication window",
+        "label:zh-CN": "处于去重窗口",
+        "sortNo": 80,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "AUTOMATIC_DEADLINE",
+        "label": "Automatic reminder deadline reached",
+        "label:zh-CN": "已到自动催办截止",
+        "sortNo": 90,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "DELIVERY_UNAVAILABLE",
+        "label": "Notification unavailable",
+        "label:zh-CN": "当前无法生成通知",
+        "sortNo": 100,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
       }
     ]
   }

@@ -2359,6 +2359,82 @@
             "primary": true
           },
           {
+            "code": "check_export_operation",
+            "label": {
+              "zh-CN": "核对导出请求",
+              "en-US": "Check export request"
+            },
+            "permissionCode": "announcement.announcement.export",
+            "permissionCodes": [
+              "announcement.announcement.stats"
+            ],
+            "variant": "secondary",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "state.peekRequestKey",
+                  "args": {
+                    "field": "statisticsExportOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "type": "if",
+                  "condition": "state.statisticsExportOperation != null",
+                  "trueNext": "lookup",
+                  "falseNext": "no_pending"
+                },
+                {
+                  "id": "no_pending",
+                  "action": "toast.show",
+                  "args": {
+                    "message": {
+                      "zh-CN": "当前没有待核对的导出请求。",
+                      "en-US": "There is no pending export request to check."
+                    }
+                  },
+                  "next": "finish"
+                },
+                {
+                  "id": "lookup",
+                  "action": "api.request",
+                  "method": "get",
+                  "endpoint": "/api/announcements/operations/${state.statisticsExportOperation}",
+                  "params": {
+                    "commandCode": "announcement:export_statistics"
+                  },
+                  "target": "exportOperationLookup"
+                },
+                {
+                  "type": "if",
+                  "condition": "state.exportOperationLookup.found === true && state.exportOperationLookup.exportTaskPid != null",
+                  "trueNext": "open_existing",
+                  "falseNext": "unknown"
+                },
+                {
+                  "id": "unknown",
+                  "action": "toast.show",
+                  "args": {
+                    "message": {
+                      "zh-CN": "尚未查到已提交结果。请保留本页原请求并稍后核对或重试，不要新建重复导出。",
+                      "en-US": "No committed result was found. Keep this request and check or retry later; do not create a duplicate export."
+                    }
+                  },
+                  "next": "finish"
+                },
+                {
+                  "id": "open_existing",
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics_export/view/${state.exportOperationLookup.exportTaskPid}"
+                  },
+                  "next": "finish"
+                }
+              ]
+            }
+          },
+          {
             "code": "preview_reminder",
             "label": {
               "zh-CN": "预览催办",
@@ -2624,6 +2700,26 @@
                   "action": "navigate",
                   "args": {
                     "path": "/p/ab_announcement/view/${record.metadata.recordPid}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "delivery_history",
+            "label": {
+              "zh-CN": "渠道记录",
+              "en-US": "Channel history"
+            },
+            "variant": "secondary",
+            "permissionCode": "announcement.announcement.stats",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_delivery_history/view/${record.metadata.versionPid}"
                   }
                 }
               ]
@@ -4537,6 +4633,217 @@
         "type": "api",
         "method": "get",
         "endpoint": "/api/announcements/versions/${$page.recordPid}/reminders/batches",
+        "params": {
+          "pageNum": 1,
+          "pageSize": 20
+        },
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_delivery_history_detail",
+    "name:zh-CN": "渠道记录",
+    "name:en": "Channel history",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/{recordPid}/delivery-summary",
+        "detailEndpoint": "/api/announcements/versions/{recordPid}/delivery-summary"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "delivery_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "固定公告版本的实时渠道记录。“提醒已生成”仅表示站内通知持久化，不表示送达设备、已读或已知悉。催办按批次单独记录，历史版本不会切换到新版；未配置的小程序渠道不会生成发送记录。",
+          "en-US": "Live channel history for one fixed version. “Notification created” means in-app persistence, not device delivery, reading or acknowledgement. Reminders have separate batches. History never switches versions; unconfigured mini-program channels generate no delivery records."
+        }
+      },
+      {
+        "id": "delivery_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "refresh_deliveries",
+            "label": {
+              "zh-CN": "刷新记录",
+              "en-US": "Refresh history"
+            },
+            "variant": "secondary",
+            "permissionCode": "announcement.announcement.stats",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "data.refresh",
+                  "args": {
+                    "dataSource": "main"
+                  }
+                },
+                {
+                  "action": "data.refresh",
+                  "args": {
+                    "dataSource": "deliveries"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "variant": "secondary",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery_rows",
+        "blockType": "table",
+        "dataSource": "deliveries",
+        "states": {
+          "403": {
+            "title": {
+              "zh-CN": "当前权限已变更，无法查看渠道记录。",
+              "en-US": "Permissions changed. Channel history is unavailable."
+            }
+          },
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍展示上次数据，请重试。",
+              "en-US": "Refresh failed. Previous data remains; retry."
+            }
+          }
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "当前范围暂无渠道记录",
+            "en-US": "No channel records in your scope"
+          },
+          "description": {
+            "zh-CN": "发布事实不代表渠道处理已完成。记录异步生成；历史或未配置渠道可能没有投递记录。",
+            "en-US": "Publication does not imply completed delivery. Records are generated asynchronously; legacy or unconfigured channels may have no records."
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "recipientName",
+              "label": {
+                "zh-CN": "接收人",
+                "en-US": "Recipient"
+              },
+              "width": 170
+            },
+            {
+              "field": "channel",
+              "label": {
+                "zh-CN": "渠道",
+                "en-US": "Channel"
+              },
+              "dictCode": "announcement_delivery_channel",
+              "width": 110
+            },
+            {
+              "field": "kind",
+              "label": {
+                "zh-CN": "通知类型",
+                "en-US": "Notification kind"
+              },
+              "dictCode": "announcement_delivery_kind",
+              "width": 120
+            },
+            {
+              "field": "status",
+              "label": {
+                "zh-CN": "持久化状态",
+                "en-US": "Persistence state"
+              },
+              "dictCode": "announcement_statistics_delivery",
+              "width": 160
+            },
+            {
+              "field": "createdAt",
+              "label": {
+                "zh-CN": "意图创建时间",
+                "en-US": "Intention created"
+              },
+              "valueType": "datetime",
+              "width": 208
+            },
+            {
+              "field": "completedAt",
+              "label": {
+                "zh-CN": "处理结束时间",
+                "en-US": "Processing finished"
+              },
+              "valueType": "datetime",
+              "width": 208
+            },
+            {
+              "field": "reasonCode",
+              "label": {
+                "zh-CN": "未生成原因",
+                "en-US": "Reason not created"
+              },
+              "dictCode": "announcement_delivery_reason",
+              "width": 210
+            }
+          ],
+          "rowKey": "pid",
+          "pagination": {
+            "mode": "server",
+            "pageField": "pageNum",
+            "pageSizeOptions": [
+              20,
+              50,
+              100
+            ]
+          }
+        },
+        "title": {
+          "zh-CN": "通知处理记录",
+          "en-US": "Notification processing history"
+        }
+      }
+    ],
+    "dataSources": {
+      "deliveries": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/${$page.recordPid}/deliveries",
         "params": {
           "pageNum": 1,
           "pageSize": 20

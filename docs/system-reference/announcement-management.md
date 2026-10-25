@@ -623,7 +623,7 @@ S4 的设计在 S1 前冻结，避免数据身份返工；实施可在 S1–S3 �
 | 撤回 | 复用 `announcement:archive`，UI名称仍为撤回 | operationId、versionPid、expectedPublicationRevision、reason | withdrawn/revision；withdraw |
 | 再发布 | 复用 republish 仅作为建立修订草稿入口，不能直接变 published | operationId、旧version、expectedLifecycleRevision | 新草稿revision，后续审批/免审另走提交；edit |
 | 删除草稿 | 复用 delete_announcement | operationId、expectedLifecycleRevision | 删除结果；delete+无历史 |
-| 操作核对 | 拟 `GET /api/announcements/operations/{operationId}` | 服务端当前actor上下文 | 仅本人或授权管理员可见 accepted/completed/failed/conflict 及引用 |
+| 操作核对 | `GET /api/announcements/operations/{operationId}?commandCode=announcement:...` | 服务端当前actor及原成员上下文，复核对应动作权限 | 本人已提交事务的accepted/completed及最小引用；未查到为unknown，不伪称failed。管理员通过记录执行视图核对，不查询他人操作身份 |
 | 阅读/确认 | 拟 `announcement:mark_read` / `announcement:acknowledge` | operationId、versionPid、versionHash | firstReadAt/acknowledgedAt/late；当前本人接收权 |
 | 附件下载 | 拟版本附件受控资源路径 | pid/versionPid/filePid | 流式文件；每次重新授权，不返回裸存储 key |
 | 预约恢复 | 拟 `announcement:retry_publication`，恢复同任务，不更改快照 | operationId、releaseAttemptId、expectedRevision | accepted/blocked；publish+记录权，超窗不得重试补发 |
@@ -1180,4 +1180,14 @@ D04/D07管理详情补充当前准确版本的发布执行状态、原计划时�
 
 `/approval-mode-options`由publish保护，使用同一当前成员/权限/政策/提供方/默认流程就绪判断，原生segmented展示两种方式及本地化不可用原因，不可用方式不可选择。未接入BPM、未配置默认流程或默认流程失效不会广告为审批就绪；缺免审权限或强制审批不会广告为免审就绪。已有审批值不自动降级为免审；通知设置无法提交失效选项，正文草稿仍可独立保存。该查询只做引导，提交命令继续完整鉴权。
 
-2e248b1c9的106项单测、32项真实集成、1条原任务恢复浏览器和15条既有浏览器回归属于上述修正之前的准确证据，见同一验收记录；不能据此声称本节新修正及BPM组合已验证。审批组合测试改为通过政策入口配置默认流程，继续覆盖默认变更不影响已受理申请和首次派发阻断后的原申请核对恢复。
+1fc8cb42b上本节默认绑定/能力查询通过111项hermetic单测及33项真实PostgreSQL/HTTP集成，无失败/跳过；原任务恢复浏览器1条与其余15条是此前2e248b1c9的准确证据，不借用为新页面验证。BPM组合与本节原生模式控件仍待配套复验。审批组合测试改为通过政策入口配置默认流程，继续覆盖默认变更不影响已受理申请和首次派发阻断后的原申请核对恢复。
+
+### 18.23 操作核对、渠道历史与监控
+
+操作账本的唯一空间是tenant+actor+commandCode+operationId，查询必须携带准确命令，不能仅凭UUID猜测动作。查询复核当前有效成员与对应动作，submit另需publish、export另需stats；仅本人原成员可核对，当前成员创建时间晚于操作则不继承旧操作。结果仅给found、命令、操作身份、受理时间、accepted/completed和记录/版本/任务引用，不回传requestHash、scope、member或原始result。事务未提交、回滚或不存在统一unknown，不能推断失败或触发新操作；accepted也不表示异步发布/导出已完成。已删除自有草稿仍能核对最小操作结果。统计页“核对导出请求”只读取本会话原UUID，未存在则解释无待核对；已受理则打开原导出任务，未知则保留请求，不分配新键或清除原意图。
+
+渠道页蓝图：现有DETAIL家族，接收统计→渠道记录→固定version；指导文案、刷新/返回公告、原生服务端分页表。`GET /api/announcements/versions/{versionPid}/delivery-summary`提供标题/版本/公告引用；同版本`/deliveries`使用20/50/100分页，准确版本与每次当前stats范围筛选，count/rows/asOf同一只读快照。名单来自不可变接收事实，按受理时间倒序，展示人名、in_app、发布/催办、queued/completed/skipped/failed/canceled及时间、稳定原因。历史已撤回/到期可授权查阅；刷新不重发，缺记录不是伪报成功，未配置小程序没有发送记录。completed统一显示“提醒已生成”，表示通知持久化，不能称设备送达或已读。内部异常一律归稳定公开原因；UI字典不回显SQL/堆栈。
+
+监控复用Micrometer及可靠outbox，不另建队列。公告固定stage标签的pending/failures/oldest_pending_age_seconds及24小时已完成发布平均延迟来自持久事实；区分发布、审批同步、通知处理、催办阻断、发布展开、分页展开、通知投影、知悉Inbox投影和催办展开。失败指标为当前故障存量，不是历史失败计数；等待审批人处理不等于同步故障。跨租户仅输出宿主聚合数，不输出租户、人员、公告或流程标识；数据源失败显示NaN，不能伪报0。可靠传输DLQ及租约复用平台既有指标。导出失败/容量测量仍在D11/D14分母内，不能凭这些新增指标宣称全部观测已完成。
+
+Core152仅新增渠道历史与待处理年龄索引，不改写公告事实。空库152迁移、独立快照drift及原任务auraboot_1的151→152增量（另含5条BPM迁移，共157条）已执行成功并validate。新增接口/原生页面/运行指标的候选验证另记，静态校验不当浏览器证明。

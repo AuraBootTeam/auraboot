@@ -23,7 +23,7 @@ import java.util.*;
 @RequiredArgsConstructor
 @Tag(name = "Announcements", description = "Tenant announcements")
 @AuthenticatedAccess(
-        "recipient listing is constrained to current tenant membership and sealed recipients")
+        "recipient routes require sealed membership; operation lookup reauthorizes the current action and original membership")
 public class AnnouncementController {
     private final AnnouncementService announcementService;
     private final com.auraboot.framework.workbench.service.AnnouncementCapabilityService capabilities;
@@ -86,6 +86,24 @@ public class AnnouncementController {
     @RequirePermission("announcement.announcement.publish")
     public ApiResponse<List<Map<String,Object>>> approvalModeOptions() {
         return ApiResponse.success(capabilities.modeOptions());
+    }
+
+    private final com.auraboot.framework.workbench.service.AnnouncementOperationsService operations;
+
+    @GetMapping("/operations/{operationId}")
+    public ApiResponse<Map<String,Object>> operation(@PathVariable String operationId,@RequestParam String commandCode) {
+        return ApiResponse.success(operations.operation(commandCode,operationId));
+    }
+    @GetMapping("/versions/{versionPid}/delivery-summary")
+    @RequirePermission("announcement.announcement.stats")
+    public ApiResponse<Map<String,Object>> deliverySummary(@PathVariable String versionPid) {
+        return ApiResponse.success(operations.deliverySummary(versionPid));
+    }
+    @GetMapping("/versions/{versionPid}/deliveries")
+    @RequirePermission("announcement.announcement.stats")
+    public ApiResponse<Map<String,Object>> deliveries(@PathVariable String versionPid,
+            @RequestParam(defaultValue="1") int pageNum,@RequestParam(defaultValue="20") int pageSize) {
+        return ApiResponse.success(operations.deliveries(versionPid,pageNum,pageSize));
     }
 
     public record AudiencePreviewRequest(String recordPid,
