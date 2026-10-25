@@ -34,7 +34,7 @@ vi.mock('~/framework/meta/hooks/useTreeData', () => ({
 
 vi.mock('~/framework/meta/rendering/pages/hooks/useDictCache', () => ({
   useDictCache: () => ({
-    getDictItems: () => [],
+    getDictItems: (code: string) => code === 'priority' ? [{ value: 'high', label: 'High' }] : [],
     getDictLabel: (_code: string, value: string) => value,
   }),
 }));
@@ -47,10 +47,6 @@ vi.mock('~/framework/meta/components/subtable/SortableSubTableRow', () => ({
   SortableSubTableRow: ({ id, children }: { id: string; children: React.ReactNode }) => (
     <tr data-testid={`sortable-row-${id}`}>{children}</tr>
   ),
-}));
-
-vi.mock('~/framework/meta/components/subtable/InlineEditableCell', () => ({
-  InlineEditableCell: () => null,
 }));
 
 vi.mock('~/framework/meta/components/subtable/SubTableSummaryRow', () => ({
@@ -545,6 +541,34 @@ describe('SubTableViewer', () => {
         params: expect.objectContaining({ sortField: 'due_date', sortOrder: 'asc' }),
       }),
     ));
+  });
+
+  it('uses typed add editors and persists their values through the existing create command', async () => {
+    fetchResultMock.mockImplementation(async (endpoint: string) => endpoint.endsWith('/field-meta')
+      ? { code: '0', data: [] } : endpoint.includes('/commands/execute/')
+        ? { code: '0', data: {} } : { code: '0', data: { records: [] } });
+    render(<SubTableViewer config={{ ...buildConfig(), readOnly: false,
+      commands: { create: 'task:create' }, columns: [
+        { field: 'title', label: 'Title', required: true },
+        { field: 'due', label: 'Due', valueType: 'date' },
+        { field: 'priority', label: 'Priority', valueType: 'tag', dictCode: 'priority' },
+        { field: 'amount', label: 'Amount', format: 'number' },
+      ] }} parentRecordPid="parent-1" isEditable />);
+    fireEvent.click(await screen.findByTestId('subtable-empty-action'));
+    fireEvent.click(screen.getByTestId('subtable-save-btn'));
+    expect(await screen.findByTestId('subtable-error-title')).toHaveTextContent('此项为必填项');
+    expect(screen.queryByTestId('inline-edit-error')).not.toBeInTheDocument();
+    expect(fetchResultMock.mock.calls.filter(([url]) => url.includes('/commands/execute/'))).toHaveLength(0);
+    expect(screen.getByTestId('subtable-add-due')).toHaveAttribute('type', 'date');
+    expect(screen.getByTestId('subtable-add-priority').tagName).toBe('SELECT');
+    expect(screen.getByTestId('subtable-add-amount')).toHaveAttribute('type', 'number');
+    for (const [field, value] of Object.entries({ title: 'Training', due: '2026-11-10', priority: 'high', amount: '0' }))
+      fireEvent.change(screen.getByTestId(`subtable-add-${field}`), { target: { value } });
+    fireEvent.click(screen.getByTestId('subtable-save-btn'));
+    await waitFor(() => expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/task:create',
+      expect.objectContaining({ params: expect.objectContaining({ payload: expect.objectContaining({
+        title: 'Training', due: '2026-11-10', priority: 'high', amount: 0, processInstanceId: 'parent-1',
+      }) }) })));
   });
 
   it('merges configured default values into create payloads with parent record templates', async () => {

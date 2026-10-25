@@ -174,8 +174,8 @@
               "id": "verification",
               "blockType": "sub-table",
               "title": {
-                "zh-CN": "交付核验结果",
-                "en": "Delivery verification results"
+                "zh-CN": "核验记录与当前有效性",
+                "en": "Verification history and current validity"
               },
               "permissionCode": "tdv.check.read",
               "subTable": {
@@ -193,8 +193,8 @@
                   {
                     "field": "tdv_ck_status",
                     "label": {
-                      "zh-CN": "状态",
-                      "en": "Status"
+                      "zh-CN": "当前有效性",
+                      "en": "Current validity"
                     },
                     "dictCode": "tdv_status",
                     "presentation": {
@@ -204,8 +204,8 @@
                   {
                     "field": "tdv_ck_passed",
                     "label": {
-                      "zh-CN": "通过项数",
-                      "en": "Passed checks"
+                      "zh-CN": "快照通过项数",
+                      "en": "Passed checks at inspection"
                     },
                     "dataType": "integer"
                   },
@@ -226,6 +226,13 @@
                   "description": {
                     "zh-CN": "执行交付核验后，这里将显示本验收单的核验结论与通过项数。",
                     "en": "Verification results and passed checks for this acceptance will appear here after verification."
+                  }
+                },
+                "dataSource": {
+                  "kind": "namedQuery",
+                  "queryCode": "tdv_acceptance_verifications",
+                  "params": {
+                    "acceptancePid": "${recordPid}"
                   }
                 }
               }

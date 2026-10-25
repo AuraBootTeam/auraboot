@@ -1,0 +1,85 @@
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+
+plugins { id 'java' }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+
+def publishedVersion = providers.gradleProperty('publicationVersion').get()
+def publicationRepository = file(providers.gradleProperty('publicationRepository').get())
+def metadataMode = providers.gradleProperty('publicationMetadata').getOrElse('module')
+if (!publicationRepository.isDirectory() || !['module', 'pom'].contains(metadataMode)) {
+    throw new GradleException('Supply an existing publicationRepository and publicationMetadata=module|pom')
+}
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                url = publicationRepository.toURI()
+                if (metadataMode == 'pom') {
+                    metadataSources { mavenPom(); ignoreGradleMetadataRedirection() }
+                }
+            }
+        }
+        filter { includeGroup 'com.auraboot' }
+    }
+    mavenCentral()
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+}
+
+def modes = ['base', 'agent', 'full', 'coreFixtures', 'agentFixtures', 'testApi']
+modes.each { mode ->
+    configurations.create(mode) {
+        canBeResolved = true
+        canBeConsumed = false
+        attributes {
+            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.JAR))
+            attribute(org.gradle.api.attributes.java.TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+        }
+    }
+}
+dependencies {
+    base "com.auraboot:auraboot-core:${publishedVersion}"
+    agent "com.auraboot:auraboot-agent:${publishedVersion}"
+    full "com.auraboot:auraboot-app:${publishedVersion}"
+    full "com.auraboot:auraboot-agent:${publishedVersion}"
+    if (metadataMode == 'module') {
+        coreFixtures(testFixtures("com.auraboot:auraboot-core:${publishedVersion}"))
+        agentFixtures(testFixtures("com.auraboot:auraboot-agent:${publishedVersion}"))
+    } else {
+        coreFixtures "com.auraboot:auraboot-core:${publishedVersion}"
+        agentFixtures "com.auraboot:auraboot-agent:${publishedVersion}"
+        coreFixtures "com.auraboot:auraboot-core:${publishedVersion}:test-fixtures"
+        agentFixtures "com.auraboot:auraboot-agent:${publishedVersion}:test-fixtures"
+    }
+    testApi "com.auraboot:auraboot-core:${publishedVersion}"
+    testApi "com.auraboot:auraboot-core:${publishedVersion}:test-api"
+    // Application consumers import the same published alignment in both metadata modes.
+    modes.each { mode ->
+        add(mode, enforcedPlatform("com.auraboot:auraboot-platform:${publishedVersion}"))
+    }
+}
+
+modes.each { mode ->
+    tasks.register("verify${mode.capitalize()}", JavaExec) {
+        dependsOn classes
+        mainClass = 'PublishedArtifactProbe'
+        classpath = sourceSets.main.output + configurations.named(mode).get()
+        args mode
+        doFirst {
+            def graph = configurations.named(mode).get().incoming.resolutionResult
+            graph.allComponents.findAll { it.id != graph.root.id }.each { component ->
+                if (component.id instanceof ProjectComponentIdentifier) {
+                    throw new GradleException("Consumer resolved a producer source project: ${component.id}")
+                }
+                if (component.moduleVersion?.group == 'com.auraboot'
+                        && component.moduleVersion.version != publishedVersion) {
+                    throw new GradleException("Consumer fell back to another version: ${component.moduleVersion}")
+                }
+            }
+        }
+    }
+}
+tasks.register('verifyPublishedArtifacts') {
+    dependsOn modes.collect { "verify${it.capitalize()}" }
+}

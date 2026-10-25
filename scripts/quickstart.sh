@@ -46,6 +46,15 @@
 
 set -euo pipefail
 
+PROJECT_DELIVERY=0
+case "${1:-}" in
+  '') ;;
+  --project-delivery) PROJECT_DELIVERY=1 ;;
+  --help|-h) printf 'Usage: bash scripts/quickstart.sh [--project-delivery]\n'; exit 0 ;;
+  *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
+esac
+[[ $# -le 1 ]] || { printf 'Only one quickstart option is supported.\n' >&2; exit 2; }
+
 BACKEND_URL="${BACKEND_URL:-http://localhost:3000}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@auraboot.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
@@ -71,6 +80,10 @@ PLUGINS=(
   showcase
   agent-control-plane
 )
+if [[ "$PROJECT_DELIVERY" == 1 ]]; then
+  # Keep the first-use journey scoped to its actual platform dependencies.
+  PLUGINS=(core-meta platform-admin page-manager org-management project-management)
+fi
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; DIM='\033[2m'; NC='\033[0m'
 say() { printf '%b\n' "$*"; }

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from '../../../../src/client/api-client.js';
 import { askAuraBotTool } from '../../../../src/mcp/tools/read/askAuraBot.js';
 import { dispatchAgentTool } from '../../../../src/mcp/tools/read/dispatchAgent.js';
@@ -15,12 +15,16 @@ import { runNamedQueryTool } from '../../../../src/mcp/tools/read/runNamedQuery.
  * tests/mcp/integration.test.ts.
  */
 
+beforeEach(() => vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })))));
+afterEach(() => vi.unstubAllGlobals());
+const session = { getBaseUrl: () => 'http://localhost:6431', getToken: () => 'unit-token' };
+
 function withGet(impl: (...args: any[]) => Promise<any>): ApiClient {
-  return { get: vi.fn(impl), post: vi.fn() } as unknown as ApiClient;
+  return { ...session, get: vi.fn(impl), post: vi.fn() } as unknown as ApiClient;
 }
 
 function withPost(impl: (...args: any[]) => Promise<any>): ApiClient {
-  return { get: vi.fn(), post: vi.fn(impl) } as unknown as ApiClient;
+  return { ...session, get: vi.fn(), post: vi.fn(impl) } as unknown as ApiClient;
 }
 
 describe('queryEntityTool', () => {
@@ -129,7 +133,7 @@ describe('dispatchAgentTool', () => {
 describe('askAuraBotTool', () => {
   it('passes question through as a single user message', async () => {
     const post = vi.fn(async () => ({ ok: true, status: 200, data: { answer: '42' } }));
-    const tool = askAuraBotTool({ get: vi.fn(), post } as unknown as ApiClient);
+    const tool = askAuraBotTool({ ...session, get: vi.fn(), post } as unknown as ApiClient);
 
     await tool.handler({ question: 'What is the meaning of life?' });
 

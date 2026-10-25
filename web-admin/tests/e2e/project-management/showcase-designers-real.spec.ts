@@ -1,5 +1,5 @@
 /** Real UI edits of reusable delivery designs; no injected designer state. */
-import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
+import { test, expect, type Page, type Locator, type APIResponse, type Response } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -36,6 +36,137 @@ async function shot(page: Page, name: string) {
   if (await toolbar.isVisible()) await toolbar.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(evidence!, `${name}.png`), fullPage: false });
 }
+
+async function showDeliveryResult(widget: Locator, page: Page, acceptanceName: string) {
+  // Follow configured pagination; retained exception cases can precede this delivery.
+  for (let visited = 0; visited < 100; visited++) {
+    await expect(widget.getByRole('cell').first()).toBeVisible();
+    const row = widget.getByRole('row').filter({ has: page.getByRole('cell', { name: acceptanceName, exact: true }) });
+    if (await row.count()) {
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText('周宁');
+      return;
+    }
+    const next = widget.getByRole('button', { name: '下一页', exact: true });
+    await expect(next).toBeEnabled();
+    const before = await widget.innerText();
+    await next.click();
+    await expect.poll(() => widget.innerText()).not.toBe(before);
+  }
+  throw new Error(`Completed delivery was not found in the configured pages: ${acceptanceName}`);
+}
+
+test('DS05 executive templates retain a finished layout after Schema edits and real exports', async ({ page }) => {
+  test.setTimeout(240000);
+  await login(page);
+  const example = (name: string) => join(root!, 'plugins/project-delivery-operations/examples', name);
+  const boardTemplate = JSON.parse(await readFile(example('delivery-executive-review.dashboard-template.json'), 'utf8'));
+  const facts = await data(await page.request.post('/api/meta/named-queries/tdo_delivery_facts/execute', { data: { parameters: {}, size: 500 } }));
+  expect(facts.records.length).toBeGreaterThan(0);
+  const completed = facts.records.find((row: any) => row.reviewer_name === '周宁' && row.acceptance_label === '已通过');
+  expect(completed, 'Complete the named delivery before reviewing its executive templates').toBeTruthy();
+  await navigateToMenuByClick(page, ['元数据管理', '仪表盘管理']);
+  await page.getByTestId('toolbar-btn-create').click();
+  await page.getByTestId('dashboard-design-import-file').setInputFiles(example('delivery-executive-review.dashboard-template.json'));
+  await page.getByRole('button', { name: '导入为新草稿', exact: true }).click();
+  const canvas = page.getByTestId('designer-canvas');
+  const chart = canvas.locator('[data-widget-id="acceptance-distribution"]');
+  await expect(chart.locator('[data-chart-ready="true"]')).toBeVisible();
+  await chart.click();
+  const panel = page.getByTestId('widget-property-panel');
+  await expect(panel.getByTestId('widget-prop-title-zh')).toHaveValue('验收状态构成');
+  await shot(page, 'DS05-dashboard-before');
+  await panel.getByTestId('widget-prop-title-zh').fill('交付验收状态 · 本次周会');
+  const legend = panel.getByTestId('schema-config-field-style.showLegend').getByRole('switch');
+  await legend.uncheck();
+  await legend.check();
+  await shot(page, 'DS05-dashboard-schema-edit');
+  const boardSaved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/dashboards' && r.request().method() === 'POST');
+  await page.getByTestId('designer-toolbar-btn-save').click();
+  const board = await data(await boardSaved);
+  await expect(page).toHaveURL(new RegExp(`/dashboard-designer/${board.pid}$`));
+  const published = page.waitForResponse(r => new URL(r.url()).pathname === `/api/dashboards/${board.pid}/publish` && r.request().method() === 'POST');
+  await page.getByTestId('toolbar-btn-publish').click();
+  await data(await published);
+  await page.reload();
+  const storedBoard = await data(await page.request.get(`/api/dashboards/${board.pid}`));
+  expect(storedBoard.widgets.map(({ id, x, y, w, h }: any) => ({ id, x, y, w, h })))
+    .toEqual(boardTemplate.dashboard.widgets.map(({ id, x, y, w, h }: any) => ({ id, x, y, w, h })));
+  const storedChart = storedBoard.widgets.find((widget: any) => widget.id === 'acceptance-distribution');
+  expect(storedChart.config.title['zh-CN'] || storedChart.config.title.zh).toBe('交付验收状态 · 本次周会');
+  expect(storedChart.config.style.showLegend).toBe(true);
+  for (const widget of storedBoard.widgets.filter((widget: any) => widget.type === 'smart-number-card')) expect(widget.config.precision).toBe(0);
+  await chart.click();
+  await expect(panel.getByTestId('widget-prop-title-zh')).toHaveValue('交付验收状态 · 本次周会');
+  await expect(chart.locator('[data-chart-ready="true"]')).toBeVisible();
+  await showDeliveryResult(canvas.locator('[data-widget-id="delivery-actions"]'), page, completed.acceptance_name);
+  await shot(page, 'DS05-dashboard-reopened');
+  await page.getByTestId('toolbar-btn-presentation').click();
+  const presentation = page.getByTestId('big-screen-mode');
+  await expect(presentation.locator('[data-widget-id="acceptance-distribution"] [data-chart-ready="true"]')).toBeVisible();
+  await expect(presentation.getByRole('img', { name: '交付验收状态 · 本次周会', exact: true })).toBeVisible();
+  await showDeliveryResult(presentation.locator('[data-widget-id="delivery-actions"]'), page, completed.acceptance_name);
+  await shot(page, 'DS05-dashboard-finished');
+  await page.keyboard.press('Escape');
+
+  const reportTemplate = JSON.parse(await readFile(example('delivery-executive-review.report-template.json'), 'utf8'));
+  await navigateToMenuByClick(page, ['元数据管理', '报表管理']);
+  await page.getByRole('button', { name: '新建报表', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByTestId('report-template-import').click();
+  await (await chooser).setFiles(example('delivery-executive-review.report-template.json'));
+  await expect(page.getByTestId('report-template-imported')).toBeVisible();
+  await page.getByTestId('drag-handle-summary').locator('..').click();
+  await expect(page.getByTestId('schema-config-field-title').getByRole('textbox')).toHaveValue('本次复盘摘要');
+  await shot(page, 'DS05-report-before');
+  await page.getByTestId('schema-config-field-title').getByRole('textbox').fill('本周交付结果与待办');
+  await page.getByRole('textbox', { name: '报表标题', exact: true }).fill('客户交付经营复盘 · 本次周会');
+  await shot(page, 'DS05-report-schema-edit');
+  const reportSaved = page.waitForResponse(r => new URL(r.url()).pathname === '/api/report-definitions' && r.request().method() === 'POST');
+  await page.getByTestId('report-designer-toolbar-btn-save').click();
+  const report = await data(await reportSaved);
+  await expect(page).toHaveURL(new RegExp(`/report-designer/${report.pid}$`));
+  await page.reload();
+  const storedReport = await data(await page.request.get(`/api/report-definitions/${report.pid}`));
+  expect(storedReport.dsl.body.find((block: any) => block.id === 'summary').title).toBe('本周交付结果与待办');
+  expect(storedReport.dsl.body.map((block: any) => block.id)).toEqual(reportTemplate.dsl.body.map((block: any) => block.id));
+  expect(storedReport.dsl.dataSources).toEqual(reportTemplate.dsl.dataSources);
+  expect(storedReport.dsl.page).toEqual(reportTemplate.dsl.page);
+  await page.getByTestId('drag-handle-summary').locator('..').click();
+  await expect(page.getByTestId('schema-config-field-title').getByRole('textbox')).toHaveValue('本周交付结果与待办');
+  await shot(page, 'DS05-report-reopened');
+  const toolbar = page.getByTestId('report-designer-toolbar');
+  await toolbar.getByRole('button', { name: '预览', exact: true }).click();
+  await expect(page.getByTestId('report-runtime-paper')).toContainText('本周交付结果与待办');
+  await expect(page.getByTestId('report-runtime-paper')).toContainText(completed.acceptance_name);
+  await expect(page.getByTestId('report-runtime-paper')).toContainText('周宁');
+  await shot(page, 'DS05-report-finished');
+  const files = [];
+  for (const [format, label, extension] of [['markdown', 'Markdown', 'md'], ['html', 'HTML', 'html'], ['pdf', 'PDF', 'pdf']] as const) {
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/reports/export/${format}` && r.request().method() === 'POST');
+    const downloading = page.waitForEvent('download');
+    await toolbar.getByRole('button', { name: `导出 ${label}`, exact: true }).click();
+    const exported = await response;
+    expect(exported.status()).toBe(200);
+    expect(exported.request().postDataJSON().reportPid).toBe(report.pid);
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(new RegExp(`\\.${extension}$`));
+    const file = join(evidence!, `DS05-executive-review.${extension}`);
+    await download.saveAs(file);
+    const bytes = await readFile(file);
+    expect(bytes.length).toBeGreaterThan(100);
+    if (format === 'pdf') expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+    const text = format === 'pdf' ? execFileSync('pdftotext', ['-layout', file, '-'], { encoding: 'utf8' }) : bytes.toString();
+    const normalized = (value: string) => value.replace(/\s+/g, '');
+    expect(normalized(text)).toContain(normalized(completed.acceptance_name));
+    expect(text).toContain('周宁');
+    expect(text).toContain('本周交付结果与待办');
+    expect(text).toContain('SLA');
+    files.push({ format, path: file, bytes: bytes.length });
+    if (format === 'pdf') execFileSync('pdftoppm', ['-png', '-r', '90', file, join(evidence!, 'DS05-report-page')]);
+  }
+  await writeFile(join(evidence!, 'DS05-finished-designs.json'), JSON.stringify({ boardPid: board.pid, reportPid: report.pid, acceptancePid: completed.acceptance_pid, acceptanceName: completed.acceptance_name, source: 'executive templates; original layout preserved; Schema controls edited through browser', files }, null, 2));
+});
 
 test('SC10 dashboard template → real donut/title edit → save/publish → reload → exported configuration', async ({
   page,

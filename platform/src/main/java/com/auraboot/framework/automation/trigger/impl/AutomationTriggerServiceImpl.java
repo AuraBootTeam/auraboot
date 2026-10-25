@@ -144,7 +144,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     @Async("eventTaskExecutor")
     public void onRecordUpdate(String modelCode, String recordPid,
                                Map<String, Object> beforeData, Map<String, Object> afterData) {
-        log.debug("Record update event: modelCode={}, recordPid={}", modelCode, recordPid);
+        log.debug("Record update event: modelCode={}", modelCode);
 
         List<Automation> automations = findAutomationsForTrigger(
                 modelCode, "on_record_update");
@@ -229,8 +229,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     @Override
     @Async("eventTaskExecutor")
     public void onStateChange(String modelCode, String recordPid, String fromState, String toState) {
-        log.debug("State change event: modelCode={}, recordPid={}, {} -> {}",
-                modelCode, recordPid, fromState, toState);
+        log.debug("State change event: modelCode={}", modelCode);
 
         List<Automation> automations = findAutomationsForTrigger(
                 modelCode, "on_state_change");
@@ -353,7 +352,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     @Transactional
     public AutomationLog executeAutomation(Automation automation, String recordPid,
                                            Map<String, Object> triggerPayload) {
-        log.info("Executing automation: pid={}, recordPid={}", automation.getPid(), recordPid);
+        log.info("Executing automation: pid={}", automation.getPid());
 
         Long tenantId = MetaContext.exists() && MetaContext.getCurrentTenantId() != null
                 ? MetaContext.getCurrentTenantId()
@@ -372,6 +371,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             establishAutomationMetaContext(automation, tenantId);
         }
         try {
+            var capabilityPreflight = automationProcessRuntimeProvider.getIfAvailable();
+            if (capabilityPreflight != null) capabilityPreflight.assertCapabilities(automation);
             Map<String, Object> executionPayload = prepareExecutionTriggerPayload(automation, triggerPayload);
 
             // Create log entry
@@ -585,8 +586,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         Semaphore semaphore = concurrencyLimits.computeIfAbsent(
                 automation.getPid(), k -> new Semaphore(MAX_CONCURRENT_PER_RULE));
         if (!semaphore.tryAcquire()) {
-            log.warn("Automation {} concurrency limit reached ({}), skipping execution for record {}",
-                    automation.getPid(), MAX_CONCURRENT_PER_RULE, recordPid);
+            log.warn("Automation {} concurrency limit reached ({}), skipping execution",
+                    automation.getPid(), MAX_CONCURRENT_PER_RULE);
             return;
         }
 
@@ -596,8 +597,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             // This catch handles infrastructure failures (e.g. DB unavailable)
             // that prevent executeAutomation from recording its own FAILED status.
             // Business-level failures are already handled inside executeAutomation().
-            log.error("Automation infrastructure failure (log status may not be recorded): pid={}, recordPid={}, error={}",
-                    automation.getPid(), recordPid, e.getMessage(), e);
+            log.error("Automation infrastructure failure (log status may not be recorded): pid={}, failureType={}",
+                    automation.getPid(), e.getClass().getSimpleName());
         } finally {
             semaphore.release();
         }

@@ -22,6 +22,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AnalyticsBusinessResultService {
     private final AnalyticsExecutionSourceService sources;
+    @org.springframework.lang.Nullable
     private final AnalyticsExecutionReadModel executionReads;
     private final DynamicDataService data;
     private final UserPermissionService permissions;
@@ -35,6 +36,11 @@ public class AnalyticsBusinessResultService {
     public Page read(String adoptionPid, int page, int pageSize) {
         if (page < 1 || page > 1000 || pageSize < 1 || pageSize > 50) {
             throw new IllegalArgumentException("Invalid business result page");
+        }
+        if (executionReads == null) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.UnsupportedFeature,
+                    "Analytics agent execution results are not installed");
         }
         var source = sources.resolveForRead(adoptionPid);
         Long tenant = MetaContext.getCurrentTenantId();

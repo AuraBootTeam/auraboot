@@ -58,13 +58,13 @@ public interface FileMapper extends BaseMapper<FileEntity> {
     /**
      * 根据创建用户ID查询文件列表
      */
-    @Select("SELECT * FROM ab_file WHERE created_by = #{userId} AND status = 'active' AND deleted_flag = false ORDER BY upload_time DESC")
+    @Select("SELECT * FROM ab_file WHERE created_by = #{userId} AND status = 'success' AND deleted_flag = false ORDER BY upload_time DESC")
     List<FileEntity> selectByCreatedBy(@Param("userId") Long userId);
 
     /**
      * 根据存储类型查询文件列表
      */
-    @Select("SELECT * FROM ab_file WHERE storage_type = #{storageType} AND status = 'active' AND deleted_flag = false")
+    @Select("SELECT * FROM ab_file WHERE storage_type = #{storageType} AND status = 'success' AND deleted_flag = false")
     List<FileEntity> selectByStorageType(@Param("storageType") String storageType);
 
     /**
@@ -76,6 +76,6 @@ public interface FileMapper extends BaseMapper<FileEntity> {
     /**
      * 根据文件扩展名查询文件列表
      */
-    @Select("SELECT * FROM ab_file WHERE file_extension = #{extension} AND status = 'active' AND deleted_flag = false")
+    @Select("SELECT * FROM ab_file WHERE file_extension = #{extension} AND status = 'success' AND deleted_flag = false")
     List<FileEntity> selectByExtension(@Param("extension") String extension);
 }

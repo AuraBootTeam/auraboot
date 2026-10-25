@@ -46,6 +46,7 @@ COPY VERSION /VERSION
 COPY scripts/ci/gradle-repositories.init.gradle /opt/aura-ci/gradle-repositories.init.gradle
 
 # Copy subproject build files for dependency resolution
+COPY platform/platform-bom/build.gradle platform-bom/build.gradle
 COPY platform/platform-app/build.gradle platform-app/build.gradle
 COPY platform/platform-agent/build.gradle platform-agent/build.gradle
 COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle
@@ -80,6 +81,7 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
 # Copy source code
 COPY platform/src ./src
 COPY platform/platform-app/src platform-app/src
+COPY platform/platform-agent/src platform-agent/src
 COPY platform/platform-plugin-api/src platform-plugin-api/src
 COPY platform/platform-storage-minio/src platform-storage-minio/src
 COPY platform/platform-storage-s3/src platform-storage-s3/src

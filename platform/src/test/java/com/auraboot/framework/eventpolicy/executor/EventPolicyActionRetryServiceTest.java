@@ -28,13 +28,13 @@ class EventPolicyActionRetryServiceTest {
             assertThat(MetaContext.getCurrentMemberId()).isEqualTo(88L);assertThat(MetaContext.getCommandPermitScope()).isNotEqualTo("ALL");return null;
         });
         MetaContext.setContext(9L,99L,"operator","operator");
-        assertThat(new EventPolicyActionRetryService(logs,executor,identities,members).retryReadyActions(1)).isEqualTo(1);
+        assertThat(new EventPolicyActionRetryService(logs,executor,identities,members, new com.auraboot.framework.event.context.ThreadContextScopes(List.of())).retryReadyActions(1)).isEqualTo(1);
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(9L);assertThat(MetaContext.getCurrentUserId()).isEqualTo(99L);
     }
     @Test void refusesReplayAfterTheOriginalMemberLosesAccess() {
         var logs=mock(DrtPolicyExecLogMapper.class);var executor=mock(PolicyExecutor.class);var identities=mock(IdentityDirectoryAccessor.class);var members=mock(TenantMemberMapper.class);
         when(logs.findReadyRetryPending(1)).thenReturn(List.of(row()));
-        assertThat(new EventPolicyActionRetryService(logs,executor,identities,members).retryReadyActions(1)).isZero();verifyNoInteractions(executor);
+        assertThat(new EventPolicyActionRetryService(logs,executor,identities,members, new com.auraboot.framework.event.context.ThreadContextScopes(List.of())).retryReadyActions(1)).isZero();verifyNoInteractions(executor);
     }
     private DrtPolicyExecLogEntity row() {
         var row=new DrtPolicyExecLogEntity();row.setTenantId(7L);row.setActionType("EXECUTE_COMMAND");row.setIdempotencyKey("owned-key");row.setPolicyCode("owned-policy");row.setActionPayload(Map.of("type","EXECUTE_COMMAND","payload",Map.of("modelCode","project","commandCode","project:update")));

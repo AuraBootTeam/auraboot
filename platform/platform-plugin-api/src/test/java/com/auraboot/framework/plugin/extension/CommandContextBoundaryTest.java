@@ -10,6 +10,16 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CommandContextBoundaryTest {
+    @Test
+    void legacyHandlersDoNotAcquireNewMandatoryHostRequirements() {
+        CommandHandlerExtension handler = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return "ordinary:command"; }
+            @Override public Object execute(CommandContext context) { return null; }
+        };
+        assertFalse(handler.requiresAiProvider("ordinary:command"));
+        assertFalse(handler.requiresKnowledgeBase("ordinary:command"));
+    }
+
     @ParameterizedTest
     @MethodSource("bridges")
     void capabilitiesComeOnlyFromTypedHostSettings(String key, String getter, Class<?> type) throws Exception {

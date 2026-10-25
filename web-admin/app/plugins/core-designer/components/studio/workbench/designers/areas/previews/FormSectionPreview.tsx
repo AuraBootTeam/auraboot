@@ -1,3 +1,5 @@
+import { StudioFormPresentationContext } from '../../../StudioFormPresentation';
+import { formGridClass, formFieldSpanClass } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 /**
  * Form Section Preview
  *
@@ -31,13 +33,15 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
   onFieldSelect,
   readonly,
 }) => {
+  const { presentation, fields: modelFields } = React.useContext(StudioFormPresentationContext);
   const { locale } = useI18n();
   const l = (zh: string, en: string) => (locale === 'zh-CN' ? zh : en);
   const fields = block.fields || [];
   const title = resolveLocalizedText(block.title, locale);
   const collapsible = block.collapsible;
   const isDetailSection = block.blockType === 'detail-section';
-  const columnsCount = (block.props as any)?.columns || 2;
+  const configuredColumns = (block as unknown as { columns?: unknown }).columns;
+  const columnsCount = typeof configuredColumns === 'number' ? configuredColumns : Number(block.layout?.columns ?? block.props?.columns) || presentation.columns;
 
   // Generate sortable IDs for fields
   const fieldIds = fields.map((fieldRef, index) => {
@@ -50,7 +54,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
        bubbling clicks to fire its onSelect handler. Field-level chip clicks
        call e.stopPropagation themselves in SortableFieldItem to avoid double
        firing. */
-    <div className="bg-white">
+    <div className="@container/form bg-white">
       {/* Section header */}
       {title && (
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
@@ -89,8 +93,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
         ) : (
           <SortableContext items={fieldIds} strategy={rectSortingStrategy}>
             <div
-              className="grid gap-4"
-              style={{ gridTemplateColumns: `repeat(${columnsCount}, 1fr)` }}
+              className={`grid ${formGridClass(columnsCount)} ${presentation.density === 'compact' ? 'gap-3' : 'gap-4'}`}
             >
               {fields.map((fieldRef, index) => {
                 const field = parseFieldShorthand(fieldRef);
@@ -102,7 +105,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
                     fieldCode={field.field || String(index)}
                     id={fieldId}
                     fieldName={
-                      resolveLocalizedText(field.label, locale) ||
+                      resolveLocalizedText(field.label ?? modelFields.find(item => item.code === field.field)?.label, locale) ||
                       field.field ||
                       l(`字段${index + 1}`, `Field ${index + 1}`)
                     }
@@ -110,7 +113,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
                     required={field.required}
                     isDetailSection={isDetailSection}
                     isSelected={selectedFieldIndex === index}
-                    span={field.span}
+                    span={Number((field as any).layout?.colSpan ?? (field as any).colSpan ?? ((field.span ?? 1) * 6))}
                     columnsCount={columnsCount}
                     disabled={readonly}
                     onSelect={() => onFieldSelect?.(block.id, index, fieldRef)}
@@ -150,7 +153,7 @@ const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
   required,
   isDetailSection,
   isSelected,
-  span = 1,
+  span = 6,
   columnsCount = 2,
   disabled,
   onSelect,
@@ -166,7 +169,7 @@ const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition: transition || 'transform 200ms ease, box-shadow 200ms ease',
-    gridColumn: `span ${Math.min(span, columnsCount)}`,
+
   };
 
   // Handle click for selection (separate from drag)
@@ -184,7 +187,7 @@ const SortableFieldItem: React.FC<SortableFieldItemProps> = ({
       onClick={handleClick}
       data-testid={`designer-field-${fieldCode}`}
       data-field-code={fieldCode}
-      className={`group/field relative transition-all duration-200 ${
+      className={`group/field relative transition-all duration-200 ${formFieldSpanClass(span, columnsCount)} ${
         !disabled ? 'cursor-pointer' : ''
       } ${isSelected ? 'rounded-lg bg-blue-50/50 ring-2 ring-blue-500' : ''} ${
         isDragging

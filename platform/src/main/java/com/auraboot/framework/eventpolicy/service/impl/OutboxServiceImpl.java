@@ -1,6 +1,7 @@
 package com.auraboot.framework.eventpolicy.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -36,6 +37,8 @@ public class OutboxServiceImpl implements OutboxService {
     private final ObjectMapper objectMapper;
     private final org.springframework.transaction.PlatformTransactionManager transactionManager;
     private final com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper tenantMembers;
+
+    private final ThreadContextScopes contextScopes;
 
     @Transactional
     @Override
@@ -96,12 +99,7 @@ public class OutboxServiceImpl implements OutboxService {
                     actor.get("userPid") instanceof String pid ? pid : null,
                     actor.get("username") instanceof String name ? name : null,
                     java.util.Set.of(), member == null ? null : member.getId(), null, null, null);
-            var previousPrincipal = com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current().orElse(null);
-            var previousEnvelope = com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current().orElse(null);
-            com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear();
-            com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear();
-            try {
-            MetaContext.runWithSnapshot(identity, () -> {
+            contextScopes.runCleared(() -> MetaContext.runWithSnapshot(identity, () -> {
                 var result = runtimeService.runAndExecute(row.getEventType(), row.getTargetType(), row.getTargetKey(), ctx);
                 var status = result.execution().overallStatus();
                 boolean failed = status == com.auraboot.framework.eventpolicy.executor.PolicyExecutionResult.OverallStatus.FAILED
@@ -110,11 +108,7 @@ public class OutboxServiceImpl implements OutboxService {
                         || result.policy().status() == com.auraboot.framework.eventpolicy.model.EventPolicyResult.Status.CONFLICT;
                 row.setStatus(failed ? "FAILED" : "PROCESSED");
                 row.setLastError(failed ? "Event policy execution requires attention" : null);
-            });
-            } finally {
-                com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.restore(previousEnvelope);
-                com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(previousPrincipal);
-            }
+            }));
             row.setProcessedAt(Instant.now());
         } catch (RuntimeException exception) {
             row.setStatus("FAILED");

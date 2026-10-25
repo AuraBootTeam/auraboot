@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 import { ResultContractView } from '../ResultContractView';
 import type { ResultContract } from '../../types/ResultContract';
@@ -27,6 +27,32 @@ const baseContract: ResultContract = {
 };
 
 describe('ResultContractView', () => {
+  it('preserves the complete business code in a result table', () => {
+    const code = 'long_' + 'business'.repeat(8);
+    render(<ResultContractView contract={{ ...baseContract, renderHint: 'table', table: [{ code }] }} />);
+    expect(screen.getByTestId('rc-table')).toHaveTextContent(code);
+  });
+
+  it('keeps protocol metadata in expandable execution details', () => {
+    render(<ResultContractView contract={{ ...baseContract, renderHint: 'summary', textSummary: 'Ready' }} />);
+    const metadata = screen.getByTestId('rc-protocol-meta');
+    expect(metadata).not.toBeVisible();
+    fireEvent.click(screen.getByText(/Execution details|执行详情/));
+    expect(metadata).toBeVisible();
+    expect(metadata).toHaveTextContent('output: structured_result');
+  });
+
+  it('keeps legacy persisted preview failures diagnostic without claiming failure or execution', () => {
+    render(<ResultContractView contract={{ ...baseContract, status: 'failed',
+      textSummary: 'AuraBot skill requires confirmation before execution.' }} />);
+    const preview = screen.getByTestId('rc-approval-preview');
+    expect(preview.querySelector('pre')).not.toBeVisible();
+    expect(screen.queryByTestId('result-contract')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Approval preview details|审批预览详情/));
+    expect(preview.querySelector('pre')).toBeVisible();
+    expect(preview).toHaveTextContent('"status": "failed"');
+  });
+
   it('renders status + skillCode + durationMs header', () => {
     render(<ResultContractView contract={baseContract} />);
     expect(screen.getByText('success')).toBeInTheDocument();
@@ -49,7 +75,7 @@ describe('ResultContractView', () => {
     expect(screen.getByText('Globex')).toBeInTheDocument();
     // Headers
     const headers = screen.getAllByRole('columnheader');
-    expect(headers.map((h: HTMLElement) => h.textContent)).toEqual(['pid', 'name', 'total']);
+    expect(headers.map((h: HTMLElement) => h.textContent)).toEqual(['记录标识', '名称', 'Total']);
   });
 
   it('renders protocol metadata for operator inspection', () => {
@@ -209,4 +235,29 @@ it('renders analytics payloads through the chart card even when the query is emp
   );
   expect(screen.getByTestId('chatbi-result-card')).toBeInTheDocument();
   expect(screen.queryByTestId('rc-card')).not.toBeInTheDocument();
+});
+
+
+describe('reference lookup presentation', () => {
+  it.each(['platform.resolve_reference', 'platform_resolve_reference'])(
+    'shows the matched business label and keeps %s protocol fields in collapsed details', (skillCode) => {
+      render(<ResultContractView contract={{...baseContract,skillCode,renderHint:'card',data:{
+        success:true,displayValue:'Huachen Manufacturing',storedValue:'01CUSTOMER',
+        modelCode:'projects',targetModel:'customers',fieldCode:'customer_id',durationMs:5,
+      }}} />);
+      expect(screen.getByTestId('reference-resolution-result')).toHaveTextContent('Huachen Manufacturing');
+      expect(screen.getByText('storedValue')).not.toBeVisible();
+      expect(screen.getByText('01CUSTOMER')).not.toBeVisible();
+      const details=screen.getByTestId('reference-resolution-details');
+      expect(details).not.toHaveAttribute('open');
+      fireEvent.click(details.querySelector('summary')!);
+      expect(details).toHaveAttribute('open');
+      expect(screen.getByText('01CUSTOMER')).toBeVisible();
+    },
+  );
+  it('does not certify an incomplete reference result or expose its internal identifier', () => {
+    render(<ResultContractView contract={{...baseContract,skillCode:'platform.resolve_reference',renderHint:'card',data:{storedValue:'01CUSTOMER'}}} />);
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.queryByText('01CUSTOMER')).not.toBeInTheDocument();
+  });
 });

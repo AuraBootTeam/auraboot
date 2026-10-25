@@ -100,14 +100,22 @@ test('SC06: live customer notes → reviewed draft → undo → manual correctio
     process.env.PW_EXPECT_LIVE_MODEL,
     'the exact configured live model is required',
   ).toBeTruthy();
-  const name = `华辰制造${Date.now().toString(36)}有限公司`;
-  const source = `今天客户会议纪要比较零散：先核对公司名称，正式客户名称是“${name}”。对接人为采购部张经理。请只整理明确的客户名称和客户联系人，不要推测其他资料。`;
+  let name: string;
+  const sourceFor = (customerName: string) => `今天客户会议纪要比较零散：先核对公司名称，正式客户名称是“${customerName}”。对接人为采购部张经理。请只整理明确的客户名称和客户联系人，不要推测其他资料。`;
   page.setDefaultTimeout(20000);
   await liveShowcaseLogin(page);
   const identity = await (await page.request.get('/api/auth/me')).json();
   expect(String(identity.code)).toBe('0');
   expect(String(identity.data.user.tenantId)).toBe(process.env.AURA_ADMIN_TENANT_ID);
   expect(identity.data.user.email).toBe(DEFAULT_TEST_ACCOUNT.email);
+
+  const existing = await page.request.get('/api/dynamic/tpm_customer/list?pageSize=1');
+  expect(existing.ok()).toBe(true);
+  const customerList = await existing.json();
+  expect(String(customerList.code)).toBe('0');
+  expect(Number.isInteger(customerList.data.total)).toBe(true);
+  name = `华辰制造 · 第${customerList.data.total + 1}事业部`;
+  const source = sourceFor(name);
 
   await navigateToMenuByClick(page, ['项目交付', 'AI整理客户资料']);
   await expect(page).toHaveURL(/\/p\/c\/tpm_customer_ai_intake$/);

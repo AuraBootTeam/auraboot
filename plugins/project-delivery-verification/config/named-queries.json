@@ -1,0 +1,45 @@
+[
+  {
+    "code": "tdv_acceptance_verifications",
+    "title:zh-CN": "验收核验记录与有效性",
+    "title:en": "Acceptance verification freshness",
+    "description": "Read-only verification snapshots; acceptance changes invalidate prior successful checks. Never rewrites stored history.",
+    "resourceCode": "tdv_check",
+    "actionCode": "read",
+    "policy": {
+      "rootAccess": {
+        "modelCode": "tpm_acceptance",
+        "pidParam": "acceptancePid",
+        "actionCode": "read"
+      }
+    },
+    "fromSql": "SELECT c.pid, c.tdv_ck_name, CASE WHEN c.tdv_ck_checked_at IS NULL THEN 'pending' WHEN c.tdv_ck_checked_at<a.updated_at THEN 'stale' ELSE c.tdv_ck_status END AS tdv_ck_status, c.tdv_ck_passed, c.tdv_ck_checked_at FROM mt_tdv_check c JOIN mt_tpm_acceptance a ON a.pid=c.tdv_ck_acceptance AND a.tenant_id=c.tenant_id WHERE c.tenant_id=#{params.tenantId} AND a.pid=#{params.acceptancePid} ORDER BY c.created_at DESC,c.id DESC",
+    "outputFields": [
+      {
+        "code": "pid",
+        "columnExpr": "pid",
+        "dataType": "string"
+      },
+      {
+        "code": "tdv_ck_name",
+        "columnExpr": "tdv_ck_name",
+        "dataType": "string"
+      },
+      {
+        "code": "tdv_ck_status",
+        "columnExpr": "tdv_ck_status",
+        "dataType": "string"
+      },
+      {
+        "code": "tdv_ck_passed",
+        "columnExpr": "tdv_ck_passed",
+        "dataType": "number"
+      },
+      {
+        "code": "tdv_ck_checked_at",
+        "columnExpr": "tdv_ck_checked_at",
+        "dataType": "string"
+      }
+    ]
+  }
+]

@@ -26,7 +26,8 @@ def pid(v):
   if v.get(k):return str(v[k])
  raise Exception('Missing record identity: '+str(v))
 existing=req('/api/dynamic/tpm_project/list','GET',headers=h)['data']['records']
-assert len(existing)==0,'Refuse to seed an already populated project fixture'
+if existing:
+ raise SystemExit('Project delivery already contains projects. Nothing was cleared or seeded. Open the existing project list; use a separate empty local evaluation instance to recreate the samples.')
 audit_config=json.loads((resources/'scripts/field-audit-config.json').read_text())
 audit_result=req('/api/audit/field-config/bulk','POST',audit_config,h)
 assert str(audit_result['code'])=='0',audit_result

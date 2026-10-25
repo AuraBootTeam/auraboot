@@ -1,3 +1,5 @@
+import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
+import { filterAgentMenus } from '~/shared/services/agent-surfaces';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { NavLink, useLocation, useRevalidator } from 'react-router';
 import { useRootLoaderData } from '~/root-data';
@@ -25,7 +27,8 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
   const tenantTheme = useTenantTheme();
   const location = useLocation();
   const rootData = useRootLoaderData();
-  const menus = rootData?.menus ?? [];
+  const { agent } = useApplicationCapabilities();
+  const menus = filterAgentMenus(rootData?.menus ?? [], agent === 'installed');
   const { t, locale } = useI18n();
   const { isRTL } = useDirection();
   const navRef = useRef<HTMLElement>(null);

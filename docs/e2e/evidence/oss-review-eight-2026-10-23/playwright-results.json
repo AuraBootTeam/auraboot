@@ -1,0 +1,641 @@
+{
+  "suites": [
+    {
+      "title": "api/setup/00-bootstrap.spec.ts",
+      "file": "api/setup/00-bootstrap.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "00-bootstrap: ensure system is initialized via /api/bootstrap/setup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 109,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:31.900Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-a6d1cee457045413b98d",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 269,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 1 \u2014 system_config row + system.initialized=true",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1385,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:32.023Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-33346083535f045d816d",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 309,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 2 \u2014 System Tenant row exists",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 236,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:33.414Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-be416222a2bd285835d3",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 329,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 3 \u2014 platform_admin role exists in System Tenant",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 140,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:33.660Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-9815fdd01ae2c9e87ed0",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 336,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 4 \u2014 admin user exists",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 145,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:33.808Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-906ccfc042c961cc66e7",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 345,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 5 \u2014 admin \u2192 System Tenant membership",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 370,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:33.956Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-3f0e364c621099a4ce4e",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 353,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 6 \u2014 admin \u2192 platform_admin role grant",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 196,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:34.336Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-c3702a70c17b67d786a8",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 363,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 7 \u2014 Business Tenant exists",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 635,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:34.540Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-716f248bed9678f02281",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 377,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 8 \u2014 Business Tenant template roles exist",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 176,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:35.184Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-b67c26a74ef3d54b573e",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 385,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 8b \u2014 tenant_admin can manage invite codes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 428,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:35.368Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-56d5d54fe8a760b42ed2",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 401,
+          "column": 1
+        },
+        {
+          "title": "00-bootstrap: invariant 9 \u2014 JWT signing key usable (login round-trip)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 620,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:35.806Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba7008bf1ae79c7623ee-1a271728e68741837404",
+          "file": "api/setup/00-bootstrap.spec.ts",
+          "line": 433,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "api/setup/01-multi-role-users.spec.ts",
+      "file": "api/setup/01-multi-role-users.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "01-multi-role-users: provision e2e-operator + e2e-viewer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 988,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:36.447Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "161362f4cd5d67d734fa-56288e44b1f492300881",
+          "file": "api/setup/01-multi-role-users.spec.ts",
+          "line": 31,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "auth.setup.ts",
+      "file": "auth.setup.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "authenticate as admin",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 522,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:37.941Z",
+                  "annotations": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-7525b0ba342817970c43",
+          "file": "auth.setup.ts",
+          "line": 141,
+          "column": 1
+        },
+        {
+          "title": "authenticate as operator",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Role authentication is explicitly disabled for this profile",
+                  "location": {
+                    "file": "<repository>/web-admin/tests/auth.setup.ts",
+                    "line": 189,
+                    "column": 9
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 78,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:38.748Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Role authentication is explicitly disabled for this profile",
+                      "location": {
+                        "file": "<repository>/web-admin/tests/auth.setup.ts",
+                        "line": 189,
+                        "column": 9
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-88b84c42d378e8dda1f9",
+          "file": "auth.setup.ts",
+          "line": 185,
+          "column": 1
+        },
+        {
+          "title": "verify e2et published fixture blocks",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Role fixtures are not part of this auth profile",
+                  "location": {
+                    "file": "<repository>/web-admin/tests/auth.setup.ts",
+                    "line": 196,
+                    "column": 9
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 78,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:38.844Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Role fixtures are not part of this auth profile",
+                      "location": {
+                        "file": "<repository>/web-admin/tests/auth.setup.ts",
+                        "line": 196,
+                        "column": 9
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-2cf2a245309a2af190e7",
+          "file": "auth.setup.ts",
+          "line": 195,
+          "column": 1
+        },
+        {
+          "title": "authenticate as viewer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Role authentication is explicitly disabled for this profile",
+                  "location": {
+                    "file": "<repository>/web-admin/tests/auth.setup.ts",
+                    "line": 235,
+                    "column": 9
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "auth",
+              "projectName": "auth",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "skipped",
+                  "duration": 97,
+                  "errors": [],
+                  "retry": 0,
+                  "startTime": "2026-10-23T13:31:38.931Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Role authentication is explicitly disabled for this profile",
+                      "location": {
+                        "file": "<repository>/web-admin/tests/auth.setup.ts",
+                        "line": 235,
+                        "column": 9
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "17e3fe6f4d9d8bd79c6b-e53e23fddf11a51daafb",
+          "file": "auth.setup.ts",
+          "line": 231,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "e2e/page-designer/upload-attachment-artifact.spec.ts",
+      "file": "e2e/page-designer/upload-attachment-artifact.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Page Designer upload attachment artifact runtime",
+          "file": "e2e/page-designer/upload-attachment-artifact.spec.ts",
+          "line": 89,
+          "column": 6,
+          "specs": [
+            {
+              "title": "SmartUpload enforces constraints, downloads uploaded bytes, and deletes the file API record",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5261,
+                      "errors": [],
+                      "retry": 0,
+                      "startTime": "2026-10-23T13:31:39.548Z",
+                      "annotations": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "231b0904eec39a7f959f-9cb72ef21ca76c0daebf",
+              "file": "e2e/page-designer/upload-attachment-artifact.spec.ts",
+              "line": 92,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-23T13:31:31.348Z",
+    "duration": 13775.738000000001,
+    "expected": 14,
+    "skipped": 3,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

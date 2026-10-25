@@ -646,6 +646,17 @@
         "$ref": "#/$defs/publicQueryContract"
       },
       "description": "Explicit external publication contracts, separate from internal model/query publication"
+    },
+    "applicationModules": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "agent"
+        ]
+      },
+      "description": "Verified backend modules required before any resource in this plugin is imported. Does not grant permissions or select the application assembly."
     }
   },
   "$defs": {
@@ -1395,7 +1406,10 @@
               "properties": {
                 "targetVersionPolicy": {
                   "type": "string",
-                  "enum": ["current_state", "unsupported"],
+                  "enum": [
+                    "current_state",
+                    "unsupported"
+                  ],
                   "description": "Trusted target-version policy; omission retains ordinary CAS behavior"
                 }
               }

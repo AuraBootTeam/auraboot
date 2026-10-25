@@ -81,6 +81,17 @@ public interface CommandHandlerExtension extends ExtensionPoint {
      */
     String getCommandType();
 
+    /** Declare mandatory AI access before the host invokes or enqueues this handler code. */
+    default boolean requiresAiProvider(String handlerCode) {
+        return false;
+    }
+
+    /** Declare mandatory knowledge access; optional/ordinary commands keep the default. */
+    default boolean requiresKnowledgeBase(String handlerCode) {
+        return false;
+    }
+
+
     /**
      * Enumerate all command types this handler can process.
      *

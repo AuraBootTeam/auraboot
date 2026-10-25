@@ -948,6 +948,21 @@
         },
         "type": "object"
       },
+      "AgentCapability": {
+        "properties": {
+          "state": {
+            "enum": [
+              "installed",
+              "not_installed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
       "AgentConversationMessageItem": {
         "properties": {
           "cardPayload": {
@@ -14053,6 +14068,32 @@
         },
         "type": "object"
       },
+      "ApiResponseQuarantineResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuarantineResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseReadReceiptSummary": {
         "properties": {
           "code": {
@@ -16320,6 +16361,24 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "ApplicationCapabilities": {
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentCapability"
+          },
+          "schemaVersion": {
+            "format": "int32",
+            "maximum": 1,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent",
+          "schemaVersion"
+        ],
         "type": "object"
       },
       "ApplicationIdentity": {
@@ -20866,6 +20925,9 @@
       },
       "ConversationMemberInfo": {
         "properties": {
+          "agentAvailable": {
+            "type": "boolean"
+          },
           "agentCode": {
             "type": "string"
           },
@@ -21012,6 +21074,9 @@
               "$ref": "#/components/schemas/LlmUsageView"
             },
             "type": "array"
+          },
+          "llmUsageAvailable": {
+            "type": "boolean"
           },
           "permissionDenials": {
             "items": {
@@ -21538,6 +21603,15 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "formGroups": {
+            "items": {
+              "$ref": "#/components/schemas/FormGroup"
+            },
+            "type": "array"
+          },
+          "formPresentation": {
+            "$ref": "#/components/schemas/FormPresentation"
           },
           "generateDetail": {
             "type": "boolean"
@@ -22290,6 +22364,9 @@
         "properties": {
           "deadLetter": {
             "$ref": "#/components/schemas/DeadLetterSummary"
+          },
+          "quarantine": {
+            "$ref": "#/components/schemas/QuarantineResult"
           },
           "receipts": {
             "items": {
@@ -28924,6 +29001,72 @@
             "type": "string"
           },
           "timeZone": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormGroup": {
+        "properties": {
+          "collapsible": {
+            "type": "boolean"
+          },
+          "defaultCollapsed": {
+            "type": "boolean"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FormPresentation": {
+        "properties": {
+          "actions": {
+            "enum": [
+              "sticky",
+              "inline",
+              "fixed"
+            ],
+            "type": "string"
+          },
+          "columns": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "density": {
+            "enum": [
+              "comfortable",
+              "compact"
+            ],
+            "type": "string"
+          },
+          "guidance": {
+            "enum": [
+              "none",
+              "aside"
+            ],
+            "type": "string"
+          },
+          "surface": {
+            "enum": [
+              "card",
+              "plain"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "enum": [
+              "comfortable",
+              "wide",
+              "full"
+            ],
             "type": "string"
           }
         },
@@ -40850,6 +40993,36 @@
         },
         "type": "object"
       },
+      "PlatformQuarantineRequest": {
+        "properties": {
+          "eventId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "expectedReplayCount": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          },
+          "tenantPid": {
+            "maxLength": 26,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "expectedReplayCount",
+          "reason",
+          "tenantPid"
+        ],
+        "type": "object"
+      },
       "PluginCompatibilityDTO": {
         "properties": {
           "compatibilityMessage": {
@@ -41180,6 +41353,12 @@
           "agentDefinitions": {
             "items": {
               "$ref": "#/components/schemas/AgentDefinitionDTO"
+            },
+            "type": "array"
+          },
+          "applicationModules": {
+            "items": {
+              "type": "string"
             },
             "type": "array"
           },
@@ -42233,6 +42412,56 @@
           "withoutWindowEntryTasks": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "QuarantineRequest": {
+        "properties": {
+          "expectedReplayCount": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedReplayCount",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "QuarantineResult": {
+        "properties": {
+          "correlationId": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordPid": {
+            "type": "string"
+          },
+          "replayCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -54737,6 +54966,36 @@
         ]
       }
     },
+    "/api/admin/infrastructure/reliable-integration/dead-letters/quarantine": {
+      "post": {
+        "operationId": "quarantine_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformQuarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseQuarantineResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "platform-reliable-integration-controller"
+        ]
+      }
+    },
     "/api/admin/infrastructure/status": {
       "get": {
         "operationId": "status_2",
@@ -55307,6 +55566,46 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseDeadLetterDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "reliable-integration-operator-controller"
+        ]
+      }
+    },
+    "/api/admin/reliable-integration/dead-letters/{eventId}/quarantine": {
+      "post": {
+        "operationId": "quarantine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseQuarantineResult"
                 }
               }
             },
@@ -60178,6 +60477,37 @@
         },
         "tags": [
           "Announcements"
+        ]
+      }
+    },
+    "/api/application/capabilities": {
+      "get": {
+        "description": "Installation facts only; does not report provider configuration, entitlement or execution permission. Responses must not be cached.",
+        "operationId": "capabilities_1",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationCapabilities"
+                }
+              }
+            },
+            "description": "Verified installation facts"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Authentication context rejected"
+          },
+          "503": {
+            "description": "Assembly not yet verified; retry later"
+          }
+        },
+        "summary": "Discover verified application composition",
+        "tags": [
+          "application-capabilities-controller"
         ]
       }
     },

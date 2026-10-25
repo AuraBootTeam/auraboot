@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="com.auraboot.framework.integration.OssReviewRegressionIT" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:32:19.317Z" hostname="Mac" time="1.998">
+  <testcase name="schedulesEnforceModelAndFieldPermissionBeforeReturningRealValues()" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.931" />
+  <testcase name="inactiveMembershipRejectsAnOtherwiseUnrevokedSignedSession()" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.207" />
+  <testcase name="batchQueryUsesRealNamedQueryOnWorkerWithCallerTenant()" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.093" />
+  <testcase name="uploadedFileIsListedAndMetadataUrlDownloadsExactBytes()" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.065" />
+  <testcase name="schedulesHonorSelfRowScopeAndExcludeAnotherMembersTask()" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.182" />
+  <testcase name="[1] batchRemoval=false" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.12" />
+  <testcase name="[2] batchRemoval=true" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.134" />
+  <testcase name="subscriptionAndDeliveryRecheckCurrentRecordAuthority()" classname="com.auraboot.framework.integration.OssReviewRegressionIT" time="0.234" />
+</testsuite>

@@ -12,7 +12,7 @@ interface Contract {
 
 // The command-side test reads this same fixture through the real entity/DTO converter.
 const contracts: Contract[] = JSON.parse(readFileSync(resolve(
-  process.cwd(), '../platform/src/test/resources/meta/page-copy-format-contract.json',
+  process.cwd(), '../platform/src/testFixtures/resources/meta/page-copy-format-contract.json',
 ), 'utf8'));
 
 describe('frontend and command page copy format contract', () => {

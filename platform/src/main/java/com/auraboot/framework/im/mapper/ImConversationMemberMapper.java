@@ -16,6 +16,23 @@ import java.util.List;
 @Mapper
 public interface ImConversationMemberMapper extends BaseMapper<ImConversationMember> {
 
+    /** Membership ownership and human identity do not require the optional agent module. */
+    @Select("""
+        SELECT m.member_type AS memberType,
+               m.member_id AS memberId,
+               CASE WHEN m.member_type = 'human' THEN m.member_id ELSE NULL END AS userId,
+               CASE WHEN m.member_type = 'human' THEN COALESCE(u.nick_name, u.user_name) ELSE NULL END AS name,
+               CASE WHEN m.member_type = 'human' THEN COALESCE(u.nick_name, u.user_name) ELSE NULL END AS displayName,
+               m.role AS role
+        FROM ab_im_conversation_member m
+        LEFT JOIN ab_user u ON u.id = m.member_id AND m.member_type = 'human'
+        WHERE m.conversation_id = #{conversationId}
+          AND m.tenant_id = #{tenantId}
+        ORDER BY m.joined_at ASC
+        """)
+    List<ConversationMemberInfo> findMembersWithInfo(@Param("conversationId") Long conversationId,
+                                                    @Param("tenantId") Long tenantId);
+
     @Select("""
         SELECT conversation_id FROM ab_im_conversation_member
         WHERE tenant_id = #{tenantId} AND member_type = #{memberType} AND member_id = #{memberId}
@@ -75,8 +92,8 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
                                                             @Param("conversationIds") List<Long> conversationIds);
 
     /**
-     * Batch variant of {@link #findHumanMemberIds} for the conversation-list endpoint: one grouped
-     * query returns the human-member count per conversation, replacing the per-conversation
+     * Total membership for the conversation-list endpoint: one tenant-scoped grouped
+     * query counts human and agent identities per conversation, replacing the per-conversation
      * findHumanMemberIds N+1.
      */
     @Select("""
@@ -84,13 +101,12 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
         SELECT conversation_id AS conversationId, COUNT(*) AS memberCount
         FROM ab_im_conversation_member
         WHERE tenant_id = #{tenantId}
-          AND member_type = 'human'
           AND conversation_id IN
           <foreach item='id' collection='conversationIds' open='(' separator=',' close=')'>#{id}</foreach>
         GROUP BY conversation_id
         </script>
         """)
-    List<ConversationMemberCountRow> countHumanMembersByConversationIds(@Param("tenantId") Long tenantId,
+    List<ConversationMemberCountRow> countMembersByConversationIds(@Param("tenantId") Long tenantId,
                                                                         @Param("conversationIds") List<Long> conversationIds);
 
     @Update("""

@@ -30,6 +30,7 @@ export interface LoaderOptions {
   dataSourceRegistry: DataSourceRegistry
   contributionRegistry: ContributionRegistry
   /** Returns true if a feature key is entitled for the current tenant/user. */
+  hasApplicationModule?: (module: string) => boolean
   hasFeature: (key: string) => boolean
 }
 
@@ -64,6 +65,17 @@ export class PluginLoader {
   setFeatureGate(hasFeature: LoaderOptions['hasFeature']): void {
     this.opts.hasFeature = hasFeature
     this.opts.contributionRegistry.setFeatureGate(hasFeature)
+  }
+
+  setApplicationModuleGate(hasModule: (module: string) => boolean): void {
+    this.opts.hasApplicationModule = hasModule
+    for (const record of this.records.values()) {
+      if (record.state === 'active' && record.definition.manifest.applicationModules?.some(module => !hasModule(module))) {
+        record.state = 'enabled'
+        record.inactiveReason = 'application module unavailable'
+        this.opts.contributionRegistry.removeByPlugin(record.definition.manifest.code)
+      }
+    }
   }
 
   /** Register a plugin definition (transition discovered → installed). */
@@ -104,6 +116,14 @@ export class PluginLoader {
         )
       if (inactiveDependency) {
         record.inactiveReason = `dependency inactive: ${inactiveDependency}`
+        continue
+      }
+
+      const missingModule = record.definition.manifest.applicationModules?.find(
+        module => !this.opts.hasApplicationModule?.(module),
+      )
+      if (missingModule) {
+        record.inactiveReason = `application module unavailable: ${missingModule}`
         continue
       }
 

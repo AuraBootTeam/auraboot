@@ -55,7 +55,18 @@ final class ReportParameterBindings {
             String field = string(binding.get("field"));
             if (field.isBlank() || !sources.containsKey(sourceKey)) throw invalid("Invalid report parameter binding: " + name);
             Map<String, Object> source = copyMap(sources.get(sourceKey));
-            if (!"model".equals(source.get("type"))) throw invalid("Report filter parameters require a model data source");
+            if ("namedQuery".equals(source.get("type"))) {
+                Set<String> reserved = Set.of("tenantId", "userId", "datasourceId", "format", "maxItems", "valueField", "labelField", "searchField", "keyword", "page", "size", "reportingCurrency");
+                if ("date-range".equals(type) || !"EQ".equals(binding.get("operator")) ||
+                        !field.matches("[a-zA-Z_][a-zA-Z0-9_]*") || reserved.contains(field))
+                    throw invalid("Invalid named query parameter binding");
+                Map<String, Object> params = copyMap(source.getOrDefault("params", Map.of()));
+                params.put(field, value);
+                source.put("params", params);
+                sources.put(sourceKey, source);
+                continue;
+            }
+            if (!"model".equals(source.get("type"))) throw invalid("Report filter parameters require a model or named query data source");
             Object existing = source.getOrDefault("filters", List.of());
             if (!(existing instanceof List<?> filters)) throw invalid("Invalid report source filters");
             List<Object> nextFilters = new ArrayList<>(filters);

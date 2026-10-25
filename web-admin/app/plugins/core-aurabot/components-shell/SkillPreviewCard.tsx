@@ -19,6 +19,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
+import { formatParamName } from '../components-internal/ConfirmCard';
+import { formatToolDisplayName } from '../components-internal/toolDisplayName';
 
 // ============================================================================
 // Types
@@ -29,6 +31,7 @@ export interface SkillPreviewCardProps {
   toolId: string;
   skillName: string;
   preview: Record<string, any>;
+  input?: Record<string, unknown>;
   previewToken: string;
   riskLevel: string;
   onConfirm: (toolId: string) => void;
@@ -86,13 +89,14 @@ export function SkillPreviewCard({
   toolId,
   skillName,
   preview,
+  input,
   previewToken: _previewToken,
   riskLevel,
   onConfirm,
   onCancel,
   disabled = false,
 }: SkillPreviewCardProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const isCritical = riskLevel.toUpperCase() === 'CRITICAL';
   const [criticalText, setCriticalText] = useState('');
 
@@ -109,7 +113,9 @@ export function SkillPreviewCard({
   const riskLabel = t(
     `aurabot.skill.risk.${riskLevel.toLowerCase()}`,
     undefined,
-    riskLevel.toUpperCase(),
+    locale.startsWith('zh')
+      ? ({ LOW: '低风险', MEDIUM: '中风险', HIGH: '高风险', CRITICAL: '极高风险' } as Record<string, string>)[riskLevel.toUpperCase()] ?? '风险未知'
+      : riskLevel.toUpperCase(),
   );
   const previewLabel = t(
     'aurabot.skill.preview.payload',
@@ -132,16 +138,16 @@ export function SkillPreviewCard({
         className={`w-full max-w-[95%] overflow-hidden rounded-xl border shadow-sm ${frameClasses(riskLevel)}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-black/5 px-3 py-2 dark:border-white/5">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 px-3 py-2 dark:border-white/5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
               {headerLabel}
             </span>
             <span
-              className="text-sm font-mono text-gray-700 dark:text-gray-300"
+              className="min-w-0 break-words text-sm font-medium text-gray-700 dark:text-gray-300"
               data-testid="skill-name"
             >
-              {skillName}
+              {formatToolDisplayName(skillName, locale.startsWith('zh'))}
             </span>
           </div>
           <span
@@ -155,15 +161,16 @@ export function SkillPreviewCard({
 
         {/* Body */}
         <div className="space-y-2 px-3 py-2">
-          <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-            {previewLabel}
-          </div>
-          <pre
-            data-testid="preview-json"
-            className="max-h-64 overflow-auto rounded-md bg-white/70 p-2 text-xs font-mono text-gray-800 dark:bg-black/30 dark:text-gray-200"
-          >
-            {previewText}
-          </pre>
+          <dl className="grid grid-cols-[minmax(4rem,0.3fr)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="skill-parameters">
+            {Object.entries(input ?? preview).map(([key, value]) => <React.Fragment key={key}>
+              <dt className="font-medium text-gray-600 dark:text-gray-300">{formatParamName(key, locale.startsWith('zh'))}</dt>
+              <dd className="min-w-0 break-words text-gray-900 [overflow-wrap:anywhere] dark:text-gray-100">{typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')}</dd>
+            </React.Fragment>)}
+          </dl>
+          <details className="text-xs text-gray-500">
+            <summary className="cursor-pointer py-1">{previewLabel}</summary>
+            <pre data-testid="preview-json" className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-white/70 p-2 text-xs dark:bg-black/30">{previewText}</pre>
+          </details>
 
           {isCritical && (
             <div className="space-y-1">

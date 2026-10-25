@@ -1,8 +1,10 @@
+import org.gradle.api.attributes.java.TargetJvmVersion
 import java.util.jar.Manifest
 import java.util.zip.ZipFile
 
 plugins {
-    id 'java'
+    id 'java-library'
+    id 'maven-publish'
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
 }
@@ -28,10 +30,37 @@ dependencyManagement {
     }
 }
 
+configurations {
+    agentRuntimeOnly {
+        canBeConsumed = false
+        canBeResolved = false
+    }
+    runtimeClasspath.extendsFrom agentRuntimeOnly
+    productionRuntimeClasspath.extendsFrom agentRuntimeOnly
+    baseRuntimeClasspath {
+        canBeConsumed = false
+        canBeResolved = true
+        extendsFrom implementation, runtimeOnly
+        attributes {
+            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.JAR))
+            attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+        }
+    }
+}
+
 dependencies {
     implementation project(':')
+    implementation project(':platform-plugin-api')
     implementation 'org.springframework.boot:spring-boot'
-    runtimeOnly project(':platform-agent')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'io.swagger.core.v3:swagger-annotations-jakarta:2.2.55'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework:spring-tx'
+    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    agentRuntimeOnly project(':platform-agent')
     runtimeOnly project(':platform-mq-kafka')
     runtimeOnly project(':platform-storage-minio')
     runtimeOnly project(':platform-storage-s3')
@@ -46,12 +75,41 @@ dependencies {
 springBoot {
     mainClass = 'com.auraboot.framework.application.PlatformApplication'
 }
+// Downstream products consume these composition classes without nesting an executable jar.
+java { withSourcesJar() }
 jar {
-    enabled = false
+    enabled = true
+    archiveClassifier = ''
+}
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'auraboot-app'
+            versionMapping {
+                usage('java-api') { fromResolutionOf('runtimeClasspath') }
+                usage('java-runtime') { fromResolutionResult() }
+            }
+        }
+    }
 }
 bootJar {
     archiveFileName = "AuraBoot-${project.version}-boot.jar"
 }
+tasks.register('bootJarBase', org.springframework.boot.gradle.tasks.bundling.BootJar) {
+    group = 'build'
+    description = 'Package the base application without the optional AI module.'
+    archiveFileName = "AuraBoot-${project.version}-base-boot.jar"
+    mainClass = 'com.auraboot.framework.application.BasePlatformApplication'
+    targetJavaVersion = tasks.named('bootJar').flatMap { it.targetJavaVersion }
+    classpath = sourceSets.main.output + configurations.baseRuntimeClasspath
+}
+tasks.register('bootJarWithAgent') {
+    group = 'build'
+    description = 'Package the default full application with the self-maintained AI module.'
+    dependsOn 'bootJar'
+}
+
 bootRun {
     // Preserve the established timezone, heap and pinned-HTTP Host-header settings.
     jvmArgs = rootProject.tasks.named('bootRun').get().jvmArgs
@@ -107,13 +165,163 @@ tasks.register('verifyApplicationAssembly') {
             if (zip.getEntry('com/auraboot/framework/application/PlatformApplication.class') != null) {
                 throw new GradleException('Application launcher leaked into core')
             }
-            // S2.1 must preserve AI; the physical extraction is deliberately S2.2.
-            if (zip.getEntry('com/auraboot/framework/agent/provider/LlmProviderFactory.class') == null) {
-                throw new GradleException('Existing AI implementation was lost during preparation')
+            if (zip.getEntry('com/auraboot/framework/agent/provider/LlmProviderFactory.class') != null) {
+                throw new GradleException('Agent implementation leaked into core')
             }
         }
     }
 }
 check {
     dependsOn 'verifyApplicationAssembly'
+}
+
+apply from: rootProject.file('gradle/platform-testing.gradle')
+apply from: rootProject.file('gradle/platform-app-test-dependencies.gradle')
+dependencies {
+    testImplementation project(':platform-agent')
+    testImplementation testFixtures(project(':'))
+    testImplementation testFixtures(project(':platform-agent'))
+    testImplementation project(':platform-plugin-api')
+}
+sourceSets {
+    integrationTest {
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+    }
+}
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+    integrationTestCompileOnly.extendsFrom testCompileOnly
+    integrationTestAnnotationProcessor.extendsFrom testAnnotationProcessor
+}
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    description = 'Run the full-composition integration tests against owned infrastructure.'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    shouldRunAfter test
+}
+
+// Check all physically owned sources and both real library artifacts, not a package sample.
+tasks.register('verifyAgentArtifactOwnership') {
+    group = 'verification'
+    dependsOn 'bootJar', ':jar', ':sourcesJar', ':platform-agent:jar', ':platform-agent:sourcesJar'
+    doLast {
+        def agentProject = project(':platform-agent')
+        def sources = agentProject.fileTree('src/main/java').matching { include '**/*.java' }.files.collect { source ->
+            def packageName = (source.text =~ /(?m)^package\s+([\w.]+);/)[0][1]
+            packageName.replace('.', '/') + '/' + source.name
+        }
+        if (sources.empty) throw new GradleException('Agent source inventory is empty')
+        def classes = sources.findAll { !it.endsWith('/package-info.java') }
+                .collect { it.replaceAll(/\.java$/, '.class') }
+        new ZipFile(agentProject.tasks.named('jar').get().archiveFile.get().asFile).withCloseable { zip ->
+            def entries = zip.entries().collect { it.name }
+            classes.each { name ->
+                if (entries.count { it == name } != 1) throw new GradleException("Agent must uniquely own ${name}")
+            }
+            ['aurabot/synonyms.yml', 'i18n/aurabot-skill_en.properties', 'i18n/aurabot-skill_zh_CN.properties',
+             'META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports'].each { name ->
+                if (entries.count { it == name } != 1) throw new GradleException("Missing agent resource: ${name}")
+            }
+        }
+        new ZipFile(agentProject.tasks.named('sourcesJar').get().archiveFile.get().asFile).withCloseable { zip ->
+            sources.each { name ->
+                if (zip.getEntry(name) == null) throw new GradleException("Missing agent source: ${name}")
+            }
+        }
+        new ZipFile(rootProject.tasks.named('sourcesJar').get().archiveFile.get().asFile).withCloseable { zip ->
+            sources.each { name ->
+                if (zip.getEntry(name) != null) throw new GradleException("Agent source leaked into core: ${name}")
+            }
+        }
+        new ZipFile(rootProject.tasks.named('jar').get().archiveFile.get().asFile).withCloseable { zip ->
+            classes.each { name ->
+                if (zip.getEntry(name) != null) throw new GradleException("Agent class leaked into core: ${name}")
+            }
+            ['MetaApplication', 'CoreOnlyApplication', 'ApplicationMode'].each { name ->
+                if (zip.getEntry("com/auraboot/framework/application/${name}.class") != null) {
+                    throw new GradleException("Application composition leaked into core: ${name}")
+                }
+            }
+        }
+        def sdkBackEdges = rootProject.configurations.runtimeClasspath.incoming.resolutionResult.allComponents
+                .collect { it.moduleVersion }.findAll { it?.group?.startsWith('io.modelcontextprotocol') }
+        if (!sdkBackEdges.empty) throw new GradleException("Agent SDK leaked into core: ${sdkBackEdges}")
+        new ZipFile(tasks.named('bootJar').get().archiveFile.get().asFile).withCloseable { zip ->
+            def libraries = zip.entries().findAll { it.name.startsWith('BOOT-INF/lib/platform-agent-') }*.name
+            if (libraries.size() != 1) throw new GradleException('Full application must contain one agent library')
+            def nestedEntries = []
+            new java.util.jar.JarInputStream(zip.getInputStream(zip.getEntry(libraries[0]))).withCloseable { nested ->
+                java.util.jar.JarEntry entry
+                while ((entry = nested.nextJarEntry) != null) nestedEntries.add(entry.name)
+            }
+            classes.each { name ->
+                if (nestedEntries.count { it == name } != 1 || zip.getEntry("BOOT-INF/classes/${name}") != null) {
+                    throw new GradleException("Full application agent ownership is invalid: ${name}")
+                }
+            }
+        }
+    }
+}
+tasks.named('verifyApplicationAssembly') { dependsOn 'verifyAgentArtifactOwnership' }
+
+// A separately resolved base graph proves omission without filtering filenames from the full jar.
+tasks.register('verifyBaseApplicationAssembly') {
+    group = 'verification'
+    dependsOn 'bootJarBase', 'verifyApplicationAssembly'
+    doLast {
+        def components = configurations.baseRuntimeClasspath.incoming.resolutionResult.allComponents
+        def forbiddenProjects = components.collect { it.id }
+                .findAll { it instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier }
+                .findAll { it.projectPath == ':platform-agent' }
+        if (!forbiddenProjects.empty) throw new GradleException("Base graph includes AI/application implementations: ${forbiddenProjects}")
+        if (components.any { it.moduleVersion?.group?.startsWith('io.modelcontextprotocol') }) {
+            throw new GradleException('Base graph contains the outbound AI MCP SDK')
+        }
+        def base = tasks.named('bootJarBase').get().archiveFile.get().asFile
+        def agent = project(':platform-agent')
+        def ownedClasses = agent.fileTree('src/main/java').matching { include '**/*.java'; exclude '**/package-info.java' }
+                .files.collect { source ->
+                    def packageName = (source.text =~ /(?m)^package\s+([\w.]+);/)[0][1]
+                    packageName.replace('.', '/') + '/' + source.name.replaceAll(/\.java$/, '.class')
+                }.toSet()
+        if (ownedClasses.empty) throw new GradleException('AI ownership inventory is empty')
+        def exclusiveResources = ['aurabot/synonyms.yml', 'i18n/aurabot-skill_en.properties',
+                                  'i18n/aurabot-skill_zh_CN.properties'].toSet()
+        new ZipFile(base).withCloseable { zip ->
+            def manifest = new Manifest(zip.getInputStream(zip.getEntry('META-INF/MANIFEST.MF')))
+            if (manifest.mainAttributes.getValue('Start-Class') != 'com.auraboot.framework.application.BasePlatformApplication') {
+                throw new GradleException('Base artifact does not use the base assembly launcher')
+            }
+            if (zip.getEntry('BOOT-INF/classes/META-INF/auraboot/agent-module.properties') != null) {
+                throw new GradleException('Agent installation descriptor leaked into base classes')
+            }
+            zip.entries().findAll { it.name.startsWith('BOOT-INF/lib/') && it.name.endsWith('.jar') }.each { entry ->
+                def nested = new java.util.zip.ZipInputStream(zip.getInputStream(entry))
+                try {
+                    for (def child = nested.nextEntry; child != null; child = nested.nextEntry) {
+                        if (child.name == 'META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports'
+                                && new String(nested.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                                        .contains('com.auraboot.autoconfigure.agent.')) {
+                            throw new GradleException("Agent auto-configuration leaked into base library ${entry.name}")
+                        }
+                        if (ownedClasses.contains(child.name) || exclusiveResources.contains(child.name)
+                                || child.name == 'META-INF/auraboot/agent-module.properties') {
+                            throw new GradleException("Agent entry ${child.name} leaked into base library ${entry.name}")
+                        }
+                    }
+                } finally { nested.close() }
+            }
+            (ownedClasses + exclusiveResources).each { name ->
+                if (zip.getEntry('BOOT-INF/classes/' + name) != null) {
+                    throw new GradleException("Agent class ${name} leaked into base classes")
+                }
+            }
+        }
+    }
+}
+check {
+    dependsOn 'verifyBaseApplicationAssembly'
 }

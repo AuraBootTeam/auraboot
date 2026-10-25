@@ -1,3 +1,4 @@
+import type { FormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 /**
  * Settings Panel Types
  *
@@ -15,6 +16,7 @@ export type SettingsCategory = 'page' | 'editor' | 'appearance' | 'export';
  * Page settings
  */
 export interface PageSettings {
+  formPresentation?: FormPresentation;
   /** Page title */
   title: string;
   /** Page description */

@@ -200,7 +200,7 @@ export default function LlmProvidersPage() {
     handleSave,
     saveReadbackPending,
     retrySaveReadback,
-  } = useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: canManagePlatform ? 'platform' : 'tenant' });
+  } = useCloudConfigs({ apiBase: '/api/llm-config', initialLevel: canManagePlatform ? 'platform' : 'tenant', enabled: canManageProviders });
 
   const { showSuccessToast, showErrorToast } = useToastContext();
 
@@ -330,7 +330,7 @@ export default function LlmProvidersPage() {
 
   if (!canManageProviders) {
     return (
-      <RouteAccessDenied message="Access denied: LLM provider settings require permission ai_center" />
+      <RouteAccessDenied title={t('application.agent.permissionTitle')} message={t('application.agent.providerPermission')} />
     );
   }
 
@@ -887,9 +887,9 @@ function EditSidePanel({
   // Field rendering order: apiKey first, then others (skip apiFormat — we render it as radio)
   const orderedFields = useMemo(() => {
     const apiKeyField = fields.find((f) => f.key === 'apiKey');
-    const others = fields.filter((f) => f.key !== 'apiKey' && f.key !== 'apiFormat');
+    const others = fields.filter((f) => f.key !== 'apiKey' && f.key !== 'apiFormat' && !(customMode && isNew && f.key === 'displayName'));
     return apiKeyField ? [apiKeyField, ...others] : others;
-  }, [fields]);
+  }, [fields, customMode, isNew]);
 
   return (
     <>

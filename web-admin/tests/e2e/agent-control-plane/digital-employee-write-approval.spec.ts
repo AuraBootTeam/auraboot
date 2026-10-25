@@ -20,6 +20,16 @@
  */
 
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { readFileSync, mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
+import { LoginPage } from '../../pages/LoginPage';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+
+const approvalFixturePath = process.env.AURA_APPROVAL_JOURNEY_FIXTURE;
+const approvalFixture = approvalFixturePath
+  ? JSON.parse(readFileSync(approvalFixturePath, 'utf8'))
+  : null;
 
 const COLLEAGUE_CODE = 'ops_xiaoao_crm_writer';
 const COLLEAGUE_NAME = '客户录入助理·小奥';
@@ -154,3 +164,271 @@ test.describe('Digital employee — write + approval through the browser UI', ()
     }
   });
 });
+
+if (approvalFixture) {
+  test.use({
+    storageState: { cookies: [], origins: [] },
+    locale: 'zh-CN',
+    viewport: { width: 1440, height: 1000 },
+  });
+  test(
+    approvalFixture.mode && approvalFixture.mode !== 'approve'
+      ? `a real model L3 write approval boundary ${approvalFixture.mode} preserves zero business writes across reload`
+      : 'a real model L3 write waits for UI approval and persists exactly once across reload',
+    async ({ page, baseURL }, info) => {
+      test.setTimeout(180_000);
+      const fixture = approvalFixture;
+      const output = process.env.AURA_AGENT_ACCEPTANCE_DIR;
+      const database = process.env.AURA_APPROVAL_DATABASE_URL;
+      expect(output, 'pin the scenario evidence directory').toBeTruthy();
+      expect(database, 'pin the isolated approval database').toBeTruthy();
+      expect(process.env.AGENT_LLM_STUB_MODE).not.toBe('true');
+      for (const identifier of [fixture.model, fixture.field])
+        expect(identifier).toMatch(/^[a-z][a-z0-9_]+$/);
+      const db = new Client({ connectionString: database });
+      await db.connect();
+      const marker = `审批验收-${randomUUID().replaceAll('-', '')}`;
+      const recordRows = async () =>
+        (
+          await db.query(
+            `SELECT pid, "${fixture.field}" AS marker FROM "mt_${fixture.model}" WHERE tenant_id=$1 AND "${fixture.field}"=$2`,
+            [fixture.tenantId, marker],
+          )
+        ).rows;
+      const approvalRows = async () =>
+        (
+          await db.query(
+            `SELECT pid, approval_status, consumed_at, expires_at, approver_id, run_id, task_id, request_data FROM ab_agent_approval WHERE tenant_id=$1 AND request_data::jsonb->>$2=$3`,
+            [fixture.tenantId, fixture.field, marker],
+          )
+        ).rows;
+      mkdirSync(output!, { recursive: true });
+      try {
+        expect(await recordRows()).toEqual([]);
+        expect(await approvalRows()).toEqual([]);
+        const login = new LoginPage(page);
+        await login.goto();
+        await login.waitForFormReady();
+        await login.emailInput.fill(DEFAULT_TEST_ACCOUNT.email);
+        await login.passwordInput.fill(DEFAULT_TEST_ACCOUNT.password);
+        await login.submitButton.click();
+        await expect(page.getByTestId('ai-panel-toggle')).toBeVisible();
+        await page
+          .getByTestId('sidebar')
+          .getByRole('link', { name: fixture.menuName, exact: true })
+          .click();
+        await expect(page.getByTestId('agent-colleagues-grid')).toBeVisible();
+        const agentCard = page.getByTestId(`agent-card-${fixture.agentCode}`);
+        await expect(agentCard).toContainText(fixture.agentName);
+        await agentCard.getByTestId(`agent-chat-${fixture.agentCode}`).click();
+        const chat = page.getByTestId('agent-chat-page');
+        await expect(chat).toBeVisible();
+        await chat
+          .getByTestId('aurabot-input')
+          .fill(
+            `请创建一条审批验收记录，名称必须精确为：${marker}。请实际调用绑定的创建工具，等待我确认后再写入。`,
+          );
+        const proposed = page.waitForResponse(
+          (r) =>
+            new URL(r.url()).pathname === '/api/ai/aurabot/chat/stream' &&
+            r.request().method() === 'POST',
+        );
+        await chat.getByTestId('aurabot-send').click();
+        const stream = await proposed;
+        expect(stream.status()).toBe(200);
+        expect(stream.request().postDataJSON().agentCode).toBe(fixture.agentCode);
+        const confirm = chat.getByTestId('aurabot-confirm-card');
+        await expect(confirm).toBeVisible({ timeout: 120_000 });
+        await expect(confirm).toContainText(marker);
+        await expect(confirm).toContainText('审批业务操作');
+        await expect(chat).toContainText('该操作需要审批');
+        await expect(confirm).not.toContainText('This tool requires');
+        await expect(confirm).not.toContainText(fixture.toolCode.replaceAll(':', '_'));
+        await expect(confirm).not.toContainText(fixture.field);
+        await expect(confirm).not.toContainText('{');
+        await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: /^\s*$/ })).toHaveCount(0);
+        const pending = await approvalRows();
+        expect(pending).toHaveLength(1);
+        expect(fixture.mode === 'expired' ? ['pending', 'expired'] : ['pending']).toContain(
+          pending[0].approval_status,
+        );
+        expect(pending[0].consumed_at).toBeNull();
+        expect(await recordRows()).toEqual([]);
+        if (fixture.mode && fixture.mode !== 'approve') {
+          const mode = fixture.mode;
+          expect(['cancel', 'expired', 'unauthorized', 'unauthorized-cancel']).toContain(mode);
+          const isCancel = mode === 'cancel' || mode === 'unauthorized-cancel';
+          const screenshot = `APPROVAL-${mode.toUpperCase()}`;
+          await page.screenshot({ path: `${output}/${screenshot}-PENDING.png`, fullPage: true });
+          const decisionResponse = page.waitForResponse(
+            (r) =>
+              new URL(r.url()).pathname === '/api/ai/aurabot/execute' &&
+              r.request().method() === 'POST',
+          );
+          await confirm
+            .getByTestId(isCancel ? 'aurabot-confirm-cancel' : 'aurabot-confirm-approve')
+            .click();
+          const decision = await decisionResponse;
+          expect(decision.status()).toBe(200);
+          const payload = decision.request().postDataJSON();
+          expect(payload).toMatchObject({
+            pendingTurnId: pending[0].pid,
+            confirmed: !isCancel,
+          });
+          const responseText = await decision.text();
+          if (mode === 'cancel') {
+            await expect
+              .poll(async () => (await approvalRows())[0].approval_status)
+              .toBe('rejected');
+            await expect(chat).toContainText('操作已取消');
+            await expect(chat.getByTestId('chat-tool-cancelled')).toHaveAttribute('role', 'status');
+            await expect(chat.getByTestId('chat-tool-cancelled')).toBeVisible();
+            const task = (
+              await db.query(
+                'SELECT task_status FROM ab_agent_task WHERE tenant_id=$1 AND pid=$2',
+                [fixture.tenantId, pending[0].task_id],
+              )
+            ).rows;
+            expect(task).toHaveLength(1);
+            expect(task[0].task_status).toBe('failed');
+          } else {
+            if (mode === 'expired') {
+              expect(responseText).toMatch(/expired|no longer pending/);
+              const expired = (
+                await db.query(
+                  'SELECT expires_at <= NOW() AS expired FROM ab_agent_approval WHERE tenant_id=$1 AND pid=$2',
+                  [fixture.tenantId, pending[0].pid],
+                )
+              ).rows;
+              expect(expired).toEqual([{ expired: true }]);
+              await expect(chat).toContainText('该审批已过期或已处理，请刷新后重新查看。');
+            } else {
+              expect(responseText).toContain('Insufficient permission to decide this approval');
+              expect(String(fixture.approverUserId)).not.toBe(String(fixture.userId));
+              await expect(chat).toContainText('你无权处理这项审批，请联系指定审批人。');
+            }
+            await expect(chat).not.toContainText(pending[0].pid);
+            await expect(chat).not.toContainText('Insufficient permission');
+          }
+          await expect(chat).not.toContainText('正在执行...');
+          await expect(chat).not.toContainText('审批通过，操作已完成。');
+          await expect(chat.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
+          const terminal = await approvalRows();
+          expect(terminal).toHaveLength(1);
+          expect(terminal[0].consumed_at).toBeNull();
+          expect(terminal[0].approval_status).not.toBe('approved');
+          if (mode.startsWith('unauthorized')) expect(terminal[0].approval_status).toBe('pending');
+          expect(await recordRows()).toEqual([]);
+          await page.screenshot({ path: `${output}/${screenshot}.png`, fullPage: true });
+          await page.reload();
+          const restored = page.getByTestId('agent-chat-page');
+          await expect(restored).toContainText(marker);
+          await expect(restored.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
+          expect(await recordRows()).toEqual([]);
+          await page.screenshot({ path: `${output}/${screenshot}-RELOADED.png`, fullPage: true });
+          const replay = await page.request.post('/api/ai/aurabot/execute', {
+            headers: { Origin: baseURL! },
+            data: { ...payload, confirmed: true },
+          });
+          expect(await replay.text()).toMatch(
+            mode.startsWith('unauthorized')
+              ? /Insufficient permission/
+              : /expired|no longer pending/,
+          );
+          expect(await recordRows()).toEqual([]);
+          await info.attach('approval-boundary-identities', {
+            body: JSON.stringify({
+              mode,
+              marker,
+              pending,
+              terminal,
+              payload,
+              replayStatus: replay.status(),
+            }),
+            contentType: 'application/json',
+          });
+          return;
+        }
+        const initialUrl = page.url();
+        await page.screenshot({ path: `${output}/APPROVAL-PENDING.png`, fullPage: true });
+        const execution = page.waitForResponse(
+          (r) =>
+            new URL(r.url()).pathname === '/api/ai/aurabot/execute' &&
+            r.request().method() === 'POST',
+        );
+        await confirm.getByTestId('aurabot-confirm-approve').click();
+        const executed = await execution;
+        expect(executed.status()).toBe(200);
+        expect(executed.request().postDataJSON()).toMatchObject({
+          pendingTurnId: pending[0].pid,
+          confirmed: true,
+        });
+        await expect.poll(recordRows, { timeout: 30_000 }).toHaveLength(1);
+        await expect(confirm.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
+        await expect(chat).toContainText('审批通过，操作已完成。');
+        await expect(chat).not.toContainText('正在执行...');
+        const approved = await approvalRows();
+        expect(approved).toHaveLength(1);
+        expect(approved[0].approval_status).toBe('approved');
+        expect(approved[0].consumed_at).not.toBeNull();
+        const conversationId = await page.evaluate(() =>
+          localStorage.getItem('aurabot.lastConversationId'),
+        );
+        expect(conversationId).toMatch(/^\d+$/);
+        const outboundRows = async () =>
+          (
+            await db.query(
+              "SELECT id,sender_id,content FROM ab_im_message WHERE tenant_id=$1 AND conversation_id=$2 AND sender_type='agent' AND content='Approved tool executed.'",
+              [fixture.tenantId, conversationId],
+            )
+          ).rows;
+        await expect.poll(outboundRows, { timeout: 15_000 }).toHaveLength(1);
+        const outbound = await outboundRows();
+        const expectedAgent = (
+          await db.query('SELECT id FROM ab_agent_definition WHERE tenant_id=$1 AND pid=$2', [
+            fixture.tenantId,
+            fixture.agentPid,
+          ])
+        ).rows;
+        expect(expectedAgent).toHaveLength(1);
+        expect(String(outbound[0].sender_id)).toBe(String(expectedAgent[0].id));
+        const persisted = await recordRows();
+        expect(persisted[0].marker).toBe(marker);
+        await page.screenshot({ path: `${output}/APPROVAL-COMPLETED.png`, fullPage: true });
+        await page.reload();
+        await expect(page.getByTestId('agent-chat-page')).toBeVisible();
+        expect(page.url()).toBe(initialUrl);
+        await expect(page.getByTestId('agent-chat-page')).toContainText(marker);
+        await expect(
+          page.getByTestId('agent-chat-page').getByTestId('chat-msg-agent'),
+        ).toContainText('审批通过，操作已完成。');
+        await expect(page.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
+        expect(await recordRows()).toEqual(persisted);
+        await page.screenshot({ path: `${output}/APPROVAL-RELOADED.png`, fullPage: true });
+        // Replay the captured UI action only as a negative probe; it must not create a second record.
+        const repeated = await page.request.post('/api/ai/aurabot/execute', {
+          headers: { Origin: baseURL! },
+          data: executed.request().postDataJSON(),
+        });
+        const repeatedBody = await repeated.text();
+        expect(repeatedBody).toContain('no longer pending');
+        expect(await recordRows()).toEqual(persisted);
+        await info.attach('approval-journey-identities', {
+          body: JSON.stringify({
+            marker,
+            conversationId,
+            outbound,
+            pending,
+            approved,
+            persisted,
+            chatUrl: initialUrl,
+            repeatedStatus: repeated.status(),
+          }),
+          contentType: 'application/json',
+        });
+      } finally {
+        await db.end();
+      }
+    },
+  );
+}

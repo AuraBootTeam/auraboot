@@ -170,7 +170,9 @@ export default defineConfig({
     // without tripping CORS errors on HEAD/GET requests.
     cors: true,
     fs: {
-      allow: ['..', coreWebAdminRoot, ...contributionRoots],
+      allow: ['..', coreWebAdminRoot, ...contributionRoots,
+        ...(process.env.AURA_WEB_COMPOSITION_ROOT ? [path.resolve(process.env.AURA_WEB_COMPOSITION_ROOT)] : []),
+      ],
     },
     watch: {
       // NOTE: do NOT use bare `**/plugins/**` — that pattern also matches
@@ -198,6 +200,12 @@ export default defineConfig({
       ],
     },
     proxy: {
+      // IM authenticates its own upgrade request; the HTTP BFF has no WS tunnel.
+      '^/api/im/ws(?:\\?|$)': {
+        target: apiDocsProxyTarget,
+        ws: true,
+        changeOrigin: true,
+      },
       '^/(swagger-ui(?:/|$)|v3/api-docs(?:/|$))': {
         target: apiDocsProxyTarget,
         changeOrigin: true,

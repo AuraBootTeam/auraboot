@@ -1,6 +1,9 @@
 package com.auraboot.framework.meta.service.impl;
 
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.meta.service.impl.CriticalPathService.CriticalPathResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,13 +26,17 @@ import static org.mockito.Mockito.when;
 class CriticalPathServiceTest {
 
     @Mock
-    private DynamicDataMapper dynamicDataMapper;
+    private DynamicDataService dynamicDataService;
+    @Mock private PermissionFacade permissionFacade;
 
     private CriticalPathService service;
 
     @BeforeEach
     void setUp() {
-        service = new CriticalPathService(dynamicDataMapper);
+        service = new CriticalPathService(dynamicDataService, permissionFacade);
+        org.mockito.Mockito.lenient().when(permissionFacade.canAction(any(), anyString(), eq("read"))).thenReturn(true);
+        org.mockito.Mockito.lenient().when(permissionFacade.getFieldPermissions(any(), anyString()))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("project_id", "duration_days", "dependencies", "pm_wbs_project_id", "pm_wbs_duration_days", "pm_wbs_dependencies")));
     }
 
     private Map<String, Object> node(String id, int duration, String deps) {
@@ -43,8 +50,8 @@ class CriticalPathServiceTest {
     @Test
     @DisplayName("Empty project returns empty result")
     void emptyProject() {
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(Collections.emptyList());
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.empty(1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertNotNull(result);
@@ -56,8 +63,8 @@ class CriticalPathServiceTest {
     @Test
     @DisplayName("Single task is always critical path")
     void singleTask() {
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(List.of(node("A", 5, null)));
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.of(List.of(node("A", 5, null)), 1L, 1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertEquals(5, result.totalDuration());
@@ -74,8 +81,8 @@ class CriticalPathServiceTest {
                 node("B", 2, "A"),
                 node("C", 4, "B")
         );
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(nodes);
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.of(nodes, (long) nodes.size(), 1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertEquals(9, result.totalDuration()); // 3+2+4
@@ -100,8 +107,8 @@ class CriticalPathServiceTest {
                 node("C", 3, "A"),
                 node("D", 1, "B,C")
         );
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(nodes);
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.of(nodes, (long) nodes.size(), 1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertEquals(8, result.totalDuration());
@@ -122,8 +129,8 @@ class CriticalPathServiceTest {
                 node("A", 5, null),
                 node("B", 5, null)
         );
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(nodes);
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.of(nodes, (long) nodes.size(), 1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertEquals(5, result.totalDuration());
@@ -140,8 +147,8 @@ class CriticalPathServiceTest {
                 node("B", 3, "A"),
                 node("C", 1, "B")
         );
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(nodes);
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.of(nodes, (long) nodes.size(), 1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertNotNull(result.error());
@@ -156,8 +163,8 @@ class CriticalPathServiceTest {
                 node("A", 3, null),
                 node("B", 2, "X,A")
         );
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(nodes);
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.of(nodes, (long) nodes.size(), 1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertNull(result.error());
@@ -171,8 +178,8 @@ class CriticalPathServiceTest {
                 node("A", 3, null),
                 node("B", 2, "A")
         );
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(nodes);
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.of(nodes, (long) nodes.size(), 1, 500));
 
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
 
@@ -189,12 +196,11 @@ class CriticalPathServiceTest {
     @Test
     @DisplayName("Null nodes list returns empty result")
     void nullNodes() {
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
+        when(dynamicDataService.list(anyString(), any()))
                 .thenReturn(null);
 
-        CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
-        assertNotNull(result);
-        assertTrue(result.criticalPathNodeIds().isEmpty());
+        assertThrows(NullPointerException.class, () -> service.compute(
+                "test_table", "project_id", "p1", "duration_days", "dependencies"));
     }
 
     @Test
@@ -207,16 +213,33 @@ class CriticalPathServiceTest {
                 service.compute("mt_pm_wbs_node", "1=1 OR pm_wbs_project_id", "p1",
                         "pm_wbs_duration_days", "pm_wbs_dependencies"));
         assertTrue(ex.getMessage().contains("Invalid SQL identifier"));
-        verifyNoInteractions(dynamicDataMapper);
+        verifyNoInteractions(dynamicDataService);
     }
 
     @Test
     @DisplayName("SEC-20260723-03: legitimate snake_case field identifiers pass validation")
     void acceptsValidFieldIdentifiers() {
-        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(Collections.emptyList());
+        when(dynamicDataService.list(anyString(), any()))
+                .thenReturn(PaginationResult.empty(1, 500));
         CriticalPathResult result = service.compute("mt_pm_wbs_node", "pm_wbs_project_id", "p1",
                 "pm_wbs_duration_days", "pm_wbs_dependencies");
         assertNotNull(result);
+    }
+
+    @Test void deniedModelNeverLoadsRecords() {
+        org.mockito.Mockito.lenient().when(dynamicDataService.list(anyString(), any())).thenReturn(PaginationResult.empty(1, 500));
+        org.mockito.Mockito.when(permissionFacade.canAction(any(), anyString(), eq("read"))).thenReturn(false);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () ->
+                service.compute("test_table", "project_id", "p1", "duration_days", "dependencies"));
+        verifyNoInteractions(dynamicDataService);
+    }
+
+    @Test void hiddenFieldNeverLoadsRecords() {
+        org.mockito.Mockito.lenient().when(dynamicDataService.list(anyString(), any())).thenReturn(PaginationResult.empty(1, 500));
+        org.mockito.Mockito.when(permissionFacade.getFieldPermissions(any(), anyString()))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("project_id", "dependencies")));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () ->
+                service.compute("test_table", "project_id", "p1", "duration_days", "dependencies"));
+        verifyNoInteractions(dynamicDataService);
     }
 }

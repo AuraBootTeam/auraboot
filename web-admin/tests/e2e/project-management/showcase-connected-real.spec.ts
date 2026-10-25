@@ -193,6 +193,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     );
     expect((await task()).tpm_ts_description).toBe(original);
     await expect(actor.getByTestId('automation-run-status')).toContainText(/失败|Failed/i);
+    await expect(actor.getByTestId('flow-node-action_0')).toHaveAttribute('data-runtime-status', 'failed');
     await expect(actor.getByTestId('automation-test-run-result')).toContainText(
       '缺少执行该业务动作所需的权限',
     );
@@ -257,6 +258,8 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     expect(successful.log.triggerRecordPid).toBe(taskPid);
     expect((await task()).tpm_ts_description).toBe(recovered);
     await expect(actor.getByTestId('automation-run-status')).toContainText(/成功|Success/i);
+    await expect(actor.getByTestId('flow-node-action_0')).toHaveAttribute('data-runtime-status', 'completed');
+    await expect(actor.getByTestId('flow-node-action_0-status-badge')).toHaveAttribute('aria-label', 'runtime status: completed');
     await shot(actor, 'SC12-recovered');
     const logs = await data(await page.request.get(`/api/automations/${automation.pid}/logs`));
     expect(
@@ -264,8 +267,8 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
     ).toHaveLength(2);
     expect(logs.find((l: any) => l.pid === failed.log.pid).status).toBe('failed');
     await menu(actor, '任务');
-    const row = actor.getByRole('row').filter({ hasText: taskName });
-    await row.getByRole('button', { name: /查看|详情/ }).click();
+    // Retained runs may share a business title; verify the exact created record.
+    await actor.goto(`/p/tpm_task/view/${taskPid}`);
     await expect(actor).toHaveURL(new RegExp(`/p/tpm_task/view/${taskPid}$`));
     await actor.reload();
     await expect(actor.getByRole('main')).toContainText(recovered);

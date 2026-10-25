@@ -72,6 +72,21 @@ class CommandHandlerAsyncTaskExecutorTest {
         return in;
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"ai", "knowledge"})
+    void recoveredTasksRejectMissingRequiredAccessorsWithoutInvokingTheHandler(String capability) throws Exception {
+        var handler = mock(CommandHandlerExtension.class);
+        if ("ai".equals(capability)) when(handler.requiresAiProvider("bom:import_material_library")).thenReturn(true);
+        else when(handler.requiresKnowledgeBase("bom:import_material_library")).thenReturn(true);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        var result = executor.execute(params("bom:import_material_library"), noop);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.isRetryable()).isFalse();
+        assertThat(result.getErrorMessage()).contains("not installed");
+        verify(handler, org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
     @Test
     void resumable_handler_receives_real_checkpoint_transaction_bridge() throws Exception {
         var manager = mock(org.springframework.transaction.PlatformTransactionManager.class);
@@ -190,6 +205,28 @@ class CommandHandlerAsyncTaskExecutorTest {
                 org.mockito.ArgumentMatchers.anyLong(), eq("async_handler"), eq(Map.of()));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"zh-CN", "en-US"})
+    void translatesBusinessRejectionWithArgumentsInThePersistedLocale(String locale) throws Exception {
+        var translations = mock(com.auraboot.framework.i18n.service.I18nService.class);
+        ReflectionTestUtils.setField(executor, "i18nService", translations);
+        var rejection = new com.auraboot.framework.plugin.extension.PluginCommandRejectionException(
+                com.auraboot.framework.plugin.extension.PluginCommandRejectionException.Code.BUSINESS_RULE_BLOCKED,
+                "test.duplicate", "D51GT01067100");
+        var handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenThrow(rejection);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        String expected = "zh-CN".equals(locale) ? "重复物料编码：D51GT01067100" : "Duplicate material code: D51GT01067100";
+        when(translations.getMessage(locale, "test.duplicate", "D51GT01067100")).thenReturn(expected);
+        ObjectNode input = params("bom:import_material_library");
+        input.put("locale", locale);
+        var result = executor.execute(input, noop);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.isRetryable()).isFalse();
+        assertThat(result.getErrorMessage()).isEqualTo(expected).doesNotContain("$i18n:");
+        verify(translations).getMessage(locale, "test.duplicate", "D51GT01067100");
+    }
+
     @Test
     void failed_async_handler_writes_failure_audit() throws Exception {
         CommandEffectExecutor effects = mock(CommandEffectExecutor.class);
@@ -217,6 +254,7 @@ class CommandHandlerAsyncTaskExecutorTest {
         RecordShareAccessor recordShareAccessor = mock(RecordShareAccessor.class);
         ReflectionTestUtils.setField(executor, "recordShareAccessor", recordShareAccessor);
         CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.requiresAiProvider("bom:import_material_library")).thenReturn(true);
         when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
             captured.set(inv.getArgument(0));
             return Map.of("success", true);

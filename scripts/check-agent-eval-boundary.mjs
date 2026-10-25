@@ -26,8 +26,8 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 
 const ROOTS = [
-  'platform/src/main/java/com/auraboot/framework/agent',
-  'platform/src/main/java/com/auraboot/framework/rag',
+  'platform/platform-agent/src/main/java/com/auraboot/framework/agent',
+  'platform/platform-agent/src/main/java/com/auraboot/framework/rag',
 ];
 
 // Quoted full business command code. The leading `"` anchors it to a string

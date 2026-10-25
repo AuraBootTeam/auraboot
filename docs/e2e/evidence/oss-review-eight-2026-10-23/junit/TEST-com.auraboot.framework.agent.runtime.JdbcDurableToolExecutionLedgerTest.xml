@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="JdbcDurableToolExecutionLedger" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:31:57.977Z" hostname="Mac" time="0.086">
+  <testcase name="markCompensated persists compensated terminal status" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.009" />
+  <testcase name="fail marks non-retryable external side effects as compensation-required" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.012" />
+  <testcase name="claim inserts a running durable execution row and returns acquired" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.003" />
+  <testcase name="complete persists raw terminal result under tenant and execution key" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.005" />
+  <testcase name="claim replays an existing succeeded execution record" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.015" />
+  <testcase name="claim fails closed when tenant identity is missing" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.004" />
+  <testcase name="claimRetry moves a failed row to running and increments the attempt" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.004" />
+  <testcase name="findRecoverable selects due failed retryable durable executions" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.011" />
+  <testcase name="findCompensationRequired selects compensation-required durable executions" classname="com.auraboot.framework.agent.runtime.JdbcDurableToolExecutionLedgerTest" time="0.006" />
+</testsuite>

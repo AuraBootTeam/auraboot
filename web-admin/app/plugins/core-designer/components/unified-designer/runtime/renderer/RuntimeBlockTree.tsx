@@ -1,3 +1,5 @@
+import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
+import { FormSection } from '~/framework/meta/rendering/pages/form/FormSection';
 import { getCustomBlockRenderer } from '../customBlockRendererRegistry';
 import { DesignerPageModelCodeContext, PreviewListTable } from '../platformTablePreview';
 import { DESIGNER_I18N } from '~/shared/designer';
@@ -79,6 +81,8 @@ import {
 
 
 
+
+const FormPresentationContext = React.createContext(resolveFormPresentation());
 
 export function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   switch (block.blockType) {
@@ -493,6 +497,7 @@ function RuntimeForm({ block, runtimeServices, pageContext, blockPath }: Runtime
   );
 
   return (
+    <FormPresentationContext.Provider value={resolveFormPresentation(block.extension)}>
     <RuntimeFormValueContext.Provider value={formContext}>
       <RuntimeContainer
         block={block}
@@ -502,6 +507,7 @@ function RuntimeForm({ block, runtimeServices, pageContext, blockPath }: Runtime
         blockPath={blockPath}
       />
     </RuntimeFormValueContext.Provider>
+    </FormPresentationContext.Provider>
   );
 }
 
@@ -593,28 +599,33 @@ function RuntimeContainer({
 }
 
 function RuntimeSection({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
+  const presentation = React.useContext(FormPresentationContext);
   const formContext = React.useContext(RuntimeFormValueContext);
+  const locale = React.useContext(RuntimeLocaleContext);
   if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
 
   return (
-    <section
-      className="rounded-md border border-slate-100 bg-slate-50 p-3"
-      data-testid={`runtime-block-${block.id}`}
+    <FormSection
       style={getSpanGridStyle(block)}
+      title={readLocalizedLabel(block.title, locale)}
+      surface={presentation.surface}
+      density={presentation.density}
+      collapsible={Boolean(block.props?.collapsible ?? block.extension?.collapsible)}
+      defaultCollapsed={Boolean(block.props?.defaultCollapsed ?? block.extension?.defaultCollapsed)}
+      testId={`runtime-block-${block.id}`}
     >
-      <RuntimeTitle block={block} />
       <div className="grid grid-cols-12 gap-3">
         {block.blocks?.map((child) => (
           <RuntimeBlock
             key={child.id}
-            block={child}
+            block={child.layout?.span === undefined && child.layout?.colSpan === undefined ? { ...child, layout: { ...child.layout, span: 12 / (Number(block.layout?.columns ?? block.props?.columns) || presentation.columns) } } : child}
             runtimeServices={runtimeServices}
             pageContext={pageContext}
             blockPath={[...blockPath, child.id]}
           />
         ))}
       </div>
-    </section>
+    </FormSection>
   );
 }
 

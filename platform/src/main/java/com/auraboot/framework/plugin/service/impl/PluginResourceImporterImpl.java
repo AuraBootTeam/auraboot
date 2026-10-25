@@ -84,6 +84,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final PageSchemaMapper pageSchemaMapper;
     private final DictMapper dictMapper;
     private final NamedQueryMapper namedQueryMapper;
+    @org.springframework.lang.Nullable
     private final com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources;
     private final PluginRecordMapper pluginRecordMapper;
     private final Map<String, Long> menuCodeToIdMap = new java.util.concurrent.ConcurrentHashMap<>();

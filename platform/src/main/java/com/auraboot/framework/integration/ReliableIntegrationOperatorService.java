@@ -8,8 +8,10 @@ import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.D
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReceiptView;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayHistoryView;
 import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.ReplayResult;
+import com.auraboot.framework.integration.ReliableIntegrationOperatorContracts.QuarantineResult;
 import com.auraboot.framework.integration.mapper.ReliableIntegrationOperatorMapper;
 import com.auraboot.framework.integration.mapper.ReliableIntegrationOperatorRow;
+import com.auraboot.framework.integration.mapper.ReliableIntegrationQuarantineRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +29,7 @@ import java.util.Set;
 public class ReliableIntegrationOperatorService {
 
     private static final int MAX_PAGE_SIZE = 100;
-    private static final Set<String> STATUSES = Set.of("open", "replayed");
+    private static final Set<String> STATUSES = Set.of("open", "replayed", "quarantined");
 
     private final ReliableIntegrationOperatorMapper mapper;
     private final ReliableIntegrationMetrics metrics;
@@ -58,7 +60,42 @@ public class ReliableIntegrationOperatorService {
                         value.getRequestedBy(), value.getReason(), value.getCorrelationId(),
                         value.getRequestedAt()))
                 .toList();
-        return new DeadLetterDetail(summary(row), receipts, history);
+        return new DeadLetterDetail(summary(row), receipts, history,
+                quarantineResult(mapper.quarantineAudit(tenantId, eventId)));
+    }
+
+    @Transactional
+    public QuarantineResult quarantine(long tenantId, String eventId, String requestedBy,
+                                       String reason, int expectedReplayCount) {
+        String safeEventId = requireText(eventId, "eventId is required");
+        String actor = requireText(requestedBy, "operator identity is required");
+        String safeReason = requireText(reason, "quarantine reason is required");
+        if (safeReason.length() > 512 || expectedReplayCount < 0) {
+            throw new IllegalArgumentException("quarantine requires a reason up to 512 characters and a non-negative expectedReplayCount");
+        }
+        requireRow(tenantId, safeEventId);
+        int changed = mapper.quarantine(UlidGenerator.generate(), tenantId, safeEventId,
+                actor, safeReason, expectedReplayCount, Instant.now());
+        ReliableIntegrationQuarantineRow audit = mapper.quarantineAudit(tenantId, safeEventId);
+        if (changed == 1) {
+            if (audit == null) {
+                throw new IllegalStateException("quarantine audit was not recorded");
+            }
+            metrics.record("quarantined");
+            return quarantineResult(audit);
+        }
+        if (audit != null && audit.getReplayCount() == expectedReplayCount
+                && Objects.equals(audit.getRequestedBy(), actor)
+                && Objects.equals(audit.getReason(), safeReason)) {
+            return quarantineResult(audit);
+        }
+        throw new IllegalStateException("dead letter changed or is not an open failed delivery");
+    }
+
+    private QuarantineResult quarantineResult(ReliableIntegrationQuarantineRow audit) {
+        return audit == null ? null : new QuarantineResult(audit.getRecordPid(), audit.getEventId(),
+                "quarantined", audit.getReplayCount(), audit.getRequestedBy(), audit.getReason(),
+                audit.getCorrelationId(), audit.getRequestedAt());
     }
 
     @Transactional
@@ -77,6 +114,9 @@ public class ReliableIntegrationOperatorService {
         ReliableIntegrationOperatorRow current = mapper.find(tenantId, safeEventId);
         if (current == null) {
             throw new NoSuchElementException("dead letter not found");
+        }
+        if ("quarantined".equals(current.getStatus())) {
+            throw new IllegalStateException("dead letter changed or is not open");
         }
         Instant requestedAt = Instant.now();
         int changed = mapper.replay(UlidGenerator.generate(), tenantId, safeEventId, safeRequestedBy,
@@ -124,7 +164,7 @@ public class ReliableIntegrationOperatorService {
     private String normalizeStatus(String status) {
         String normalized = trimToNull(status);
         if (normalized != null && !STATUSES.contains(normalized)) {
-            throw new IllegalArgumentException("status must be open or replayed");
+            throw new IllegalArgumentException("status must be open, replayed or quarantined");
         }
         return normalized;
     }

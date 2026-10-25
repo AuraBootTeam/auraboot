@@ -40,6 +40,8 @@ export default defineConfig({
   // the coverage provider falls back to parsing raw TS with a JS parser, and the file
   // is silently dropped from the coverage denominator.
   resolve: {
+    // Match the browser singleton boundary when workspace packages use a capsule.
+    dedupe: ['react', 'react-dom', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
     // Shared dependency caches can link this package to another checkout.
     // Unit tests must execute the kernel from this exact source tree.
     alias: {

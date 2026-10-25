@@ -23,9 +23,12 @@ public class AutomationWorkflowRuntime {
     private final AutomationFlowCompiler compiler;
     private final WorkflowCapabilityRegistry workflowCapabilities;
     private final ObjectMapper objectMapper;
+    @org.springframework.beans.factory.annotation.Qualifier("compositeActionExecutor")
+    private final org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.automation.executor.ActionExecutor> actionExecutors;
 
     public String deploy(Automation automation) {
         AutomationFlowCompiler.CompiledFlow compiled = compiler.compile(automation);
+        assertCompiledCapabilities(compiled);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("automationPid", automation.getPid());
         payload.put("processKey", compiled.processKey());
@@ -101,8 +104,29 @@ public class AutomationWorkflowRuntime {
                         payload)).payload();
     }
 
+    /** Reject unavailable LLM nodes before the trigger log or workflow product can perform work. */
+    public void assertCapabilities(Automation automation) {
+        if (!actionExecutors.getObject().supports("llm_call")) {
+            assertCompiledCapabilities(compiler.compile(automation));
+        }
+    }
+
+    private void assertCompiledCapabilities(AutomationFlowCompiler.CompiledFlow compiled) {
+        boolean requiresLlm = compiled.actionsByNodeId().values().stream()
+                .filter(value -> value instanceof Map<?, ?>)
+                .map(value -> (Map<?, ?>) value)
+                .anyMatch(action -> "llm_call".equals(action.get("type")));
+        if (requiresLlm && !actionExecutors.getObject().supports("llm_call")) {
+            throw new com.auraboot.framework.exception.BusinessException(
+                    com.auraboot.framework.common.constant.ResponseCode.UnsupportedFeature,
+                    "LLM workflow capability is not installed");
+        }
+    }
+
     private Map<String, Object> compiledActions(Automation automation) {
-        return compiler.compile(automation).actionsByNodeId();
+        var compiled = compiler.compile(automation);
+        assertCompiledCapabilities(compiled);
+        return compiled.actionsByNodeId();
     }
 
     public static class AutomationWorkflowRunException extends RuntimeException {

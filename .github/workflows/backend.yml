@@ -3,8 +3,8 @@ name: Backend CI
 on:
   push:
     branches: [main]
+  # Backend contracts must also execute on stacked feature PRs.
   pull_request:
-    branches: [main]
 
 concurrency:
   group: backend-${{ github.ref }}
@@ -47,7 +47,7 @@ jobs:
           fi
 
           if git diff --name-only "$base" "$head" \
-            | grep -E '^(platform/|\.github/workflows/backend\.yml)' >/dev/null; then
+            | grep -E '^(platform/|scripts/fixtures/agent-artifact-consumer/|\.github/workflows/backend\.yml)' >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -82,10 +82,15 @@ jobs:
         working-directory: platform
         run: ./gradlew --no-daemon compileJava compileTestJava
 
-      - name: Verify full application assembly and launcher modes
+      - name: Verify application assemblies, discovery and launcher modes
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
-        run: ./gradlew --no-daemon :platform-app:test :platform-app:verifyApplicationAssembly
+        run: >-
+          ./gradlew --no-daemon :platform-app:test
+          --tests com.auraboot.framework.application.PlatformApplicationModeTest
+          --tests com.auraboot.framework.application.AgentAssemblyVerifierTest
+          --tests com.auraboot.framework.application.ApplicationCapabilitiesControllerTest
+          :platform-app:verifyBaseApplicationAssembly
 
       - name: Verify core agent implementation boundary
         if: steps.changes.outputs.run == 'true'
@@ -93,6 +98,7 @@ jobs:
         run: >-
           ./gradlew --no-daemon :test
           --tests com.auraboot.framework.architecture.CoreAgentBoundaryTest
+          --tests com.auraboot.framework.plugin.service.impl.PluginOptionalAgentCapabilityTest
           --max-workers=2 -PauraTestMaxHeap=2g -PauraTestMinHeap=256m
 
       - name: Upload core agent boundary results
@@ -103,13 +109,57 @@ jobs:
           path: platform/build/test-results/test/TEST-com.auraboot.framework.architecture.CoreAgentBoundaryTest.xml
           if-no-files-found: warn
 
+      - name: Verify isolated core agent app publications
+        if: steps.changes.outputs.run == 'true'
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/agent-publication-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          repository="$evidence/maven"
+          consumer="$evidence/consumer"
+          version="$(tr -d '\r\n' < ../VERSION)-ci.${GITHUB_SHA}.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          test ! -e "$evidence"
+          mkdir -p "$repository" "$consumer/src/main/java"
+          echo "AGENT_PUBLICATION_EVIDENCE=$evidence" >> "$GITHUB_ENV"
+          cp ../scripts/fixtures/agent-artifact-consumer/settings.gradle "$consumer/"
+          cp ../scripts/fixtures/agent-artifact-consumer/build.gradle "$consumer/"
+          cp ../scripts/fixtures/agent-artifact-consumer/src/main/java/PublishedArtifactProbe.java "$consumer/src/main/java/"
+          ./gradlew --no-daemon "-Dmaven.repo.local=$repository" "-PauraPlatformVersion=$version" \
+            :publishMavenJavaPublicationToMavenLocal \
+            :platform-plugin-api:publishMavenJavaPublicationToMavenLocal \
+            :platform-agent:publishMavenJavaPublicationToMavenLocal \
+            :platform-app:publishMavenJavaPublicationToMavenLocal \
+            :platform-bom:publishMavenJavaPublicationToMavenLocal \
+            :platform-storage-minio:publishMavenJavaPublicationToMavenLocal \
+            :platform-storage-s3:publishMavenJavaPublicationToMavenLocal \
+            :platform-storage-oss:publishMavenJavaPublicationToMavenLocal \
+            :platform-storage-cos:publishMavenJavaPublicationToMavenLocal \
+            :platform-mq-kafka:publishMavenJavaPublicationToMavenLocal 2>&1 | tee "$evidence/producer.log"
+          for metadata in module pom; do
+            ./gradlew --no-daemon --project-dir "$consumer" "-Dmaven.repo.local=$repository" \
+              "-PpublicationRepository=$repository" "-PpublicationVersion=$version" \
+              "-PpublicationMetadata=$metadata" verifyPublishedArtifacts \
+              2>&1 | tee "$evidence/consumer-$metadata.log"
+          done
+
+      - name: Retain published consumer evidence
+        if: always() && steps.changes.outputs.run == 'true' && env.AGENT_PUBLICATION_EVIDENCE != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-publication-java-${{ matrix.java }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.AGENT_PUBLICATION_EVIDENCE }}/producer.log
+            ${{ env.AGENT_PUBLICATION_EVIDENCE }}/consumer-*.log
+          if-no-files-found: warn
+
       # Phase 2.1 IT scaffolding: compile-only gate ensures IT sources stay
       # green even though we don't run the suite in CI yet (running requires
       # a seeded Postgres — schema init script is Phase 2.2 backlog).
       - name: Compile (integrationTest sources)
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
-        run: ./gradlew --no-daemon compileIntegrationTestJava
+        run: ./gradlew --no-daemon :platform-app:compileIntegrationTestJava
 
       - name: Checkstyle (main)
         if: steps.changes.outputs.run == 'true'

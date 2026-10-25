@@ -6,6 +6,7 @@ export const manifest: PluginManifest = {
   version: '0.1.0',
   description: 'AuraBot dashboard, traces, run logs, providers, prompts, RAG knowledge.',
   kind: 'core',
+  applicationModules: ['agent'],
   visibility: 'public',
   permissions: ['aurabot.dashboard.read', 'aurabot.trace.read', 'aurabot.run.read', 'aurabot.provider.read', 'aurabot.prompt.read', 'aurabot.knowledge.read'],
   dependencies: { coreVersion: '^0.0.1' },

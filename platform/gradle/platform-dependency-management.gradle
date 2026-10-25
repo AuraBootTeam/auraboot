@@ -1,10 +1,17 @@
+// Native Gradle consumers must receive the same BOM relationships as Maven consumers.
+// Spring's dependency-management plugin exports POM imports but not Gradle module dependencies.
+dependencies {
+    api platform('org.springframework.boot:spring-boot-dependencies:3.5.16')
+    api platform("io.sentry:sentry-bom:${sentryVersion}")
+    api platform("com.baomidou:mybatis-plus-bom:${mybatisPlusVersion}")
+}
+
 // Shared managed versions for core and its application/agent consumers.
 dependencyManagement {
     imports {
         mavenBom 'org.springframework.boot:spring-boot-dependencies:3.5.16'
         mavenBom "io.sentry:sentry-bom:${sentryVersion}"
         mavenBom "com.baomidou:mybatis-plus-bom:${mybatisPlusVersion}"
-        mavenBom "io.modelcontextprotocol.sdk:mcp-bom:${mcpSdkVersion}"
 
     }
 

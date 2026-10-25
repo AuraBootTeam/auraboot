@@ -28,7 +28,7 @@ vi.mock('~/framework/smart/charts/SharedChartFactory', () => ({
         data-orientation={props.orientation}
         data-title={props.title}
         data-axis={JSON.stringify(props.chartOptions)}
-        data-tick={props.chartOptions?.xAxis?.axisLabel.formatter(200000)}
+        data-tick={props.chartOptions?.xAxis?.axisLabel.formatter?.(200000)}
       >
         {JSON.stringify(props.metricLabels)}
       </div>
@@ -59,7 +59,7 @@ describe('chat chart presentation labels', () => {
           chartType: 'bar',
           modelCode: 'tpm_project',
           columns: ['tpm_pj_name', 'budget_total'],
-          records: [{ tpm_pj_name: '供应链平台', budget_total: 128000 }],
+          records: [{ tpm_pj_name: '华辰制造 · 第4批供应链协同平台交付项目', budget_total: 128000 }],
           dataSource,
           metrics: dataSource.metrics,
           dimensions: dataSource.dimensions,
@@ -73,7 +73,7 @@ describe('chat chart presentation labels', () => {
     );
     expect(screen.getByTestId('shared-chart-labels')).not.toHaveAttribute('data-title');
     expect(screen.getByTestId('shared-chart-labels')).toHaveAttribute('data-tick', '20万');
-    expect(JSON.parse(screen.getByTestId('shared-chart-labels').getAttribute('data-axis')!)).toMatchObject({ xAxis: { splitNumber: 2, axisLabel: { hideOverlap: true } } });
+    expect(JSON.parse(screen.getByTestId('shared-chart-labels').getAttribute('data-axis')!)).toMatchObject({ xAxis: { splitNumber: 2, axisLabel: { hideOverlap: true } }, yAxis: { type: 'category', data: ['华辰制造 · 第4批供应链协同平台交付项目'], axisLabel: { width: 96, overflow: 'truncate' } } });
     fireEvent.click(screen.getByTestId('chatbi-save-dashboard'));
     await waitFor(() => expect(dashboardService.create).toHaveBeenCalled());
     const widget = vi.mocked(dashboardService.create).mock.calls[0][0].widgets![0];
