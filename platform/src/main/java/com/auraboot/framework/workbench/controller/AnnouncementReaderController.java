@@ -62,7 +62,6 @@ public class AnnouncementReaderController {
             .success(true).reason(reason).build());
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
             .header(HttpHeaders.CACHE_CONTROL,"private, no-store")
-            .header("X-Content-Type-Options","nosniff")
             .header(HttpHeaders.CONTENT_DISPOSITION,FileNameEncodingSupport.contentDisposition("attachment",metadata.getOriginalName()))
             .body(body);
     }
