@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { URL } from 'node:url';
+import { resolve } from 'node:path';
 import { resolveColumnLabel, resolveConfirmDialog, resolveFieldLabel } from '../i18nResolver';
 
 const missingTranslation = (key: string) => key;
@@ -88,11 +88,11 @@ describe('canonical announcement submission confirmation', () => {
     blocks: Array<{ buttons?: ConfirmButton[]; rowActions?: ConfirmButton[] }>;
   };
   const pages: ConfirmPage[] = JSON.parse(readFileSync(
-    new URL('../../../../../../plugins/core-announcement/config/pages.json', import.meta.url),
+    resolve(import.meta.dirname, '../../../../../../plugins/core-announcement/config/pages.json'),
     'utf8',
   ));
   const resources: Array<Record<string, string>> = JSON.parse(readFileSync(
-    new URL('../../../../../../plugins/core-announcement/config/i18n.json', import.meta.url),
+    resolve(import.meta.dirname, '../../../../../../plugins/core-announcement/config/i18n.json'),
     'utf8',
   ));
   const expected = {
