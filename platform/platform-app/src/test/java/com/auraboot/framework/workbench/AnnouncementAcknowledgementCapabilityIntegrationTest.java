@@ -186,4 +186,17 @@ class AnnouncementAcknowledgementCapabilityIntegrationTest extends BaseIntegrati
             executor.shutdown(); assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS)); identity();
         }
     }
+
+    @Test void everyRequiredVersionInABatchMustRemainSatisfiedThroughCommit() {
+        var first = acknowledged(); var second = acknowledged();
+        var requirements = List.of(required(second).getFirst(), required(first).getFirst());
+        var checks = new TransactionTemplate(transactions).execute(status -> capability.checkForCommand(requirements));
+        assertEquals(List.of(second.version, first.version), checks.stream().map(Check::requestedVersionPid).toList());
+        assertTrue(checks.stream().allMatch(c -> c.status() == Status.SATISFIED));
+        assertThrows(BusinessException.class, () -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            assertTrue(capability.checkForCommand(requirements).stream().allMatch(c -> c.status() == Status.SATISFIED));
+            withdraw(first);
+        }));
+        assertEquals(Status.SATISFIED, check(first).status()); assertEquals(Status.SATISFIED, check(second).status());
+    }
 }
