@@ -31,7 +31,7 @@ type Entry = {
   subject: string | null;
   note: string | null;
   actor: string | null;
-  transition?: { from: Value; to: Value };
+  transition?: { from: Value | undefined; to: Value | undefined };
   details: FieldValues;
   previous: FieldValues;
 };
@@ -80,8 +80,9 @@ function identityReady(runtime: BusinessActivityRuntime, pid: string, model: str
   return candidates.length > 0 && candidates.every((value) => value === pid);
 }
 function optionalText(row: Record<string, unknown>, field?: string): string | null {
-  if (!field) return null;
-  if (!Object.hasOwn(row, field)) throw new Error('Missing mapped history field');
+  // Public rows may omit null or field-filtered display values. Never recover
+  // those values from another endpoint or an older record snapshot.
+  if (!field || !Object.hasOwn(row, field)) return null;
   const value = row[field];
   if (value === null || value === '') return null;
   if (typeof value !== 'string') throw new Error('Invalid mapped history text');
@@ -98,6 +99,10 @@ function value(row: Record<string, unknown>, field: string): Value {
   )
     return actual;
   throw new Error('Invalid mapped history value');
+}
+function optionalValue(row: Record<string, unknown>, field: string): Value | undefined {
+  // Missing is unknown/not visible, not evidence of a business null transition.
+  return Object.hasOwn(row, field) ? value(row, field) : undefined;
 }
 function readFields(
   row: Record<string, unknown>,
@@ -152,8 +157,13 @@ function readBusinessData(
         throw new Error('Invalid history identity or clock');
       seen.add(id);
       const transition =
-        mapping.fromState && mapping.toState
-          ? { from: value(row, mapping.fromState), to: value(row, mapping.toState) }
+        mapping.fromState &&
+        mapping.toState &&
+        (Object.hasOwn(row, mapping.fromState) || Object.hasOwn(row, mapping.toState))
+          ? {
+              from: optionalValue(row, mapping.fromState),
+              to: optionalValue(row, mapping.toState),
+            }
           : undefined;
       const previous = readFields(row, fields),
         details = readFields(row, detailFields);
@@ -401,7 +411,13 @@ export function BusinessActivityTimeline({
     data.pageSize ?? previewLimit ?? 100,
   );
   const visible = data.rows.slice(0, limit);
-  const dict = (code: string | undefined, actual: Value, state = false): string => {
+  const dict = (code: string | undefined, actual: Value | undefined, state = false): string => {
+    if (actual === undefined)
+      return label(
+        'activity.timeline.unavailableValue',
+        '未提供或不可见',
+        'Not provided or not visible',
+      );
     if (actual === null) return '—';
     if (!code) return String(actual);
     const item = (getDictItems?.(code) ?? []).find(
@@ -463,7 +479,11 @@ export function BusinessActivityTimeline({
               <div className="text-text-3 mt-1 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span data-testid={`activity-timeline-actor-${row.pid}`}>
                   {row.actor ??
-                    label('activity.timeline.unknownActor', '操作人未提供', 'Actor unavailable')}
+                    label(
+                      'activity.timeline.unknownActor',
+                      '操作人未提供或不可见',
+                      'Actor unavailable',
+                    )}
                 </span>
                 <time dateTime={row.at} title={row.at}>
                   {formatInTimezone(row.at, 'YYYY-MM-DD HH:mm:ss', timezone)}

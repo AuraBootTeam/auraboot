@@ -4,6 +4,7 @@ import { ActivityTimeline } from '../ActivityTimeline';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import capturedNullOmission from './fixtures/business-timeline-null-omission.json';
 import type {
   BusinessActivityRecordMapping,
   BusinessActivityDetailField,
@@ -65,7 +66,7 @@ function row(pid: string, alert = 'alert-A', note = 'Actual note'): HistoryRow {
     anc_resolution: null,
   };
 }
-function response(rows: ReturnType<typeof row>[]) {
+function response(rows: unknown[]) {
   return { code: '0', data: { records: rows, total: rows.length, page: 1, pageSize: 100 } };
 }
 function runtime(pid = 'alert-A') {
@@ -123,6 +124,108 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe('ActivityTimeline named business-only source', () => {
+  it('renders the captured dynamic API response with omitted nullable display fields', async () => {
+    const received = capturedNullOmission.data.records[0];
+    expect(received).not.toHaveProperty('anc_from');
+    expect(received).not.toHaveProperty('anc_resolution');
+    fetchResultMock.mockResolvedValue(capturedNullOmission);
+    render(
+      <ActivityTimeline
+        {...props}
+        recordPid={received.anc_alert_ref}
+        businessDetailFields={detailFields}
+        runtime={runtime(received.anc_alert_ref)}
+      />,
+    );
+    const entry = await screen.findByTestId(`activity-timeline-item-business-${received.pid}`);
+    expect(entry).toHaveTextContent(received.anc_action_name);
+    expect(entry).toHaveTextContent(received.anc_action_note);
+    expect(entry).toHaveTextContent(received.anc_operator);
+    expect(screen.getByTestId(`activity-timeline-transition-${received.pid}`)).toHaveTextContent(
+      'Not provided or not visible→Awaiting investigation',
+    );
+    expect(screen.queryByTestId(`activity-timeline-details-${received.pid}`)).toBeNull();
+    expect(screen.queryByTestId(`activity-timeline-snapshot-${received.pid}`)).toBeNull();
+    expect(fetchResultMock).toHaveBeenCalledTimes(1);
+    expect(fetchResultMock.mock.calls[0][1].params.filters).toBe(
+      JSON.stringify([
+        { fieldName: 'anc_alert_ref', operator: 'EQ', value: received.anc_alert_ref },
+      ]),
+    );
+  });
+  it('removes previously visible optional fields when a later authorized projection omits them', async () => {
+    const hidden: Record<string, unknown> = { ...row('projection') };
+    for (const key of [
+      'anc_action_name',
+      'anc_action_note',
+      'anc_operator',
+      'anc_from',
+      'anc_to',
+    ]) {
+      delete hidden[key];
+    }
+    fetchResultMock
+      .mockResolvedValueOnce(response([row('projection')]))
+      .mockResolvedValueOnce(response([hidden]));
+    const host = runtime();
+    render(<ActivityTimeline {...props} runtime={host} />);
+    await screen.findByText('Actual note');
+    await act(async () => {
+      await host.manager.reload('history');
+    });
+    const entry = await screen.findByTestId('activity-timeline-item-business-projection');
+    expect(entry).toHaveTextContent('Actor unavailable');
+    expect(screen.queryByText('Verified operator')).toBeNull();
+    expect(screen.queryByText('Actual note')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Actual action' })).toBeNull();
+    expect(screen.queryByTestId('activity-timeline-transition-projection')).toBeNull();
+    expect(screen.queryByTestId('activity-timeline-snapshot-projection')).toBeNull();
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+    expect(
+      fetchResultMock.mock.calls.every(([url]) => url === '/api/dynamic/anc_action/list'),
+    ).toBe(true);
+  });
+  it.each(['pid', 'anc_alert_ref', 'anc_action_at'])(
+    'still rejects a missing required identity or clock field: %s',
+    async (field) => {
+      const invalid: Record<string, unknown> = { ...row('required') };
+      delete invalid[field];
+      fetchResultMock.mockResolvedValue(response([invalid]));
+      render(<ActivityTimeline {...props} runtime={runtime()} />);
+      expect(await screen.findByTestId('activity-timeline-error')).toHaveAttribute(
+        'data-error-reason',
+        'invalid',
+      );
+      expect(screen.queryByTestId('activity-timeline')).toBeNull();
+    },
+  );
+  it.each([
+    ['anc_action_name', {}],
+    ['anc_action_note', []],
+    ['anc_operator', {}],
+    ['anc_from', {}],
+    ['anc_to', []],
+    ['anc_resolution', {}],
+    ['anc_previous_note', {}],
+    ['anc_action_at', 'not-a-time'],
+  ])('still rejects a malformed present mapped field: %s', async (field, actual) => {
+    fetchResultMock.mockResolvedValue(response([{ ...row('malformed'), [String(field)]: actual }]));
+    render(<ActivityTimeline {...props} businessDetailFields={detailFields} runtime={runtime()} />);
+    expect(await screen.findByTestId('activity-timeline-error')).toHaveAttribute(
+      'data-error-reason',
+      'invalid',
+    );
+    expect(screen.queryByTestId('activity-timeline')).toBeNull();
+  });
+  it('still rejects duplicate identities instead of rendering a partial history', async () => {
+    fetchResultMock.mockResolvedValue(response([row('duplicate'), row('duplicate')]));
+    render(<ActivityTimeline {...props} runtime={runtime()} />);
+    expect(await screen.findByTestId('activity-timeline-error')).toHaveAttribute(
+      'data-error-reason',
+      'invalid',
+    );
+    expect(screen.queryByTestId('activity-timeline')).toBeNull();
+  });
   it('uses the actual DMS filter, shows complete text and actual snapshots without audit access', async () => {
     const note =
       'First line\n' +
