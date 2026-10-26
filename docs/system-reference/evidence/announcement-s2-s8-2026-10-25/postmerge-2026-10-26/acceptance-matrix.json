@@ -67,7 +67,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--c4b06-nnouncement-in-draft-status-oss/create-form-guidance.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--c4b06-nnouncement-in-draft-status-oss/create-form-guidance.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:edit-form-values",
@@ -135,7 +149,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--15156-etain-the-observed-revision-oss/edit-form-values.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--15156-etain-the-observed-revision-oss/edit-form-values.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:draft-detail",
@@ -203,7 +231,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--15156-etain-the-observed-revision-oss/draft-detail.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--15156-etain-the-observed-revision-oss/draft-detail.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:permission-denied",
@@ -271,7 +313,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--df931-ot-create-or-modify-notices-oss/permission-denied.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--df931-ot-create-or-modify-notices-oss/permission-denied.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "仅有公告读取权限的观察者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:legacy-revision",
@@ -339,7 +395,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--46257-mutating-its-frozen-version-oss/legacy-revision.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--46257-mutating-its-frozen-version-oss/legacy-revision.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:notification-settings-audience",
@@ -407,7 +477,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/notification-settings-audience.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/notification-settings-audience.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:scheduled-publication",
@@ -475,7 +559,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/scheduled-publication.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/scheduled-publication.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:canceled-publication",
@@ -543,7 +641,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/canceled-publication.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/canceled-publication.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:published-and-projected",
@@ -611,7 +723,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--8051a-hes-independent-projections-oss/published-and-projected.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--8051a-hes-independent-projections-oss/published-and-projected.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:confirm-announcement-delete_announcement",
@@ -679,7 +805,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--44047-rough-its-protected-command-oss/confirm-announcement-delete_announcement.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--44047-rough-its-protected-command-oss/confirm-announcement-delete_announcement.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "lifecycle:deleted-draft",
@@ -747,7 +887,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--44047-rough-its-protected-command-oss/deleted-draft.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--44047-rough-its-protected-command-oss/deleted-draft.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:any-submitted",
@@ -816,7 +970,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-submitted.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-submitted.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "公告发布者/申请人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:any-frozen-readonly-attachment",
@@ -885,7 +1053,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-frozen-readonly-attachment.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-frozen-readonly-attachment.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:any-decision",
@@ -954,7 +1136,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-decision.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:any-completed-frozen-history",
@@ -1023,7 +1219,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-completed-frozen-history.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-completed-frozen-history.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-submitted",
@@ -1092,7 +1302,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-submitted.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-submitted.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "公告发布者/申请人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-first-decision",
@@ -1161,7 +1385,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-first-decision.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-first-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-reject-decision",
@@ -1230,7 +1468,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-reject-decision.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-reject-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-rejected-history-after-revision",
@@ -1299,7 +1551,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-rejected-history-after-revision.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-rejected-history-after-revision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-blocked-node-resolution",
@@ -1368,7 +1634,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-blocked-node-resolution.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-blocked-node-resolution.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-blocked-original-resume",
@@ -1437,7 +1717,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-blocked-original-resume.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-blocked-original-resume.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-recovery-replacement-confirm",
@@ -1506,7 +1800,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-recovery-replacement-confirm.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-recovery-replacement-confirm.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:recovery-final-decision",
@@ -1575,7 +1883,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/recovery-final-decision.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/recovery-final-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-recovery-preserved-quorum",
@@ -1644,7 +1966,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-recovery-preserved-quorum.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-recovery-preserved-quorum.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:any-default-definition-selected",
@@ -1713,7 +2049,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-default-definition-selected.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-default-definition-selected.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户公告政策管理员",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "bpm:all-withdrawal-reason",
@@ -1782,7 +2132,21 @@
           "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
         }
       },
-      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-withdrawal-reason.png"
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-withdrawal-reason.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "公告发布者/申请人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "reader:frozen-attachment",
@@ -1850,7 +2214,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-frozen-attachment.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-frozen-attachment.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "该冻结版本的有权接收者",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "reader:pending-inbox",
@@ -1918,7 +2296,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-narrow-inbox-pending.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-narrow-inbox-pending.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "该冻结版本的有权接收者",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "reader:ack-confirm",
@@ -1986,7 +2378,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-narrow-confirmation.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-narrow-confirmation.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "该冻结版本的有权接收者",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "statistics:overview",
@@ -2054,7 +2460,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--9525e-certain-response-and-reload-oss/statistics-overview.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--9525e-certain-response-and-reload-oss/statistics-overview.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "reminders:preview",
@@ -2124,7 +2544,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-ready.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-ready.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     },
     {
       "id": "reminders:resume-original",
@@ -2192,7 +2626,21 @@
           "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
         }
       },
-      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--94ba0-plan-through-native-actions-oss/reminder-original-plan-resumed.png"
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--94ba0-plan-through-native-actions-oss/reminder-original-plan-resumed.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
     }
   ],
   "coreRun": "attempt-2",
@@ -2240,5 +2688,6 @@
         "bpm/reconciliation.json"
       ]
     }
-  ]
+  ],
+  "captureEnvironmentLimits": "Screenshots record the local Chromium/macOS render, not physical mobile or screen-reader acceptance. No cross-platform pixel diff was performed."
 }
