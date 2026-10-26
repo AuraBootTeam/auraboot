@@ -73,6 +73,23 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
 }
 
 describe('FiltersBlockRenderer', () => {
+  it('removes hidden filter wrappers from the grid and restores them when their condition changes', () => {
+    const runtime = makeRuntime();
+    runtime.getContext().form = { scope: 'ALL' };
+    const block = {
+      id: 'conditional-filters',
+      blockType: 'filters',
+      fields: [
+        { field: 'scope', label: 'Scope' },
+        { field: 'category', label: 'Category', visibleWhen: "form.scope == 'CATEGORY'" },
+      ],
+    } as any;
+    const view = render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+    expect(view.container.querySelector('[data-authoring-node-id="category"]')).toBeNull();
+    runtime.getContext().form = { scope: 'CATEGORY' };
+    view.rerender(<FiltersBlockRenderer block={block} runtime={runtime} />);
+    expect(view.container.querySelector('[data-authoring-node-id="category"]')).not.toBeNull();
+  });
   it('resets only declared filter inputs before the configured reset action when enabled', async () => {
     const runtime = makeRuntime() as any;
     runtime.getContext().form = { keyword: 'old query', status: 'ARCHIVED', unrelated: 'keep' };
