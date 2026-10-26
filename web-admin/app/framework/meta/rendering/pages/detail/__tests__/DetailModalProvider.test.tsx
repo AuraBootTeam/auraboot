@@ -1,3 +1,4 @@
+import { renderToString } from 'react-dom/server';
 import { useState, type ReactNode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
@@ -106,6 +107,30 @@ const allowed: LoaderFunction = ({ params }) => ({
   httpStatus: 200,
 });
 describe('ordinary detail modal route contract', () => {
+  it('server-renders a restored detail URL without accessing the DOM', () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/source',
+          element: (
+            <DetailModalProvider>
+              <div>Source page</div>
+            </DetailModalProvider>
+          ),
+        },
+      ],
+      { initialEntries: ['/source?detailModal=%2Fp%2Fanc_alert%2Fview%2FA'] },
+    );
+    routers.push(router);
+    vi.stubGlobal('document', undefined);
+    try {
+      const html = renderToString(<RouterProvider router={router} />);
+      expect(html).toContain('Source page');
+      expect(html).not.toContain('detail-modal');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it('preserves source filters/hash, pushes the detail URL, and Back closes with one native refresh callback', async () => {
     const loader = vi.fn(allowed),
       closed = vi.fn();
