@@ -264,7 +264,7 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
 
   const modelQuery = contract.status === 'success' && contract.skillCode === 'aurabot:model:query'
     && skillPayload && typeof skillPayload === 'object' && 'matched' in skillPayload ? skillPayload : null;
-  const queriedModel = modelQuery?.model && typeof modelQuery.model === 'object'
+  const queriedModel = modelQuery && 'model' in modelQuery && modelQuery.model && typeof modelQuery.model === 'object'
     && 'displayName' in modelQuery.model && typeof modelQuery.model.displayName === 'string'
     && 'code' in modelQuery.model && typeof modelQuery.model.code === 'string'
     ? { displayName: modelQuery.model.displayName, modelCode: modelQuery.model.code } : null;
@@ -353,7 +353,9 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
         </dl>
       ) : modelQuery ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm" data-testid="rc-model-not-found">
-          {text({ 'zh-CN': '未找到该模型，请核对模型编码或联系管理员。', 'en-US': 'Model not found. Check its code or contact an administrator.' })}
+          {modelQuery.matched === false
+            ? text({ 'zh-CN': '未找到该模型，请核对模型编码或联系管理员。', 'en-US': 'Model not found. Check its code or contact an administrator.' })
+            : text({ 'zh-CN': '模型结果不完整，请重新查询或联系管理员。', 'en-US': 'The model result is incomplete. Try again or contact an administrator.' })}
         </div>
       ) : contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
         <TableView rows={resolveTableRows(contract)} label={(key) => text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })} structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })} />
