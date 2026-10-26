@@ -1,0 +1,729 @@
+{
+  "scope": "Two reported defects only; existing reminder/lifecycle tests and original task runtimes",
+  "rows": [
+    {
+      "id": "reminders:preview",
+      "feature": "announcement preview or BPM lifecycle",
+      "actionPoint": "reminders:preview",
+      "stateBranch": "ready / confirmation / owned lifecycle",
+      "expectation": "All guidance, reminder metadata and qualification facts finish rendering; neighboring groups have normal spacing at 1440x1000.",
+      "driver": "existing native reminder journey or public owned lifecycle",
+      "screenshotId": "reminders-preview",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "reminders-preview.png",
+      "sha256": "ef13f41d51167a101a32e4de90421409b807dbc1c264c07c8e2d2a5fdf69ca27",
+      "locale": "zh-CN",
+      "source": "902a5b943d373300a5e8269c250e74f02625234a",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "runtime": "announcement-management",
+      "fixture": "Unique Reminder golden announcement created by the restored native journey; same fixture across all six frames.",
+      "role": "authorized announcement publisher",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T06:57:46.729471+00:00",
+      "visualVerdict": "accepted",
+      "observation": "冻结公告、说明、知悉截止与范围、可提交状态及 1/1/0 资格事实全部入镜；分组间距正常，原 240px 空加载占位已不再被误当作就绪态。",
+      "functionalVerdict": "pass for the registered native reminder journey",
+      "interactionVerdict": "pass; confirmation cancellation, lost-response replay, reload and real narrow scrolling asserted",
+      "evidenceTrustVerdict": "fresh exact original; runtime/source verified; catalog/browser production-source equivalence attached",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "冻结公告、说明、知悉截止与范围、可提交状态及 1/1/0 资格事实全部入镜；分组间距正常，原 240px 空加载占位已不再被误当作就绪态。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Adjacent business groups have normal 16px spacing; readiness helper rejects missing lazy content and bounds the spacing at 24px."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Labels, values and actions are readable at the recorded width; long synthetic title wraps on narrow viewport."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Context/confirmation frames show the relevant primary and cancel/back actions; scrolled facts frames are read-only evidence."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Controlled fixture counts/state/time are explicit; no platform PID or private machine path is shown."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Ready, open confirmation and accepted-after-replay are distinct recorded states; no loading reservation is accepted as ready."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Narrow context plus actual vertical/horizontal scroll frames cover relevant content; confirm focus visible. Physical mobile and screen-reader usability not tested."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing detail/card/table/confirmation family preserved; no business layout or CSS override introduced."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Individually viewed unmodified originals; exact SHA-256/source/viewport and restored run recorded; failed fault captures isolated."
+        }
+      },
+      "privateOriginalPath": "restored-preview-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-ready.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    },
+    {
+      "id": "reminders:preview-narrow",
+      "feature": "announcement preview or BPM lifecycle",
+      "actionPoint": "reminders:preview-narrow",
+      "stateBranch": "ready / confirmation / owned lifecycle",
+      "expectation": "390px layout keeps announcement context, reminder status, counts and actions readable without blank loading reservations.",
+      "driver": "existing native reminder journey or public owned lifecycle",
+      "screenshotId": "reminders-preview-narrow",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "reminders-preview-narrow.png",
+      "sha256": "b33706a61cf9861afd91efaecd3811c629e0c1084be49df4c71c4f0baaeb14ac",
+      "locale": "zh-CN",
+      "source": "902a5b943d373300a5e8269c250e74f02625234a",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshotDimensions": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime": "announcement-management",
+      "fixture": "Unique Reminder golden announcement created by the restored native journey; same fixture across all six frames.",
+      "role": "authorized announcement publisher",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T06:57:46.730059+00:00",
+      "visualVerdict": "accepted",
+      "observation": "390×844 顶部上下文图：长标题自然换行，确认/重新预览/返回均可见，说明可读；下半部内层滚动内容由同一记录的左右区域图补充，不宣称此帧展示全部统计。",
+      "functionalVerdict": "pass for the registered native reminder journey",
+      "interactionVerdict": "pass; confirmation cancellation, lost-response replay, reload and real narrow scrolling asserted",
+      "evidenceTrustVerdict": "fresh exact original; runtime/source verified; catalog/browser production-source equivalence attached",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "390×844 顶部上下文图：长标题自然换行，确认/重新预览/返回均可见，说明可读；下半部内层滚动内容由同一记录的左右区域图补充，不宣称此帧展示全部统计。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Adjacent business groups have normal 16px spacing; readiness helper rejects missing lazy content and bounds the spacing at 24px."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Labels, values and actions are readable at the recorded width; long synthetic title wraps on narrow viewport."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Context/confirmation frames show the relevant primary and cancel/back actions; scrolled facts frames are read-only evidence."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Controlled fixture counts/state/time are explicit; no platform PID or private machine path is shown."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Ready, open confirmation and accepted-after-replay are distinct recorded states; no loading reservation is accepted as ready."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Narrow context plus actual vertical/horizontal scroll frames cover relevant content; confirm focus visible. Physical mobile and screen-reader usability not tested."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing detail/card/table/confirmation family preserved; no business layout or CSS override introduced."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Individually viewed unmodified originals; exact SHA-256/source/viewport and restored run recorded; failed fault captures isolated."
+        }
+      },
+      "privateOriginalPath": "restored-preview-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-narrow.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    },
+    {
+      "id": "reminders:confirm-cancel",
+      "feature": "announcement preview or BPM lifecycle",
+      "actionPoint": "reminders:confirm-cancel",
+      "stateBranch": "ready / confirmation / owned lifecycle",
+      "expectation": "Open confirmation can be canceled without creating a reminder batch.",
+      "driver": "existing native reminder journey or public owned lifecycle",
+      "screenshotId": "reminders-confirm-cancel",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "reminders-confirm-cancel.png",
+      "sha256": "1ecc337fd2eb708794ca20710104465e630132568c2f465d5c4122e4e0bcb00c",
+      "locale": "zh-CN",
+      "source": "902a5b943d373300a5e8269c250e74f02625234a",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "runtime": "announcement-management",
+      "fixture": "Unique Reminder golden announcement created by the restored native journey; same fixture across all six frames.",
+      "role": "authorized announcement publisher",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T06:57:46.730405+00:00",
+      "visualVerdict": "accepted",
+      "observation": "确认框打开态完整入镜，提交时重算与不等于已读/知悉的说明、取消和确认清楚，确认焦点可见；取消后零批次由原生旅程数据库断言证明。",
+      "functionalVerdict": "pass for the registered native reminder journey",
+      "interactionVerdict": "pass; confirmation cancellation, lost-response replay, reload and real narrow scrolling asserted",
+      "evidenceTrustVerdict": "fresh exact original; runtime/source verified; catalog/browser production-source equivalence attached",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "确认框打开态完整入镜，提交时重算与不等于已读/知悉的说明、取消和确认清楚，确认焦点可见；取消后零批次由原生旅程数据库断言证明。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Adjacent business groups have normal 16px spacing; readiness helper rejects missing lazy content and bounds the spacing at 24px."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Labels, values and actions are readable at the recorded width; long synthetic title wraps on narrow viewport."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Context/confirmation frames show the relevant primary and cancel/back actions; scrolled facts frames are read-only evidence."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Controlled fixture counts/state/time are explicit; no platform PID or private machine path is shown."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Ready, open confirmation and accepted-after-replay are distinct recorded states; no loading reservation is accepted as ready."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Narrow context plus actual vertical/horizontal scroll frames cover relevant content; confirm focus visible. Physical mobile and screen-reader usability not tested."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing detail/card/table/confirmation family preserved; no business layout or CSS override introduced."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Individually viewed unmodified originals; exact SHA-256/source/viewport and restored run recorded; failed fault captures isolated."
+        }
+      },
+      "privateOriginalPath": "restored-preview-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-confirm-open.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    },
+    {
+      "id": "reminders:confirm-retry",
+      "feature": "announcement preview or BPM lifecycle",
+      "actionPoint": "reminders:confirm-retry",
+      "stateBranch": "ready / confirmation / owned lifecycle",
+      "expectation": "Retry after an uncertain response preserves the original request and creates one batch.",
+      "driver": "existing native reminder journey or public owned lifecycle",
+      "screenshotId": "reminders-confirm-retry",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "reminders-confirm-retry.png",
+      "sha256": "00e090183bbd2981c07ddbe48bc2a625e616698942e1352c1caa8956e779dbe7",
+      "locale": "zh-CN",
+      "source": "902a5b943d373300a5e8269c250e74f02625234a",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "runtime": "announcement-management",
+      "fixture": "Unique Reminder golden announcement created by the restored native journey; same fixture across all six frames.",
+      "role": "authorized announcement publisher",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T06:57:46.730770+00:00",
+      "visualVerdict": "accepted",
+      "observation": "丢失响应重试并重载后显示手动、已受理、实际 1、生成 1、等待/跳过/失败均 0；说明与元信息已加载。重试始终同一批次由原生断言证明，不靠截图推导。",
+      "functionalVerdict": "pass for the registered native reminder journey",
+      "interactionVerdict": "pass; confirmation cancellation, lost-response replay, reload and real narrow scrolling asserted",
+      "evidenceTrustVerdict": "fresh exact original; runtime/source verified; catalog/browser production-source equivalence attached",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "丢失响应重试并重载后显示手动、已受理、实际 1、生成 1、等待/跳过/失败均 0；说明与元信息已加载。重试始终同一批次由原生断言证明，不靠截图推导。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Adjacent business groups have normal 16px spacing; readiness helper rejects missing lazy content and bounds the spacing at 24px."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Labels, values and actions are readable at the recorded width; long synthetic title wraps on narrow viewport."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Context/confirmation frames show the relevant primary and cancel/back actions; scrolled facts frames are read-only evidence."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Controlled fixture counts/state/time are explicit; no platform PID or private machine path is shown."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Ready, open confirmation and accepted-after-replay are distinct recorded states; no loading reservation is accepted as ready."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Narrow context plus actual vertical/horizontal scroll frames cover relevant content; confirm focus visible. Physical mobile and screen-reader usability not tested."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing detail/card/table/confirmation family preserved; no business layout or CSS override introduced."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Individually viewed unmodified originals; exact SHA-256/source/viewport and restored run recorded; failed fault captures isolated."
+        }
+      },
+      "privateOriginalPath": "restored-preview-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-batch-reloaded.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    },
+    {
+      "id": "bpm:stop-owned-stack",
+      "feature": "announcement preview or BPM lifecycle",
+      "actionPoint": "bpm:stop-owned-stack",
+      "stateBranch": "ready / confirmation / owned lifecycle",
+      "expectation": "Public suspend stops the exact verified backend+Web generation on its first invocation; ports are free and stoppedAt is recorded.",
+      "driver": "existing native reminder journey or public owned lifecycle",
+      "screenshotId": null,
+      "status": "verified",
+      "visualApplicable": false,
+      "visualReason": "process lifecycle is verified by owned process, listener and retained database evidence; no browser screenshot applies to a suspended server",
+      "functionalVerdict": "pass",
+      "visualVerdict": "not-applicable",
+      "evidence": "first-stop-proof.json",
+      "observation": "Resume, product/workspace verify, retained 3 announcements/4 versions, first public suspend all exit 0; ports free and private stoppedAt present.",
+      "privateEvidence": "bpm/first-stop-proof.json",
+      "source": "a61fd24781160b6bb0bf686156f06bfab541af83",
+      "runtime": "announcement-management-bpm",
+      "interactionVerdict": "pass; public resume/verify/suspend with exact registered owner generations",
+      "evidenceTrustVerdict": "verified release helper; no diagnostic hook; explicit port-free and stoppedAt proof"
+    },
+    {
+      "id": "bpm:resume-and-stop-again",
+      "feature": "announcement preview or BPM lifecycle",
+      "actionPoint": "bpm:resume-and-stop-again",
+      "stateBranch": "ready / confirmation / owned lifecycle",
+      "expectation": "Same retained runtime resumes and publicly suspends again with no ownership/probe error; identity and data retained.",
+      "driver": "existing native reminder journey or public owned lifecycle",
+      "screenshotId": null,
+      "status": "verified",
+      "visualApplicable": false,
+      "visualReason": "process lifecycle is verified by owned process, listener and retained database evidence; no browser screenshot applies to a suspended server",
+      "functionalVerdict": "pass",
+      "visualVerdict": "not-applicable",
+      "evidence": "second-stop-proof.json",
+      "observation": "Same retained runtime resumes with new owned generations; second round verify/data/first suspend all exit 0, no diagnostic hook or database reset.",
+      "privateEvidence": "bpm/second-stop-proof.json",
+      "source": "a61fd24781160b6bb0bf686156f06bfab541af83",
+      "runtime": "announcement-management-bpm",
+      "interactionVerdict": "pass; public resume/verify/suspend with exact registered owner generations",
+      "evidenceTrustVerdict": "verified release helper; no diagnostic hook; explicit port-free and stoppedAt proof"
+    },
+    {
+      "id": "bpm:any-decision",
+      "feature": "embedded approval regression",
+      "actionPoint": "bpm:any-decision",
+      "stateBranch": "qualified decision / completed recovery",
+      "expectation": "Frozen submitted announcement content and attachment remain readable with qualified decision actions after packaging the lifecycle fix.",
+      "driver": "playwright.announcements.config.ts strict-announcements.spec.ts",
+      "screenshotId": "bpm-any-decision",
+      "expectedFileName": "any-decision.png",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "bpm-any-decision.png",
+      "sha256": "2a981bb8216fad15a0563dfcf8c0cb556d59219c30b5d4c2b3bd71ee026eddcb",
+      "locale": "zh-CN",
+      "source": "a61fd24781160b6bb0bf686156f06bfab541af83",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "runtime": "announcement-management-bpm",
+      "fixture": "Unique strict announcement fixture from the current four-case native profile",
+      "role": "qualified current task reviewer",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T07:08:16.646956+00:00",
+      "visualVerdict": "accepted",
+      "observation": "ANY 当前审批人在任务抽屉看到冻结正文、知悉 7 天与 46 B 送审附件；通过决定、非空意见及底部取消/驳回/通过可达。英文任务名和正文为业务测试夹具。",
+      "functionalVerdict": "pass; current four-case native profile reconciled",
+      "interactionVerdict": "pass; frozen content, authorization and quorum asserted in the real journey",
+      "evidenceTrustVerdict": "current Core2214/BPMa61 artifact and actual Java classpath verified before browser",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "ANY 当前审批人在任务抽屉看到冻结正文、知悉 7 天与 46 B 送审附件；通过决定、非空意见及底部取消/驳回/通过可达。英文任务名和正文为业务测试夹具。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Existing task drawer/recovery page remains readable; all key content in the selected frame is reachable, no unexplained spacer."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Desktop labels and frozen values are readable; ALL rule is one line and current approvers align within the table."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Pending task offers cancel, reject and approve; completed recovery exposes no further replacement action."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Frozen fixture content and synthetic labels are shown; actual byte/quorum properties are verified separately by the native journey."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Qualified pending decision and completed ALL recovery remain distinct; no terminal request is presented as actionable."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Selected desktop frame reviewed; footer is reachable. Narrow BPM and screen-reader usability are not claimed."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing BPM task drawer, form and recovery detail family unchanged."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed from the current BPM native four-case run; actual new package lock/Java path checked."
+        }
+      },
+      "privateOriginalPath": "bpm/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-decision.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    },
+    {
+      "id": "bpm:all-recovery-preserved-quorum",
+      "feature": "embedded approval regression",
+      "actionPoint": "bpm:all-recovery-preserved-quorum",
+      "stateBranch": "qualified decision / completed recovery",
+      "expectation": "Final ALL recovery page remains approved, preserves both current/accepted approvers and removes further replacement actions.",
+      "driver": "playwright.announcements.config.ts strict-announcements.spec.ts",
+      "screenshotId": "bpm-all-recovery-preserved-quorum",
+      "expectedFileName": "all-recovery-preserved-quorum.png",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "bpm-all-recovery-preserved-quorum.png",
+      "sha256": "25c23fd52d58989f99b7e68afd005c7cc7c84eb7e4f4c2f794864a56d4a169ff",
+      "locale": "zh-CN",
+      "source": "a61fd24781160b6bb0bf686156f06bfab541af83",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "runtime": "announcement-management-bpm",
+      "fixture": "Unique strict announcement fixture from the current four-case native profile",
+      "role": "tenant flow administrator",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T07:08:16.647792+00:00",
+      "visualVerdict": "accepted",
+      "observation": "ALL 恢复完成页显示已通过，所有人通过保持单行；原已接受意见人与替换人均列明，未再展示替换动作。投票与历史事实由原生旅程后端断言核验。",
+      "functionalVerdict": "pass; current four-case native profile reconciled",
+      "interactionVerdict": "pass; frozen content, authorization and quorum asserted in the real journey",
+      "evidenceTrustVerdict": "current Core2214/BPMa61 artifact and actual Java classpath verified before browser",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "ALL 恢复完成页显示已通过，所有人通过保持单行；原已接受意见人与替换人均列明，未再展示替换动作。投票与历史事实由原生旅程后端断言核验。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Existing task drawer/recovery page remains readable; all key content in the selected frame is reachable, no unexplained spacer."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Desktop labels and frozen values are readable; ALL rule is one line and current approvers align within the table."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Pending task offers cancel, reject and approve; completed recovery exposes no further replacement action."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Frozen fixture content and synthetic labels are shown; actual byte/quorum properties are verified separately by the native journey."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Qualified pending decision and completed ALL recovery remain distinct; no terminal request is presented as actionable."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Selected desktop frame reviewed; footer is reachable. Narrow BPM and screen-reader usability are not claimed."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing BPM task drawer, form and recovery detail family unchanged."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed from the current BPM native four-case run; actual new package lock/Java path checked."
+        }
+      },
+      "privateOriginalPath": "bpm/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-recovery-preserved-quorum.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    },
+    {
+      "id": "reminders:preview-narrow-facts",
+      "feature": "announcement reminder preview",
+      "actionPoint": "reminders:preview",
+      "stateBranch": "ready / narrow inner scroll",
+      "expectation": "Same ready preview is scrolled to the actual qualification table; first counts and metadata remain readable in the narrow inner scroll area.",
+      "driver": "existing native reminder preview journey",
+      "screenshotId": "reminders-preview-narrow-facts",
+      "expectedFileName": "reminder-preview-narrow-facts.png",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "reminders-preview-narrow-facts.png",
+      "sha256": "033fb24e430855ffdf3281d9b638281197831e010034b7194154a1eb02e3cec9",
+      "locale": "zh-CN",
+      "source": "902a5b943d373300a5e8269c250e74f02625234a",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshotDimensions": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime": "announcement-management",
+      "fixture": "Unique Reminder golden announcement created by the restored native journey; same fixture across all six frames.",
+      "role": "authorized announcement publisher",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T06:57:46.731148+00:00",
+      "visualVerdict": "accepted",
+      "observation": "同一就绪预览内层纵向滚动后，完整催办信息和资格表左侧 1/1/0 可读；横向未入镜列由右侧图与宽屏补充，未扩大 viewport 或裁剪图片。",
+      "functionalVerdict": "pass for the registered native reminder journey",
+      "interactionVerdict": "pass; confirmation cancellation, lost-response replay, reload and real narrow scrolling asserted",
+      "evidenceTrustVerdict": "fresh exact original; runtime/source verified; catalog/browser production-source equivalence attached",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "同一就绪预览内层纵向滚动后，完整催办信息和资格表左侧 1/1/0 可读；横向未入镜列由右侧图与宽屏补充，未扩大 viewport 或裁剪图片。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Adjacent business groups have normal 16px spacing; readiness helper rejects missing lazy content and bounds the spacing at 24px."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Labels, values and actions are readable at the recorded width; long synthetic title wraps on narrow viewport."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Context/confirmation frames show the relevant primary and cancel/back actions; scrolled facts frames are read-only evidence."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Controlled fixture counts/state/time are explicit; no platform PID or private machine path is shown."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Ready, open confirmation and accepted-after-replay are distinct recorded states; no loading reservation is accepted as ready."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Narrow context plus actual vertical/horizontal scroll frames cover relevant content; confirm focus visible. Physical mobile and screen-reader usability not tested."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing detail/card/table/confirmation family preserved; no business layout or CSS override introduced."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Individually viewed unmodified originals; exact SHA-256/source/viewport and restored run recorded; failed fault captures isolated."
+        }
+      },
+      "privateOriginalPath": "restored-preview-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-narrow-facts.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    },
+    {
+      "id": "reminders:preview-narrow-facts-right",
+      "feature": "announcement reminder preview",
+      "actionPoint": "reminders:preview",
+      "stateBranch": "ready / narrow inner scroll",
+      "expectation": "Horizontal scrolling reaches the same preview expiry column without widening the viewport or altering data.",
+      "driver": "existing native reminder preview journey",
+      "screenshotId": "reminders-preview-narrow-facts-right",
+      "expectedFileName": "reminder-preview-narrow-facts-right.png",
+      "status": "captured",
+      "visualApplicable": true,
+      "path": "reminders-preview-narrow-facts-right.png",
+      "sha256": "03d3951cfc4513253876c537362be36c2f70d4c330eb5482b3b1e8b8d35a8e98",
+      "locale": "zh-CN",
+      "source": "902a5b943d373300a5e8269c250e74f02625234a",
+      "coreCatalogSource": "2214c7294b2e84083f82483b8657be82282cfe7f",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshotDimensions": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime": "announcement-management",
+      "fixture": "Unique Reminder golden announcement created by the restored native journey; same fixture across all six frames.",
+      "role": "authorized announcement publisher",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T06:57:46.731468+00:00",
+      "visualVerdict": "accepted",
+      "observation": "同一记录横向滚动到右端，有效期列和值完整可读；左侧预览时间被滚动裁切属于当前视窗，宽屏图保留完整时间与人数。",
+      "functionalVerdict": "pass for the registered native reminder journey",
+      "interactionVerdict": "pass; confirmation cancellation, lost-response replay, reload and real narrow scrolling asserted",
+      "evidenceTrustVerdict": "fresh exact original; runtime/source verified; catalog/browser production-source equivalence attached",
+      "issues": [],
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "同一记录横向滚动到右端，有效期列和值完整可读；左侧预览时间被滚动裁切属于当前视窗，宽屏图保留完整时间与人数。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Adjacent business groups have normal 16px spacing; readiness helper rejects missing lazy content and bounds the spacing at 24px."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Labels, values and actions are readable at the recorded width; long synthetic title wraps on narrow viewport."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Context/confirmation frames show the relevant primary and cancel/back actions; scrolled facts frames are read-only evidence."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Controlled fixture counts/state/time are explicit; no platform PID or private machine path is shown."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "Ready, open confirmation and accepted-after-replay are distinct recorded states; no loading reservation is accepted as ready."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "Narrow context plus actual vertical/horizontal scroll frames cover relevant content; confirm focus visible. Physical mobile and screen-reader usability not tested."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Existing detail/card/table/confirmation family preserved; no business layout or CSS override introduced."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Individually viewed unmodified originals; exact SHA-256/source/viewport and restored run recorded; failed fault captures isolated."
+        }
+      },
+      "privateOriginalPath": "restored-preview-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-narrow-facts-right.png",
+      "captureEnvironment": {
+        "host": "macOS",
+        "browser": "Playwright Chromium / Desktop Chrome profile; responsive viewport emulation for narrow frames",
+        "font": "Application CSS and local browser fonts; no font fingerprint or cross-machine pixel comparison",
+        "physicalMobile": false,
+        "screenReaderTested": false
+      }
+    }
+  ],
+  "sources": {
+    "bpm": "a61fd24781160b6bb0bf686156f06bfab541af83",
+    "coreBrowser": "902a5b943d373300a5e8269c250e74f02625234a",
+    "coreCatalog": "2214c7294b2e84083f82483b8657be82282cfe7f"
+  },
+  "excludedHarnessAttempt": {
+    "log": "capture-fault.log",
+    "reason": "external config CJS/ESM loading error; no test/result JSON produced; not the expected negative"
+  },
+  "sourceEquivalence": "Core browser commit differs from catalog producer only in nine screenshot-scroll lines in the reminder browser spec; production source unchanged.",
+  "issues": [
+    {
+      "id": "R-UI-01",
+      "status": "resolved-as-capture-error",
+      "cause": "Original ready screenshot was taken before lazy guidance and reminder information rendered; no persistent layout gap.",
+      "resolution": "Readiness and normal-gap assertions, narrow inner-scroll coverage, deliberate missing-component failure and restored native pass; old image quarantined."
+    },
+    {
+      "id": "BPM-STOP-01",
+      "status": "resolved",
+      "cause": "30-second outer deadline cannot cover a full Spring graceful phase plus shutdown cleanup.",
+      "resolution": "Bounded 60-second owner-verified wait, explicit timeout reason; 31.5-second real-process regression red before/green after; post-browser public stop and two clean lifecycle rounds passed."
+    }
+  ],
+  "limits": [
+    "Two reported defects and their configured regression profiles, not complete product/state coverage.",
+    "No physical mobile, screen-reader, 50000-recipient, mini-program sender, remote BPM, standalone 340-case UI, OCI/Linux/Jenkins or production acceptance.",
+    "Coverage not measured; native restored1 overlaps the configured Core17.",
+    "Original failed retention-probe harness remains business_exit=1 stop_exit=1; its native4 and actual public stop are recorded separately from the final clean lifecycle rounds."
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "coreCatalogProducer": "2214c7294b2e84083f82483b8657be82282cfe7f",
+  "coreBrowserDriver": "902a5b943d373300a5e8269c250e74f02625234a",
+  "changedPaths": [
+    "web-admin/tests/e2e/announcement/announcement-reminders.spec.ts"
+  ],
+  "change": "nine extra screenshot/scroll lines only",
+  "productionSourceEquivalent": true,
+  "bpmCompositionRebuiltAfterThisTestOnlyChange": false
+}

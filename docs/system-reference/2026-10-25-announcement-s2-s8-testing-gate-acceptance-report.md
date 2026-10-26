@@ -7,7 +7,17 @@ updated: 2026-10-26
 
 # 公告 S2–S8 本地分层验收记录
 
-## 当前合并后验收（2026-10-26）
+## 当前催办预览与 BPM 停止修复验收
+
+允许结论为本次两项缺陷及指定回归通过，不是全产品黄金。当前事实源为[设计 §18.30](./announcement-management.md)、[本轮 8 张原图与分层证明](./evidence/announcement-s2-s8-2026-10-25/fix-preview-stop-2026-10-26/manifest.md)及原 manifest 的 `previewStopFixValidation`；关联 OSS [#2434](https://github.com/AuraBootTeam/auraboot/pull/2434)、BPM [#61](https://github.com/AuraBootTeam/aura-bpm/pull/61)。
+
+旧预览图为懒加载未完成时的过早抓取，已隔离并撤销 ready 成功裁决；原批次 32 张已查看中有效图更正为 31。新增完整内容/人数/间距门槛与窄屏内层滚动截图，缺失组件反例 1 按预期失败、恢复后 native preview1 通过（与 Core17 重叠）。当前 Core17、BPM4 均 collected/executed/passed，fail/skip/retry=0，认证各 1 另计；8 张原图逐张查看并记录角色、locale、viewport、SHA-256 和九维观察。
+
+BPM 原 30 秒外层期限小于完整优雅停机与关闭资源，新预算有界 60 秒且保留所有归属校验，不强杀。31.5 秒真实进程回归旧红新绿，边界 20 通过；新正式组合 98 脚本契约、1657 后端项/224 JUnit、Web/摘要/单 React/图一致性通过，空库有序 Flyway161。业务后公开 stop 成功且实际停机区间 36.635 秒；修正辅助探针后两轮独立公开生命周期均首次成功、端口释放，恢复后公告3/版本4。原辅助探针的 1/1 退出保留，未重标。
+
+准确 Core catalog producer2214、browser driver902a（只差9行测试截图、生产源码相同）与 BPMa61、锁/收据/Java来源和对账见上方证明。不外推未执行的生产、OCI/Linux/Jenkins、真机/真实小程序发送、远程BPM、50000人或独立340 UI；coverage_not_measured。原环境与绑定源码保留并暂停，现有 warning/历史登记问题独立保留。下方各“当前”段均为当时的历史版本。
+
+## 历史合并后验收（2026-10-26）
 
 当前裁决为[设计 §18.29](./announcement-management.md#1829-已合并版本与截图验收2026-10-26)、[本轮 32 张原图与逐图复核](./evidence/announcement-s2-s8-2026-10-25/postmerge-2026-10-26/manifest.md)及同一 manifest 的 `postMergeValidation`。OSS #2396、BPM #60、EE #1589 已合并并证明进入 main；下方旧开放 PR/不合并声明为历史口径。准确源码分别为 Core `7c5c1a4951b9d44a5282a0273b939762cd999d3a` 和 BPM `1b4b702285dc26afb416fc600174a2efc0244542`。
 

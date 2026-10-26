@@ -1,0 +1,28 @@
+{
+  "phase": "second",
+  "firstPublicAttemptPassed": true,
+  "portsFree": [
+    6501,
+    5401
+  ],
+  "ownerGenerations": [
+    {
+      "key": "backend",
+      "pid": 56808,
+      "group": 56808,
+      "startedAt": "Mon Oct 26 15:02:47 2026",
+      "stoppedAt": "2026-10-26T07:03:14.659Z"
+    },
+    {
+      "key": "web",
+      "pid": 57965,
+      "group": 57965,
+      "startedAt": "Mon Oct 26 15:03:03 2026",
+      "stoppedAt": "2026-10-26T07:03:14.661Z"
+    }
+  ],
+  "processMetadataPreserved": true,
+  "diagnosticPreloadUsed": false,
+  "elapsedSeconds": 6.207393457996659,
+  "newOwnedGenerationsVerified": true
+}
