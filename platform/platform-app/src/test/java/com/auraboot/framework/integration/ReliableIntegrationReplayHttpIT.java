@@ -1,6 +1,7 @@
 package com.auraboot.framework.integration;
 
 import com.auraboot.framework.application.TestApplication;
+import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.meta.service.impl.OutboxWorkerImpl;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
 import com.auraboot.framework.plugin.extension.integration.ReliableEventConsumerExtension;
@@ -105,7 +106,11 @@ class ReliableIntegrationReplayHttpIT {
         assertThat(count("ab_integration_receipt", tenant, eventId)).isZero();
         JsonNode failed = ok(OPERATOR_PATH + eventId, token, null);
         assertThat(failed.path("deadLetter").path("status").asText()).isEqualTo("open");
-        assertThat(request(OPERATOR_PATH + eventId, null, null).path("code").asText()).isIn("401", "403");
+        var anonymous = rest.getForEntity(OPERATOR_PATH + eventId, String.class);
+        assertThat(anonymous.getStatusCode().value()).isEqualTo(401);
+        assertThat(json.readTree(anonymous.getBody()).path("code").asText())
+                .isEqualTo(ResponseCode.MissingAuthorizationHeader.getCode());
+        assertThat(anonymous.getBody()).doesNotContain(eventId, correlation);
 
         receiver.reject.set(false);
         JsonNode accepted;
