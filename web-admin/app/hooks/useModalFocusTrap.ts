@@ -31,9 +31,10 @@ export function useModalFocusTrap(
     const previousIndex = activeModalStack.indexOf(container);
     if (previousIndex >= 0) activeModalStack.splice(previousIndex, 1);
     activeModalStack.push(container);
-    const restoreBackground = makeBackgroundInert(container);
+    // Native inert activation can blur the opener synchronously. Capture it first.
     const returnTarget =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const restoreBackground = makeBackgroundInert(container);
     const frame = window.requestAnimationFrame(() => {
       if (!isTopmostModal(container)) return;
       // Do not steal focus if a user already moved inside before this frame.
