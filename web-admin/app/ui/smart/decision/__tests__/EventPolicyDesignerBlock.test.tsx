@@ -169,7 +169,7 @@ describe('EventPolicyDesignerBlock', () => {
     fireEvent.click(screen.getByTestId('cb-add'));
 
     const fieldPicker = screen.getByLabelText('field-0');
-    expect(fieldPicker).toHaveTextContent('请假天数');
+    await waitFor(() => expect(fieldPicker).toHaveTextContent('请假天数'));
     expect(fieldPicker).not.toHaveTextContent('访问次数');
     expect(fieldPicker).not.toHaveTextContent('客户等级');
   });
