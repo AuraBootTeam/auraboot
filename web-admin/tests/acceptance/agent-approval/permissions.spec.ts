@@ -96,6 +96,13 @@ async function readModel(page: Page, name: string) {
   return { toolId: invocation!.data.toolId, tool: invocation!.data.toolName };
 }
 
+async function modelInventory() {
+  return (await database.query(`SELECT
+    (SELECT count(*)::int FROM ab_meta_model WHERE tenant_id=$1 AND deleted_flag=FALSE) AS models,
+    (SELECT count(*)::int FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE 'mt_%') AS tables`,
+  [fixture.tenantId])).rows[0];
+}
+
 async function forbiddenEffect(code: string) {
   const model = await database.query(
     'SELECT count(*)::int AS n FROM ab_meta_model WHERE tenant_id=$1 AND code=$2 AND deleted_flag=FALSE',
@@ -108,6 +115,9 @@ test('ordinary member reads model metadata and restores the visible result after
   await login(page, fixture.reader);
   await openPanel(page, true);
   const tool = await readModel(page, 'reader-read');
+  await page.getByTestId('rc-queried-model').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('rc-queried-model')).toContainText(fixture.modelCode);
+  await expect(page.getByTestId('rc-card')).not.toBeVisible();
   await page.screenshot({ path: join(evidence, 'reader-model-read.png'), fullPage: true });
   const usageBefore = (await database.query(
     'SELECT count(*)::int AS n FROM ab_gen_ai_usage WHERE tenant_id=$1', [fixture.tenantId])).rows[0].n;
@@ -124,12 +134,14 @@ test('ordinary member reads model metadata and restores the visible result after
 
 test('ordinary member cannot create a model and can still perform an allowed read', async ({ page }) => {
   const code = 'reader_denied_' + randomUUID().replaceAll('-', '').slice(0, 12);
+  const inventoryBefore = await modelInventory();
   expect(await forbiddenEffect(code)).toEqual({ models: 0, physical: null });
   await login(page, fixture.reader);
   await openPanel(page, true);
   const result = await send(page, '请现在实际创建一个业务模型，调用 aurabot_model_create，'
     + '编码为 ' + code + '，名称为权限拒绝验收台账。请执行创建，不要只返回示例。', 'reader-denied');
   expect(await forbiddenEffect(code)).toEqual({ models: 0, physical: null });
+  expect(await modelInventory()).toEqual(inventoryBefore);
   await expect(page.getByTestId('skill-preview-card')).toHaveCount(0);
   await expect(page.getByTestId('aurabot-confirm-card')).toHaveCount(0);
   await expect(page.locator('[data-testid=aurabot-panel]')).toContainText(/权限|无法|不能|不可用|未创建|未执行/);
@@ -140,7 +152,8 @@ test('ordinary member cannot create a model and can still perform an allowed rea
   const tool = await readModel(page, 'reader-after-denial');
   expect(await forbiddenEffect(code)).toEqual({ models: 0, physical: null });
   await page.screenshot({ path: join(evidence, 'reader-read-recovered.png'), fullPage: true });
-  facts.push({ id: 'U2', forbiddenCode: code, effect: await forbiddenEffect(code), recovery: tool });
+  expect(await modelInventory()).toEqual(inventoryBefore);
+  facts.push({ id: 'U2', forbiddenCode: code, effect: await forbiddenEffect(code), inventoryUnchanged: true, recovery: tool });
 });
 
 test('switching from admin to a nonmember cannot restore or list the admin conversation', async ({ page }) => {

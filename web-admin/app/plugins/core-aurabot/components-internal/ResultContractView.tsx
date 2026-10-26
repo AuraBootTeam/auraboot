@@ -262,6 +262,14 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
     && 'displayName' in skillPayload && typeof skillPayload.displayName === 'string'
     && 'modelCode' in skillPayload && typeof skillPayload.modelCode === 'string' ? skillPayload : null;
 
+  const modelQuery = contract.status === 'success' && contract.skillCode === 'aurabot:model:query'
+    && skillPayload && typeof skillPayload === 'object' && 'matched' in skillPayload ? skillPayload : null;
+  const queriedModel = modelQuery?.model && typeof modelQuery.model === 'object'
+    && 'displayName' in modelQuery.model && typeof modelQuery.model.displayName === 'string'
+    && 'code' in modelQuery.model && typeof modelQuery.model.code === 'string'
+    ? { displayName: modelQuery.model.displayName, modelCode: modelQuery.model.code } : null;
+  const businessModel = createdModel ?? queriedModel;
+
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
   const { color, Icon } = statusStyle;
   const metric = contractMetric(contract);
@@ -333,16 +341,20 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
         )}
       </div>
 
-      {createdModel && <div className="mt-2"><CardView contract={contract} /></div>}
+      {(createdModel || modelQuery) && <div className="mt-2"><CardView contract={contract} /></div>}
       </details>
 
-      {createdModel ? (
-        <dl className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm" data-testid="rc-created-model">
+      {businessModel ? (
+        <dl className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm" data-testid={createdModel ? "rc-created-model" : "rc-queried-model"}>
           <dt className="text-gray-600">{text({ 'zh-CN': '模型名称', 'en-US': 'Model name' })}</dt>
-          <dd className="min-w-0 break-words font-medium">{String(createdModel.displayName)}</dd>
+          <dd className="min-w-0 break-words font-medium">{String(businessModel.displayName)}</dd>
           <dt className="text-gray-600">{text({ 'zh-CN': '模型编码', 'en-US': 'Model code' })}</dt>
-          <dd className="min-w-0 break-words [overflow-wrap:anywhere]">{String(createdModel.modelCode)}</dd>
+          <dd className="min-w-0 break-words [overflow-wrap:anywhere]">{String(businessModel.modelCode)}</dd>
         </dl>
+      ) : modelQuery ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm" data-testid="rc-model-not-found">
+          {text({ 'zh-CN': '未找到该模型，请核对模型编码或联系管理员。', 'en-US': 'Model not found. Check its code or contact an administrator.' })}
+        </div>
       ) : contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
         <TableView rows={resolveTableRows(contract)} label={(key) => text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })} structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })} />
       ) : contract.renderHint === 'summary' ? (
