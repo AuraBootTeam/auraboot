@@ -434,14 +434,17 @@ public class ChatToolResolver {
         if (code != null && code.startsWith("aurabot:")) {
             return "AURABOT_SKILL";
         }
+        // Preserve the registry's executor metadata. Reclassifying a local DSL read as
+        // built_in makes runtime authorization infer EXTERNAL_NETWORK and reject it
+        // under a read-only ceiling, even though discovery correctly allowed it.
+        if (toolDef.toolType() != null && !toolDef.toolType().isBlank()) {
+            return toolDef.toolType();
+        }
         if (code != null && (code.startsWith("cmd:")
                 || code.startsWith("nq:")
                 || code.startsWith("list:")
                 || code.startsWith("get:"))) {
             return "built_in";
-        }
-        if (toolDef.toolType() != null && !toolDef.toolType().isBlank()) {
-            return toolDef.toolType();
         }
         return inferProviderToolType(code);
     }
