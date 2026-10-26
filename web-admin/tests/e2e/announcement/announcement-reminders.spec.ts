@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
+import { expectAnnouncementReminderPreviewReady } from '../../helpers/announcement-preview';
 import { authenticateBffSession } from '../../helpers/bff-auth-session';
 
 test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
@@ -88,7 +89,13 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     await expect(page.getByRole('heading', { name: fixture.title, exact: true })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: '当前可催办', exact: true })).toBeVisible();
     await expect(page.getByText('Page Unavailable', { exact: true })).toHaveCount(0);
+    await expectAnnouncementReminderPreviewReady(page);
     await screenshot('reminder-preview-ready');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectAnnouncementReminderPreviewReady(page);
+    await expect(page.getByRole('button', { name: '确认催办', exact: true })).toBeVisible();
+    await screenshot('reminder-preview-narrow');
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole('button', { name: '确认催办', exact: true }).click();
     const dialog = page.getByTestId('confirm-dialog'); await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('提交时会重新检查'); await screenshot('reminder-confirm-open');
