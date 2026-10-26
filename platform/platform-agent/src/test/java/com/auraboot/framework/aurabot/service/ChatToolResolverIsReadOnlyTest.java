@@ -264,4 +264,33 @@ class ChatToolResolverIsReadOnlyTest {
             MetaContext.clear();
         }
     }
+    @Test
+    void discoveredDslRuntimeTypeAndSourceSurviveChatAdaptation() {
+        GroundingPort grounding = (tenant, message, model, record) ->
+                new GroundingPort.GroundingResult("query", "orders", 0.9, List.of(), true);
+        List<ToolDiscoveryPort.ToolDef> definitions = List.of(
+                new ToolDiscoveryPort.ToolDef("list:orders", "Orders", "Read orders", Map.of("type", "object"),
+                        true, "dsl_query", "orders", false, false, "L0", "none"),
+                new ToolDiscoveryPort.ToolDef("get:orders", "Order", "Read order", Map.of("type", "object"),
+                        true, "dsl_query", "orders", false, false, "L0", "none"),
+                new ToolDiscoveryPort.ToolDef("nq:late_orders", "Late orders", "Query late orders", Map.of("type", "object"),
+                        true, "dsl_query", "late_orders", false, false, "L0", "none"),
+                new ToolDiscoveryPort.ToolDef("cmd:orders:query", "Query command", "Read command", Map.of("type", "object"),
+                        true, "dsl_query", "orders:query", false, false, "L0", "none"));
+        ChatToolResolver mapped = new ChatToolResolver(grounding,
+                discoveryPort((tenant, skills, model, intent, limit, channel) -> definitions), null);
+        MetaContext.setSystemTenantContext(1L);
+        try {
+            mapped.resolveTools("query orders", "orders", null, "web");
+            for (var definition : definitions) {
+                var runtime = mapped.getAgentToolDefinition(definition.code().replace(':', '_'));
+                assertThat(runtime).isNotNull();
+                boolean command = definition.code().startsWith("cmd:");
+                assertThat(runtime.getToolType()).isEqualTo(command ? "built_in" : "dsl_query");
+                assertThat(runtime.getSourceCode()).isEqualTo(command ? definition.code() : definition.sourceCode());
+                assertThat(runtime.getRiskLevel()).isEqualTo("L0");
+            }
+        } finally { MetaContext.clear(); }
+    }
+
 }
