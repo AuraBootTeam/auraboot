@@ -118,6 +118,24 @@ public interface FileAccessor {
         throw new UnsupportedOperationException("uploaded file relation capability is unavailable");
     }
 
+    /**
+     * Append an owned finalized upload to the original human command's root record and retain
+     * its bytes, atomically in the caller's physical Core transaction. Existing relations remain.
+     * The host validates the published multi-file field and its exact command writer. The caller
+     * must perform its parent CAS/projection first in the same transaction; this method does not
+     * update the business field, create a child relation, or copy bytes. Repeated exact links are
+     * idempotent. Append distinct file PIDs in ascending order to prevent cross-root lock cycles.
+     * Nested commands cannot install this capability. The capability expires when the handler returns and rejects async use, another
+     * thread, identity/target changes and a suspended/replaced transaction (including REQUIRES_NEW).
+     * A failure must abort the original command transaction.
+     *
+     * @param filePid exact public PID of an active finalized upload owned by the current user
+     * @param fieldCode real published root multi-file field code
+     */
+    default void appendAndRetainExistingToTarget(String filePid, String fieldCode) {
+        throw new UnsupportedOperationException("command target file append capability is unavailable");
+    }
+
     /** Saved platform file metadata returned to plugin handlers. */
     record SavedFile(String fileId, String originalName, long size, String url) {
     }

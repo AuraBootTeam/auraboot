@@ -1204,4 +1204,32 @@ class HandlerPhaseTest {
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
     }
 
+    @Test
+    void targetFileCapabilityReceivesTrustedPipelineContextAndClosesOnSuccessAndFailure() {
+        var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", factory);
+        for (boolean reject : List.of(false, true)) {
+            var scope = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
+            var accessor = org.mockito.Mockito.mock(FileAccessor.class);
+            var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type","custom","handler",PLUGIN_HANDLER_CODE));
+            when(factory.forCommand(ctx)).thenReturn(scope);
+            when(scope.accessor()).thenReturn(accessor);
+            var handler = new CommandHandlerExtension() {
+                @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+                @Override public Object execute(CommandContext context) {
+                    assertThat(context.fileAccessor()).isSameAs(accessor);
+                    context.fileAccessor().appendAndRetainExistingToTarget("upload-pid", "photos");
+                    if (reject) throw new IllegalStateException("domain evidence failed");
+                    return Map.of();
+                }
+            };
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            if (reject) assertThatThrownBy(()->phase.execute(ctx)).hasMessageContaining("domain evidence failed");
+            else phase.execute(ctx);
+            verify(factory).forCommand(ctx);
+            verify(accessor).appendAndRetainExistingToTarget("upload-pid", "photos");
+            verify(scope).close();
+        }
+    }
+
 }

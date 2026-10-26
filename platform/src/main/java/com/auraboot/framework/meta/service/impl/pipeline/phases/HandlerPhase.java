@@ -114,6 +114,9 @@ public class HandlerPhase implements CommandPhase {
     private FileService fileService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory commandTargetFiles;
+
+    @Autowired(required = false)
     private AsyncTaskServiceImpl asyncTaskService;
 
     @Autowired
@@ -147,7 +150,7 @@ public class HandlerPhase implements CommandPhase {
         Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
                 withCommandAuthority(ctx, () -> executeHandlerPhase(
                         handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
-                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(),
+                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(), ctx,
                         Boolean.TRUE.equals(ctx.getTargetRecordReadable())
                             && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
                             && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized())));
@@ -166,7 +169,7 @@ public class HandlerPhase implements CommandPhase {
                                                      Map<String, Object> fieldMapResults,
                                                      Long tenantId, Long userId,
                                                      CommandExecuteRequest request,
-                                                     Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
+                                                     Map<String, Object> execConfig, CommandPipelineContext pipelineContext, boolean relatedUpdateBoundaryAuthorized) {
         Map<String, Object> handlerResults = new HashMap<>();
         boolean dryRun = request.isDryRun();
 
@@ -221,7 +224,7 @@ public class HandlerPhase implements CommandPhase {
 
         // 2. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
-                fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized);
+                fieldMapResults, handlerResults, execConfig, pipelineContext, relatedUpdateBoundaryAuthorized);
 
         // 3. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
@@ -551,7 +554,7 @@ public class HandlerPhase implements CommandPhase {
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults,
                                               Map<String, Object> handlerResults,
-                                              Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
+                                              Map<String, Object> execConfig, CommandPipelineContext pipelineContext, boolean relatedUpdateBoundaryAuthorized) {
         if (extensionRegistry == null) {
             return;
         }
@@ -636,6 +639,7 @@ public class HandlerPhase implements CommandPhase {
                 handler != null ? handler.getClass().getName() : "<none>", secondaryHandlers.size());
 
         DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
+        var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext);
         try {
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>();
@@ -729,7 +733,7 @@ public class HandlerPhase implements CommandPhase {
             }
             if (fileService != null && storageProvider != null) {
                 pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
-                        new FileAccessorImpl(fileService, storageProvider, userId));
+                        fileScope == null ? new FileAccessorImpl(fileService, storageProvider, userId) : fileScope.accessor());
             }
             if (asyncTaskService != null && objectMapper != null) {
                 pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
@@ -848,6 +852,7 @@ public class HandlerPhase implements CommandPhase {
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {
+            if (fileScope != null) fileScope.close();
             queryScope.close();
         }
     }
