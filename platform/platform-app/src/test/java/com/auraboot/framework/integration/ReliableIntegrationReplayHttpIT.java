@@ -110,7 +110,9 @@ class ReliableIntegrationReplayHttpIT {
         assertThat(anonymous.getStatusCode().value()).isEqualTo(401);
         assertThat(json.readTree(anonymous.getBody()).path("code").asText())
                 .isEqualTo(ResponseCode.MissingAuthorizationHeader.getCode());
-        assertThat(anonymous.getBody()).doesNotContain(eventId, correlation);
+        // The public error context echoes the caller's path, but never returns stored event data.
+        assertThat(json.readTree(anonymous.getBody()).path("data").isNull()).isTrue();
+        assertThat(anonymous.getBody()).doesNotContain(correlation, EVENT_TYPE, CONSUMER, "replayHistory");
 
         receiver.reject.set(false);
         JsonNode accepted;
