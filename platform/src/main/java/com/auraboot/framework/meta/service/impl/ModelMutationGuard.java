@@ -32,8 +32,9 @@ public final class ModelMutationGuard {
             }
         }
         java.util.List<?> allowed = (java.util.List<?>) policy.get(operation);
+        String commandCode = MetaContext.getAuthorizedCommandCode();
         if (allowed == null || !MetaContext.hasCommandPermitScope()
-                || !allowed.contains(MetaContext.getAuthorizedCommandCode())) {
+                || commandCode == null || !allowed.contains(commandCode)) {
             throw new MetaServiceException("Model mutation requires its exact authorized command");
         }
     }
