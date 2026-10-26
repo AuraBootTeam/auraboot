@@ -117,11 +117,12 @@ class VerifiedWechatSubscriptionGrantResolverTest {
         assertThatThrownBy(() -> resolver.claim(42, "source-ref")).hasMessage("WECHAT_RESERVATION_SERIALIZABLE_TRANSACTION_REQUIRED");
         verifyNoInteractions(reservations);
     }
-    @Test void dispatchCanVerifyInItsOwnShortSerializableReadTransaction() {
+    @Test void dispatchVerificationAllowsMetadataShareLocksInItsShortSerializableTransaction() {
         var grant = resolver.claim(42, "source-ref").orElseThrow(); TransactionSynchronizationManager.clear();
         when(plans.resolve(42, "source-ref")).thenAnswer(call -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
             assertThat(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_SERIALIZABLE);
+            assertThat(TransactionSynchronizationManager.isCurrentTransactionReadOnly()).isFalse();
             return Optional.of(plan);
         });
         assertThat(resolver.verifyReserved(42, "source-ref", grant.reservationReference())).contains(grant);

@@ -72,7 +72,7 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
         this.reservations = reservations; this.clock = clock;
         reads = new TransactionTemplate(manager);
         reads.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
-        reads.setReadOnly(true);
+        // Source resolvers take metadata share locks. PostgreSQL forbids those locks in read-only transactions.
     }
 
     @Override public Optional<Grant> claim(long tenant, String reference) {
@@ -104,7 +104,7 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
             requireTransaction();
             return verify(tenant, reference, reservation);
         }
-        // Dispatch happens outside a transaction. Re-read source eligibility and revocation in a short consistent view.
+        // Dispatch happens outside a transaction. Re-read eligibility with its metadata locks in a short consistent view.
         return Objects.requireNonNull(reads.execute(status -> verify(tenant, reference, reservation)));
     }
     private Optional<Grant> verify(long tenant, String reference, String reservation) {
