@@ -88,12 +88,25 @@ public class AnnouncementAcknowledgementAccessorImpl implements AnnouncementAckn
             checks.add(check(required, tenant, user, root, version, now));
         }
         List<Check> result = List.copyOf(checks);
-        var expiring = result.stream().filter(c -> c.status() == Status.SATISFIED && c.validUntil() != null).toList();
-        if (!expiring.isEmpty()) TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        var satisfied = result.stream().filter(c -> c.status() == Status.SATISFIED).toList();
+        var requiredByVersion = new HashMap<String,Requirement>();
+        requirements.forEach(r -> requiredByVersion.put(r.versionPid(), r));
+        Object memberId = member == null ? null : member.get("member_id");
+        if (!satisfied.isEmpty()) TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void beforeCommit(boolean readOnly) {
+                var current = proof.lockMember(tenant, actor, user);
+                if (current == null || !Objects.equals(memberId, current.get("member_id"))) unavailable();
                 Instant commitCheck = proof.databaseNow();
-                if (expiring.stream().anyMatch(c -> !commitCheck.isBefore(c.validUntil()))) {
-                    throw BusinessException.i18n("announcement.error.recipient_unavailable");
+                // Root locks stop other transactions, but the caller may have changed
+                // the same records itself. Revalidate all satisfied facts, not just time.
+                for (Check previous : satisfied) {
+                    Requirement required = requiredByVersion.get(previous.requestedVersionPid());
+                    if (!required.memberPid().equals(current.get("member_pid"))) unavailable();
+                    var freshVersion = proof.version(tenant, required.versionPid());
+                    var originalVersion = versions.get(required.versionPid());
+                    if (freshVersion == null || !Objects.equals(freshVersion.get("announcement_pid"), originalVersion.get("announcement_pid"))) unavailable();
+                    var freshRoot = lifecycle.lock(tenant, (String) originalVersion.get("announcement_pid"));
+                    if (check(required, tenant, user, freshRoot, freshVersion, commitCheck).status() != Status.SATISFIED) unavailable();
                 }
             }
         });
@@ -135,5 +148,9 @@ public class AnnouncementAcknowledgementAccessorImpl implements AnnouncementAckn
 
     private static Instant instant(Object value) {
         return value == null ? null : AnnouncementDeliveryPlanResolver.instant(value);
+    }
+
+    private static void unavailable() {
+        throw BusinessException.i18n("announcement.error.recipient_unavailable");
     }
 }

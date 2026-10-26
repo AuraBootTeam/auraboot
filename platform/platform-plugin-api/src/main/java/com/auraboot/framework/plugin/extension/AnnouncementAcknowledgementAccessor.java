@@ -14,7 +14,7 @@ public interface AnnouncementAcknowledgementAccessor {
     /**
      * Requires the caller's existing writable Core transaction. The host locks the
      * current member/user and announcement roots until that transaction ends,
-     * orders aggregate locks consistently and checks expiry again before commit.
+     * orders aggregate locks consistently and revalidates satisfied facts before commit.
      * A result is proof only when status is SATISFIED; ordinary reading is not
      * acknowledgement, and NOT_REQUIRED must not satisfy an explicit-ack gate.
      * The caller persists these exact identities with its business revision.

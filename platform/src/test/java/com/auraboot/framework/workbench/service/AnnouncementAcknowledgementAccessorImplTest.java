@@ -153,6 +153,24 @@ class AnnouncementAcknowledgementAccessorImplTest {
         assertDoesNotThrow(() -> TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.beforeCommit(false)));
     }
 
+    @Test void sameTransactionWithdrawalCannotCommitUsingAnEarlierSatisfiedProof() {
+        check(); root.setActiveVersionPid(null); version.put("publication_state", "withdrawn");
+        assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                () -> TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.beforeCommit(false)));
+    }
+
+    @Test void sameTransactionMemberChangeCannotCommitUsingAnEarlierSatisfiedProof() {
+        check(); when(proof.lockMember(1L, 2L, "user-public")).thenReturn(null);
+        assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                () -> TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.beforeCommit(false)));
+    }
+
+    @Test void sameTransactionSnapshotChangeCannotCommitUsingAnEarlierSatisfiedProof() {
+        check(); version.put("snapshot_hash", "b".repeat(64));
+        assertThrows(com.auraboot.framework.exception.BusinessException.class,
+                () -> TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.beforeCommit(false)));
+    }
+
     @Test void duplicateEmptyAndOversizedPlansAreRejectedBeforeDataAccess() {
         assertThrows(IllegalArgumentException.class, () -> service.checkForCommand(List.of()));
         assertThrows(IllegalArgumentException.class, () -> service.checkForCommand(List.of(required().getFirst(), required().getFirst())));
