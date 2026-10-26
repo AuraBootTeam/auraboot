@@ -128,17 +128,21 @@ class MemoryGovernancePostgresTest {
     void conversationalWriteRetainsTenantOwnerAndProvenanceInOneRecord() {
         String provenance = "kind=episodic;source_turn_id=turn-42;observed_at=2026-10-26T00:00:00Z;authority=model_response";
         String pid = memories.createScopedMemory(TENANT_A, agent, "turn_summary", "conversation_turn",
-                "Past answer", "Customer balance was 100", 4, false, "user", "alice", provenance);
+                "Past answer", "Customer balance was 100", 4, false, "user", "42", provenance);
         assertThat(jdbc.queryForMap("SELECT metadata,scope,scope_key,tenant_id FROM ab_agent_memory WHERE pid=?", pid))
-                .containsEntry("metadata", provenance).containsEntry("scope", "user").containsEntry("scope_key", "alice")
+                .containsEntry("metadata", provenance).containsEntry("scope", "user").containsEntry("scope_key", "42")
                 .containsEntry("tenant_id", TENANT_A);
         ActiveMemoryService recall = new ActiveMemoryService(memories);
-        assertThat(recall.preRecall(TENANT_A, "alice", agent, "balance"))
+        assertThat(recall.preRecall(TENANT_A, "42", agent, "balance"))
                 .anySatisfy(row -> assertThat((String)row.get("content"))
                         .startsWith("[Historical model response; verify current business data]"));
-        assertThat(recall.preRecall(TENANT_B, "alice", agent, "balance")).isEmpty();
+        assertThat(recall.preRecall(TENANT_B, "42", agent, "balance")).isEmpty();
         jdbc.update("UPDATE ab_agent_memory SET category='user' WHERE pid=?", pid);
-        assertThat(recall.preRecall(TENANT_A, "alice", agent, "balance"))
+        AgentPromptAssemblyService assembly = new AgentPromptAssemblyService(jdbc, new com.fasterxml.jackson.databind.ObjectMapper());
+        assertThat(assembly.assemblePrompt(TENANT_A, agent, 42L))
+                .contains("[Historical model response; verify current business data]", "Customer balance was 100");
+        assertThat(assembly.assemblePrompt(TENANT_A, agent, null)).doesNotContain("Customer balance was 100");
+        assertThat(recall.preRecall(TENANT_A, "42", agent, "balance"))
                 .anySatisfy(row -> assertThat((String)row.get("content"))
                         .startsWith("[Historical model response; verify current business data]"));
     }
