@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-24
-updated: 2026-10-25
+updated: 2026-10-26
 implementation_status: implemented-local-validated-pr-open
 ---
 
@@ -1338,3 +1338,19 @@ BPM source `3861a3146caf07a16b0937971e4cba5c2433e8de` 未改代码；针对新 c
 保留的反例与失败：旧远端 Frontend env-drift 6 处、Docker Quickstart 的 live OpenAPI drift、CodeQL 4 项路径日志告警；本地全量 8752 pass/2 fail 后修正收件箱测试与无效 DSL；发布工具检查首轮 35 pass/1 runner error，缺 TS loader 的 1 文件使用 tsx 后 2 项通过；API foundation 首次拒绝 dirty source，提交快照后 clean checkout 的 38 项才通过。原日志不覆盖或重标。当前原 PR 的准确 head 与 Checks 是远端 CI 的裁决入口，运行中不算通过；本节记录本地测试、真实捕获与已发生失败，不预报后续 CI 结果。
 
 本期未新增小程序真实发送、远程 BPM、50000 人、独立 BPM 340 corpus、OCI/Linux/Jenkins 或生产验收；本机未运行容器。源代码改变后由 GitHub 自动触发的 Docker/CodeQL 等结果只按其准确 head 单独记录。原 Workspace `RUNTIME_MANIFEST_MISSING` warning 与共享 Gradle 路径前缀问题未修改；构建与生命周期保持串行。详情见[同一验收报告](./2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md)与[同一 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `ciFollowupValidation`。
+
+### 18.29 已合并版本与截图验收（2026-10-26）
+
+本节取代 §18.28 的当前交付指针。用户已明确授权合并并截图验证；OSS [#2396](https://github.com/AuraBootTeam/auraboot/pull/2396)、BPM [#60](https://github.com/AuraBootTeam/aura-bpm/pull/60)、EE [#1589](https://github.com/AuraBootTeam/auraboot-enterprise/pull/1589) 已合并，准确 merge commit 分别为 `7c5c1a4951b9d44a5282a0273b939762cd999d3a`、`1b4b702285dc26afb416fc600174a2efc0244542`、`562f8df415a0f6fb357969c03e34cc6ef019b432`，均已证明进入各自 origin/main。不涉及生产发布。下方及旧节的开放 PR/暂不合并表述只记录当时授权状态。
+
+合并后冻结准确源重新构建：Core catalog 15 artifacts/18 entries，lock `sha256:74f491cdc6f290c946b5ac082c1e543edfd2fb015db0c8a4a948a38f983ae736`；BPM 显式消费该 catalog 生成 22 件 announcements 组合，lock `sha256:45cfca8872588debb44a9e8ae6c3ca5d751f33d83b828df242a374023d8fe4ca`。两端正式 Web typecheck/client/SSR、摘要、图一致性和单 React 检查通过，OCI 明确跳过。组合构建 97 Node 契约和 1657 后端项通过（224 JUnit，fail/error/skip=0）。原受管 BPM 开发库备份后正常 reset，从空库顺序执行 161 条 Flyway（156 Core + 5 BPM）；Core browser 使用 canonical schema 快照，不冒充逐条 Flyway。
+
+Core 原生 browser 17/17、BPM profile 4/4（含 3 公告与 1 原项目审批）通过，均单次、无 fail/skip/retry，认证各 1 另计，collection/result 准确身份集合对账通过。实际 Java classpath、artifact root、producer 和 lock 在 BPM browser 前验证。先登记的 32 张选定原图已逐张查看并记录九维结论，涵盖列表、表单、无权限、定时/撤销/删除、冻结附件、窄屏待办/知悉、统计导出入口、催办、ANY/ALL 审批与恢复替换；只裁决捕获状态，不外推全部产品排列或按钮。详见[本轮原图及观察](./evidence/announcement-s2-s8-2026-10-25/postmerge-2026-10-26/manifest.md)与[同一 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `postMergeValidation`。
+
+视觉存在非阻断 R-UI-01：催办预览摘要与统计行之间留白较大，数据和主操作仍清楚可达；本次不扩大到页面重设计。未验证读屏器。功能、视觉、交互和证据信任独立记录，截图不代替权限/冻结字节/投票事实断言。
+
+本轮排除首轮 Core 依赖启动失败、误用旧组合的 BPM browser、未执行 browser 的 Web 依赖升级拒绝；旧图片不重标。公开 update-web 完成原运行时的依赖升级后才运行上述有效 BPM 轮次。适配器生成受 evidence 软链物理路径影响，一次失败启动覆盖了旧轮次部分生命周期日志；旧 browser/results/images 保留，不能宣称该轮生命周期证据完整。有效 BPM business_exit=0，首次停止却为 stop_exit=2（进程所有权探针异常，原因未定位）；随后经同一所有权校验器核对已退出进程并成功公开 suspend。该异常单列，不能写成初次正常退出。Core business/stop 均为 0。
+
+OSS/BPM 原 runtime 已暂停，DB、构件、备份与证据保留；地址仍为 Core Web 5101/backend 6401、BPM Web 5401/backend 6501。BPM Workspace 的 RUNTIME_MANIFEST_MISSING warning 与共享 Gradle cache 路径前缀问题未修，产品 verify 独立通过，生命周期/构建串行。OSS/BPM source checkout 与引用因原 runtime 仍绑定准确 root/branch 而保留，不能强删或宣称源码资源全部回收；EE 工作区及分支已收口。任务注册中的历史 removed Workspace 行没有 PR/head 证明，阻止整任务自动 finish；当前任务负责后续受支持的 artifact handoff/登记凭证对账，未为本次验收修改 Workspace 业务代码。保留环境不等于生产部署。
+
+验证范围仍不包括小程序真实 sender/真机、跨服务远程 BPM、50000 人、独立 BPM 340 corpus、OCI/Linux/Jenkins 或生产验收。历史前端 8774 和既有 Core 单测不冒称本次重跑；本次新增绿色只按上述准确源与执行面解释。

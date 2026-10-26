@@ -2,12 +2,22 @@
 type: system-reference
 status: active
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # 公告 S2–S8 本地分层验收记录
 
-## 当前 CI 后续验收（取代下方旧版本的“当前”口径）
+## 当前合并后验收（2026-10-26）
+
+当前裁决为[设计 §18.29](./announcement-management.md#1829-已合并版本与截图验收2026-10-26)、[本轮 32 张原图与逐图复核](./evidence/announcement-s2-s8-2026-10-25/postmerge-2026-10-26/manifest.md)及同一 manifest 的 `postMergeValidation`。OSS #2396、BPM #60、EE #1589 已合并并证明进入 main；下方旧开放 PR/不合并声明为历史口径。准确源码分别为 Core `7c5c1a4951b9d44a5282a0273b939762cd999d3a` 和 BPM `1b4b702285dc26afb416fc600174a2efc0244542`。
+
+本轮重新执行 Core 17 条原生旅程、BPM 4 条原生旅程，认证各 1 另计，collection/result 全量身份集合对账 PASS，无 fail/skip/retry；不累计历史重复轮次。BPM 新组合正式构建包含 97 Node 契约及 1657 后端项，224 JUnit 的 fail/error/skip 为 0。新 Core catalog 15 件/18 entries、BPM 22 件组合，正式 Web 与构件身份检查通过；receipt、锁、实际 Java 来源与分层对账均已入证据清单。空库正常 Flyway 161；Core snapshot 模式独立说明。
+
+32 张选中原图逐张复核：功能及原生交互在上述旅程范围通过，视觉接受但保留非阻断 R-UI-01（催办预览留白），九维观察与 SHA-256 逐图登记。未截图的全状态排列不算视觉通过。误用旧组合的首轮 BPM browser 排除；Web 升级拒绝和 Core 依赖失败单独保留，部分旧生命周期日志被适配器重试覆盖的证据缺陷如实记录。有效 BPM 首次停止 exit=2，所有权核对后公开 suspend 成功；不把它改写为首次 0/0。Core 正常 0/0。
+
+原环境已暂停，DB/构件/备份保留；OSS/BPM 源码因 runtime 依赖保留，EE 源码收口。任务登记历史 Workspace 行缺少 PR/head 证明，整任务自动 finish 尚未成立。保留的 RUNTIME_MANIFEST_MISSING warning、Gradle 前缀匹配限制和本轮停止探针异常均不是“零环境问题”。不含生产发布、OCI/Linux/Jenkins、小程序真实发送、远程 BPM、50000 人或独立 340 corpus；旧前端/Core 单测没有冒称本次重跑。
+
+## 历史 CI 后续验收（463515 基线）
 
 当前裁决以[设计 §18.28](./announcement-management.md#1828-ci-后续修正与当前集成裁决)及 manifest 的 `ciFollowupValidation` 为准。main 固定为 `463515bb730bcdad966c10d69665b8203194a8e7`，实际 browser source `8837ec03c2be416d524e7a8d1339bea52d6d0915`，snapshot/catalog source `6eae14ad872da86a453d1379a107aa17dc971253`；两者只差实时快照和生成类型，后续交付只改文档/证据。BPM source 3861 未改，新增 19 项真实集成对照；旧 1657/4 属于旧正式组合，未冒充新 catalog 的全量验收。
 
