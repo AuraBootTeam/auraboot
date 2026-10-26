@@ -73,6 +73,7 @@ class MemoryL1L2SemanticDedupIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setup() {
         tenantId = getTestTenant().getId();
+        Mockito.when(embeddingService.currentSpace(anyLong(), org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyInt())).thenReturn("a".repeat(64));
         agentCode = TEST_PREFIX + "agent_" + UniqueIdGenerator.generate();
         userId = String.valueOf(getTestUser().getId());
         Mockito.when(embeddingService.embed(anyLong(), anyString(), anyString()))
@@ -259,6 +260,7 @@ class MemoryL1L2SemanticDedupIntegrationTest extends BaseIntegrationTest {
                     pid, tenantId, agentCode, TEST_PREFIX + "title", content,
                     importance, runId, accessCount, userId, vectorLiteral);
         }
+        jdbc.update("UPDATE ab_agent_memory SET embedding_space=?,embedding_content_hash=encode(sha256(convert_to(memory_content,'UTF8')),'hex') WHERE pid=? AND embedding IS NOT NULL", "a".repeat(64), pid);
         return pid;
     }
 
@@ -276,6 +278,7 @@ class MemoryL1L2SemanticDedupIntegrationTest extends BaseIntegrationTest {
                         + " NOW() - INTERVAL '2 days', NOW(), FALSE)",
                 pid, tenantId, agentCode, TEST_PREFIX + "l2-title", content,
                 importance, accessCount, userId, contentHash, vectorLiteral);
+        jdbc.update("UPDATE ab_agent_memory SET embedding_space=?,embedding_content_hash=encode(sha256(convert_to(memory_content,'UTF8')),'hex') WHERE pid=? AND embedding IS NOT NULL", "a".repeat(64), pid);
         return pid;
     }
 

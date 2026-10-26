@@ -496,28 +496,27 @@ public class AgentMemoryService {
      * one visibility contract — a semantic hit can never cross the tenant/user boundary the
      * keyword path enforces. Rows without a stored embedding are skipped.
      *
-     * @param queryEmbedding the query vector; MUST be produced by the same provider/model
-     *                       that wrote the stored embeddings ({@code MemoryEmbeddingService},
-     *                       "openai"), or the distances are meaningless. Null/empty → empty list.
+     * @deprecated A bare array has no provenance; returns no semantic results.
+     * Use searchScopedSemanticInSpace with a provider-produced identity instead.
      */
+    @Deprecated
     public List<Map<String, Object>> searchScopedSemantic(Long tenantId, String userId,
                                                            String agentCode, float[] queryEmbedding, int limit) {
         Objects.requireNonNull(tenantId, "tenantId");
-        if (queryEmbedding == null || queryEmbedding.length == 0) {
-            return List.of();
-        }
+        // A bare array cannot prove which embedding space produced it.
+        return List.of();
+    }
+
+    public List<Map<String, Object>> searchScopedSemanticInSpace(Long tenantId, String userId,
+            String agentCode, com.auraboot.framework.rag.service.EmbeddingService.EmbeddedVector query, int limit) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        if (query == null || query.values().length != 1536 || limit <= 0) return List.of();
         String userKey = MemoryReadPolicy.userKey(tenantId, userId);
-        String vec = toVectorLiteral(queryEmbedding);
-        String sql =
-                "SELECT pid, memory_type, category, memory_title, memory_content, "
-                + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
-                + "FROM ab_agent_memory "
-                + "WHERE memory_agent_id = ? "
-                + "  AND embedding IS NOT NULL "
-                + "  AND " + MemoryReadPolicy.VISIBLE + " "
-                + "ORDER BY embedding <=> ?::vector "
-                + "LIMIT ?";
-        return jdbcTemplate.queryForList(sql, agentCode, tenantId, userKey, vec, limit);
+        String sql = "SELECT pid,memory_type,category,memory_title,memory_content,importance,shareable,scope,scope_key,shadow_mode,created_at "
+                + "FROM ab_agent_memory WHERE memory_agent_id=? AND embedding_space=? AND "
+                + com.auraboot.framework.agent.memory.MemoryVectorPolicy.fresh("") + " AND " + MemoryReadPolicy.VISIBLE
+                + " ORDER BY embedding <=> ?::vector LIMIT ?";
+        return jdbcTemplate.queryForList(sql, agentCode, query.space(), tenantId, userKey, toVectorLiteral(query.values()), limit);
     }
 
     /** Format a float vector as a pgvector literal {@code [v0,v1,...]} for a {@code ?::vector} bind. */

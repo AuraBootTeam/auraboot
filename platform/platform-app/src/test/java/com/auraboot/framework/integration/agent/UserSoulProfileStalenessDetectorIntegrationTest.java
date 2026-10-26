@@ -44,6 +44,7 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
     @BeforeEach
     void setup() {
         tenantId = TestIdGenerator.uniqueTenantId();
+        when(embeddingService.currentSpace(ArgumentMatchers.anyLong(), ArgumentMatchers.nullable(String.class), ArgumentMatchers.anyInt())).thenReturn("a".repeat(64));
         userId = "us_" + Long.toString(System.nanoTime() & 0xffff, 36);
         ReflectionTestUtils.setField(detector, "enabled", true);
         ReflectionTestUtils.setField(detector, "minDivergentMemories", 3);
@@ -102,16 +103,17 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
                         + "VALUES (?, ?, 'default', 'fact', 'profile', 't', 'c', ?, FALSE, 'user', ?, "
                         + " ?::vector, NOW(), NOW(), FALSE)",
                 pid, tenantId, importance, userId, vectorLiteral(vec));
+        jdbc.update("UPDATE ab_agent_memory SET embedding_space=?,embedding_content_hash=encode(sha256(convert_to(memory_content,'UTF8')),'hex') WHERE pid=? AND embedding IS NOT NULL", "a".repeat(64), pid);
     }
 
     @Test
     @DisplayName("3 divergent memories → stale flagged")
     void threeDivergentFlag() {
         String pid = seedActiveProfile("engineer");
-        when(embeddingService.embed(ArgumentMatchers.eq(tenantId),
+        when(embeddingService.embedWithIdentity(ArgumentMatchers.eq(tenantId),
                 ArgumentMatchers.anyString(),
                 ArgumentMatchers.nullable(String.class)))
-                .thenReturn(sameVec());
+                .thenReturn(new EmbeddingService.EmbeddedVector(sameVec(),"a".repeat(64)));
         // 3 orthogonal (cosine = 0) recent memories.
         seedMemoryWithVec("a", orthoVec(1), 8);
         seedMemoryWithVec("b", orthoVec(2), 8);
@@ -129,10 +131,10 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
     @DisplayName("2 divergent + 1 similar → no flag (below threshold)")
     void twoDivergentNoFlag() {
         String pid = seedActiveProfile("engineer");
-        when(embeddingService.embed(ArgumentMatchers.eq(tenantId),
+        when(embeddingService.embedWithIdentity(ArgumentMatchers.eq(tenantId),
                 ArgumentMatchers.anyString(),
                 ArgumentMatchers.nullable(String.class)))
-                .thenReturn(sameVec());
+                .thenReturn(new EmbeddingService.EmbeddedVector(sameVec(),"a".repeat(64)));
         seedMemoryWithVec("a", orthoVec(1), 8);   // divergent
         seedMemoryWithVec("b", orthoVec(2), 8);   // divergent
         seedMemoryWithVec("c", sameVec(), 8);     // similar
@@ -150,10 +152,10 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
     void alreadyFlaggedSkipped() {
         String pid = seedActiveProfile("engineer");
         jdbc.update("UPDATE ab_agent_user_soul_profile SET stale_flagged_at = NOW() WHERE pid = ?", pid);
-        when(embeddingService.embed(ArgumentMatchers.eq(tenantId),
+        when(embeddingService.embedWithIdentity(ArgumentMatchers.eq(tenantId),
                 ArgumentMatchers.anyString(),
                 ArgumentMatchers.nullable(String.class)))
-                .thenReturn(sameVec());
+                .thenReturn(new EmbeddingService.EmbeddedVector(sameVec(),"a".repeat(64)));
         // Even 10 divergent memories shouldn't change anything.
         for (int i = 1; i <= 10; i++) seedMemoryWithVec("m" + i, orthoVec(i), 8);
         int flagged = detector.runOnce();
@@ -165,9 +167,9 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
     void hiddenSkipped() {
         String pid = seedActiveProfile("engineer");
         jdbc.update("UPDATE ab_agent_user_soul_profile SET hidden_at = NOW() WHERE pid = ?", pid);
-        when(embeddingService.embed(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
+        when(embeddingService.embedWithIdentity(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
                 ArgumentMatchers.nullable(String.class)))
-                .thenReturn(sameVec());
+                .thenReturn(new EmbeddingService.EmbeddedVector(sameVec(),"a".repeat(64)));
         for (int i = 1; i <= 5; i++) seedMemoryWithVec("m" + i, orthoVec(i), 8);
         int flagged = detector.runOnce();
         assertThat(flagged).isZero();
@@ -178,9 +180,9 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
     void tenantIsolation() {
         String pid = seedActiveProfile("engineer");
         Long otherTenant = tenantId + 1;
-        when(embeddingService.embed(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
+        when(embeddingService.embedWithIdentity(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
                 ArgumentMatchers.nullable(String.class)))
-                .thenReturn(sameVec());
+                .thenReturn(new EmbeddingService.EmbeddedVector(sameVec(),"a".repeat(64)));
         // Divergent memories exist, but under a different tenant.
         for (int i = 1; i <= 5; i++) {
             String mpid = "mem_other_" + i;
@@ -191,6 +193,7 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
                             + "VALUES (?, ?, 'default', 'fact', 'profile', 't', 'c', 8, FALSE, 'user', ?, "
                             + " ?::vector, NOW(), NOW(), FALSE)",
                     mpid, otherTenant, userId, vectorLiteral(orthoVec(i)));
+            jdbc.update("UPDATE ab_agent_memory SET embedding_space=?,embedding_content_hash=encode(sha256(convert_to(memory_content,'UTF8')),'hex') WHERE pid=?", "a".repeat(64), mpid);
         }
         try {
             int flagged = detector.runOnce();
@@ -208,7 +211,7 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
     @DisplayName("Embedding provider outage skips the profile gracefully")
     void embeddingOutageSkips() {
         String pid = seedActiveProfile("engineer");
-        when(embeddingService.embed(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
+        when(embeddingService.embedWithIdentity(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
                 ArgumentMatchers.nullable(String.class)))
                 .thenThrow(new RuntimeException("embedding provider down"));
         for (int i = 1; i <= 5; i++) seedMemoryWithVec("m" + i, orthoVec(i), 8);
@@ -237,9 +240,9 @@ class UserSoulProfileStalenessDetectorIntegrationTest extends BaseIntegrationTes
     @DisplayName("Concurrent runOnce() respects advisory lock")
     void advisoryLockSerialises() throws InterruptedException {
         seedActiveProfile("engineer");
-        when(embeddingService.embed(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
+        when(embeddingService.embedWithIdentity(ArgumentMatchers.any(), ArgumentMatchers.anyString(),
                 ArgumentMatchers.nullable(String.class)))
-                .thenReturn(sameVec());
+                .thenReturn(new EmbeddingService.EmbeddedVector(sameVec(),"a".repeat(64)));
         for (int i = 1; i <= 5; i++) seedMemoryWithVec("m" + i, orthoVec(i), 8);
         List<Integer> results = new ArrayList<>();
         Thread t1 = new Thread(() -> results.add(detector.runOnce()));

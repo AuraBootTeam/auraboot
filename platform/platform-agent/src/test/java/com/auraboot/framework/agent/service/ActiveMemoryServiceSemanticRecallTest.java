@@ -60,9 +60,9 @@ class ActiveMemoryServiceSemanticRecallTest {
     void semanticHitsAreBlendedAndDedupedWhenEnabled() {
         when(memoryService.searchScoped(anyLong(), any(), anyString(), anyString(), anyInt()))
                 .thenReturn(List.of(row("kw1")));
-        when(embeddingService.embed(anyLong(), anyString(), anyString()))
-                .thenReturn(new float[]{0.1f, 0.2f, 0.3f});
-        when(memoryService.searchScopedSemantic(anyLong(), any(), anyString(), any(), anyInt()))
+        when(embeddingService.embedWithIdentity(anyLong(), anyString(), anyString()))
+                .thenReturn(new EmbeddingService.EmbeddedVector(new float[]{0.1f, 0.2f, 0.3f}, "a".repeat(64)));
+        when(memoryService.searchScopedSemanticInSpace(anyLong(), any(), anyString(), any(), anyInt()))
                 .thenReturn(List.of(row("sem1"), row("kw1")));  // sem1 new, kw1 duplicates the keyword hit
 
         List<Map<String, Object>> out = service.preRecall(7L, "u1", "aurabot", "上次那个客户");
@@ -70,7 +70,7 @@ class ActiveMemoryServiceSemanticRecallTest {
         List<Object> pids = out.stream().map(m -> m.get("pid")).toList();
         assertThat(pids).contains("kw1", "sem1");
         assertThat(pids).filteredOn("kw1"::equals).as("keyword+semantic overlap deduped").hasSize(1);
-        verify(memoryService).searchScopedSemantic(eq(7L), eq("u1"), eq("aurabot"), any(), eq(5));
+        verify(memoryService).searchScopedSemanticInSpace(eq(7L), eq("u1"), eq("aurabot"), any(), eq(5));
     }
 
     @Test
@@ -81,7 +81,7 @@ class ActiveMemoryServiceSemanticRecallTest {
 
         service.preRecall(7L, "u1", "aurabot", "hi");
 
-        verify(memoryService, never()).searchScopedSemantic(anyLong(), any(), anyString(), any(), anyInt());
+        verify(memoryService, never()).searchScopedSemanticInSpace(anyLong(), any(), anyString(), any(), anyInt());
         verify(embeddingService, never()).embed(anyLong(), anyString(), any());
     }
 
@@ -94,17 +94,17 @@ class ActiveMemoryServiceSemanticRecallTest {
 
         service.preRecall(7L, "u1", "aurabot", "hi");
 
-        verify(memoryService, never()).searchScopedSemantic(anyLong(), any(), anyString(), any(), anyInt());
+        verify(memoryService, never()).searchScopedSemanticInSpace(anyLong(), any(), anyString(), any(), anyInt());
     }
 
     @Test
     void semanticSkippedWhenEmbeddingReturnsNull() {
         when(memoryService.searchScoped(anyLong(), any(), anyString(), anyString(), anyInt()))
                 .thenReturn(List.of());
-        when(embeddingService.embed(anyLong(), anyString(), anyString())).thenReturn(null);
+        when(embeddingService.embedWithIdentity(anyLong(), anyString(), anyString())).thenReturn(null);
 
         service.preRecall(7L, "u1", "aurabot", "hi");
 
-        verify(memoryService, never()).searchScopedSemantic(anyLong(), any(), anyString(), any(), anyInt());
+        verify(memoryService, never()).searchScopedSemanticInSpace(anyLong(), any(), anyString(), any(), anyInt());
     }
 }

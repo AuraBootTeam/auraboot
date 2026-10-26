@@ -71,10 +71,10 @@ class MemoryGovernancePostgresTest {
                 .containsExactlyInAnyOrder("other-tenant", "global");
         float[] vector = new float[1536]; vector[0] = 1;
         String literal = "[1," + "0,".repeat(1534) + "0]";
-        jdbc.update("UPDATE ab_agent_memory SET embedding=?::vector WHERE memory_agent_id=?", literal, agent);
-        assertThat(titles(memories.searchScopedSemantic(TENANT_A, "alice", agent, vector, 20)))
+        jdbc.update("UPDATE ab_agent_memory SET embedding=?::vector, embedding_space=?, embedding_content_hash=encode(sha256(convert_to(memory_content,'UTF8')),'hex') WHERE memory_agent_id=?", literal, "a".repeat(64), agent);
+        assertThat(titles(memories.searchScopedSemanticInSpace(TENANT_A, "alice", agent, new com.auraboot.framework.rag.service.EmbeddingService.EmbeddedVector(vector,"a".repeat(64)), 20)))
                 .containsExactlyInAnyOrder("private-a", "team", "global");
-        assertThat(titles(memories.searchScopedSemantic(TENANT_A, null, agent, vector, 20)))
+        assertThat(titles(memories.searchScopedSemanticInSpace(TENANT_A, null, agent, new com.auraboot.framework.rag.service.EmbeddingService.EmbeddedVector(vector,"a".repeat(64)), 20)))
                 .containsExactlyInAnyOrder("team", "global");
     }
 
@@ -145,6 +145,15 @@ class MemoryGovernancePostgresTest {
         assertThat(recall.preRecall(TENANT_A, "42", agent, "balance"))
                 .anySatisfy(row -> assertThat((String)row.get("content"))
                         .startsWith("[Historical model response; verify current business data]"));
+    }
+
+    @Test
+    void unversionedVectorsCannotBeComparedByTheLegacySemanticApi() {
+        String pid = add(TENANT_A, "user", "alice", "user", "unknown-space");
+        float[] vector = new float[1536]; vector[0] = 1;
+        String literal = "[1," + "0,".repeat(1534) + "0]";
+        jdbc.update("UPDATE ab_agent_memory SET embedding=?::vector WHERE pid=?", literal, pid);
+        assertThat(memories.searchScopedSemantic(TENANT_A, "alice", agent, vector, 20)).isEmpty();
     }
 
 }

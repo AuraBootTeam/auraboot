@@ -2307,7 +2307,10 @@ CREATE TABLE public.ab_agent_memory (
     promoted_from_run_id character varying(26),
     score_snapshot jsonb,
     demoted_at timestamp with time zone,
-    demotion_count integer DEFAULT 0 NOT NULL
+    demotion_count integer DEFAULT 0 NOT NULL,
+    embedding_space character varying(64),
+    embedding_content_hash character varying(64),
+    embedding_generated_at timestamp with time zone
 );
 
 
@@ -2316,6 +2319,27 @@ CREATE TABLE public.ab_agent_memory (
 --
 
 COMMENT ON TABLE public.ab_agent_memory IS 'Agent long-term memory — facts, preferences, lessons, decisions';
+
+
+--
+-- Name: COLUMN ab_agent_memory.embedding_space; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_memory.embedding_space IS 'SHA256 of provider endpoint/model/dimensions/spaceVersion; NULL means unverified legacy vector';
+
+
+--
+-- Name: COLUMN ab_agent_memory.embedding_content_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_memory.embedding_content_hash IS 'SHA256 UTF8 of original memory_content at embedding time';
+
+
+--
+-- Name: COLUMN ab_agent_memory.embedding_generated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_memory.embedding_generated_at IS 'Time the versioned embedding was persisted';
 
 
 --
