@@ -80,6 +80,7 @@ export interface StrictBlockConfig {
 
   // Form
   fields?: FieldConfig[];
+  resetFieldsOnReset?: boolean;
   buttons?: ButtonConfig[];
 
   // Table
@@ -129,7 +130,6 @@ export interface StrictBlockConfig {
   detailUrl?: string;
   addCommandCode?: string;
 }
-
 
 // ---------------------------------------------------------------------------
 // Inlined Linkage types (from ~/studio/workbench/panels/linkage/types)

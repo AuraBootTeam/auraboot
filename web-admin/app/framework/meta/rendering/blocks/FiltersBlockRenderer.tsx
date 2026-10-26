@@ -8,7 +8,7 @@ import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { useI18n } from '~/contexts/I18nContext';
-import { executeSimpleWorkbenchAction } from './workbenchBlockUtils';
+import { executeSimpleWorkbenchAction, writeRuntimeState } from './workbenchBlockUtils';
 
 export interface FiltersBlockRendererProps {
   block: BlockConfig;
@@ -45,6 +45,14 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
 
   // 处理重置
   const handleReset = async () => {
+    if (block.resetFieldsOnReset === true) {
+      for (const field of fields) {
+        const value = null;
+        runtime.getStateManager().updateField(runtime.getScopeId(), field.field, value);
+        const bound = (field as { bindState?: string }).bindState;
+        if (bound) writeRuntimeState(runtime, bound, value);
+      }
+    }
     if (block.onReset) {
       try {
         await executeFilterHandler(block.onReset);

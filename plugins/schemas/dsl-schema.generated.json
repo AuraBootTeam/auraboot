@@ -437,6 +437,9 @@
             "$ref": "#/definitions/FieldConfig"
           }
         },
+        "resetFieldsOnReset": {
+          "type": "boolean"
+        },
         "buttons": {
           "type": "array",
           "items": {

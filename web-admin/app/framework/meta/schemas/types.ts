@@ -50,6 +50,8 @@ export interface BlockConfig {
 
   // 表单相关
   fields?: FieldConfig[];
+  /** Opt-in filters behavior: reset only declared filter fields before the onReset action. */
+  resetFieldsOnReset?: boolean;
   /** Optional card-grid inner field layout; existing cards retain stacked fields. */
   fieldsLayout?: LayoutConfig;
   /** Explicit card-row selection; eligibility derives from current exact positive facts. */

@@ -73,6 +73,30 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
 }
 
 describe('FiltersBlockRenderer', () => {
+  it('resets only declared filter inputs before the configured reset action when enabled', async () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().form = { keyword: 'old query', status: 'ARCHIVED', unrelated: 'keep' };
+    const block = {
+      id: 'reset-inputs',
+      blockType: 'filters',
+      resetFieldsOnReset: true,
+      fields: [
+        { field: 'keyword', label: 'Keyword' },
+        { field: 'status', label: 'Status' },
+      ],
+      onReset: { action: 'state.set', args: { appliedFilters: null } },
+    } as any;
+    render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('filter-btn-reset'));
+    await waitFor(() =>
+      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'appliedFilters', null),
+    );
+    expect(runtime.getContext().form).toEqual({
+      keyword: null,
+      status: null,
+      unrelated: 'keep',
+    });
+  });
   it('executes direct workbench search and reset actions without page-level handlers', async () => {
     const runtime = makeRuntime() as any;
     const block = {
