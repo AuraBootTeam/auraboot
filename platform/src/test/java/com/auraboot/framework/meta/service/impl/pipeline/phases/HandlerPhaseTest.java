@@ -676,6 +676,8 @@ class HandlerPhaseTest {
 
     @Test
     void execute_dispatchesAsyncWhenHandlerParamsAsyncTrue() throws Exception {
+        var targetFiles = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", targetFiles);
         RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
         when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
         AsyncTaskDTO dto = new AsyncTaskDTO();
@@ -702,7 +704,8 @@ class HandlerPhaseTest {
         MetaContext.runWithCommandPermitPlan(
                 "SELF", 6L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
 
-        // Handler must NOT run inline on the request thread.
+        // Handler must NOT run inline on the request thread or acquire a target write capability.
+        org.mockito.Mockito.verifyNoInteractions(targetFiles);
         assertThat(handler.capturedContext.get()).isNull();
         assertThat(ctx.getHandlerResults())
                 .containsEntry("async", true)
