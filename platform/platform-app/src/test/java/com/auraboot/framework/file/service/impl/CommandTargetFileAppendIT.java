@@ -48,6 +48,9 @@ class CommandTargetFileAppendIT {
     private String model, table, command;
 
     @BeforeAll void publishFixture() {
+        String database=System.getenv("POSTGRES_DB");
+        assertThat(database).as("An owned aura runtime is required").startsWith("auraboot_");
+        assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(database);
         actor();
         model="file_append_"+Long.toString(System.currentTimeMillis(),36); table="mt_"+model; command=model+":repair";
         var photos=FieldDefinition.builder().code("photos").columnName("photos").dataType("file").maxLength(32768)
