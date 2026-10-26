@@ -21,7 +21,7 @@ await waitFor(() =>
 expect(preflightFieldChange).toHaveBeenLastCalledWith({...});
 ```
 
-已修实例(全部同一根因,CI 负载下间歇红,污染无关依赖 PR):#2385(DetailPageContent flowRefresh)、#2386 同族、#2427(DecisionFieldImpactPanel 两处)、10-23 ExecutionLogTraceBlock(由 #2385 顺带修复)。判定为**同类不再新增修改**,新用例一律按 ✅ 写。
+已修实例(全部同一根因,CI 负载下间歇红,污染无关依赖 PR):#2385(DetailPageContent flowRefresh)、#2386 同族、#2427(DecisionFieldImpactPanel 两处)、10-23 ExecutionLogTraceBlock(由 #2385 顺带修复)、2026-10-26 EventPolicyDesigner 两处(Workflow 的 `epd-run-result` 等 mock 后裸读 + Block 的字段选择器在策略数据到达前裸读,大合并拖慢 CI 触发双红)。判定为**同类不再新增修改**,新用例一律按 ✅ 写。
 
 ## 复扫脚本(2026-10-26 全仓扫描:796 文件,117 个启发式候选)
 

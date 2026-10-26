@@ -456,15 +456,15 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() =>
-      expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledWith({
-        eventType: 'FORM_SUBMITTED',
-        targetType: 'FORM',
-        targetKey: 'complaint_form',
-        context: { record: { data: {} } },
-      }),
+      expect(screen.getByTestId('epd-run-result')).toHaveTextContent('已命中'),
     );
+    expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledWith({
+      eventType: 'FORM_SUBMITTED',
+      targetType: 'FORM',
+      targetKey: 'complaint_form',
+      context: { record: { data: {} } },
+    });
     expect(fakeApi.runPolicy).not.toHaveBeenCalled();
-    expect(screen.getByTestId('epd-run-result')).toHaveTextContent('已命中');
     const { executionResults, payload } = await findActionExecutionEvidence();
     expect(executionResults).toHaveTextContent('全部成功');
     expect(executionResults).toHaveTextContent('发送站内通知');
