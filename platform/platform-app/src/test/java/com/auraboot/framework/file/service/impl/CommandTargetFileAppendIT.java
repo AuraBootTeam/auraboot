@@ -163,8 +163,8 @@ class CommandTargetFileAppendIT {
         try(var pool=Executors.newFixedThreadPool(2)) {
             for(int i=0;i<6;i++) {
                 String parent=parent(), file=upload(TENANT,USER,"success"); var start=new CyclicBarrier(2);
-                var appended=pool.submit(()->{await(start); try {command(parent,a->a.appendAndRetainExistingToTarget(file,"photos")); return true;} catch(RuntimeException e){return false;}});
-                var deleted=pool.submit(()->{actor(); try {await(start); return files.deleteFile(file,USER);} catch(RuntimeException e){return false;} finally{MetaContext.clear();}});
+                var appended=pool.submit(()->{await(start); try {command(parent,a->a.appendAndRetainExistingToTarget(file,"photos")); return true;} catch(AccessDeniedException deletedFirst){return false;}});
+                var deleted=pool.submit(()->{actor(); try {await(start); return files.deleteFile(file,USER);} catch(com.auraboot.framework.exception.BusinessException retainedFirst){assertThat(retainedFirst).hasMessageContaining("retention"); return false;} finally{MetaContext.clear();}});
                 boolean a=appended.get(30,TimeUnit.SECONDS), d=deleted.get(30,TimeUnit.SECONDS);
                 assertThat(a^d).as("append=%s delete=%s",a,d).isTrue();
                 assertThat(retained(file)).isEqualTo(a); assertThat(relationCount(parent)).isEqualTo(a?1:0);
