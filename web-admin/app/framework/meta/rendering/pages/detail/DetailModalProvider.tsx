@@ -54,6 +54,9 @@ interface SourceEntry {
 }
 
 export function DetailModalProvider({ children }: { children: ReactNode }) {
+  // Portals are mounted only after hydration; restored URLs also render on the server.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -249,7 +252,7 @@ export function DetailModalProvider({ children }: { children: ReactNode }) {
       <DetailSourceRefreshContext.Provider value={sourceRefreshVersion}>
         {children}
       </DetailSourceRefreshContext.Provider>
-      {value ? (
+      {mounted && value ? (
         <DetailModal key={`${scope}:${source}:${value}`} target={target} onClose={close} />
       ) : null}
     </DetailModalContext.Provider>
