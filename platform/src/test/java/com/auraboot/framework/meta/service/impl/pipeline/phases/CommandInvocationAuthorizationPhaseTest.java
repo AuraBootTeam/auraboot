@@ -88,6 +88,24 @@ class CommandInvocationAuthorizationPhaseTest {
         assertThatThrownBy(() -> ((List<?>) actual.payload().get("values")).clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test void theHostScopeBridgeIsUsableOnlyInsideTheAuthorizerCallback() {
+        var factory = new com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory(
+                mock(org.springframework.context.ApplicationContext.class),
+                mock(org.springframework.transaction.PlatformTransactionManager.class),
+                mock(org.apache.ibatis.session.SqlSessionFactory.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "recordScopeFactory", factory);
+        var observed = new AtomicReference<com.auraboot.framework.plugin.extension.RecordActionScopeAccessor>();
+        var handler = authorizer();
+        when(((CommandInvocationAuthorizer)handler).authorizeInvocation(any())).thenAnswer(call -> {
+            CommandInvocationAuthorizer.InvocationContext invocation = call.getArgument(0);
+            assertThat(invocation.recordScopes()).isNotNull(); observed.set(invocation.recordScopes()); return true;
+        });
+        var context = context(config());
+        context.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("category.create"));
+        phase.execute(context);
+        assertThat(observed.get().permits("parent", "parent-1", "update")).isFalse();
+    }
+
     private CommandHandlerExtension authorizer() {
         var handler = mock(CommandHandlerExtension.class, withSettings().extraInterfaces(CommandInvocationAuthorizer.class));
         when(registry.getCommandHandler("app:category")).thenReturn(Optional.of(handler));

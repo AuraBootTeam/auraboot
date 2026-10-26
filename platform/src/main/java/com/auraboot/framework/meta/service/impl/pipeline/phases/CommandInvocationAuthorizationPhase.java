@@ -19,6 +19,8 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class CommandInvocationAuthorizationPhase implements CommandPhase {
     private final ExtensionRegistry extensions;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory recordScopeFactory;
 
     @Override public String name() { return "invocation_authorization"; }
 
@@ -39,11 +41,15 @@ public class CommandInvocationAuthorizationPhase implements CommandPhase {
         var handler = extensions.getCommandHandler(code).orElseThrow(CommandInvocationAuthorizationPhase::denied);
         if (!(handler instanceof CommandInvocationAuthorizer authorizer)) throw denied();
         var request = context.getRequest();
-        var invocation = new CommandInvocationAuthorizer.InvocationContext(context.getTenantId(),
-                MetaContext.getCurrentMemberId(), MetaContext.getCurrentUserPid(), context.getCommandCode(), code,
-                context.getCommand() == null ? null : context.getCommand().getModelCode(),
-                request == null ? null : request.getTargetRecordId(), request == null ? null : request.getPayload());
-        if (!authorizer.authorizeInvocation(invocation)) throw denied();
+        var scope = recordScopeFactory == null ? null : recordScopeFactory.forInvocation(context);
+        try {
+            var invocation = new CommandInvocationAuthorizer.InvocationContext(context.getTenantId(),
+                    MetaContext.getCurrentMemberId(), MetaContext.getCurrentUserPid(), context.getCommandCode(), code,
+                    context.getCommand() == null ? null : context.getCommand().getModelCode(),
+                    request == null ? null : request.getTargetRecordId(), request == null ? null : request.getPayload(),
+                    scope == null ? null : scope.accessor());
+            if (!authorizer.authorizeInvocation(invocation)) throw denied();
+        } finally { if (scope != null) scope.close(); }
     }
 
     private static AccessDeniedException denied() {

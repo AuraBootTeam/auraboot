@@ -338,7 +338,7 @@ class CommandTargetScopePhaseTest {
         var shares = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RecordShareService.class);
         when(applicationContext.getBean(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class)).thenReturn(scope);
         when(applicationContext.getBean(com.auraboot.framework.permission.service.RecordShareService.class)).thenReturn(shares);
-        when(scope.evaluate(eq(99L), eq("qo_quote_common"), eq("read"), any())).thenReturn(
+        when(scope.evaluate(eq(99L), eq("qo_quote_common"), eq("update"), any())).thenReturn(
                 new com.auraboot.framework.permission.engine.model.EvaluationStep("DataScope",
                         com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY, "Not owner"));
         var ctx = context("qo_quote_common", "REC-1");

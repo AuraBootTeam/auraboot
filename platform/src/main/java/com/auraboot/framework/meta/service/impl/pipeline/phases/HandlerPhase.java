@@ -137,6 +137,8 @@ public class HandlerPhase implements CommandPhase {
     private com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
 
     @Autowired private com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor commandMembershipLockAccessor;
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory recordScopeFactory;
     @Autowired private IdentityDirectoryAccessorImpl identityDirectoryAccessor;
     @Autowired private RoleMapper roleMapper;
     @Autowired private UserRoleService userRoleService;
@@ -749,6 +751,11 @@ public class HandlerPhase implements CommandPhase {
             }
             pluginSettings.put(com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.SETTINGS_KEY,
                     commandMembershipLockAccessor);
+            if (recordScopeFactory != null) {
+                var scopes = recordScopeFactory.forCommand(ctx);
+                if (scopes != null) pluginSettings.put(
+                        com.auraboot.framework.plugin.extension.RecordActionScopeAccessor.SETTINGS_KEY, scopes);
+            }
             if (announcementAcknowledgementAccessor != null) {
                 pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY,
                         announcementAcknowledgementAccessor);
