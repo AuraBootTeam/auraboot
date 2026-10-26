@@ -68,7 +68,8 @@ public class CommandTargetFileAccessorFactory {
                 || context.getCommand() == null || context.getAuthorizationVerdict() == null
                 || !context.getAuthorizationVerdict().isAuthorized() || context.getPermitPlan() == null
                 || !context.getPermitPlan().isPermitted() || !Boolean.TRUE.equals(context.getTargetRecordReadable())
-                || !MetaContext.exists() || MetaContext.isImpersonating()
+                || !MetaContext.exists() || MetaContext.isImpersonating() || !MetaContext.isRootAuthorizedCommand()
+                || com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext.isActive()
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || !writableTransaction()) return null;
@@ -99,7 +100,8 @@ public class CommandTargetFileAccessorFactory {
             @Override public void appendAndRetainExistingToTarget(String filePid, String fieldCode) {
                 try {
                     if (!scope.active || scope.thread != Thread.currentThread() || !writableTransaction()
-                        || MetaContext.isImpersonating()
+                        || MetaContext.isImpersonating() || !MetaContext.isRootAuthorizedCommand()
+                        || com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext.isActive()
                         || !actor.equals(current()) || !command.equals(MetaContext.getAuthorizedCommandCode())
                         || !target.equals(MetaContext.getCommandPermitTargetFor(model))
                         || !TransactionSynchronizationManager.getSynchronizations().contains(lifetime)
