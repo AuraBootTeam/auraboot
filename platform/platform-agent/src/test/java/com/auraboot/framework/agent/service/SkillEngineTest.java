@@ -176,4 +176,24 @@ class SkillEngineTest {
                 anyString(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
     }
 
+    @Test
+    void failedOrchestrationCannotRestartPossiblyCommittedTools() throws Exception {
+        when(agentSkillService.loadSkill(1L, "orchestrate")).thenReturn(Map.of(
+                "skill_code", "orchestrate", "execution_mode", "orchestration",
+                "failure_mode", "retry_then_fail", "max_retry", 3, "skill_tools", List.of("write")));
+        when(agentSkillService.resolveSkillTools(1L, "orchestrate"))
+                .thenReturn(List.of(AgentToolDefinition.builder().name("write").build()));
+        when(stepLoopService.executeAgentLoop(anyLong(), anyString(), any(), any(), anyString(),
+                anyString(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenThrow(new IllegalStateException("Failure after a potentially committed write"));
+        SkillResult result = skillEngine.execute(1L, "run", "orchestrate",
+                SkillInput.builder().parameters(Map.of()).build(), null,
+                org.mockito.Mockito.mock(com.auraboot.framework.agent.provider.LlmProvider.class),
+                com.auraboot.framework.agent.provider.LlmProviderFactory.ProviderConfig.builder().build());
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.FAILED);
+        assertThat(result.getData()).containsEntry("retryable", false);
+        verify(stepLoopService, org.mockito.Mockito.times(1)).executeAgentLoop(anyLong(), anyString(), any(), any(), anyString(),
+                anyString(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
 }

@@ -384,7 +384,8 @@ public class SkillEngine {
                             "response", loopResult.lastResponse != null ? loopResult.lastResponse : "",
                             "inputTokens", loopResult.totalInputTokens,
                             "outputTokens", loopResult.totalOutputTokens,
-                            "cost", loopResult.totalCost))
+                            "cost", loopResult.totalCost,
+                            "retryable", loopResult.success))
                     .toolCallCount(maxSteps) // approximate; actual count is tracked in run record
                     .build();
 
@@ -400,6 +401,8 @@ public class SkillEngine {
             return SkillResult.builder()
                     .status(SkillResult.Status.FAILED)
                     .errorMessage("Orchestration failed: " + e.getMessage())
+                    // The loop may already have committed tools; retry belongs to its checkpoint boundary.
+                    .data(Map.of("retryable", false))
                     .build();
         }
     }
