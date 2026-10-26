@@ -425,6 +425,10 @@
         "visibleWhen": {
           "type": "string"
         },
+        "permissionCode": {
+          "type": "string",
+          "description": "Existing block visibility and named-source permission gate."
+        },
         "className": {
           "type": "string"
         },
