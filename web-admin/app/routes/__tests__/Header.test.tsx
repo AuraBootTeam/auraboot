@@ -3,10 +3,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Header from '../Header';
 
-const presentation = vi.hoisted(() => ({ workspace: false }));
+const presentation = vi.hoisted(() => ({ workspace: false, configured: false, headerHeight: 56 }));
 vi.mock('~/shared/layout/PagePresentationContext', () => ({
-  usePagePresentation: () => presentation.workspace ? { mode: 'workspace', section: 'Delivery', title: 'Projects' } : null,
-  usePresentationNavigation: () => ({ sidebarWidth: 216 }),
+  usePagePresentation: () =>
+    presentation.workspace ? { mode: 'workspace', section: 'Delivery', title: 'Projects' } : null,
+  usePresentationNavigation: () => ({
+    sidebarWidth: 216,
+    shell: presentation.configured ? { useThemeTokens: true } : null,
+    isOverlay: false,
+    headerHeight: presentation.headerHeight,
+  }),
 }));
 
 const rootLoaderData = vi.hoisted(() => ({
@@ -55,6 +61,8 @@ vi.mock('~/plugins/core-aurabot/components-shell/AuraBotProvider', () => ({
 // Stub fetch to keep useEffect for spaces quiet
 beforeEach(() => {
   presentation.workspace = false;
+  presentation.configured = false;
+  presentation.headerHeight = 56;
   rootLoaderData.value = {
     user: { username: 'cat', tenantName: 'AcmeCo' },
     menus: [{ id: 'home', path: '/home' }],
@@ -198,7 +206,27 @@ describe('Header — polish', () => {
 
 it('keeps the explicit AI action available in a business workspace', () => {
   presentation.workspace = true;
-  render(<MemoryRouter><Header /></MemoryRouter>);
+  render(
+    <MemoryRouter>
+      <Header />
+    </MemoryRouter>,
+  );
   expect(screen.getByTestId('workspace-breadcrumb')).toBeInTheDocument();
   expect(screen.getByTestId('ai-panel-toggle')).toBeVisible();
+});
+
+it('renders the configured header with the shared actual-height variable and keeps utility controls', () => {
+  presentation.workspace = true;
+  presentation.configured = true;
+  presentation.headerHeight = 55;
+  const { container } = render(
+    <MemoryRouter>
+      <Header />
+    </MemoryRouter>,
+  );
+  expect(container.querySelector('header')).toHaveStyle({
+    height: 'var(--workspace-header-height, 55px)',
+  });
+  expect(screen.getByTestId('ai-panel-toggle')).toBeInTheDocument();
+  expect(screen.getByTestId('header-search-trigger')).toBeInTheDocument();
 });

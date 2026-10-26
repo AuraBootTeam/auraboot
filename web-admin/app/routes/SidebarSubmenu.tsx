@@ -3,6 +3,7 @@ import { useLocation, Link } from 'react-router';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { resolveIcon } from '~/utils/icon-resolver';
+import { usePagePresentation } from '~/shared/layout/PagePresentationContext';
 
 interface SubmenuItem {
   id?: string;
@@ -47,6 +48,7 @@ export default function SidebarSubmenu({
 }: SidebarSubmenuProps) {
   const location = useLocation();
   const { t } = useI18n();
+  const tokenized = usePagePresentation()?.workspaceShell?.useThemeTokens === true;
   // Default expanded so child nav links are always visible & clickable.
   // Previously collapsed-by-default created two failure modes:
   //   1. Clicking a sidebar link from a fresh page (e.g. test goes
@@ -73,7 +75,7 @@ export default function SidebarSubmenu({
       <button
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded(!isExpanded)}
-        className="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+        className={`group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${tokenized ? 'text-text-2 hover:bg-hover hover:text-text' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'}`}
       >
         <span className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
           {resolveIcon(typeof icon === 'string' ? icon : null, name, 16)}
@@ -119,18 +121,27 @@ export default function SidebarSubmenu({
               <Link
                 key={item.id || index}
                 to={item.path}
+                aria-current={isActive ? 'page' : undefined}
                 onClick={onNavigate}
                 className={`group flex items-center rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-100 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
+                    ? tokenized
+                      ? 'bg-accent-weak text-accent font-medium'
+                      : 'bg-blue-100 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                    : tokenized
+                      ? 'text-text-2 hover:bg-hover hover:text-text'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
                 }`}
               >
                 <span className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
                   {resolveIcon(typeof item.icon === 'string' ? item.icon : null, itemName, 14)}
                 </span>
                 <span className="truncate">{itemName}</span>
-                {isActive && <span className="ms-auto h-1.5 w-1.5 rounded-full bg-blue-500" />}
+                {isActive && (
+                  <span
+                    className={`ms-auto h-1.5 w-1.5 rounded-full ${tokenized ? 'bg-accent' : 'bg-blue-500'}`}
+                  />
+                )}
               </Link>
             );
           })}

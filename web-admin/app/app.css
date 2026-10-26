@@ -11,6 +11,7 @@
 @variant ltr ([dir="ltr"] &);
 
 @import './styles/application/foundation.css';
+@import './styles/application/presentation-dialog.css';
 @import './styles/application/decisionops-shell.css';
 @import './styles/application/event-policy.css';
 @import './styles/application/condition-facts.css';

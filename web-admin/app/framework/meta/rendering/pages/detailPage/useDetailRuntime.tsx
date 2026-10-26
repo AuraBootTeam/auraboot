@@ -1,3 +1,4 @@
+import { reloadDetailForReview } from './reloadDetailForReview';
 import { useState, useCallback, useMemo } from 'react';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -72,6 +73,14 @@ export function useDetailRuntime({
     setDetailRefreshVersion((version) => version + 1);
   }, [reloadRecord, schema?.dataSources, permissionHiddenDataSourceIds, dataSourceManager]);
 
+  const refreshDetailForReview = useCallback(async () => {
+    const sourceIds = Object.keys(schema?.dataSources || {}).filter(
+      (id) => !permissionHiddenDataSourceIds.has(id),
+    );
+    await reloadDetailForReview(reloadRecordStrict, dataSourceManager, sourceIds);
+    setDetailRefreshVersion((version) => version + 1);
+  }, [reloadRecordStrict, schema?.dataSources, permissionHiddenDataSourceIds, dataSourceManager]);
+
   // Use unified action handler for toolbar buttons (commandCode, navigateTo)
   const {
     handleAction,
@@ -85,6 +94,7 @@ export function useDetailRuntime({
     context: {
       record: recordData,
       loadData: refreshDetailAfterChildChange,
+      loadDataForReview: refreshDetailForReview,
     },
     dataSourceManager,
     locale,

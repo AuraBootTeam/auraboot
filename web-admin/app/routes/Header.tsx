@@ -3,7 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSSE } from '~/hooks/useSSE';
 import { Link } from 'react-router';
 import { Folder } from 'lucide-react';
-import { usePagePresentation, usePresentationNavigation } from '~/shared/layout/PagePresentationContext';
+import {
+  usePagePresentation,
+  usePresentationNavigation,
+} from '~/shared/layout/PagePresentationContext';
 import {
   Bars3Icon,
   SunIcon,
@@ -44,16 +47,22 @@ export default function Header({
 }: HeaderProps) {
   const { agent, loading: agentLoading } = useApplicationCapabilities();
   const presentation = usePagePresentation();
-  const { sidebarWidth } = usePresentationNavigation();
+  const { sidebarWidth, shell, isOverlay, headerHeight = 56 } = usePresentationNavigation();
+  const themedShell = shell?.useThemeTokens === true;
   const workspace = presentation?.mode === 'workspace';
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
   const notificationScope = `${user?.tenantId ?? ''}:${user?.pid ?? user?.id ?? ''}`;
-  const [notificationCount, setNotificationCount] = useState<{ scope: string; count: number } | null>(null);
+  const [notificationCount, setNotificationCount] = useState<{
+    scope: string;
+    count: number;
+  } | null>(null);
   useEffect(() => {
     delete (window as any).__auraSSEConnectionId;
-    return () => { delete (window as any).__auraSSEConnectionId; };
+    return () => {
+      delete (window as any).__auraSSEConnectionId;
+    };
   }, [notificationScope]);
   const deploymentBranding = rootData?.branding ?? COMMUNITY_BRANDING;
   // Tenant-level skin (ui.theme) wins over deployment branding when configured.
@@ -180,49 +189,72 @@ export default function Header({
   return (
     <>
       <header
-        className={`print-hide fixed top-0 right-0 left-0 z-50 border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 ${workspace ? 'ltr:lg:left-[var(--workspace-sidebar-width)] rtl:lg:right-[var(--workspace-sidebar-width)] shadow-none' : 'shadow-lg backdrop-blur-sm'}`}
-        style={{ '--workspace-sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+        className={`print-hide fixed top-0 right-0 left-0 z-50 border-b ${themedShell ? 'border-border bg-panel' : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'} ${workspace ? 'shadow-none ltr:lg:left-[var(--workspace-sidebar-width)] rtl:lg:right-[var(--workspace-sidebar-width)]' : 'shadow-lg backdrop-blur-sm'}`}
+        style={
+          shell
+            ? {
+                insetInlineStart: sidebarWidth,
+                insetInlineEnd: 0,
+                height: `var(--workspace-header-height, ${headerHeight}px)`,
+              }
+            : ({ '--workspace-sidebar-width': `${sidebarWidth}px` } as React.CSSProperties)
+        }
         data-print="hide"
         data-hydrated={hydrated ? 'true' : 'false'}
       >
-        <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-2 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
+        <div
+          className={`flex items-center justify-between px-2 sm:px-6 lg:px-8 ${shell ? '' : 'h-14'} ${themedShell ? 'bg-panel' : 'bg-gradient-to-r from-white/50 to-gray-50/50 dark:from-gray-800/50 dark:to-gray-900/50'}`}
+          style={shell ? { height: '100%' } : undefined}
+        >
           {/* Left: logo and menu button */}
           <div className="flex min-w-0 items-center">
-            {showSidebar && hasMenus && (
+            {showSidebar && hasMenus && (!shell || isOverlay) && (
               <button
                 type="button"
                 aria-controls="app-sidebar"
                 aria-expanded={Boolean(sidebarOpen)}
                 aria-label={sidebarToggleLabel}
                 data-testid="header-sidebar-toggle"
-                className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-600 shadow-sm transition-all duration-200 hover:bg-blue-100 hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none lg:hidden dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:focus:ring-offset-gray-800"
+                className={`rounded-lg border p-3 shadow-sm transition-all duration-200 hover:shadow-md focus:ring-2 focus:ring-offset-2 focus:outline-none ${shell ? '' : 'lg:hidden'} ${themedShell ? 'border-border bg-subtle text-accent hover:bg-hover focus:ring-accent' : 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 focus:ring-blue-500 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:focus:ring-offset-gray-800'}`}
                 onClick={() => setSidebarOpen?.(!sidebarOpen)}
               >
                 <Bars3Icon className="h-6 w-6" />
               </button>
             )}
 
-            {workspace ? <div className="text-text-2 flex items-center gap-3 text-xs" data-testid="workspace-breadcrumb"><Folder className="text-text-3 h-4 w-4" /><span>{presentation.section}</span><span className="text-text-3">/</span><span className="text-text font-medium">{presentation.title}</span></div> : <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
-              <img
-                className="h-7 w-7 rounded-lg sm:h-8 sm:w-8"
-                src={branding.logoUrl}
-                alt={branding.productName}
-              />
-              <span
-                data-testid="header-brand-name"
-                className="ms-3 hidden text-xl font-bold text-gray-900 xl:inline dark:text-white"
+            {workspace ? (
+              <div
+                className="text-text-2 flex items-center gap-3 text-xs"
+                data-testid="workspace-breadcrumb"
               >
-                {branding.productName}
-              </span>
-              {envChipLabel && (
+                <Folder className="text-text-3 h-4 w-4" />
+                <span>{presentation.section}</span>
+                <span className="text-text-3">/</span>
+                <span className="text-text font-medium">{presentation.title}</span>
+              </div>
+            ) : (
+              <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
+                <img
+                  className="h-7 w-7 rounded-lg sm:h-8 sm:w-8"
+                  src={branding.logoUrl}
+                  alt={branding.productName}
+                />
                 <span
-                  data-testid="header-env-chip"
-                  className="ml-2 hidden rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 xl:inline-flex dark:bg-gray-700 dark:text-gray-300"
+                  data-testid="header-brand-name"
+                  className="ms-3 hidden text-xl font-bold text-gray-900 xl:inline dark:text-white"
                 >
-                  {envChipLabel}
+                  {branding.productName}
                 </span>
-              )}
-            </Link>}
+                {envChipLabel && (
+                  <span
+                    data-testid="header-env-chip"
+                    className="ml-2 hidden rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 xl:inline-flex dark:bg-gray-700 dark:text-gray-300"
+                  >
+                    {envChipLabel}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {/* Current tenant name — hidden when env chip already encodes it (avoids "AuraBoot [Dev] · AuraBoot Dev") */}
             {!workspace && !simplified && user?.tenantName && !tenantDuplicatesChip && (
@@ -249,7 +281,11 @@ export default function Header({
                     ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
                 }`}
-                title={!agentLoading && agent === 'installed' ? 'AuraBot (⌘J)' : t(`application.agent.${agentLoading ? 'loading' : agent}`)}
+                title={
+                  !agentLoading && agent === 'installed'
+                    ? 'AuraBot (⌘J)'
+                    : t(`application.agent.${agentLoading ? 'loading' : agent}`)
+                }
               >
                 <SparklesIcon className="h-5 w-5" />
               </button>
@@ -259,8 +295,16 @@ export default function Header({
             {!simplified && showNotifications && <InboxHeaderWidget key={notificationScope} />}
 
             {/* Notification centre bell (unread badge + SSE live updates) */}
-            {!simplified && showNotifications && <NotificationHeaderWidget key={notificationScope}
-              streamCount={notificationCount?.scope === notificationScope ? notificationCount.count : undefined} />}
+            {!simplified && showNotifications && (
+              <NotificationHeaderWidget
+                key={notificationScope}
+                streamCount={
+                  notificationCount?.scope === notificationScope
+                    ? notificationCount.count
+                    : undefined
+                }
+              />
+            )}
 
             {/* Language switch — only shown in non-compact mode */}
             {!workspace && !simplified && showLanguageSwitch && (

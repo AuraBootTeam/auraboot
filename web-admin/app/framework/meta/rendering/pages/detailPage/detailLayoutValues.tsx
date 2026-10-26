@@ -157,7 +157,12 @@ export function resolveVisibleTopLevelDetailBlocks(
   isVisible: (visibleWhen: string | undefined) => boolean,
 ): BlockConfig[] {
   return blocks.filter((block) => {
-    if ((block.blockType === 'toolbar' && (block as { detailPlacement?: string }).detailPlacement !== 'body') || block.blockType === 'tabs') return false;
+    if (
+      (block.blockType === 'toolbar' &&
+        (block as { detailPlacement?: string }).detailPlacement !== 'body') ||
+      block.blockType === 'tabs'
+    )
+      return false;
     if (block.visibleWhen && !isVisible(block.visibleWhen)) return false;
     return (block as BlockConfig & { detailPlacement?: string }).detailPlacement !== 'header';
   });
@@ -197,48 +202,35 @@ export function resolvePermissionHiddenDataSourceIds(
 
   const consumedByVisible = new Set<string>();
   const consumedByAny = new Set<string>();
-  const collectConsumption = (block: BlockConfig, into: Set<string>): void => {
+  const collectDirectConsumption = (block: BlockConfig, into: Set<string>): void => {
     const record = block as BlockConfig & Record<string, unknown>;
     for (const key of ['dataSource', 'contextDataSource'] as const) {
       const value = record[key];
       if (typeof value === 'string' && candidates[value]) into.add(value);
     }
-    if (Array.isArray(record.fields)) {
-      for (const field of record.fields) {
-        const fieldSource = (field as { dataSource?: unknown })?.dataSource;
-        if (typeof fieldSource === 'string' && candidates[fieldSource]) into.add(fieldSource);
-      }
-    }
-    if (Array.isArray(record.blocks)) {
-      for (const child of record.blocks as BlockConfig[]) collectConsumption(child, into);
+    for (const field of Array.isArray(record.fields) ? record.fields : []) {
+      const value = (field as { dataSource?: unknown }).dataSource;
+      if (typeof value === 'string' && candidates[value]) into.add(value);
     }
   };
-
-  const permissionVisibleBlocks: BlockConfig[] = [];
-  const permissionHiddenBlocks: BlockConfig[] = [];
-  const walkTabs = (blocks: BlockConfig[], inheritedVisible: boolean): void => {
+  const allowed = (code: string | undefined): boolean => !code || Boolean(hasPermission?.(code));
+  const walk = (blocks: BlockConfig[], inheritedVisible: boolean): void => {
     for (const block of blocks) {
+      const visible = inheritedVisible && allowed(block.permissionCode);
+      collectDirectConsumption(block, consumedByAny);
+      if (visible) collectDirectConsumption(block, consumedByVisible);
       if (block.blockType === 'tabs') {
-        for (const tab of ((block as BlockConfig & { tabs?: DetailTabConfig[] }).tabs ??
-          []) as DetailTabConfig[]) {
-          const tabVisible =
-            inheritedVisible &&
-            (!tab.permissionCode || Boolean(hasPermission?.(tab.permissionCode)));
-          walkTabs(tab.blocks ?? [], tabVisible);
+        for (const tab of (block as BlockConfig & { tabs?: DetailTabConfig[] }).tabs ?? []) {
+          walk(tab.blocks ?? [], visible && allowed(tab.permissionCode));
         }
-        continue;
       }
-      collectConsumption(block, inheritedVisible ? consumedByVisible : consumedByAny);
-      const nested = (block as BlockConfig & { blocks?: BlockConfig[] }).blocks;
-      if (Array.isArray(nested)) walkTabs(nested, inheritedVisible);
+      const children = (block as BlockConfig & { blocks?: BlockConfig[] }).blocks;
+      if (Array.isArray(children)) walk(children, visible);
     }
   };
-  walkTabs(allBlocks, true);
-
+  walk(allBlocks, true);
   for (const id of candidateIds) {
-    if (consumedByAny.has(id) && !consumedByVisible.has(id)) {
-      hidden.add(id);
-    }
+    if (consumedByAny.has(id) && !consumedByVisible.has(id)) hidden.add(id);
   }
   return hidden;
 }

@@ -4,6 +4,7 @@ export async function resolveDynamicPageAccessError(
   request: Request,
   token: string | null,
   pageKey: string,
+  menuPath = `/p/${pageKey}`,
 ): Promise<string | null> {
   if (!token) return null;
 
@@ -11,7 +12,7 @@ export async function resolveDynamicPageAccessError(
     '/api/menu/by-path',
     {
       method: 'get',
-      params: { path: `/p/${pageKey}` },
+      params: { path: menuPath },
       token,
       timeout: 5_000,
     },

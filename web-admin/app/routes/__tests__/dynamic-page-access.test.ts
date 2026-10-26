@@ -62,4 +62,19 @@ describe('dynamic page access inheritance', () => {
     ).resolves.toBeNull();
     expect(fetchResult).toHaveBeenCalledTimes(1);
   });
+  it('checks the exact custom menu path while retaining explicit-deny semantics', async () => {
+    vi.mocked(fetchResult).mockResolvedValue({
+      code: '403',
+      message: 'Denied custom menu',
+    } as never);
+    const request = new Request('http://localhost/p/c/record_workbench');
+    await expect(
+      resolveDynamicPageAccessError(request, 'token', 'record_workbench', '/p/c/record_workbench'),
+    ).resolves.toBe('Denied custom menu');
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/menu/by-path',
+      expect.objectContaining({ params: { path: '/p/c/record_workbench' } }),
+      request,
+    );
+  });
 });
