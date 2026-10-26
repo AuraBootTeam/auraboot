@@ -30,8 +30,8 @@ class PluginImportPublishedModelGuardTest {
         ReflectionTestUtils.setField(service,"schemaManagementService",schemas);
         ReflectionTestUtils.setField(service,"applicationEventPublisher",events);
         ReflectionTestUtils.setField(service,"autoPermissionAssignmentService",permissions);
-        var model=new MetaModelDTO();model.setCode("fixture_guarded");model.setPid("model-pid");
-        model.setStatus(StatusConstants.PUBLISHED);model.setModelType("entity");
+        var model=MetaModelDTO.builder().code("fixture_guarded").pid("model-pid")
+                .status(StatusConstants.PUBLISHED).modelType("entity").build();
         when(models.findByCode("fixture_guarded")).thenReturn(model);
         when(schemas.syncModelToTable(eq("fixture_guarded"),any()))
                 .thenReturn(SchemaOperationResult.builder().success(true).build());
@@ -68,7 +68,7 @@ class PluginImportPublishedModelGuardTest {
         run(false);verifyNoInteractions(models,schemas,events,permissions);
     }
     @Test void draftPublishRemainsTheAuthorityForItsOwnGuard(){
-        var draft=new MetaModelDTO();draft.setPid("draft-pid");draft.setCode("fixture_guarded");draft.setStatus(StatusConstants.DRAFT);
+        var draft=MetaModelDTO.builder().pid("draft-pid").code("fixture_guarded").status(StatusConstants.DRAFT).build();
         when(models.findByCode("fixture_guarded")).thenReturn(draft);
         run(true);
         verify(models).publish(eq("draft-pid"),anyString(),eq(true),anyString());
