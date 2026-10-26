@@ -45,10 +45,10 @@ class FileRetentionDeletionRaceIT {
     private final AtomicLong sequence = new AtomicLong();
 
     @BeforeAll
-    void ensureBranchSchema() {
-        // The shared integration profile does not auto-run branch-local Flyway migrations.
-        jdbcTemplate.execute("ALTER TABLE ab_file ADD COLUMN IF NOT EXISTS "
-                + "retention_locked BOOLEAN NOT NULL DEFAULT FALSE");
+    void requireMigratedSchema() {
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM information_schema.columns "
+                + "WHERE table_schema='public' AND table_name='ab_file' AND column_name='retention_locked'",
+                Integer.class)).as("Run official Flyway migrations before the suite").isEqualTo(1);
     }
 
     @AfterAll

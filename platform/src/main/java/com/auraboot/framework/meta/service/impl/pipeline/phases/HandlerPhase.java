@@ -114,6 +114,9 @@ public class HandlerPhase implements CommandPhase {
     private FileService fileService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory commandTargetFiles;
+
+    @Autowired(required = false)
     private AsyncTaskServiceImpl asyncTaskService;
 
     @Autowired
@@ -644,6 +647,7 @@ public class HandlerPhase implements CommandPhase {
                 handler != null ? handler.getClass().getName() : "<none>", secondaryHandlers.size());
 
         DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
+        var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext);
         try {
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>();
@@ -737,7 +741,7 @@ public class HandlerPhase implements CommandPhase {
             }
             if (fileService != null && storageProvider != null) {
                 pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
-                        new FileAccessorImpl(fileService, storageProvider, userId));
+                        fileScope == null ? new FileAccessorImpl(fileService, storageProvider, userId) : fileScope.accessor());
             }
             if (asyncTaskService != null && objectMapper != null) {
                 pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
@@ -867,6 +871,7 @@ public class HandlerPhase implements CommandPhase {
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {
+            if (fileScope != null) fileScope.close();
             queryScope.close();
         }
     }
