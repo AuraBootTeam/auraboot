@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 1,
+  "allowedClaim": "targeted Core service/contract checks; product command and browser acceptance pending",
+  "producer": "88d3ea33eb060f80bab1d90127708bdc98f60f93",
+  "runtime": {
+    "name": "maritime-parallel-core",
+    "slot": 26,
+    "database": "auraboot_26",
+    "processes": "no resident app"
+  },
+  "counts": {
+    "hermetic": 122,
+    "realPg": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "browserExecuted": 0
+  },
+  "tests": [
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.CommandInvocationAuthorizationPhaseTest.xml",
+      "sha256": "8de8bd80d2d232842193ee72649eb56f727309c58553e3e4196f2dcc2bad07e4",
+      "class": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandInvocationAuthorizationPhaseTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "legacyCommandsDoNotAcquireDomainAuthority()",
+        "olderHandlersCannotSilentlyAuthorizeAnInvocation()",
+        "explicitDomainDenialIsEnforcing()",
+        "createReceivesTrustedIdentityAndAnImmutableInputSnapshot()",
+        "unavailableHandlerFailsClosed()",
+        "theHostScopeBridgeIsUsableOnlyInsideTheAuthorizerCallback()",
+        "unknownOptInValuesFailClosed()",
+        "missingOrDifferentNativeIdentityFailsBeforeCallingTheHandler()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetScopePhaseTest.xml",
+      "sha256": "6d182a8f0fd1fefeb0f237ccace5bd2228b87f588dc6c97470eb1ef600c11334",
+      "class": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetScopePhaseTest",
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "springOwnerReauthorizesTombstoneBeforeReplay()",
+        "evaluatesTheBoundaryReadInARequiresNewTransaction()",
+        "leavesTheVerdictUnsetWhenTheTargetDoesNotExist()",
+        "springOwnerRevocationStopsCachedReplay()",
+        "readShareAuthorizationCannotAuthorizeAnExplicitUpdateTarget()",
+        "recordsAnAbstainPhaseDecisionWhenTheTargetDoesNotExist()",
+        "handlerTargetStorageFailureCannotFallBackToOrdinaryRead()",
+        "explicitReadPolicyDoesNotRequireAnUpdateShare()",
+        "authenticatedCallerWithoutTenantMembershipFailsClosed()",
+        "recordsTheDenyPhaseDecisionBeforeThrowing()",
+        "acceptsAMatchingClientVersionAndRetainsTheAuthoritativeVersion()",
+        "handlerTargetRequiresDeclaredPermissionAndActiveHostIdentity()",
+        "skipsWhenTheCommandHasNoModel()",
+        "revokedHandlerTargetCannotReplayKnownRequest()",
+        "handlerTargetAuthorizationKeepsVersionWithoutGrantingRawModelRead()",
+        "machineTargetUsesItsExplicitDecisionRegardlessOfHumanMembership()",
+        "ordinaryMissingRecordPreservesItsOriginalLookupFailure()",
+        "unavailableWriteScopeCannotBecomeAnAllowDecision()",
+        "lookupFailureFailsClosedAndRollsBackTheBoundaryRead()",
+        "targetDenialIsAlwaysEnforced()",
+        "recordsADenyPhaseDecisionWhenTheCallerCannotSeeTheTarget()",
+        "explicitWritePolicyRejectsReadOnlyShareBeforeHandlerDispatch()",
+        "tenantScopedMissingHandlerTargetUsesTheSameForbiddenBoundaryAsNull()",
+        "recordsThatTheCallerCanSeeTheirOwnTarget()",
+        "declaredWriteScopeIsCheckedBeforeIdempotentReplayEvenWhenReadScopeIsAll()",
+        "leavesAnUnversionedBoundaryReadForTheTransactionalLockToReject()",
+        "updateShareAuthorizationCannotAuthorizeAnExplicitDeleteTarget()",
+        "skipsWhenTheRequestNamesNoTargetRecord()",
+        "defersAStaleClientVersionUntilAfterEveryAuthorizationGate()",
+        "unreadableTargetCannotReplayACachedResult()",
+        "missingHandlerTargetFailsBeforeReplay()",
+        "skipsDynamicTargetGateWhenTheHandlerOwnsPersistence()",
+        "readsTheTargetOutsideTheCallersOwnProjection()",
+        "targetedCommandCannotSkipTheGate()",
+        "abstainsRatherThanPermitsWhenTheCallerCanSeeTheTarget()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessorTest.xml",
+      "sha256": "afbb251f51868bbaa96ce6e3f1bd348b1ea894c33e06d4b34bcdb0246de4f410",
+      "class": "com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessorTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "aHostInstalledBridgeRetainsItsExactType()",
+        "satisfiedCannotMeanReadOnlyWrongVersionWrongHashOrExpired()",
+        "oldHostsAndPlainSettingsCannotManufactureACapability()",
+        "requirementsNeedExactPublicIdentitiesAndAFullSnapshotHash()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.plugin.extension.CommandMembershipLockAccessorTest.xml",
+      "sha256": "1674fa29ad078ed6778f2436a293e294f11a6b74de69da4e08d1810955c828ef",
+      "class": "com.auraboot.framework.plugin.extension.CommandMembershipLockAccessorTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "theInstalledBridgeRetainsItsExactPublicType()",
+        "assertionsRejectAliasesAndNonPublicControlText()",
+        "absentOrUntypedSettingsDoNotManufactureAHostCapability()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.plugin.extension.RecordActionScopeAccessorTest.xml",
+      "sha256": "44ea00bc18c6fcda65fbc2e5378b4843197dfcde530fb9ce986a4100c8828f24",
+      "class": "com.auraboot.framework.plugin.extension.RecordActionScopeAccessorTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "handlerAndInvocationContextsRetainOnlyTheTypedHostBridge()",
+        "absentOrUntypedSettingsDoNotManufactureAuthority()",
+        "theExistingInvocationConstructorRemainsAvailableWithoutAnImplicitGrant()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.plugin.pf4j.CommandMembershipLockAccessorImplTest.xml",
+      "sha256": "f4eea9505cd1be5435696ea61ace75668a81e9e93cd304e68b5b9e9b1d56854a",
+      "class": "com.auraboot.framework.plugin.pf4j.CommandMembershipLockAccessorImplTest",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "[1] fault=disabled",
+        "[2] fault=user-deleted",
+        "[3] fault=member-deleted",
+        "[4] fault=inactive",
+        "[5] fault=leave-date",
+        "[6] fault=user-id",
+        "[7] fault=member-id",
+        "[8] fault=member-pid",
+        "[1] fault=no-tx",
+        "[2] fault=read-only",
+        "[3] fault=no-sync",
+        "[4] fault=foreign-resource",
+        "[5] fault=not-synchronized",
+        "[6] fault=autocommit",
+        "[7] fault=physical-read-only",
+        "[8] fault=closed",
+        "requiresTrustedExactActorAndDistinctCompleteAssertions()",
+        "locksAllUsersThenAllMembersInNumericOrderAndKeepsRequestOrder()",
+        "subsetReuseDoesNotGrowOrInvertTheTransactionLockSet()",
+        "changingTheTrustedActorCannotReuseAnEarlierProof()",
+        "anIdentityRaceBeforeTheLockIsRecheckedAfterAllLocks()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactoryTest.xml",
+      "sha256": "93d58672f2753114d81eb27aea4d4cb36db7b2f1cd6cdd592632a6c091a331d7",
+      "class": "com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactoryTest",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "[1] fault=wrong-pid",
+        "[2] fault=numeric-alias",
+        "[3] fault=wrong-tenant",
+        "[4] fault=missing-tenant",
+        "[5] fault=deleted",
+        "[6] fault=missing",
+        "absentOrDifferentTrustedActorsNeverReceiveTheBridge()",
+        "callbackBridgeExpiresOnCloseActorChangeOrAnotherThread()",
+        "readAllCannotReplaceUpdateNoneAndNoGenericUpdatePermissionIsGranted()",
+        "exactActionSharingIsRecheckedOnEveryCallAndDoesNotBecomeReadAuthority()",
+        "[1] fault=no-tx",
+        "[2] fault=read-only",
+        "[3] fault=no-sync",
+        "[4] fault=foreign-resource",
+        "[5] fault=not-synchronized",
+        "[6] fault=autocommit",
+        "[7] fault=physical-read-only",
+        "[8] fault=closed",
+        "commandBridgeCannotSurviveTheOriginalSynchronizationEvenWithTheSameConnection()",
+        "malformedModelPidOrActionsNeverReachHostData()",
+        "storageAndScopeFailuresAreNotConvertedIntoPermissionOrFallbackQueries()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/unit-88d-junit/TEST-com.auraboot.framework.workbench.service.AnnouncementAcknowledgementAccessorImplTest.xml",
+      "sha256": "0b5f8ef12ab9e4787b32a429afe9eded63caf17b6f419860739562d660cfaa06",
+      "class": "com.auraboot.framework.workbench.service.AnnouncementAcknowledgementAccessorImplTest",
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "nonRecipientsCannotAcquireProofByKnowingTheVersionPid()",
+        "exactRecipientVersionAndHashProduceAnImmutableProof()",
+        "aChangedConfiguredSnapshotDoesNotPass()",
+        "[1] state=read-only",
+        "[2] state=no-ack",
+        "[3] state=wrong-hash",
+        "[4] state=future-ack",
+        "sameTransactionSnapshotChangeCannotCommitUsingAnEarlierSatisfiedProof()",
+        "missingAuthenticationDoesNotQueryAnyRecipient()",
+        "expiryIsCheckedAgainBeforeTheBusinessTransactionCommits()",
+        "missingVersionIsNotAcknowledged()",
+        "freshProofAllowsTheTransactionCommitCheck()",
+        "[1] state=withdrawn",
+        "[2] state=expired",
+        "[3] state=superseded",
+        "duplicateEmptyAndOversizedPlansAreRejectedBeforeDataAccess()",
+        "databaseExpiryBoundaryIsExclusive()",
+        "[1] failure=no-transaction",
+        "[2] failure=read-only",
+        "[3] failure=no-sync",
+        "[1] failure=inactive",
+        "[2] failure=context-incarnation",
+        "[3] failure=requested-incarnation",
+        "sameTransactionWithdrawalCannotCommitUsingAnEarlierSatisfiedProof()",
+        "sameTransactionMemberChangeCannotCommitUsingAnEarlierSatisfiedProof()",
+        "rootLocksUseStableOrderAndMutableControlIsRereadAfterLocking()",
+        "anOrdinaryAnnouncementCannotSatisfyAnExplicitAcknowledgementGate()"
+      ]
+    },
+    {
+      "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/pg-88d-junit/TEST-com.auraboot.framework.plugin.CommandRecordActionScopeCapabilityIntegrationTest.xml",
+      "sha256": "51ee6872a3c2a8f24c17b63c3dc8eb215686086a1fde526d52cdbf021eba5fbe",
+      "class": "com.auraboot.framework.plugin.CommandRecordActionScopeCapabilityIntegrationTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "actualReadAllAndUpdateNoneDenyBeforeTheGuardedReplayStage()",
+        "theHandlerBridgeBelongsToOnlyItsOriginalPhysicalTransaction()",
+        "anInvocationBridgeReadsCommittedScopeChangesEvenInsideAnOlderTransaction()",
+        "numericAliasesDeletedRowsAndAnotherTenantCannotReuseAParentProof()",
+        "aCommandMayUseItsOwnCapabilityWithUpdateAllWithoutGenericModelUpdate()",
+        "readSharingNeverBecomesUpdateSharingAndRevocationRechecksTheSameRequest()"
+      ]
+    }
+  ],
+  "baselineRegression": {
+    "producer": "e29bbd12de4ea83a7e88ba5d9ed9e9dc4b416a2c",
+    "file": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/before-e29.xml",
+    "sha256": "07e3d19366e44717dd4e44bba88c4b1db203b804888f75928d07e1e844e4c7e5",
+    "tests": 4,
+    "expectedFailures": 4
+  },
+  "artifacts": {
+    "runtime": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-app/build/libs/AuraBoot-1.0.0-boot.jar",
+      "sha256": "f9afa1d3d41bf1ddcbab6b0e2e0cab5b14cc06619304eb9b232e3b4347c7601c"
+    },
+    "api": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar",
+      "sha256": "66827430dd40e4a7004dea856bb262ed4e8037ce8d51c0d705e7216edebdd099"
+    },
+    "embeddedApiByteIdentical": true,
+    "hostClassHashes": {
+      "com/auraboot/framework/plugin/pf4j/CommandRecordActionScopeAccessorFactory.class": "a5831d207aa5056b9797befaa19f0a5deb797da149a08633b194bf124852d864",
+      "com/auraboot/framework/plugin/pf4j/CommandRecordActionScopePolicy.class": "7284cb64acaae2711d02d0124051d256eb6cf167aabfd959a54dfe121f95fb5d",
+      "com/auraboot/framework/meta/service/impl/pipeline/phases/CommandTargetScopePhase.class": "2ef19efd046d6b263dd8b3e6256469eb49ad6e1959bcd83c5a2fb87fe32bb817",
+      "com/auraboot/framework/meta/service/impl/pipeline/phases/CommandInvocationAuthorizationPhase.class": "382610e9d5b654ce67163a9f69a63b0769d97b826257f39ba9f47700a9c67d64",
+      "com/auraboot/framework/meta/service/impl/pipeline/phases/HandlerPhase.class": "303882c80609214a98e95a45f6a96abf8efefc7ae95c8e78f4d0d9d7593cbf5e"
+    },
+    "apiJavap": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/record-action-scope/api-88d-javap.txt"
+  },
+  "logs": {
+    "unit-507.log": "2d64f16a6aad4e473ab7b859b83610d49f5e3b8f00bffa71c504799280216e1e",
+    "unit-3fb.log": "13f3856ca07c18e3b30e3d5ecaff39cff2c7f209cbfdffca28e75b64ba9791c4",
+    "unit-current.log": "f7548bb7b59e92c4b3c4d4d31d9c3ff33bba6f29e7f95a5b0de9ef0b1061df42",
+    "unit-5f0.log": "28bfac505fb6c2151f0693660cdea8952a3b037dd3d5ccd39175fa2c9dfa6d24",
+    "unit-88d.log": "ec7b74dc0550e761004e2d33abd7e5b7f8007c80ef6ea8ffbb756486bb6717c1",
+    "pg-88d.log": "e6aa2d0850f37504cba60cd15804fb712bb81427e9f3144959c742f04f6793e8",
+    "build-88d.log": "9e8754d887a2879ab78e39a4791ae82fa3707bad13a83230eacfefc7e6b3e2d7"
+  },
+  "notProven": [
+    "Anchorage native resource/dispatch command consumption",
+    "create-parent authorization before real idempotency lookup in product",
+    "full RBAC revocation serialization",
+    "strict high-fidelity UI",
+    "real devices",
+    "deployment handover"
+  ],
+  "coverage": "not measured"
+}
