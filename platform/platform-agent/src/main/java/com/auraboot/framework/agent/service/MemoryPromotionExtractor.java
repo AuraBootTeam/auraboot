@@ -295,11 +295,11 @@ public class MemoryPromotionExtractor {
                             + "AND " + com.auraboot.framework.agent.memory.MemoryVectorPolicy.fresh("") + " "
                             + "AND embedding_space = ? AND pid <> ? "
                             + "AND (scope_key IS NULL OR scope_key <> ?) "
-                            + "ORDER BY embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?) "
+                            + "ORDER BY embedding <=> ?::vector "
                             + "LIMIT ?",
                     (rs, rn) -> MemoryRow.fromResultSet(rs),
                     tenantId, seed.space, seed.pid, seed.scopeKey == null ? "" : seed.scopeKey,
-                    seed.pid, ANN_CANDIDATE_LIMIT);
+                    java.util.Arrays.toString(seed.embedding), ANN_CANDIDATE_LIMIT);
 
             List<MemoryRow> cluster = new ArrayList<>();
             cluster.add(seed);
