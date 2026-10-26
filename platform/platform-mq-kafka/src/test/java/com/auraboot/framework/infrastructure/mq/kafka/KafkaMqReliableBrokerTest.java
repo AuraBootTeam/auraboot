@@ -47,7 +47,9 @@ class KafkaMqReliableBrokerTest {
         jdbcUrl = "jdbc:postgresql://" + required("POSTGRES_HOST") + ":" + required("POSTGRES_PORT") + "/" + database;
         String bootstrap = required("KAFKA_BOOTSTRAP_SERVERS");
         admin = Admin.create(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap));
-        admin.createTopics(List.of(new NewTopic(topic, 3, (short) 1))).all().get(15, TimeUnit.SECONDS);
+        // Set admission limits at creation; altering a live topic propagates asynchronously.
+        admin.createTopics(List.of(new NewTopic(topic, 3, (short) 1)
+                .configs(Map.of("max.message.bytes", "512")))).all().get(15, TimeUnit.SECONDS);
         MqProperties properties = new MqProperties();
         properties.getKafka().setBootstrapServers(bootstrap);
         provider = new KafkaMqProvider(properties);
@@ -135,11 +137,6 @@ class KafkaMqReliableBrokerTest {
 
     @Test
     void brokerRejectionCompletesConfirmedSendExceptionally() throws Exception {
-        admin.alterConfigs(Map.of(new org.apache.kafka.common.config.ConfigResource(
-                        org.apache.kafka.common.config.ConfigResource.Type.TOPIC, topic),
-                new org.apache.kafka.clients.admin.Config(List.of(
-                        new org.apache.kafka.clients.admin.ConfigEntry("max.message.bytes", "512")))))
-                .all().get(15, TimeUnit.SECONDS);
         CompletableFuture<?> send = provider.sendConfirmed(topic, "target-9", "x".repeat(4096), Map.of())
                 .toCompletableFuture();
         assertInstanceOf(RecordTooLargeException.class,
