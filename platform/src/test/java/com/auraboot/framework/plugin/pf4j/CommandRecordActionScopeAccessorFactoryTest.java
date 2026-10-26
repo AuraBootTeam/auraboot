@@ -132,8 +132,10 @@ class CommandRecordActionScopeAccessorFactoryTest {
     @Test void absentOrDifferentTrustedActorsNeverReceiveTheBridge() {
         context.setAuthorizationVerdict(null); assertNull(factory.forInvocation(context).accessor());
         context.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("domain.configure"));
-        context.setUserId(99L); assertNull(factory.forInvocation(context).accessor());
-        context.setUserId(20L); context.setTenantId(99L); assertNull(factory.forInvocation(context).accessor());
+        MetaContext.setContext(7L,99L,"other-user","Other"); MetaContext.setMemberId(30L);
+        assertNull(factory.forInvocation(context).accessor());
+        MetaContext.setContext(99L,20L,"actor","Actor"); MetaContext.setMemberId(30L);
+        assertNull(factory.forInvocation(context).accessor());
         MetaContext.clear(); assertNull(factory.forInvocation(context).accessor());
         verifyNoInteractions(data);
     }
