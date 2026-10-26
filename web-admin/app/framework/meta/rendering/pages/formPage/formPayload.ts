@@ -238,7 +238,7 @@ export function normalizePayloadValue(rawValue: any, dataType?: string) {
             url,
             size: item.size,
             type: item.type,
-            fileId: (response as any).fileId || (response as any).pid,
+            fileId: item.fileId || (response as any).fileId || (response as any).pid,
           };
         })
         .filter((item) => item.name && item.url);

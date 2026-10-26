@@ -2,11 +2,13 @@
  * FileAttachmentField — Lightweight file upload/display for DSL forms.
  * Stores value as JSON array: [{name, url, size, type}]
  */
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { uploadFile } from '~/shared/services/fileupload/uploadService';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { fetchResult } from '~/shared/services/http-client';
+import { ResultHelper } from '~/utils/type';
 import FILE_ATTACHMENT_TEXT from './FileAttachmentField.i18n.json';
 
 interface FileItem {
@@ -25,13 +27,16 @@ interface FileAttachmentFieldProps {
   multiple?: boolean;
   accept?: string;
   maxSize?: number;
+  maxCount?: number;
+  limitsEndpoint?: string;
   onChange?: (value: FileItem[]) => void;
   context?: any;
 }
 
 export function attachmentDownloadUrl(value: string): string | null {
   if (/^\/download\/[A-Za-z0-9_-]+$/.test(value)) return `/api/file${value}`;
-  if (/^\/api\/file\/download\/[A-Za-z0-9_-]+$/.test(value)) return value;
+  // Same-origin controlled download references remain subject to server-side authorization.
+  if (/^\/api\/(?:[A-Za-z0-9_-]+\/)*(?:download|attachments)\/[A-Za-z0-9_-]+$/.test(value)) return value;
   try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; } catch { return null; }
 }
 
@@ -61,11 +66,16 @@ export function FileAttachmentField({
   multiple = true,
   accept = '',
   maxSize = 10,
+  maxCount,
+  limitsEndpoint,
   onChange,
 }: FileAttachmentFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const files = parseValue(value);
+  const [effectiveMaxSize, setEffectiveMaxSize] = useState(maxSize);
+  const [limitsReady, setLimitsReady] = useState(!limitsEndpoint || readOnly);
+  const [limitsError, setLimitsError] = useState(false);
   const { showErrorToast } = useToastContext();
   const { locale } = useI18n();
   const uploadText = useCallback(
@@ -73,16 +83,37 @@ export function FileAttachmentField({
     [locale],
   );
 
+  useEffect(() => {
+    if (!limitsEndpoint || readOnly) return;
+    let active = true;
+    setLimitsReady(false); setLimitsError(false);
+    void fetchResult<{ maxFileBytes: number; maxRequestBytes: number }>(limitsEndpoint, { method: 'get' })
+      .then((result) => {
+        if (!active) return;
+        if (!ResultHelper.isSuccess(result) || !result.data || !Number.isFinite(result.data.maxFileBytes)) {
+          setLimitsError(true); return;
+        }
+        setEffectiveMaxSize(result.data.maxFileBytes < 0 ? Infinity : result.data.maxFileBytes / (1024 * 1024));
+        setLimitsReady(true);
+      })
+      .catch(() => { if (active) setLimitsError(true); });
+    return () => { active = false; };
+  }, [limitsEndpoint, readOnly]);
+
   const handleUpload = useCallback(
     async (fileList: FileList) => {
+      if (!limitsReady || disabled || readOnly) return;
+      if (maxCount !== undefined && files.length + fileList.length > maxCount) {
+        showErrorToast(uploadText('tooManyFiles').replace('{count}', String(maxCount))); return;
+      }
       const newFiles: FileItem[] = [];
       setUploading(true);
       for (const file of Array.from(fileList)) {
-        if (file.size > maxSize * 1024 * 1024) {
+        if (file.size > effectiveMaxSize * 1024 * 1024) {
           console.warn(
-            `[FileAttachmentField] File "${file.name}" exceeds ${maxSize}MB limit, skipped.`,
+            `[FileAttachmentField] File "${file.name}" exceeds ${effectiveMaxSize}MB limit, skipped.`,
           );
-          showErrorToast(`${file.name} 超出 ${maxSize}MB 限制`);
+          showErrorToast(uploadText('fileTooLarge').replace('{name}', file.name).replace('{size}', String(effectiveMaxSize)));
           continue;
         }
         try {
@@ -106,7 +137,7 @@ export function FileAttachmentField({
       setUploading(false);
       onChange?.([...files, ...newFiles]);
     },
-    [files, maxSize, onChange, showErrorToast, uploadText],
+    [files, effectiveMaxSize, maxCount, limitsReady, disabled, readOnly, onChange, showErrorToast, uploadText],
   );
 
   const handleRemove = useCallback(
@@ -154,8 +185,14 @@ export function FileAttachmentField({
         className="hidden"
         accept={accept}
         multiple={multiple}
+        disabled={disabled || uploading || !limitsReady || (maxCount !== undefined && files.length >= maxCount)}
+        data-testid="attachment-file-input"
         onChange={(e) => e.target.files && handleUpload(e.target.files)}
       />
+      {limitsEndpoint && !limitsReady && !limitsError && <p role="status" className="text-text-3 text-sm">{uploadText('limitsLoading')}</p>}
+      {limitsError && <p role="alert" className="text-status-red text-sm">{uploadText('limitsUnavailable')}</p>}
+      {limitsEndpoint && limitsReady && <p className="text-text-3 text-sm">{Number.isFinite(effectiveMaxSize)
+        ? uploadText('effectiveLimit').replace('{size}', String(effectiveMaxSize)) : uploadText('unlimitedSize')}</p>}
       {files.length > 0 && (
         <div className="mb-2 space-y-1">
           {files.map((f, i) => (
@@ -180,7 +217,7 @@ export function FileAttachmentField({
       )}
       <button
         type="button"
-        disabled={disabled || uploading}
+        disabled={disabled || uploading || !limitsReady || (maxCount !== undefined && files.length >= maxCount)}
         onClick={() => inputRef.current?.click()}
         className="border-border-strong text-text-2 hover:border-accent hover:text-accent rounded border border-dashed px-3 py-1.5 text-sm disabled:opacity-50"
       >

@@ -1,6 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
+
+it('defers paged choices to the rendered dialog without eagerly downloading the full directory', async () => {
+  const fetchResult = vi.fn();
+  window.addEventListener('dialog:form', event => {
+    const detail = (event as CustomEvent).detail;
+    expect(detail.fields[0].dataSource).toMatchObject({ pagination: true, endpoint: '/api/choices/record' });
+    expect(detail.fieldOptions).toEqual({});
+    detail.onSubmit({ people: ['chosen'] });
+  }, { once: true });
+  await expect(promptInputForm([{ field: 'people', type: 'multiselect', dataSource: {
+    type: 'api', endpoint: '/api/choices/${record.pid}', pagination: true,
+  } }], 'Select people', fetchResult, undefined, { record: { pid: 'record' } })).resolves.toEqual({ people: ['chosen'] });
+  expect(fetchResult).not.toHaveBeenCalled();
+});
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
 import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
@@ -681,6 +695,21 @@ describe('ActionRegistry refresh', () => {
 });
 
 describe('ActionRegistry navigate / new / router.push handlers', () => {
+  it.each(['navigate', 'router.push'])('resolves %s from the accepted API result in the real flow', async action => {
+    const context = createExpressionContext();
+    const navigate = vi.fn();
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { snapshotToken: 'sealed-capture' } });
+    const manager = { getContext: () => context, updateState: (_scope: string, key: string, value: unknown) => { context.state[key] = value; } };
+    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: manager as any, scopeId: 'capture-route', dataSourceManager: {} as any,
+      schema: {} as any, getAllFormFields: () => [], navigate });
+    await flow.run([
+      { action: 'api.request', method: 'post', endpoint: '/api/statistics/captures', body: { state: 'all' }, target: 'capture' },
+      { action, args: { path: '/p/statistics/view/${state.capture.snapshotToken}' } },
+    ], { ...context, fetchResult } as any);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('/p/statistics/view/sealed-capture');
+  });
+
   it('navigate jumps to args.path', async () => {
     const navigate = vi.fn();
     await actionRegistry.execute('navigate', { navigate, args: { path: '/p/orders' } });
@@ -901,6 +930,13 @@ describe('ActionRegistry toast handlers', () => {
     await expect(
       actionRegistry.execute('toast.show', { args: { message: 'hi' } }),
     ).resolves.toBeUndefined();
+  });
+  it.each(['toast.show', 'toast.success', 'toast.error'])('%s honors the active locale and catalog messages', async (action) => {
+    const showToast=vi.fn();
+    await actionRegistry.execute(action,{showToast,locale:'en-US',args:{message:{'zh-CN':'管理操作已记录','en-US':'Administration recorded'}}});
+    expect(showToast).toHaveBeenLastCalledWith('Administration recorded',expect.any(String));
+    await actionRegistry.execute(action,{showToast,locale:'zh-CN',t:key=>key==='recovery.recorded'?'管理操作已记录':key,args:{message:'$i18n:recovery.recorded'}});
+    expect(showToast).toHaveBeenLastCalledWith('管理操作已记录',expect.any(String));
   });
 });
 
@@ -1517,5 +1553,9 @@ describe('Scoped stable request-key action and real flow transport', () => {
     manager.createScope('s');
     for (const args of [{field:'__proto__'}, {field:'state.key'}, {field:'requestKey',value:'forced'}, {}])
       await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'s',args})).rejects.toThrow();
+    await expect(actionRegistry.execute('state.ensureRequestKey',{
+      stateManager:manager,scopeId:'s',args:{field:'${record.field}'},expressionEvaluator:new ExpressionEvaluator(),
+      expressionContext:{record:{field:'__proto__'}} as any,
+    })).rejects.toThrow();
   });
 });

@@ -1,6 +1,8 @@
 import type { RequestKeySession } from './request-key/session';
+import { downloadWithAuth, FileDownloadHttpError, FileDownloadValidationError } from '~/framework/meta/utils/commandDownload';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -35,6 +37,7 @@ function translateOrFallback(
   const translated = t?.(key);
   return translated && translated !== key ? translated : fallback;
 }
+
 
 /**
  * 动作执行上下文
@@ -207,6 +210,34 @@ class ActionRegistry {
 // 导出单例
 export const actionRegistry = new ActionRegistry();
 
+actionRegistry.register('file.download', async ({ args, t, locale, expressionEvaluator, expressionContext }) => {
+  const failed = translateOrFallback(t, 'file.download.failed', 'Could not download the file. Refresh and check its expiry and current access.');
+  const invalid = translateOrFallback(t, 'file.download.invalid_response', 'The server did not return a complete file. Refresh or create a new export.');
+  const configured = args?.url;
+  const url = typeof configured === 'string' && expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateTemplate(configured, expressionContext) : configured;
+  if (typeof url !== 'string' || !url.startsWith('/api/') || url.includes('\\')
+    || typeof window === 'undefined' || new URL(url, window.location.origin).pathname.indexOf('/api/') !== 0) {
+    throw new Error(translateOrFallback(t, 'file.download.invalid_url', 'The protected file link is unavailable. Refresh the task.'));
+  }
+  const expected = args?.expectedContentType;
+  if (expected !== undefined && (typeof expected !== 'string' || !expected.includes('/'))) throw new Error(invalid);
+  try {
+    await downloadWithAuth(url, {
+      expectedContentTypes: expected ? [expected] : undefined,
+      requireAttachment: true,
+      requireNonEmpty: true,
+      resolveFailure: async response => {
+        const body = response.headers.get('Content-Type')?.includes('json') ? await response.json() : undefined;
+        return resolveCommandErrorMessage(body, '', t, locale, failed);
+      },
+    });
+  } catch (failure) {
+    if (failure instanceof FileDownloadHttpError) throw failure;
+    throw new Error(failure instanceof FileDownloadValidationError ? invalid : failed, { cause: failure });
+  }
+});
+
 // ============================================
 // 注册内置动作处理器
 // ============================================
@@ -233,7 +264,7 @@ function resolveDataSourceTargets(args?: Record<string, any>): string | string[]
 /**
  * 导航动作 - 跳转到指定路径
  */
-actionRegistry.register('navigate', ({ args, navigate }) => {
+actionRegistry.register('navigate', ({ args, navigate, expressionEvaluator, expressionContext }) => {
   if (!navigate) {
     console.error('[ActionRegistry] navigate: navigate function not provided');
     return;
@@ -243,7 +274,9 @@ actionRegistry.register('navigate', ({ args, navigate }) => {
     console.error('[ActionRegistry] navigate: missing path argument');
     return;
   }
-  navigate(path);
+  const resolvedPath = expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateTemplate(path, expressionContext) : path;
+  navigate(resolvedPath);
 });
 
 /**
@@ -539,7 +572,7 @@ actionRegistry.register('setState', ({ setFilters, args }) => {
 /**
  * router.push - 路由跳转
  */
-actionRegistry.register('router.push', ({ args, navigate }) => {
+actionRegistry.register('router.push', ({ args, navigate, expressionEvaluator, expressionContext }) => {
   if (!navigate) {
     console.error('[ActionRegistry] router.push: missing navigate');
     return;
@@ -549,7 +582,9 @@ actionRegistry.register('router.push', ({ args, navigate }) => {
     console.error('[ActionRegistry] router.push: missing path argument');
     return;
   }
-  navigate(path);
+  const resolvedPath = expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateTemplate(path, expressionContext) : path;
+  navigate(resolvedPath);
 });
 
 /**
@@ -609,11 +644,8 @@ actionRegistry.register('dataSource.reload', async ({ dataSourceManager, args })
 /**
  * toast.show - 显示提示消息
  */
-actionRegistry.register('toast.show', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content;
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || JSON.stringify(message);
-  }
+actionRegistry.register('toast.show', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t);
   const level = args?.level || 'info';
   showToast?.(message as string, level);
 });
@@ -621,22 +653,16 @@ actionRegistry.register('toast.show', ({ args, showToast }) => {
 /**
  * toast.success - 成功提示
  */
-actionRegistry.register('toast.success', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content || 'Operation successful';
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Operation successful';
-  }
+actionRegistry.register('toast.success', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t) || 'Operation successful';
   showToast?.(message as string, 'success');
 });
 
 /**
  * toast.error - 错误提示
  */
-actionRegistry.register('toast.error', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content || 'Operation failed';
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Operation failed';
-  }
+actionRegistry.register('toast.error', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t) || 'Operation failed';
   showToast?.(message as string, 'error');
 });
 
@@ -716,6 +742,15 @@ export async function promptInputForm(
     Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any; options?: Array<{ value: string; disabled?: boolean }>; defaultValues?: unknown }>
   > = {};
   for (const field of normalizedFields) {
+    if (field.dataSource?.pagination === true) {
+      if (field.type !== 'multiselect' || field.dataSource.type !== 'api' || !field.dataSource.endpoint) {
+        throw new Error('Paged choices require an API multiselect endpoint');
+      }
+      field.dataSource = { ...field.dataSource, endpoint: String(field.dataSource.endpoint).replace(
+        /\$\{([^}]+)\}/g, (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
+      ) };
+      continue;
+    }
     if (field.dictCode && fetchResult) {
       const result = await fetchPromptChoices(fetchResult,
         `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,
@@ -1073,8 +1108,16 @@ actionRegistry.register('form.set', ({ stateManager, scopeId, args, expressionEv
   Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
 });
 
+function resolveRequestKeyArgs(context: ActionContext): Record<string, any> | undefined {
+  const { args, expressionEvaluator, expressionContext } = context;
+  if (!args || typeof args.field !== 'string' || !expressionEvaluator || !expressionContext) return args;
+  return { ...args, field: expressionEvaluator.evaluateTemplate(args.field, expressionContext) };
+}
+
 /** Allocate one domain request key in the existing scoped state, never per click. */
-actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+actionRegistry.register('state.ensureRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).some(key => !['field','persistence'].includes(key)) || typeof args.field !== 'string'
     || (args.persistence !== undefined && args.persistence !== 'session')
@@ -1100,7 +1143,9 @@ actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args
 });
 
 /** Restore only an existing authenticated session UUID; never allocate or persist one. */
-actionRegistry.register('state.peekRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+actionRegistry.register('state.peekRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).length !== 2 || Object.keys(args).some(key => !['field','persistence'].includes(key))
     || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
@@ -1112,7 +1157,9 @@ actionRegistry.register('state.peekRequestKey', ({ stateManager, scopeId, args, 
 });
 
 /** Explicit completion/next-attempt transition; ordinary state.set never clears persisted intent. */
-actionRegistry.register('state.clearRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
+actionRegistry.register('state.clearRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
   if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
     || Object.keys(args).some(key => !['field','persistence'].includes(key))
     || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)

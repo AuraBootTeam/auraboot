@@ -1,4 +1,11 @@
+import {
+  commandRequestMetadata,
+  commandPolicyFor,
+  projectCommandPayload,
+  type CommandRequestIdentity,
+} from '~/framework/meta/utils/commandRequestPolicy';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
+import { useActionTriggerFocus } from '~/hooks/useActionTriggerFocus';
 import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
 /**
  * useActionHandler - 统一的 Action 处理 Hook (重构版本)
@@ -51,7 +58,7 @@ import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCan
  * ```
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   downloadWithAuth,
   resolveCommandFileDownload,
@@ -92,7 +99,6 @@ import {
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
 type NavigateFunction = RouterNavigateFunction;
-
 
 function toNonBlankString(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -190,10 +196,14 @@ function resolveNavigationRecord(
   // Static card rows carry route fields rather than entity identifiers.
   // Preserve those fields before falling back to a surrounding detail record.
   const routeFields = [...target.matchAll(/\{(\w+)\}/g)]
-    .map((match) => match[1]).filter((field) => field !== 'pid' && field !== 'id');
-  const templateRecord = routeFields.length > 0
-    ? candidates.find((candidate) => candidate && routeFields.every((field) => field in candidate))
-    : undefined;
+    .map((match) => match[1])
+    .filter((field) => field !== 'pid' && field !== 'id');
+  const templateRecord =
+    routeFields.length > 0
+      ? candidates.find(
+          (candidate) => candidate && routeFields.every((field) => field in candidate),
+        )
+      : undefined;
   if (templateRecord) return templateRecord;
 
   const recordWithPublicPid = candidates.find((candidate) =>
@@ -295,6 +305,7 @@ interface ExecuteCommandOptions {
   suppressAsyncSubmitToast?: boolean;
   asyncTaskLabel?: string;
   expectedVersion?: number;
+  clientRequestId?: string;
 }
 
 function notifyActionToast(
@@ -429,7 +440,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     [effectiveShowToast],
   );
 
+  const commandIdentity = useRef<CommandRequestIdentity | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const captureTriggerFocus = useActionTriggerFocus(loading);
   const [error, setError] = useState<string | null>(null);
   // Live async task backing the progress modal (running → terminal). Kept after
   // terminal so the modal can show the final summary until the host dismisses.
@@ -530,6 +543,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       if (commandOptions.expectedVersion != null) {
         body.expectedVersion = commandOptions.expectedVersion;
       }
+      if (commandOptions.clientRequestId) body.clientRequestId = commandOptions.clientRequestId;
       const sendCommand = () =>
         fetchResult(`/api/meta/commands/execute/${commandCode}`, {
           method: 'post',
@@ -623,7 +637,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    * Show confirmation dialog and return user's choice
    */
   const showConfirmDialog = useCallback(
-    async (messageKey: string | Record<string, string>, variant: 'default' | 'danger'): Promise<boolean> => {
+    async (
+      messageKey: string | Record<string, string>,
+      variant: 'default' | 'danger',
+    ): Promise<boolean> => {
       const { title, content } = resolveConfirmDialog(messageKey, t);
       return confirmDialog({ title, content, variant });
     },
@@ -696,19 +713,29 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
   const handleAction = useCallback(
     async (button: ButtonConfig, record?: Record<string, any>) => {
+      captureTriggerFocus();
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
-      const confirmVariant = normalizedButton.confirmVariant
-        ?? (normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default');
+      const confirmVariant =
+        normalizedButton.confirmVariant ??
+        (normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default');
       const confirmKey = (normalizedButton as any).confirm || normalizedButton.confirmMessageKey;
 
       try {
         setLoading(true);
         setError(null);
-        if (normalizedButton.confirmVariant !== undefined
-          && normalizedButton.confirmVariant !== 'default' && normalizedButton.confirmVariant !== 'danger') {
-          throw new Error(t('message.operation.failed', undefined,
-            locale.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed'));
+        if (
+          normalizedButton.confirmVariant !== undefined &&
+          normalizedButton.confirmVariant !== 'default' &&
+          normalizedButton.confirmVariant !== 'danger'
+        ) {
+          throw new Error(
+            t(
+              'message.operation.failed',
+              undefined,
+              locale.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed',
+            ),
+          );
         }
 
         switch (actionDef.type) {
@@ -836,8 +863,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
+            let collectedInputs: Record<string, any> | undefined;
             if (inputFields.length > 0) {
-              let collectedInputs: Record<string, any>;
               try {
                 collectedInputs = await promptInputForm(
                   inputFields,
@@ -934,12 +961,33 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   `no explicit command and no convention "${operationType}" command on the model`,
               );
             }
+            const requestExtension = runtime?.getSchema?.()?.extension;
+            const policy = commandPolicyFor(
+              requestExtension?.commandRequest,
+              requestExtension?.commandRequestByCommand,
+              effectiveCommand,
+            );
+            payload = projectCommandPayload(payload, policy, collectedInputs);
+            const request = commandRequestMetadata(
+              policy,
+              actionRecord,
+              {
+                command: effectiveCommand,
+                targetRecordPid,
+                payload,
+                version: actionRecord?.row_version,
+              },
+              commandIdentity.current,
+            );
+            commandIdentity.current = request.identity;
+            const requestMetadata = request.metadata;
             const commandResult = await executeCommand(
               effectiveCommand,
               targetRecordPid,
               payload,
               operationType,
               {
+                ...requestMetadata,
                 suppressAsyncSubmitToast: promptUploadUsesPanelFeedback,
                 asyncTaskLabel: getLocalizedText(
                   normalizedButton.label || normalizedButton.content || normalizedButton.code,
@@ -1172,11 +1220,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               }
             }
             const { getKernel } = await import('~/framework/bootstrap');
-            const result = await getKernel().pluginLoader.invoke('workflow.start', {
+            const result = (await getKernel().pluginLoader.invoke('workflow.start', {
               workflowKey,
               businessKey: String(businessKeyRaw),
               variables: Object.keys(resolvedVars).length > 0 ? resolvedVars : undefined,
-            }) as { deduped?: boolean };
+            })) as { deduped?: boolean };
             const toastMessage = result.deduped
               ? t('workflow.action.start.deduped', undefined, '该记录已有工作流在运行')
               : t('workflow.action.start.success', undefined, '工作流已启动');
@@ -1260,7 +1308,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         if (err instanceof ActionCancelledError) return;
         const errorMessage = resolveCommandErrorMessage(
           { context: { detail: err instanceof Error ? err.message : 'Action execution failed' } },
-          button.code, t, locale,
+          button.code,
+          t,
+          locale,
         );
         const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
@@ -1286,6 +1336,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       resolveNavigateTo,
       showConfirmDialog,
       surfaceTemporaryPassword,
+      captureTriggerFocus,
     ],
   );
 

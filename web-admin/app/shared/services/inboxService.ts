@@ -112,6 +112,14 @@ export async function getUnreadCount(): Promise<number> {
   return count;
 }
 
+/** Pending business work is independent from whether its reminder was read. */
+export async function getPendingCount(): Promise<number> {
+  const result = await fetchResult<number>(`${BASE}/pending-count`, { method: 'get' });
+  const count = requireData(result);
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) throw new Error('Inbox pending count is invalid');
+  return count;
+}
+
 /**
  * Get single inbox item detail.
  */

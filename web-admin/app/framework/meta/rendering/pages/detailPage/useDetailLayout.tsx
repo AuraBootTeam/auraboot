@@ -55,7 +55,7 @@ export function useDetailLayout({
   const showDefaultEditAction = shouldRenderDefaultDetailEditAction(schema);
 
   const headerToolbar = useMemo(
-    () => allBlocks.find((b: BlockConfig) => b.blockType === 'toolbar'),
+    () => allBlocks.find((b: BlockConfig) => b.blockType === 'toolbar' && (b as { detailPlacement?: string }).detailPlacement !== 'body'),
     [allBlocks],
   );
   const effectiveHeaderToolbar = headerToolbar || null;
@@ -114,7 +114,8 @@ export function useDetailLayout({
   const directMiscBlocks = useMemo(
     () =>
       allBlocks.filter(
-        (b: BlockConfig) => !DETAIL_SPECIALIZED_BLOCK_TYPES.has(b.blockType as string),
+        (b: BlockConfig) => !DETAIL_SPECIALIZED_BLOCK_TYPES.has(b.blockType as string)
+          || (b.blockType === 'toolbar' && (b as { detailPlacement?: string }).detailPlacement === 'body'),
       ),
     [allBlocks],
   );
@@ -125,7 +126,7 @@ export function useDetailLayout({
   );
   const workspaceContentBlocks = allBlocks.filter(
     (block: BlockConfig) =>
-      block.blockType !== 'toolbar' &&
+      (block.blockType !== 'toolbar' || (block as { detailPlacement?: string }).detailPlacement === 'body') &&
       block.blockType !== 'tabs' &&
       (block as { detailPlacement?: string }).detailPlacement !== 'header',
   );

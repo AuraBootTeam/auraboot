@@ -13,19 +13,13 @@ import {
   EnvelopeOpenIcon,
 } from '@heroicons/react/24/outline';
 import { listInboxItems, markRead, markAllRead, type InboxItem } from '~/shared/services/inboxService';
+import { useAuth } from '~/contexts/AuthContext';
+import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
 import { InboxBadge } from './InboxBadge';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import FEEDBACK from '../notification/NotificationFeedback.i18n.json';
 
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const diff = now - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 function itemIcon(type: string) {
   switch (type) {
@@ -53,31 +47,43 @@ function priorityDot(priority: string) {
 }
 
 export function InboxHeaderWidget() {
+  const { t, locale } = useI18n();
+  const { timezone } = useTimezone();
+  const { user } = useAuth();
+  const scope = `${user?.tenantId ?? ''}:${user?.pid ?? ''}`;
+  const scopeRef = useRef(scope); scopeRef.current = scope;
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const openRef = useRef(open); openRef.current = open;
+  const generation = useRef(0);
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   const fetchItems = useCallback(async () => {
-    setLoading(true);
+    const requestGeneration = ++generation.current;
+    setLoading(true); setError(null);
     try {
       const page = await listInboxItems({
         status: 'pending',
         pageNum: 1,
         pageSize: 5,
       });
-      setItems(page.records || []);
+      if (scopeRef.current === scope && requestGeneration === generation.current) setItems(page.records);
     } catch {
-      // Non-critical
+      if (scopeRef.current === scope && requestGeneration === generation.current) setError(t('inbox.loadFailed'));
     } finally {
-      setLoading(false);
+      if (scopeRef.current === scope && requestGeneration === generation.current) setLoading(false);
     }
-  }, []);
+  }, [scope, t]);
+  useEffect(() => {setItems([]);setOpen(false);setError(null);}, [scope]);
 
   useEffect(() => {
     if (open) fetchItems();
+    else { generation.current++; setLoading(false); }
   }, [open, fetchItems]);
+  useEffect(() => () => { generation.current++; }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -87,7 +93,10 @@ export function InboxHeaderWidget() {
       }
     };
     const escHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape' && openRef.current) {
+        setOpen(false);
+        dropdownRef.current?.querySelector<HTMLButtonElement>('[data-testid="inbox-badge"]')?.focus();
+      }
     };
     document.addEventListener('mousedown', handler);
     document.addEventListener('keydown', escHandler);
@@ -107,7 +116,9 @@ export function InboxHeaderWidget() {
     }
     setOpen(false);
 
-    if (item.itemType === 'approval' && item.sourceId) {
+    if (item.itemType === 'announcement_ack' && item.sourceId) {
+      navigate(`/p/announcement_reader/view/${encodeURIComponent(item.sourceId)}`);
+    } else if (item.itemType === 'approval' && item.sourceId) {
       navigate(`/inbox?task=${item.sourceId}`);
     } else if (item.sourceModel ?? item.modelCode) {
       const modelCode = item.sourceModel ?? item.modelCode;
@@ -125,9 +136,9 @@ export function InboxHeaderWidget() {
   const handleMarkAllRead = async () => {
     try {
       await markAllRead();
-      setItems((prev) => prev.map((i) => ({ ...i, isRead: true })));
+      if (scopeRef.current === scope && openRef.current) await fetchItems();
     } catch {
-      // Non-critical
+      if (scopeRef.current === scope && openRef.current) setError(getLocalizedText(FEEDBACK.markAllFailed, locale));
     }
   };
 
@@ -138,30 +149,30 @@ export function InboxHeaderWidget() {
       {open && (
         <div
           data-testid="inbox-dropdown"
-          className="absolute end-0 z-50 mt-2 w-96 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800"
+          className="fixed inset-x-4 top-14 z-50 mt-2 rounded-xl border border-gray-200 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:top-auto sm:end-0 sm:w-96 dark:border-gray-700 dark:bg-gray-800"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Inbox</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('inbox.title')}</h3>
             <button
               onClick={handleMarkAllRead}
               className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
               data-testid="inbox-mark-all-read"
             >
               <EnvelopeOpenIcon className="h-3.5 w-3.5" />
-              Mark all read
+              {t('inbox.markAllRead')}
             </button>
           </div>
 
           {/* Items */}
           <div className="max-h-80 overflow-y-auto">
-            {loading && items.length === 0 ? (
+            {error ? <div role="alert" className="p-4 text-sm">{error}<button type="button" onClick={() => void fetchItems()} className="ms-2 underline">{t('common.retry')}</button></div> : loading && items.length === 0 ? (
               <div className="flex items-center justify-center py-8">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
               </div>
             ) : items.length === 0 ? (
               <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                No pending items
+                {t('inbox.empty')}
               </div>
             ) : (
               items.map((item) => (
@@ -188,9 +199,9 @@ export function InboxHeaderWidget() {
                     )}
                     <div className="mt-1 flex items-center gap-2">
                       <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                        {item.itemType}
+                        {t(`inbox.type.${['approval','task','mention','ai_suggestion','alert','assignment','system','announcement_ack'].includes(item.itemType) ? item.itemType : 'system'}`)}
                       </span>
-                      <span className="text-xs text-gray-400">{timeAgo(item.createdAt)}</span>
+                      <span className="text-xs text-gray-400">{new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short', timeZone: timezone }).format(new Date(item.createdAt))}</span>
                     </div>
                   </div>
                 </button>
@@ -206,7 +217,7 @@ export function InboxHeaderWidget() {
               data-testid="inbox-view-all"
               className="flex w-full items-center justify-center rounded-lg py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
             >
-              View all
+              {t('inbox.viewAll')}
               <ArrowRightIcon className="ml-1 h-4 w-4" />
             </Link>
           </div>

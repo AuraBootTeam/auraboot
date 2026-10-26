@@ -57,6 +57,18 @@ describe('resolveLocalMenuRedirect', () => {
 });
 
 describe('DynamicField', () => {
+  it('uses a safe same-page download for controlled file attachments', () => {
+    render(<DynamicField field={{ field: 'files', component: 'fileattachment' } as any}
+      value={JSON.stringify([{ name: 'Policy.txt', url: '/api/announcements/versions/v1/attachments/f1', size: 12 },
+        { name: 'Unsafe.txt', url: 'javascript:alert(1)' }])} onChange={vi.fn()} readOnly locale="en-US" />);
+    const safe = screen.getByRole('link', { name: 'Policy.txt (12 B)' });
+    expect(safe).toHaveAttribute('href', '/api/announcements/versions/v1/attachments/f1');
+    expect(safe).toHaveAttribute('download', 'Policy.txt');
+    expect(safe).toHaveAttribute('target', '_self');
+    expect(screen.getByText('Unsafe.txt')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Unsafe.txt')).not.toHaveAttribute('href');
+  });
+
   it('formats read-only numeric and money controls with locale grouping', () => {
     const { rerender } = render(
       <DynamicField

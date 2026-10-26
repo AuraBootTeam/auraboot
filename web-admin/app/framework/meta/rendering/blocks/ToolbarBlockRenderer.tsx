@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 /**
  * ToolbarBlockRenderer - 工具栏/按钮组渲染器
  */
@@ -14,6 +15,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { LoadingOverlay } from '~/ui/LoadingOverlay';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
+import { useActionTriggerFocus } from '~/hooks/useActionTriggerFocus';
 
 export interface ToolbarBlockRendererProps {
   block: BlockConfig;
@@ -102,6 +104,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   // WorkbenchActionBarBlockRenderer's in-flight behaviour.
   const [runningCode, setRunningCode] = React.useState<string | null>(null);
   const busy = loading || runningCode !== null;
+  const captureTriggerFocus = useActionTriggerFocus(busy);
 
   // 处理按钮点击 - 委托给 useActionHandler
   // Toolbar 通常无 record（列表页工具栏），传 undefined 是合法的
@@ -127,9 +130,10 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     ) {
       return;
     }
+    captureTriggerFocus();
     setRunningCode(button.code);
     try {
-      await handleAction(normalized, undefined);
+      await handleAction(normalized, initialRecord);
     } finally {
       setRunningCode(null);
     }
@@ -140,7 +144,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
       <LoadingOverlay visible={busy} label={t('common.loading')} />
       <div className="toolbar-block flex space-x-2">
         {buttons.map((button) => {
-          if (button.permissionCode && !hasPermission(button.permissionCode)) {
+          if (!hasButtonPermissions(button, hasPermission)) {
             return null;
           }
 
@@ -152,7 +156,8 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
 
           const label = getLocalizedText(button.label || button.content || button.code, locale, t);
           const isRunning = runningCode === button.code;
-          const isDisabled = Boolean(button.disabled) || busy;
+          const isDisabled = Boolean(button.disabled) || busy || Boolean(button.disableWhen
+            && evaluator.evaluateCondition(button.disableWhen, actionContext));
           const loadingLabel = t('common.loading') || '加载中...';
 
           return (

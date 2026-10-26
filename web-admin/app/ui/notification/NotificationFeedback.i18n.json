@@ -1,0 +1,5 @@
+{
+  "loadFailed": {"zh-CN":"无法加载通知，请重试。","en-US":"Notifications could not be loaded. Retry."},
+  "markAllFailed": {"zh-CN":"未能确认全部已读，请刷新核对后重试。","en-US":"Marking all read could not be confirmed. Refresh and retry."},
+  "retry": {"zh-CN":"重试","en-US":"Retry"}
+}

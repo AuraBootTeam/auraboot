@@ -30,6 +30,9 @@ public class ExecutionJobQueryService {
     private final ExportTaskMapper exportTaskMapper;
     private final DocumentArtifactJobRepository documentArtifactJobRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.meta.service.impl.DomainExportTaskService> domainExports;
+
     public List<ExecutionJobDTO> recent(int requestedLimit) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -42,6 +45,7 @@ public class ExecutionJobQueryService {
                 .map(this::fromImport)
                 .forEach(jobs::add);
         exportTaskMapper.findRecentForOwner(tenantId, userId, limit).stream()
+                .filter(task->!com.auraboot.framework.meta.service.impl.DomainExportTaskService.isDomain(task) || domainExports.getObject().visible(task))
                 .map(this::fromExport)
                 .forEach(jobs::add);
         jobs.addAll(fromDocuments(documentArtifactJobRepository.findRecentForOwner(
@@ -94,6 +98,11 @@ public class ExecutionJobQueryService {
     }
 
     private ExecutionJobDTO fromExport(ExportTask task) {
+        boolean domain=com.auraboot.framework.meta.service.impl.DomainExportTaskService.isDomain(task);
+        com.auraboot.framework.meta.dto.ExportTaskDTO domainView=domain ? domainExports.getObject().status(task.getPid()) : null;
+        if(domain) {
+            task.setStatus(domainView.getStatus());task.setProgress(domainView.getProgress());task.setProcessedRows(domainView.getProcessedRows());
+        }
         Instant now = Instant.now();
         boolean modelExport = task.getQueryCode() != null && task.getQueryCode().startsWith("model:");
         String sourceCode = modelExport ? task.getQueryCode().substring("model:".length()) : task.getQueryCode();
@@ -102,7 +111,7 @@ public class ExecutionJobQueryService {
                 && task.getExpiresAt() != null
                 && task.getExpiresAt().isAfter(now);
         String status = available ? "completed" : normalizeExportStatus(task, now);
-        String downloadUrl = available
+        String downloadUrl = domain ? domainView.getDownloadUrl() : available
                 ? modelExport
                     ? "/api/dynamic/" + sourceCode + "/exports/" + task.getPid() + "/download"
                     : "/api/meta/named-queries/export-tasks/" + task.getPid() + "/download"

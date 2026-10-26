@@ -28,6 +28,7 @@ import { type ListSortFilterQuery } from './listViewConfig';
 interface ListDataLoaderInput {
   locale: string;
   rememberSubmittedFilters: (filters: Record<string, any>) => void;
+  getSubmittedFilters: () => Record<string, any>;
   readApiRequest: ReturnType<typeof useListApiReadRetry>['read'];
   clearApiReadFailure: ReturnType<typeof useListApiReadRetry>['clearFailure'];
   loadDataSeqRef: React.RefObject<number>;
@@ -81,6 +82,7 @@ interface ListDataLoaderInput {
 export function useListDataLoader({
   locale,
   rememberSubmittedFilters,
+  getSubmittedFilters,
   readApiRequest,
   clearApiReadFailure,
   loadDataSeqRef,
@@ -165,6 +167,8 @@ export function useListDataLoader({
         // Capture only explicitly submitted filters before issuing the request.
         // Pending filter-form edits do not participate in keyword-only searches.
         if (params?.filters !== undefined) rememberSubmittedFilters(params.filters);
+        // Mutation refreshes keep the applied query; pending form edits remain unsubmitted.
+        const submittedFilters = params?.filters ?? getSubmittedFilters();
 
         const requestedPageNum = retryRequest
           ? Number(retryRequest.queryParams.page) + 1
@@ -197,8 +201,8 @@ export function useListDataLoader({
 
           if (isApiDatasource) {
             // For API datasources, pass filter values as individual query params
-            if (params?.filters) {
-              for (const [key, value] of Object.entries(params.filters)) {
+            if (submittedFilters) {
+              for (const [key, value] of Object.entries(submittedFilters)) {
                 if (value == null || value === '') continue;
                 // Handle date range objects { start, end }
                 if (typeof value === 'object' && ('start' in value || 'end' in value)) {
@@ -221,7 +225,7 @@ export function useListDataLoader({
             const tabCondition = getTabFilter();
             const filtersParam = buildFiltersParam(
               tabCondition,
-              params?.filters,
+              submittedFilters,
               params?.chipFilters ?? chipFiltersRef.current,
               modelFieldMapRef.current,
             );
@@ -322,6 +326,7 @@ export function useListDataLoader({
       tableName,
       token,
       rememberSubmittedFilters,
+      getSubmittedFilters,
       readApiRequest,
       clearApiReadFailure,
       pagination.current,

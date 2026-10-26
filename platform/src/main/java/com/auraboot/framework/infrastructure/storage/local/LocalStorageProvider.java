@@ -36,7 +36,7 @@ public class LocalStorageProvider implements StorageProvider {
         try {
             Files.createDirectories(filePath.getParent());
             Files.copy(input, filePath);
-            log.debug("File uploaded to local storage: {}", filePath);
+            log.debug("File uploaded to local storage (bytes={})", size);
             return filePath.toString();
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to upload file to local storage: " + key, e);

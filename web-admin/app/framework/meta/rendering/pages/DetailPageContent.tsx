@@ -6,6 +6,7 @@ import { AsyncTaskModalProvider } from '~/framework/meta/rendering/components/As
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { AdditionalPermissionsProvider } from '~/contexts/AuthContext';
 import { useDetailPageState } from './detailPage/useDetailPageState';
+import { useRenderedReceipt } from './detailPage/useRenderedReceipt';
 import { useDetailRecord } from './detailPage/useDetailRecord';
 import { useDetailMetadata } from './detailPage/useDetailMetadata';
 import { useDetailSharing } from './detailPage/useDetailSharing';
@@ -197,7 +198,16 @@ function DetailPageContentInner(props: PageContentProps) {
     routerNavigate,
     t,
   });
-  return renderDetailPageView({
+  const receipt = useRenderedReceipt({
+    config: schema?.extension?.renderedReceipt,
+    root: pdfExportTargetRef,
+    record: recordData,
+    loading: recordLoading,
+    failed: Boolean(recordError || recordAccessDenied || recordNotFound),
+    recordPid: routeRecordPid,
+    onReceipt: setRecordData,
+  });
+  const view = renderDetailPageView({
     recordLoading,
     recordError,
     schema,
@@ -252,6 +262,14 @@ function DetailPageContentInner(props: PageContentProps) {
     showDefaultEditAction,
     shareDialogOpen,
   });
+  return <>
+    {receipt.error && <div role="alert" className="mx-6 my-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+      <span>{receipt.error}</span>
+      <button type="button" onClick={receipt.retry} className="ms-3 underline">{t('common.retry')}</button>
+    </div>}
+    {view}
+  </>;
+
 }
 
 export function DetailPageContent(props: PageContentProps) {

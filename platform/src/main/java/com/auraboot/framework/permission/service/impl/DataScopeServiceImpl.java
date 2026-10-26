@@ -75,6 +75,19 @@ public class DataScopeServiceImpl implements DataScopeService {
         return resolveScopeInternal(memberId, resourceCode, actionCode, true);
     }
 
+    @Override
+    public DataScopeCondition resolveAudienceScope(Long memberId, String resourceCode, String actionCode) {
+        if (memberId == null) return DataScopeCondition.none();
+        List<Long> roles = userRoleMapper.findEffectiveRoleIdsByMemberId(MetaContext.getCurrentTenantId(),memberId);
+        if (roles == null || roles.isEmpty()) return DataScopeCondition.notConfigured();
+        List<RoleDataScope> entries = roleDataScopeMapper.findByRoleIdsAndResource(roles, resourceCode, actionCode);
+        if (entries == null || entries.isEmpty()) return DataScopeCondition.notConfigured();
+        DataScopeType type = mergeScopes(entries);
+        return type == DataScopeType.TEAM
+                ? buildTeamCondition(memberId, resourceCode, true, false)
+                : resolveCondition(memberId, type, resourceCode, true);
+    }
+
     private DataScopeCondition resolveScopeInternal(Long memberId, String resourceCode, String actionCode,
                                                     boolean strict) {
         // 1. Get member's role IDs
@@ -346,8 +359,12 @@ public class DataScopeServiceImpl implements DataScopeService {
      * to no team, mirroring the DEPT fallback.
      */
     private DataScopeCondition buildTeamCondition(Long memberId, String resourceCode, boolean strict) {
+        return buildTeamCondition(memberId, resourceCode, strict, true);
+    }
+
+    private DataScopeCondition buildTeamCondition(Long memberId, String resourceCode, boolean strict, boolean recordScope) {
         String teamField = getDataScopeTeamField(resourceCode);
-        if (teamField == null) {
+        if (recordScope && teamField == null) {
             log.warn("TEAM data scope on {} has no extension.dataScope.teamField; denying", resourceCode);
             return DataScopeCondition.none();
         }

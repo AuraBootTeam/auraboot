@@ -88,6 +88,7 @@ public class ApplicationModuleRegistry {
     }
 
     public synchronized void unregister(String pluginId) {
+        pluginManager.requireTenantLifecycleChange(pluginId);
         extensionRegistry.unregisterApplicationModuleActions(pluginId);
         workflowCapabilities.unregister(pluginId);
         usageSources.unregister(pluginId);

@@ -1,0 +1,6 @@
+{
+  "invalidDateTime": {
+    "zh-CN": "所选时间在当前时区不存在，请重新选择。",
+    "en-US": "This time does not exist in the current time zone. Choose another time."
+  }
+}

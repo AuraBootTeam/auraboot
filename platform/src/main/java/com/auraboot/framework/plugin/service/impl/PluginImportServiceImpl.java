@@ -120,6 +120,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private final PluginImportHistoryMapper importHistoryMapper;
     private final PluginRecordMapper pluginRecordMapper;
+    private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
     private final PluginResourceMapper pluginResourceMapper;
     private final PluginResourceImporter resourceImporter;
     private final PlatformTransactionManager transactionManager;
@@ -1495,10 +1496,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             PluginAgentResourceGuard.requireResources(pluginResourceMapper.findUpdatedResourcesForRollback(
                     history.getTenantId(), history.getPluginPid(), importId), null);
         }
-        modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
         if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
             throw new PluginException("Rollback tenant does not match import owner");
         }
+        var rollbackOwner = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
+        if (rollbackOwner == null) throw new PluginException("Plugin rollback owner is missing");
+        auraPluginManager.requireTenantLifecycleChange(rollbackOwner);
+        modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
 
         PluginMetadataRollbackSnapshot metadataRollback = null;
         boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()

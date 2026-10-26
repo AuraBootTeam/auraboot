@@ -11,23 +11,19 @@
         "label:zh-CN": "普通",
         "sortNo": 10,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
       },
       {
-        "value": "high",
-        "label": "High",
-        "label:zh-CN": "高",
+        "value": "important",
+        "label": "Important",
+        "label:zh-CN": "重要",
         "sortNo": 20,
         "status": "enabled",
-        "extension": { "color": "amber" }
-      },
-      {
-        "value": "urgent",
-        "label": "Urgent",
-        "label:zh-CN": "紧急",
-        "sortNo": 30,
-        "status": "enabled",
-        "extension": { "color": "red" }
+        "extension": {
+          "color": "amber"
+        }
       }
     ]
   },
@@ -43,7 +39,9 @@
         "label:zh-CN": "草稿",
         "sortNo": 10,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
       },
       {
         "value": "published",
@@ -51,15 +49,19 @@
         "label:zh-CN": "已发布",
         "sortNo": 20,
         "status": "enabled",
-        "extension": { "color": "green" }
+        "extension": {
+          "color": "green"
+        }
       },
       {
-        "value": "archived",
+        "value": "withdrawn",
         "label": "Archived",
         "label:zh-CN": "已撤回",
         "sortNo": 30,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
       },
       {
         "value": "expired",
@@ -67,7 +69,909 @@
         "label:zh-CN": "已过期",
         "sortNo": 40,
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "unpublished",
+        "label": "Publication queued",
+        "label:zh-CN": "发布处理中",
+        "sortNo": 100,
+        "status": "enabled"
+      },
+      {
+        "value": "scheduled",
+        "label": "Scheduled",
+        "label:zh-CN": "定时待发布",
+        "sortNo": 110,
+        "status": "enabled"
+      },
+      {
+        "value": "missed",
+        "label": "Publication window missed",
+        "label:zh-CN": "已错过发布时间",
+        "sortNo": 120,
+        "status": "enabled"
+      },
+      {
+        "value": "pending_approval",
+        "label": "Approval pending",
+        "label:zh-CN": "审批中",
+        "sortNo": 140,
+        "status": "enabled"
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 150,
+        "status": "enabled"
+      },
+      {
+        "value": "approval_withdrawn",
+        "label": "Approval withdrawn",
+        "label:zh-CN": "审批已撤销",
+        "sortNo": 160,
+        "status": "enabled"
+      },
+      {
+        "value": "approval_failed",
+        "label": "Approval failed",
+        "label:zh-CN": "审批异常",
+        "sortNo": 170,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_audience_kind",
+    "name": "announcement_audience_kind",
+    "name:zh-CN": "通知范围",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "selected",
+        "label": "Selected audience",
+        "label:zh-CN": "定向通知",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "all",
+        "label": "All tenant members",
+        "label:zh-CN": "当前租户全员",
+        "sortNo": 20,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_mode",
+    "name": "announcement_approval_mode",
+    "name:zh-CN": "发布方式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "exempt",
+        "label": "Exempt publication",
+        "label:zh-CN": "免审发布",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "approval",
+        "label": "Publish after approval",
+        "label:zh-CN": "审批后发布",
+        "sortNo": 20,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_execution",
+    "name": "审批申请状态",
+    "name:zh-CN": "审批申请状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending_dispatch",
+        "label": "Awaiting dispatch",
+        "label:zh-CN": "等待发起",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "running",
+        "label": "Approval pending",
+        "label:zh-CN": "审批中",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "withdraw_requested",
+        "label": "Withdrawal requested",
+        "label:zh-CN": "撤销处理中",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已通过",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "withdrawn",
+        "label": "Withdrawn",
+        "label:zh-CN": "已撤销",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "流程异常",
+        "sortNo": 60,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_provider",
+    "name": "审批流程进度",
+    "name:zh-CN": "审批流程进度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "starting",
+        "label": "Starting",
+        "label:zh-CN": "启动处理中",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "running",
+        "label": "Running",
+        "label:zh-CN": "审批中",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "blocked",
+        "label": "Attention required",
+        "label:zh-CN": "分配或执行异常",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已通过",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "withdrawn",
+        "label": "Withdrawn",
+        "label:zh-CN": "已撤销",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "流程异常",
+        "sortNo": 60,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_approval_sync",
+    "name": "审批同步状态",
+    "name:zh-CN": "审批同步状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "queued",
+        "label": "Queued",
+        "label:zh-CN": "待同步",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "polling",
+        "label": "Reconciling",
+        "label:zh-CN": "核对中",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "waiting",
+        "label": "Waiting",
+        "label:zh-CN": "等待进展",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "blocked",
+        "label": "Sync blocked",
+        "label:zh-CN": "同步异常",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "completed",
+        "label": "Reconciled",
+        "label:zh-CN": "已核对",
+        "sortNo": 40,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_read_state",
+    "name": "阅读状态",
+    "name:zh-CN": "阅读状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "unread",
+        "label": "Unread",
+        "label:zh-CN": "未读",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "read",
+        "label": "Read",
+        "label:zh-CN": "已读",
+        "sortNo": 10,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_ack_state",
+    "name": "知悉状态",
+    "name:zh-CN": "知悉状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "not_required",
+        "label": "Not required",
+        "label:zh-CN": "无需确认",
+        "sortNo": 0,
+        "status": "enabled"
+      },
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待确认",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "completed",
+        "label": "Acknowledged",
+        "label:zh-CN": "已知悉",
+        "sortNo": 20,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_statistics_read",
+    "name": "Statistics read states",
+    "name:zh-CN": "统计阅读状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "unread",
+        "label": "Unread",
+        "label:zh-CN": "未读",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "read",
+        "label": "Read",
+        "label:zh-CN": "已读",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "unknown",
+        "label": "History unknown",
+        "label:zh-CN": "历史未知",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "read_after_migration",
+        "label": "Read after migration",
+        "label:zh-CN": "迁移后已读",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_statistics_ack",
+    "name": "Statistics acknowledgement states",
+    "name:zh-CN": "统计知悉状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending_ack",
+        "label": "Pending acknowledgement",
+        "label:zh-CN": "待知悉",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Acknowledged",
+        "label:zh-CN": "已知悉",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "not_required",
+        "label": "Not required",
+        "label:zh-CN": "无需知悉",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "unknown",
+        "label": "History unknown",
+        "label:zh-CN": "历史未知",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_statistics_membership",
+    "name": "Statistics membership",
+    "name:zh-CN": "统计成员资格",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "true",
+        "label": "Active",
+        "label:zh-CN": "有效",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "false",
+        "label": "Inactive",
+        "label:zh-CN": "已失效",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_statistics_delivery",
+    "name": "Statistics delivery states",
+    "name:zh-CN": "统计投递状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "queued",
+        "label": "Queued",
+        "label:zh-CN": "待投递",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Notification created",
+        "label:zh-CN": "提醒已生成",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "投递失败",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "canceled",
+        "label": "Canceled",
+        "label:zh-CN": "已取消",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "not_generated",
+        "label": "Not generated",
+        "label:zh-CN": "未生成",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "skipped",
+        "label": "Skipped",
+        "label:zh-CN": "已跳过",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_reminder_mode",
+    "name": "Reminder mode",
+    "name:zh-CN": "催办方式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "AUTO",
+        "label": "Automatic",
+        "label:zh-CN": "自动",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "MANUAL",
+        "label": "Manual",
+        "label:zh-CN": "手动",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_reminder_batch_state",
+    "name": "Reminder acceptance state",
+    "name:zh-CN": "催办受理状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "已受理",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "skipped",
+        "label": "No new intentions",
+        "label:zh-CN": "无新增提醒",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Blocked",
+        "label:zh-CN": "已阻断",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_publication_job",
+    "name": "Publication execution",
+    "name:zh-CN": "发布执行状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "queued",
+        "label": "Queued",
+        "label:zh-CN": "排队中",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "running",
+        "label": "Running",
+        "label:zh-CN": "执行中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "succeeded",
+        "label": "Published",
+        "label:zh-CN": "发布完成",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "retryable_failed",
+        "label": "Retry pending",
+        "label:zh-CN": "等待重试",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "blocked",
+        "label": "Blocked",
+        "label:zh-CN": "发布阻断",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "canceled",
+        "label": "Canceled",
+        "label:zh-CN": "已取消",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "missed",
+        "label": "Window missed",
+        "label:zh-CN": "窗口已错过",
+        "sortNo": 70,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_publication_issue",
+    "name": "Publication attention",
+    "name:zh-CN": "发布处理提示",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "ACTOR_INACTIVE",
+        "label": "The original publisher is inactive",
+        "label:zh-CN": "原发布者暂不可用",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "AUTHORIZATION_DENIED",
+        "label": "Original publisher authority denied",
+        "label:zh-CN": "原发布者权限不足",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "AUTHORIZATION_CHANGED",
+        "label": "Authorization changed; submit again",
+        "label:zh-CN": "授权依据已变化，需重新提交",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "DELIVERY_DISABLED",
+        "label": "In-app delivery is unavailable",
+        "label:zh-CN": "站内通知暂不可用",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "APPROVAL_REQUIRED",
+        "label": "Current policy requires approval",
+        "label:zh-CN": "当前政策要求审批",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "APPROVAL_NOT_READY",
+        "label": "Approval evidence is unavailable",
+        "label:zh-CN": "审批依据暂不可用",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "SCHEDULE_MISSED",
+        "label": "Publication window missed",
+        "label:zh-CN": "发布时间窗口已错过",
+        "sortNo": 70,
+        "status": "enabled"
+      },
+      {
+        "value": "VERSION_SUPERSEDED",
+        "label": "The version was superseded",
+        "label:zh-CN": "版本已变更",
+        "sortNo": 80,
+        "status": "enabled"
+      },
+      {
+        "value": "TRANSIENT_DATABASE_FAILURE",
+        "label": "Temporary execution failure; verify before retrying",
+        "label:zh-CN": "暂时执行异常，可核对后重试",
+        "sortNo": 90,
+        "status": "enabled"
+      },
+      {
+        "value": "RETRY_EXHAUSTED",
+        "label": "Automatic retries exhausted; verify conditions",
+        "label:zh-CN": "自动重试已用尽，请核对条件",
+        "sortNo": 100,
+        "status": "enabled"
+      },
+      {
+        "value": "EXECUTION_FAILURE",
+        "label": "Execution failed; contact an administrator",
+        "label:zh-CN": "执行异常，请联系管理员核对",
+        "sortNo": 110,
+        "status": "enabled"
+      },
+      {
+        "value": "PUBLICATION_BLOCKED",
+        "label": "Publication blocked; verify conditions before retrying",
+        "label:zh-CN": "发布条件未满足，请核对后恢复",
+        "sortNo": 120,
+        "status": "enabled"
+      },
+      {
+        "value": "AUDIENCE_CAPACITY_EXCEEDED",
+        "label": "Audience exceeds capacity; contact an administrator before retrying",
+        "label:zh-CN": "名单超过处理容量，请联系管理员调整后恢复",
+        "sortNo": 125,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "announcement_delivery_channel",
+    "name": "Notification channel",
+    "name:zh-CN": "通知渠道",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "in_app",
+        "label": "In-app",
+        "label:zh-CN": "站内通知",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "wechat_mini",
+        "label": "Mini-program",
+        "label:zh-CN": "小程序",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_delivery_kind",
+    "name": "Notification kind",
+    "name:zh-CN": "通知类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "publication",
+        "label": "Publication",
+        "label:zh-CN": "发布通知",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "reminder",
+        "label": "Reminder",
+        "label:zh-CN": "催办提醒",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
+  },
+  {
+    "code": "announcement_delivery_reason",
+    "name": "Reason not created",
+    "name:zh-CN": "通知未生成原因",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "VERSION_INACTIVE",
+        "label": "Version inactive",
+        "label:zh-CN": "版本已失效",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "RECIPIENT_OR_VERSION_INACTIVE",
+        "label": "Recipient or version inactive",
+        "label:zh-CN": "接收成员或版本已失效",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "BATCH_BLOCKED",
+        "label": "Reminder batch blocked",
+        "label:zh-CN": "催办批次被阻断",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "ACTOR_OR_VERSION_UNAVAILABLE",
+        "label": "Original actor or version unavailable",
+        "label:zh-CN": "原操作者或版本不可用",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "LEGACY_UNKNOWN",
+        "label": "Legacy facts unknown",
+        "label:zh-CN": "历史接收事实未知",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "MEMBERSHIP_INACTIVE",
+        "label": "Original membership inactive",
+        "label:zh-CN": "原接收成员已失效",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "ALREADY_COMPLETE",
+        "label": "No longer outstanding",
+        "label:zh-CN": "已无需催办",
+        "sortNo": 70,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "THROTTLED",
+        "label": "Within deduplication window",
+        "label:zh-CN": "处于去重窗口",
+        "sortNo": 80,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "AUTOMATIC_DEADLINE",
+        "label": "Automatic reminder deadline reached",
+        "label:zh-CN": "已到自动催办截止",
+        "sortNo": 90,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "DELIVERY_UNAVAILABLE",
+        "label": "Notification unavailable",
+        "label:zh-CN": "当前无法生成通知",
+        "sortNo": 100,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
       }
     ]
   }

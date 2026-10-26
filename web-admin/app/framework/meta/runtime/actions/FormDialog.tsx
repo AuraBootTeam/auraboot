@@ -13,10 +13,14 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import FORM_DIALOG_TEXT from './FormDialog.i18n.json';
+import { formatInTimezone, parseDateTimeInTimezone } from '~/shared/services/dateTimeFormatService';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 import MemberPicker from '~/ui/smart/picker/MemberPicker';
 import BomUploadReviewField, { type BomUploadReviewValue } from './BomUploadReviewField';
+import PagedChoiceField from './PagedChoiceField';
 
 interface VisibilityRule {
   field: string;
@@ -68,24 +72,13 @@ interface FormFieldConfig {
   dataSource?: {
     type: 'api' | 'static';
     endpoint?: string;
+    pagination?: boolean;
     data?: FormOptionConfig[];
   };
 }
 
-function localDateTimeValue(value: unknown): string {
-  if (typeof value !== 'string' || !value) return '';
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return '';
-  const pad = (part: number) => String(part).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function localDateTimeInstant(value: string): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return '';
-  const instant = date.toISOString();
-  return localDateTimeValue(instant) === value ? instant : '';
+function localDateTimeValue(value: unknown, timezone: string): string {
+  return typeof value === 'string' && value ? formatInTimezone(value, 'YYYY-MM-DDTHH:mm', timezone) : '';
 }
 
 interface FormDialogState {
@@ -157,6 +150,7 @@ function isMissing(value: any) {
 
 export default function FormDialog() {
   const { t, locale } = useI18n();
+  const { timezone } = useTimezone();
   const [state, setState] = useState<FormDialogState>({
     open: false,
     fields: [],
@@ -165,6 +159,8 @@ export default function FormDialog() {
   });
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [dateTimeErrors, setDateTimeErrors] = useState<Record<string, string>>({});
+  const [dateTimeDrafts, setDateTimeDrafts] = useState<Record<string, string>>({});
   const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
   const firstInputRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
 
@@ -187,6 +183,8 @@ export default function FormDialog() {
       });
       setFormData({ ...defaults });
       setErrors({});
+      setDateTimeErrors({});
+      setDateTimeDrafts({});
       setSearchTerms({});
     };
 
@@ -224,7 +222,9 @@ export default function FormDialog() {
     const visibleFields = state.fields.filter((field) =>
       matchesVisibility(field.visibleWhen, formData),
     );
-    const newErrors: Record<string, string> = {};
+    const newErrors: Record<string, string> = Object.fromEntries(
+      Object.entries(dateTimeErrors).filter(([key]) => visibleFields.some((field) => field.field === key)),
+    );
     for (const field of visibleFields) {
       const value = formData[field.field];
       if (field.required) {
@@ -267,7 +267,7 @@ export default function FormDialog() {
       }
       if (
         ['select', 'segmented'].includes(field.type || '') &&
-        value !== undefined &&
+        value != null &&
         value !== ''
       ) {
         const options = visibleOptions(field, state.fieldOptions, formData);
@@ -299,7 +299,7 @@ export default function FormDialog() {
     );
     state.onSubmit?.(submitted);
     setState((prev) => ({ ...prev, open: false }));
-  }, [state.fields, state.onSubmit, formData, locale, t]);
+  }, [state.fields, state.onSubmit, formData, dateTimeErrors, locale, t]);
 
   const updateField = useCallback(
     (fieldName: string, value: any) => {
@@ -576,6 +576,13 @@ export default function FormDialog() {
                         );
                       })}
                     </div>
+                  ) : fieldType === 'multiselect' && field.dataSource?.pagination && field.dataSource.endpoint ? (
+                    <div data-testid={`form-dialog-field-${field.field}`}>
+                      <PagedChoiceField endpoint={field.dataSource.endpoint}
+                        label={getLocalizedText(field.label, locale, t)}
+                        value={Array.isArray(formData[field.field]) ? formData[field.field] : []}
+                        onChange={value => updateField(field.field, value)} />
+                    </div>
                   ) : fieldType === 'multiselect' ? (
                     <div
                       data-testid={`form-dialog-field-${field.field}`}
@@ -760,9 +767,21 @@ export default function FormDialog() {
                       ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
                       data-testid={`form-dialog-field-${field.field}`}
                       type={fieldType === 'date' ? 'date' : 'datetime-local'}
-                      value={fieldType === 'date' ? formData[field.field] ?? '' : localDateTimeValue(formData[field.field])}
-                      onChange={(event) => updateField(field.field, fieldType === 'date'
-                        ? event.target.value : localDateTimeInstant(event.target.value))}
+                      value={fieldType === 'date' ? formData[field.field] ?? '' : dateTimeDrafts[field.field] ?? localDateTimeValue(formData[field.field], timezone)}
+                      onChange={(event) => {
+                        const wallTime = event.target.value;
+                        if (fieldType === 'date') { updateField(field.field, wallTime); return; }
+                        const instant = parseDateTimeInTimezone(wallTime, timezone);
+                        setDateTimeDrafts((previous) => ({ ...previous, [field.field]: wallTime }));
+                        if (wallTime && !instant) {
+                          const message = getLocalizedText(FORM_DIALOG_TEXT.invalidDateTime, locale, t);
+                          setDateTimeErrors((previous) => ({ ...previous, [field.field]: message }));
+                          setErrors((previous) => ({ ...previous, [field.field]: message }));
+                          return;
+                        }
+                        setDateTimeErrors((previous) => { const next = { ...previous }; delete next[field.field]; return next; });
+                        updateField(field.field, instant);
+                      }}
                       aria-invalid={!!error}
                       className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-700 dark:text-white ${
                         error ? 'border-red-500 focus:border-red-500 focus:ring-red-500'

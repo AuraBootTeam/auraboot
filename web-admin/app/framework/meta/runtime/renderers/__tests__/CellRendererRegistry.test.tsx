@@ -34,6 +34,13 @@ describe('CellRendererRegistry tag renderer', () => {
 });
 
 describe('CellRendererRegistry datetime renderer', () => {
+  it('renders a DSL datetime format alias using the configured temporal policy', () => {
+    render(<>{cellRendererRegistry.render('datetime', {
+      value: '2026-06-03T03:08:00Z', record: {},
+      column: { field: 'published_at', format: 'datetime', timezone: 'Asia/Shanghai', dateTimeFormats: { datetime: 'YYYY/MM/DD HH:mm' } },
+    })}</>);
+    expect(screen.getByText('2026/06/03 11:08')).toBeInTheDocument();
+  });
   // NOTE: tests use America/New_York deliberately — different from any China dev
   // machine's local timezone — so they fail unless column.timezone is honored
   // (a dayjs(value) machine-local parse would produce a different result).

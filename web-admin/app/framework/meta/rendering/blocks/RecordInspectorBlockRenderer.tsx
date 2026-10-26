@@ -4,6 +4,8 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { BlockRenderer } from '@auraboot/runtime-kernel';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { readPath, resolveRuntimeValue, useRuntimeStateSubscription } from './workbenchBlockUtils';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone, resolveTemporalFormat, resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 
 export interface RecordInspectorBlockRendererProps {
   block: BlockConfig;
@@ -39,6 +41,7 @@ export const RecordInspectorBlockRenderer: React.FC<RecordInspectorBlockRenderer
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
+  const { timezone, formats } = useTimezone();
   const empty = (block as any).empty || {};
   const fields = Array.isArray((block as any).fields) ? (block as any).fields : [];
   const childBlocks = Array.isArray((block as any).blocks) ? (block as any).blocks : [];
@@ -73,7 +76,12 @@ export const RecordInspectorBlockRenderer: React.FC<RecordInspectorBlockRenderer
             const fieldCode = String(field.field || field.path || '');
             const label = getLocalizedText(field.label || fieldCode, locale, t);
             const value = readPath(contextRecord, field.path || field.field);
-            const displayValue = formatValue(value, field.valueMap, locale, t);
+            const mapped = mappedValue(value, field.valueMap, locale, t);
+            const temporal = resolveTemporalType(field.path || field.field, field.valueType || field.dataType, value);
+            const displayValue = mapped !== null ? mapped
+              : temporal && value !== null && value !== undefined && value !== ''
+                ? formatInTimezone(value, resolveTemporalFormat(temporal, formats, field.format), timezone)
+                : formatValue(value, field.valueMap, locale, t);
             return (
               <div key={fieldCode} className={field.span === 2 ? 'sm:col-span-2' : undefined}>
                 <dt className="text-text-2 text-xs font-medium">{label}</dt>

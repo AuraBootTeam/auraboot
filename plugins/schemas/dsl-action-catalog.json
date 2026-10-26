@@ -108,6 +108,7 @@
         "edit",
         "event.emit",
         "export",
+        "file.download",
         "form.reset",
         "form.set",
         "form.validate",

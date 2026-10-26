@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -118,6 +119,80 @@ class HandlerPhaseTest {
     void tearDown() {
         org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         MetaContext.clear();
+    }
+
+    @Test
+    void handlerOwnedResultsAreResponseOnly() {
+        CommandHandler owner = new CommandHandler() {
+            @Override public String getHandlerName() { return "owner"; }
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ctx) {
+                assertThat(ctx.getClientRequestId()).isEqualTo("operation-1");
+                assertThat(ctx.getExpectedVersion()).isEqualTo(3);
+                return Map.of("status","draft","row_version",4);
+            }
+        };
+        when(applicationContext.getBean("owner", CommandHandler.class)).thenReturn(owner);
+        CommandPipelineContext ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+        BindingRule rule=new BindingRule(); rule.setHandlerClass("owner");
+        ctx.setRulesByType(Map.of("handler",List.of(rule)));
+        ctx.setHandlerOwnedMutation(true);
+        ctx.getRequest().setClientRequestId("operation-1");
+        ctx.getRequest().setExpectedVersion(3);
+        phase.execute(ctx);
+        assertThat(ctx.getHandlerResults()).containsEntry("row_version",4).containsEntry("status","draft");
+        verify(metaModelService,never()).getModelDefinition("ab_announcement");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void nativeOwnershipAndConcurrencyDenialsKeepTheirHttpSemantics() {
+        CommandHandler owner=org.mockito.Mockito.mock(CommandHandler.class);
+        when(applicationContext.getBean("owner",CommandHandler.class)).thenReturn(owner);
+        for(RuntimeException failure : List.of(new AccessDeniedException("ownership revoked"),
+                new com.auraboot.framework.exception.ConflictException("CAS_VERSION_CONFLICT","changed",Map.of()))) {
+            org.mockito.Mockito.doThrow(failure).when(owner).execute(any());
+            var ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+            BindingRule rule=new BindingRule();rule.setHandlerClass("owner");
+            ctx.setRulesByType(Map.of("handler",List.of(rule)));
+            assertThatThrownBy(()->phase.execute(ctx)).isSameAs(failure);
+        }
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void dryRunNeverInvokesAnUnmarkedNativeHandler() {
+        AtomicBoolean invoked=new AtomicBoolean();
+        CommandHandler owner=new CommandHandler() {
+            @Override public String getHandlerName(){return "owner";}
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ctx){
+                invoked.set(true);return Map.of("status","published");
+            }
+        };
+        when(applicationContext.getBean("owner",CommandHandler.class)).thenReturn(owner);
+        var ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+        BindingRule rule=new BindingRule();rule.setHandlerClass("owner");
+        ctx.setRulesByType(Map.of("handler",List.of(rule)));ctx.getRequest().setDryRun(true);
+        phase.execute(ctx);
+        assertThat(invoked).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void declaredNativeHandlerIdentityResolvesWithoutDependingOnBeanName() {
+        CommandHandler owner=new CommandHandler() {
+            @Override public String getHandlerName(){return "declaredOwner";}
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ctx){
+                return Map.of("recordPid","created-record");
+            }
+        };
+        when(applicationContext.getBean("declaredOwner",CommandHandler.class))
+                .thenThrow(new org.springframework.beans.factory.NoSuchBeanDefinitionException("declaredOwner"));
+        when(applicationContext.getBeansOfType(CommandHandler.class)).thenReturn(Map.of("actualBean",owner));
+        var ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+        BindingRule rule=new BindingRule();rule.setHandlerClass("declaredOwner");
+        ctx.setRulesByType(Map.of("handler",List.of(rule)));
+        phase.execute(ctx);
+        assertThat(ctx.getHandlerResults()).containsEntry("recordPid","created-record");
     }
 
     @Test

@@ -152,8 +152,10 @@ public class HandlerPhase implements CommandPhase {
                             && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
                             && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized())));
         ctx.setHandlerResults(handlerResults);
-        persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
-                handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
+        if (!ctx.isHandlerOwnedMutation()) {
+            persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
+                    handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
+        }
     }
 
     // ==================== Inlined delegate methods ====================
@@ -191,6 +193,8 @@ public class HandlerPhase implements CommandPhase {
                         .modelCode(command.getModelCode())
                         .payload(payload)
                         .operationType(request.getOperationType())
+                        .clientRequestId(request.getClientRequestId())
+                        .expectedVersion(request.getExpectedVersion())
                         .targetRecordId(request.getTargetRecordId())
                         .tenantId(tenantId)
                         .userId(userId)
@@ -203,6 +207,8 @@ public class HandlerPhase implements CommandPhase {
                 if (result != null) {
                     handlerResults.putAll(result);
                 }
+            } catch (org.springframework.security.access.AccessDeniedException | com.auraboot.framework.exception.ConflictException e) {
+                throw e;
             } catch (BusinessException e) {
                 log.warn("Handler {} rejected command: {}", rule.getHandlerClass(), e.getMessage());
                 throw e;

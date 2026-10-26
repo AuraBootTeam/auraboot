@@ -4,7 +4,7 @@
  * Stores content as HTML string. Renders a toolbar with common formatting
  * options and an editor area. In display/disabled mode, renders HTML read-only.
  */
-import React, { forwardRef, useCallback } from 'react';
+import React, { forwardRef, useCallback, useEffect } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
@@ -14,9 +14,11 @@ import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/ui/ui/field-base';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import EDITOR_TEXT from './RichTextEditor.i18n.json';
 
 interface RichTextEditorProps {
   name: string;
@@ -45,6 +47,8 @@ const ToolbarButton: React.FC<{
     type="button"
     onClick={onClick}
     title={title}
+    aria-label={title}
+    aria-pressed={active}
     className={clsx(
       'rounded p-1.5 text-sm transition-colors',
       active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
@@ -75,6 +79,8 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
     ref,
   ) => {
     const st = useSmartText();
+    const { locale } = useI18n();
+    const text = (key: keyof typeof EDITOR_TEXT) => getLocalizedText(EDITOR_TEXT[key], locale);
 
     const {
       labelText,
@@ -119,23 +125,29 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
     );
 
     const editor = useEditor({
+      immediatelyRender: false,
       extensions: [
         StarterKit.configure({
           heading: { levels: [1, 2, 3] },
-        }),
-        Link.configure({
-          openOnClick: false,
-          HTMLAttributes: { class: 'text-blue-600 underline' },
+          link: { openOnClick: false, HTMLAttributes: { class: 'text-blue-600 underline' } },
         }),
         Placeholder.configure({
           placeholder: placeholderText || '',
         }),
       ],
-      content: field.value || '',
+      content: typeof window === 'undefined' ? '' : sanitizeHtml(field.value || ''),
+      editorProps: { attributes: { role: 'textbox', 'aria-label': labelText || placeholderText || name, 'aria-multiline': 'true' } },
       editable: !disabledValue,
       onUpdate: handleUpdate,
       onBlur: () => field.onBlur?.(),
     });
+
+    useEffect(() => {
+      if (!editor) return;
+      const content = sanitizeHtml(field.value || '');
+      if ((content || !editor.isEmpty) && editor.getHTML() !== content)
+        editor.commands.setContent(content, { emitUpdate: false });
+    }, [editor, field.value]);
 
     if (!isVisible) return null;
 
@@ -181,21 +193,21 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
               <ToolbarButton
                 active={editor.isActive('bold')}
                 onClick={() => editor.chain().focus().toggleBold().run()}
-                title="Bold"
+                title={text('bold')}
               >
                 <strong>B</strong>
               </ToolbarButton>
               <ToolbarButton
                 active={editor.isActive('italic')}
                 onClick={() => editor.chain().focus().toggleItalic().run()}
-                title="Italic"
+                title={text('italic')}
               >
                 <em>I</em>
               </ToolbarButton>
               <ToolbarButton
                 active={editor.isActive('strike')}
                 onClick={() => editor.chain().focus().toggleStrike().run()}
-                title="Strikethrough"
+                title={text('strike')}
               >
                 <s>S</s>
               </ToolbarButton>
@@ -205,21 +217,21 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
               <ToolbarButton
                 active={editor.isActive('heading', { level: 1 })}
                 onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                title="Heading 1"
+                title={text('heading1')}
               >
                 H1
               </ToolbarButton>
               <ToolbarButton
                 active={editor.isActive('heading', { level: 2 })}
                 onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                title="Heading 2"
+                title={text('heading2')}
               >
                 H2
               </ToolbarButton>
               <ToolbarButton
                 active={editor.isActive('heading', { level: 3 })}
                 onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-                title="Heading 3"
+                title={text('heading3')}
               >
                 H3
               </ToolbarButton>
@@ -229,7 +241,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
               <ToolbarButton
                 active={editor.isActive('bulletList')}
                 onClick={() => editor.chain().focus().toggleBulletList().run()}
-                title="Bullet List"
+                title={text('bulletList')}
               >
                 <svg
                   className="h-4 w-4"
@@ -249,7 +261,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
               <ToolbarButton
                 active={editor.isActive('orderedList')}
                 onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                title="Ordered List"
+                title={text('orderedList')}
               >
                 <svg
                   className="h-4 w-4"
@@ -299,7 +311,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
               <ToolbarButton
                 active={editor.isActive('blockquote')}
                 onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                title="Blockquote"
+                title={text('blockquote')}
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z" />
@@ -308,7 +320,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
               <ToolbarButton
                 active={editor.isActive('codeBlock')}
                 onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                title="Code Block"
+                title={text('codeBlock')}
               >
                 {'</>'}
               </ToolbarButton>
@@ -321,13 +333,13 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
                   if (editor.isActive('link')) {
                     editor.chain().focus().unsetLink().run();
                   } else {
-                    const url = window.prompt('URL:');
+                    const url = window.prompt(text('linkAddress'));
                     if (url) {
                       editor.chain().focus().setLink({ href: url }).run();
                     }
                   }
                 }}
-                title="Link"
+                title={text('link')}
               >
                 <svg
                   className="h-4 w-4"

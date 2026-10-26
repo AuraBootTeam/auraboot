@@ -43,4 +43,12 @@ class CsvSafetyUtilsTest {
         assertEquals("\"a\"\"b\"", CsvSafetyUtils.escapeCsvCell("a\"b"));
         assertEquals("", CsvSafetyUtils.escapeCsvCell(null));
     }
+    @Test
+    void whitespaceBomAndControlPrefixesCannotHideAFormulaAndCarriageReturnsAreQuoted() {
+        for(String text:new String[]{" =1+1","  +1","\uFEFF=1+1","\u200B@cmd","\n=1+1","\u0000-cmd","\u00a0=1+1"}) {
+            assertEquals("\"'"+text+"\"",CsvSafetyUtils.escapeCsvCell(text),"unsafe prefixed text");
+        }
+        assertEquals("\"line1\rline2\"",CsvSafetyUtils.escapeCsvCell("line1\rline2"));
+    }
+
 }

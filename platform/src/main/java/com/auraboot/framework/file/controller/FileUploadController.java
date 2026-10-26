@@ -43,6 +43,17 @@ import java.util.List;
 @RequestMapping("/api/file")
 @Tag(name = "Files", description = "File upload and management")
 public class FileUploadController {
+    public record UploadLimits(long maxFileBytes,long maxRequestBytes) {}
+    @Autowired
+    private org.springframework.boot.autoconfigure.web.servlet.MultipartProperties multipartProperties;
+
+    @GetMapping("/limits")
+    @RequirePermission(MetaPermission.SYS_FILE_UPLOAD)
+    public ApiResponse<UploadLimits> limits() {
+        return ApiResponse.success(new UploadLimits(multipartProperties.getMaxFileSize().toBytes(),
+                multipartProperties.getMaxRequestSize().toBytes()));
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(FileUploadController.class);
 
     @Autowired

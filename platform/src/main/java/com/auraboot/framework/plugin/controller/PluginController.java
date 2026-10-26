@@ -32,6 +32,7 @@ public class PluginController {
     private final PluginRecordMapper pluginRecordMapper;
     private final PlatformVersionChecker platformVersionChecker;
     private final PlatformProperties platformProperties;
+    private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
 
     /**
      * List all installed plugins for the current tenant.
@@ -114,6 +115,7 @@ public class PluginController {
             return ApiResponse.error("Plugin not found");
         }
 
+        auraPluginManager.requireTenantLifecycleChange(plugin);
         pluginRecordMapper.markAsDisabled(pid);
         plugin = pluginRecordMapper.findByPid(pid);
 

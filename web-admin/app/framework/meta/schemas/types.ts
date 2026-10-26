@@ -106,7 +106,8 @@ export interface DataSourceConfig {
   body?: string | Record<string, any>;
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
-  adaptor?: string; // Default: 'optionList'
+  /** Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata. */
+  adaptor?: string;
   /** Explicit path inside completed command data; no fallback. */
   dataPath?: string;
   /** Optional safe projection before commandArray rows seed a scoped form. */
@@ -165,6 +166,12 @@ export interface FlowStep {
 // Field 配置（用于表单）
 export interface FieldConfig {
   field: string;
+  /** Read-only inspector path and presentation; values stay in the parent record. */
+  path?: string;
+  valueType?: string;
+  dataType?: string;
+  format?: string;
+  valueMap?: Record<string, string | LocalizedText>;
   label?: string | LocalizedText;
   /** Business input guidance localized by the controlled renderer. */
   placeholder?: string | LocalizedText;
@@ -229,6 +236,8 @@ export interface EventConfig {
 
 // Column 配置（用于列表）
 export interface ColumnConfig {
+  /** Localized placeholder for explicitly empty values, including empty arrays. */
+  emptyText?: string | LocalizedText;
   /** Structured, reusable business cell presentation. */
   presentation?: import('../runtime/renderers/WorkspaceCells').WorkspaceCellPresentation;
   field: string;
@@ -450,6 +459,8 @@ export interface ButtonConfig {
   /** @deprecated Use `confirm` instead. */
   confirmMessageKey?: string;
   permissionCode?: string; // Permission control
+  /** Every listed permission is required in addition to permissionCode. */
+  permissionCodes?: string[];
   /** Custom report code (for report generation buttons) */
   reportCode?: string;
 
@@ -492,6 +503,10 @@ export interface TableConfig {
 }
 
 export interface PaginationConfig {
+  /** Explicit opt-in for paged API data sources on a table block. */
+  mode?: 'server';
+  /** Use the declared response field; request parameters remain pageNum/pageSize. */
+  pageField?: 'pageNum' | 'current';
   pageSize?: number;
   pageSizeOptions?: number[];
   showTotal?: boolean;

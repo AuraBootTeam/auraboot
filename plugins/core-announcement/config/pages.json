@@ -17,12 +17,16 @@
           {
             "code": "create",
             "variant": "primary",
-            "label": { "zh-CN": "新建公告", "en-US": "Create Announcement" },
+            "label": {
+              "zh-CN": "新建公告",
+              "en-US": "Create Announcement"
+            },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_form",
               "command": "announcement:create_announcement"
-            }
+            },
+            "permissionCode": "announcement.announcement.edit"
           }
         ]
       },
@@ -30,112 +34,499 @@
         "id": "filters",
         "blockType": "filters",
         "fields": [
-          {"field": "title", "props": {"placeholder": {"zh-CN": "例如：周末系统维护", "en-US": "e.g. Scheduled weekend maintenance"}}, "helpText": {"zh-CN": "按公告标题关键词查找；清除关键词可查看全部公告。", "en-US": "Search by announcement title keywords. Clear the keywords to show all announcements."}},
-          { "field": "status" },
-          { "field": "announcement_priority" }
+          {
+            "field": "title",
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如：周末系统维护",
+                "en-US": "e.g. Scheduled weekend maintenance"
+              }
+            },
+            "helpText": {
+              "zh-CN": "按公告标题关键词查找；清除关键词可查看全部公告。",
+              "en-US": "Search by announcement title keywords. Clear the keywords to show all announcements."
+            }
+          },
+          {
+            "field": "status"
+          },
+          {
+            "field": "announcement_priority"
+          }
         ]
       },
       {
         "id": "table",
         "blockType": "table",
         "empty": {
-          "title": { "zh-CN": "没有匹配的公告", "en-US": "No matching announcements" },
-          "description": { "zh-CN": "选择“新建公告”创建草稿，或清除筛选条件查看已有公告。", "en-US": "Choose Create Announcement to draft a notice, or clear the filters to view existing announcements." }
+          "title": {
+            "zh-CN": "没有匹配的公告",
+            "en-US": "No matching announcements"
+          },
+          "description": {
+            "zh-CN": "选择“新建公告”创建草稿，或清除筛选条件查看已有公告。",
+            "en-US": "Choose Create Announcement to draft a notice, or clear the filters to view existing announcements."
+          }
         },
         "columns": [
           {
             "field": "title",
-            "width": 280,
+            "width": 200,
             "sortable": true
           },
           {
             "field": "announcement_priority",
-            "width": 100,
+            "width": 88,
             "dictCode": "announcement_priority",
             "renderType": "tag"
           },
           {
             "field": "status",
-            "width": 100,
+            "width": 136,
             "dictCode": "announcement_status",
             "renderType": "tag"
           },
           {
             "field": "pinned",
-            "width": 80
+            "width": 64
           },
           {
             "field": "published_at",
-            "width": 160,
-            "format": "YYYY-MM-DD HH:mm"
+            "width": 168,
+            "format": "YYYY-MM-DD HH:mm",
+            "label": {
+              "zh-CN": "上次发布时间",
+              "en-US": "Last published at"
+            }
           },
           {
             "field": "expires_at",
-            "width": 160,
+            "width": 168,
             "format": "YYYY-MM-DD HH:mm"
           }
         ],
         "rowActions": [
           {
             "code": "view",
-            "label": { "zh-CN": "查看", "en-US": "View" },
+            "label": {
+              "zh-CN": "查看",
+              "en-US": "View"
+            },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_detail"
-            }
+            },
+            "permissionCode": "announcement.announcement.read"
+          },
+          {
+            "code": "notification_settings",
+            "label": {
+              "zh-CN": "通知设置",
+              "en-US": "Notification settings"
+            },
+            "action": {
+              "type": "command",
+              "command": "announcement:update_announcement",
+              "operationType": "UPDATE",
+              "inputFields": [
+                {
+                  "field": "audience_kind",
+                  "label": {
+                    "zh-CN": "通知范围",
+                    "en-US": "Audience kind"
+                  },
+                  "type": "select",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_kind}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-options?kind=kind"
+                  },
+                  "required": true
+                },
+                {
+                  "field": "audience_users",
+                  "label": {
+                    "zh-CN": "人员",
+                    "en-US": "People"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_users}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-option-page?kind=person",
+                    "pagination": true
+                  },
+                  "helpText": {
+                    "zh-CN": "仅可选择当前发布管理范围内的有效成员。",
+                    "en-US": "Choose active members within your current publication scope."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "audience_departments",
+                  "label": {
+                    "zh-CN": "部门及下级",
+                    "en-US": "Departments and descendants"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_departments}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-option-page?kind=department",
+                    "pagination": true
+                  },
+                  "helpText": {
+                    "zh-CN": "包含下级；仅列出整个子树均已授权的部门。",
+                    "en-US": "Includes descendants. Only fully authorized department subtrees are selectable."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "audience_roles",
+                  "label": {
+                    "zh-CN": "管理范围内角色成员",
+                    "en-US": "Role members within management scope"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_roles}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-option-page?kind=role",
+                    "pagination": true
+                  },
+                  "helpText": {
+                    "zh-CN": "仅通知当前管理范围内的该角色成员，发布时重新解析。",
+                    "en-US": "Only role members within your current management scope; resolved again at publication."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "approval_mode",
+                  "label": {
+                    "zh-CN": "发布方式",
+                    "en-US": "Approval mode"
+                  },
+                  "type": "segmented",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.approval_mode}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/approval-mode-options"
+                  },
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "仅可选择当前权限和租户政策允许的方式；不可用原因会在选项上显示。已有审批草稿不会自动转为免审。",
+                    "en-US": "Only modes allowed by current permissions and tenant policy can be selected. Unavailable reasons are shown. Existing approval drafts never become exempt automatically."
+                  }
+                },
+                {
+                  "field": "approval_definition",
+                  "label": {
+                    "zh-CN": "租户默认审批流程",
+                    "en-US": "Tenant default approval process"
+                  },
+                  "type": "select",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.approval_definition}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/approval-options"
+                  },
+                  "helpText": {
+                    "zh-CN": "提交时固定管理员配置的默认流程；不可自选。历史草稿如曾指定其他流程，请明确选择“租户默认流程”后保存。已提交审批不受默认流程变更影响。",
+                    "en-US": "Submission freezes the administrator-configured default. Publishers cannot choose other workflows. For legacy drafts, explicitly choose the tenant default and save. Existing submissions retain their frozen workflow."
+                  },
+                  "visibleWhen": {
+                    "field": "approval_mode",
+                    "value": "approval"
+                  },
+                  "required": false,
+                  "placeholder": {
+                    "zh-CN": "使用租户默认审批",
+                    "en-US": "Use tenant default approval"
+                  }
+                },
+                {
+                  "field": "scheduled_at",
+                  "label": {
+                    "zh-CN": "预约发布时间",
+                    "en-US": "Scheduled publication"
+                  },
+                  "type": "datetime",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.scheduled_at}",
+                  "helpText": {
+                    "zh-CN": "留空为立即发布；审批未在预约时间前就绪时不会补发。",
+                    "en-US": "Leave empty for immediate publication. Late approval does not trigger a missed schedule."
+                  }
+                },
+                {
+                  "field": "exemption_reason",
+                  "label": {
+                    "zh-CN": "免审原因",
+                    "en-US": "Exemption reason"
+                  },
+                  "type": "textarea",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.exemption_reason}",
+                  "placeholder": {
+                    "zh-CN": "例如：已批准的例行维护通知",
+                    "en-US": "e.g. Authorized routine maintenance notice"
+                  },
+                  "helpText": {
+                    "zh-CN": "免审提交必须有独立免审权限并说明原因。",
+                    "en-US": "Exempt submission requires separate exemption permission and a reason."
+                  },
+                  "visibleWhen": {
+                    "field": "approval_mode",
+                    "value": "exempt"
+                  }
+                },
+                {
+                  "field": "ack_required",
+                  "label": {
+                    "zh-CN": "要求确认已知悉",
+                    "en-US": "Require acknowledgement"
+                  },
+                  "type": "checkbox",
+                  "group": {
+                    "zh-CN": "知悉政策",
+                    "en-US": "Acknowledgement"
+                  },
+                  "defaultValue": "${record.ack_required_effective}",
+                  "helpText": {
+                    "zh-CN": "重要公告默认开启；阅读与确认是两个独立动作。",
+                    "en-US": "Enabled by default for important notices. Reading and acknowledgement are separate."
+                  }
+                },
+                {
+                  "field": "ack_days",
+                  "label": {
+                    "zh-CN": "知悉期限（天）",
+                    "en-US": "Acknowledgement period (days)"
+                  },
+                  "type": "number",
+                  "group": {
+                    "zh-CN": "知悉政策",
+                    "en-US": "Acknowledgement"
+                  },
+                  "defaultValue": "${record.ack_days}",
+                  "helpText": {
+                    "zh-CN": "发布后 1–30 天，默认 7 天；到期后仍可确认。",
+                    "en-US": "1–30 days from publication, default 7. Late acknowledgement remains available."
+                  },
+                  "placeholder": {
+                    "zh-CN": "例如：7",
+                    "en-US": "e.g. 7"
+                  }
+                }
+              ],
+              "inputFieldsTitle": {
+                "zh-CN": "通知设置",
+                "en-US": "Notification settings"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "保存设置",
+                "en-US": "Save settings"
+              }
+            },
+            "permissionCode": "announcement.announcement.edit",
+            "visibleWhen": "record.status === 'draft'",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ]
           },
           {
             "code": "edit",
-            "label": { "zh-CN": "编辑", "en-US": "Edit" },
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
             "action": {
               "type": "navigate",
               "to": "ab_announcement_form",
               "command": "announcement:update_announcement"
             },
-            "visibleWhen": "record.status === 'draft'"
+            "visibleWhen": "record.status === 'draft'",
+            "permissionCode": "announcement.announcement.edit"
+          },
+          {
+            "code": "submit_approval",
+            "label": {
+              "zh-CN": "提交审批",
+              "en-US": "Submit for approval"
+            },
+            "variant": "primary",
+            "confirm": "announcement.submit_approval.confirm",
+            "permissionCode": "announcement.announcement.submit",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ],
+            "visibleWhen": "record.status === 'draft' && record.approval_mode === 'approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:submit_approval",
+              "operationType": "UPDATE"
+            }
           },
           {
             "code": "publish",
-            "label": { "zh-CN": "发布", "en": "Publish" },
+            "label": {
+              "zh-CN": "免审发布",
+              "en-US": "Publish without approval"
+            },
             "variant": "primary",
             "confirm": "announcement.publish.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:publish"
+              "command": "announcement:publish",
+              "operationType": "UPDATE"
             },
-            "visibleWhen": "record.status === 'draft'"
+            "visibleWhen": "record.status === 'draft' && record.approval_mode !== 'approval'",
+            "permissionCode": "announcement.announcement.publish",
+            "permissionCodes": [
+              "announcement.announcement.exempt"
+            ]
           },
           {
             "code": "archive",
-            "label": { "zh-CN": "撤回", "en": "Archive" },
+            "label": {
+              "zh-CN": "撤回",
+              "en": "Archive"
+            },
             "confirm": "announcement.archive.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:archive"
+              "command": "announcement:archive",
+              "operationType": "UPDATE"
             },
-            "visibleWhen": "record.status === 'published'"
+            "visibleWhen": "record.status === 'published'",
+            "permissionCode": "announcement.announcement.withdraw"
           },
           {
             "code": "republish",
-            "label": { "zh-CN": "重新发布", "en": "Republish" },
+            "label": {
+              "zh-CN": "建立修订草稿",
+              "en-US": "Create revision draft"
+            },
             "variant": "primary",
             "confirm": "announcement.republish.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:republish"
+              "command": "announcement:republish",
+              "operationType": "UPDATE"
             },
-            "visibleWhen": "record.status === 'archived'"
+            "visibleWhen": "['withdrawn','expired','missed','rejected','approval_withdrawn','approval_failed'].includes(record.status)",
+            "permissionCode": "announcement.announcement.edit"
           },
           {
             "code": "delete",
             "variant": "danger",
-            "label": { "zh-CN": "删除", "en-US": "Delete" },
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
-              "command": "announcement:delete_announcement"
+              "command": "announcement:delete_announcement",
+              "operationType": "DELETE"
             },
-            "visibleWhen": "record.status === 'draft' || record.status === 'archived'"
+            "visibleWhen": "record.status === 'draft' && !record.current_version_pid",
+            "permissionCode": "announcement.announcement.delete"
+          },
+          {
+            "code": "cancel_schedule",
+            "label": {
+              "zh-CN": "取消发布安排",
+              "en-US": "Cancel release"
+            },
+            "action": {
+              "type": "command",
+              "command": "announcement:cancel_schedule",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "record.status === 'scheduled' || record.status === 'unpublished'",
+            "permissionCode": "announcement.announcement.publish",
+            "confirm": "announcement.cancel_schedule.confirm"
+          },
+          {
+            "code": "withdraw_approval",
+            "label": {
+              "zh-CN": "撤销审批申请",
+              "en-US": "Withdraw approval"
+            },
+            "permissionCode": "announcement.announcement.withdraw",
+            "visibleWhen": "record.status === 'pending_approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:withdraw_approval",
+              "operationType": "UPDATE",
+              "inputFieldsTitle": {
+                "zh-CN": "撤销审批申请",
+                "en-US": "Withdraw approval"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "提交撤销请求",
+                "en-US": "Request withdrawal"
+              },
+              "inputFields": [
+                {
+                  "field": "reason",
+                  "label": {
+                    "zh-CN": "撤销原因",
+                    "en-US": "Reason"
+                  },
+                  "type": "textarea",
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "请求受理后将核对实际流程结果；尚未发布的公告会停止自动发布。",
+                    "en-US": "The request reconciles the authoritative workflow outcome and prevents an unpublished version from being automatically released."
+                  },
+                  "placeholder": {
+                    "zh-CN": "例如：发布安排调整，撤销本次申请",
+                    "en-US": "e.g. Publication plans changed; withdraw this request"
+                  }
+                }
+              ]
+            }
           }
         ],
         "defaultSort": {
@@ -143,7 +534,41 @@
           "order": "desc"
         }
       }
-    ]
+    ],
+    "extension": {
+      "commandRequest": {
+        "idempotent": true,
+        "versionField": "row_version",
+        "payloadFields": []
+      },
+      "commandRequestByCommand": {
+        "announcement:update_announcement": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "audience_kind",
+            "audience_users",
+            "audience_departments",
+            "audience_roles",
+            "ack_required",
+            "ack_days",
+            "approval_mode",
+            "approval_definition",
+            "scheduled_at",
+            "exemption_reason"
+          ],
+          "inputFieldsOnly": true
+        },
+        "announcement:withdraw_approval": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "reason"
+          ],
+          "inputFieldsOnly": true
+        }
+      }
+    }
   },
   {
     "pageKey": "ab_announcement_form",
@@ -165,11 +590,65 @@
           "en-US": "Announcement Content"
         },
         "fields": [
-          {"field": "title", "colSpan": 12, "required": true, "props": {"placeholder": {"zh-CN": "例如：10 月 12 日系统维护通知", "en-US": "e.g. System maintenance on October 12"}}, "helpText": {"zh-CN": "用简明标题说明事项，最多 256 个字符；保存后为草稿，发布后读者才可见。", "en-US": "Summarize the subject in up to 256 characters. Saving creates a draft; readers see it after publication."}},
-          { "field": "announcement_priority", "colSpan": 6 },
-          { "field": "pinned", "colSpan": 6 },
-          { "field": "expires_at", "colSpan": 6 },
-          {"field": "content", "colSpan": 12, "props": {"placeholder": {"zh-CN": "说明适用对象、具体事项和生效时间", "en-US": "Describe the audience, details and effective time"}}, "helpText": {"zh-CN": "补充影响范围、时间安排和需要读者采取的行动。", "en-US": "Explain the impact, schedule and any action readers should take."}}
+          {
+            "field": "title",
+            "colSpan": 12,
+            "required": false,
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如：10 月 12 日系统维护通知",
+                "en-US": "e.g. System maintenance on October 12"
+              }
+            },
+            "helpText": {
+              "zh-CN": "可先保存未完成的草稿，再从公告列表的“通知设置”选择受众、发布方式和知悉要求。",
+              "en-US": "Save an incomplete draft, then use Notification settings from the announcement list to choose the audience, approval mode and acknowledgement policy."
+            }
+          },
+          {
+            "field": "announcement_priority",
+            "colSpan": 6,
+            "defaultValue": "normal"
+          },
+          {
+            "field": "pinned",
+            "colSpan": 6,
+            "defaultValue": false
+          },
+          {
+            "field": "expires_at",
+            "colSpan": 6
+          },
+          {
+            "field": "content",
+            "colSpan": 12,
+            "props": {
+              "placeholder": {
+                "zh-CN": "说明适用对象、具体事项和生效时间",
+                "en-US": "Describe the audience, details and effective time"
+              }
+            },
+            "helpText": {
+              "zh-CN": "补充影响范围、时间安排和需要读者采取的行动。",
+              "en-US": "Explain the impact, schedule and any action readers should take."
+            },
+            "component": "richtext"
+          },
+          {
+            "field": "attachments",
+            "colSpan": 12,
+            "defaultValue": [],
+            "props": {
+              "multiple": true,
+              "maxCount": 10,
+              "limitsEndpoint": "/api/file/limits"
+            },
+            "helpText": {
+              "zh-CN": "最多 10 个附件；单文件限制以服务器当前上传配置为准。",
+              "en-US": "Up to 10 attachments. The current server upload configuration determines the file-size limit."
+            },
+            "component": "fileattachment"
+          }
         ]
       },
       {
@@ -179,19 +658,40 @@
           {
             "code": "submit",
             "primary": true,
-            "label": { "zh-CN": "保存", "en-US": "Save" },
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
             "action": {
               "type": "command",
               "command": "announcement:update_announcement"
-            }
+            },
+            "permissionCode": "announcement.announcement.edit"
           },
           {
             "code": "cancel",
-            "label": { "zh-CN": "取消", "en-US": "Cancel" }
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            }
           }
         ]
       }
-    ]
+    ],
+    "extension": {
+      "commandRequest": {
+        "idempotent": true,
+        "versionField": "row_version",
+        "payloadFields": [
+          "title",
+          "content",
+          "announcement_priority",
+          "pinned",
+          "expires_at",
+          "attachments"
+        ]
+      }
+    }
   },
   {
     "pageKey": "ab_announcement_detail",
@@ -206,6 +706,555 @@
     },
     "blocks": [
       {
+        "id": "announcement_management_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "notification_settings",
+            "label": {
+              "zh-CN": "通知设置",
+              "en-US": "Notification settings"
+            },
+            "action": {
+              "type": "command",
+              "command": "announcement:update_announcement",
+              "operationType": "UPDATE",
+              "inputFields": [
+                {
+                  "field": "audience_kind",
+                  "label": {
+                    "zh-CN": "通知范围",
+                    "en-US": "Audience kind"
+                  },
+                  "type": "select",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_kind}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-options?kind=kind"
+                  },
+                  "required": true
+                },
+                {
+                  "field": "audience_users",
+                  "label": {
+                    "zh-CN": "人员",
+                    "en-US": "People"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_users}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-option-page?kind=person",
+                    "pagination": true
+                  },
+                  "helpText": {
+                    "zh-CN": "仅可选择当前发布管理范围内的有效成员。",
+                    "en-US": "Choose active members within your current publication scope."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "audience_departments",
+                  "label": {
+                    "zh-CN": "部门及下级",
+                    "en-US": "Departments and descendants"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_departments}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-option-page?kind=department",
+                    "pagination": true
+                  },
+                  "helpText": {
+                    "zh-CN": "包含下级；仅列出整个子树均已授权的部门。",
+                    "en-US": "Includes descendants. Only fully authorized department subtrees are selectable."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "audience_roles",
+                  "label": {
+                    "zh-CN": "管理范围内角色成员",
+                    "en-US": "Role members within management scope"
+                  },
+                  "type": "multiselect",
+                  "group": {
+                    "zh-CN": "通知对象",
+                    "en-US": "Audience"
+                  },
+                  "defaultValue": "${record.audience_roles}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/audience-option-page?kind=role",
+                    "pagination": true
+                  },
+                  "helpText": {
+                    "zh-CN": "仅通知当前管理范围内的该角色成员，发布时重新解析。",
+                    "en-US": "Only role members within your current management scope; resolved again at publication."
+                  },
+                  "visibleWhen": {
+                    "field": "audience_kind",
+                    "value": "selected"
+                  }
+                },
+                {
+                  "field": "approval_mode",
+                  "label": {
+                    "zh-CN": "发布方式",
+                    "en-US": "Approval mode"
+                  },
+                  "type": "segmented",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.approval_mode}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/approval-mode-options"
+                  },
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "仅可选择当前权限和租户政策允许的方式；不可用原因会在选项上显示。已有审批草稿不会自动转为免审。",
+                    "en-US": "Only modes allowed by current permissions and tenant policy can be selected. Unavailable reasons are shown. Existing approval drafts never become exempt automatically."
+                  }
+                },
+                {
+                  "field": "approval_definition",
+                  "label": {
+                    "zh-CN": "租户默认审批流程",
+                    "en-US": "Tenant default approval process"
+                  },
+                  "type": "select",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.approval_definition}",
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/announcements/approval-options"
+                  },
+                  "helpText": {
+                    "zh-CN": "提交时固定管理员配置的默认流程；不可自选。历史草稿如曾指定其他流程，请明确选择“租户默认流程”后保存。已提交审批不受默认流程变更影响。",
+                    "en-US": "Submission freezes the administrator-configured default. Publishers cannot choose other workflows. For legacy drafts, explicitly choose the tenant default and save. Existing submissions retain their frozen workflow."
+                  },
+                  "visibleWhen": {
+                    "field": "approval_mode",
+                    "value": "approval"
+                  },
+                  "required": false,
+                  "placeholder": {
+                    "zh-CN": "使用租户默认审批",
+                    "en-US": "Use tenant default approval"
+                  }
+                },
+                {
+                  "field": "scheduled_at",
+                  "label": {
+                    "zh-CN": "预约发布时间",
+                    "en-US": "Scheduled publication"
+                  },
+                  "type": "datetime",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.scheduled_at}",
+                  "helpText": {
+                    "zh-CN": "留空为立即发布；审批未在预约时间前就绪时不会补发。",
+                    "en-US": "Leave empty for immediate publication. Late approval does not trigger a missed schedule."
+                  }
+                },
+                {
+                  "field": "exemption_reason",
+                  "label": {
+                    "zh-CN": "免审原因",
+                    "en-US": "Exemption reason"
+                  },
+                  "type": "textarea",
+                  "group": {
+                    "zh-CN": "发布与审批",
+                    "en-US": "Publication and approval"
+                  },
+                  "defaultValue": "${record.exemption_reason}",
+                  "placeholder": {
+                    "zh-CN": "例如：已批准的例行维护通知",
+                    "en-US": "e.g. Authorized routine maintenance notice"
+                  },
+                  "helpText": {
+                    "zh-CN": "免审提交必须有独立免审权限并说明原因。",
+                    "en-US": "Exempt submission requires separate exemption permission and a reason."
+                  },
+                  "visibleWhen": {
+                    "field": "approval_mode",
+                    "value": "exempt"
+                  }
+                },
+                {
+                  "field": "ack_required",
+                  "label": {
+                    "zh-CN": "要求确认已知悉",
+                    "en-US": "Require acknowledgement"
+                  },
+                  "type": "checkbox",
+                  "group": {
+                    "zh-CN": "知悉政策",
+                    "en-US": "Acknowledgement"
+                  },
+                  "defaultValue": "${record.ack_required_effective}",
+                  "helpText": {
+                    "zh-CN": "重要公告默认开启；阅读与确认是两个独立动作。",
+                    "en-US": "Enabled by default for important notices. Reading and acknowledgement are separate."
+                  }
+                },
+                {
+                  "field": "ack_days",
+                  "label": {
+                    "zh-CN": "知悉期限（天）",
+                    "en-US": "Acknowledgement period (days)"
+                  },
+                  "type": "number",
+                  "group": {
+                    "zh-CN": "知悉政策",
+                    "en-US": "Acknowledgement"
+                  },
+                  "defaultValue": "${record.ack_days}",
+                  "helpText": {
+                    "zh-CN": "发布后 1–30 天，默认 7 天；到期后仍可确认。",
+                    "en-US": "1–30 days from publication, default 7. Late acknowledgement remains available."
+                  },
+                  "placeholder": {
+                    "zh-CN": "例如：7",
+                    "en-US": "e.g. 7"
+                  }
+                }
+              ],
+              "inputFieldsTitle": {
+                "zh-CN": "通知设置",
+                "en-US": "Notification settings"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "保存设置",
+                "en-US": "Save settings"
+              }
+            },
+            "permissionCode": "announcement.announcement.edit",
+            "visibleWhen": "record.status === 'draft'",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ]
+          },
+          {
+            "code": "submit_approval",
+            "label": {
+              "zh-CN": "提交审批",
+              "en-US": "Submit for approval"
+            },
+            "variant": "primary",
+            "confirm": "announcement.submit_approval.confirm",
+            "permissionCode": "announcement.announcement.submit",
+            "permissionCodes": [
+              "announcement.announcement.publish"
+            ],
+            "visibleWhen": "record.status === 'draft' && record.approval_mode === 'approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:submit_approval",
+              "operationType": "UPDATE"
+            }
+          },
+          {
+            "code": "publish",
+            "label": {
+              "zh-CN": "免审发布",
+              "en-US": "Publish without approval"
+            },
+            "variant": "primary",
+            "confirm": "announcement.publish.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:publish",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "record.status === 'draft' && record.approval_mode !== 'approval'",
+            "permissionCode": "announcement.announcement.publish",
+            "permissionCodes": [
+              "announcement.announcement.exempt"
+            ]
+          },
+          {
+            "code": "archive",
+            "label": {
+              "zh-CN": "撤回",
+              "en": "Archive"
+            },
+            "confirm": "announcement.archive.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:archive",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "record.status === 'published'",
+            "permissionCode": "announcement.announcement.withdraw"
+          },
+          {
+            "code": "republish",
+            "label": {
+              "zh-CN": "建立修订草稿",
+              "en-US": "Create revision draft"
+            },
+            "variant": "primary",
+            "confirm": "announcement.republish.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:republish",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "['withdrawn','expired','missed','rejected','approval_withdrawn','approval_failed'].includes(record.status)",
+            "permissionCode": "announcement.announcement.edit"
+          },
+          {
+            "code": "cancel_schedule",
+            "label": {
+              "zh-CN": "取消发布安排",
+              "en-US": "Cancel release"
+            },
+            "action": {
+              "type": "command",
+              "command": "announcement:cancel_schedule",
+              "operationType": "UPDATE"
+            },
+            "visibleWhen": "record.status === 'scheduled' || record.status === 'unpublished'",
+            "permissionCode": "announcement.announcement.publish",
+            "confirm": "announcement.cancel_schedule.confirm"
+          },
+          {
+            "code": "withdraw_approval",
+            "label": {
+              "zh-CN": "撤销审批申请",
+              "en-US": "Withdraw approval"
+            },
+            "permissionCode": "announcement.announcement.withdraw",
+            "visibleWhen": "record.status === 'pending_approval'",
+            "action": {
+              "type": "command",
+              "command": "announcement:withdraw_approval",
+              "operationType": "UPDATE",
+              "inputFieldsTitle": {
+                "zh-CN": "撤销审批申请",
+                "en-US": "Withdraw approval"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "提交撤销请求",
+                "en-US": "Request withdrawal"
+              },
+              "inputFields": [
+                {
+                  "field": "reason",
+                  "label": {
+                    "zh-CN": "撤销原因",
+                    "en-US": "Reason"
+                  },
+                  "type": "textarea",
+                  "required": true,
+                  "helpText": {
+                    "zh-CN": "请求受理后将核对实际流程结果；尚未发布的公告会停止自动发布。",
+                    "en-US": "The request reconciles the authoritative workflow outcome and prevents an unpublished version from being automatically released."
+                  },
+                  "placeholder": {
+                    "zh-CN": "例如：发布安排调整，撤销本次申请",
+                    "en-US": "e.g. Publication plans changed; withdraw this request"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "statistics",
+            "label": {
+              "zh-CN": "接收统计",
+              "en-US": "Recipient statistics"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.pid}/statistics/snapshots",
+                  "body": {
+                    "query": "",
+                    "state": "all",
+                    "departmentPid": null
+                  },
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.stats"
+          },
+          {
+            "code": "management_preview_reminder",
+            "label": {
+              "zh-CN": "预览催办",
+              "en-US": "Preview reminder"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.pid}/versions/${record.current_version_pid}/reminders/preview",
+                  "body": {
+                    "query": "",
+                    "state": "all",
+                    "departmentPid": null
+                  },
+                  "target": "reminderPreview"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_preview/view/${state.reminderPreview.previewToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "visibleWhen": "record.status === 'published'"
+          },
+          {
+            "code": "management_reminder_plan",
+            "label": {
+              "zh-CN": "自动催办计划",
+              "en-US": "Automatic reminder plan"
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "visibleWhen": "record.current_version_pid != null",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "get",
+                  "endpoint": "/api/announcements/records/${record.pid}/reminders/plan",
+                  "target": "latestReminderPlan"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_plan/view/${state.latestReminderPlan.versionPid}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "pin",
+            "label": {
+              "zh-CN": "置顶",
+              "en-US": "Pin announcement"
+            },
+            "permissionCode": "announcement.announcement.edit",
+            "visibleWhen": "record.status === 'published' && record.pinned !== true",
+            "confirm": "announcement.pin.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:set_pinned",
+              "operationType": "UPDATE",
+              "payload": {
+                "pinned": true
+              }
+            }
+          },
+          {
+            "code": "unpin",
+            "label": {
+              "zh-CN": "取消置顶",
+              "en-US": "Unpin announcement"
+            },
+            "permissionCode": "announcement.announcement.edit",
+            "visibleWhen": "record.status === 'published' && record.pinned === true",
+            "confirm": "announcement.unpin.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:set_pinned",
+              "operationType": "UPDATE",
+              "payload": {
+                "pinned": false
+              }
+            }
+          },
+          {
+            "code": "reconcile_approval",
+            "label": {
+              "zh-CN": "核对审批结果",
+              "en-US": "Reconcile approval"
+            },
+            "permissionCode": "announcement.announcement.manage",
+            "visibleWhen": "record.status === 'pending_approval'",
+            "confirm": "announcement.reconcile_approval.confirm",
+            "action": {
+              "type": "command",
+              "command": "announcement:reconcile_approval",
+              "operationType": "UPDATE"
+            }
+          },
+          {
+            "code": "refresh_publication",
+            "label": {
+              "zh-CN": "刷新发布状态",
+              "en-US": "Refresh publication"
+            },
+            "permissionCode": "announcement.announcement.read",
+            "visibleWhen": "record.current_version_pid != null && (record.status === 'unpublished' || record.status === 'scheduled' || record.status === 'published' || record.status === 'withdrawn' || record.status === 'expired' || record.status === 'missed')",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "publicationFacts"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "basic",
         "blockType": "form-section",
         "title": {
@@ -214,16 +1263,3610 @@
         },
         "readOnly": true,
         "fields": [
-          { "field": "title", "colSpan": 12 },
-          { "field": "announcement_priority", "colSpan": 4 },
-          { "field": "status", "colSpan": 4 },
-          { "field": "pinned", "colSpan": 4 },
-          { "field": "published_by", "colSpan": 6 },
-          { "field": "published_at", "colSpan": 6 },
-          { "field": "expires_at", "colSpan": 6 },
-          { "field": "content", "colSpan": 12 }
+          {
+            "field": "title",
+            "colSpan": 12
+          },
+          {
+            "field": "announcement_priority",
+            "colSpan": 4
+          },
+          {
+            "field": "status",
+            "colSpan": 4
+          },
+          {
+            "field": "pinned",
+            "colSpan": 4
+          },
+          {
+            "field": "expires_at",
+            "colSpan": 6
+          },
+          {
+            "field": "content",
+            "colSpan": 12,
+            "component": "richtext"
+          }
+        ]
+      },
+      {
+        "id": "announcement_approval_status",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "审批进展",
+          "en-US": "Approval progress"
+        },
+        "dataSource": "approvalStatus",
+        "emptyText": {
+          "zh-CN": "此公告尚未提交审批。",
+          "en-US": "This announcement has not been submitted for approval."
+        },
+        "columns": [
+          {
+            "field": "definitionName",
+            "label": {
+              "zh-CN": "审批流程",
+              "en-US": "Workflow"
+            },
+            "width": 200
+          },
+          {
+            "field": "approvalState",
+            "label": {
+              "zh-CN": "申请状态",
+              "en-US": "Submission"
+            },
+            "dictCode": "announcement_approval_execution",
+            "width": 130
+          },
+          {
+            "field": "providerState",
+            "label": {
+              "zh-CN": "流程进度",
+              "en-US": "Workflow state"
+            },
+            "dictCode": "announcement_approval_provider",
+            "width": 150
+          },
+          {
+            "field": "syncState",
+            "label": {
+              "zh-CN": "结果同步",
+              "en-US": "Synchronization"
+            },
+            "dictCode": "announcement_approval_sync",
+            "width": 120
+          },
+          {
+            "field": "attention",
+            "label": {
+              "zh-CN": "处理提示",
+              "en-US": "Attention"
+            },
+            "width": 300
+          }
+        ],
+        "visibleWhen": "record.approval_mode == 'approval' && record.current_version_pid != null"
+      },
+      {
+        "id": "announcement_publication_status",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "发布执行",
+          "en-US": "Publication execution"
+        },
+        "dataSource": "publicationFacts",
+        "visibleWhen": "record.current_version_pid != null && (record.status === 'unpublished' || record.status === 'scheduled' || record.status === 'published' || record.status === 'withdrawn' || record.status === 'expired' || record.status === 'missed')",
+        "emptyText": {
+          "zh-CN": "此版本尚无发布执行记录。",
+          "en-US": "This version has no publication execution record."
+        },
+        "columns": [
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "任务状态",
+              "en-US": "Task state"
+            },
+            "dictCode": "announcement_publication_job",
+            "width": 110
+          },
+          {
+            "field": "plannedAt",
+            "label": {
+              "zh-CN": "计划发布时间",
+              "en-US": "Planned publication"
+            },
+            "valueType": "datetime",
+            "width": 176
+          },
+          {
+            "field": "latestAllowedAt",
+            "label": {
+              "zh-CN": "最晚执行时间",
+              "en-US": "Latest execution"
+            },
+            "valueType": "datetime",
+            "width": 176
+          },
+          {
+            "field": "lastAttemptFinishedAt",
+            "label": {
+              "zh-CN": "上次尝试结束",
+              "en-US": "Last attempt finished"
+            },
+            "valueType": "datetime",
+            "width": 176
+          },
+          {
+            "field": "attempts",
+            "label": {
+              "zh-CN": "累计尝试",
+              "en-US": "Attempts"
+            },
+            "width": 100
+          },
+          {
+            "field": "errorCode",
+            "label": {
+              "zh-CN": "上次异常",
+              "en-US": "Last issue"
+            },
+            "dictCode": "announcement_publication_issue",
+            "width": 240
+          }
+        ],
+        "rowActions": [
+          {
+            "code": "retry_publication",
+            "label": {
+              "zh-CN": "恢复发布任务",
+              "en-US": "Retry publication"
+            },
+            "permissionCode": "announcement.announcement.publish",
+            "visibleWhen": "record.canRetry === true",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.confirm",
+                  "args": {
+                    "title": {
+                      "zh-CN": "恢复同一发布任务？",
+                      "en-US": "Retry this publication?"
+                    },
+                    "content": {
+                      "zh-CN": "沿用原版本、操作者和时间窗口，重新检查发布条件；不会替换正文、重新批准或延长窗口。",
+                      "en-US": "Keep the original version, actor and time window, and recheck publication conditions. This does not replace content, approve again, or extend the window."
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "publicationRetry_${record.recordRevision}",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:retry_publication",
+                  "body": {
+                    "clientRequestId": "${state['publicationRetry_' + record.recordRevision]}",
+                    "targetRecordPid": "${record.recordPid}",
+                    "expectedVersion": "${record.recordRevision}",
+                    "payload": {}
+                  },
+                  "target": "publicationRetried"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "publicationRetry_${record.recordRevision}",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "publicationFacts"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "announcement_publisher",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "发布信息",
+          "en-US": "Publication information"
+        },
+        "dataSource": "announcementPublisher",
+        "columns": [
+          {
+            "field": "publisherName",
+            "label": {
+              "zh-CN": "上次发布人",
+              "en-US": "Last publisher"
+            },
+            "width": 240,
+            "emptyText": {
+              "zh-CN": "暂无可显示发布人",
+              "en-US": "No publisher available"
+            }
+          },
+          {
+            "field": "publishedAt",
+            "label": {
+              "zh-CN": "上次发布时间",
+              "en-US": "Last published at"
+            },
+            "valueType": "datetime",
+            "width": 240,
+            "emptyText": {
+              "zh-CN": "尚未发布",
+              "en-US": "Not published"
+            }
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无发布信息",
+            "en-US": "No publication information"
+          },
+          "description": {
+            "zh-CN": "请刷新；发布人仅显示有权查看的账户名称。",
+            "en-US": "Refresh to view authorized publisher names."
+          }
+        }
+      }
+    ],
+    "extension": {
+      "commandRequest": {
+        "idempotent": true,
+        "versionField": "row_version",
+        "payloadFields": []
+      },
+      "commandRequestByCommand": {
+        "announcement:update_announcement": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "audience_kind",
+            "audience_users",
+            "audience_departments",
+            "audience_roles",
+            "ack_required",
+            "ack_days",
+            "approval_mode",
+            "approval_definition",
+            "scheduled_at",
+            "exemption_reason"
+          ],
+          "inputFieldsOnly": true
+        },
+        "announcement:withdraw_approval": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "reason"
+          ],
+          "inputFieldsOnly": true
+        },
+        "announcement:set_pinned": {
+          "idempotent": true,
+          "versionField": "row_version",
+          "payloadFields": [
+            "pinned"
+          ]
+        }
+      },
+      "showInlineApprovalPanel": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false
+    },
+    "dataSources": {
+      "approvalStatus": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/${$page.recordPid}/approval",
+        "adaptor": "table"
+      },
+      "announcementPublisher": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/records/${$page.recordPid}/management-summary",
+        "adaptor": "raw"
+      },
+      "publicationFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/records/${$page.recordPid}/publication",
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_reader_list",
+    "name:zh-CN": "我的公告",
+    "name:en": "My announcements",
+    "modelCode": "ab_announcement",
+    "kind": "list",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideQuickFilters": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/announcements/received",
+        "method": "get",
+        "pagination": true
+      },
+      "options": {
+        "detailUrl": "/p/announcement_reader/view/{pid}"
+      }
+    },
+    "blocks": [
+      {
+        "id": "recipient_tabs",
+        "blockType": "tabs",
+        "tabs": [
+          {
+            "key": "all",
+            "label": {
+              "zh-CN": "全部",
+              "en-US": "All"
+            }
+          },
+          {
+            "key": "unread",
+            "label": {
+              "zh-CN": "未读",
+              "en-US": "Unread"
+            },
+            "filter": {
+              "field": "filter",
+              "operator": "EQ",
+              "value": "unread"
+            }
+          },
+          {
+            "key": "pending_ack",
+            "label": {
+              "zh-CN": "待确认",
+              "en-US": "To acknowledge"
+            },
+            "filter": {
+              "field": "filter",
+              "operator": "EQ",
+              "value": "pending_ack"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recipient_table",
+        "blockType": "table",
+        "columns": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Title"
+            },
+            "width": 240
+          },
+          {
+            "field": "importance",
+            "label": {
+              "zh-CN": "重要程度",
+              "en-US": "Importance"
+            },
+            "width": 96,
+            "dictCode": "announcement_priority"
+          },
+          {
+            "field": "readState",
+            "label": {
+              "zh-CN": "阅读",
+              "en-US": "Reading"
+            },
+            "width": 88,
+            "dictCode": "announcement_read_state"
+          },
+          {
+            "field": "acknowledgementState",
+            "label": {
+              "zh-CN": "知悉",
+              "en-US": "Acknowledgement"
+            },
+            "width": 100,
+            "dictCode": "announcement_ack_state"
+          },
+          {
+            "field": "published_at",
+            "label": {
+              "zh-CN": "发布时间",
+              "en-US": "Published at"
+            },
+            "width": 200,
+            "format": "datetime"
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无符合条件的公告",
+            "en-US": "No matching announcements"
+          },
+          "description": {
+            "zh-CN": "请刷新或调整筛选；这里只显示你有权查看的有效公告。",
+            "en-US": "Refresh or adjust filters. Only active announcements available to your current membership appear here."
+          }
+        },
+        "rowActions": [
+          {
+            "code": "open_announcement",
+            "label": {
+              "zh-CN": "查看公告",
+              "en-US": "Open announcement"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/p/announcement_reader/view/{pid}"
+            }
+          }
         ]
       }
     ]
+  },
+  {
+    "pageKey": "announcement_reader_detail",
+    "name:zh-CN": "公告详情",
+    "name:en": "Announcement detail",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true,
+      "hideSort": true,
+      "hideColumnSettings": true,
+      "hideQuickFilters": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/announcements/versions/{recordPid}/recipient",
+        "method": "get"
+      },
+      "renderedReceipt": {
+        "bodyField": "content",
+        "endpoint": "/api/announcements/versions/{recordPid}/read",
+        "payloadFields": {
+          "snapshotHash": "snapshotHash"
+        }
+      },
+      "showBack": false
+    },
+    "blocks": [
+      {
+        "id": "recipient_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "back_to_announcements",
+            "label": {
+              "zh-CN": "返回我的公告",
+              "en-US": "Back to my announcements"
+            },
+            "variant": "default",
+            "action": {
+              "type": "navigate",
+              "to": "/p/announcement_reader"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recipient_content",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告内容",
+          "en-US": "Announcement"
+        },
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Title"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "importance",
+            "label": {
+              "zh-CN": "重要程度",
+              "en-US": "Importance"
+            },
+            "component": "select",
+            "dictCode": "announcement_priority",
+            "colSpan": 6
+          },
+          {
+            "field": "publisherName",
+            "label": {
+              "zh-CN": "发布人",
+              "en-US": "Publisher"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "published_at",
+            "label": {
+              "zh-CN": "发布时间",
+              "en-US": "Published at"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "expires_at",
+            "label": {
+              "zh-CN": "公告有效期",
+              "en-US": "Available until"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "acknowledgementState",
+            "label": {
+              "zh-CN": "知悉状态",
+              "en-US": "Acknowledgement"
+            },
+            "component": "select",
+            "dictCode": "announcement_ack_state",
+            "colSpan": 6
+          },
+          {
+            "field": "ack_due_at",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement due"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "acknowledged_at",
+            "label": {
+              "zh-CN": "首次确认时间",
+              "en-US": "First acknowledged"
+            },
+            "component": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "content",
+            "label": {
+              "zh-CN": "公告正文",
+              "en-US": "Announcement content"
+            },
+            "component": "richtext",
+            "colSpan": 12
+          },
+          {
+            "field": "attachments",
+            "label": {
+              "zh-CN": "附件",
+              "en-US": "Attachments"
+            },
+            "component": "fileAttachment",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "ack_overdue",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "知悉截止时间已过。公告仍有效时，你可以继续确认知悉，系统将记录逾期完成。",
+          "en-US": "The acknowledgement deadline has passed. You can still acknowledge while this announcement is active; completion will be recorded as late."
+        },
+        "visibleWhen": "record.ackOverdue == true"
+      },
+      {
+        "id": "ack_complete",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "你已确认知悉，首次确认时间会保留。",
+          "en-US": "Your first acknowledgement has been recorded."
+        },
+        "visibleWhen": "record.acknowledgementState == 'completed'"
+      },
+      {
+        "id": "recipient_acknowledgement",
+        "blockType": "toolbar",
+        "detailPlacement": "body",
+        "buttons": [
+          {
+            "code": "acknowledge",
+            "label": {
+              "zh-CN": "确认已知悉",
+              "en-US": "Acknowledge"
+            },
+            "variant": "primary",
+            "visibleWhen": "record.acknowledgementRequired == true && record.acknowledgementState == 'pending'",
+            "confirm": "announcement.ack.confirm",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "endpoint": "/api/announcements/versions/${record.versionPid}/acknowledge",
+                  "method": "post",
+                  "body": {
+                    "snapshotHash": "${record.snapshotHash}"
+                  }
+                },
+                {
+                  "action": "event.emit",
+                  "args": {
+                    "event": "aura:inbox-update",
+                    "type": "inbox"
+                  }
+                },
+                {
+                  "action": "refresh"
+                }
+              ]
+            },
+            "disableWhen": "!record.first_read_at",
+            "primary": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "announcement_policy_detail",
+    "name:zh-CN": "公告政策",
+    "name:en": "Announcement policy",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "backUrl": "/home",
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/policy",
+        "detailEndpoint": "/api/announcements/policy"
+      },
+      "showBack": false
+    },
+    "blocks": [
+      {
+        "id": "policy_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "公告政策仅作用于当前租户。安全规则在执行时实时复查；提醒时刻、次数和免打扰窗口仅供新提交版本冻结使用，不追溯修改已有公告。",
+          "en-US": "Policy applies to the current tenant. Security rules are rechecked at execution. Reminder timing, limits and quiet hours are frozen for new submissions and do not reschedule existing announcements."
+        }
+      },
+      {
+        "id": "policy_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "edit_announcement_policy",
+            "label": {
+              "zh-CN": "编辑政策",
+              "en-US": "Edit policy"
+            },
+            "variant": "primary",
+            "permissionCode": "announcement.announcement.policy_manage",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.form",
+                  "args": {
+                    "title": {
+                      "zh-CN": "编辑公告政策",
+                      "en-US": "Edit announcement policy"
+                    },
+                    "fields": [
+                      {
+                        "field": "forceApproval",
+                        "label": {
+                          "zh-CN": "所有公告必须审批",
+                          "en-US": "Require approval for every announcement"
+                        },
+                        "type": "checkbox",
+                        "defaultValue": "${record.forceApproval}",
+                        "helpText": {
+                          "zh-CN": "收紧后立即复查尚未执行的发布任务。",
+                          "en-US": "A tighter rule is rechecked before pending publication executes."
+                        }
+                      },
+                      {
+                        "field": "defaultDefinitionPid",
+                        "label": {
+                          "zh-CN": "默认审批流程",
+                          "en-US": "Default approval workflow"
+                        },
+                        "type": "select",
+                        "defaultValue": "${record.defaultDefinitionPid}",
+                        "dataSource": {
+                          "type": "api",
+                          "endpoint": "/api/announcements/policy/approval-options"
+                        },
+                        "helpText": {
+                          "zh-CN": "仅可新选当前可用且本人有权使用的流程；已有实例保持原流程。",
+                          "en-US": "New selections require a qualified available workflow. Existing instances keep their original definition."
+                        }
+                      },
+                      {
+                        "field": "clearDefaultDefinition",
+                        "label": {
+                          "zh-CN": "移除默认审批流程",
+                          "en-US": "Remove the default workflow"
+                        },
+                        "type": "checkbox",
+                        "defaultValue": false
+                      },
+                      {
+                        "field": "lateWindowMinutes",
+                        "label": {
+                          "zh-CN": "发布技术延迟窗口（分钟）",
+                          "en-US": "Publication technical grace period (minutes)"
+                        },
+                        "type": "number",
+                        "required": true,
+                        "defaultValue": "${record.lateWindowMinutes}",
+                        "helpText": {
+                          "zh-CN": "1–120 分钟，仅用于已获许可的发布技术重试，不为逾期审批补发。",
+                          "en-US": "1–120 minutes for authorized technical retries. Late approval never triggers a missed publication."
+                        }
+                      },
+                      {
+                        "field": "reminderAt",
+                        "label": {
+                          "zh-CN": "每日自动催办时刻",
+                          "en-US": "Daily automatic reminder time"
+                        },
+                        "type": "string",
+                        "required": true,
+                        "defaultValue": "${record.reminderAt}",
+                        "placeholder": "09:00",
+                        "helpText": {
+                          "zh-CN": "HH:mm，使用公告版本冻结的租户时区。",
+                          "en-US": "HH:mm in the tenant time zone frozen for the announcement version."
+                        }
+                      },
+                      {
+                        "field": "automaticReminderLimit",
+                        "label": {
+                          "zh-CN": "自动催办次数上限",
+                          "en-US": "Automatic reminder limit"
+                        },
+                        "type": "number",
+                        "required": true,
+                        "defaultValue": "${record.automaticReminderLimit}",
+                        "helpText": {
+                          "zh-CN": "1–3 次。没有合格收件人的扫描不消耗次数。",
+                          "en-US": "1–3 batches. Scans without eligible recipients do not consume the limit."
+                        }
+                      },
+                      {
+                        "field": "reminderDedupeMinutes",
+                        "label": {
+                          "zh-CN": "重复提醒间隔（分钟）",
+                          "en-US": "Minimum reminder interval (minutes)"
+                        },
+                        "type": "number",
+                        "required": true,
+                        "defaultValue": "${record.reminderDedupeMinutes}",
+                        "helpText": {
+                          "zh-CN": "60–1440 分钟；手动和自动催办共用。",
+                          "en-US": "60–1440 minutes, shared by manual and automatic reminders."
+                        }
+                      },
+                      {
+                        "field": "quietStart",
+                        "label": {
+                          "zh-CN": "免打扰开始",
+                          "en-US": "Quiet hours start"
+                        },
+                        "type": "string",
+                        "defaultValue": "${record.quietStart}",
+                        "placeholder": "22:00"
+                      },
+                      {
+                        "field": "quietEnd",
+                        "label": {
+                          "zh-CN": "免打扰结束",
+                          "en-US": "Quiet hours end"
+                        },
+                        "type": "string",
+                        "defaultValue": "${record.quietEnd}",
+                        "placeholder": "08:00",
+                        "helpText": {
+                          "zh-CN": "开始与结束同时填写或同时留空；支持跨午夜，结束时刻可发送。",
+                          "en-US": "Set or clear both times together. Overnight intervals are supported; reminders are allowed at the end time."
+                        }
+                      }
+                    ],
+                    "submitLabel": {
+                      "zh-CN": "保存政策",
+                      "en-US": "Save policy"
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "announcementPolicyOperation"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:update_policy",
+                  "body": {
+                    "clientRequestId": "${state.announcementPolicyOperation}",
+                    "payload": {
+                      "forceApproval": "${form.forceApproval}",
+                      "lateWindowMinutes": "${form.lateWindowMinutes}",
+                      "reminderAt": "${form.reminderAt}",
+                      "automaticReminderLimit": "${form.automaticReminderLimit}",
+                      "reminderDedupeMinutes": "${form.reminderDedupeMinutes}",
+                      "quietStart": "${form.quietStart}",
+                      "quietEnd": "${form.quietEnd}",
+                      "expectedPolicyRevision": "${record.revision}",
+                      "defaultDefinitionPid": "${form.clearDefaultDefinition ? '' : form.defaultDefinitionPid}"
+                    }
+                  }
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "announcementPolicyOperation"
+                  }
+                },
+                {
+                  "action": "toast.show",
+                  "args": {
+                    "level": "success",
+                    "message": {
+                      "zh-CN": "公告政策已保存；已有公告的提醒时间保持不变。",
+                      "en-US": "Announcement policy saved. Existing announcements keep their frozen reminder schedule."
+                    }
+                  }
+                },
+                {
+                  "action": "refresh"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy_current",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "当前政策",
+          "en-US": "Current policy"
+        },
+        "fields": [
+          {
+            "field": "forceApproval",
+            "label": {
+              "zh-CN": "所有公告必须审批",
+              "en-US": "Approval required for every announcement"
+            },
+            "component": "checkbox",
+            "colSpan": 6
+          },
+          {
+            "field": "lateWindowMinutes",
+            "label": {
+              "zh-CN": "技术延迟窗口（分钟）",
+              "en-US": "Technical grace period (minutes)"
+            },
+            "component": "number",
+            "colSpan": 6
+          },
+          {
+            "field": "reminderAt",
+            "label": {
+              "zh-CN": "每日自动催办时刻",
+              "en-US": "Daily automatic reminder time"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "automaticReminderLimit",
+            "label": {
+              "zh-CN": "自动催办次数上限",
+              "en-US": "Automatic reminder limit"
+            },
+            "component": "number",
+            "colSpan": 6
+          },
+          {
+            "field": "reminderDedupeMinutes",
+            "label": {
+              "zh-CN": "重复提醒间隔（分钟）",
+              "en-US": "Minimum reminder interval (minutes)"
+            },
+            "component": "number",
+            "colSpan": 6
+          },
+          {
+            "field": "quietStart",
+            "label": {
+              "zh-CN": "免打扰开始",
+              "en-US": "Quiet hours start"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "quietEnd",
+            "label": {
+              "zh-CN": "免打扰结束",
+              "en-US": "Quiet hours end"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "policy_safety",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "默认审批流程可在“编辑政策”中查看、更换或移除。知悉截止后停止自动催办，但有效公告仍允许手动催办和确认。免打扰时段同时留空表示未配置；新公告默认每日 09:00、最多三次。",
+          "en-US": "View, replace or remove the default workflow in Edit policy. Automatic reminders stop at the acknowledgement deadline; active announcements still allow manual reminders and acknowledgement. Empty quiet-hour fields mean no quiet interval is configured. New announcements default to 09:00 daily and at most three automatic batches."
+        }
+      }
+    ]
+  },
+  {
+    "pageKey": "announcement_statistics_detail",
+    "name:zh-CN": "接收统计",
+    "name:en": "Recipient statistics",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/statistics/snapshots/{recordPid}",
+        "detailEndpoint": "/api/announcements/statistics/snapshots/{recordPid}"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "statistics_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "固定版本、固定统计时间。筛选不改变历史分母，重新统计会生成新快照。已读与已知悉分别统计；失效成员保留在历史名单，未知或不适用项单独标明。网络中断时请保持本页快照，刷新后重试导出会沿用原请求。",
+          "en-US": "One fixed version and capture time. Filters preserve the historical denominator; recapturing creates a new snapshot. Reading and acknowledgement are separate. Inactive members remain in history; unknown and inapplicable values are identified. After a connection loss, keep this capture and reload to retry the original export request."
+        }
+      },
+      {
+        "id": "statistics_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "export_statistics",
+            "label": {
+              "zh-CN": "导出当前明细",
+              "en-US": "Export current details"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "statisticsExportOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:export_statistics",
+                  "body": {
+                    "clientRequestId": "${state.statisticsExportOperation}",
+                    "targetRecordPid": "${record.metadata.recordPid}",
+                    "payload": {
+                      "snapshotToken": "${record.snapshotToken}"
+                    }
+                  },
+                  "target": "statisticsExport"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "statisticsExportOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics_export/view/${state.statisticsExport.data.exportTaskPid}"
+                  }
+                }
+              ]
+            },
+            "variant": "primary",
+            "permissionCode": "announcement.announcement.export",
+            "permissionCodes": [
+              "announcement.announcement.stats"
+            ],
+            "primary": true
+          },
+          {
+            "code": "check_export_operation",
+            "label": {
+              "zh-CN": "核对导出请求",
+              "en-US": "Check export request"
+            },
+            "permissionCode": "announcement.announcement.export",
+            "permissionCodes": [
+              "announcement.announcement.stats"
+            ],
+            "variant": "default",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "state.peekRequestKey",
+                  "args": {
+                    "field": "statisticsExportOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "type": "if",
+                  "condition": "state.statisticsExportOperation != null",
+                  "trueNext": "lookup",
+                  "falseNext": "no_pending"
+                },
+                {
+                  "id": "no_pending",
+                  "action": "toast.show",
+                  "args": {
+                    "message": {
+                      "zh-CN": "当前没有待核对的导出请求。",
+                      "en-US": "There is no pending export request to check."
+                    }
+                  },
+                  "next": "finish"
+                },
+                {
+                  "id": "lookup",
+                  "action": "api.request",
+                  "method": "get",
+                  "endpoint": "/api/announcements/operations/${state.statisticsExportOperation}",
+                  "params": {
+                    "commandCode": "announcement:export_statistics"
+                  },
+                  "target": "exportOperationLookup"
+                },
+                {
+                  "type": "if",
+                  "condition": "state.exportOperationLookup.found === true && state.exportOperationLookup.exportTaskPid != null",
+                  "trueNext": "open_existing",
+                  "falseNext": "unknown"
+                },
+                {
+                  "id": "unknown",
+                  "action": "toast.show",
+                  "args": {
+                    "message": {
+                      "zh-CN": "尚未查到已提交结果。请保留本页原请求并稍后核对或重试，不要新建重复导出。",
+                      "en-US": "No committed result was found. Keep this request and check or retry later; do not create a duplicate export."
+                    }
+                  },
+                  "next": "finish"
+                },
+                {
+                  "id": "open_existing",
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics_export/view/${state.exportOperationLookup.exportTaskPid}"
+                  },
+                  "next": "finish"
+                }
+              ]
+            }
+          },
+          {
+            "code": "preview_reminder",
+            "label": {
+              "zh-CN": "预览催办",
+              "en-US": "Preview reminder"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.metadata.recordPid}/versions/${record.versionPid}/reminders/preview",
+                  "body": "${record.filters}",
+                  "target": "reminderPreview"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_preview/view/${state.reminderPreview.previewToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "view_reminder_plan",
+            "label": {
+              "zh-CN": "自动催办计划",
+              "en-US": "Automatic reminder plan"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_plan/view/${record.versionPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "filter_statistics",
+            "label": {
+              "zh-CN": "筛选明细",
+              "en-US": "Filter details"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.form",
+                  "args": {
+                    "title": {
+                      "zh-CN": "筛选接收明细",
+                      "en-US": "Filter recipient details"
+                    },
+                    "fields": [
+                      {
+                        "field": "query",
+                        "label": {
+                          "zh-CN": "姓名关键词",
+                          "en-US": "Name keywords"
+                        },
+                        "type": "string",
+                        "defaultValue": "${record.filters.query}",
+                        "placeholder": {
+                          "zh-CN": "例如：王小明",
+                          "en-US": "e.g. Alex"
+                        },
+                        "helpText": {
+                          "zh-CN": "搜索发布时封存的姓名，最多 200 字。",
+                          "en-US": "Search frozen publication names, up to 200 characters."
+                        }
+                      },
+                      {
+                        "field": "state",
+                        "label": {
+                          "zh-CN": "接收状态",
+                          "en-US": "Recipient state"
+                        },
+                        "type": "select",
+                        "required": true,
+                        "defaultValue": "${record.filters.state}",
+                        "dataSource": {
+                          "type": "static",
+                          "data": [
+                            {
+                              "value": "all",
+                              "label": {
+                                "zh-CN": "全部",
+                                "en-US": "All"
+                              }
+                            },
+                            {
+                              "value": "unread",
+                              "label": {
+                                "zh-CN": "未读",
+                                "en-US": "Unread"
+                              }
+                            },
+                            {
+                              "value": "pending_ack",
+                              "label": {
+                                "zh-CN": "待知悉",
+                                "en-US": "Pending acknowledgement"
+                              }
+                            },
+                            {
+                              "value": "overdue",
+                              "label": {
+                                "zh-CN": "逾期未知悉",
+                                "en-US": "Overdue acknowledgement"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "field": "departmentPid",
+                        "label": {
+                          "zh-CN": "发布时部门",
+                          "en-US": "Department at publication"
+                        },
+                        "type": "select",
+                        "defaultValue": "${record.filters.departmentPid}",
+                        "dataSource": {
+                          "type": "api",
+                          "endpoint": "/api/announcements/statistics/snapshots/${record.snapshotToken}/departments"
+                        },
+                        "helpText": {
+                          "zh-CN": "仅列出本快照中当前有权查看的部门；留空为全部。",
+                          "en-US": "Only currently authorized departments in this capture are listed. Leave empty for all."
+                        }
+                      }
+                    ],
+                    "submitLabel": {
+                      "zh-CN": "应用筛选",
+                      "en-US": "Apply filters"
+                    }
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${record.versionPid}/statistics/snapshots",
+                  "body": {
+                    "query": "${form.query || ''}",
+                    "state": "${form.state}",
+                    "departmentPid": "${form.departmentPid ? form.departmentPid : null}"
+                  },
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "switch_statistics_version",
+            "label": {
+              "zh-CN": "切换版本",
+              "en-US": "Switch version"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.form",
+                  "args": {
+                    "title": {
+                      "zh-CN": "选择发布版本",
+                      "en-US": "Choose a published version"
+                    },
+                    "fields": [
+                      {
+                        "field": "versionPid",
+                        "label": {
+                          "zh-CN": "发布版本",
+                          "en-US": "Published version"
+                        },
+                        "type": "select",
+                        "required": true,
+                        "defaultValue": "${record.versionPid}",
+                        "dataSource": {
+                          "type": "api",
+                          "endpoint": "/api/announcements/records/${record.metadata.recordPid}/statistics/versions"
+                        },
+                        "helpText": {
+                          "zh-CN": "切换版本会清除筛选，并生成该版本的新统计。",
+                          "en-US": "Switching versions clears filters and creates a new capture for that version."
+                        }
+                      }
+                    ],
+                    "submitLabel": {
+                      "zh-CN": "查看统计",
+                      "en-US": "View statistics"
+                    }
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${form.versionPid}/statistics/snapshots",
+                  "body": {
+                    "query": "",
+                    "state": "all",
+                    "departmentPid": null
+                  },
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "refresh_statistics",
+            "label": {
+              "zh-CN": "重新统计",
+              "en-US": "Capture latest statistics"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${record.versionPid}/statistics/snapshots",
+                  "body": "${record.filters}",
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement/view/${record.metadata.recordPid}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "delivery_history",
+            "label": {
+              "zh-CN": "渠道记录",
+              "en-US": "Channel history"
+            },
+            "variant": "default",
+            "permissionCode": "announcement.announcement.stats",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_delivery_history/view/${record.metadata.versionPid}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_context",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "统计口径",
+          "en-US": "Capture context"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "metadata.versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            }
+          },
+          {
+            "field": "asOf",
+            "label": {
+              "zh-CN": "统计时间",
+              "en-US": "Statistics as of"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "expiresAt",
+            "label": {
+              "zh-CN": "本页有效期",
+              "en-US": "Page expires at"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "metadata.snapshotOrigin",
+            "label": {
+              "zh-CN": "名单来源",
+              "en-US": "Audience origin"
+            },
+            "valueMap": {
+              "publication": {
+                "zh-CN": "实际发布封存",
+                "en-US": "Sealed at publication"
+              },
+              "legacy_migration": {
+                "zh-CN": "存量迁移（历史阅读未知）",
+                "en-US": "Migrated; historical reads unknown"
+              },
+              "__default": {
+                "zh-CN": "迁移名单（历史数据未知）",
+                "en-US": "Migrated audience; history unknown"
+              }
+            }
+          },
+          {
+            "field": "summary.denominatorScope",
+            "label": {
+              "zh-CN": "当前授权范围",
+              "en-US": "Current authorization scope"
+            },
+            "valueMap": {
+              "all": {
+                "zh-CN": "全员管理范围",
+                "en-US": "All members"
+              },
+              "dept": {
+                "zh-CN": "指定部门",
+                "en-US": "Authorized departments"
+              },
+              "dept_and_sub": {
+                "zh-CN": "部门及下级",
+                "en-US": "Departments and descendants"
+              },
+              "self": {
+                "zh-CN": "本人",
+                "en-US": "Self"
+              }
+            }
+          },
+          {
+            "field": "metadata.acknowledgementRequired",
+            "label": {
+              "zh-CN": "要求确认知悉",
+              "en-US": "Acknowledgement required"
+            },
+            "valueMap": {
+              "true": {
+                "zh-CN": "是",
+                "en-US": "Yes"
+              },
+              "false": {
+                "zh-CN": "否",
+                "en-US": "No"
+              }
+            }
+          },
+          {
+            "field": "metadata.acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime",
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "无需知悉",
+                "en-US": "Not required"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_summary",
+        "blockType": "metric-strip",
+        "context": "${record}",
+        "columns": 3,
+        "metrics": [
+          {
+            "key": "actualRecipients",
+            "valueField": "summary.actualRecipients",
+            "label": {
+              "zh-CN": "接收人数 N",
+              "en-US": "Recipients N"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          },
+          {
+            "key": "read",
+            "valueField": "summary.read",
+            "label": {
+              "zh-CN": "已读人数 R",
+              "en-US": "Read R"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          },
+          {
+            "key": "acknowledged",
+            "valueField": "summary.acknowledged",
+            "label": {
+              "zh-CN": "已知悉人数 A",
+              "en-US": "Acknowledged A"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          },
+          {
+            "key": "readRate",
+            "valueField": "summary.readRate",
+            "label": {
+              "zh-CN": "阅读率（%）",
+              "en-US": "Read rate (%)"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            },
+            "precision": 2
+          },
+          {
+            "key": "acknowledgementRate",
+            "valueField": "summary.acknowledgementRate",
+            "label": {
+              "zh-CN": "知悉率（%）",
+              "en-US": "Acknowledgement rate (%)"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            },
+            "precision": 2
+          },
+          {
+            "key": "filteredRows",
+            "valueField": "summary.filteredRows",
+            "label": {
+              "zh-CN": "筛选后人数",
+              "en-US": "Filtered recipients"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用 / 未知",
+                "en-US": "Not applicable / unknown"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_operations",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "运营信息",
+          "en-US": "Operational information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "summary.visibleCohort",
+            "label": {
+              "zh-CN": "当前可见的封存人数",
+              "en-US": "Visible sealed cohort"
+            }
+          },
+          {
+            "field": "summary.inactiveMembers",
+            "label": {
+              "zh-CN": "已失效成员",
+              "en-US": "Inactive members"
+            }
+          },
+          {
+            "field": "summary.overdueUnacknowledged",
+            "label": {
+              "zh-CN": "逾期未知悉",
+              "en-US": "Overdue unacknowledged"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用",
+                "en-US": "Not applicable"
+              }
+            }
+          },
+          {
+            "field": "summary.lateCompleted",
+            "label": {
+              "zh-CN": "逾期后知悉",
+              "en-US": "Acknowledged late"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "不适用",
+                "en-US": "Not applicable"
+              }
+            }
+          },
+          {
+            "field": "summary.actionable",
+            "label": {
+              "zh-CN": "可催办人数",
+              "en-US": "Actionable recipients"
+            }
+          },
+          {
+            "field": "summary.readsAfterMigration",
+            "label": {
+              "zh-CN": "迁移后已读",
+              "en-US": "Read after migration"
+            }
+          }
+        ]
+      },
+      {
+        "id": "statistics_recipients",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "接收明细",
+          "en-US": "Recipient details"
+        },
+        "dataSource": "recipients",
+        "table": {
+          "columns": [
+            {
+              "field": "displayName",
+              "label": {
+                "zh-CN": "姓名",
+                "en-US": "Name"
+              },
+              "width": 160
+            },
+            {
+              "field": "departments",
+              "label": {
+                "zh-CN": "发布时部门",
+                "en-US": "Departments at publication"
+              },
+              "width": 180,
+              "emptyText": {
+                "zh-CN": "无可显示部门",
+                "en-US": "No visible department"
+              }
+            },
+            {
+              "field": "matchedRoles",
+              "label": {
+                "zh-CN": "匹配角色",
+                "en-US": "Matched roles"
+              },
+              "width": 160,
+              "emptyText": {
+                "zh-CN": "无可显示角色",
+                "en-US": "No visible roles"
+              }
+            },
+            {
+              "field": "readState",
+              "label": {
+                "zh-CN": "阅读状态",
+                "en-US": "Read state"
+              },
+              "dictCode": "announcement_statistics_read",
+              "width": 145
+            },
+            {
+              "field": "firstReadAt",
+              "label": {
+                "zh-CN": "首次阅读",
+                "en-US": "First read"
+              },
+              "valueType": "datetime",
+              "width": 208
+            },
+            {
+              "field": "acknowledgementState",
+              "label": {
+                "zh-CN": "知悉状态",
+                "en-US": "Acknowledgement"
+              },
+              "dictCode": "announcement_statistics_ack",
+              "width": 145
+            },
+            {
+              "field": "acknowledgedAt",
+              "label": {
+                "zh-CN": "确认时间",
+                "en-US": "Acknowledged at"
+              },
+              "valueType": "datetime",
+              "width": 208
+            },
+            {
+              "field": "memberEligible",
+              "label": {
+                "zh-CN": "成员资格",
+                "en-US": "Membership"
+              },
+              "dictCode": "announcement_statistics_membership",
+              "width": 110
+            },
+            {
+              "field": "notificationState",
+              "label": {
+                "zh-CN": "通知投递",
+                "en-US": "Notification delivery"
+              },
+              "dictCode": "announcement_statistics_delivery",
+              "width": 140
+            }
+          ],
+          "rowKey": "pid",
+          "pagination": {
+            "mode": "server",
+            "pageField": "pageNum",
+            "pageSizeOptions": [
+              20,
+              50,
+              100
+            ]
+          }
+        },
+        "states": {
+          "403": {
+            "title": {
+              "zh-CN": "当前权限已变更，请返回公告重新统计。",
+              "en-US": "Permissions changed. Return to the announcement and capture again."
+            }
+          },
+          "stale": {
+            "title": {
+              "zh-CN": "翻页失败，仍展示上一次的数据。重试后再操作。",
+              "en-US": "Paging failed. Previous data is shown; retry before acting."
+            }
+          }
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "没有匹配的接收人",
+            "en-US": "No matching recipients"
+          },
+          "description": {
+            "zh-CN": "没有符合当前筛选的接收人。请调整筛选；历史分母保持不变。",
+            "en-US": "No recipients match these filters. Adjust filters; the historical denominator is unchanged."
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "recipients": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/statistics/snapshots/${$page.recordPid}/recipients",
+        "params": {
+          "pageNum": 1,
+          "pageSize": 20
+        },
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_statistics_export_detail",
+    "name:zh-CN": "统计导出",
+    "name:en": "Statistics export",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/exports/domain/{recordPid}",
+        "detailEndpoint": "/api/exports/domain/{recordPid}"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "export_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "导出文件固定保留受理时的版本、统计时间与筛选结果，24 小时内可下载。刷新仅查询原任务；权限变化后可能无法下载，请重新统计。失败、取消或过期后，可查看此版本最新统计并创建新导出。",
+          "en-US": "The file preserves the accepted version, capture time and filters, and is available for 24 hours. Refresh checks this task. Changed permissions can prevent download; capture again. For failed, canceled or expired tasks, view the latest statistics for this version and create another export."
+        }
+      },
+      {
+        "id": "export_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "download_statistics",
+            "label": {
+              "zh-CN": "下载 CSV",
+              "en-US": "Download CSV"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "file.download",
+                  "args": {
+                    "url": "${record.downloadUrl}",
+                    "expectedContentType": "text/csv"
+                  }
+                }
+              ]
+            },
+            "variant": "primary",
+            "visibleWhen": "record.status === 'completed' && record.downloadUrl != null",
+            "permissionCode": "announcement.announcement.export",
+            "primary": true
+          },
+          {
+            "code": "refresh_export",
+            "label": {
+              "zh-CN": "刷新进度",
+              "en-US": "Refresh progress"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "artifactFacts"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "latest_version_statistics",
+            "label": {
+              "zh-CN": "查看此版本最新统计",
+              "en-US": "View latest statistics for this version"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/versions/${record.sourceSnapshot.versionPid}/statistics/snapshots",
+                  "body": "${record.sourceSnapshot.filters}",
+                  "target": "statisticsCapture"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_statistics/view/${state.statisticsCapture.snapshotToken}"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "export_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement/view/${record.sourceSnapshot.recordPid}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "export_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "导出文件",
+          "en-US": "Export file"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "fileName",
+            "label": {
+              "zh-CN": "文件名",
+              "en-US": "File name"
+            },
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "export_details",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "文件与任务",
+          "en-US": "File and task"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "sourceSnapshot.versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            }
+          },
+          {
+            "field": "sourceSnapshot.asOf",
+            "label": {
+              "zh-CN": "统计时间",
+              "en-US": "Statistics as of"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "sourceSnapshot.rowCount",
+            "label": {
+              "zh-CN": "导出行数",
+              "en-US": "Exported rows"
+            }
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "任务状态",
+              "en-US": "Task status"
+            },
+            "valueMap": {
+              "pending": {
+                "zh-CN": "等待执行",
+                "en-US": "Pending"
+              },
+              "running": {
+                "zh-CN": "正在生成",
+                "en-US": "Running"
+              },
+              "completed": {
+                "zh-CN": "可下载",
+                "en-US": "Ready to download"
+              },
+              "failed": {
+                "zh-CN": "生成失败",
+                "en-US": "Failed"
+              },
+              "canceled": {
+                "zh-CN": "已取消",
+                "en-US": "Canceled"
+              },
+              "cancelled": {
+                "zh-CN": "已取消",
+                "en-US": "Canceled"
+              },
+              "expired": {
+                "zh-CN": "已过期",
+                "en-US": "Expired"
+              }
+            }
+          },
+          {
+            "field": "progress",
+            "label": {
+              "zh-CN": "进度（%）",
+              "en-US": "Progress (%)"
+            }
+          },
+          {
+            "field": "format",
+            "label": {
+              "zh-CN": "文件格式",
+              "en-US": "File format"
+            },
+            "valueMap": {
+              "CSV": "CSV",
+              "csv": "CSV"
+            }
+          },
+          {
+            "field": "expiresAt",
+            "label": {
+              "zh-CN": "下载截止",
+              "en-US": "Download expires at"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "sourceSnapshot.filters.query",
+            "label": {
+              "zh-CN": "姓名筛选",
+              "en-US": "Name filter"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "全部姓名",
+                "en-US": "All names"
+              }
+            }
+          },
+          {
+            "field": "sourceSnapshot.filters.state",
+            "label": {
+              "zh-CN": "状态筛选",
+              "en-US": "State filter"
+            },
+            "valueMap": {
+              "all": {
+                "zh-CN": "全部",
+                "en-US": "All"
+              },
+              "unread": {
+                "zh-CN": "未读",
+                "en-US": "Unread"
+              },
+              "pending_ack": {
+                "zh-CN": "待知悉",
+                "en-US": "Pending acknowledgement"
+              },
+              "overdue": {
+                "zh-CN": "逾期未知悉",
+                "en-US": "Overdue acknowledgement"
+              }
+            }
+          },
+          {
+            "field": "errorMessage",
+            "label": {
+              "zh-CN": "处理提示",
+              "en-US": "Result guidance"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "—",
+                "en-US": "—"
+              },
+              "$i18n:export.domain_failed": {
+                "zh-CN": "生成失败。请返回统计页重新创建导出。",
+                "en-US": "Generation failed. Return to statistics and create a new export."
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "export_artifact_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "生成结果",
+          "en-US": "Generated artifact facts"
+        },
+        "dataSource": "artifactFacts",
+        "columns": [
+          {
+            "field": "totalRows",
+            "label": {
+              "zh-CN": "总行数",
+              "en-US": "Total rows"
+            },
+            "width": 100
+          },
+          {
+            "field": "processedRows",
+            "label": {
+              "zh-CN": "已处理行数",
+              "en-US": "Processed rows"
+            },
+            "width": 110
+          },
+          {
+            "field": "fileSize",
+            "label": {
+              "zh-CN": "文件字节数",
+              "en-US": "File bytes"
+            },
+            "width": 120
+          },
+          {
+            "field": "completedAt",
+            "label": {
+              "zh-CN": "完成时间",
+              "en-US": "Completed at"
+            },
+            "valueType": "datetime",
+            "width": 180
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无生成结果",
+            "en-US": "No generated artifact yet"
+          },
+          "description": {
+            "zh-CN": "请刷新进度；生成完成后可查看文件信息。",
+            "en-US": "Refresh progress to see file information after generation."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "结果刷新失败，仍展示上一次的文件信息，请重试。",
+              "en-US": "Result refresh failed. Previous artifact information is shown; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "artifactFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/exports/domain/${$page.recordPid}",
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_reminder_preview_detail",
+    "name:zh-CN": "催办预览",
+    "name:en": "Reminder preview",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/previews/{recordPid}",
+        "detailEndpoint": "/api/announcements/reminders/previews/{recordPid}"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "announcement_reminder_preview_detail_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "预览有效 30 分钟，提交时重新计算实际人数。未读和待知悉合并为一条提醒；手动与自动共用一小时去重。公告有效时截止后仍可手动催办。网络中断后保留本预览并刷新重试原请求。",
+          "en-US": "The preview is valid for 30 minutes; submission recalculates eligibility. Unread and unacknowledged work share one reminder and the manual/automatic deduplication window. Manual reminders remain available after the deadline while the announcement is active. After a connection loss, keep this preview and reload to retry the original request."
+        }
+      },
+      {
+        "id": "announcement_reminder_preview_detail_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "confirm_reminder",
+            "label": {
+              "zh-CN": "确认催办",
+              "en-US": "Confirm reminder"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.confirm",
+                  "args": {
+                    "title": {
+                      "zh-CN": "确认生成催办提醒？",
+                      "en-US": "Generate reminder notifications?"
+                    },
+                    "content": {
+                      "zh-CN": "提交时会重新检查未完成状态和一小时去重。站内提醒生成不代表用户已读或已知悉。",
+                      "en-US": "Submission rechecks unfinished work and the shared deduplication window. A generated notification does not mean that the recipient has read or acknowledged it."
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "reminderOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:remind",
+                  "body": {
+                    "clientRequestId": "${state.reminderOperation}",
+                    "targetRecordPid": "${record.recordPid}",
+                    "payload": {
+                      "previewToken": "${record.previewToken}"
+                    }
+                  },
+                  "target": "reminderAccepted"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "reminderOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_batch/view/${state.reminderAccepted.data.batchPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "primary": true,
+            "variant": "primary",
+            "visibleWhen": "record.status === 'ready' && record.eligibleCount > 0"
+          },
+          {
+            "code": "reminder_repreview",
+            "label": {
+              "zh-CN": "重新预览",
+              "en-US": "Preview again"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/announcements/records/${record.recordPid}/versions/${record.versionPid}/reminders/preview",
+                  "body": "${record.filters}",
+                  "target": "reminderPreview"
+                },
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/announcement_reminder_preview/view/${state.reminderPreview.previewToken}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "reminder_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_preview_detail_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告与版本",
+          "en-US": "Announcement and version"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "timezone",
+            "label": {
+              "zh-CN": "冻结时区",
+              "en-US": "Frozen timezone"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_preview_detail_metadata",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "催办信息",
+          "en-US": "Reminder information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "预览状态",
+              "en-US": "Preview status"
+            },
+            "valueMap": {
+              "ready": {
+                "zh-CN": "可提交",
+                "en-US": "Ready"
+              },
+              "expired": {
+                "zh-CN": "已失效，请重新预览",
+                "en-US": "Expired; preview again"
+              },
+              "throttled": {
+                "zh-CN": "去重窗口内，暂无新增提醒",
+                "en-US": "Deduplicated; no new reminders"
+              },
+              "empty": {
+                "zh-CN": "当前无需催办",
+                "en-US": "No reminder needed"
+              }
+            }
+          },
+          {
+            "field": "filters.query",
+            "label": {
+              "zh-CN": "姓名筛选",
+              "en-US": "Name filter"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "全部姓名",
+                "en-US": "All names"
+              }
+            }
+          },
+          {
+            "field": "filters.state",
+            "label": {
+              "zh-CN": "状态筛选",
+              "en-US": "State filter"
+            },
+            "valueMap": {
+              "all": {
+                "zh-CN": "未读或待知悉",
+                "en-US": "Unread or pending acknowledgement"
+              },
+              "unread": {
+                "zh-CN": "未读",
+                "en-US": "Unread"
+              },
+              "pending_ack": {
+                "zh-CN": "待知悉",
+                "en-US": "Pending acknowledgement"
+              },
+              "overdue": {
+                "zh-CN": "逾期未知悉",
+                "en-US": "Overdue acknowledgement"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_preview_detail_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "预览资格事实",
+          "en-US": "Preview qualification facts"
+        },
+        "dataSource": "reminderFacts",
+        "columns": [
+          {
+            "field": "eligibleCount",
+            "label": {
+              "zh-CN": "预览时可催办",
+              "en-US": "Eligible at preview"
+            },
+            "width": 150
+          },
+          {
+            "field": "currentEligible",
+            "label": {
+              "zh-CN": "当前可催办",
+              "en-US": "Currently eligible"
+            },
+            "width": 150
+          },
+          {
+            "field": "currentThrottled",
+            "label": {
+              "zh-CN": "当前限流",
+              "en-US": "Currently throttled"
+            },
+            "width": 150
+          },
+          {
+            "field": "evaluatedAt",
+            "label": {
+              "zh-CN": "预览时间",
+              "en-US": "Previewed at"
+            },
+            "width": 208,
+            "valueType": "datetime"
+          },
+          {
+            "field": "expiresAt",
+            "label": {
+              "zh-CN": "有效期",
+              "en-US": "Expires at"
+            },
+            "width": 208,
+            "valueType": "datetime"
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无事实",
+            "en-US": "No facts available"
+          },
+          "description": {
+            "zh-CN": "请刷新同一预览或批次；不会重新发送。",
+            "en-US": "Refresh the same preview or batch. This does not resend notifications."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍显示上次事实，请重试。",
+              "en-US": "Refresh failed. Previous facts remain visible; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "reminderFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/previews/${$page.recordPid}",
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_reminder_batch_detail",
+    "name:zh-CN": "催办批次",
+    "name:en": "Reminder batch",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/batches/{recordPid}",
+        "detailEndpoint": "/api/announcements/reminders/batches/{recordPid}"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "announcement_reminder_batch_detail_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "本页刷新只查询原批次，不会重新发送。“提醒已生成”仅表示站内通知已持久化，不表示已读或已知悉。受理后完成、成员失效或操作者失权会跳过。实际人数可能与预览不同；限流与零人数批次不增加自动额度。",
+          "en-US": "Refresh only queries this batch. Completed means the in-app notification was persisted, not read or acknowledged. Completion, inactive membership or revoked authority can skip accepted work. Actual counts may differ from the preview; empty or throttled batches do not consume automatic quota."
+        }
+      },
+      {
+        "id": "announcement_reminder_batch_detail_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "reminder_refresh",
+            "label": {
+              "zh-CN": "刷新状态",
+              "en-US": "Refresh status"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "reminderFacts"
+                    ]
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "reminder_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_batch_detail_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告与版本",
+          "en-US": "Announcement and version"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "timezone",
+            "label": {
+              "zh-CN": "冻结时区",
+              "en-US": "Frozen timezone"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_batch_detail_metadata",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "催办信息",
+          "en-US": "Reminder information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "mode",
+            "label": {
+              "zh-CN": "催办方式",
+              "en-US": "Mode"
+            },
+            "valueMap": {
+              "AUTO": {
+                "zh-CN": "自动",
+                "en-US": "Automatic"
+              },
+              "MANUAL": {
+                "zh-CN": "手动",
+                "en-US": "Manual"
+              }
+            }
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "批次状态",
+              "en-US": "Batch status"
+            },
+            "valueMap": {
+              "accepted": {
+                "zh-CN": "已受理",
+                "en-US": "Accepted"
+              },
+              "skipped": {
+                "zh-CN": "无新增提醒",
+                "en-US": "No new reminders"
+              },
+              "blocked": {
+                "zh-CN": "权限或版本变化，已阻断",
+                "en-US": "Blocked by authority or version change"
+              }
+            }
+          },
+          {
+            "field": "previewCount",
+            "label": {
+              "zh-CN": "预览人数",
+              "en-US": "Preview count"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "自动批次，不适用",
+                "en-US": "Automatic batch; not applicable"
+              }
+            }
+          },
+          {
+            "field": "throttled",
+            "label": {
+              "zh-CN": "限流人数",
+              "en-US": "Throttled recipients"
+            }
+          },
+          {
+            "field": "evaluatedAt",
+            "label": {
+              "zh-CN": "受理时间",
+              "en-US": "Accepted at"
+            },
+            "valueType": "datetime"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_batch_detail_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "批次执行事实",
+          "en-US": "Batch execution facts"
+        },
+        "dataSource": "reminderFacts",
+        "columns": [
+          {
+            "field": "actualCount",
+            "label": {
+              "zh-CN": "实际受理人数",
+              "en-US": "Accepted intentions"
+            },
+            "width": 150
+          },
+          {
+            "field": "queued",
+            "label": {
+              "zh-CN": "等待执行",
+              "en-US": "Queued"
+            },
+            "width": 150
+          },
+          {
+            "field": "completed",
+            "label": {
+              "zh-CN": "提醒已生成",
+              "en-US": "Notifications generated"
+            },
+            "width": 150
+          },
+          {
+            "field": "skipped",
+            "label": {
+              "zh-CN": "已跳过",
+              "en-US": "Skipped"
+            },
+            "width": 150
+          },
+          {
+            "field": "failed",
+            "label": {
+              "zh-CN": "执行失败",
+              "en-US": "Failed"
+            },
+            "width": 150
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无事实",
+            "en-US": "No facts available"
+          },
+          "description": {
+            "zh-CN": "请刷新同一预览或批次；不会重新发送。",
+            "en-US": "Refresh the same preview or batch. This does not resend notifications."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍显示上次事实，请重试。",
+              "en-US": "Refresh failed. Previous facts remain visible; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "reminderFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/reminders/batches/${$page.recordPid}",
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_reminder_plan_detail",
+    "name:zh-CN": "自动催办计划",
+    "name:en": "Automatic reminder plan",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/{recordPid}/reminders/plan",
+        "detailEndpoint": "/api/announcements/versions/{recordPid}/reminders/plan"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "announcement_reminder_plan_detail_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "按发布时冻结的租户时区和政策每天扫描，首次不早于发布满 24 小时，最多三个有效批次。截止相等停止自动催办；恢复不补发错过周期。原操作者失权时计划阻断，管理员可在自身权限内手动催办，但不会接管自动主体。",
+          "en-US": "The plan uses the frozen publication timezone and policy, starting no earlier than 24 hours after publication and allowing at most three positive batches. Automatic reminders stop at the deadline; resumption does not catch up missed cycles. Revoked original authority blocks the plan. Administrators may send authorized manual reminders but cannot take over the automatic actor."
+        }
+      },
+      {
+        "id": "announcement_reminder_plan_detail_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "resume_reminders",
+            "label": {
+              "zh-CN": "恢复自动催办",
+              "en-US": "Resume automatic reminders"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "dialog.confirm",
+                  "args": {
+                    "title": {
+                      "zh-CN": "恢复原自动催办计划？",
+                      "en-US": "Resume the original reminder plan?"
+                    },
+                    "content": {
+                      "zh-CN": "仅恢复原操作者的现有计划，不回补已错过的日期；截止或失效后不能恢复。",
+                      "en-US": "Resume under the original actor without catching up missed dates. A deadline or expired version prevents resumption."
+                    }
+                  }
+                },
+                {
+                  "action": "state.ensureRequestKey",
+                  "args": {
+                    "field": "reminderResumeOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "api.request",
+                  "method": "post",
+                  "endpoint": "/api/meta/commands/execute/announcement:resume_reminders",
+                  "body": {
+                    "clientRequestId": "${state.reminderResumeOperation}",
+                    "targetRecordPid": "${record.recordPid}",
+                    "payload": {
+                      "versionPid": "${record.versionPid}"
+                    }
+                  },
+                  "target": "reminderResumed"
+                },
+                {
+                  "action": "state.clearRequestKey",
+                  "args": {
+                    "field": "reminderResumeOperation",
+                    "persistence": "session"
+                  }
+                },
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "reminderFacts",
+                      "reminderBatches"
+                    ]
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "primary": true,
+            "variant": "primary",
+            "visibleWhen": "record.canResume === true"
+          },
+          {
+            "code": "reminder_refresh",
+            "label": {
+              "zh-CN": "刷新状态",
+              "en-US": "Refresh status"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "refresh"
+                },
+                {
+                  "action": "refresh",
+                  "args": {
+                    "targets": [
+                      "reminderFacts",
+                      "reminderBatches"
+                    ]
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          },
+          {
+            "code": "reminder_back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
+                  }
+                }
+              ]
+            },
+            "permissionCode": "announcement.announcement.remind"
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_plan_detail_summary",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "公告与版本",
+          "en-US": "Announcement and version"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "title",
+            "label": {
+              "zh-CN": "公告标题",
+              "en-US": "Announcement"
+            },
+            "colSpan": 12
+          },
+          {
+            "field": "versionNumber",
+            "label": {
+              "zh-CN": "发布版本",
+              "en-US": "Published version"
+            },
+            "colSpan": 6
+          },
+          {
+            "field": "timezone",
+            "label": {
+              "zh-CN": "冻结时区",
+              "en-US": "Frozen timezone"
+            },
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_plan_detail_metadata",
+        "blockType": "record-inspector",
+        "title": {
+          "zh-CN": "催办信息",
+          "en-US": "Reminder information"
+        },
+        "context": "${record}",
+        "fields": [
+          {
+            "field": "acknowledgementDeadline",
+            "label": {
+              "zh-CN": "知悉截止",
+              "en-US": "Acknowledgement deadline"
+            },
+            "valueType": "datetime"
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "计划状态",
+              "en-US": "Plan status"
+            },
+            "valueMap": {
+              "active": {
+                "zh-CN": "运行中",
+                "en-US": "Active"
+              },
+              "blocked": {
+                "zh-CN": "计划已阻断",
+                "en-US": "Plan blocked"
+              },
+              "completed": {
+                "zh-CN": "已结束",
+                "en-US": "Completed"
+              },
+              "canceled": {
+                "zh-CN": "公告已撤回或失效",
+                "en-US": "Announcement withdrawn or expired"
+              }
+            }
+          },
+          {
+            "field": "errorCode",
+            "label": {
+              "zh-CN": "处理说明",
+              "en-US": "Recovery guidance"
+            },
+            "valueMap": {
+              "__empty": {
+                "zh-CN": "无需处理",
+                "en-US": "No action required"
+              },
+              "ACTOR_OR_VERSION_UNAVAILABLE": {
+                "zh-CN": "请核实原操作者权限、租户成员状态和公告有效性；恢复后由原操作者显式恢复计划。",
+                "en-US": "Check the original actor permissions, membership and announcement validity, then explicitly resume as the original actor."
+              },
+              "EXECUTION_FAILURE": {
+                "zh-CN": "执行失败，请联系管理员排查后，由原操作者恢复计划。",
+                "en-US": "Execution failed. Ask an administrator to investigate before the original actor resumes the plan."
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "announcement_reminder_plan_detail_facts",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "冻结计划事实",
+          "en-US": "Frozen plan facts"
+        },
+        "dataSource": "reminderFacts",
+        "columns": [
+          {
+            "field": "automaticBatches",
+            "label": {
+              "zh-CN": "已使用额度",
+              "en-US": "Batches used"
+            },
+            "width": 150
+          },
+          {
+            "field": "limit",
+            "label": {
+              "zh-CN": "额度上限",
+              "en-US": "Batch limit"
+            },
+            "width": 150
+          },
+          {
+            "field": "at",
+            "label": {
+              "zh-CN": "每日本地时间",
+              "en-US": "Daily local time"
+            },
+            "width": 150
+          },
+          {
+            "field": "dedupeMinutes",
+            "label": {
+              "zh-CN": "去重（分钟）",
+              "en-US": "Dedupe (minutes)"
+            },
+            "width": 150
+          },
+          {
+            "field": "quietStart",
+            "label": {
+              "zh-CN": "免打扰开始",
+              "en-US": "Quiet hours start"
+            },
+            "width": 150,
+            "emptyText": {
+              "zh-CN": "未设置",
+              "en-US": "Not configured"
+            }
+          },
+          {
+            "field": "quietEnd",
+            "label": {
+              "zh-CN": "免打扰结束",
+              "en-US": "Quiet hours end"
+            },
+            "width": 150,
+            "emptyText": {
+              "zh-CN": "未设置",
+              "en-US": "Not configured"
+            }
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无事实",
+            "en-US": "No facts available"
+          },
+          "description": {
+            "zh-CN": "请刷新同一预览或批次；不会重新发送。",
+            "en-US": "Refresh the same preview or batch. This does not resend notifications."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍显示上次事实，请重试。",
+              "en-US": "Refresh failed. Previous facts remain visible; retry."
+            }
+          }
+        }
+      },
+      {
+        "id": "reminder_batch_history",
+        "blockType": "table",
+        "title": {
+          "zh-CN": "同版本催办历史",
+          "en-US": "Reminder history for this version"
+        },
+        "dataSource": "reminderBatches",
+        "columns": [
+          {
+            "field": "mode",
+            "label": {
+              "zh-CN": "方式",
+              "en-US": "Mode"
+            },
+            "width": 100,
+            "dictCode": "announcement_reminder_mode"
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "受理状态",
+              "en-US": "Acceptance state"
+            },
+            "width": 150,
+            "dictCode": "announcement_reminder_batch_state"
+          },
+          {
+            "field": "evaluatedAt",
+            "label": {
+              "zh-CN": "受理时间",
+              "en-US": "Accepted at"
+            },
+            "width": 208,
+            "valueType": "datetime"
+          },
+          {
+            "field": "actualCount",
+            "label": {
+              "zh-CN": "实际受理人数",
+              "en-US": "Accepted intentions"
+            },
+            "width": 140
+          },
+          {
+            "field": "queued",
+            "label": {
+              "zh-CN": "排队",
+              "en-US": "Queued"
+            },
+            "width": 100
+          },
+          {
+            "field": "completed",
+            "label": {
+              "zh-CN": "提醒已生成",
+              "en-US": "Generated"
+            },
+            "width": 130
+          },
+          {
+            "field": "skipped",
+            "label": {
+              "zh-CN": "跳过",
+              "en-US": "Skipped"
+            },
+            "width": 100
+          },
+          {
+            "field": "failed",
+            "label": {
+              "zh-CN": "失败",
+              "en-US": "Failed"
+            },
+            "width": 100
+          }
+        ],
+        "table": {
+          "rowKey": "pid",
+          "pagination": {
+            "mode": "server",
+            "pageField": "pageNum",
+            "pageSizeOptions": [
+              20,
+              50,
+              100
+            ]
+          }
+        },
+        "rowActions": [
+          {
+            "code": "view_reminder_batch",
+            "label": {
+              "zh-CN": "查看批次",
+              "en-US": "View batch"
+            },
+            "permissionCode": "announcement.announcement.remind",
+            "action": {
+              "type": "navigate",
+              "to": "/p/announcement_reminder_batch/view/{pid}"
+            }
+          }
+        ],
+        "empty": {
+          "title": {
+            "zh-CN": "暂无催办批次",
+            "en-US": "No reminder batches"
+          },
+          "description": {
+            "zh-CN": "自动扫描或手动受理后在此核对，翻页和查看不会重新发送。",
+            "en-US": "Accepted manual batches and automatic scans appear here. Paging and viewing never resend reminders."
+          }
+        },
+        "states": {
+          "stale": {
+            "title": {
+              "zh-CN": "批次历史刷新失败，仍显示上次结果，请重试。",
+              "en-US": "History refresh failed. Previous results remain visible; retry."
+            }
+          }
+        }
+      }
+    ],
+    "dataSources": {
+      "reminderFacts": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/${$page.recordPid}/reminders/plan",
+        "adaptor": "raw"
+      },
+      "reminderBatches": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/${$page.recordPid}/reminders/batches",
+        "params": {
+          "pageNum": 1,
+          "pageSize": 20
+        },
+        "adaptor": "raw"
+      }
+    }
+  },
+  {
+    "pageKey": "announcement_delivery_history_detail",
+    "name:zh-CN": "渠道记录",
+    "name:en": "Channel history",
+    "modelCode": "ab_announcement",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "extension": {
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "showEdit": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "showPdfExport": false,
+      "showInlineApprovalPanel": false,
+      "showBack": false,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/{recordPid}/delivery-summary",
+        "detailEndpoint": "/api/announcements/versions/{recordPid}/delivery-summary"
+      },
+      "headerTitleField": "title"
+    },
+    "blocks": [
+      {
+        "id": "delivery_guidance",
+        "blockType": "rich-text",
+        "content": {
+          "zh-CN": "固定公告版本的实时渠道记录。“提醒已生成”仅表示站内通知持久化，不表示送达设备、已读或已知悉。催办按批次单独记录，历史版本不会切换到新版；未配置的小程序渠道不会生成发送记录。",
+          "en-US": "Live channel history for one fixed version. “Notification created” means in-app persistence, not device delivery, reading or acknowledgement. Reminders have separate batches. History never switches versions; unconfigured mini-program channels generate no delivery records."
+        }
+      },
+      {
+        "id": "delivery_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "refresh_deliveries",
+            "label": {
+              "zh-CN": "刷新记录",
+              "en-US": "Refresh history"
+            },
+            "variant": "default",
+            "permissionCode": "announcement.announcement.stats",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "data.refresh",
+                  "args": {
+                    "dataSource": "main"
+                  }
+                },
+                {
+                  "action": "data.refresh",
+                  "args": {
+                    "dataSource": "deliveries"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "code": "back_announcement",
+            "label": {
+              "zh-CN": "返回公告",
+              "en-US": "Back to announcement"
+            },
+            "variant": "default",
+            "action": {
+              "type": "flow",
+              "steps": [
+                {
+                  "action": "navigate",
+                  "args": {
+                    "path": "/p/ab_announcement/view/${record.recordPid}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery_rows",
+        "blockType": "table",
+        "dataSource": "deliveries",
+        "states": {
+          "403": {
+            "title": {
+              "zh-CN": "当前权限已变更，无法查看渠道记录。",
+              "en-US": "Permissions changed. Channel history is unavailable."
+            }
+          },
+          "stale": {
+            "title": {
+              "zh-CN": "刷新失败，仍展示上次数据，请重试。",
+              "en-US": "Refresh failed. Previous data remains; retry."
+            }
+          }
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "当前范围暂无渠道记录",
+            "en-US": "No channel records in your scope"
+          },
+          "description": {
+            "zh-CN": "发布事实不代表渠道处理已完成。记录异步生成；历史或未配置渠道可能没有投递记录。",
+            "en-US": "Publication does not imply completed delivery. Records are generated asynchronously; legacy or unconfigured channels may have no records."
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "recipientName",
+              "label": {
+                "zh-CN": "接收人",
+                "en-US": "Recipient"
+              },
+              "width": 170
+            },
+            {
+              "field": "channel",
+              "label": {
+                "zh-CN": "渠道",
+                "en-US": "Channel"
+              },
+              "dictCode": "announcement_delivery_channel",
+              "width": 150
+            },
+            {
+              "field": "kind",
+              "label": {
+                "zh-CN": "通知类型",
+                "en-US": "Notification kind"
+              },
+              "dictCode": "announcement_delivery_kind",
+              "width": 120
+            },
+            {
+              "field": "status",
+              "label": {
+                "zh-CN": "持久化状态",
+                "en-US": "Persistence state"
+              },
+              "dictCode": "announcement_statistics_delivery",
+              "width": 160
+            },
+            {
+              "field": "createdAt",
+              "label": {
+                "zh-CN": "意图创建时间",
+                "en-US": "Intention created"
+              },
+              "valueType": "datetime",
+              "width": 208
+            },
+            {
+              "field": "completedAt",
+              "label": {
+                "zh-CN": "处理结束时间",
+                "en-US": "Processing finished"
+              },
+              "valueType": "datetime",
+              "width": 208
+            },
+            {
+              "field": "reasonCode",
+              "label": {
+                "zh-CN": "未生成原因",
+                "en-US": "Reason not created"
+              },
+              "dictCode": "announcement_delivery_reason",
+              "width": 210
+            }
+          ],
+          "rowKey": "pid",
+          "pagination": {
+            "mode": "server",
+            "pageField": "pageNum",
+            "pageSizeOptions": [
+              20,
+              50,
+              100
+            ]
+          }
+        },
+        "title": {
+          "zh-CN": "通知处理记录",
+          "en-US": "Notification processing history"
+        }
+      }
+    ],
+    "dataSources": {
+      "deliveries": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/announcements/versions/${$page.recordPid}/deliveries",
+        "params": {
+          "pageNum": 1,
+          "pageSize": 20
+        },
+        "adaptor": "raw"
+      }
+    }
   }
 ]

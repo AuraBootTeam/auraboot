@@ -1,3 +1,6 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
+import { Pagination } from '~/ui/Pagination';
+import { readServerTablePage, ServerTablePageError, type ServerTablePage } from './serverTablePage';
 import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { dictionaryData } from '~/shared/services/dict-adapter';
 /**
@@ -303,11 +306,46 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   );
   const rawData = dataSourceId ? readDataSourceRows(runtime, dataSourceId) : [];
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
+  const paging = block.table?.pagination;
+  const serverPaging = paging?.mode === 'server';
+  const pagingAttempt = useRef<{ pageNum: number; pageSize: number } | null>(null);
+  const parentPid = getLegacyCompatibleRecordPid((context as any).record);
+  useEffect(() => { pagingAttempt.current = null; }, [runtime, dataSourceId, parentPid]);
+  let serverPage: ServerTablePage | undefined;
+  let pagingInvalid = false;
+  if (serverPaging && dataSourceId) {
+    const page = dataSourceManager.getData(dataSourceId);
+    if (page !== undefined && page !== null) {
+      try { serverPage = readServerTablePage(page, paging?.pageField); }
+      catch (failure) { if (!(failure instanceof ServerTablePageError)) throw failure; pagingInvalid = true; }
+    }
+  }
+  const runPageRequest = (params: { pageNum: number; pageSize: number }, force = false) => {
+    if (!dataSourceId) return;
+    pagingAttempt.current = params;
+    // The subscribed data source preserves its error and last accepted rows; this UI boundary retains diagnostics.
+    void dataSourceManager.fetch(dataSourceId, params, { force }).catch(failure => console.error('Table page request failed', failure));
+  };
+  const retryDataSource = () => {
+    if (!dataSourceId) return;
+    if (serverPaging && pagingAttempt.current) runPageRequest(pagingAttempt.current, true);
+    else void dataSourceManager.reload(dataSourceId);
+  };
+  const acceptedPage = serverPage;
+  const pagination = acceptedPage ? (
+    <fieldset disabled={Boolean(dataSourceState?.loading)} aria-busy={Boolean(dataSourceState?.loading)} className="m-0 min-w-0 border-0 p-0" data-testid="table-server-pagination">
+      <Pagination alwaysVisible compact current={acceptedPage.current} pageSize={acceptedPage.pageSize} total={acceptedPage.total} t={t}
+        pageSizeOptions={paging?.pageSizeOptions} showPageSizeSelector={paging?.showSizeChanger !== false} showQuickJumper={paging?.showQuickJumper}
+        onChange={pageNum => runPageRequest({ pageNum, pageSize: acceptedPage.pageSize })}
+        onPageSizeChange={pageSize => runPageRequest({ pageNum: 1, pageSize })} />
+    </fieldset>
+  ) : null;
   const dataSourceError = dataSourceState?.error as any;
   const errorStatus = Number(
     dataSourceError?.status ?? dataSourceError?.statusCode ?? dataSourceError?.response?.status,
   );
-  const hasStaleRows = Boolean(dataSourceError) && rawData.length > 0;
+  const accessDenied = errorStatus === 401 || errorStatus === 403;
+  const hasStaleRows = Boolean(dataSourceError) && !accessDenied && rawData.length > 0;
   const stateConfig = ((block as any).states || {}) as Record<string, any>;
   const stateTitle = (key: string, fallback: string): string => {
     const configured = stateConfig[key]?.title;
@@ -671,6 +709,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       return String(enrichedDisplayValue);
     }
 
+    if (column.emptyText !== undefined && (value === null || value === undefined || value === ''
+      || (Array.isArray(value) && value.length === 0))) {
+      return <span className="text-text-3">{getLocalizedText(column.emptyText, locale, t)}</span>;
+    }
+
     // Null/undefined 处理
     if (value === null || value === undefined) {
       return <span className="text-text-3">-</span>;
@@ -855,7 +898,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     return (
       <div className="flex flex-wrap gap-2">
         {actions.map((button) => {
-          if (button.permissionCode && !hasPermission(button.permissionCode)) {
+          if (!hasButtonPermissions(button, hasPermission)) {
             return null;
           }
           // 条件渲染
@@ -923,7 +966,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           record,
         })
       }
-      canUseButton={(button) => !button.permissionCode || hasPermission(button.permissionCode)}
+      canUseButton={(button) => hasButtonPermissions(button, hasPermission)}
       resolveButtonLabel={(button) =>
         getLocalizedText(button.label || button.content || button.code, locale, t)
       }
@@ -1248,6 +1291,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     setLocalSelectedRowKey(getRowIdentity(row));
   };
 
+  if (serverPaging && !dataSourceId) throw new Error('Server table pagination requires an explicit data source');
+
   if (dataSourceState?.loading && rawData.length === 0) {
     return (
       <div
@@ -1263,7 +1308,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     );
   }
 
-  if (dataSourceError && rawData.length === 0) {
+  if (pagingInvalid) {
+    const key = 'table.pagination.invalid_response';
+    return <div role="alert" data-testid="table-page-contract-error" className="border-border bg-panel text-text rounded-control border p-4">
+      {t(key) !== key ? t(key) : 'Page information is unavailable. Refresh to try again.'}
+      <button type="button" className="ml-3 underline" onClick={retryDataSource}>{stateTitle('retry', t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry')}</button>
+    </div>;
+  }
+
+  if (dataSourceError && (accessDenied || rawData.length === 0)) {
     return (
       <div
         data-testid={`table-error-state-${errorStateKey}`}
@@ -1282,7 +1335,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             type="button"
             data-testid="table-error-retry"
             className="border-border bg-panel text-text mt-3 rounded-md border px-3 py-1.5 text-sm font-medium"
-            onClick={() => void dataSourceManager.reload(dataSourceId)}
+            onClick={retryDataSource}
           >
             {stateTitle(
               'retry',
@@ -1301,6 +1354,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       className="border-warning/30 bg-warning/5 text-text mb-2 rounded-lg border px-4 py-2 text-sm"
     >
       {stateTitle('stale', 'Showing preserved data because refresh failed. Retry before acting.')}
+      <button type="button" data-testid="table-stale-retry" className="ml-3 underline" onClick={retryDataSource}>{stateTitle('retry', t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry')}</button>
     </div>
   ) : null;
 
@@ -1315,6 +1369,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         >
           {renderGroupedRadioSelection()}
         </div>
+        {pagination}
       </>
     );
   }
@@ -1324,6 +1379,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       <>
         {staleState}
         {renderMobileCards()}
+        {pagination}
       </>
     );
   }
@@ -1463,7 +1519,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                         key={column.field}
                         className={`${bodyCellClass} text-text text-sm ${
                           colIdx === 0 ? 'font-medium' : ''
-                        } ${column.ellipsis ? 'truncate' : ''} text-${column.align || 'left'}`}
+                        } ${column.ellipsis ? 'truncate' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
                         title={getCellTitle(column, row)}
                         style={{
                           maxWidth: column.ellipsis ? column.width : undefined,
@@ -1526,6 +1582,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           </tbody>
         </table>
       </div>
+      {pagination}
     </>
   );
 };

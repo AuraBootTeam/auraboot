@@ -520,6 +520,10 @@ async function main() {
     resolve(repoRoot, 'plugins/core-ownership'),
     resolve(output, 'config/core-ownership'),
   );
+  const coreAnnouncement = copyArtifact(
+    resolve(repoRoot, 'plugins/core-announcement'),
+    resolve(output, 'config/core-announcement'),
+  );
   const platformAdmin = copyArtifact(
     resolve(repoRoot, 'plugins/platform-admin'),
     resolve(output, 'config/platform-admin'),
@@ -566,6 +570,7 @@ async function main() {
       { source: platformAdmin, destination: '/opt/auraboot/config/platform-admin' },
       { source: orgManagement, destination: '/opt/auraboot/config/org-management' },
       { source: coreOwnership, destination: '/opt/auraboot/config/core-ownership' },
+      { source: coreAnnouncement, destination: '/opt/auraboot/config/core-announcement' },
       { source: coreDecisionops, destination: '/opt/auraboot/config/core-decisionops' },
       { source: showcase, destination: '/opt/auraboot/config/showcase' },
       { source: resolve(output, 'web'), destination: '/opt/auraboot/web' },
@@ -601,6 +606,7 @@ async function main() {
     { type: 'config', id: 'platform-admin', version: JSON.parse(readFileSync(resolve(platformAdmin, 'plugin.json'), 'utf8')).version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
+    { type: 'config', id: 'core-announcement', version: JSON.parse(readFileSync(resolve(coreAnnouncement, 'plugin.json'), 'utf8')).version, path: coreAnnouncement },
     { type: 'config', id: 'core-decisionops', version: '1.0.0', path: coreDecisionops },
     { type: 'config', id: 'showcase', version: '1.0.0', path: showcase },
     ...(runtimeImage ? [{ type: 'oci', id: 'auraboot-runtime', version, path: runtimeImage }] : []),

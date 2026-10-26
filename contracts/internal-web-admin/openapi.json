@@ -2403,8 +2403,10 @@
             "type": "string"
           },
           "id": {
-            "format": "int64",
-            "type": "integer"
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
           },
           "pinned": {
             "type": "boolean"
@@ -2417,8 +2419,7 @@
             "type": "string"
           },
           "publishedBy": {
-            "format": "int64",
-            "type": "integer"
+            "type": "string"
           },
           "publishedByName": {
             "type": "string"
@@ -2430,34 +2431,6 @@
             "type": "string"
           }
         },
-        "type": "object"
-      },
-      "AnnouncementRequest": {
-        "properties": {
-          "content": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "pinned": {
-            "type": "boolean"
-          },
-          "priority": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "title": {
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "required": [
-          "title"
-        ],
         "type": "object"
       },
       "ApiConnector": {
@@ -3016,32 +2989,6 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AnalyticsRetention"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "message": {
-            "type": "string"
-          },
-          "timestamp": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "ApiResponseAnnouncementDTO": {
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "context": {},
-          "data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnnouncementDTO"
               },
               {
                 "type": "null"
@@ -5274,6 +5221,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/DictValidationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseDomainExportTaskDTO": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DomainExportTaskDTO"
               },
               {
                 "type": "null"
@@ -9908,6 +9881,31 @@
         },
         "type": "object"
       },
+      "ApiResponseListOption": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListOtDataLog": {
         "properties": {
           "code": {
@@ -12508,6 +12506,32 @@
         },
         "type": "object"
       },
+      "ApiResponseOptionPage": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionPage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseOrgEmployeeDTO": {
         "properties": {
           "code": {
@@ -13886,6 +13910,32 @@
         },
         "type": "object"
       },
+      "ApiResponsePolicy": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Policy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePolicyResponse": {
         "properties": {
           "code": {
@@ -14520,6 +14570,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ReportScheduleResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseResolution": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Resolution"
               },
               {
                 "type": "null"
@@ -15806,6 +15882,32 @@
         },
         "type": "object"
       },
+      "ApiResponseUploadLimits": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UploadLimits"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseUsageEvent": {
         "properties": {
           "code": {
@@ -16765,6 +16867,17 @@
           "unattributed": {
             "format": "int32",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "AudiencePreviewRequest": {
+        "properties": {
+          "audience": {
+            "$ref": "#/components/schemas/Rule"
+          },
+          "recordPid": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -25068,6 +25181,66 @@
         },
         "type": "object"
       },
+      "DomainExportTaskDTO": {
+        "properties": {
+          "completedAt": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "format": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "processedRows": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "progress": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "queryCode": {
+            "type": "string"
+          },
+          "sourceSnapshot": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "totalRows": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "DraftRequest": {
         "properties": {
           "definition": {
@@ -28935,6 +29108,20 @@
           "name",
           "pageCode"
         ],
+        "type": "object"
+      },
+      "Filters": {
+        "properties": {
+          "departmentPid": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "ForgotPasswordRequest": {
@@ -36598,6 +36785,20 @@
         },
         "type": "object"
       },
+      "Option": {
+        "properties": {
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "OptionItem": {
         "properties": {
           "label": {
@@ -36605,6 +36806,29 @@
           },
           "value": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OptionPage": {
+        "properties": {
+          "pageNum": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -41827,6 +42051,46 @@
         },
         "type": "object"
       },
+      "Policy": {
+        "properties": {
+          "automaticReminderLimit": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "defaultDefinitionPid": {
+            "type": "string"
+          },
+          "forceApproval": {
+            "type": "boolean"
+          },
+          "lateWindowMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "quietEnd": {
+            "type": "string"
+          },
+          "quietStart": {
+            "type": "string"
+          },
+          "reminderAt": {
+            "type": "string"
+          },
+          "reminderDedupeMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "revision": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "securityRevision": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PolicyCreateDTO": {
         "properties": {
           "allowedEditors": {
@@ -42750,6 +43014,26 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Recipient": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "matchedRuleRefs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "memberPid": {
+            "type": "string"
+          },
+          "userPid": {
             "type": "string"
           }
         },
@@ -44026,6 +44310,33 @@
           "newPassword",
           "token"
         ],
+        "type": "object"
+      },
+      "Resolution": {
+        "properties": {
+          "allowedDepartmentPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "recipients": {
+            "items": {
+              "$ref": "#/components/schemas/Recipient"
+            },
+            "type": "array"
+          },
+          "resolvedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "roleLimitedToManagementScope": {
+            "type": "boolean"
+          },
+          "scopeType": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "ResolvedActionPlan": {
@@ -45617,6 +45928,32 @@
             "type": "string"
           },
           "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Rule": {
+        "properties": {
+          "departmentPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "rolePids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "userPids": {
             "items": {
               "type": "string"
             },
@@ -50038,6 +50375,19 @@
         },
         "type": "object"
       },
+      "UploadLimits": {
+        "properties": {
+          "maxFileBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "maxRequestBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "UpsertApplicationMemberRequest": {
         "properties": {
           "role": {
@@ -52251,7 +52601,7 @@
     },
     "/api/admin/agent-runs": {
       "get": {
-        "operationId": "list_44",
+        "operationId": "list_45",
         "parameters": [
           {
             "in": "query",
@@ -52412,7 +52762,7 @@
     },
     "/api/admin/agent-runs/{runId}": {
       "get": {
-        "operationId": "detail_3",
+        "operationId": "detail_4",
         "parameters": [
           {
             "in": "path",
@@ -54998,7 +55348,7 @@
     },
     "/api/admin/infrastructure/status": {
       "get": {
-        "operationId": "status_2",
+        "operationId": "status_3",
         "responses": {
           "200": {
             "content": {
@@ -55483,7 +55833,7 @@
     },
     "/api/admin/reliable-integration/dead-letters": {
       "get": {
-        "operationId": "list_43",
+        "operationId": "list_44",
         "parameters": [
           {
             "in": "query",
@@ -55549,7 +55899,7 @@
     },
     "/api/admin/reliable-integration/dead-letters/{eventId}": {
       "get": {
-        "operationId": "detail_2",
+        "operationId": "detail_3",
         "parameters": [
           {
             "in": "path",
@@ -55729,7 +56079,7 @@
     },
     "/api/admin/shadow-runs/{shadowRunPid}": {
       "get": {
-        "operationId": "detail_1",
+        "operationId": "detail_2",
         "parameters": [
           {
             "in": "path",
@@ -55878,7 +56228,7 @@
     },
     "/api/admin/user-soul-profiles": {
       "get": {
-        "operationId": "list_42",
+        "operationId": "list_43",
         "parameters": [
           {
             "in": "query",
@@ -59799,7 +60149,7 @@
     },
     "/api/ai/usage/summary": {
       "get": {
-        "operationId": "summary_1",
+        "operationId": "summary_2",
         "responses": {
           "200": {
             "content": {
@@ -59985,7 +60335,7 @@
     },
     "/api/analytics/behavior/quarantine": {
       "get": {
-        "operationId": "list_41",
+        "operationId": "list_42",
         "parameters": [
           {
             "in": "query",
@@ -60252,7 +60602,7 @@
     },
     "/api/analytics/suggestions": {
       "get": {
-        "operationId": "list_40",
+        "operationId": "list_41",
         "parameters": [
           {
             "in": "query",
@@ -60302,7 +60652,7 @@
     },
     "/api/analytics/suggestions/{adoptionPid}/business-results": {
       "get": {
-        "operationId": "read",
+        "operationId": "read_1",
         "parameters": [
           {
             "in": "path",
@@ -60387,7 +60737,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnnouncementRequest"
+                "additionalProperties": {},
+                "type": "object"
               }
             }
           },
@@ -60398,7 +60749,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAnnouncementDTO"
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -60410,16 +60761,372 @@
         ]
       }
     },
-    "/api/announcements/{id}": {
-      "delete": {
-        "operationId": "delete_23",
+    "/api/announcements/approval-mode-options": {
+      "get": {
+        "operationId": "approvalModeOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/approval-options": {
+      "get": {
+        "operationId": "approvalOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListOption"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/approval-readiness": {
+      "get": {
+        "operationId": "approvalReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/approvals/{submission}/attachments/{file}": {
+      "get": {
+        "operationId": "approvalAttachment",
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "submission",
             "required": true,
             "schema": {
-              "format": "int64",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "file",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reader-controller"
+        ]
+      }
+    },
+    "/api/announcements/audience-option-page": {
+      "get": {
+        "operationId": "audienceOptionPage",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageNum",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "values",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOptionPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/audience-options": {
+      "get": {
+        "operationId": "audienceOptions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListOption"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/audience-preview": {
+      "post": {
+        "operationId": "preview_4",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudiencePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseResolution"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/capabilities": {
+      "get": {
+        "operationId": "capabilities_2",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/operations/{operationId}": {
+      "get": {
+        "operationId": "operation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "commandCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/policy": {
+      "get": {
+        "operationId": "policy",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicy"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/policy/approval-options": {
+      "get": {
+        "operationId": "policyDefinitions",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListOption"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/received": {
+      "get": {
+        "operationId": "list_40",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
               "type": "integer"
             }
           }
@@ -60429,7 +61136,821 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reader-controller"
+        ]
+      }
+    },
+    "/api/announcements/records/{pid}/management-summary": {
+      "get": {
+        "operationId": "managementSummary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/records/{pid}/publication": {
+      "get": {
+        "operationId": "publication",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/records/{recordPid}/reminders/plan": {
+      "get": {
+        "operationId": "latestPlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recordPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reminder-controller"
+        ]
+      }
+    },
+    "/api/announcements/records/{recordPid}/statistics/snapshots": {
+      "post": {
+        "operationId": "captureRecord",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recordPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Filters"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-statistics-controller"
+        ]
+      }
+    },
+    "/api/announcements/records/{recordPid}/statistics/versions": {
+      "get": {
+        "operationId": "versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recordPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListOption"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-statistics-controller"
+        ]
+      }
+    },
+    "/api/announcements/records/{recordPid}/versions/{versionPid}/reminders/plan": {
+      "get": {
+        "operationId": "planStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recordPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reminder-controller"
+        ]
+      }
+    },
+    "/api/announcements/records/{recordPid}/versions/{versionPid}/reminders/preview": {
+      "post": {
+        "operationId": "preview_3",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recordPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Filters"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reminder-controller"
+        ]
+      }
+    },
+    "/api/announcements/reminders/batches/{batchPid}": {
+      "get": {
+        "operationId": "batchStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batchPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reminder-controller"
+        ]
+      }
+    },
+    "/api/announcements/reminders/previews/{previewPid}": {
+      "get": {
+        "operationId": "previewStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "previewPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reminder-controller"
+        ]
+      }
+    },
+    "/api/announcements/statistics/snapshots/{snapshotPid}": {
+      "get": {
+        "operationId": "summary_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshotPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-statistics-controller"
+        ]
+      }
+    },
+    "/api/announcements/statistics/snapshots/{snapshotPid}/departments": {
+      "get": {
+        "operationId": "departments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshotPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListOption"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-statistics-controller"
+        ]
+      }
+    },
+    "/api/announcements/statistics/snapshots/{snapshotPid}/recipients": {
+      "get": {
+        "operationId": "page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshotPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageNum",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-statistics-controller"
+        ]
+      }
+    },
+    "/api/announcements/versions/{versionPid}/deliveries": {
+      "get": {
+        "operationId": "deliveries_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageNum",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/versions/{versionPid}/delivery-summary": {
+      "get": {
+        "operationId": "deliverySummary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/versions/{versionPid}/reminders/batches": {
+      "get": {
+        "operationId": "batches",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageNum",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reminder-controller"
+        ]
+      }
+    },
+    "/api/announcements/versions/{versionPid}/reminders/plan": {
+      "get": {
+        "operationId": "planByVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reminder-controller"
+        ]
+      }
+    },
+    "/api/announcements/versions/{versionPid}/statistics/snapshots": {
+      "post": {
+        "operationId": "capture",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Filters"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-statistics-controller"
+        ]
+      }
+    },
+    "/api/announcements/versions/{version}/acknowledge": {
+      "post": {
+        "operationId": "acknowledge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": {},
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reader-controller"
+        ]
+      }
+    },
+    "/api/announcements/versions/{version}/attachments/{file}": {
+      "get": {
+        "operationId": "attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "file",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reader-controller"
+        ]
+      }
+    },
+    "/api/announcements/versions/{version}/read": {
+      "post": {
+        "operationId": "read",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": {},
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reader-controller"
+        ]
+      }
+    },
+    "/api/announcements/versions/{version}/recipient": {
+      "get": {
+        "operationId": "detail_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "announcement-reader-controller"
+        ]
+      }
+    },
+    "/api/announcements/{pid}": {
+      "delete": {
+        "operationId": "delete_23",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -60445,11 +61966,10 @@
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "pid",
             "required": true,
             "schema": {
-              "format": "int64",
-              "type": "integer"
+              "type": "string"
             }
           }
         ],
@@ -60457,7 +61977,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnnouncementRequest"
+                "additionalProperties": {},
+                "type": "object"
               }
             }
           },
@@ -60468,7 +61989,37 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseAnnouncementDTO"
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Announcements"
+        ]
+      }
+    },
+    "/api/announcements/{pid}/approval": {
+      "get": {
+        "operationId": "approvalSummary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -62024,7 +63575,7 @@
     },
     "/api/auth/login/wechat-pc/status": {
       "get": {
-        "operationId": "status_1",
+        "operationId": "status_2",
         "responses": {
           "200": {
             "content": {
@@ -73693,6 +75244,59 @@
         ]
       }
     },
+    "/api/exports/domain/{taskPid}": {
+      "get": {
+        "operationId": "status_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "taskPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDomainExportTaskDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "domain-export-controller"
+        ]
+      }
+    },
+    "/api/exports/domain/{taskPid}/download": {
+      "get": {
+        "operationId": "download",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "taskPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "domain-export-controller"
+        ]
+      }
+    },
     "/api/ext/{namespace}/**": {
       "delete": {
         "operationId": "dispatch_4",
@@ -74052,7 +75656,7 @@
     },
     "/api/field-mask/config/preview": {
       "get": {
-        "operationId": "preview_4",
+        "operationId": "preview_6",
         "parameters": [
           {
             "in": "query",
@@ -74219,6 +75823,26 @@
                 "schema": {
                   "format": "binary",
                   "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/file/limits": {
+      "get": {
+        "operationId": "limits",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUploadLimits"
                 }
               }
             },
@@ -76374,6 +77998,26 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseMapStringInteger"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "inbox-controller"
+        ]
+      }
+    },
+    "/api/inbox/pending-count": {
+      "get": {
+        "operationId": "pendingCount",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseInteger"
                 }
               }
             },
@@ -103059,7 +104703,7 @@
     "/api/templates/{templateId}/preview": {
       "get": {
         "description": "Parse template resources without installing. Returns models, fields, commands, pages that would be created.",
-        "operationId": "preview_3",
+        "operationId": "preview_5",
         "parameters": [
           {
             "description": "Template ID, e.g., 'project-management'",
@@ -109213,6 +110857,10 @@
       "name": "模型管理"
     },
     {
+      "description": "Tenant announcements",
+      "name": "Announcements"
+    },
+    {
       "description": "Command definition management and command execution APIs",
       "name": "Commands"
     },
@@ -109311,10 +110959,6 @@
     {
       "description": "Meta平台性能指标监控接口",
       "name": "Meta性能监控"
-    },
-    {
-      "description": "Workbench announcement management",
-      "name": "Announcements"
     },
     {
       "description": "Decision definition management and runtime evaluation",

@@ -90,7 +90,7 @@ public class S3StorageProvider implements StorageProvider, DisposableBean {
                 .build();
         s3Client.putObject(request, RequestBody.fromInputStream(input, size));
         String url = String.format("s3://%s/%s", bucket, key);
-        log.debug("File uploaded to S3: {}", url);
+        log.debug("File uploaded to S3 (bytes={})", size);
         return url;
     }
 

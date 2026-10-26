@@ -244,3 +244,24 @@ test('static browser references cannot emit a passing coverage verdict', () => {
     rmSync(repoRoot, { recursive: true, force: true });
   }
 });
+
+test('route aliases preserve page kind and command URL references remain registration only', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'coverage-alias-'));
+  try {
+    const config = path.join(root, 'plugins', 'fixture', 'config');
+    mkdirSync(config, { recursive: true }); mkdirSync(path.join(root, 'tests'));
+    writeFileSync(path.join(config, 'commands.json'), JSON.stringify({ commands: [{ code: 'demo:flow' }] }));
+    writeFileSync(path.join(config, 'pages.json'), JSON.stringify([
+      { pageKey: 'alias_detail', modelCode: 'underlying', kind: 'detail' },
+      { pageKey: 'alias_list', modelCode: 'underlying', kind: 'list' },
+    ]));
+    writeFileSync(path.join(root, 'tests', 'alias.spec.ts'),
+      `await page.goto('/p/alias/view/current'); await page.waitForResponse('/api/meta/commands/execute/demo:flow');`);
+    const manifest = buildManifest({ repoRoot: root, pluginRoot: path.join(root, 'plugins'), specRoots: ['tests'] });
+    const rows = manifest.groups.flatMap(group => group.rows);
+    assert.equal(rows.find(row => row.id === 'page:alias_detail').verdict, 'partial');
+    assert.equal(rows.find(row => row.id === 'page:alias_list').verdict, 'untested');
+    assert.equal(rows.find(row => row.id === 'demo:flow').verdict, 'partial');
+    assert.equal(manifest.run.executed, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

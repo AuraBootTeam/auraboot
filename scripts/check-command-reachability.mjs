@@ -121,6 +121,19 @@ export function referencedCommands(pluginDir) {
   // that knows four of five reports reachable commands as unreachable.
   const text = loadConfigText(pluginDir, 'pages', 'menus');
   for (const m of text.matchAll(/"([a-z0-9_-]+:[a-z0-9_]+)"/gi)) found.add(m[1]);
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.action === 'api.request') {
+      const request = node.args ?? node;
+      const match = typeof request.endpoint === 'string'
+        && request.endpoint.match(/^\/api\/meta\/commands\/execute\/([a-z0-9_-]+:[a-z0-9_]+)$/i);
+      if (String(request.method).toLowerCase() === 'post' && match) found.add(match[1]);
+    }
+    for (const value of Object.values(node)) visit(value);
+  };
+  for (const kind of ['pages', 'menus']) {
+    for (const node of loadConfigList(pluginDir, kind)) visit(node);
+  }
   for (const code of conventionReferencedCommands(pluginDir)) found.add(code);
   return found;
 }

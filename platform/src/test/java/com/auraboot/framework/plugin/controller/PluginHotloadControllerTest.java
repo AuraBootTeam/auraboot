@@ -31,6 +31,21 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PluginHotloadControllerTest {
 
+    @Test void sharedApplicationRejectionPrecedesEveryHotStopReloadAndUnloadSideEffect() {
+        org.mockito.Mockito.doThrow(com.auraboot.framework.exception.BusinessException.i18n("plugin.error.composition_lifecycle"))
+                .when(pluginManager).requireTenantLifecycleChange("shared-application");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->controller.stopPlugin("shared-application"))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->controller.reloadPlugin("shared-application"))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->controller.unloadPlugin("shared-application",true))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(backgroundComponentRegistry,extensionRegistry,pluginExtensionRegistryBridge);
+        org.mockito.Mockito.verify(pluginManager,org.mockito.Mockito.never()).stopPlugin("shared-application");
+        org.mockito.Mockito.verify(pluginManager,org.mockito.Mockito.never()).hotReloadPlugin("shared-application");
+        org.mockito.Mockito.verify(pluginManager,org.mockito.Mockito.never()).hotUnloadPlugin("shared-application");
+    }
+
     @TempDir
     Path pluginsDir;
 

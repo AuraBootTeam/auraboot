@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import type { TranslateFunction } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { type PageContentProps } from '@auraboot/runtime-kernel';
 import { decodeRouteContextFromSearch } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
@@ -43,10 +44,10 @@ export function shouldRenderDefaultDetailEditAction(
 }
 
 export function canRenderDetailToolbarButton(
-  button: Pick<ButtonConfig, 'permissionCode'>,
+  button: Pick<ButtonConfig, 'permissionCode' | 'permissionCodes'>,
   hasPermission: (permissionCode: string) => boolean,
 ): boolean {
-  return !button.permissionCode || hasPermission(button.permissionCode);
+  return hasButtonPermissions(button, hasPermission);
 }
 
 /**
@@ -156,7 +157,7 @@ export function resolveVisibleTopLevelDetailBlocks(
   isVisible: (visibleWhen: string | undefined) => boolean,
 ): BlockConfig[] {
   return blocks.filter((block) => {
-    if (block.blockType === 'toolbar' || block.blockType === 'tabs') return false;
+    if ((block.blockType === 'toolbar' && (block as { detailPlacement?: string }).detailPlacement !== 'body') || block.blockType === 'tabs') return false;
     if (block.visibleWhen && !isVisible(block.visibleWhen)) return false;
     return (block as BlockConfig & { detailPlacement?: string }).detailPlacement !== 'header';
   });
