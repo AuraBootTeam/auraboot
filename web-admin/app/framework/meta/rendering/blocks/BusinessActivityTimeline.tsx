@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
+import type {
+  DataSourceManager,
+  DataSourceState,
+} from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import type {
   BusinessActivityRecordMapping,
   BusinessActivityDetailField,
@@ -261,6 +264,10 @@ export function BusinessActivityTimeline({
     }
     const ready = () =>
       identityReady(runtime, recordPid, modelCode) && manager.dependenciesReady(config);
+    let readBaseline = manager.getState(source);
+    const completedSinceBaseline = (state: DataSourceState) =>
+      Number.isFinite(state.lastFetch) &&
+      (state.lastFetch !== readBaseline?.lastFetch || state.data !== readBaseline?.data);
     const accept = (raw: unknown) => {
       if (!active || !ready()) {
         publish({ phase: 'pending' });
@@ -284,7 +291,12 @@ export function BusinessActivityTimeline({
         publish({ phase: 'pending' });
       } else if (state.loading) publish({ phase: 'loading' });
       else if (state.error) publish({ phase: 'error', reason: errorReason(state.error) });
-      else if (initialized && state.data !== null && state.data !== undefined) accept(state.data);
+      else if (
+        (initialized || completedSinceBaseline(state)) &&
+        state.data !== null &&
+        state.data !== undefined
+      )
+        initialized = accept(state.data);
     });
     const load = async (force: boolean) => {
       const current = ++sequence;
@@ -294,6 +306,7 @@ export function BusinessActivityTimeline({
         return;
       }
       const before = manager.getState(source);
+      readBaseline = before;
       const refresh =
         force || (before?.data !== null && before?.data !== undefined && !before.loading);
       publish({ phase: 'loading' });
@@ -310,16 +323,24 @@ export function BusinessActivityTimeline({
           publish({ phase: 'error', reason: errorReason(state.error) });
           return;
         }
-        if (!state || state.loading || state.data === null || state.data === undefined) {
+        // The native page may issue a newer read of this same source while our
+        // coalesced request is pending. Its completion arrives on the subscription.
+        if (state?.loading) {
+          publish({ phase: 'loading' });
+          return;
+        }
+        if (!state || state.data === null || state.data === undefined) {
           publish({ phase: 'error', reason: 'unavailable' });
           return;
         }
-        // DMS may retain a cache during hard backoff. It is not a completed reread.
+        // DMS may retain a cache during hard backoff. A changed data reference is
+        // not required for success, but an actual completion marker is required
+        // when the same value is retained.
         if (
           refresh &&
           before?.data !== null &&
           before?.data !== undefined &&
-          state.data === before.data
+          !completedSinceBaseline(state)
         ) {
           publish({ phase: 'error', reason: 'unavailable' });
           return;
