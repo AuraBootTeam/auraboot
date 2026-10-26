@@ -1,0 +1,51 @@
+{
+  "contractVersion": 1,
+  "declared": 4,
+  "collected": 4,
+  "reported": 4,
+  "passed": 4,
+  "unresolved": 0,
+  "counts": {
+    "passed": 4
+  },
+  "findings": [],
+  "rows": [
+    {
+      "identity": "9405b4a73349aaae807f-1b90c1c457beeb005687:",
+      "file": "bpm/enterprise-project-approval.spec.ts",
+      "title": "SC05-BPM real deployed project approval: explicit approver, approve/reject, unrelated user denied",
+      "outcome": "passed",
+      "status": "expected",
+      "attempts": 1,
+      "accepted": true
+    },
+    {
+      "identity": "3a17dcbe5c7447293d04-9fff512715ae46787324:",
+      "file": "composition/announcements/strict-announcements.spec.ts",
+      "title": "ANY role approval shows frozen bytes, denies unrelated actors and publishes the original version once",
+      "outcome": "passed",
+      "status": "expected",
+      "attempts": 1,
+      "accepted": true
+    },
+    {
+      "identity": "3a17dcbe5c7447293d04-7e2c41b9b826d983e38f:",
+      "file": "composition/announcements/strict-announcements.spec.ts",
+      "title": "ALL named approvers preserve the first vote and a rejection never releases or rewrites history",
+      "outcome": "passed",
+      "status": "expected",
+      "attempts": 1,
+      "accepted": true
+    },
+    {
+      "identity": "3a17dcbe5c7447293d04-22e431d9c6ce542f3d14:",
+      "file": "composition/announcements/strict-announcements.spec.ts",
+      "title": "native administrator replacement keeps the original ALL quorum and accepted vote before the remaining approver finishes",
+      "outcome": "passed",
+      "status": "expected",
+      "attempts": 1,
+      "accepted": true
+    }
+  ],
+  "status": "PASS"
+}

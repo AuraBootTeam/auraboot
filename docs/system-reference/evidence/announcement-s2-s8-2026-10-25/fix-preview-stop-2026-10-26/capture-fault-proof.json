@@ -1,0 +1,9 @@
+{
+  "fault": "actual lazy-loaded reminder information module aborted",
+  "expectedOutcome": "readiness helper rejects before ready screenshot",
+  "executed": 1,
+  "expectedFailures": 1,
+  "retries": 0,
+  "globalErrors": 0,
+  "verified": true
+}

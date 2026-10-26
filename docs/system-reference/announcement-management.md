@@ -1347,10 +1347,26 @@ BPM source `3861a3146caf07a16b0937971e4cba5c2433e8de` 未改代码；针对新 c
 
 Core 原生 browser 17/17、BPM profile 4/4（含 3 公告与 1 原项目审批）通过，均单次、无 fail/skip/retry，认证各 1 另计，collection/result 准确身份集合对账通过。实际 Java classpath、artifact root、producer 和 lock 在 BPM browser 前验证。先登记的 32 张选定原图已逐张查看并记录九维结论，涵盖列表、表单、无权限、定时/撤销/删除、冻结附件、窄屏待办/知悉、统计导出入口、催办、ANY/ALL 审批与恢复替换；只裁决捕获状态，不外推全部产品排列或按钮。详见[本轮原图及观察](./evidence/announcement-s2-s8-2026-10-25/postmerge-2026-10-26/manifest.md)与[同一 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `postMergeValidation`。
 
-视觉存在非阻断 R-UI-01：催办预览摘要与统计行之间留白较大，数据和主操作仍清楚可达；本次不扩大到页面重设计。未验证读屏器。功能、视觉、交互和证据信任独立记录，截图不代替权限/冻结字节/投票事实断言。
+原视觉判断（后续已由 §18.30 更正为抓取过早并隔离原图）：催办预览摘要与统计行之间留白较大，数据和主操作仍清楚可达；本次不扩大到页面重设计。未验证读屏器。功能、视觉、交互和证据信任独立记录，截图不代替权限/冻结字节/投票事实断言。
 
 本轮排除首轮 Core 依赖启动失败、误用旧组合的 BPM browser、未执行 browser 的 Web 依赖升级拒绝；旧图片不重标。公开 update-web 完成原运行时的依赖升级后才运行上述有效 BPM 轮次。适配器生成受 evidence 软链物理路径影响，一次失败启动覆盖了旧轮次部分生命周期日志；旧 browser/results/images 保留，不能宣称该轮生命周期证据完整。有效 BPM business_exit=0，首次停止却为 stop_exit=2（进程所有权探针异常，原因未定位）；随后经同一所有权校验器核对已退出进程并成功公开 suspend。该异常单列，不能写成初次正常退出。Core business/stop 均为 0。
 
 OSS/BPM 原 runtime 已暂停，DB、构件、备份与证据保留；地址仍为 Core Web 5101/backend 6401、BPM Web 5401/backend 6501。BPM Workspace 的 RUNTIME_MANIFEST_MISSING warning 与共享 Gradle cache 路径前缀问题未修，产品 verify 独立通过，生命周期/构建串行。OSS/BPM source checkout 与引用因原 runtime 仍绑定准确 root/branch 而保留，不能强删或宣称源码资源全部回收；EE 工作区及分支已收口。任务注册中的历史 removed Workspace 行没有 PR/head 证明，阻止整任务自动 finish；当前任务负责后续受支持的 artifact handoff/登记凭证对账，未为本次验收修改 Workspace 业务代码。保留环境不等于生产部署。
 
 验证范围仍不包括小程序真实 sender/真机、跨服务远程 BPM、50000 人、独立 BPM 340 corpus、OCI/Linux/Jenkins 或生产验收。历史前端 8774 和既有 Core 单测不冒称本次重跑；本次新增绿色只按上述准确源与执行面解释。
+
+### 18.30 催办预览就绪与 BPM 优雅停机修复
+
+本节取代 §18.29 的当前截图及停止异常结论，公告领域模型、权限、定时/催办规则和公共审批契约不变。相关变更为 OSS [#2434](https://github.com/AuraBootTeam/auraboot/pull/2434) 与 BPM [#61](https://github.com/AuraBootTeam/aura-bpm/pull/61)；本次授权包含合并，不包含生产发布。
+
+R-UI-01 经实际页面与反例复核更正为 capture-error：原截图仅等待统计表，说明与“催办信息”懒加载尚未完成；稳定后相邻块间距为 16px，不存在持续的静态大留白。本次增强原用例，等待说明、可提交状态、截止/筛选和 1/1/0 资格事实，并验证正常间距；补充 390×844 的纵向和横向滚动图。实际阻断元信息模块时新就绪门槛按预期失败，恢复后同一原生旅程通过。没有改业务样式或新建 React 页面。旧图移至 capture-error 并保留原 SHA-256；历史 32 张已查看中有效验收图更正为 31，不再把该图计为 ready 成功。
+
+BPM-STOP-01 根因为原 30 秒外层期限无法覆盖完整 Spring graceful phase 加后续关闭。新包业务后的首次公开停止成功，从后端进入 graceful shutdown 到写入完全停止记录为 36.635 秒；等待预算改为有界 60 秒，超时明确报期限且保留现场。全部目标的 PID generation/cwd/命令/token 校验和逐个复核保持，仍仅 SIGTERM，不增加强杀。真实子进程 31.5 秒退出的回归在旧代码失败、修复后通过，进程边界 20 项通过。职责仍在独立 BPM 应用的打包生命周期，OSS 没有引入 BPM 引擎或私有停机实现。
+
+当前 Core catalog 为 `2214c7294b2e84083f82483b8657be82282cfe7f`（15 artifacts/18 entries，lock `sha256:d8a1c04fd8a571b777ea04b170c88719d8fe796edd41c2b5390a74e8d3fd1df6`）；BPM 为 `a61fd24781160b6bb0bf686156f06bfab541af83`，显式消费该 catalog（22 artifacts，lock `sha256:efb97764daaa9011464d5975e859ee5b164b05c76ff83f663d3e0ac84621af81`）。正式构建的 98 脚本契约、1657 后端项/224 JUnit、Web typecheck/client/SSR/摘要/图与单 React 检查均通过；原开发库备份后空库顺序完成 161 条 Flyway。Core browser driver 为 `902a5b943d373300a5e8269c250e74f02625234a`，与 catalog producer 仅差 9 行测试滚动截图，生产源码相同；不冒称重建了另一个 catalog，Core 快照初始化也不冒充逐条迁移。
+
+固定 Core17、BPM4 均单次通过，无 fail/skip/retry，认证各 1 另计，准确身份集合对账通过；故障恢复后的 preview1 与 Core17 重叠不累计。8 张本轮原图已逐张复核并记录九维结论（6 张预览/确认/批次与 2 张审批），非视觉停止使用实际进程/端口证明。随后两轮公开 resume/verify/retained-facts/首次 suspend 均为 0，新的受管代次已停止、端口释放，公告 3 条/版本 4 条保持；未在两轮间 reset。
+
+原 BPM 外层验证在 native4 成功后因持久事实探针漏载运行时环境及缺少先前 proof 记录而为 1/1，公开 suspend 自身实际已成功；保留原失败，不以之后两轮正常记录覆盖。首轮通知桥接未启用、外部反例配置加载错误及早轮重复执行也单列，不算当前产品失败或额外覆盖。详见[当前原图与分层证明](./evidence/announcement-s2-s8-2026-10-25/fix-preview-stop-2026-10-26/manifest.md)和[原 manifest](./evidence/announcement-s2-s8-2026-10-25/manifest.json)的 `previewStopFixValidation`。
+
+原环境现已暂停，DB/构件/备份/证据与 source 依赖保留。BPM 的 RUNTIME_MANIFEST_MISSING warning、共享 Gradle 路径前缀限制和历史任务登记凭证问题未作为本次两项产品缺陷强制绕过；产品身份独立核验、构建与生命周期串行。未做生产、OCI/Linux/Jenkins、小程序真发/真机、远程 BPM、50000 人或独立340 UI验收；行覆盖率未测，不宣称全产品黄金。

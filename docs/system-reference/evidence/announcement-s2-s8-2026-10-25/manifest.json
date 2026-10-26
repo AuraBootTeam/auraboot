@@ -7,7 +7,7 @@
     "bpmArtifactProducer": "41c1ffc44022e1ef3a3634e69e850c90ff66c3e4",
     "bpmBrowser": "68a4f347b91b9152fe42811a3daaf40adbcea17e"
   },
-  "claim": "merged-and-postmerge-local-validated-with-explicit-boundaries; no production release",
+  "claim": "merged feature; preview readiness and BPM graceful-stop fix locally verified with explicit provenance; no production release",
   "evidenceRound": {
     "core": "2026-10-25T06-44-38-789Z-19730da7-11cf-48fe-a1d2-f7fe27ecd574",
     "bpm": "final-visual"
@@ -2933,11 +2933,14 @@
     "issues": [
       {
         "id": "R-UI-01",
-        "severity": "non-blocking visual density",
+        "severity": "capture-error",
         "scope": "reminders:preview",
-        "observation": "Large vertical whitespace between summary and count row.",
+        "observation": "Named ready screenshot preceded lazy business content; earlier density interpretation withdrawn.",
         "disposition": "Accepted with note for this merge-and-verify scope; no task action is blocked; no unsolicited redesign performed.",
-        "owner": "announcement UI/platform page layout"
+        "owner": "announcement UI/platform page layout",
+        "initialSeverity": "non-blocking visual density",
+        "status": "resolved-as-capture-error",
+        "resolution": "fix-preview-stop-2026-10-26/manifest.md"
       }
     ],
     "scopeLimits": [
@@ -2950,6 +2953,105 @@
       "bpm": "business_exit=0 initial_stop_exit=2; exact owner reconciled and subsequent public suspend passed; suspended"
     },
     "resourceRetention": "Original OSS/BPM checkouts and refs retained because registered runtimes still depend on their exact source roots/branches; no complete artifact handoff supported. EE source/ref removed. Historical removed Workspace registry row lacks PR/head proof; task-wide automatic finish remains blocked. Owner: current announcement task; next action requires supported handoff or receipt reconciliation, not force deletion.",
-    "productionReleased": false
+    "productionReleased": false,
+    "acceptedReadyOriginalsAfterCorrection": 31,
+    "invalidReadyCaptures": 1,
+    "screenshotAcceptanceCorrected": true
+  },
+  "currentValidation": "previewStopFixValidation",
+  "previewStopFixValidation": {
+    "date": "2026-10-26",
+    "scope": [
+      "R-UI-01 capture readiness",
+      "BPM-STOP-01 graceful shutdown budget"
+    ],
+    "report": "fix-preview-stop-2026-10-26/manifest.md",
+    "matrix": "fix-preview-stop-2026-10-26/acceptance-matrix.json",
+    "sources": {
+      "bpm": "a61fd24781160b6bb0bf686156f06bfab541af83",
+      "coreBrowser": "902a5b943d373300a5e8269c250e74f02625234a",
+      "coreCatalog": "2214c7294b2e84083f82483b8657be82282cfe7f"
+    },
+    "sourceEquivalence": "fix-preview-stop-2026-10-26/source-equivalence.json",
+    "coreBrowser": {
+      "declared": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "reconciliation": "fix-preview-stop-2026-10-26/core-reconciliation.json"
+    },
+    "restoredPreview": {
+      "passed": 1,
+      "overlapsCore17": true,
+      "retries": 0
+    },
+    "negativeCaptureProof": "fix-preview-stop-2026-10-26/capture-fault-proof.json",
+    "bpmBrowser": {
+      "declared": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "reconciliation": "fix-preview-stop-2026-10-26/bpm-reconciliation.json"
+    },
+    "authenticationSetupsPerRuntime": 1,
+    "nodeContracts": {
+      "passed": 98,
+      "failed": 0,
+      "includesRealProcessBoundary": true
+    },
+    "backend": {
+      "passed": 1657,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junitFiles": 224,
+      "summary": "fix-preview-stop-2026-10-26/bpm-junit-summary.json"
+    },
+    "orderedFlywayMigrations": 161,
+    "coreDatabaseMode": "canonical snapshot; not per-file Flyway",
+    "reviewedCurrentOriginals": 8,
+    "historicalReadyCaptureExcluded": 1,
+    "lifecycle": {
+      "configuredStopBudgetMs": 60000,
+      "oldBudgetMs": 30000,
+      "realProcessDrainMs": 31500,
+      "realProcessOldCodeResult": "failed as expected",
+      "realProcessFixedCodeResult": "passed",
+      "afterNativeWorkloadStop": "fix-preview-stop-2026-10-26/after-native-workload-stop-proof.json",
+      "cleanRounds": [
+        "fix-preview-stop-2026-10-26/first-stop-proof.json",
+        "fix-preview-stop-2026-10-26/second-stop-proof.json"
+      ],
+      "retainedFacts": "fix-preview-stop-2026-10-26/retained-facts.json"
+    },
+    "issues": [
+      {
+        "id": "R-UI-01",
+        "status": "resolved-as-capture-error",
+        "cause": "Original ready screenshot was taken before lazy guidance and reminder information rendered; no persistent layout gap.",
+        "resolution": "Readiness and normal-gap assertions, narrow inner-scroll coverage, deliberate missing-component failure and restored native pass; old image quarantined."
+      },
+      {
+        "id": "BPM-STOP-01",
+        "status": "resolved",
+        "cause": "30-second outer deadline cannot cover a full Spring graceful phase plus shutdown cleanup.",
+        "resolution": "Bounded 60-second owner-verified wait, explicit timeout reason; 31.5-second real-process regression red before/green after; post-browser public stop and two clean lifecycle rounds passed."
+      }
+    ],
+    "scopeLimits": [
+      "Two reported defects and their configured regression profiles, not complete product/state coverage.",
+      "No physical mobile, screen-reader, 50000-recipient, mini-program sender, remote BPM, standalone 340-case UI, OCI/Linux/Jenkins or production acceptance.",
+      "Coverage not measured; native restored1 overlaps the configured Core17.",
+      "Original failed retention-probe harness remains business_exit=1 stop_exit=1; its native4 and actual public stop are recorded separately from the final clean lifecycle rounds."
+    ],
+    "delivery": {
+      "ossPullRequest": "https://github.com/AuraBootTeam/auraboot/pull/2434",
+      "bpmPullRequest": "https://github.com/AuraBootTeam/aura-bpm/pull/61",
+      "mergeAuthorized": true,
+      "productionReleased": false
+    },
+    "environment": "Original Core and BPM runtimes suspended; DB/artifacts/backups/source dependencies retained. Existing BPM RUNTIME_MANIFEST_MISSING warning and historical task-registry/source retention blockers remain outside this fix."
   }
 }

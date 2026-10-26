@@ -9,7 +9,7 @@ updated: 2026-10-26
 
 本轮先登记 32 场景，再执行并逐张查看原图。来源为同一公告需求矩阵，不新增独立覆盖分母。每图的原始 SHA-256、尺寸、locale、producer、九维观察与四类裁决见 [matrix](./acceptance-matrix.json)。仅选中帧具有视觉结论；同轮其他图片不自动视为复核通过。
 
-功能：Core 17/17、BPM 4/4，均单次且 fail/skip/retry 为 0，认证各 1 另计。互动：原生浏览器旅程断言，包括取消、授权拒绝、冻结附件与审批恢复；不从像素推导后台事实。视觉：32/32 已查看，1 项非阻断 R-UI-01（催办预览垂直留白较大），其余所捕获状态通过。证据信任：Core `7c5c1a4951b9d44a5282a0273b939762cd999d3a`，BPM `1b4b702285dc26afb416fc600174a2efc0244542`；实际 Java classpath、新组合锁及产品 verify 在浏览器前核对。无旧图重标。
+功能：Core 17/17、BPM 4/4，均单次且 fail/skip/retry 为 0，认证各 1 另计。互动：原生浏览器旅程断言，包括取消、授权拒绝、冻结附件与审批恢复；不从像素推导后台事实。视觉历史复核为 32 张已查看；后续证明其中 1 张预览图为抓取过早，已移至 capture-error，不再计为就绪态成功，该批有效原图为 31 张。替代图和新门槛见[本次修复](../fix-preview-stop-2026-10-26/manifest.md)。证据信任：Core `7c5c1a4951b9d44a5282a0273b939762cd999d3a`，BPM `1b4b702285dc26afb416fc600174a2efc0244542`；实际 Java classpath、新组合锁及产品 verify 在浏览器前核对。无旧图重标。
 
 BPM 正式组合 97 Node 契约及 1657 后端项通过（224 JUnit，fail/error/skip=0），新空库按序完成 161 Flyway。Core 启动使用 schema 快照，不把文件数写成逐条 Flyway。BPM Workspace 仍有 RUNTIME_MANIFEST_MISSING warning，产品 verify 与实际进程身份独立通过。
 
@@ -49,5 +49,5 @@ BPM 正式组合 97 Node 契约及 1657 后端项通过（224 JUnit，fail/error
 | reader:pending-inbox | Narrow inbox exposes the pending acknowledgement and an accessible all-todos action. | [reader-pending-inbox.png](./reader-pending-inbox.png) | accepted | 390px 收件箱浮层完整入镜，待知悉事项、公告待知悉标签及查看全部待办均可读；未把通知阅读当作已知悉。本帧不单独证明 Header 徽标刷新时序。 |
 | reader:ack-confirm | Keyboard-opened acknowledgement confirmation fits 390px and cancellation preserves the unread acknowledgement fact. | [reader-ack-confirm.png](./reader-ack-confirm.png) | accepted | 390px 知悉确认框完整显示首次确认说明，取消与确认未被遮挡且焦点可见；背景加载态属于等待该确认的命令交互，取消结果由原旅程断言。 |
 | statistics:overview | Captured real recipient counts and snapshot-backed statistics render with an authorized export entry. | [statistics-overview.png](./statistics-overview.png) | accepted | 固定版本和统计时刻、授权范围与知悉截止分组清楚；接收 1、已读 1、知悉 0 与 100%/0% 分离，导出主动作可辨。下方明细未全部在本帧入镜。 |
-| reminders:preview | Actual recipient preview, cooldown and confirmation are clear; preview alone consumes no quota. | [reminders-preview.png](./reminders-preview.png) | accepted-with-note | 实际可催办人数 1、当前限流 0、预览与有效时间以及确认/重新预览可读。摘要与计数表之间留白较大，记录为非阻断版式意见 R-UI-01，不在本次验证中重设计。 |
+| reminders:preview | Actual recipient preview, cooldown and confirmation are clear; preview alone consumes no quota. | [reminders-preview.png](./capture-error/reminders-preview.png) | capture-error / 已替代 | 实际可催办人数 1、当前限流 0、预览与有效时间以及确认/重新预览可读。摘要与计数表之间留白较大，记录为非阻断版式意见 R-UI-01，不在本次验证中重设计。  后续更正：此图加载未完成，不计为就绪态成功。 |
 | reminders:resume-original | Original plan resumes after member authority recovery without a new publication or reset quota. | [reminders-resume-original.png](./reminders-resume-original.png) | accepted | 恢复后计划显示运行中、已用额度 0/上限 3、每日 09:00 和去重 60 分钟；无历史批次有解释。该普通公告未要求知悉，截止为空符合夹具。 |
