@@ -30,7 +30,7 @@ public interface AnnouncementAcknowledgementMapper {
     Map<String,Object> version(@Param("tenant") Long tenant, @Param("version") String version);
 
     @Select("""
-            SELECT r.first_read_at,r.acknowledged_at,r.acknowledged_hash
+            SELECT r.version_pid AS recipient_version_pid,r.first_read_at,r.acknowledged_at,r.acknowledged_hash
             FROM ab_announcement_recipient r
             JOIN ab_announcement_recipient_snapshot s
               ON s.tenant_id=r.tenant_id AND s.version_pid=r.version_pid AND s.sealed=TRUE
