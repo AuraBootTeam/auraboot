@@ -11,8 +11,15 @@ import { resolveIcon } from '~/utils/icon-resolver';
 import { useDirection } from '~/hooks/useDirection';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 import { useTenantTheme } from '~/contexts/TenantThemeContext';
-import { usePagePresentation, usePresentationNavigation } from '~/shared/layout/PagePresentationContext';
+import {
+  usePagePresentation,
+  usePresentationNavigation,
+} from '~/shared/layout/PagePresentationContext';
 import { UserMenuWidget } from '~/ui/user/UserMenuWidget';
+import {
+  findCurrentNavigationLink,
+  workspaceSidebarGeometry,
+} from '~/shared/layout/workspaceShell';
 
 const COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -23,7 +30,8 @@ interface LeftSidebarProps {
 
 export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebarProps) {
   const workspace = usePagePresentation()?.mode === 'workspace';
-  const { setSidebarWidth } = usePresentationNavigation();
+  const { setSidebarWidth, shell, viewportWidth = 1280, isOverlay } = usePresentationNavigation();
+  const tokenized = shell?.useThemeTokens === true;
   const tenantTheme = useTenantTheme();
   const location = useLocation();
   const rootData = useRootLoaderData();
@@ -34,14 +42,25 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
   const navRef = useRef<HTMLElement>(null);
   const revalidator = useRevalidator();
 
-  const [collapsed, setCollapsed] = useState(() => {
+  const [preferredCollapsed, setCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(COLLAPSED_KEY) === 'true';
     }
     return false;
   });
 
-  useEffect(() => { setSidebarWidth(collapsed ? 68 : workspace ? 216 : 256); }, [collapsed, workspace, setSidebarWidth]);
+  const geometry = shell
+    ? workspaceSidebarGeometry(shell, viewportWidth, preferredCollapsed)
+    : null;
+  const collapsed = geometry?.collapsed ?? preferredCollapsed;
+  const panelWidth = geometry?.panelWidth ?? (collapsed ? 68 : workspace ? 216 : 256);
+  useEffect(() => {
+    setSidebarWidth(shell && menus.length === 0 ? 0 : panelWidth);
+  }, [panelWidth, shell, menus.length, setSidebarWidth]);
+  useEffect(() => {
+    if (shell && isOverlay && sidebarOpen)
+      navRef.current?.querySelector<HTMLElement>('a[href], button')?.focus();
+  }, [shell, isOverlay, sidebarOpen]);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
@@ -67,7 +86,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
     if (collapsed) return;
     const timer = setTimeout(() => {
       if (navRef.current) {
-        const activeItem = navRef.current.querySelector('.bg-blue-100');
+        const activeItem = findCurrentNavigationLink(navRef.current);
         if (activeItem) {
           activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -83,12 +102,17 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
   // In RTL mode the sidebar is anchored to the right edge; the hidden-state
   // translation must be inverted so it slides out to the right instead of left.
   const hiddenTranslate = isRTL ? 'translate-x-full' : '-translate-x-full';
-  const sidebarClasses = `
-    fixed inset-y-0 ltr:left-0 rtl:right-0 z-50 ${widthClass} bg-white dark:bg-gray-800 ltr:border-r rtl:border-l border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out
-    flex flex-col overflow-visible
-    lg:translate-x-0 lg:static lg:inset-0
-    ${sidebarOpen ? 'translate-x-0' : hiddenTranslate}
-  `;
+  const positionClasses = shell
+    ? isOverlay
+      ? 'fixed inset-y-0 ltr:left-0 rtl:right-0'
+      : 'relative shrink-0'
+    : 'fixed inset-y-0 ltr:left-0 rtl:right-0 lg:translate-x-0 lg:static lg:inset-0';
+  const translateClass =
+    shell && !isOverlay ? 'translate-x-0' : sidebarOpen ? 'translate-x-0' : hiddenTranslate;
+  const sidebarClasses = `${positionClasses} z-50 ${shell ? '' : widthClass}
+    ${tokenized ? 'border-border bg-panel' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}
+    ltr:border-r rtl:border-l transform transition-all duration-300 ease-in-out
+    flex flex-col overflow-visible ${translateClass}`;
 
   return (
     <div
@@ -96,44 +120,76 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
       className={`${sidebarClasses} print-hide`}
       data-print="hide"
       data-testid="sidebar"
+      style={shell ? { width: panelWidth } : undefined}
+      inert={shell && isOverlay && !sidebarOpen ? true : undefined}
+      aria-hidden={shell && isOverlay && !sidebarOpen ? true : undefined}
     >
-      {workspace && !collapsed && <>
-        <NavLink to="/" className="flex h-14 shrink-0 items-center gap-3 px-6">
-          <img className="h-6 w-6" src={tenantTheme?.logoUrl || rootData?.branding?.logoUrl || COMMUNITY_BRANDING.logoUrl} alt="" />
-          <span className="text-text text-lg font-semibold tracking-tight">{tenantTheme?.brandName || rootData?.branding?.productName || COMMUNITY_BRANDING.productName}</span>
-        </NavLink>
-        <div className="border-border mx-3.5 my-5 rounded-lg border px-3 py-3">
-          <div className="text-text text-xs font-semibold">{rootData?.user?.tenantName || t('sidebar.workspace', undefined, 'Workspace')}</div>
-          <div className="text-text-3 mt-1 text-[11px]">{t('sidebar.currentSpace', undefined, locale.startsWith('zh') ? '当前空间' : 'Current space')}</div>
-        </div>
-      </>}
+      {workspace && !collapsed && (
+        <>
+          <NavLink
+            to="/"
+            className={`flex shrink-0 items-center gap-3 px-6 ${shell ? '' : 'h-14'}`}
+            style={shell ? { height: shell.sidebar.brandHeight } : undefined}
+          >
+            <img
+              className="h-6 w-6"
+              src={
+                tenantTheme?.logoUrl || rootData?.branding?.logoUrl || COMMUNITY_BRANDING.logoUrl
+              }
+              alt=""
+            />
+            <span className="text-text text-lg font-semibold tracking-tight">
+              {tenantTheme?.brandName ||
+                rootData?.branding?.productName ||
+                COMMUNITY_BRANDING.productName}
+            </span>
+          </NavLink>
+          <div className="border-border mx-3.5 my-5 rounded-lg border px-3 py-3">
+            <div className="text-text text-xs font-semibold">
+              {rootData?.user?.tenantName || t('sidebar.workspace', undefined, 'Workspace')}
+            </div>
+            <div className="text-text-3 mt-1 text-[11px]">
+              {t(
+                'sidebar.currentSpace',
+                undefined,
+                locale.startsWith('zh') ? '当前空间' : 'Current space',
+              )}
+            </div>
+          </div>
+        </>
+      )}
       {/* Top bar: toggle + mobile close */}
       <div
         className={`flex items-center ${collapsed ? 'justify-center' : 'justify-end'} h-8 flex-shrink-0 px-2`}
       >
         {/* Mobile close */}
-        {!collapsed && (
+        {!collapsed && (!shell || isOverlay) && (
           <button
             onClick={() => setSidebarOpen(false)}
-            className="me-auto rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-500 lg:hidden dark:hover:bg-gray-700"
+            aria-label={t('action.close', undefined, 'Close')}
+            className={`me-auto rounded-md p-1.5 ${shell ? '' : 'lg:hidden'} ${tokenized ? 'text-text-3 hover:bg-hover hover:text-text' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700'}`}
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
         )}
         {/* Collapse/Expand toggle */}
-        <button
-          onClick={toggleCollapsed}
-          className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-          title={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
-        >
-          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
+        {(!shell || !isOverlay) && (
+          <button
+            onClick={toggleCollapsed}
+            data-testid="sidebar-collapse-toggle"
+            aria-expanded={!collapsed}
+            className={`rounded-md p-1.5 transition-colors ${tokenized ? 'text-text-3 hover:bg-hover hover:text-text' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}`}
+            title={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
+          >
+            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
       <nav
         ref={navRef}
-        className={`min-h-0 flex-1 ${collapsed ? 'px-2' : workspace ? 'px-3.5' : 'px-4'} pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent space-y-1 overflow-y-auto py-1 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500`}
+        className={`min-h-0 flex-1 ${collapsed ? 'px-2' : workspace ? 'px-3.5' : 'px-4'} scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent space-y-1 overflow-y-auto py-1 pb-2 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500`}
       >
         {menus.map((menu: any, index: number) => (
           <div key={menu.id || index}>
@@ -157,8 +213,12 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                 className={({ isActive }) =>
                   `group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                      ? tokenized
+                        ? 'bg-accent-weak text-accent'
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                      : tokenized
+                        ? 'text-text-2 hover:bg-hover hover:text-text'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
                   } `
                 }
                 onClick={() => setSidebarOpen(false)}
@@ -168,7 +228,9 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                 </span>
                 <span className="truncate">{resolveMenuLabel(t, menu)}</span>
                 {location.pathname === menu.path && (
-                  <span className="ms-auto h-2 w-2 rounded-full bg-blue-500" />
+                  <span
+                    className={`ms-auto h-2 w-2 rounded-full ${tokenized ? 'bg-accent' : 'bg-blue-500'}`}
+                  />
                 )}
               </NavLink>
             )}
@@ -204,6 +266,7 @@ function CollapsedMenuItem({
   t: (key: string) => string;
   setSidebarOpen: (open: boolean) => void;
 }) {
+  const tokenized = usePagePresentation()?.workspaceShell?.useThemeTokens === true;
   const [open, setOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -222,7 +285,10 @@ function CollapsedMenuItem({
       const rect = wrapperRef.current.getBoundingClientRect();
       const maxTop = window.innerHeight - 320;
       // In RTL the sidebar is on the right; the popover opens to the left.
-      const horizontalPos = isRTL ? { right: SIDEBAR_COLLAPSED_W } : { left: SIDEBAR_COLLAPSED_W };
+      const sidebarRect = wrapperRef.current.closest('#app-sidebar')?.getBoundingClientRect();
+      const horizontalPos = isRTL
+        ? { right: sidebarRect ? window.innerWidth - sidebarRect.left : SIDEBAR_COLLAPSED_W }
+        : { left: sidebarRect?.right ?? SIDEBAR_COLLAPSED_W };
       setPopoverStyle({
         top: Math.max(4, Math.min(rect.top, maxTop)),
         ...horizontalPos,
@@ -252,8 +318,12 @@ function CollapsedMenuItem({
     <div
       className={`mx-auto flex h-10 w-12 cursor-pointer items-center justify-center rounded-lg transition-all duration-200 ${
         isActive
-          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
+          ? tokenized
+            ? 'bg-accent-weak text-accent'
+            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+          : tokenized
+            ? 'text-text-3 hover:bg-hover hover:text-text'
+            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
       } `}
     >
       {iconEl}
@@ -295,12 +365,12 @@ function CollapsedMenuItem({
               isRTL
                 ? {
                     top: (popoverStyle.top as number) - 4,
-                    right: SIDEBAR_COLLAPSED_W - 8,
+                    right: Number(popoverStyle.right ?? SIDEBAR_COLLAPSED_W) - 8,
                     width: 12,
                   }
                 : {
                     top: (popoverStyle.top as number) - 4,
-                    left: SIDEBAR_COLLAPSED_W - 8,
+                    left: Number(popoverStyle.left ?? SIDEBAR_COLLAPSED_W) - 8,
                     width: 12,
                   }
             }
@@ -310,7 +380,7 @@ function CollapsedMenuItem({
           <div
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
-            className={`animate-in fade-in fixed z-[60] max-h-[70vh] min-w-[210px] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl duration-150 dark:border-gray-700 dark:bg-gray-800 ${
+            className={`animate-in fade-in fixed z-[60] max-h-[70vh] min-w-[210px] overflow-y-auto rounded-lg border py-1.5 shadow-xl duration-150 ${tokenized ? 'border-border bg-panel' : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'} ${
               isRTL ? 'slide-in-from-right-2' : 'slide-in-from-left-2'
             }`}
             style={popoverStyle}
@@ -350,6 +420,7 @@ function PopoverSubmenu({
   onNavigate: () => void;
   depth?: number;
 }) {
+  const tokenized = usePagePresentation()?.workspaceShell?.useThemeTokens === true;
   return (
     <div className={depth > 0 ? 'ms-3 border-s border-gray-100 dark:border-gray-700' : ''}>
       {items.map((item: any, index: number) => {
@@ -378,8 +449,12 @@ function PopoverSubmenu({
             onClick={onNavigate}
             className={`mx-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors ${
               isActive
-                ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
+                ? tokenized
+                  ? 'bg-accent-weak text-accent font-medium'
+                  : 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                : tokenized
+                  ? 'text-text-2 hover:bg-hover hover:text-text'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
             } `}
           >
             <span className="me-2 flex h-4 w-4 flex-shrink-0 items-center justify-center">
@@ -387,7 +462,9 @@ function PopoverSubmenu({
             </span>
             <span className="truncate">{itemName}</span>
             {isActive && (
-              <span className="ms-auto h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
+              <span
+                className={`ms-auto h-1.5 w-1.5 flex-shrink-0 rounded-full ${tokenized ? 'bg-accent' : 'bg-blue-500'}`}
+              />
             )}
           </NavLink>
         );
@@ -411,13 +488,14 @@ function PopoverGroup({
   onNavigate: () => void;
   depth: number;
 }) {
+  const tokenized = usePagePresentation()?.workspaceShell?.useThemeTokens === true;
   const [expanded, setExpanded] = useState(() => isPathInSubmenu(item.submenu, location.pathname));
 
   return (
     <div>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="mx-1 flex w-full items-center rounded-md px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+        className={`mx-1 flex w-full items-center rounded-md px-3 py-1.5 text-sm transition-colors ${tokenized ? 'text-text-3 hover:bg-hover hover:text-text' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'}`}
       >
         <span className="me-2 flex h-4 w-4 flex-shrink-0 items-center justify-center">
           {resolveIcon(item.icon, itemName, 14)}

@@ -24,6 +24,7 @@
       "verbs": [
         "command.execute",
         "dataSource.reload",
+        "form.reset",
         "navigate",
         "state.set"
       ],
@@ -44,6 +45,7 @@
         "id",
         "ids",
         "inputFields",
+        "inputFieldsPresentation",
         "inputFieldsSubmitLabel",
         "inputFieldsTitle",
         "maxPollAttempts",

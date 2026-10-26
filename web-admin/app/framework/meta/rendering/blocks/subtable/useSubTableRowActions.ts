@@ -1,3 +1,5 @@
+import { createPromptSubmissionFeedback } from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
+import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
 import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { useCallback } from 'react';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
@@ -187,6 +189,7 @@ export function useSubTableRowActions({
       const loadingKey = `${rowPid}:${button.code}:${rowIndex}`;
       setRowActionLoadingKey(loadingKey);
       setEditErrors({});
+      const submissionFeedback = createPromptSubmissionFeedback({ t, locale });
       try {
         const commandAction =
           actionDef && (actionDef.type === 'command' || actionDef.type === 'state_transition')
@@ -247,6 +250,10 @@ export function useSubTableRowActions({
               (actionDef as any)?.inputFieldsSubmitLabel ?? (button as any).inputFieldsSubmitLabel,
               expressionContext,
               { t, locale },
+              (actionDef as any)?.inputFieldsPresentation ??
+                (button as any).inputFieldsPresentation,
+              undefined,
+              submissionFeedback,
             );
           } catch (error) {
             if (error instanceof ActionCancelledError) return;
@@ -267,16 +274,20 @@ export function useSubTableRowActions({
         });
 
         if (!ResultHelper.isSuccess(result)) {
-          throw new Error(resolveCommandErrorMessage(result, command, t, locale));
+          throw commandExecutionError(result, command, t, locale);
         }
 
+        submissionFeedback.completeResult(result);
+        if (submissionFeedback.getState().phase === 'failed') return;
         reloadRows();
         onDataChange?.();
       } catch (err) {
+        submissionFeedback.fail(err);
         setEditErrors({
           _form: err instanceof Error ? err.message : `Command ${command} failed`,
         });
       } finally {
+        submissionFeedback.finalize();
         setRowActionLoadingKey(null);
       }
     },

@@ -1,3 +1,12 @@
+import { currentFormDialogScope } from '~/framework/meta/runtime/actions/formDialogLifecycle';
+import {
+  commandBusinessRejectionError,
+  createPromptSubmissionFeedback,
+} from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
+import {
+  CommandExecutionError,
+  commandExecutionError,
+} from '~/framework/meta/utils/commandExecutionError';
 import {
   commandRequestMetadata,
   commandPolicyFor,
@@ -58,7 +67,9 @@ import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCan
  * ```
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useDetailModal } from '~/framework/meta/rendering/pages/detail/DetailModalProvider';
+import { resolveDetailModalTarget } from '~/framework/meta/rendering/pages/detail/detailModalTarget';
 import {
   downloadWithAuth,
   resolveCommandFileDownload,
@@ -345,6 +356,8 @@ export interface UseActionHandlerOptions {
   context?: {
     // 列表页上下文
     loadData?: (...args: any[]) => void | Promise<void>;
+    /** Explicit strict read capability; a best-effort loadData promise is insufficient. */
+    loadDataForReview?: () => Promise<void>;
     filters?: Record<string, any>;
     setFilters?: (filters: Record<string, any>) => void;
     pagination?: {
@@ -440,6 +453,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     [effectiveShowToast],
   );
 
+  const openDetailModal = useDetailModal();
+  const promptLifecycle = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    promptLifecycle.current = controller;
+    return () => controller.abort();
+  }, [token]);
   const commandIdentity = useRef<CommandRequestIdentity | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const captureTriggerFocus = useActionTriggerFocus(loading);
@@ -471,8 +491,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           token,
         });
         if (!ResultHelper.isSuccess(res)) {
-          throw new Error(
+          throw new CommandExecutionError(
             (res as any).desc || (res as any).message || 'Async task status unavailable',
+            res,
           );
         }
         const task = (res as any).data || {};
@@ -578,7 +599,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       }
 
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(resolveCommandErrorMessage(result, commandCode, t, locale));
+        throw commandExecutionError(result, commandCode, t, locale);
       }
 
       // Async dispatch: handlerParams.async commands return immediately with a
@@ -720,6 +741,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         normalizedButton.confirmVariant ??
         (normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default');
       const confirmKey = (normalizedButton as any).confirm || normalizedButton.confirmMessageKey;
+      const actionSignal = promptLifecycle.current?.signal;
+      const actionScope = currentFormDialogScope();
+      const submissionFeedback = createPromptSubmissionFeedback({
+        t,
+        locale,
+        refresh: context.loadDataForReview,
+      });
 
       try {
         setLoading(true);
@@ -767,7 +795,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               throw new Error('Command includeRecordPayload must be boolean');
             }
             let payload = {
-              ...(includeRecordPayload === false ? {} : (record || context.data || {})),
+              ...(includeRecordPayload === false ? {} : record || context.data || {}),
               ...resolveCommandPayload(
                 actionDef as unknown as Record<string, unknown>,
                 actionRuntimeContext,
@@ -873,6 +901,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   inputFieldsSubmitLabel,
                   actionRuntimeContext,
                   { t, locale },
+                  (actionDef as any).inputFieldsPresentation ??
+                    (normalizedButton as any).inputFieldsPresentation,
+                  actionSignal,
+                  submissionFeedback,
                 );
               } catch (error) {
                 if (error instanceof ActionCancelledError) return;
@@ -1003,6 +1035,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 ),
               },
             );
+            if (actionSignal?.aborted || actionScope?.aborted) return;
+            submissionFeedback.completeResult(commandResult, true);
+            if (
+              submissionFeedback.getState().phase === 'failed' &&
+              commandBusinessRejectionError(commandResult)
+            )
+              return;
             surfaceTemporaryPassword(commandResult);
             const downloadedInline = downloadBase64CommandArtifact(commandResult);
             if (!downloadedInline && !(commandResult as any)?.__asyncFailed && actionDef.download) {
@@ -1077,6 +1116,51 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               actionDef.to,
               isContextualCreate && !target.startsWith('/') ? undefined : navigationRecord,
             );
+            if (actionDef.presentation !== undefined) {
+              if (
+                actionDef.presentation.mode !== 'modal' ||
+                actionDef.command ||
+                actionDef.hardReload
+              ) {
+                throw new Error('Modal presentation supports ordinary detail navigation only');
+              }
+              if (!openDetailModal) throw new Error('Detail modal host is unavailable');
+              const target = resolveDetailModalTarget(path, actionDef.presentation.width ?? 900);
+              const sourceIds = Object.keys(runtime?.getSchema?.()?.dataSources ?? {}).filter(
+                (id) => dataSourceManager?.has(id),
+              );
+              const refreshSource =
+                context.loadData || (dataSourceManager && sourceIds.length > 0)
+                  ? () => {
+                      const refresh = async () => {
+                        if (context.loadData) await context.loadData();
+                        else if (dataSourceManager && sourceIds.length > 0) {
+                          await dataSourceManager.reload(sourceIds);
+                          // DMS records a failed read in state while its reload promise resolves.
+                          const failure = sourceIds
+                            .map((id) => dataSourceManager.getState?.(id)?.error)
+                            .find(Boolean);
+                          if (failure) throw failure;
+                        }
+                      };
+                      return refresh().catch((failure) => {
+                        notifyToast(
+                          t(
+                            'error.data_load_failed',
+                            undefined,
+                            locale.startsWith('zh')
+                              ? '数据刷新失败，请重试。'
+                              : 'Unable to refresh data. Try again.',
+                          ),
+                          'error',
+                        );
+                        throw failure;
+                      });
+                    }
+                  : undefined;
+              openDetailModal(target, refreshSource);
+              return;
+            }
             // Absolute backend/external URLs (e.g. a file-download endpoint) are
             // real browser navigations, not client-side routes — open them so the
             // browser handles the Content-Disposition download.
@@ -1129,13 +1213,29 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     record: record || context.data,
                   },
                   { t, locale },
+                  (actionDef as any).inputFieldsPresentation ??
+                    (normalizedButton as any).inputFieldsPresentation,
+                  actionSignal,
+                  submissionFeedback,
                 );
               } catch (error) {
                 if (error instanceof ActionCancelledError) return;
                 throw error;
               }
             }
-            await executeCommand(actionDef.command, targetRecordPid, payload, 'update');
+            const transitionResult = await executeCommand(
+              actionDef.command,
+              targetRecordPid,
+              payload,
+              'update',
+            );
+            if (actionSignal?.aborted || actionScope?.aborted) return;
+            submissionFeedback.completeResult(transitionResult, true);
+            if (
+              submissionFeedback.getState().phase === 'failed' &&
+              commandBusinessRejectionError(transitionResult)
+            )
+              return;
             if (context.loadData) {
               await context.loadData();
             } else {
@@ -1305,6 +1405,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
         }
       } catch (err) {
+        if (actionSignal?.aborted || actionScope?.aborted) return;
+        submissionFeedback.fail(err);
         if (err instanceof ActionCancelledError) return;
         const errorMessage = resolveCommandErrorMessage(
           { context: { detail: err instanceof Error ? err.message : 'Action execution failed' } },
@@ -1318,6 +1420,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         notifyToast(errorMessage, 'error');
         if (onError) onError(errorObject);
       } finally {
+        submissionFeedback.finalize();
         setLoading(false);
       }
     },
@@ -1337,6 +1440,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       showConfirmDialog,
       surfaceTemporaryPassword,
       captureTriggerFocus,
+      openDetailModal,
     ],
   );
 

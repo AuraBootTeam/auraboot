@@ -1,0 +1,62 @@
+import { useRef, useState } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { useModalFocusTrap } from '../useModalFocusTrap';
+function Harness() {
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null),
+    input = useRef<HTMLInputElement>(null);
+  useModalFocusTrap(open, container, () => setOpen(false), input);
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>Open</button>
+      {open && (
+        <div ref={container} role="dialog" aria-label="Test">
+          <button onClick={() => setOpen(false)}>×</button>
+          <input ref={input} aria-label="Reason" />
+          <button>Last</button>
+        </div>
+      )}
+    </>
+  );
+}
+describe('shared modal initial focus', () => {
+  it('focuses the requested input ahead of X, then restores the actual opener', async () => {
+    render(<Harness />);
+    const opener = screen.getByRole('button', { name: 'Open' });
+    opener.focus();
+    fireEvent.click(opener);
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Reason' })).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+  it('does not steal a user-selected control when the autofocus frame arrives late', async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    const last = screen.getByRole('button', { name: 'Last' });
+    last.focus();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(last).toHaveFocus();
+  });
+  it('does not let a closing modal restore focus into the header of its replacement', async () => {
+    function Dialog({ id, onReplace }: { id: number; onReplace: () => void }) {
+      const container = useRef<HTMLDivElement>(null),
+        input = useRef<HTMLInputElement>(null);
+      useModalFocusTrap(true, container, onReplace, input);
+      return (
+        <div ref={container} role="dialog" aria-label={`Dialog ${id}`}>
+          <button onClick={onReplace}>Next</button>
+          <input ref={input} aria-label={`Reason ${id}`} />
+        </div>
+      );
+    }
+    function SequentialDialogs() {
+      const [id, setId] = useState(1);
+      return <Dialog key={id} id={id} onReplace={() => setId((value) => value + 1)} />;
+    }
+    render(<SequentialDialogs />);
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Reason 1' })).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Reason 2' })).toHaveFocus());
+  });
+});

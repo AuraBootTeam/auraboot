@@ -159,7 +159,9 @@ export const ListTable = React.memo(function ListTable({
   treeConfig,
 }: ListTableProps) {
   const effectiveRowHeight = normalizeRowHeight(rowHeight);
-  const rowHeightCfg = workspace ? { ...ROW_HEIGHT_CONFIG[effectiveRowHeight], px: 64, pyClass: 'py-3' } : ROW_HEIGHT_CONFIG[effectiveRowHeight];
+  const rowHeightCfg = workspace
+    ? { ...ROW_HEIGHT_CONFIG[effectiveRowHeight], px: 64, pyClass: 'py-3' }
+    : ROW_HEIGHT_CONFIG[effectiveRowHeight];
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -181,8 +183,12 @@ export const ListTable = React.memo(function ListTable({
       const title =
         typeof rawValue === 'string' || typeof rawValue === 'number' ? String(rawValue) : undefined;
       return (
-        <div className={`max-w-full min-w-0 ${column.ellipsis === false
-          ? 'whitespace-normal break-words' : 'truncate'}`} title={title}>
+        <div
+          className={`max-w-full min-w-0 ${
+            column.ellipsis === false ? 'break-words whitespace-normal' : 'truncate'
+          }`}
+          title={title}
+        >
           {renderCellContent(record, column, rowIndex)}
         </div>
       );
@@ -693,6 +699,7 @@ export const ListTable = React.memo(function ListTable({
                       <tr
                         key={rowId || index}
                         data-testid={`table-row-${index}`}
+                        data-record-pid={rowId || undefined}
                         data-tree-depth={node.depth}
                         className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
@@ -743,7 +750,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap overflow-hidden ${
+                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'
@@ -821,6 +828,7 @@ export const ListTable = React.memo(function ListTable({
                       <tr
                         key={rowId || index}
                         data-testid={`table-row-${index}`}
+                        data-record-pid={rowId || undefined}
                         data-index={virtualRow.index}
                         className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
@@ -850,7 +858,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap overflow-hidden ${
+                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'
@@ -935,6 +943,7 @@ export const ListTable = React.memo(function ListTable({
                     <tr
                       key={rowId || index}
                       data-testid={`table-row-${index}`}
+                      data-record-pid={rowId || undefined}
                       className={getRowClassName(rowId)}
                       style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                       onClick={() => onRowClick(record)}
