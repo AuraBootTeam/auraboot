@@ -87,7 +87,9 @@ class KafkaMqProviderBoundsTest {
             assertSame(wakeup,assertThrows(IllegalStateException.class,()->provider.close(Duration.ofMillis(25))));
             assertTrue(System.nanoTime()-before<Duration.ofSeconds(1).toNanos());
             assertEquals(2,wakeup.getSuppressed().length); assertSame(close,wakeup.getSuppressed()[1]);
-            assertEquals(1,provider.activeSubscriptionCount(),"A live consumer cannot disappear from the ownership ledger");
+            assertFalse(stage.toCompletableFuture().isDone(),"The consumer has not actually terminated");
+            assertSame(wakeup,assertThrows(IllegalStateException.class,
+                    ()->provider.unsubscribe("bounded-topic","bounded-group")),"The still-owned entry must remain addressable");
             verify(producer).close(argThat(duration->!duration.isNegative() && duration.compareTo(Duration.ofMillis(25))<=0));
         } finally {release.countDown();stage.toCompletableFuture().get(1,TimeUnit.SECONDS);}
         assertEquals(0,provider.activeSubscriptionCount());
@@ -103,6 +105,7 @@ class KafkaMqProviderBoundsTest {
         @SuppressWarnings("unchecked") KafkaProducer<String,String> producer=mock(KafkaProducer.class);
         var provider=new KafkaMqProvider(producer,"unused:1","bounded-unit");
         var error=new org.apache.kafka.common.errors.InterruptException(new InterruptedException("Producer was interrupted"));
+        Thread.interrupted(); // Kafka's exception constructor itself marks the constructing thread interrupted.
         doThrow(error).when(producer).close(any(Duration.class));
         try {
             assertSame(error,assertThrows(org.apache.kafka.common.errors.InterruptException.class,
