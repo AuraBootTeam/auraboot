@@ -2888,9 +2888,10 @@
         "mergeCommit": "1b4b702285dc26afb416fc600174a2efc0244542"
       },
       {
-        "repository": "AuraBootTeam/auraboot-enterprise",
+        "repository": "Enterprise",
         "number": 1589,
-        "mergeCommit": "562f8df415a0f6fb357969c03e34cc6ef019b432"
+        "mergeCommit": "562f8df415a0f6fb357969c03e34cc6ef019b432",
+        "repositoryLinkReference": "announcement-management.md section 18.29"
       }
     ],
     "coreBrowser": {

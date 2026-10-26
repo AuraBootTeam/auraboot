@@ -2215,7 +2215,7 @@
     }
   ],
   "excludedBpmRun": {
-    "path": "/Users/ghj/work/auraboot-evidence/workspace/announcement-management/merge-ui-2026-10-26/bpm",
+    "path": "bpm",
     "reason": "lifecycle adapter retained old artifact path; browser and captures excluded; fresh build remains valid"
   },
   "bpmRun": "bpm/attempt-2",

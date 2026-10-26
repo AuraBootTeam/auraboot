@@ -1,7 +1,7 @@
 {
   "verified": true,
   "backendPid": 56388,
-  "artifactRoot": "/Users/ghj/work/auraboot/.workspace/evidence/announcement-management/merge-ui-2026-10-26/bpm-composition-main-1b4b70228",
+  "artifactRoot": ".workspace/evidence/announcement-management/merge-ui-2026-10-26/bpm-composition-main-1b4b70228",
   "source": {
     "repository": "git@github.com:AuraBootTeam/aura-bpm.git",
     "commit": "1b4b702285dc26afb416fc600174a2efc0244542"
@@ -10,5 +10,6 @@
     "repository": "git@github.com:AuraBootTeam/auraboot.git",
     "commit": "7c5c1a4951b9d44a5282a0273b939762cd999d3a"
   },
-  "lockIdentity": "sha256:45cfca8872588debb44a9e8ae6c3ca5d751f33d83b828df242a374023d8fe4ca"
+  "lockIdentity": "sha256:45cfca8872588debb44a9e8ae6c3ca5d751f33d83b828df242a374023d8fe4ca",
+  "publicProjection": "Machine-specific root removed; exact private producer and process check retained in the owned evidence round."
 }
