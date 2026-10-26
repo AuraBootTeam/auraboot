@@ -200,4 +200,15 @@ class EmbeddingServiceBranchTest {
         assertNotNull(resolved);
         assertEquals(0, resolved.dimensions(), "absent dimensions → 0 (no body field sent)");
     }
+    @Test
+    void versionedVectorsRejectInvalidCosineInputsAndDefendTheirSnapshot() {
+        String space="a".repeat(64);
+        assertThrows(IllegalArgumentException.class, () -> new EmbeddingService.EmbeddedVector(new float[]{0,0},space));
+        assertThrows(IllegalArgumentException.class, () -> new EmbeddingService.EmbeddedVector(new float[]{Float.NaN,1},space));
+        assertThrows(IllegalArgumentException.class, () -> new EmbeddingService.EmbeddedVector(new float[]{Float.POSITIVE_INFINITY,1},space));
+        float[] source={1,0};var vector=new EmbeddingService.EmbeddedVector(source,space);
+        source[0]=99;vector.values()[0]=77;
+        assertEquals(1,vector.values()[0]);
+    }
+
 }

@@ -69,60 +69,67 @@ public class MemoryEmbeddingService {
     }
 
     /**
-     * Compute the embedding for the given memory row and persist it. No-op
-     * if the row is missing, already embedded, or the provider is down.
+     * Explicitly compute or rebuild the embedding for a live memory row. Existing
+     * vectors are reused only when their space and content snapshot are current.
      *
      * @return true if a new vector was written, false otherwise.
      */
     public boolean computeAndStore(String memoryPid) {
-        if (memoryPid == null || memoryPid.isBlank()) {
+        Map<String, Object> row = loadVectorRow(memoryPid);
+        if (row == null) return false;
+        Long tenantId = ((Number) row.get("tenant_id")).longValue();
+        String content = (String) row.get("memory_content");
+        if (content == null || content.isBlank()) return false;
+        String hash = com.auraboot.framework.agent.memory.MemoryVectorPolicy.sha256(content);
+        String currentSpace = embeddingService.currentSpace(tenantId, null, EXPECTED_DIM);
+        if (currentSpace == null) return false;
+        if (row.get("embedding_text") != null && currentSpace.equals(row.get("embedding_space"))
+                && hash.equals(row.get("embedding_content_hash"))) return false;
+        String normalised = normaliseForEmbedding(content);
+        if (normalised.isEmpty()) return false;
+        var embedded = embeddingService.embedWithIdentity(tenantId, normalised, null);
+        if (embedded == null || embedded.values().length != EXPECTED_DIM) {
+            recordDimMismatch(tenantId, "auto", embedded == null ? 0 : embedded.values().length);
             return false;
         }
-        Map<String, Object> row;
+        return jdbcTemplate.update(
+                "UPDATE ab_agent_memory SET embedding=?::vector, embedding_space=?, embedding_content_hash=?, embedding_generated_at=NOW() "
+                        + "WHERE pid=? AND tenant_id=? AND memory_content IS NOT DISTINCT FROM ? "
+                        + "AND embedding::text IS NOT DISTINCT FROM ? AND embedding_space IS NOT DISTINCT FROM ? "
+                        + "AND embedding_content_hash IS NOT DISTINCT FROM ? AND " + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE,
+                toVectorLiteral(embedded.values()), embedded.space(), hash, memoryPid, tenantId, content,
+                row.get("embedding_text"), row.get("embedding_space"), row.get("embedding_content_hash")) == 1;
+    }
+
+    private Map<String, Object> loadVectorRow(String memoryPid) {
+        if (memoryPid == null || memoryPid.isBlank()) return null;
         try {
-            row = jdbcTemplate.queryForMap(
-                    "SELECT tenant_id, memory_content, embedding IS NOT NULL AS has_embedding "
-                            + "FROM ab_agent_memory "
-                            + "WHERE pid = ? "
-                            + "AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
-                    memoryPid);
-        } catch (EmptyResultDataAccessException e) {
-            log.debug("computeAndStore: memory {} not found", memoryPid);
-            return false;
+            return jdbcTemplate.queryForMap("SELECT tenant_id,memory_content,embedding::text AS embedding_text,embedding_space,embedding_content_hash "
+                    + "FROM ab_agent_memory WHERE pid=? AND " + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE, memoryPid);
+        } catch (EmptyResultDataAccessException absent) {
+            return null;
         }
-        if (Boolean.TRUE.equals(row.get("has_embedding"))) {
-            return false;
+    }
+
+    /** Existing vectors are never silently rebuilt on a read; explicit computeAndStore is required. */
+    public EmbeddingService.EmbeddedVector resolveVersionedEmbedding(String memoryPid) {
+        Map<String, Object> row = loadVectorRow(memoryPid);
+        if (row == null) return null;
+        if (row.get("embedding_text") == null) {
+            if (!computeAndStore(memoryPid)) return null;
+            row = loadVectorRow(memoryPid);
+            if (row == null) return null;
         }
         Long tenantId = ((Number) row.get("tenant_id")).longValue();
         String content = (String) row.get("memory_content");
-        if (content == null || content.isBlank()) {
-            return false;
-        }
-
-        String normalised = normaliseForEmbedding(content);
-        if (normalised.isEmpty()) {
-            return false;
-        }
-
-        float[] vector = embeddingService.embed(tenantId, normalised, null);
-        if (vector == null || vector.length == 0) {
-            log.warn("MemoryEmbeddingService: embedding provider returned null/empty vector for tenant {} memory {} — leaving null",
-                    tenantId, memoryPid);
-            recordDimMismatch(tenantId, "auto", vector == null ? 0 : vector.length);
-            return false;
-        }
-        if (vector.length != EXPECTED_DIM) {
-            log.warn("MemoryEmbeddingService: embedding dim mismatch tenant={} memory={} provider={} returnedDim={} expectedDim={} — dropping",
-                    tenantId, memoryPid, "auto", vector.length, EXPECTED_DIM);
-            recordDimMismatch(tenantId, "auto", vector.length);
-            return false;
-        }
-
-        String literal = toVectorLiteral(vector);
-        int affected = jdbcTemplate.update(
-                "UPDATE ab_agent_memory SET embedding = ?::vector WHERE pid = ?",
-                literal, memoryPid);
-        return affected > 0;
+        String currentSpace = embeddingService.currentSpace(tenantId, null, EXPECTED_DIM);
+        if (content == null || currentSpace == null || !currentSpace.equals(row.get("embedding_space"))
+                || !com.auraboot.framework.agent.memory.MemoryVectorPolicy.sha256(content).equals(row.get("embedding_content_hash"))) return null;
+        double[] values = parseVectorLiteral((String) row.get("embedding_text"));
+        if (values == null || values.length != EXPECTED_DIM) return null;
+        float[] vector = new float[values.length];
+        for (int i=0; i<values.length; i++) vector[i]=(float)values[i];
+        return new EmbeddingService.EmbeddedVector(vector, currentSpace);
     }
 
     private void recordDimMismatch(Long tenantId, String provider, int actualDim) {
@@ -193,23 +200,17 @@ public class MemoryEmbeddingService {
      * content, or the embedding provider is down.
      */
     public double[] resolveEmbedding(String memoryPid) {
-        if (memoryPid == null || memoryPid.isBlank()) {
-            return null;
-        }
-        double[] existing = readEmbedding(memoryPid);
-        if (existing != null) {
-            return existing;
-        }
-        boolean stored = computeAndStore(memoryPid);
-        if (!stored) {
-            return null;
-        }
-        return readEmbedding(memoryPid);
+        var embedded = resolveVersionedEmbedding(memoryPid);
+        if (embedded == null) return null;
+        float[] values = embedded.values();
+        double[] result = new double[values.length];
+        for (int i=0; i<values.length; i++) result[i]=values[i];
+        return result;
     }
 
     /**
-     * Read an existing embedding as {@code double[]}. Returns null when the
-     * column is null or the row is missing.
+     * Diagnostic raw-vector reader retained for compatibility. Do not use this value
+     * for similarity: resolveVersionedEmbedding enforces identity and freshness.
      */
     public double[] readEmbedding(String memoryPid) {
         try {

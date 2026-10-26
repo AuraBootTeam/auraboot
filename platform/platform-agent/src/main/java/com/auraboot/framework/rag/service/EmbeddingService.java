@@ -45,6 +45,67 @@ public class EmbeddingService {
         return results.isEmpty() ? null : results.get(0);
     }
 
+    /** Vector with the identity of the configuration snapshot actually used for its request. */
+    public record EmbeddedVector(float[] values, String space) {
+        public EmbeddedVector {
+            if (values == null || values.length == 0 || space == null || !space.matches("[a-f0-9]{64}")) {
+                throw new IllegalArgumentException("A vector and SHA-256 space identity are required");
+            }
+            values = values.clone();
+            double norm = 0;
+            for (float value : values) {
+                if (!Float.isFinite(value)) throw new IllegalArgumentException("Embedding values must be finite");
+                norm += (double) value * value;
+            }
+            if (norm == 0) throw new IllegalArgumentException("A cosine embedding must be nonzero");
+        }
+        @Override public float[] values() { return values.clone(); }
+    }
+
+    /** Resolve identity without performing a provider request or exposing its credentials. */
+    public String currentSpace(Long tenantId, String providerCode, int actualDimensions) {
+        EmbeddingConfig config = resolveConfig(tenantId, providerCode);
+        return config == null ? null : spaceIdentity(config, actualDimensions);
+    }
+
+    public EmbeddedVector embedWithIdentity(Long tenantId, String text, String providerCode) {
+        if (text == null || text.isBlank()) return null;
+        EmbeddingConfig config = resolveConfig(tenantId, providerCode);
+        if (config == null) return null;
+        try {
+            List<float[]> result = callEmbeddingApi(config, List.of(text));
+            if (result.size() != 1) throw new IllegalStateException("Expected one embedding result");
+            float[] vector = result.get(0);
+            if (config.dimensions > 0 && vector.length != config.dimensions) {
+                throw new IllegalStateException("Embedding response dimension differs from request");
+            }
+            return new EmbeddedVector(vector, spaceIdentity(config, vector.length));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception failure) {
+            // Provider bodies may contain confidential input; report the type, never the body/key.
+            log.warn("Versioned embedding request failed: {}", failure.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private String spaceIdentity(EmbeddingConfig config, int actualDimensions) {
+        if (actualDimensions <= 0) throw new IllegalArgumentException("Positive dimensions required");
+        String endpoint = embeddingUrl(config);
+        StringBuilder source = new StringBuilder();
+        for (String part : List.of("embedding-space-v1", config.providerCode, endpoint, config.model,
+                Integer.toString(config.dimensions), Integer.toString(actualDimensions), config.spaceVersion)) {
+            source.append(part.length()).append(':').append(part);
+        }
+        try {
+            return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(source.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is required by the Java runtime", impossible);
+        }
+    }
+
     /**
      * Embed a batch of texts (max 20 per API call). Splits into sub-batches if needed.
      *
@@ -109,14 +170,16 @@ public class EmbeddingService {
         return body;
     }
 
+    private String embeddingUrl(EmbeddingConfig config) {
+        return config.baseUrl.endsWith("/") ? config.baseUrl + "v1/embeddings" : config.baseUrl + "/v1/embeddings";
+    }
+
     @SuppressWarnings("unchecked")
     private List<float[]> callEmbeddingApi(EmbeddingConfig config, List<String> texts) throws Exception {
         Map<String, Object> body = buildRequestBody(config.model, texts, config.dimensions);
         String jsonBody = objectMapper.writeValueAsString(body);
 
-        String url = config.baseUrl.endsWith("/")
-                ? config.baseUrl + "v1/embeddings"
-                : config.baseUrl + "/v1/embeddings";
+        String url = embeddingUrl(config);
 
         // SSRF guard: baseUrl is tenant-configurable (CloudConfig). Reject private/
         // loopback/link-local targets and disallowed schemes, and pin the resolved IP
@@ -194,7 +257,7 @@ public class EmbeddingService {
                             getStr(cfg, "baseUrl", "https://api.openai.com"),
                             getStr(cfg, "defaultModel", "text-embedding-3-small"),
                             getInt(cfg, "maxBatchSize", 20),
-                            getInt(cfg, "dimensions", 0)
+                            getInt(cfg, "dimensions", 0), providerCode, getStr(cfg, "spaceVersion", "")
                     );
                 }
             }
@@ -223,5 +286,11 @@ public class EmbeddingService {
      *                   providers with Matryoshka Representation Learning
      *                   (Qwen text-embedding-v4, OpenAI text-embedding-3-*).
      */
-    record EmbeddingConfig(String apiKey, String baseUrl, String model, int maxBatchSize, int dimensions) {}
+    record EmbeddingConfig(String apiKey, String baseUrl, String model, int maxBatchSize, int dimensions,
+                           String providerCode, String spaceVersion) {
+        EmbeddingConfig(String apiKey, String baseUrl, String model, int maxBatchSize, int dimensions) {
+            this(apiKey, baseUrl, model, maxBatchSize, dimensions, "unspecified", "");
+        }
+        @Override public String toString() { return "EmbeddingConfig[credentials=REDACTED]"; }
+    }
 }

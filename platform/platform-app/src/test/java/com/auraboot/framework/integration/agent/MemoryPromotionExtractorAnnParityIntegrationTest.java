@@ -113,6 +113,7 @@ class MemoryPromotionExtractorAnnParityIntegrationTest extends BaseIntegrationTe
                         + " embedding, created_at, updated_at, deleted_flag) "
                         + "VALUES (?, ?, 'default', 'fact', 'ops', ?, ?, 6, FALSE, 'user', ?, ?::vector, NOW(), NOW(), FALSE)",
                 pid, tenantId, "title-" + pid, "content-" + pid, scopeKey, toVectorLiteral(vector));
+        jdbc.update("UPDATE ab_agent_memory SET embedding_space=?,embedding_content_hash=encode(sha256(convert_to(memory_content,'UTF8')),'hex') WHERE pid=? AND embedding IS NOT NULL", "a".repeat(64), pid);
     }
 
     private static String toVectorLiteral(double[] v) {

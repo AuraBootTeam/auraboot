@@ -170,9 +170,9 @@ public class ActiveMemoryService {
         // when no embedding provider is wired, or when the embedding call fails.
         if (semanticRecallEnabled && embeddingService != null
                 && snippets.size() < MAX_SNIPPETS && userMessage != null && !userMessage.isBlank()) {
-            float[] q = safeEmbed(tenantId, userMessage.trim());
+            EmbeddingService.EmbeddedVector q = safeEmbed(tenantId, userMessage.trim());
             if (q != null) {
-                for (Map<String, Object> row : memoryService.searchScopedSemantic(
+                for (Map<String, Object> row : memoryService.searchScopedSemanticInSpace(
                         tenantId, userId, agent, q, semanticLimit)) {
                     if (snippets.size() >= MAX_SNIPPETS) break;
                     if (seenPids.add(String.valueOf(row.get("pid")))) {
@@ -234,9 +234,9 @@ public class ActiveMemoryService {
     }
 
     /** Embed the query text for CAP-01 semantic recall; null on any failure (graceful skip). */
-    private float[] safeEmbed(Long tenantId, String text) {
+    private EmbeddingService.EmbeddedVector safeEmbed(Long tenantId, String text) {
         try {
-            return embeddingService.embed(tenantId, text, semanticProvider);
+            return embeddingService.embedWithIdentity(tenantId, text, semanticProvider);
         } catch (Exception e) {
             log.warn("Semantic pre-recall embedding failed for tenant {}: {}", tenantId, e.getMessage());
             return null;
