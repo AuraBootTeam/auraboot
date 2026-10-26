@@ -95,6 +95,15 @@ test('native reminder preview confirms, replays a lost response, and shows persi
     await expectAnnouncementReminderPreviewReady(page);
     await expect(page.getByRole('button', { name: '确认催办', exact: true })).toBeVisible();
     await screenshot('reminder-preview-narrow');
+    const narrowFacts = page.locator('[data-aura-block-id="announcement_reminder_preview_detail_facts"]');
+    await narrowFacts.scrollIntoViewIfNeeded();
+    await expect(narrowFacts.getByRole('columnheader', { name: '预览时可催办', exact: true })).toBeInViewport();
+    await screenshot('reminder-preview-narrow-facts');
+    const horizontalFacts = narrowFacts.locator('.table-block');
+    await horizontalFacts.evaluate(element => { element.scrollLeft = element.scrollWidth; });
+    await expect(narrowFacts.getByRole('columnheader', { name: '有效期', exact: true })).toBeInViewport();
+    await screenshot('reminder-preview-narrow-facts-right');
+    await horizontalFacts.evaluate(element => { element.scrollLeft = 0; });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole('button', { name: '确认催办', exact: true }).click();
     const dialog = page.getByTestId('confirm-dialog'); await expect(dialog).toBeVisible();
