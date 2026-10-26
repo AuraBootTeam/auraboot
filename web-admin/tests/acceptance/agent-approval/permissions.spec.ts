@@ -139,13 +139,32 @@ test('ordinary member cannot create a model and can still perform an allowed rea
   expect(await forbiddenEffect(code)).toEqual({ models: 0, physical: null });
   await login(page, fixture.reader);
   await openPanel(page, true);
-  const result = await send(page, '请现在实际创建一个业务模型，调用 aurabot_model_create，'
-    + '编码为 ' + code + '，名称为权限拒绝验收台账。请执行创建，不要只返回示例。', 'reader-denied');
+  const proposal = await send(page, '请实际调用 platform_create_model 创建一个业务模型，'
+    + '编码为 ' + code + '，名称为权限拒绝验收台账。请提交创建请求，不要只返回示例。', 'reader-denied-proposal');
+  expect(proposal.some(item => item.name === 'confirm_required'
+    && item.data.toolName === 'platform_create_model')).toBe(true);
+  await expect(page.getByTestId('aurabot-confirm-approve')).toBeVisible();
+  expect(await modelInventory()).toEqual(inventoryBefore);
+  const response = page.waitForResponse(candidate =>
+    new URL(candidate.url()).pathname === '/api/ai/aurabot/execute'
+      && candidate.request().method() === 'POST', { timeout: 120_000 });
+  await page.getByTestId('aurabot-confirm-approve').click();
+  const decision = await response;
+  expect(decision.status()).toBe(200);
+  const raw = (await decision.body()).toString('utf8');
+  writeFileSync(join(evidence, 'reader-denied.private.sse.txt'), raw, { mode: 0o600 });
+  const result = events(raw);
+  const denial = result.find(item => item.name === 'tool_result');
+  expect(denial?.data.success).toBe(false);
+  expect(denial?.data.result.errorCode).toBe('TOOL_ACCESS_DENIED');
+  expect(denial?.data.result.retryable).toBe(false);
+  expect(denial?.data.result.errorFrame.errorClass).toBe('ToolAccessDenied');
+  await expect(page.getByTestId('aurabot-input')).toBeEnabled({ timeout: 120_000 });
   expect(await forbiddenEffect(code)).toEqual({ models: 0, physical: null });
   expect(await modelInventory()).toEqual(inventoryBefore);
   await expect(page.getByTestId('skill-preview-card')).toHaveCount(0);
   await expect(page.getByTestId('aurabot-confirm-card')).toHaveCount(0);
-  await expect(page.locator('[data-testid=aurabot-panel]')).toContainText(/权限|无法|不能|不可用|未创建|未执行/);
+  await expect(page.locator('[data-testid=aurabot-panel]')).toContainText(/权限|无权|授权|管理员/);
   expect(result.filter(item => item.name === 'tool_result' && item.data.success === true)
     .some(item => JSON.stringify(item.data.result).includes(code))).toBe(false);
   await page.screenshot({ path: join(evidence, 'reader-write-denied.png'), fullPage: true });
