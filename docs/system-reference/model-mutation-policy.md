@@ -31,6 +31,19 @@ the model mutation policy and never grant command or record authority.
 | `commandOnlyCreate: true` | Reject generic creation without the trusted command permit scope. |
 | `extension.commandOnlyDelete: true` | Reject generic single and batch deletion without that scope; permit lifecycle updates subject to field ownership and other policies. |
 
+`extension.commandWriters` requires exactly three array-valued keys: `create`,
+`update`, and `delete`. Each nonempty array contains exact authorized command
+codes; an explicit empty array denies every command for that operation. For
+example, `{"create":["audit:create"],"update":[],"delete":[]}` permits only
+the named creation command and rejects later updates, state transitions and
+deletion. An empty update list also rejects same-command insert-completion
+writes. The command permit scope and exact command identity are both required;
+`ALL` alone grants no writer authority. Matching a writer does not override an
+immutable model. Missing/extra keys, non-arrays, null entries and blank/non-string
+codes fail closed as malformed policies. An absent policy retains existing
+model behavior. This model-wide contract is separate from the record-selected
+`recordCommandWriters` policy below.
+
 Deletion protection is declared in the existing model extension map, which plugin import, metadata normalization and Application Release definitions preserve:
 
 ```json

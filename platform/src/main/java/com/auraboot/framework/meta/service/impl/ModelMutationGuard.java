@@ -25,7 +25,8 @@ public final class ModelMutationGuard {
             throw new MetaServiceException("Invalid model commandWriters policy");
         }
         for (Object value : policy.values()) {
-            if (!(value instanceof java.util.List<?> codes) || codes.isEmpty()
+            // An explicit empty list denies every command for this operation.
+            if (!(value instanceof java.util.List<?> codes)
                     || codes.stream().anyMatch(code -> !(code instanceof String text) || text.isBlank())) {
                 throw new MetaServiceException("Invalid model commandWriters policy");
             }
