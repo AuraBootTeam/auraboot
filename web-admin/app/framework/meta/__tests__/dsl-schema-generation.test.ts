@@ -16,9 +16,26 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes the card image viewport in the 43-definition contract', () => {
-    expect(Object.keys(defs).length).toBe(43);
+  it('includes card, workspace presentation and rule types in the 48-definition contract', () => {
+    expect(Object.keys(defs).length).toBe(48);
     expect(defs).toHaveProperty('CardImageViewport');
+    expect(defs).toHaveProperty('WorkspaceCellPresentation');
+    expect(defs).toHaveProperty('RuleOverride');
+  });
+
+  it('accepts explicit server page bindings and rejects incomplete or unknown pagination properties', () => {
+    const ajv = new Ajv({ strict: false });
+    const validate = ajv.compile({ ...schema, $ref: '#/definitions/PaginationConfig' });
+    expect(
+      validate({
+        pageSize: 20,
+        server: { pageState: 'page', pageSizeState: 'size', resetOn: ['state.store'] },
+      }),
+    ).toBe(true);
+    expect(validate({ server: { pageState: 'page' } })).toBe(false);
+    expect(validate({ server: { pageState: 'page', pageSizeState: 'size', offset: 20 } })).toBe(
+      false,
+    );
   });
 
   it('should have DslSchema definition', () => {

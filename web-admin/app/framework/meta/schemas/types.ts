@@ -1,5 +1,7 @@
 import type { CardRowSelection } from '../runtime/expression/row-selection';
 import type { RowProjection } from '../runtime/expression/row-projection';
+import type { WorkspaceCellPresentation } from '../runtime/renderers/WorkspaceCells';
+import type { CrossFieldRule, RuleOverride } from '../validation/crossFieldRuleTypes';
 /**
  * 统一 DSL Schema 类型定义
  * 基于 final.v1.0 DSL 结构
@@ -230,7 +232,7 @@ export interface EventConfig {
 // Column 配置（用于列表）
 export interface ColumnConfig {
   /** Structured, reusable business cell presentation. */
-  presentation?: import('../runtime/renderers/WorkspaceCells').WorkspaceCellPresentation;
+  presentation?: WorkspaceCellPresentation;
   field: string;
   label?: string | LocalizedText; // optional: resolved by i18n Resolver from model displayName
   /** Runtime personalization may reorder but never hide this baseline field. */
@@ -497,6 +499,13 @@ export interface PaginationConfig {
   showTotal?: boolean;
   showSizeChanger?: boolean;
   showQuickJumper?: boolean;
+  /** Opt-in server pagination for a data-source table block. API parameters bind these state keys. */
+  server?: {
+    pageState: string;
+    pageSizeState: string;
+    /** Context paths whose changes return the queue to page one, e.g. state.selectedStore.pid. */
+    resetOn?: string[];
+  };
 }
 
 export interface SelectionConfig {
@@ -807,10 +816,10 @@ export interface UnifiedSchema {
   linkageRules?: LinkageRule[];
 
   // Cross-field validation rules (model-level baseline)
-  rules?: import('~/framework/meta/validation/crossFieldRuleTypes').CrossFieldRule[];
+  rules?: CrossFieldRule[];
 
   // Command-level rule overrides (loaded per command)
-  ruleOverrides?: import('~/framework/meta/validation/crossFieldRuleTypes').RuleOverride[];
+  ruleOverrides?: RuleOverride[];
 
   // Multi-view support — when true, show view type tabs (Table/Kanban/Calendar/etc.)
   // Default: false (only table view, no view switcher)

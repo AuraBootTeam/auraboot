@@ -909,6 +909,25 @@
         "adaptor": {
           "type": "string"
         },
+        "dataPath": {
+          "type": "string",
+          "description": "Explicit path inside completed command data; no fallback."
+        },
+        "rowProjection": {
+          "$ref": "#/definitions/RowProjection",
+          "description": "Optional safe projection before commandArray rows seed a scoped form."
+        },
+        "rowIdentityField": {
+          "type": "string"
+        },
+        "totalPath": {
+          "type": "string",
+          "description": "Options require this total to equal the complete array length."
+        },
+        "selectableField": {
+          "type": "string",
+          "description": "Optional boolean path; false disables the corresponding option."
+        },
         "valueField": {
           "type": "string"
         },
@@ -943,6 +962,66 @@
         }
       },
       "additionalProperties": false
+    },
+    "RowProjection": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/definitions/RowProjectionDescriptor"
+          }
+        ]
+      }
+    },
+    "RowProjectionDescriptor": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "omitWhen": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OmissionState"
+          },
+          "description": "No omission fallback: optional fields must explicitly declare omitted states."
+        }
+      },
+      "required": [
+        "paths"
+      ],
+      "additionalProperties": false
+    },
+    "OmissionState": {
+      "type": "string",
+      "enum": [
+        "undefined",
+        "null",
+        "empty"
+      ],
+      "description": "Declarative, bounded projection of read rows into explicit command payloads."
     },
     "EventConfig": {
       "type": "object",
@@ -1059,6 +1138,14 @@
           ],
           "description": "Confirmation prompt i18n key — shown before executing the action."
         },
+        "confirmVariant": {
+          "type": "string",
+          "enum": [
+            "default",
+            "danger"
+          ],
+          "description": "Explicit confirmation style; omitted follows the button danger/variant intent."
+        },
         "commandCode": {
           "type": "string",
           "deprecated": "Use `action: { type: \"command\", command }` instead."
@@ -1148,6 +1235,34 @@
                 }
               ]
             },
+            "includeRecordPayload": {
+              "type": "boolean",
+              "description": "Defaults to true for legacy actions; false sends only configured and prompted fields."
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "operationType": {
+              "type": "string",
+              "enum": [
+                "create",
+                "update",
+                "delete",
+                "CREATE",
+                "UPDATE",
+                "DELETE"
+              ]
+            },
+            "expectedVersion": {
+              "type": [
+                "number",
+                "string"
+              ]
+            },
+            "idempotent": {
+              "type": "boolean"
+            },
             "type": {
               "type": "string",
               "const": "command"
@@ -1202,6 +1317,34 @@
                   "$ref": "#/definitions/LocalizedText"
                 }
               ]
+            },
+            "includeRecordPayload": {
+              "type": "boolean",
+              "description": "Defaults to true for legacy actions; false sends only configured and prompted fields."
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "operationType": {
+              "type": "string",
+              "enum": [
+                "create",
+                "update",
+                "delete",
+                "CREATE",
+                "UPDATE",
+                "DELETE"
+              ]
+            },
+            "expectedVersion": {
+              "type": [
+                "number",
+                "string"
+              ]
+            },
+            "idempotent": {
+              "type": "boolean"
             },
             "type": {
               "type": "string",
@@ -1785,6 +1928,30 @@
         },
         "showQuickJumper": {
           "type": "boolean"
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "pageState": {
+              "type": "string"
+            },
+            "pageSizeState": {
+              "type": "string"
+            },
+            "resetOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Context paths whose changes return the queue to page one, e.g. state.selectedStore.pid."
+            }
+          },
+          "required": [
+            "pageState",
+            "pageSizeState"
+          ],
+          "additionalProperties": false,
+          "description": "Opt-in server pagination for a data-source table block. API parameters bind these state keys."
         }
       },
       "additionalProperties": false
@@ -1957,6 +2124,10 @@
     "ColumnConfig": {
       "type": "object",
       "properties": {
+        "presentation": {
+          "$ref": "#/definitions/WorkspaceCellPresentation",
+          "description": "Structured, reusable business cell presentation."
+        },
         "field": {
           "type": "string"
         },
@@ -2000,6 +2171,10 @@
         },
         "format": {
           "type": "string"
+        },
+        "precision": {
+          "type": "number",
+          "description": "Maximum displayed fractional digits for numeric cells; defaults to 2 when omitted."
         },
         "readOnly": {
           "type": "boolean"
@@ -2128,6 +2303,9 @@
         "dictCode": {
           "type": "string"
         },
+        "dictValueSeparator": {
+          "type": "string"
+        },
         "currencyCode": {
           "type": "string"
         },
@@ -2162,6 +2340,53 @@
       },
       "required": [
         "field"
+      ],
+      "additionalProperties": false
+    },
+    "WorkspaceCellPresentation": {
+      "type": "object",
+      "properties": {
+        "size": {
+          "type": "string",
+          "const": "summary"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "object",
+            "member",
+            "progress",
+            "deadline",
+            "currency"
+          ]
+        },
+        "currencyCode": {
+          "type": "string"
+        },
+        "precision": {
+          "type": "number"
+        },
+        "subtitleFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "displayField": {
+          "type": "string"
+        },
+        "completedField": {
+          "type": "string"
+        },
+        "completedValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind"
       ],
       "additionalProperties": false
     },
@@ -2250,6 +2475,31 @@
       ],
       "additionalProperties": false
     },
+    "CardRowSelection": {
+      "type": "object",
+      "properties": {
+        "identityField": {
+          "type": "string"
+        },
+        "selectedField": {
+          "type": "string"
+        },
+        "positiveField": {
+          "type": "string"
+        },
+        "defaultSelected": {
+          "type": "boolean"
+        },
+        "label": {},
+        "emptyText": {}
+      },
+      "additionalProperties": false,
+      "required": [
+        "identityField",
+        "positiveField",
+        "selectedField"
+      ]
+    },
     "DetailTabConfig": {
       "type": "object",
       "properties": {
@@ -2304,6 +2554,56 @@
     "SubTableConfig": {
       "type": "object",
       "properties": {
+        "presentation": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "collection",
+                "focus"
+              ]
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
+            "titleField": {
+              "type": "string"
+            },
+            "descriptionField": {
+              "type": "string"
+            },
+            "dateField": {
+              "type": "string"
+            },
+            "statusField": {
+              "type": "string"
+            },
+            "completedValues": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ownerField": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "titleField",
+            "statusField",
+            "completedValues"
+          ],
+          "additionalProperties": false
+        },
         "childModel": {
           "type": "string"
         },

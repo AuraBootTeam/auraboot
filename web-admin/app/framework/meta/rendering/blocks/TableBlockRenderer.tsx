@@ -34,6 +34,7 @@ import { useMediaQuery } from '~/framework/meta/rendering/components/ResponsiveB
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { RowActionButtons } from '~/framework/meta/rendering/pages/list/RowActionButtons';
 import { useTimezone } from '~/contexts/TimezoneContext';
+import { useTableBlockPagination } from './useTableBlockPagination';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -303,6 +304,12 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   );
   const rawData = dataSourceId ? readDataSourceRows(runtime, dataSourceId) : [];
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
+  const pagination = useTableBlockPagination(
+    runtime,
+    block.table?.pagination,
+    dataSourceId,
+    dataSourceState,
+  );
   const dataSourceError = dataSourceState?.error as any;
   const errorStatus = Number(
     dataSourceError?.status ?? dataSourceError?.statusCode ?? dataSourceError?.response?.status,
@@ -1329,6 +1336,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         >
           {renderGroupedRadioSelection()}
         </div>
+        {pagination}
       </>
     );
   }
@@ -1338,6 +1346,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       <>
         {staleState}
         {renderMobileCards()}
+        {pagination}
       </>
     );
   }
@@ -1548,6 +1557,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           </tbody>
         </table>
       </div>
+      {pagination}
     </>
   );
 };
