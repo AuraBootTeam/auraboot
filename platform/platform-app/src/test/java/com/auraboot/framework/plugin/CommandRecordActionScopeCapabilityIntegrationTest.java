@@ -100,7 +100,7 @@ class CommandRecordActionScopeCapabilityIntegrationTest extends BaseIntegrationT
         scopes.setScope(getTestTenant().getId(),getTestRole().getId(),model,action,type,"MAX");
     }
     private CommandPipelineContext context() {
-        var command=new CommandDefinition(); command.setCode(model+"_manage"); command.setModelCode(model); command.setCommandType("update");
+        var command=new CommandDefinition(); command.setCode(model+"_manage"); command.setModelCode(model);
         var request=new CommandExecuteRequest(); request.setTargetRecordId(pid); request.setPayload(Map.of()); request.setClientRequestId("stable-request-key");
         return CommandPipelineContext.builder().tenantId(getTestTenant().getId()).userId(getTestUser().getId())
                 .commandCode(command.getCode()).command(command).request(request)
