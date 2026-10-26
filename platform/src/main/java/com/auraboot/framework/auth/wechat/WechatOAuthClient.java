@@ -42,7 +42,7 @@ public class WechatOAuthClient {
         return exchange(appId, appSecret, code, requiredScope, OFFICIAL_API);
     }
 
-    /** A configured loopback HTTP base is supported for owned protocol fixtures, never a browser parameter. */
+    /** Owned loopback HTTP fixtures use HTTP/1.1; official HTTPS keeps the client default. Never a browser parameter. */
     public Grant exchange(String appId, String appSecret, String code, String requiredScope, String apiBase) {
         if (!identifier(appId) || appSecret == null || appSecret.isBlank() || appSecret.length() > 256
                 || code == null || !code.matches("[A-Za-z0-9_-]{1,512}")
@@ -51,7 +51,10 @@ public class WechatOAuthClient {
         URI uri = URI.create(base + "/sns/oauth2/access_token?appid=" + enc(appId) + "&secret=" + enc(appSecret)
                 + "&code=" + enc(code) + "&grant_type=authorization_code");
         try {
-            var response = http.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).GET().build(), HttpResponse.BodyHandlers.ofString());
+            var request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).GET();
+            // Owned HTTP fixtures may expose HTTP/1 only and cannot negotiate h2c upgrades.
+            if (!OFFICIAL_API.equals(base)) request.version(HttpClient.Version.HTTP_1_1);
+            var response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
             String body = response.body();
             if (response.statusCode() != 200 || body == null || body.isBlank() || body.length() > 65536) throw failure();
             var result = JSON.readTree(body);

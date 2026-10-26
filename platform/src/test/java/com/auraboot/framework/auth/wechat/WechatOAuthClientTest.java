@@ -26,6 +26,7 @@ class WechatOAuthClientTest {
         assertThat(request.getValue().uri().getPath()).isEqualTo("/sns/oauth2/access_token");
         assertThat(request.getValue().uri().getQuery()).contains("appid=wx_app_original", "code=code_original", "grant_type=authorization_code");
         assertThat(request.getValue().timeout()).contains(java.time.Duration.ofSeconds(10));
+        assertThat(request.getValue().version()).isEmpty();
     }
     @Test void pcScopeCannotStandInForOfficialAccountPaymentIdentity() throws Exception {
         response(200, "{\"openid\":\"verified-openid\",\"access_token\":\"private-token\",\"scope\":\"snsapi_login\"}");
@@ -60,4 +61,15 @@ class WechatOAuthClientTest {
         assertThatThrownBy(() -> client.exchange("wx_app_original", "private-secret", "code_original", "snsapi_base"))
                 .hasMessageNotContaining("private-secret").hasCause(null);
     }
+    @Test void ownedLoopbackExchangeUsesHttp11WithoutChangingOfficialTransportDefaults() throws Exception {
+        response(200, "{\"openid\":\"verified-openid\",\"access_token\":\"private-token\",\"scope\":\"snsapi_base\"}");
+        assertThat(client.exchange("wx_app_original", "private-secret", "code_original", "snsapi_base", "http://127.0.0.1:5524").openId()).isEqualTo("verified-openid");
+        var request = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(request.capture(), any());
+        assertThat(request.getValue().version()).contains(HttpClient.Version.HTTP_1_1);
+        assertThat(request.getValue().uri().getHost()).isEqualTo("127.0.0.1");
+        assertThat(request.getValue().uri().getPort()).isEqualTo(5524);
+        assertThat(request.getValue().timeout()).contains(java.time.Duration.ofSeconds(10));
+    }
+
 }
