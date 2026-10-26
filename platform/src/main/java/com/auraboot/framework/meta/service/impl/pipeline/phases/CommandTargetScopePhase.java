@@ -306,6 +306,7 @@ public class CommandTargetScopePhase implements CommandPhase {
         if (!result.granted()) return false;
         String action = targetRecordAction(ctx);
         if (action == null || "read".equals(action)) return true;
+        if (!MetaContext.exists()) return false;
         // The command capability is already authorized. Apply the declared action's row
         // restriction, not generic model-operation RBAC or the unrelated read scope.
         return com.auraboot.framework.plugin.pf4j.CommandRecordActionScopePolicy.permits(

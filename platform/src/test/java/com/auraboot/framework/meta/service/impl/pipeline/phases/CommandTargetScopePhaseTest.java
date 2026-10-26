@@ -385,6 +385,7 @@ class CommandTargetScopePhaseTest {
     }
 
     @Test void unavailableWriteScopeCannotBecomeAnAllowDecision() {
+        MetaContext.setContext(1L,42L,"scope-user","Scope user");
         givenRecordIsReadable(true);
         when(applicationContext.getBean(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class))
                 .thenReturn(org.mockito.Mockito.mock(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class));
