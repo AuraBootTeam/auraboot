@@ -5,12 +5,16 @@ import com.auraboot.framework.infrastructure.mq.MqProperties;
 import com.auraboot.framework.infrastructure.mq.MqProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -23,6 +27,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -54,6 +60,7 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
     private final KafkaProducer<String, String> producer;
     private final DeadLetterQueueHandler deadLetterQueueHandler;
     private final Map<String, ConsumerEntry> consumers = new ConcurrentHashMap<>();
+    private boolean destroyed;
 
     public KafkaMqProvider(MqProperties properties) {
         MqProperties.Kafka kafkaConfig = properties.getKafka();
@@ -92,13 +99,7 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
 
     @Override
     public void send(String topic, String messageBody, Map<String, String> headers) {
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic, messageBody);
-
-        if (headers != null) {
-            for (Map.Entry<String, String> entry : headers.entrySet()) {
-                record.headers().add(entry.getKey(), entry.getValue().getBytes(StandardCharsets.UTF_8));
-            }
-        }
+        ProducerRecord<String, String> record = buildRecord(topic, null, messageBody, headers);
 
         producer.send(record, (metadata, exception) -> {
             if (exception != null) {
@@ -110,72 +111,163 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         });
     }
 
+    /**
+     * Send using a stable caller-owned partition key and expose the broker result.
+     * Completion means Kafka acknowledged the record under {@code acks=all}, not
+     * that a downstream service persisted or processed it. A failed/uncertain send
+     * may have reached Kafka; retries must retain the application's event identity.
+     * Key ordering requires a stable partition count and partitioning policy.
+     */
+    public CompletionStage<RecordMetadata> sendConfirmed(String topic, String partitionKey,
+                                                        String messageBody, Map<String, String> headers) {
+        if (partitionKey == null || partitionKey.isBlank()) {
+            throw new IllegalArgumentException("A nonblank partition key is required");
+        }
+        ProducerRecord<String, String> record = buildRecord(topic, partitionKey, messageBody, headers);
+        CompletableFuture<RecordMetadata> result = new CompletableFuture<>();
+        try {
+            producer.send(record, (metadata, error) -> {
+                if (error != null) {
+                    result.completeExceptionally(error);
+                } else if (metadata == null) {
+                    result.completeExceptionally(new IllegalStateException("Kafka acknowledgement has no metadata"));
+                } else {
+                    result.complete(metadata);
+                }
+            });
+        } catch (RuntimeException error) {
+            result.completeExceptionally(error);
+        }
+        return result.minimalCompletionStage();
+    }
+
+    private static ProducerRecord<String, String> buildRecord(String topic, String key,
+                                                              String body, Map<String, String> headers) {
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, body);
+        if (headers != null) {
+            headers.forEach((name, value) -> record.headers().add(name, value.getBytes(StandardCharsets.UTF_8)));
+        }
+        return record;
+    }
+
     @Override
     public void subscribe(String topic, String groupId, MqMessageHandler handler) {
-        String key = buildKey(topic, groupId);
-        if (consumers.containsKey(key)) {
-            log.warn("Already subscribed to topic={}, group={}. Ignoring duplicate subscription.", topic, groupId);
-            return;
+        Objects.requireNonNull(handler, "handler");
+        startSubscription(topic, groupId,
+                record -> handler.handle(record.topic(), record.value(), extractHeaders(record)), false);
+    }
+
+    /**
+     * Consume with automatic commits disabled. The callback must synchronously
+     * commit the caller's durable receipt before returning (within Kafka's poll
+     * interval). Only then is this record's exact partition offset + 1 committed.
+     * The record exposes source topic/partition/offset/key for receipt identity.
+     *
+     * <p>A callback or commit failure stops this subscription and completes the
+     * returned stage exceptionally. No retry topic or DLT bypasses the failed
+     * receipt. After fixing the cause, subscribe again using the same group to
+     * replay uncommitted records. A crash/rebalance/uncertain commit can redeliver
+     * an already persisted receipt, so the receiver must be idempotent. Never mix
+     * legacy auto-commit consumers with this mode in the same group. This is not
+     * an atomic Kafka/database transaction or a domain command bridge.</p>
+     *
+     * @return lifecycle stage: normal completion after stop/close, exceptional
+     *         completion on receive, commit or close failure
+     */
+    public CompletionStage<Void> subscribeDurably(String topic, String groupId, DurableMessageHandler handler) {
+        return startSubscription(topic, groupId, Objects.requireNonNull(handler, "handler"), true);
+    }
+
+    @FunctionalInterface
+    public interface DurableMessageHandler {
+        void handle(ConsumerRecord<String, String> record) throws Exception;
+    }
+
+    private synchronized CompletionStage<Void> startSubscription(String topic, String groupId,
+                                                     DurableMessageHandler handler, boolean durable) {
+        if (destroyed) {
+            throw new IllegalStateException("Kafka provider is closed");
         }
-
-        AtomicBoolean running = new AtomicBoolean(true);
-
-        Thread consumerThread = new Thread(() -> {
-            KafkaConsumer<String, String> consumer = createConsumer(bootstrapServers, groupId);
-            // Store consumer reference so unsubscribe/destroy can call wakeup()
-            ConsumerEntry entry = consumers.get(key);
-            if (entry != null) {
-                entry.setConsumer(consumer);
+        if (topic == null || topic.isBlank() || groupId == null || groupId.isBlank()) {
+            throw new IllegalArgumentException("Topic and groupId must be nonblank");
+        }
+        String key = buildKey(topic, groupId);
+        ConsumerEntry entry = new ConsumerEntry();
+        Thread thread = new Thread(() -> runConsumer(key, entry, topic, groupId, handler, durable),
+                "kafka-consumer-" + topic + "-" + groupId);
+        thread.setDaemon(true);
+        entry.thread = thread;
+        ConsumerEntry previous = consumers.putIfAbsent(key, entry);
+        if (previous != null) {
+            if (durable) {
+                throw new IllegalStateException("Subscription is already active or stopping: " + key);
             }
+            log.warn("Already subscribed to topic={}, group={}. Ignoring duplicate subscription.", topic, groupId);
+            return previous.stopped.minimalCompletionStage();
+        }
+        thread.start();
+        return entry.stopped.minimalCompletionStage();
+    }
 
-            try {
-                consumer.subscribe(Collections.singletonList(topic));
-                log.info("Kafka consumer started: topic={}, group={}", topic, groupId);
-
-                while (running.get()) {
-                    ConsumerRecords<String, String> records = consumer.poll(POLL_TIMEOUT);
-                    for (ConsumerRecord<String, String> record : records) {
+    private void runConsumer(String key, ConsumerEntry entry, String topic, String groupId,
+                             DurableMessageHandler handler, boolean durable) {
+        Throwable failure = null;
+        try (Consumer<String, String> consumer = createSubscriptionConsumer(groupId, durable)) {
+            entry.consumer = consumer;
+            consumer.subscribe(Collections.singletonList(topic));
+            while (entry.running.get()) {
+                ConsumerRecords<String, String> records = consumer.poll(POLL_TIMEOUT);
+                for (ConsumerRecord<String, String> record : records) {
+                    if (!entry.running.get()) {
+                        break;
+                    }
+                    if (durable) {
+                        handler.handle(record);
+                        if (!entry.running.get()) {
+                            break;
+                        }
+                        consumer.commitSync(Map.of(new TopicPartition(record.topic(), record.partition()),
+                                new OffsetAndMetadata(record.offset() + 1)));
+                    } else {
                         try {
-                            Map<String, String> headersMap = extractHeaders(record);
-                            handler.handle(topic, record.value(), headersMap);
-                        } catch (Exception e) {
-                            handleConsumerFailure(record, e, topic, groupId);
+                            handler.handle(record);
+                        } catch (Exception error) {
+                            handleConsumerFailure(record, error, topic, groupId);
                         }
                     }
                 }
-            } catch (WakeupException e) {
-                // Expected during shutdown — only rethrow if still supposed to be running
-                if (running.get()) {
-                    throw e;
-                }
-            } finally {
-                try {
-                    consumer.close();
-                } catch (Exception e) {
-                    log.warn("Error closing Kafka consumer: topic={}, group={}", topic, groupId, e);
-                }
-                log.info("Kafka consumer stopped: topic={}, group={}", topic, groupId);
             }
-        }, "kafka-consumer-" + topic + "-" + groupId);
-
-        consumerThread.setDaemon(true);
-
-        // Register entry before starting thread (consumer reference set by thread itself)
-        consumers.put(key, new ConsumerEntry(null, consumerThread, running));
-        consumerThread.start();
+        } catch (WakeupException error) {
+            if (entry.running.get()) {
+                failure = error;
+            }
+        } catch (Throwable error) {
+            // This thread owns the lifecycle stage: Errors must not become normal completion either.
+            failure = error;
+        } finally {
+            entry.running.set(false);
+            consumers.remove(key, entry);
+            if (failure == null) {
+                entry.stopped.complete(null);
+            } else {
+                log.error("Kafka subscription stopped after failure: topic={}, group={}, durable={}",
+                        topic, groupId, durable, failure);
+                entry.stopped.completeExceptionally(failure);
+            }
+        }
     }
 
     @Override
     public void unsubscribe(String topic, String groupId) {
         String key = buildKey(topic, groupId);
-        ConsumerEntry entry = consumers.remove(key);
+        ConsumerEntry entry = consumers.get(key);
         if (entry == null) {
             log.warn("No subscription found for topic={}, group={}", topic, groupId);
             return;
         }
 
         entry.running().set(false);
-        KafkaConsumer<String, String> consumer = entry.consumer();
+        Consumer<String, String> consumer = entry.consumer();
         if (consumer != null) {
             consumer.wakeup();
         }
@@ -183,13 +275,17 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
     }
 
     @Override
-    public void destroy() {
+    public synchronized void destroy() {
+        if (destroyed) {
+            return;
+        }
+        destroyed = true;
         log.info("KafkaMqProvider shutting down: closing producer and {} consumer(s)", consumers.size());
 
         // Signal all consumers to stop
         for (Map.Entry<String, ConsumerEntry> entry : consumers.entrySet()) {
             entry.getValue().running().set(false);
-            KafkaConsumer<String, String> consumer = entry.getValue().consumer();
+            Consumer<String, String> consumer = entry.getValue().consumer();
             if (consumer != null) {
                 consumer.wakeup();
             }
@@ -221,14 +317,15 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
      * Visible for testing — number of active subscriptions.
      */
     int activeSubscriptionCount() {
-        return consumers.size();
+        return (int) consumers.values().stream().filter(entry -> entry.running.get()).count();
     }
 
     /**
      * Visible for testing — check if a subscription exists.
      */
     boolean hasSubscription(String topic, String groupId) {
-        return consumers.containsKey(buildKey(topic, groupId));
+        ConsumerEntry entry = consumers.get(buildKey(topic, groupId));
+        return entry != null && entry.running.get();
     }
 
     /**
@@ -240,6 +337,7 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
         return new KafkaProducer<>(props);
     }
@@ -248,14 +346,22 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
      * Factory method for creating a Kafka consumer. Package-private for test override.
      */
     static KafkaConsumer<String, String> createConsumer(String bootstrapServers, String groupId) {
+        return new KafkaConsumer<>(consumerProperties(bootstrapServers, groupId, false));
+    }
+
+    Consumer<String, String> createSubscriptionConsumer(String groupId, boolean durable) {
+        return new KafkaConsumer<>(consumerProperties(bootstrapServers, groupId, durable));
+    }
+
+    static Properties consumerProperties(String bootstrapServers, String groupId, boolean durable) {
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-        return new KafkaConsumer<>(props);
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, Boolean.toString(!durable));
+        return props;
     }
 
     /**
@@ -313,10 +419,11 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         });
     }
 
-    private Map<String, String> extractHeaders(ConsumerRecord<String, String> record) {
+    private static Map<String, String> extractHeaders(ConsumerRecord<String, String> record) {
         Map<String, String> headersMap = new HashMap<>();
         for (Header header : record.headers()) {
-            headersMap.put(header.key(), new String(header.value(), StandardCharsets.UTF_8));
+            headersMap.put(header.key(), header.value() == null ? null
+                    : new String(header.value(), StandardCharsets.UTF_8));
         }
         return headersMap;
     }
@@ -330,19 +437,13 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
      * The consumer reference is set after thread start (since KafkaConsumer is created inside the thread).
      */
     static final class ConsumerEntry {
-        private volatile KafkaConsumer<String, String> consumer;
-        private final Thread thread;
-        private final AtomicBoolean running;
+        private volatile Consumer<String, String> consumer;
+        private Thread thread;
+        private final AtomicBoolean running = new AtomicBoolean(true);
+        private final CompletableFuture<Void> stopped = new CompletableFuture<>();
 
-        ConsumerEntry(KafkaConsumer<String, String> consumer, Thread thread, AtomicBoolean running) {
-            this.consumer = consumer;
-            this.thread = thread;
-            this.running = running;
-        }
-
-        KafkaConsumer<String, String> consumer() { return consumer; }
+        Consumer<String, String> consumer() { return consumer; }
         Thread thread() { return thread; }
         AtomicBoolean running() { return running; }
-        void setConsumer(KafkaConsumer<String, String> consumer) { this.consumer = consumer; }
     }
 }

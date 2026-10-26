@@ -3,6 +3,9 @@ package com.auraboot.framework.infrastructure.mq.kafka;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.Header;
 import org.junit.jupiter.api.AfterEach;
@@ -15,6 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,7 +40,19 @@ class KafkaMqProviderTest {
     @BeforeEach
     void setUp() {
         mockProducer = mock(KafkaProducer.class);
-        provider = new KafkaMqProvider(mockProducer, "localhost:9092", "test-group");
+        provider = spy(new KafkaMqProvider(mockProducer, "localhost:9092", "test-group"));
+        doAnswer(invocation -> {
+            Consumer<String, String> consumer = mock(Consumer.class);
+            CountDownLatch wakeup = new CountDownLatch(1);
+            when(consumer.poll(any())).thenAnswer(poll -> {
+                if (!wakeup.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("test consumer was not stopped");
+                }
+                throw new WakeupException();
+            });
+            doAnswer(wake -> { wakeup.countDown(); return null; }).when(consumer).wakeup();
+            return consumer;
+        }).when(provider).createSubscriptionConsumer(anyString(), anyBoolean());
     }
 
     @AfterEach
