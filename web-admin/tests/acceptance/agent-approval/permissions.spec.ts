@@ -178,6 +178,17 @@ test('ordinary member cannot create a model and can still perform an allowed rea
 });
 
 test('switching from admin to a nonmember cannot restore or list the admin conversation', async ({ page }) => {
+  const own = await database.query(`SELECT message.conversation_id::text AS id
+    FROM ab_im_message message
+    JOIN ab_tenant_member member ON member.id=message.sender_id AND member.tenant_id=message.tenant_id
+    JOIN ab_user actor ON actor.id=member.user_id
+    JOIN ab_im_conversation_member participation ON participation.conversation_id=message.conversation_id
+      AND participation.member_id=member.id AND participation.tenant_id=message.tenant_id
+    WHERE message.tenant_id=$1 AND message.sender_type='human' AND actor.email=$2
+      AND participation.member_type='human' AND participation.hidden=FALSE
+    ORDER BY message.id DESC LIMIT 1`, [fixture.tenantId, fixture.reader.email]);
+  expect(own.rows).toHaveLength(1);
+  const readerConversation = String(own.rows[0].id);
   await login(page, fixture.admin);
   await openPanel(page);
   await page.getByTestId('aurabot-history-trigger').click();
@@ -192,11 +203,15 @@ test('switching from admin to a nonmember cannot restore or list the admin conve
   await openPanel(page);
   await expect(page.locator('[data-testid=aurabot-panel]')).not.toContainText(fixture.privateHistoryValue);
   await page.getByTestId('aurabot-history-trigger').click();
+  await expect(page.getByTestId('aurabot-session-' + readerConversation)).toBeVisible();
   await expect(page.getByTestId('aurabot-session-' + fixture.adminConversationId)).toHaveCount(0);
   await page.screenshot({ path: join(evidence, 'reader-history-isolated.png'), fullPage: true });
   await page.reload();
   await expect(page.getByTestId('ai-panel-toggle')).toBeVisible();
   await openPanel(page);
   await expect(page.locator('[data-testid=aurabot-panel]')).not.toContainText(fixture.privateHistoryValue);
-  facts.push({ id: 'U3', adminConversationAbsent: true, staleIdentityDidNotExposeHistory: true });
+  await page.getByTestId('aurabot-history-trigger').click();
+  await expect(page.getByTestId('aurabot-session-' + readerConversation)).toBeVisible();
+  await expect(page.getByTestId('aurabot-session-' + fixture.adminConversationId)).toHaveCount(0);
+  facts.push({ id: 'U3', readerConversationPresent: readerConversation, adminConversationAbsent: true, staleIdentityDidNotExposeHistory: true });
 });
