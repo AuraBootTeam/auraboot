@@ -94,6 +94,12 @@ export function useModalFocusTrap(
           focusWithoutScrolling(returnTarget);
           return;
         }
+        // A command may already have re-enabled and restored its opener.
+        // Do not replace that valid focus with the outer dialog header.
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && topmost.contains(active) && canRestoreFocus(active)) {
+          return;
+        }
         focusWithoutScrolling(firstFocusable(topmost));
       });
     };

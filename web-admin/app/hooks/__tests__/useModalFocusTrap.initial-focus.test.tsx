@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { useModalFocusTrap } from '../useModalFocusTrap';
@@ -21,6 +21,55 @@ function Harness() {
   );
 }
 describe('shared modal initial focus', () => {
+  it('does not override a command restoring its enabled opener before the cleanup frame', async () => {
+    function Prompt({ close }: { close: () => void }) {
+      const container = useRef<HTMLDivElement>(null);
+      useModalFocusTrap(true, container, close);
+      return (
+        <div ref={container} role="dialog" aria-label="Prompt">
+          <button onClick={close}>Cancel prompt</button>
+        </div>
+      );
+    }
+    function Nested() {
+      const [open, setOpen] = useState(false);
+      const outer = useRef<HTMLDivElement>(null),
+        opener = useRef<HTMLButtonElement>(null);
+      useModalFocusTrap(true, outer, () => {}, undefined, false);
+      useEffect(() => {
+        if (!open) queueMicrotask(() => opener.current?.focus());
+      }, [open]);
+      return (
+        <>
+          <div ref={outer} role="dialog" aria-label="Detail">
+            <button>Detail X</button>
+            <button
+              ref={opener}
+              disabled={open}
+              onClick={() => {
+                opener.current?.blur();
+                setOpen(true);
+              }}
+            >
+              Open prompt
+            </button>
+          </div>
+          {open && <Prompt close={() => setOpen(false)} />}
+        </>
+      );
+    }
+    render(<Nested />);
+    const opener = screen.getByRole('button', { name: 'Open prompt' });
+    opener.focus();
+    fireEvent.click(opener);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Cancel prompt' })).toHaveFocus(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel prompt' }));
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    expect(opener).toHaveFocus();
+  });
+
   it('captures the opener before native inert activation blurs it', async () => {
     render(<Harness />);
     const opener = screen.getByRole('button', { name: 'Open' });
