@@ -1,0 +1,46 @@
+{
+  "producer": "49b5f80354808b636cc4bf9a435097642b29bb5d",
+  "nativeProductQualified": false,
+  "proofs": {
+    "unit-18b4.log": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/unit-18b4.log",
+      "sha256": "030cdb40d0b18051eba7b9a261f2c3242c2558d6c8950400e099ec958d4e7a50"
+    },
+    "unit-49b5.log": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/unit-49b5.log",
+      "sha256": "8d3c49d113de9a3bc84e30d7c552756067b86e9572e6c45dfe72b4a6345b449e"
+    },
+    "unit-49b5-proof.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/unit-49b5-proof.json",
+      "sha256": "61c9d21341eb200bd2272b8afa2ee0c6bb26e82b2f70d2a78bbd140e82f7d86a"
+    },
+    "baseline-inputs.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/baseline-inputs.json",
+      "sha256": "d117b6fab8a66a014ff33903bd1382482272e7c92dd2408e835cd565ba6826e3"
+    },
+    "baseline-first-classpath-invalid.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/baseline-first-classpath-invalid.json",
+      "sha256": "a69c300a32e08d6697908edd2a9f14968e1943ddd85596b1a1ff20c4abfa8820"
+    },
+    "baseline-enforced-proof.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/baseline-enforced-proof.json",
+      "sha256": "4df714e4ecf53dff407b62eb6b338b3166916ea37a58f0ad319f675d51b39344"
+    },
+    "restored-49b5-proof.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/restored-49b5-proof.json",
+      "sha256": "73c6d4a69b8c356588c5392eed43fea8924b10d96941c06cc37cdd55ecd2e7c1"
+    },
+    "build-49b5.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/build-49b5.json",
+      "sha256": "78d23344fa57f37240b8b7207db53561f81d6e63e06468a3f8016f2358069e00"
+    },
+    "boot-diff-49b5.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/boot-diff-49b5.json",
+      "sha256": "1722c4a2ccb2119ee287377f68d4ba0b892ecfb4501e3aeef7cf4137b941afca"
+    },
+    "core-library-diff-49b5.json": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/model-publish-guards/core-library-diff-49b5.json",
+      "sha256": "1f6ced436681b25fe5538ed71fb90020a986d721598497bd4022fba9a840908e"
+    }
+  }
+}

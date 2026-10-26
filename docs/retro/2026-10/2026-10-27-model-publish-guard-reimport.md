@@ -1,0 +1,19 @@
+---
+type: retro
+status: active
+created: 2026-10-27
+---
+
+# 已发布模型重导入的数据库保护钩子
+
+产品原生验证发现：围栏迁移、配置导入及10组受限HTTP命令成功，但已发布围栏表的trigger／constraint均缺失。直接调用hook的PG测试没有覆盖发布编排，产品整体资格失败，暂停其自有应用并保留反证。
+
+Root在同一Core树修复两条路径：已PUBLISHED模型导入成功schema sync后同步发送ModelTablePublishedEvent；schema-changing字段重导入在完整batch同步之后发送同一事件。缺失或失败schema结果、hook异常向上传播，不用warn继续注册权限。DRAFT publication继续由既有MetaModelService负责，不重复改其权限／发布流程。生产源码为18b4b21，测试fixture通过49b5f80354808b636cc4bf9a435097642b29bb5d修正。
+
+49b5干净源码下24项hermetic检查通过：6项完整模型导入、14项字段重导入、4项dispatcher；无失败／skip。首次18b4的测试DTO构造编译失败，没有执行用例，日志保留。随后用此前正式准入f548 runtime中的真实旧importer bytecode做test-only baseline，原始6用例中4项预期失败；类加载日志证明实际来自该baseline目录。第一次classpath替换被项目JaCoCo前置输出覆盖，测试仍加载新实现，不计expected-red；显式保留所有原Test动作并在其后重置测试classpath才得到反例。没有修改仓库生产源码、JAR或放宽测试断言。移除该test-only init后6项恢复通过。
+
+49b5正式bootJar已构建，SHA256为aa234ce831d615262ceff163d9de3d6554ded7dd16381f50dd26c545491a2bf1；standalone／embedded API仍为66827430dd40e4a7004dea856bb262ed4e8037ce8d51c0d705e7216edebdd099。与旧f548 boot对比，没有新增／删除entry，仅内部AuraBoot库变化，内部5个class均属本次三个importer及其编译内部类；Kafka、Spring、文件及API库未变。上述组件与构件证据不等于产品真栈已修复，Root仍须重建产品并通过公开导入检查实际guard及回滚／拒绝。
+
+原始日志／JUnit／受控baseline输入和类加载证据位于受管`maritime-parallel-core/model-publish-guards`；摘要见本目录model-publish-guard-evidence.json。Core PR保留reviewable状态，不合main、不部署生产。
+
+SOT Updates：model-mutation-policy新增publish-time guard契约；产品总体失败及后续准入保留在Anchorage唯一交付摘要，不将Core组件绿色升级为业务通过。

@@ -2,12 +2,28 @@
 type: system-reference
 status: active
 created: 2026-10-03
-updated: 2026-10-25
+updated: 2026-10-27
 ---
 
 # Model mutation policy
 
 Model policies apply inside the server write boundary, including requests from administrators. They complement command permissions and capability/record scopes; they do not grant authority to a command.
+
+## Publish-time database guards
+
+Physical database guards declared by a plugin's `ModelPublishHookExtension` run
+synchronously after successful schema synchronization, inside the import/publish
+transaction. This includes DRAFT model publication, reimport of an already
+PUBLISHED entity model, and schema-changing field reimport. A field batch invokes
+guards only after all its field definitions have been synchronized. Unchanged
+field definitions that do not change schema retain their existing no-DDL behavior.
+
+Missing/failed schema results and guard exceptions fail import; permission
+registration must not turn them into a successful import. A successful metadata
+response alone does not prove that a declared trigger or constraint exists.
+Products must inspect the actual deployed guard and verify its refusal semantics.
+Starting the application does not repair missing guards. These hooks complement
+the model mutation policy and never grant command or record authority.
 
 | Declaration | Contract |
 | --- | --- |
