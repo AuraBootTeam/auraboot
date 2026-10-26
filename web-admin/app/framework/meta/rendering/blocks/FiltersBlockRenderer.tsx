@@ -8,7 +8,7 @@ import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { useI18n } from '~/contexts/I18nContext';
-import { executeSimpleWorkbenchAction } from './workbenchBlockUtils';
+import { executeSimpleWorkbenchAction, useRuntimeStateSubscription } from './workbenchBlockUtils';
 
 export interface FiltersBlockRendererProps {
   block: BlockConfig;
@@ -17,6 +17,7 @@ export interface FiltersBlockRendererProps {
 
 export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ block, runtime }) => {
   const { t } = useI18n();
+  useRuntimeStateSubscription(runtime);
   const windowConfig = (block as any).props?.timeWindow;
   if (windowConfig) return <TimeWindowFilter config={windowConfig} runtime={runtime} />;
   const fields = block.fields || [];

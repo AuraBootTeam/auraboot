@@ -347,7 +347,9 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   const componentProps: Record<string, any> = {
     name: field.field,
     label: localizedFieldLabel,
-    value,
+    // Runtime state owns the value even when reset removes the field key.
+    // Explicit null keeps Smart controls from reviving an uncontrolled draft.
+    value: value === undefined ? null : value,
     onChange: handleChange,
     onBlur: handleBlur,
     onFocus: handleFocus,
