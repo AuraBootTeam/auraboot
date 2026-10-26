@@ -102,7 +102,7 @@ public class AgentSkillService {
         if (skill == null) return List.of();
 
         List<String> toolCodes = parseToolCodes(skill.get("skill_tools"));
-        // dsl_dispatch skills have no pre-registered tools — SkillEngine handles dispatch directly
+        // Dynamic recipes resolve their actual target through resolveToolCodes at execution time.
         if (toolCodes.isEmpty()) return List.of();
 
         return resolveToolCodes(tenantId, toolCodes);
@@ -134,7 +134,7 @@ public class AgentSkillService {
      * {@code nq:} code does not carry — use {@code list:}/{@code get:}/{@code cmd:}
      * in {@code skill_tools} for governed reads/writes.)
      */
-    private List<AgentToolDefinition> resolveToolCodes(Long tenantId, List<String> toolCodes) {
+    public List<AgentToolDefinition> resolveToolCodes(Long tenantId, List<String> toolCodes) {
         List<AgentToolDefinition> tools = new ArrayList<>(loadToolsByCode(tenantId, toolCodes));
 
         Set<String> resolved = new HashSet<>();

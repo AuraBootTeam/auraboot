@@ -932,6 +932,37 @@ class AgentRunServiceSyncTest {
                 .containsEntry("runStatus", "failed");
     }
 
+    @Test
+    void promptRecallUsesInitiatorAndOnlyReinforcesInjectedRows() {
+        when(agentProperties.getMemoryMaxItems()).thenReturn(20);
+        when(agentProperties.getMemoryMaxChars()).thenReturn(320);
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")), anyMap()))
+                .thenReturn(List.of(baseAgentDef()));
+        ExecutionPrincipal principal = new ExecutionPrincipal(TENANT_ID, 301L, 401L,
+                "USR_AGENT", "agent", 501L, "EMP", Initiator.human(101L, 201L, "web"),
+                DelegationGrant.employeeAutonomous(), AGENT_CODE, "release", "deployment", "hash",
+                "web", ExecutionPrincipal.Type.DIGITAL_EMPLOYEE, Set.of());
+        ExecutionPrincipalContext.restore(principal);
+        when(memoryService.loadForPrompt(TENANT_ID, "101", AGENT_CODE, null, 20)).thenReturn(List.of(
+                Map.of("pid", "visible", "memory_type", "turn_summary", "memory_content", "A short observation"),
+                Map.of("pid", "over-budget", "memory_content", "x".repeat(500))));
+        String text = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "loadMemorySection", TENANT_ID, AGENT_CODE);
+        assertThat(text).contains("A short observation", "[Historical model response; verify current business data]").doesNotContain("xxx");
+        verify(memoryService).trackAccess(TENANT_ID, "101", "visible");
+        verify(memoryService, never()).trackAccess(TENANT_ID, "101", "over-budget");
+        verify(memoryService).recordMemoryAccess("visible", "101");
+    }
+
+    @Test
+    void promptRecallDoesNotInferPrivateOwnerFromAmbientMetaContext() {
+        when(agentProperties.getMemoryMaxItems()).thenReturn(20);
+        MetaContext.setContext(TENANT_ID, 666L, "ambient", "ambient");
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "loadMemorySection", TENANT_ID, AGENT_CODE);
+        verify(memoryService).loadForPrompt(TENANT_ID, null, AGENT_CODE, null, 20);
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================

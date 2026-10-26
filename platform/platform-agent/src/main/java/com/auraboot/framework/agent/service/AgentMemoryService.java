@@ -4,6 +4,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.auraboot.framework.agent.memory.MemorySecretGuard;
+import com.auraboot.framework.agent.memory.MemoryReadPolicy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -140,7 +141,7 @@ public class AgentMemoryService {
                 + "  memory_title, memory_content, importance, created_at "
                 + "FROM ab_agent_memory "
                 + "WHERE tenant_id = ? AND shareable = TRUE "
-                + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "AND " + MemoryReadPolicy.SHARED + " "
                 + "ORDER BY importance DESC, created_at DESC "
                 + "LIMIT ?",
                 tenantId, limit);
@@ -294,21 +295,26 @@ public class AgentMemoryService {
     // =========================================================================
 
     /**
-     * Increment the {@code access_count} for all non-deleted memories belonging to the agent.
-     * Called when the memory set is loaded into a prompt context.
-     *
-     * @param tenantId  tenant scope
-     * @param agentCode agent identifier
+     * Reinforce one live, visible memory actually included in the caller's prompt.
+     * Unselected and over-budget rows must not become hot merely because the agent ran.
      */
-    public void trackAccess(Long tenantId, String agentCode) {
-        jdbcTemplate.update(
-                "UPDATE ab_agent_memory "
-                + "SET access_count = COALESCE(access_count, 0) + 1, "
-                + "    last_accessed = NOW(), "
-                + "    updated_at = NOW() "
-                + "WHERE tenant_id = ? AND memory_agent_id = ? "
-                + "AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
-                tenantId, agentCode);
+    public void trackAccess(Long tenantId, String userId, String memoryPid) {
+        jdbcTemplate.update("UPDATE ab_agent_memory "
+                + "SET access_count = COALESCE(access_count, 0) + 1, last_accessed = NOW(), updated_at = NOW() "
+                + "WHERE pid = ? AND " + MemoryReadPolicy.VISIBLE,
+                memoryPid, tenantId, MemoryReadPolicy.userKey(tenantId, userId));
+    }
+
+    /** Read prompt rows, preserving legacy agent-null rows while enforcing the caller namespace. */
+    public List<Map<String, Object>> loadForPrompt(Long tenantId, String userId, String agentCode,
+                                                  String category, int limit) {
+        return jdbcTemplate.queryForList("SELECT pid, memory_title, memory_content, memory_type, "
+                + "category, shadow_mode FROM ab_agent_memory "
+                + "WHERE (memory_agent_id = ? OR memory_agent_id IS NULL) "
+                + "AND " + MemoryReadPolicy.VISIBLE
+                + " AND (?::text IS NULL OR category = ?) "
+                + "ORDER BY importance DESC, updated_at DESC, pid ASC LIMIT ?",
+                agentCode, tenantId, MemoryReadPolicy.userKey(tenantId, userId), category, category, limit);
     }
 
     /**
@@ -400,7 +406,7 @@ public class AgentMemoryService {
     //   caller sees memory iff
     //     (scope='global')
     //     OR (scope='tenant' AND tenant_id = currentTenantId)
-    //     OR (scope='user'   AND scope_key = currentUserId)
+    //     OR (scope='user' AND tenant_id = currentTenantId AND scope_key = currentUserId)
     //
     // The existing un-scoped APIs (listMemories / searchSemantic / …) remain
     // available for internal consolidation/prompt-assembly paths; new callers
@@ -427,6 +433,14 @@ public class AgentMemoryService {
                                       String title, String content,
                                       int importance, boolean shareable,
                                       String scope, String scopeKey) {
+        return createScopedMemory(tenantId, agentCode, memoryType, category, title, content,
+                importance, shareable, scope, scopeKey, null);
+    }
+
+    public String createScopedMemory(Long tenantId, String agentCode,
+                                      String memoryType, String category, String title, String content,
+                                      int importance, boolean shareable, String scope, String scopeKey,
+                                      String provenance) {
         assertValidScope(scope);
         if ("user".equals(scope) && (scopeKey == null || scopeKey.isBlank())) {
             throw new IllegalArgumentException("scope='user' requires non-blank scope_key (user_id)");
@@ -439,10 +453,10 @@ public class AgentMemoryService {
                 "INSERT INTO ab_agent_memory "
                 + "(pid, tenant_id, memory_agent_id, memory_type, category, "
                 + " memory_title, memory_content, importance, shareable, "
-                + " scope, scope_key, created_at, updated_at, deleted_flag) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), FALSE)",
+                + " scope, scope_key, metadata, created_at, updated_at, deleted_flag) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), FALSE)",
                 pid, tenantId, agentCode, memoryType, category,
-                title, content, importance, shareable, scope, scopeKey);
+                title, content, importance, shareable, scope, scopeKey, provenance);
         log.debug("Created scoped memory {} type={} scope={}/{}", pid, memoryType, scope, scopeKey);
         return pid;
     }
@@ -459,24 +473,17 @@ public class AgentMemoryService {
                                                    String agentCode, String query, int limit) {
         Objects.requireNonNull(tenantId, "tenantId");
         String pattern = "%" + (query == null ? "" : query) + "%";
-        boolean hasUser = userId != null && !userId.isBlank();
+        String userKey = MemoryReadPolicy.userKey(tenantId, userId);
         String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
                 + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
                 + "FROM ab_agent_memory "
                 + "WHERE memory_agent_id = ? "
                 + "  AND (memory_content ILIKE ? OR memory_title ILIKE ?) "
-                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "  AND ( "
-                + "    scope = 'global' "
-                + "    OR (scope = 'tenant' AND tenant_id = ?) "
-                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
-                + "  ) "
+                + "  AND " + MemoryReadPolicy.VISIBLE + " "
                 + "ORDER BY importance DESC, created_at DESC, pid ASC "
                 + "LIMIT ?";
-        return hasUser
-                ? jdbcTemplate.queryForList(sql, agentCode, pattern, pattern, tenantId, userId, limit)
-                : jdbcTemplate.queryForList(sql, agentCode, pattern, pattern, tenantId, limit);
+        return jdbcTemplate.queryForList(sql, agentCode, pattern, pattern, tenantId, userKey, limit);
     }
 
     /**
@@ -499,7 +506,7 @@ public class AgentMemoryService {
         if (queryEmbedding == null || queryEmbedding.length == 0) {
             return List.of();
         }
-        boolean hasUser = userId != null && !userId.isBlank();
+        String userKey = MemoryReadPolicy.userKey(tenantId, userId);
         String vec = toVectorLiteral(queryEmbedding);
         String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
@@ -507,17 +514,10 @@ public class AgentMemoryService {
                 + "FROM ab_agent_memory "
                 + "WHERE memory_agent_id = ? "
                 + "  AND embedding IS NOT NULL "
-                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "  AND ( "
-                + "    scope = 'global' "
-                + "    OR (scope = 'tenant' AND tenant_id = ?) "
-                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
-                + "  ) "
+                + "  AND " + MemoryReadPolicy.VISIBLE + " "
                 + "ORDER BY embedding <=> ?::vector "
                 + "LIMIT ?";
-        return hasUser
-                ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, vec, limit)
-                : jdbcTemplate.queryForList(sql, agentCode, tenantId, vec, limit);
+        return jdbcTemplate.queryForList(sql, agentCode, tenantId, userKey, vec, limit);
     }
 
     /** Format a float vector as a pgvector literal {@code [v0,v1,...]} for a {@code ?::vector} bind. */
@@ -540,23 +540,16 @@ public class AgentMemoryService {
     public List<Map<String, Object>> loadScopedByImportance(Long tenantId, String userId,
                                                              String agentCode, int limit) {
         Objects.requireNonNull(tenantId, "tenantId");
-        boolean hasUser = userId != null && !userId.isBlank();
+        String userKey = MemoryReadPolicy.userKey(tenantId, userId);
         String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
                 + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
                 + "FROM ab_agent_memory "
                 + "WHERE memory_agent_id = ? "
-                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "  AND ( "
-                + "    scope = 'global' "
-                + "    OR (scope = 'tenant' AND tenant_id = ?) "
-                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
-                + "  ) "
+                + "  AND " + MemoryReadPolicy.VISIBLE + " "
                 + "ORDER BY importance DESC, created_at DESC, pid ASC "
                 + "LIMIT ?";
-        return hasUser
-                ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, limit)
-                : jdbcTemplate.queryForList(sql, agentCode, tenantId, limit);
+        return jdbcTemplate.queryForList(sql, agentCode, tenantId, userKey, limit);
     }
 
     /**
@@ -573,24 +566,17 @@ public class AgentMemoryService {
     public List<Map<String, Object>> loadScopedByImportanceL2Only(Long tenantId, String userId,
                                                                    String agentCode, int limit) {
         Objects.requireNonNull(tenantId, "tenantId");
-        boolean hasUser = userId != null && !userId.isBlank();
+        String userKey = MemoryReadPolicy.userKey(tenantId, userId);
         String sql =
                 "SELECT pid, memory_type, category, memory_title, memory_content, "
                 + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
                 + "FROM ab_agent_memory "
                 + "WHERE memory_agent_id = ? "
                 + "  AND category IN ('user','agent') "
-                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "  AND ( "
-                + "    scope = 'global' "
-                + "    OR (scope = 'tenant' AND tenant_id = ?) "
-                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
-                + "  ) "
+                + "  AND " + MemoryReadPolicy.VISIBLE + " "
                 + "ORDER BY importance DESC, created_at DESC, pid ASC "
                 + "LIMIT ?";
-        return hasUser
-                ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, limit)
-                : jdbcTemplate.queryForList(sql, agentCode, tenantId, limit);
+        return jdbcTemplate.queryForList(sql, agentCode, tenantId, userKey, limit);
     }
 
     /**
@@ -633,7 +619,7 @@ public class AgentMemoryService {
                 + "WHERE tenant_id = ? "
                 + "  AND scope = 'user' AND scope_key = ? "
                 + "  AND category = 'session' "
-                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "  AND " + MemoryReadPolicy.LIVE + " "
                 + "ORDER BY last_accessed DESC NULLS LAST, created_at DESC, pid ASC "
                 + "LIMIT ?",
                 tenantId, scopeKey, maxRows);

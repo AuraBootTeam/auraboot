@@ -22,6 +22,8 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.service.AgentRunServiceSyncTest' \
   --tests 'com.auraboot.framework.agent.service.PlanServiceTest' \
   --tests 'com.auraboot.framework.agent.service.SkillEngineTest' \
+  --tests 'com.auraboot.framework.agent.service.ActiveMemoryServiceSemanticRecallTest' \
+  --tests 'com.auraboot.framework.conversation.TurnCompletionMemoryListenerTest' \
   --tests 'com.auraboot.framework.agent.service.AgentApprovalGateServiceConcurrencyTest' \
   --tests 'com.auraboot.framework.agentchat.handoff.HandoffPermissionPolicyTest' \
   --tests 'com.auraboot.framework.agentchat.reply.AgentReplyTaskChokepointTest' \
@@ -63,6 +65,8 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.AgentLifecycleSuspendIT' \
   --tests 'com.auraboot.framework.agent.MemorySecretWritebackIT' \
   --tests 'com.auraboot.framework.agent.AgentMemoryIntegrationTest' \
+  --tests 'com.auraboot.framework.integration.agent.AgentMemoryScopeIntegrationTest' \
+  --tests 'com.auraboot.framework.integration.agent.MemoryCompactionIntegrationTest' \
   --tests 'com.auraboot.framework.agent.AgentResumeRetryIntegrationTest' \
   --tests 'com.auraboot.framework.agent.AgentApprovalTimeoutEnforcementIT' \
   --tests 'com.auraboot.framework.agent.memory.MemoryL1L2Phase4IntegrationTest' \
@@ -76,3 +80,6 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.integration.runtime.DurableToolExecutionRecoveryIT' \
   --tests 'com.auraboot.framework.agent.service.AgentRunTerminalStoreIT' \
   --no-daemon
+
+# Uncached, real-PostgreSQL namespace/expiry/compaction/provenance qualification.
+./gradlew :platform-agent:memoryGovernanceIntegrationTest --no-daemon

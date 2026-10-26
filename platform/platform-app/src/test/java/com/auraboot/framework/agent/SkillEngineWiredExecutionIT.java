@@ -37,6 +37,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 /**
  * Proves the {@code POST /api/agent/skills/{code}/execute} endpoint now <b>actually executes</b> a
@@ -59,6 +61,7 @@ import org.springframework.test.context.ActiveProfiles;
 @Slf4j
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("The execute-skill endpoint runs skills through SkillEngine, not the planner")
 class SkillEngineWiredExecutionIT extends BaseIntegrationTest {
 
@@ -70,11 +73,13 @@ class SkillEngineWiredExecutionIT extends BaseIntegrationTest {
     @Autowired private MetaModelFieldBindingMapper fieldBindingMapper;
     @Autowired private DynamicDataMapper dynamicDataMapper;
     @Autowired private DynamicDataService dynamicDataService;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private Long tenantId;
     private final List<String> createdTables = new ArrayList<>();
     private final List<Model> createdModels = new ArrayList<>();
     private final List<Field> createdFields = new ArrayList<>();
+    private final List<String> createdAclPids = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -87,6 +92,8 @@ class SkillEngineWiredExecutionIT extends BaseIntegrationTest {
     @AfterEach
     void tearDown() {
         try {
+            for (String pid : createdAclPids) jdbc.update("DELETE FROM ab_agent_tool_acl WHERE tenant_id=? AND pid=?", tenantId, pid);
+            createdAclPids.clear();
             for (String t : createdTables) {
                 try { dynamicDataMapper.alterTable("DROP TABLE IF EXISTS " + t); } catch (Exception ignore) {}
             }
@@ -122,6 +129,7 @@ class SkillEngineWiredExecutionIT extends BaseIntegrationTest {
         String fieldCode = "wname_" + suffix;
         String modelCode = createModel(suffix, fieldCode + ":STRING");
 
+        grantCommittedPermissionToTestRole("model." + modelCode + ".read", "model", modelCode, "read", "Read wired skill fixture");
         String rowName = "WIRED-" + suffix;
         Map<String, Object> created = dynamicDataService.create(modelCode, Map.of(fieldCode, rowName));
         assertThat(created).as("seed row must be created").isNotNull();
@@ -132,9 +140,11 @@ class SkillEngineWiredExecutionIT extends BaseIntegrationTest {
         SkillResult result = resp.getData();
         assertThat(result).isNotNull();
         assertThat(result.getStatus())
-                .as("dsl.query by model must actually run DynamicDataService.list and succeed")
+                .as("dsl.query should succeed through the governed kernel: %s", result.getErrorMessage())
                 .isEqualTo(SkillResult.Status.SUCCESS);
         assertThat(result.getOutputType()).isEqualTo("structured_result");
+        assertThat(jdbc.queryForList("SELECT length(run_id) FROM ab_agent_authorization_decision WHERE tenant_id=? AND tool_ref=?",
+                Integer.class, tenantId, modelCode)).containsOnly(26).isNotEmpty();
         assertThat(result.getData()).containsKey("records");
 
         @SuppressWarnings("unchecked")
@@ -144,6 +154,22 @@ class SkillEngineWiredExecutionIT extends BaseIntegrationTest {
                 .isNotEmpty();
         assertThat(records)
                 .anySatisfy(row -> assertThat(String.valueOf(row.get(fieldCode))).isEqualTo(rowName));
+    }
+
+    @Test
+    void executeEndpointHonorsAclEvenWhenTheModelIsReadable() {
+        String suffix = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 4);
+        String modelCode = createModel(suffix, "wname_" + suffix + ":STRING");
+        grantCommittedPermissionToTestRole("model." + modelCode + ".read", "model", modelCode, "read", "Read denied skill fixture");
+        String pid = UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_agent_tool_acl (pid,tenant_id,tool_ref_pattern,effect,priority,active) VALUES (?,?,?,'deny',9999,TRUE)",
+                pid, tenantId, "list:" + modelCode);
+        createdAclPids.add(pid);
+        SkillResult result = controller.executeSkill("dsl.query", Map.of("input", Map.of("model", modelCode))).getData();
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.FAILED);
+        assertThat(result.getData()).containsEntry("errorCode", "TOOL_ACCESS_DENIED").doesNotContainKeys("records", "record");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_agent_authorization_decision WHERE tenant_id=? AND tool_ref=?",
+                Integer.class, tenantId, modelCode)).isZero();
     }
 
     // ==================== helpers (mirror SkillCmdResolutionIT) ====================
