@@ -1274,7 +1274,7 @@ function FormDialogHost() {
             disabled={
               Boolean(state.submission && submissionState?.phase !== 'idle') || state.refreshing
             }
-            className="bg-accent hover:bg-accent-hover focus:ring-accent rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
+            className="bg-accent enabled:hover:bg-accent-hover focus:ring-accent rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting
               ? locale.startsWith('zh')
