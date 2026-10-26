@@ -164,7 +164,8 @@ test('ordinary member cannot create a model and can still perform an allowed rea
   expect(await modelInventory()).toEqual(inventoryBefore);
   await expect(page.getByTestId('skill-preview-card')).toHaveCount(0);
   await expect(page.getByTestId('aurabot-confirm-card')).toHaveCount(0);
-  await expect(page.locator('[data-testid=aurabot-panel]')).toContainText(/权限|无权|授权|管理员/);
+  await expect(page.getByTestId('aurabot-panel')).toContainText('当前操作未获授权，未执行');
+  await expect(page.getByTestId('aurabot-panel').getByText('已完成', { exact: true })).toHaveCount(0);
   expect(result.filter(item => item.name === 'tool_result' && item.data.success === true)
     .some(item => JSON.stringify(item.data.result).includes(code))).toBe(false);
   await page.screenshot({ path: join(evidence, 'reader-write-denied.png'), fullPage: true });

@@ -63,6 +63,22 @@ describe('approval decision feedback', () => {
     expect(pending[0].riskLevel).toBe('HIGH');
   });
 
+  it.each(['TOOL_ACCESS_DENIED', 'generic failure'])('does not turn a failed tool result into success on stream completion: %s', async errorCode => {
+    await propose(); fireEvent.click(screen.getByText('Approve'));
+    await waitFor(() => expect(auraBotApi.executeStream).toHaveBeenCalled());
+    await act(async () => {
+      callbacks.onToolResult?.('decision', { success: false, errorCode, retryable: false }, false);
+      callbacks.onDone('The action failed.', 'trace-denied'); finish();
+    });
+    const messages = JSON.parse(screen.getByTestId('state').textContent || '{}').messages;
+    expect(messages.find((message: any) => message.toolId === 'decision')?.type).toBe('error');
+    expect(messages.some((message: any) => message.type === 'tool_executed')).toBe(false);
+    expect(screen.getByTestId('state')).toHaveTextContent(errorCode === 'TOOL_ACCESS_DENIED'
+      ? '当前操作未获授权，未执行。请联系管理员授权后再试；确认审批不会补授权限。'
+      : '操作未完成，请查看结果或联系管理员。');
+    expect(screen.getByTestId('state')).toHaveTextContent('"isLoading":false');
+  });
+
   it('keeps unknown server diagnostics out of the approval UI', async () => {
     await propose(); fireEvent.click(screen.getByText('Cancel'));
     await waitFor(() => expect(auraBotApi.executeStream).toHaveBeenCalled());
