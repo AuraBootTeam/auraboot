@@ -414,6 +414,7 @@ final class PluginModelFieldImporter {
                 throw new PluginException("Failed to sync schema after updating field " + fieldCode
                         + " for model " + modelCode + ": " + errorMessage);
             }
+            facadeReceiver.verifyPublishedModelGuards(modelCode);
             log.info("Synced published model after field reimport");
         }
     }
