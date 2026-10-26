@@ -128,6 +128,9 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private RecordShareAccessor recordShareAccessor;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor announcementAcknowledgementAccessor;
+
     /** Lazy so the phase → executor → (lazy) pipeline edge never cycles at startup. */
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
@@ -742,6 +745,10 @@ public class HandlerPhase implements CommandPhase {
             }
             if (recordShareAccessor != null) {
                 pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
+            }
+            if (announcementAcknowledgementAccessor != null) {
+                pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY,
+                        announcementAcknowledgementAccessor);
             }
             com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.finishSettings(pluginSettings);
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
