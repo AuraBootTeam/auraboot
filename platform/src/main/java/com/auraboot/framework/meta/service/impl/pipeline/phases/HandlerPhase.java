@@ -156,7 +156,7 @@ public class HandlerPhase implements CommandPhase {
                         ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(),
                         Boolean.TRUE.equals(ctx.getTargetRecordReadable())
                             && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
-                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized())));
+                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized(), ctx)));
         ctx.setHandlerResults(handlerResults);
         if (!ctx.isHandlerOwnedMutation()) {
             persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
@@ -172,7 +172,8 @@ public class HandlerPhase implements CommandPhase {
                                                      Map<String, Object> fieldMapResults,
                                                      Long tenantId, Long userId,
                                                      CommandExecuteRequest request,
-                                                     Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
+                                                     Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized,
+                                                     CommandPipelineContext pipelineContext) {
         Map<String, Object> handlerResults = new HashMap<>();
         boolean dryRun = request.isDryRun();
 
@@ -227,7 +228,7 @@ public class HandlerPhase implements CommandPhase {
 
         // 2. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
-                fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized);
+                fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized, pipelineContext);
 
         // 3. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
@@ -557,7 +558,8 @@ public class HandlerPhase implements CommandPhase {
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults,
                                               Map<String, Object> handlerResults,
-                                              Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
+                                              Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized,
+                                              CommandPipelineContext pipelineContext) {
         if (extensionRegistry == null) {
             return;
         }
@@ -752,7 +754,7 @@ public class HandlerPhase implements CommandPhase {
             pluginSettings.put(com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.SETTINGS_KEY,
                     commandMembershipLockAccessor);
             if (recordScopeFactory != null) {
-                var scopes = recordScopeFactory.forCommand(ctx);
+                var scopes = recordScopeFactory.forCommand(pipelineContext);
                 if (scopes != null) pluginSettings.put(
                         com.auraboot.framework.plugin.extension.RecordActionScopeAccessor.SETTINGS_KEY, scopes);
             }

@@ -123,7 +123,7 @@ class CommandRecordActionScopeAccessorFactoryTest {
         try(var scope=factory.forInvocation(context)) {
             when(data.getById("parent","parent-1")).thenThrow(new IllegalStateException("storage unavailable"));
             assertThrows(IllegalStateException.class,()->scope.accessor().permits("parent","parent-1","update"));
-            when(data.getById("parent","parent-1")).thenAnswer(call->row);
+            doAnswer(call->row).when(data).getById("parent","parent-1");
             when(scopes.evaluate(30L,"parent","update",row)).thenReturn(null);
             assertFalse(scope.accessor().permits("parent","parent-1","update"));
         }
