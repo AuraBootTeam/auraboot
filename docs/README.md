@@ -25,6 +25,7 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 
 - Scheduled command delegation: [deployment bindings and execution boundaries](./system-reference/scheduled-command-bindings.md).
 - Notification source delivery: [deployment descriptors and configuration boundaries](./system-reference/notification-source-bindings.md).
+- Module-owned command validation: [live module registration and import metadata](./system-reference/application-module-command-lifecycle.md).
 - Command consistency: [explicit transaction isolation admission](./system-reference/command-transaction-isolation.md).
 
 - Architecture overview: start at [ARCHITECTURE.md](../ARCHITECTURE.md) (repo root), then dive into `system-reference/` for operational detail.
