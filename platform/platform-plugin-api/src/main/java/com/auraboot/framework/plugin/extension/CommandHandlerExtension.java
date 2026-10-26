@@ -344,6 +344,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             return accessor instanceof RecordShareAccessor value ? value : null;
         }
 
+        /** Exact identity locks in the caller's Core transaction, or null if no host bridge is installed. */
+        public CommandMembershipLockAccessor commandMembershipLockAccessor() {
+            Object value = settings != null ? settings.get(CommandMembershipLockAccessor.SETTINGS_KEY) : null;
+            return value instanceof CommandMembershipLockAccessor accessor ? accessor : null;
+        }
+
         /** Exact-version recipient proof, available only on supporting hosts. */
         public AnnouncementAcknowledgementAccessor announcementAcknowledgementAccessor() {
             Object value = settings != null ? settings.get(AnnouncementAcknowledgementAccessor.SETTINGS_KEY) : null;

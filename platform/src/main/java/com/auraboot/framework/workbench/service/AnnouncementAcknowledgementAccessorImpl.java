@@ -30,6 +30,7 @@ public class AnnouncementAcknowledgementAccessorImpl implements AnnouncementAckn
     private final AnnouncementAcknowledgementMapper proof;
     private final AnnouncementLifecycleMapper lifecycle;
     private final AnnouncementCodec codec;
+    private final com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor membershipLocks;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -53,9 +54,12 @@ public class AnnouncementAcknowledgementAccessorImpl implements AnnouncementAckn
         for (var required : requirements) {
             if (!seen.add(required.versionPid())) throw new IllegalArgumentException("Duplicate version requirement");
         }
-        var member = proof.lockMember(tenant, actor, user);
+        var member = proof.currentMember(tenant, actor, user);
         boolean currentMember = member != null && member.get("member_id") instanceof Number id
                 && Objects.equals(MetaContext.getCurrentMemberId(), id.longValue());
+        if (currentMember) membershipLocks.requireEnabledMemberships(List.of(
+                new com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.MembershipAssertion(
+                        user, (String) member.get("member_pid"))));
         Map<String,Map<String,Object>> versions = new HashMap<>();
         var rootPids = new TreeSet<String>();
         if (currentMember) for (var required : requirements) {
@@ -94,7 +98,7 @@ public class AnnouncementAcknowledgementAccessorImpl implements AnnouncementAckn
         Object memberId = member == null ? null : member.get("member_id");
         if (!satisfied.isEmpty()) TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void beforeCommit(boolean readOnly) {
-                var current = proof.lockMember(tenant, actor, user);
+                var current = proof.currentMember(tenant, actor, user);
                 if (current == null || !Objects.equals(memberId, current.get("member_id"))) unavailable();
                 Instant commitCheck = proof.databaseNow();
                 // Root locks stop other transactions, but the caller may have changed

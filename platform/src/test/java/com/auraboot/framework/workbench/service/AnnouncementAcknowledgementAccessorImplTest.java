@@ -38,13 +38,13 @@ class AnnouncementAcknowledgementAccessorImplTest {
     @BeforeEach void context() {
         proof = mock(AnnouncementAcknowledgementMapper.class);
         roots = mock(AnnouncementLifecycleMapper.class);
-        service = new AnnouncementAcknowledgementAccessorImpl(proof, roots, new AnnouncementCodec(new ObjectMapper()));
+        service = new AnnouncementAcknowledgementAccessorImpl(proof, roots, new AnnouncementCodec(new ObjectMapper()), mock(com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.class));
         MetaContext.setContext(1L, 2L, "user-public", "recipient");
         MetaContext.setMemberId(3L);
         TransactionSynchronizationManager.setActualTransactionActive(true);
         TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
         TransactionSynchronizationManager.initSynchronization();
-        when(proof.lockMember(1L, 2L, "user-public")).thenReturn(Map.of("member_id", 3L, "member_pid", "member-public", "user_pid", "user-public"));
+        when(proof.currentMember(1L, 2L, "user-public")).thenReturn(Map.of("member_id", 3L, "member_pid", "member-public", "user_pid", "user-public"));
         when(proof.databaseNow()).thenReturn(NOW);
         version = new HashMap<>(Map.of("version_pid", "version-public", "announcement_pid", "root-public",
                 "snapshot_hash", HASH, "snapshot", "{\"policy\":{\"acknowledgementRequired\":true}}",
@@ -92,7 +92,7 @@ class AnnouncementAcknowledgementAccessorImplTest {
 
     @ParameterizedTest @ValueSource(strings = {"inactive", "context-incarnation", "requested-incarnation"})
     void memberChangesCannotReuseAnOldAcknowledgement(String failure) {
-        if (failure.equals("inactive")) when(proof.lockMember(anyLong(), anyLong(), anyString())).thenReturn(null);
+        if (failure.equals("inactive")) when(proof.currentMember(anyLong(), anyLong(), anyString())).thenReturn(null);
         if (failure.equals("context-incarnation")) MetaContext.setMemberId(99L);
         var requirements = failure.equals("requested-incarnation") ? List.of(new Requirement("version-public", HASH, "old-member")) : required();
         var check = service.checkForCommand(requirements).getFirst();
@@ -160,7 +160,7 @@ class AnnouncementAcknowledgementAccessorImplTest {
     }
 
     @Test void sameTransactionMemberChangeCannotCommitUsingAnEarlierSatisfiedProof() {
-        check(); when(proof.lockMember(1L, 2L, "user-public")).thenReturn(null);
+        check(); when(proof.currentMember(1L, 2L, "user-public")).thenReturn(null);
         assertThrows(com.auraboot.framework.exception.BusinessException.class,
                 () -> TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.beforeCommit(false)));
     }

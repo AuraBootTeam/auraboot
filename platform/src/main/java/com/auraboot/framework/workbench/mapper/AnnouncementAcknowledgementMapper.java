@@ -16,9 +16,8 @@ public interface AnnouncementAcknowledgementMapper {
             WHERE m.tenant_id=#{tenant} AND m.user_id=#{actor} AND u.pid=#{user}
               AND m.status='active' AND m.deleted_flag=FALSE
               AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
-            FOR UPDATE
             """)
-    Map<String,Object> lockMember(@Param("tenant") Long tenant, @Param("actor") Long actor, @Param("user") String user);
+    Map<String,Object> currentMember(@Param("tenant") Long tenant, @Param("actor") Long actor, @Param("user") String user);
 
     @Select("""
             SELECT v.pid AS version_pid,v.announcement_pid,v.snapshot_hash,v.snapshot::text AS snapshot,

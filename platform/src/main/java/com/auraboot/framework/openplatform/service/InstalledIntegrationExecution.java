@@ -112,7 +112,8 @@ public final class InstalledIntegrationExecution {
         for (String key : java.util.List.of("__independentTransactionAccessor","__asyncTaskAccessor",
                 com.auraboot.framework.plugin.extension.CommandDispatcherAccessor.SETTINGS_KEY,"__tenantRoleAssignmentAccessor","__verifiedPhoneGrantAccessor",
                 "__biTemporalAccessor","__aiProviderAccessor","__fileAccessor","__recordShareAccessor",
-                com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY)) settings.remove(key);
+                com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY,
+                com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.SETTINGS_KEY)) settings.remove(key);
         if (query()) {
             settings.remove(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY);
             Object data = settings.get(com.auraboot.framework.plugin.extension.CommandHandlerExtension.DATA_ACCESSOR_KEY);

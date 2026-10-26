@@ -136,6 +136,7 @@ public class HandlerPhase implements CommandPhase {
     @org.springframework.context.annotation.Lazy
     private com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
 
+    @Autowired private com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor commandMembershipLockAccessor;
     @Autowired private IdentityDirectoryAccessorImpl identityDirectoryAccessor;
     @Autowired private RoleMapper roleMapper;
     @Autowired private UserRoleService userRoleService;
@@ -746,6 +747,8 @@ public class HandlerPhase implements CommandPhase {
             if (recordShareAccessor != null) {
                 pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
             }
+            pluginSettings.put(com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.SETTINGS_KEY,
+                    commandMembershipLockAccessor);
             if (announcementAcknowledgementAccessor != null) {
                 pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY,
                         announcementAcknowledgementAccessor);
