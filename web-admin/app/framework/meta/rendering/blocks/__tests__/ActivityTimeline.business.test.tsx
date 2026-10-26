@@ -124,6 +124,84 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe('ActivityTimeline named business-only source', () => {
+  it('waits for the newer same-record DMS read when its initial request is superseded', async () => {
+    let first!: (value: ReturnType<typeof response>) => void;
+    let second!: (value: ReturnType<typeof response>) => void;
+    fetchResultMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            first = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            second = resolve;
+          }),
+      );
+    const host = runtime();
+    render(<ActivityTimeline {...props} runtime={host} />);
+    await waitFor(() => expect(fetchResultMock).toHaveBeenCalledTimes(1));
+    const initialRead = host.manager.fetch('history');
+    let newerRead!: Promise<void>;
+    act(() => {
+      newerRead = host.manager.reload('history');
+    });
+    await waitFor(() => expect(fetchResultMock).toHaveBeenCalledTimes(2));
+    try {
+      await act(async () => {
+        first(response([row('superseded', 'alert-A', 'Must not replace the newer read')]));
+        await initialRead;
+      });
+      expect(screen.getByTestId('activity-timeline-loading')).toBeVisible();
+      expect(screen.queryByTestId('activity-timeline-error')).toBeNull();
+    } finally {
+      await act(async () => {
+        second(response([row('latest', 'alert-A', 'Actual latest source read')]));
+        await newerRead;
+      });
+    }
+    expect(await screen.findByText('Actual latest source read')).toBeVisible();
+    expect(screen.queryByText('Must not replace the newer read')).toBeNull();
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+  });
+  it('accepts a completed reread of the same data object using the native completion timestamp', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    fetchResultMock.mockResolvedValue(response([row('same-value')]));
+    const host = runtime();
+    await host.manager.fetch('history');
+    const previousData = host.manager.getData('history');
+    now.mockReturnValue(2000);
+    render(<ActivityTimeline {...props} runtime={host} />);
+    expect(await screen.findByTestId('activity-timeline-item-business-same-value')).toBeVisible();
+    expect(host.manager.getData('history')).toBe(previousData);
+    expect(host.manager.getState('history')?.lastFetch).toBe(2000);
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+  });
+  it('does not call retained hard-backoff cache a successful reread and recovers only after expiry', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    fetchResultMock
+      .mockResolvedValueOnce(response([row('retained')]))
+      .mockRejectedValueOnce(new Error('Rate limit exceeded'))
+      .mockResolvedValueOnce(response([row('fresh', 'alert-A', 'Actual post-backoff read')]));
+    const host = runtime();
+    await host.manager.fetch('history');
+    now.mockReturnValue(2000);
+    render(<ActivityTimeline {...props} runtime={host} />);
+    expect(await screen.findByTestId('activity-timeline-error')).toHaveAttribute(
+      'data-error-reason',
+      'unavailable',
+    );
+    expect(screen.queryByTestId('activity-timeline')).toBeNull();
+    fireEvent.click(screen.getByTestId('activity-timeline-retry'));
+    expect(await screen.findByTestId('activity-timeline-error')).toBeVisible();
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+    now.mockReturnValue(32001);
+    fireEvent.click(screen.getByTestId('activity-timeline-retry'));
+    expect(await screen.findByText('Actual post-backoff read')).toBeVisible();
+    expect(fetchResultMock).toHaveBeenCalledTimes(3);
+  });
   it('renders the captured dynamic API response with omitted nullable display fields', async () => {
     const received = capturedNullOmission.data.records[0];
     expect(received).not.toHaveProperty('anc_from');
