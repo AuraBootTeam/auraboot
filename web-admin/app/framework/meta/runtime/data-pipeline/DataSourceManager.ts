@@ -4,6 +4,7 @@
  */
 
 import { completedCommandArray, completedCommandOptions } from './completed-command-array';
+import { completedCommandObject } from './completed-command-object';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { DataSourceConfig } from '~/framework/meta/schemas/types';
@@ -745,6 +746,8 @@ export class DataSourceManager {
     switch (config.adaptor) {
       case 'raw':
         return data;
+      case 'commandObject':
+        return completedCommandObject(data, config);
       case 'commandArray':
         return completedCommandArray(data, config);
       case 'commandOptions':
