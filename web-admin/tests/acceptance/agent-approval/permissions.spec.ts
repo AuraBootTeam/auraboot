@@ -3,6 +3,7 @@ import { Client } from 'pg';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { BASE_URL, BACKEND_URL } from '../../helpers/environments';
 
 type Account = { email: string; password: string };
 type Fixture = {
@@ -19,8 +20,8 @@ let database: Client;
 
 test.beforeAll(async () => {
   mkdirSync(evidence, { recursive: true });
-  expect(fixture.baseURL).toBe(process.env.PLAYWRIGHT_BASE_URL);
-  expect(fixture.backendURL).toBe(process.env.BACKEND_URL);
+  expect(fixture.baseURL).toBe(BASE_URL);
+  expect(fixture.backendURL).toBe(BACKEND_URL);
   const identity = JSON.parse(readFileSync(fixture.productIdentity, 'utf8'));
   expect(identity.bundleSha256).toBe(fixture.bundleSha256);
   expect(identity.checks.database).toBe(fixture.database.database);
