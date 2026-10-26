@@ -127,6 +127,9 @@ public class UserServiceImpl implements UserService {
 
             User signUpUser = new User();
             signUpUser.setPid(UniqueIdGenerator.generate());
+            Instant createdAt = Instant.now();
+            signUpUser.setCreatedAt(createdAt);
+            signUpUser.setUpdatedAt(createdAt);
             signUpUser.setEmail(normalizedEmail);
             signUpUser.setUserName(normalizedUserName);
             String resolvedName = (displayName != null && !displayName.isBlank()) ? displayName
