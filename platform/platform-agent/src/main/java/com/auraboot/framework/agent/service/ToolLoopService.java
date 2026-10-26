@@ -219,7 +219,7 @@ public class ToolLoopService {
             String reason = acl.getReason() == null ? "denied_by_tool_acl" : acl.getReason();
             log.info("Tool ACL deny: tenant={} profile={} channel={} run_kind={} tool={} → {}",
                     tenantId, profileId, channel, runKind, toolName, reason);
-            return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
+            return toolAccessDenied(toolName, input);
         }
 
         RuntimeAuthorizationService.IncrementalAuthorization authorization =
@@ -511,7 +511,7 @@ public class ToolLoopService {
                 tenantId, null, null, "interactive", toolName);
         if (!acl.isAllowed()) {
             String reason = acl.getReason() == null ? "denied_by_tool_acl" : acl.getReason();
-            return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
+            return toolAccessDenied(toolName, input);
         }
 
         RuntimeAuthorizationService.IncrementalAuthorization authorization =
@@ -1160,6 +1160,18 @@ public class ToolLoopService {
         if (observabilityService != null) {
             observabilityService.recordUnsupportedToolType(toolType);
         }
+    }
+
+    private String toolAccessDenied(String toolName, Map<String, Object> input) {
+        String message = "Tool access denied. Ask an administrator to grant access before trying again. "
+                + "Human approval does not grant tool access.";
+        AgentErrorFrame frame = AgentErrorFrame.of(
+                AgentErrorFrame.CATEGORY_TOOL, toolName, input, "ToolAccessDenied", false,
+                message, "Do not retry or switch to another write tool. Explain the permission denial "
+                        + "in the user's language and offer an allowed read-only action.");
+        return toJsonResult(Map.of("success", false, "error", message,
+                "errorCode", "TOOL_ACCESS_DENIED", "retryable", false,
+                "errorFrame", frame.toSnapshotMap()));
     }
 
     private String toJsonResult(Map<String, Object> result) {
