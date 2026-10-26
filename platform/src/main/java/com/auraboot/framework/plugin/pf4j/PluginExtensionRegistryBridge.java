@@ -11,6 +11,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 
 /**
  * Bridges discovered PF4J and live application-module handlers into the import-time
@@ -50,15 +53,22 @@ public class PluginExtensionRegistryBridge {
 
     private final ExtensionRegistry extensionRegistry;
     private final CommandHandlerRegistry commandHandlerRegistry;
+    private final Map<String, CommandHandlerRegistry.HandlerMeta> ownedEntries = new HashMap<>();
 
     @EventListener(ApplicationReadyEvent.class)
     public void bridge() {
         bridgePluginCommandHandlers();
     }
 
-    public BridgeResult bridgePluginCommandHandlers() {
+    @EventListener(ApplicationModuleRegistry.ApplicationModulesChangedEvent.class)
+    public void onApplicationModulesChanged() {
+        bridgePluginCommandHandlers();
+    }
+
+    public synchronized BridgeResult bridgePluginCommandHandlers() {
         int registered = 0;
         int skipped = 0;
+        Set<String> liveCodes = new HashSet<>();
         for (CommandHandlerExtension ext : extensionRegistry.getAllCommandHandlers()) {
             String primaryCode = ext.getCommandType();
             var commandTypes = ext.getSupportedCommandTypes();
@@ -78,6 +88,7 @@ public class PluginExtensionRegistryBridge {
                     skipped++;
                     continue;
                 }
+                liveCodes.add(code);
                 if (commandHandlerRegistry.isRegistered(code)) {
                     // Platform built-in or another plugin already won — keep first registration.
                     log.debug("Plugin extension {} reuses already-registered code '{}'",
@@ -88,11 +99,17 @@ public class PluginExtensionRegistryBridge {
                 String description = code.equals(primaryCode)
                         ? "Plugin command handler"
                         : "Plugin command handler alias of " + primaryCode;
-                commandHandlerRegistry.register(new CommandHandlerRegistry.HandlerMeta(
-                        code, source, description, null, null));
+                var metadata = new CommandHandlerRegistry.HandlerMeta(code, source, description, null, null);
+                commandHandlerRegistry.register(metadata);
+                ownedEntries.put(code, metadata);
                 registered++;
             }
         }
+        ownedEntries.entrySet().removeIf(entry -> {
+            if (liveCodes.contains(entry.getKey())) return false;
+            commandHandlerRegistry.unregisterIfSame(entry.getValue());
+            return true;
+        });
         log.info("PluginExtensionRegistryBridge: registered {} plugin command handlers ({} skipped)",
                 registered, skipped);
         return new BridgeResult(registered, skipped);
