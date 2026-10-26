@@ -434,6 +434,11 @@ public class ChatToolResolver {
         if (code != null && code.startsWith("aurabot:")) {
             return "AURABOT_SKILL";
         }
+        // Commands retain provider dispatch: a query command is still a command,
+        // not a named query, even when discovery classifies its effects as a read.
+        if (code != null && code.startsWith("cmd:")) {
+            return "built_in";
+        }
         // Preserve the registry's executor metadata. Reclassifying a local DSL read as
         // built_in makes runtime authorization infer EXTERNAL_NETWORK and reject it
         // under a read-only ceiling, even though discovery correctly allowed it.

@@ -200,7 +200,24 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                 "web", "aurabot", null, UniqueIdGenerator.generate(), prompt, Map.of(), Map.of(),
                 InboundMode.NEW_FROM_REQUEST, TriageBucket.CONTEXTUAL_ANSWER, null, null, null, chat), sink);
         String answer = result instanceof TurnOutcome.Success ok ? ok.finalResponse() : sink.answer;
+        // Keep normal async writeback enabled, but wait for this exact turn before
+        // clearing the next paired baseline. Otherwise a late write leaks treatment.
+        List<String> turnIds = jdbc.queryForList("SELECT metadata::jsonb->>'turn_id' FROM ab_ai_trace WHERE tenant_id=? AND trace_id=?",
+                String.class, tenantId, sink.trace);
+        assertThat(turnIds).hasSize(1);
+        String turnId = turnIds.get(0);
+        if (result instanceof TurnOutcome.Success && !sink.results.isEmpty()
+                && sink.results.stream().allMatch(r -> Boolean.TRUE.equals(r.get("success")))) {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (jdbc.queryForObject("SELECT COUNT(*) FROM ab_agent_memory WHERE tenant_id=? AND metadata LIKE ?",
+                    Integer.class, tenantId, "%source_turn_id=" + turnId + ";%") == 0 && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_agent_memory WHERE tenant_id=? AND metadata LIKE ?",
+                    Integer.class, tenantId, "%source_turn_id=" + turnId + ";%")).isEqualTo(1);
+        }
         Map<String, Object> row = base(id, repeat, enabled, started, answer, canary);
+        row.put("turnId", turnId);
         row.put("outcome", result.getClass().getSimpleName()); row.put("rawOutcome", result.toString());
         String wireText = json.writeValueAsString(wireCalls);
         String expectedMemory = id.equals("ME1") ? "【交付例会】" : "Earlier model response: ACME-184 was CLOSED";
@@ -209,7 +226,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         row.put("recalledPids", recalled.stream().map(m -> m.get("pid")).toList());
         row.put("tools", sink.tools); row.put("toolResults", sink.results); row.put("traceId", sink.trace == null ? "" : sink.trace);
         row.put("humanIntervention", sink.pending ? "approval" : "none_or_unclassified");
-        row.put("businessCorrect", answer != null && currentFactsPresent(answer) && observedBusinessRead() && !sink.results.isEmpty());
+        row.put("businessCorrect", answer != null && currentFactsPresent(answer) && observedBusinessRead(json, wireCalls) && !sink.results.isEmpty());
         row.put("preferenceFollowed", answer != null && answer.stripLeading().startsWith("【交付例会】"));
         row.put("providerUsage", result instanceof TurnOutcome.Success ok ? ok.meta() : Map.of());
         samples.add(row);
@@ -234,7 +251,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         String answer = result.getTextSummary();
         Map<String, Object> row = base(id, repeat, enabled, started, answer, "NO-CANARY");
         row.put("skillCode", code); row.put("outcome", result.getStatus().name()); row.put("rawResult", result);
-        row.put("businessCorrect", answer != null && currentFactsPresent(answer) && observedBusinessRead());
+        row.put("businessCorrect", answer != null && currentFactsPresent(answer) && observedBusinessRead(json, wireCalls));
         row.put("escalationCorrect", id.equals("SK1") && answer != null && answer.contains("ESCALATE") && !answer.contains("NO_ESCALATION"));
         row.put("humanIntervention", "unclassified_review_raw_response");
         samples.add(row);
@@ -246,7 +263,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         row.put("elapsedMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
         row.put("answer", answer == null ? "" : answer);
         row.put("wireCalls", List.copyOf(wireCalls));
-        row.put("observedBusinessRead", observedBusinessRead());
+        row.put("observedBusinessRead", observedBusinessRead(json, wireCalls));
         row.put("estimatedCostUsd", "unavailable_for_current_model_unless_provider_has_price_metadata");
         row.put("unauthorizedLeak", (answer != null && answer.contains(canary)) || wireCalls.toString().contains(canary));
         // The credential itself is never included in evidence, even if a provider violates its contract.
@@ -255,11 +272,18 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         return row;
     }
 
-    private boolean observedBusinessRead() {
+    static boolean observedBusinessRead(ObjectMapper json, List<Map<String, Object>> wireCalls) {
         for (var node : json.valueToTree(wireCalls).findParents("type")) {
-            if (!"tool_result".equals(node.path("type").asText()) || !node.path("content").isTextual()) continue;
+            if (!"tool_result".equals(node.path("type").asText())) continue;
+            var encoded = node.path("content").isTextual() ? node.path("content") : node.path("result");
+            if (!encoded.isTextual()) continue;
+            String text = encoded.asText();
+            int start = text.indexOf("<tool-output>\n");
+            if (start >= 0 && text.endsWith("\n</tool-output>")) {
+                text = text.substring(start + "<tool-output>\n".length(), text.length() - "\n</tool-output>".length());
+            }
             try {
-                var payload = json.readTree(node.path("content").asText());
+                var payload = json.readTree(text);
                 if (!payload.path("success").asBoolean(false)) continue;
                 for (var record : payload.path("records")) {
                     if ("ACME-184".equals(record.path("order_ref").asText())

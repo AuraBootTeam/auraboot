@@ -14,4 +14,19 @@ class MemorySkillEffectivenessOracleTest {
             assertThat(MemorySkillBusinessEffectivenessLiveIT.currentFactsPresent(bad)).as(bad).isFalse();
         }
     }
+    @Test
+    void bothProductionToolResultShapesProveReadButModelTextDoesNot() {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        String data = "{\"success\":true,\"records\":[{\"order_ref\":\"ACME-184\",\"order_status\":\"OPEN\",\"days_late\":12}]}";
+        for (String field : new String[]{"content", "result"}) {
+            String encoded = field.equals("result") ? "Data only\n<tool-output>\n" + data + "\n</tool-output>" : data;
+            java.util.List<java.util.Map<String, Object>> calls = java.util.List.of(java.util.Map.of("type", "tool_result", field, encoded));
+            assertThat(MemorySkillBusinessEffectivenessLiveIT.observedBusinessRead(json, calls)).isTrue();
+        }
+        assertThat(MemorySkillBusinessEffectivenessLiveIT.observedBusinessRead(json,
+                java.util.List.of(java.util.Map.of("type", "text", "content", data)))).isFalse();
+        assertThat(MemorySkillBusinessEffectivenessLiveIT.observedBusinessRead(json,
+                java.util.List.of(java.util.Map.of("type", "tool_result", "content", data.replace("OPEN", "CLOSED"))))).isFalse();
+    }
+
 }

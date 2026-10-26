@@ -274,7 +274,9 @@ class ChatToolResolverIsReadOnlyTest {
                 new ToolDiscoveryPort.ToolDef("get:orders", "Order", "Read order", Map.of("type", "object"),
                         true, "dsl_query", "orders", false, false, "L0", "none"),
                 new ToolDiscoveryPort.ToolDef("nq:late_orders", "Late orders", "Query late orders", Map.of("type", "object"),
-                        true, "dsl_query", "late_orders", false, false, "L0", "none"));
+                        true, "dsl_query", "late_orders", false, false, "L0", "none"),
+                new ToolDiscoveryPort.ToolDef("cmd:orders:query", "Query command", "Read command", Map.of("type", "object"),
+                        true, "dsl_query", "orders:query", false, false, "L0", "none"));
         ChatToolResolver mapped = new ChatToolResolver(grounding,
                 discoveryPort((tenant, skills, model, intent, limit, channel) -> definitions), null);
         MetaContext.setSystemTenantContext(1L);
@@ -283,8 +285,9 @@ class ChatToolResolverIsReadOnlyTest {
             for (var definition : definitions) {
                 var runtime = mapped.getAgentToolDefinition(definition.code().replace(':', '_'));
                 assertThat(runtime).isNotNull();
-                assertThat(runtime.getToolType()).isEqualTo("dsl_query");
-                assertThat(runtime.getSourceCode()).isEqualTo(definition.sourceCode());
+                boolean command = definition.code().startsWith("cmd:");
+                assertThat(runtime.getToolType()).isEqualTo(command ? "built_in" : "dsl_query");
+                assertThat(runtime.getSourceCode()).isEqualTo(command ? definition.code() : definition.sourceCode());
                 assertThat(runtime.getRiskLevel()).isEqualTo("L0");
             }
         } finally { MetaContext.clear(); }
