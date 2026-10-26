@@ -162,11 +162,9 @@ public class SkillToolExecutor {
      * {@link PreviewTokenStore#consume} which enforces skill-name + params-hash
      * match; any drift surfaces as {@link SkillErrorCode#PREVIEW_TOKEN_INVALID}.
      *
-     * <p>This entry deliberately does NOT re-run the validator — the dispatch
-     * step already gated permission / schema, and the token's params-hash is
-     * the second-line guard against parameter tampering between preview and
-     * confirm. Routing back through the validator would also re-claim the
-     * Redis idempotency ledger which the controller path owns.
+     * <p>Revalidate current permission and schema in DRY_RUN mode before consuming
+     * the preview. This does not claim a second idempotency slot. Approval is
+     * not a grant of missing business permissions.
      */
     public DispatchOutcome confirm(String skillName, SkillRequest input, String previewToken) {
         SkillRequest req = buildRequest(skillName, input);
@@ -174,9 +172,9 @@ public class SkillToolExecutor {
             req.setPreviewToken(previewToken);
         }
 
-        AuraBotSkill skill = registry.get(skillName)
-                .orElseThrow(() -> new SkillSpiException(SkillErrorCode.SKILL_NOT_FOUND,
-                        "skill not found: " + skillName));
+        // Approval never supplements current business permissions or schema validity.
+        AuraBotSkill skill = validator.validate(req, resolvePermissionsFromContext(), currentTenantId(),
+                ValidationMode.DRY_RUN).skill();
 
         PreviewTokenStore previewTokenStore = previewTokenStoreProvider.getIfAvailable();
         if (previewTokenStore == null) {
@@ -184,6 +182,7 @@ public class SkillToolExecutor {
                     "preview token store unavailable (redis not configured); cannot consume token");
         }
         previewTokenStore.consume(previewToken, skillName, req.getParams())
+                .filter(payload -> payload.tenantId() == currentTenantId())
                 .orElseThrow(() -> new SkillSpiException(SkillErrorCode.PREVIEW_TOKEN_INVALID,
                         "preview token invalid, expired, or params mismatch"));
 

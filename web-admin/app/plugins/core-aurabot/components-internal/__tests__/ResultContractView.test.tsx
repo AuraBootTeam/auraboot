@@ -27,6 +27,19 @@ const baseContract: ResultContract = {
 };
 
 describe('ResultContractView', () => {
+  it('restores created model identity without exposing the execution envelope in the business card', () => {
+    render(<ResultContractView contract={{ ...baseContract, skillCode: 'aurabot:model:create', renderHint: 'card',
+      data: { data: { displayName: 'Acceptance ledger', modelCode: 'acceptance_ledger', modelPid: 'internal-pid', tableName: 'mt_acceptance_ledger' }, status: 'SUCCESS' } }} />);
+    const result = screen.getByTestId('rc-created-model');
+    expect(result).toHaveTextContent('Acceptance ledger');
+    expect(result).toHaveTextContent('acceptance_ledger');
+    expect(result).not.toHaveTextContent('internal-pid');
+    expect(result).not.toHaveTextContent('SUCCESS');
+    const details = screen.getByTestId('rc-diagnostics');
+    expect(details).not.toHaveAttribute('open');
+    expect(details).toHaveTextContent('internal-pid');
+  });
+
   it('preserves the complete business code in a result table', () => {
     const code = 'long_' + 'business'.repeat(8);
     render(<ResultContractView contract={{ ...baseContract, renderHint: 'table', table: [{ code }] }} />);

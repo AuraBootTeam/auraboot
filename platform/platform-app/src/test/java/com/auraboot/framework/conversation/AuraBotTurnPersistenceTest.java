@@ -341,4 +341,19 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
         Long returned = persistence.persistInbound(newImEventTurnRequest("Hi", null), null);
         assertThat(returned).isNull();
     }
+    @Test
+    void genericResultAndTraceRoundTripThroughRealMessageStorage() {
+        var contract = com.auraboot.framework.agent.dto.ResultContract.builder().skillCode("platform.list_models")
+                .status("success").outputType("structured_result").renderHint("table").actionability("read_only")
+                .table(java.util.List.of(java.util.Map.of("code", "approve_log", "displayName", "审批台账"))).build();
+        var artifacts = TurnArtifacts.of(null, null, java.util.List.of(), java.util.List.of(contract), "trace-history");
+        Long id = persistence.persistOutbound(newCtx(), new TurnOutcome.Success("Historical result", java.util.Map.of()), artifacts);
+        assertThat(messageMapper.selectById(id).getCardPayload()).contains("resultContractsVersion", "trace-history");
+        var message = conversationService.getMessages(conversationId, tenantId, humanMemberId, 100).stream()
+                .filter(value -> id.equals(value.getId())).findFirst().orElseThrow();
+        assertThat(message.getTraceId()).isEqualTo("trace-history");
+        assertThat(message.getResultContracts()).hasSize(1);
+        assertThat(message.getResultContracts().get(0).getTable().get(0))
+                .containsEntry("code", "approve_log").containsEntry("displayName", "审批台账");
+    }
 }

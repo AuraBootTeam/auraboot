@@ -547,7 +547,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_pe_procurement_comparison_supplier_options"),
                 eq(toolInput),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("{\"success\":true,\"data\":{\"records\":[{\"supplier\":\"Acme PCB\"}]},\"durationMs\":12}");
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse(
@@ -571,7 +571,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_pe_procurement_comparison_supplier_options"),
                 eq(toolInput),
                 anyList(),
-                isNull());
+                isNull(), any(), any());
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
@@ -619,7 +619,7 @@ class AgentChatPortImplToolLoopTest {
         assertThat(requests.getAllValues().get(0).getTools()).extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("nq_pe_procurement_comparison_supplier_options");
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any());
         verify(sink, never()).onConfirmRequired(any(), any(), any(), any(), any());
     }
 
@@ -660,7 +660,7 @@ class AgentChatPortImplToolLoopTest {
         assertThat(requests.getAllValues().get(0).getTools()).extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("nq_customers");
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any());
     }
 
     @ParameterizedTest
@@ -698,7 +698,7 @@ class AgentChatPortImplToolLoopTest {
         assertThat(requests.getAllValues().get(0).getTools()).extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("list_tpm_customer");
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any());
         verify(sink, never()).onConfirmRequired(any(), any(), any(), any(), any());
     }
 
@@ -715,7 +715,7 @@ class AgentChatPortImplToolLoopTest {
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse("allowed-read", "list_tpm_customer", Map.of()))
                 .thenReturn(endTurnResponse("One customer was returned."));
-        when(toolLoopService.executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any()))
+        when(toolLoopService.executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any()))
                 .thenReturn("{\"success\":true,\"data\":{\"records\":[{\"tpm_cu_name\":\"Customer A\"}]}}");
         var overrides = com.auraboot.framework.agent.port.AgentTurnOverrides.builder().readOnlyExecution(true)
                 .scopedModelQueryOnly(true).effectivePermissions(java.util.Set.of("model.tpm_customer.read")).build();
@@ -724,7 +724,7 @@ class AgentChatPortImplToolLoopTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AgentToolDefinition>> definitions = ArgumentCaptor.forClass(List.class);
         verify(toolLoopService).executeToolCall(any(), any(), any(), eq(AGENT_CODE), eq("list_tpm_customer"),
-                anyMap(), definitions.capture(), any());
+                anyMap(), definitions.capture(), any(), any(), any());
         assertThat(definitions.getValue().get(0).getRequiredPermissions()).containsExactly("model.tpm_customer.read");
     }
 
@@ -747,7 +747,7 @@ class AgentChatPortImplToolLoopTest {
         ArgumentCaptor<LlmChatRequest> requests = ArgumentCaptor.forClass(LlmChatRequest.class);
         verify(provider, times(2)).chat(requests.capture(), eq("test-key"), eq("https://example.invalid"));
         assertThat(requests.getAllValues().get(0).getTools()).isNull();
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any());
     }
 
     @Test
@@ -789,7 +789,7 @@ class AgentChatPortImplToolLoopTest {
         assertThat(requestCaptor.getValue().getTools())
                 .extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("nq_pe_procurement_comparison_supplier_options");
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any());
     }
 
     @Test
@@ -890,7 +890,7 @@ class AgentChatPortImplToolLoopTest {
         verify(sink).onError(contains("required tool call"), eq("named-trace"));
         verify(sink, never()).onTextChunk(anyString());
         verify(sink, never()).onDone(anyString(), any());
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any());
 
         ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
         verify(provider).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
@@ -930,7 +930,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_qc_quality_capa_context"),
                 eq(input),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("{\"success\":true,\"data\":{\"records\":[{\"source_record_pid\":\"DEFECT-1\"}]},\"durationMs\":7}");
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse("toolu-nq", "nq_qc_quality_capa_context", input))
@@ -947,7 +947,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_qc_quality_capa_context"),
                 eq(input),
                 anyList(),
-                isNull());
+                isNull(), any(), any());
         ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
         verify(provider, times(2)).chat(requestCaptor.capture(), eq("test-key"), eq("https://example.invalid"));
         assertThat(requestCaptor.getAllValues().get(0).getTools())
@@ -978,7 +978,7 @@ class AgentChatPortImplToolLoopTest {
         TurnOutcome outcome = service.runAgentTurn(newTurnContext(), newRequest("Create a customer model"), sink);
 
         assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), anyMap(), anyList(), any(), any(), any());
         verify(toolProviderRegistry, never()).execute(any(), anyString(), anyMap());
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
@@ -1024,7 +1024,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_pe_procurement_comparison_supplier_options"),
                 eq(input),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenThrow(new IllegalStateException("database password=secret-db exploded"));
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse(
@@ -1082,7 +1082,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_pe_procurement_comparison_supplier_options"),
                 eq(input),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("Error: database password=secret-db exploded apiKey=sk-secret");
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse(
@@ -1143,7 +1143,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_pe_procurement_comparison_supplier_options"),
                 eq(input),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("{\"success\":false,\"error\":\"database password=secret-db exploded\",\"durationMs\":12}");
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse(
@@ -1199,7 +1199,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("platform_create_model"),
                 eq(input),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("{\"success\":false,\"approvalRequired\":true,\"approvalPid\":\"approval-1\",\"message\":\"Approval required\"}");
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse("toolu-approval", "platform_create_model", input));
@@ -1345,7 +1345,7 @@ class AgentChatPortImplToolLoopTest {
                 .containsEntry("approvalPid", "approval-1")
                 .containsEntry("toolName", "platform.create_model");
         assertThat(result.get("result")).isEqualTo(completedResult);
-        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(toolLoopService, never()).executeToolCall(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -1365,7 +1365,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("platform_create_model"),
                 eq(input),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("{\"success\":false,\"approvalRequired\":true,\"error\":\"No matching approval policy\"}");
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))
                 .thenReturn(toolUseResponse("toolu-approval", "platform_create_model", input));
@@ -1527,7 +1527,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("aurabot_model_create"),
                 eq(input),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("{\"success\":false,\"approvalRequired\":true,\"skillName\":\"model:create\","
                         + "\"riskLevel\":\"high\",\"preview\":{\"modelCode\":\"crm_customer\"},"
                         + "\"previewToken\":\"preview-1\"}");
@@ -1549,7 +1549,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("aurabot_model_create"),
                 eq(input),
                 anyList(),
-                isNull());
+                isNull(), any(), any());
         verify(sink).onToolStart("toolu-skill", "aurabot_model_create", input);
         verify(sink).onConfirmRequired(
                 eq("toolu-skill"),
@@ -1653,7 +1653,7 @@ class AgentChatPortImplToolLoopTest {
                 eq("nq_pe_procurement_comparison_supplier_options"),
                 anyMap(),
                 anyList(),
-                isNull()))
+                isNull(), any(), any()))
                 .thenReturn("{\"success\":true,\"data\":{\"records\":[]},\"durationMs\":1}");
         // Return tool_use forever — loop must abort at MAX_TOOL_ROUNDS (5).
         when(provider.chat(any(LlmChatRequest.class), eq("test-key"), eq("https://example.invalid")))

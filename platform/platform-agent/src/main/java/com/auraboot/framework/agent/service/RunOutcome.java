@@ -46,8 +46,13 @@ public sealed interface RunOutcome
             String finalResponse,
             int inputTokens,
             int outputTokens,
-            double totalCost
-    ) implements RunOutcome {}
+            double totalCost,
+            String traceId
+    ) implements RunOutcome {
+        public Success(String runPid, String response, int input, int output, double cost) {
+            this(runPid, response, input, output, cost, null);
+        }
+    }
 
     /**
      * Run paused on an approval gate. Phase C.3d (Q-C3.3=α): {@code approvalPid}
@@ -59,7 +64,12 @@ public sealed interface RunOutcome
      * {@code TurnOutcome.Failed} since there is nothing for the user to
      * approve.
      */
-    record PendingApproval(String runPid, String approvalPid, String message) implements RunOutcome {}
+    record PendingApproval(String runPid, String approvalPid, String message,
+                           java.util.Map<String, Object> review, String traceId) implements RunOutcome {
+        public PendingApproval(String runPid, String approvalPid, String message) {
+            this(runPid, approvalPid, message, java.util.Map.of(), null);
+        }
+    }
 
     record Failed(String runPid, String errorMessage) implements RunOutcome {}
 
