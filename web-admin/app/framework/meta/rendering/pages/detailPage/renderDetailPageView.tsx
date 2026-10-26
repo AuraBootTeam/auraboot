@@ -836,27 +836,30 @@ export function renderDetailPageView({
               )}
 
               {/* Default back/edit buttons (hidden in print) */}
-              {!effectiveHeaderToolbar && (
-                <div
-                  className="print-hide border-border flex justify-end space-x-3 border-t pt-6"
-                  data-print="hide"
-                >
-                  <Link
-                    to={`/p/${tableName}${location.search}`}
-                    className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
+              {!effectiveHeaderToolbar &&
+                (schema.extension?.showBack !== false || showDefaultEditAction) && (
+                  <div
+                    className="print-hide border-border flex justify-end space-x-3 border-t pt-6"
+                    data-print="hide"
                   >
-                    {t('action.back')}
-                  </Link>
-                  {showDefaultEditAction && (
-                    <Link
-                      to={`/p/${tableName}/edit/${recordPid}`}
-                      className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
-                    >
-                      {t('action.update')}
-                    </Link>
-                  )}
-                </div>
-              )}
+                    {schema.extension?.showBack !== false && (
+                      <Link
+                        to={`/p/${tableName}${location.search}`}
+                        className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
+                      >
+                        {t('action.back')}
+                      </Link>
+                    )}
+                    {showDefaultEditAction && (
+                      <Link
+                        to={`/p/${tableName}/edit/${recordPid}`}
+                        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
+                      >
+                        {t('action.update')}
+                      </Link>
+                    )}
+                  </div>
+                )}
             </div>
           )}
         </div>

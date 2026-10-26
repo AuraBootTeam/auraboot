@@ -102,4 +102,27 @@ describe('TableBlockRenderer data-source states', () => {
     expect(screen.queryByTestId('table-refreshing-state')).not.toBeInTheDocument();
     expect(screen.getByText('Batch A')).toBeInTheDocument();
   });
+  it('announces hierarchical expansion and preserves keyboard button semantics', () => {
+    const rows = [
+      { pid: 'parent', name: 'Apparel' },
+      { pid: 'child', name: 'Tops', parentPid: 'parent' },
+    ];
+    render(
+      <TableBlockRenderer
+        block={
+          { ...block, treeConfig: { parentField: 'parentPid', defaultExpanded: false } } as any
+        }
+        runtime={runtime(rows, { data: rows, loading: false, error: null })}
+      />,
+    );
+    const expand = screen.getByRole('button', { name: 'Expand child rows' });
+    expect(expand).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Tops')).not.toBeInTheDocument();
+    fireEvent.click(expand);
+    expect(screen.getByRole('button', { name: 'Collapse child rows' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByText('Tops')).toBeInTheDocument();
+  });
 });

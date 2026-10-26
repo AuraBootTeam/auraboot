@@ -400,7 +400,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 渲染列头
   useEffect(() => {
-    if (!selectionConfig?.bind || isMultipleSelection || !defaultFirstSelection) return;
+    if (!selectionConfig?.bind || isMultipleSelection) return;
     const current = (runtime.getContext().state as Record<string, any> | undefined)?.[
       selectionConfig.bind
     ];
@@ -423,14 +423,14 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       return;
     }
 
-    if (data.length > 0) {
+    if (defaultFirstSelection && data.length > 0) {
       const firstRow = data[0];
       writeRuntimeState(runtime, selectionConfig.bind, firstRow);
       setLocalSelectedRowKey(getRowIdentity(firstRow, 0));
       return;
     }
 
-    if (data.length === 0 && current) {
+    if (current) {
       writeRuntimeState(runtime, selectionConfig.bind, null);
       setLocalSelectedRowKey('');
     }
@@ -730,7 +730,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
         if (item && typeof item.label === 'string' && item.label.trim()) {
-          const tone = resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined);
+          const tone = resolveStatusTone(
+            typeof item.extension?.color === 'string' ? item.extension.color : undefined,
+          );
           if (column.renderType === 'status-pill') {
             return renderStatusPill(tone, item.label);
           }
@@ -796,7 +798,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       case 'date':
       case 'datetime':
         return cellRendererRegistry.render(column.valueType, {
-          value, record: row, column: { ...column, timezone, dateTimeFormats } as any, locale, t,
+          value,
+          record: row,
+          column: { ...column, timezone, dateTimeFormats } as any,
+          locale,
+          t,
         } as any);
 
       case 'currency':
@@ -1480,6 +1486,14 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                             {row._hasChildren ? (
                               <button
                                 type="button"
+                                aria-expanded={Boolean(row._expanded)}
+                                aria-label={getLocalizedText(
+                                  row._expanded
+                                    ? { 'zh-CN': '收起子项', en: 'Collapse child rows' }
+                                    : { 'zh-CN': '展开子项', en: 'Expand child rows' },
+                                  locale,
+                                  t,
+                                )}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleExpand(getLegacyCompatibleRecordPid(row) || '');
