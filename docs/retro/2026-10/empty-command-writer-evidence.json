@@ -1,0 +1,42 @@
+{
+  "producer": "ded2865bb5a234b8309c1aeae5b9aa4e8d45c21f",
+  "cleanSource": true,
+  "boot": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-app/build/libs/AuraBoot-1.0.0-boot.jar",
+  "bootSha256": "af40266d1f1899eb830b20d5554817661768738d5436363bf05b37f900f97f57",
+  "pluginApi": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar",
+  "apiSha256": "66827430dd40e4a7004dea856bb262ed4e8037ce8d51c0d705e7216edebdd099",
+  "previousProducer": "49b5f80354808b636cc4bf9a435097642b29bb5d",
+  "changedBootEntries": [
+    "BOOT-INF/lib/AuraBoot-1.0.0.jar"
+  ],
+  "changedCoreClasses": [
+    "com/auraboot/framework/meta/service/impl/ModelMutationGuard.class"
+  ],
+  "hermeticTests": 18,
+  "suites": [
+    {
+      "name": "com.auraboot.framework.meta.service.impl.ModelMutationGuardTest",
+      "tests": "14",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-26T23:24:49.131Z",
+      "hostname": "Mac",
+      "time": "0.62"
+    },
+    {
+      "name": "com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTOTest",
+      "tests": "4",
+      "skipped": "0",
+      "failures": "0",
+      "errors": "0",
+      "timestamp": "2026-10-26T23:24:49.976Z",
+      "hostname": "Mac",
+      "time": "0.198"
+    }
+  ],
+  "previousBytecodeTests": 2,
+  "expectedSemanticFailures": 2,
+  "nativeProductQualification": "not-yet-run",
+  "productionAuthorityGranted": false
+}

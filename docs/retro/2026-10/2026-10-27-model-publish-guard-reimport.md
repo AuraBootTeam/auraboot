@@ -17,3 +17,8 @@ Root在同一Core树修复两条路径：已PUBLISHED模型导入成功schema sy
 原始日志／JUnit／受控baseline输入和类加载证据位于受管`maritime-parallel-core/model-publish-guards`；摘要见本目录model-publish-guard-evidence.json。Core PR保留reviewable状态，不合main、不部署生产。
 
 SOT Updates：model-mutation-policy新增publish-time guard契约；产品总体失败及后续准入保留在Anchorage唯一交付摘要，不将Core组件绿色升级为业务通过。
+
+
+## 后续产品限定原生证据
+
+Anchorage clean native producer e41b916e22701ea20a9d52f351a030808825da6e已实际使用49b5 runtime完成公开导入限定复验：启动前后无隐式repair，公开导入安装trigger／validated CHECK，旧g4 UPDATE／DELETE均23514拒绝；十组受限HTTP命令、重复导入与正常stop/start保持8围栏及3案件／15历史。该结果属于产品原始producer，不重标到Core文档head；最终prepared-transfer、Root业务grant、崩溃恢复／真实设备及UI仍未完成。原件归Anchorage reports/maritime-runtime-integration/fence-input-authority/，受管evidence同名目录。后续空命令白名单runtime ded2865是另一个候选，不能自动继承上述原生资格。
