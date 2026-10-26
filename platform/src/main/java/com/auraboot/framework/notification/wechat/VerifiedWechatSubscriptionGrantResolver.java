@@ -30,10 +30,10 @@ import java.util.*;
 @Service
 @ConditionalOnProperty(prefix = "aura.notification.wechat-subscription.reservations", name = "enabled", havingValue = "true")
 public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscriptionGrantResolver {
-    private final WechatSubscriptionProperties delivery;
     private final WechatMiniProperties mini;
-    private final Set<String> sourceTypes;
-    private final Map<String, WechatSubscriptionReservationProperties.Value> fields;
+    private final Map<String, TemplateRoute> routes;
+    private record TemplateRoute(String templateId,
+            Map<String, WechatSubscriptionReservationProperties.Value> fields, Map<String, Integer> limits) {}
     private final List<NotificationDeliveryPlanResolver> plans;
     private final NotificationMapper recipients;
     private final AuthIdentityMapper identities;
@@ -57,17 +57,9 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
             List<NotificationDeliveryPlanResolver> plans, NotificationMapper recipients, AuthIdentityMapper identities,
             WechatSubscriptionConsentMapper consent, WechatSubscriptionReservationMapper reservations,
             PlatformTransactionManager manager, Clock clock) {
-        if (!policy.isEnabled() || policy.getSourceTypes().isEmpty() || policy.getSourceTypes().size() > 100
-                || policy.getSourceTypes().stream().anyMatch(value -> !value.matches("[A-Za-z_][A-Za-z0-9_]{0,63}"))
-                || policy.getFieldSources().isEmpty() || policy.getFieldSources().size() > 16
-                || !policy.getFieldSources().keySet().equals(delivery.getFieldMaxLengths().keySet())
-                || policy.getFieldSources().keySet().stream().anyMatch(value -> !value.matches("[A-Za-z][A-Za-z0-9]*"))
-                || delivery.getFieldMaxLengths().values().stream().anyMatch(value -> value == null || value < 1)
-                || blank(delivery.getTemplateId()) || blank(mini.getAppId())) {
-            throw new IllegalArgumentException("WECHAT_RESERVATION_CONFIGURATION_INVALID");
-        }
-        this.delivery = delivery; this.mini = mini; this.plans = List.copyOf(plans);
-        this.sourceTypes = Set.copyOf(policy.getSourceTypes()); this.fields = Map.copyOf(policy.getFieldSources());
+        if (blank(mini.getAppId())) throw invalidConfiguration();
+        this.routes = configuredRoutes(policy, delivery);
+        this.mini = mini; this.plans = List.copyOf(plans);
         this.recipients = recipients; this.identities = identities; this.consent = consent;
         this.reservations = reservations; this.clock = clock;
         reads = new TransactionTemplate(manager);
@@ -86,11 +78,11 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
         var existing = reservations.find(tenant, reference);
         if (existing != null) return verified(current, tenant, reference, existing, null);
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        var available = reservations.available(mini.getAppId(), current.identity().getOpenid(), delivery.getTemplateId(), now);
+        var available = reservations.available(mini.getAppId(), current.identity().getOpenid(), current.templateId(), now);
         if (available == null) return Optional.empty();
         String reservation = hash(tenant + "\n" + reference + "\n" + available.reference());
         Grant grant = new Grant(tenant, reference, current.plan().recipientUserPid(), mini.getAppId(),
-                current.identity().getPid(), current.identity().getOpenid(), delivery.getTemplateId(),
+                current.identity().getPid(), current.identity().getOpenid(), current.templateId(),
                 available.reference(), reservation, available.expiresAt(), current.values(), now);
         int inserted = reservations.append(tenant, reference, reservation, available.reference(),
                 current.plan().configurationVersion(), encode(grant), now);
@@ -119,7 +111,7 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
         if (grant.tenantId() != tenant || !reference.equals(grant.resolutionReference())
                 || !current.plan().configurationVersion().equals(stored.sourceVersion())
                 || !current.plan().recipientUserPid().equals(grant.userPid())
-                || !mini.getAppId().equals(grant.appId()) || !delivery.getTemplateId().equals(grant.templateId())
+                || !mini.getAppId().equals(grant.appId()) || !current.templateId().equals(grant.templateId())
                 || !current.identity().getPid().equals(grant.identityPid())
                 || !current.identity().getOpenid().equals(grant.openid()) || !current.values().equals(grant.values())
                 || (reservation != null && !reservation.equals(grant.reservationReference()))
@@ -128,13 +120,13 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
         return reservations.eligible(grant.grantReference(), grant.appId(), grant.openid(), grant.templateId(),
                 grant.expiresAt(), clock.instant()) == 1 ? Optional.of(grant) : Optional.empty();
     }
-    private record Context(Plan plan, AuthIdentity identity, Map<String, String> values) {}
+    private record Context(Plan plan, AuthIdentity identity, Map<String, String> values, String templateId) {}
     private Optional<Context> context(long tenant, String reference) {
         if (plans.stream().anyMatch(plan -> plan.getClass().getClassLoader() != getClass().getClassLoader())) return Optional.empty();
         var resolved = plans.stream().map(plan -> plan.resolve(tenant, reference)).flatMap(Optional::stream).toList();
         if (resolved.size() != 1) return Optional.empty();
         var plan = resolved.getFirst();
-        if (plan.tenantId() != tenant || !reference.equals(plan.reference()) || !sourceTypes.contains(plan.sourceType())
+        if (plan.tenantId() != tenant || !reference.equals(plan.reference()) || !routes.containsKey(plan.sourceType())
                 || blank(plan.recipientUserPid()) || blank(plan.configurationVersion()) || plan.configurationVersion().length() > 128)
             return Optional.empty();
         Long user = recipients.findActiveRecipient(tenant, plan.recipientUserPid());
@@ -145,16 +137,52 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
         var identity = bound.getFirst();
         if (!Objects.equals(user, identity.getUserId()) || !"wechat_mini".equals(identity.getProvider())
                 || !mini.getAppId().equals(identity.getAppId()) || blank(identity.getPid()) || blank(identity.getOpenid())) return Optional.empty();
+        var route = routes.get(plan.sourceType());
         Map<String, String> values = new TreeMap<>();
-        for (var field : fields.entrySet()) {
+        for (var field : route.fields().entrySet()) {
             String value = switch (field.getValue()) {
                 case TITLE -> plan.title(); case CONTENT -> plan.content(); case SOURCE_ID -> plan.sourceId();
             };
-            Integer max = delivery.getFieldMaxLengths().get(field.getKey());
+            Integer max = route.limits().get(field.getKey());
             if (blank(value) || max == null || value.codePointCount(0, value.length()) > max) return Optional.empty();
             values.put(field.getKey(), value);
         }
-        return Optional.of(new Context(plan, identity, Map.copyOf(values)));
+        return Optional.of(new Context(plan, identity, Map.copyOf(values), route.templateId()));
+    }
+    private static Map<String, TemplateRoute> configuredRoutes(WechatSubscriptionReservationProperties policy,
+            WechatSubscriptionProperties delivery) {
+        var contracts = delivery.templateContracts();
+        if (!policy.isEnabled() || policy.getSourceTypes().isEmpty() || policy.getSourceTypes().size() > 100
+                || policy.getSourceTypes().stream().anyMatch(value -> !value.matches("[A-Za-z_][A-Za-z0-9_]{0,63}"))
+                || contracts.isEmpty()) throw invalidConfiguration();
+        var result = new TreeMap<String, TemplateRoute>();
+        if (delivery.getTemplates().isEmpty()) {
+            if (!policy.getRoutes().isEmpty()) throw invalidConfiguration();
+            var fields = policy.getFieldSources();
+            var limits = contracts.get(delivery.getTemplateId());
+            if (!fields.keySet().equals(limits.keySet()) || fields.values().stream().anyMatch(Objects::isNull))
+                throw invalidConfiguration();
+            for (var source : policy.getSourceTypes())
+                result.put(source, new TemplateRoute(delivery.getTemplateId(), Map.copyOf(fields), limits));
+        } else {
+            if (!policy.getFieldSources().isEmpty() || !policy.getRoutes().keySet().equals(policy.getSourceTypes()))
+                throw invalidConfiguration();
+            Set<String> selected = new HashSet<>();
+            for (var entry : policy.getRoutes().entrySet()) {
+                var route = entry.getValue();
+                if (route == null || route.getTemplateId() == null || !selected.add(route.getTemplateId()))
+                    throw invalidConfiguration();
+                var limits = contracts.get(route.getTemplateId());
+                if (limits == null || !route.getFieldSources().keySet().equals(limits.keySet())
+                        || route.getFieldSources().values().stream().anyMatch(Objects::isNull)) throw invalidConfiguration();
+                result.put(entry.getKey(), new TemplateRoute(route.getTemplateId(), Map.copyOf(route.getFieldSources()), limits));
+            }
+            if (!selected.equals(contracts.keySet())) throw invalidConfiguration();
+        }
+        return Map.copyOf(result);
+    }
+    private static IllegalArgumentException invalidConfiguration() {
+        return new IllegalArgumentException("WECHAT_RESERVATION_CONFIGURATION_INVALID");
     }
     private boolean owned(long tenant, String reference) {
         return tenant > 0 && Objects.equals(MetaContext.getCurrentTenantId(), tenant)

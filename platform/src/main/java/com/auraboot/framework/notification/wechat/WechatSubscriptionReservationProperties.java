@@ -13,6 +13,17 @@ public class WechatSubscriptionReservationProperties {
     private boolean enabled;
     private Set<String> sourceTypes = Set.of();
     private Map<String, Value> fieldSources = Map.of();
+    private Map<String, Route> routes = Map.of();
+    public Map<String, Route> getRoutes() { return routes; }
+    public void setRoutes(Map<String, Route> routes) { this.routes = Map.copyOf(routes); }
+    public static class Route {
+        private String templateId;
+        private Map<String, Value> fieldSources = Map.of();
+        public String getTemplateId() { return templateId; }
+        public void setTemplateId(String templateId) { this.templateId = templateId; }
+        public Map<String, Value> getFieldSources() { return fieldSources; }
+        public void setFieldSources(Map<String, Value> fieldSources) { this.fieldSources = Map.copyOf(fieldSources); }
+    }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public Set<String> getSourceTypes() { return sourceTypes; }

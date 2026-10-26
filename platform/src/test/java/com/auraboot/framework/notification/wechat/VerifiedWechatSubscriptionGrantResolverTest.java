@@ -67,6 +67,75 @@ class VerifiedWechatSubscriptionGrantResolverTest {
         protected void doRollback(DefaultTransactionStatus status) { }
     }
 
+    void configureDistinctRoutes() {
+        policy.setSourceTypes(Set.of("quote","order"));policy.setFieldSources(Map.of());policy.setRoutes(Map.of());
+        delivery.setTemplates(Map.of());
+        delivery.setTemplateId(null);delivery.setFieldMaxLengths(Map.of());
+        var source=new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(Map.of(
+                "aura.notification.wechat-subscription.templates.explicit-template.field-max-lengths.thing1", "20",
+                "aura.notification.wechat-subscription.templates.order-template.field-max-lengths.thing2", "40",
+                "aura.notification.wechat-subscription.reservations.routes.quote.template-id", "explicit-template",
+                "aura.notification.wechat-subscription.reservations.routes.quote.field-sources.thing1", "TITLE",
+                "aura.notification.wechat-subscription.reservations.routes.order.template-id", "order-template",
+                "aura.notification.wechat-subscription.reservations.routes.order.field-sources.thing2", "CONTENT"));
+        var binder=new org.springframework.boot.context.properties.bind.Binder(source);
+        binder.bind("aura.notification.wechat-subscription",org.springframework.boot.context.properties.bind.Bindable.ofInstance(delivery));
+        binder.bind("aura.notification.wechat-subscription.reservations",org.springframework.boot.context.properties.bind.Bindable.ofInstance(policy));
+    }
+    @Test void distinctSourcesReserveTheirOwnTemplateAndFieldMapping() {
+        configureDistinctRoutes();resolver=create(List.of(plans));
+        var quote=resolver.claim(42,"source-ref").orElseThrow();
+        assertThat(quote.templateId()).isEqualTo("explicit-template");
+        assertThat(quote.values()).containsExactlyEntriesOf(Map.of("thing1","报价提醒"));
+        stored=null;
+        plan=new NotificationDeliveryPlanResolver.Plan(42,"order-ref","recipient","v1","order","order-source",NOW,"发货标题","订单发货内容");
+        when(plans.resolve(42,"order-ref")).thenReturn(Optional.of(plan));
+        when(reservations.find(42,"order-ref")).thenAnswer(call->stored);
+        when(reservations.available(eq("wx-test"),eq("provider-principal"),eq("order-template"),any()))
+                .thenReturn(new WechatSubscriptionReservationMapper.Available("b".repeat(64),NOW.plusSeconds(600)));
+        var order=resolver.claim(42,"order-ref").orElseThrow();
+        assertThat(order.templateId()).isEqualTo("order-template");
+        assertThat(order.values()).containsExactlyEntriesOf(Map.of("thing2","订单发货内容"));
+        assertThat(order.grantReference()).isNotEqualTo(quote.grantReference());
+        verify(reservations).available(eq("wx-test"),eq("provider-principal"),eq("explicit-template"),any());
+        verify(reservations).available(eq("wx-test"),eq("provider-principal"),eq("order-template"),any());
+    }
+    private static WechatSubscriptionReservationProperties.Route route(String template,
+            Map<String,WechatSubscriptionReservationProperties.Value> fields) {
+        var route=new WechatSubscriptionReservationProperties.Route();route.setTemplateId(template);route.setFieldSources(fields);return route;
+    }
+    @Test void routeChangeCannotReassignOrReplaceAnExistingReservation() {
+        configureDistinctRoutes();resolver=create(List.of(plans));var grant=resolver.claim(42,"source-ref").orElseThrow();
+        policy.setRoutes(Map.of("quote",route("order-template",Map.of("thing2",WechatSubscriptionReservationProperties.Value.TITLE)),
+                "order",route("explicit-template",Map.of("thing1",WechatSubscriptionReservationProperties.Value.CONTENT))));
+        resolver=create(List.of(plans));clearInvocations(reservations);
+        assertThat(resolver.verifyReserved(42,"source-ref",grant.reservationReference())).isEmpty();
+        assertThat(resolver.claim(42,"source-ref")).isEmpty();
+        verify(reservations,never()).available(anyString(),anyString(),anyString(),any());
+        verify(reservations,never()).append(anyLong(),anyString(),anyString(),anyString(),anyString(),anyString(),any());
+    }
+    @Test void changedSourceTypeCannotReuseAnotherPurposesGrant() {
+        configureDistinctRoutes();resolver=create(List.of(plans));var grant=resolver.claim(42,"source-ref").orElseThrow();
+        plan=new NotificationDeliveryPlanResolver.Plan(42,"source-ref","recipient","v1","order","source",NOW,"报价提醒","内容");
+        clearInvocations(reservations);assertThat(resolver.claim(42,"source-ref")).isEmpty();
+        assertThat(resolver.verifyReserved(42,"source-ref",grant.reservationReference())).isEmpty();
+        verify(reservations,never()).available(anyString(),anyString(),anyString(),any());
+    }
+    @Test void missingDuplicateMixedAndMismappedRoutesFailClosedOnInitialization() {
+        configureDistinctRoutes();policy.setRoutes(Map.of("quote",policy.getRoutes().get("quote")));
+        assertThatThrownBy(()->create(List.of(plans))).hasMessage("WECHAT_RESERVATION_CONFIGURATION_INVALID");
+        configureDistinctRoutes();policy.setRoutes(Map.of("quote",route("explicit-template",Map.of("thing1",WechatSubscriptionReservationProperties.Value.TITLE)),
+                "order",route("explicit-template",Map.of("thing1",WechatSubscriptionReservationProperties.Value.CONTENT))));
+        assertThatThrownBy(()->create(List.of(plans))).hasMessage("WECHAT_RESERVATION_CONFIGURATION_INVALID");
+        configureDistinctRoutes();policy.getRoutes().get("order").setFieldSources(Map.of("wrong",WechatSubscriptionReservationProperties.Value.TITLE));
+        assertThatThrownBy(()->create(List.of(plans))).hasMessage("WECHAT_RESERVATION_CONFIGURATION_INVALID");
+        configureDistinctRoutes();policy.setFieldSources(Map.of("thing1",WechatSubscriptionReservationProperties.Value.TITLE));
+        assertThatThrownBy(()->create(List.of(plans))).hasMessage("WECHAT_RESERVATION_CONFIGURATION_INVALID");
+        configureDistinctRoutes();delivery.setTemplateId("legacy-template");
+        assertThatThrownBy(()->create(List.of(plans))).hasMessage("WECHAT_RESERVATION_CONFIGURATION_INVALID");
+        configureDistinctRoutes();policy.getRoutes().get("order").setTemplateId("unconfigured");
+        assertThatThrownBy(()->create(List.of(plans))).hasMessage("WECHAT_RESERVATION_CONFIGURATION_INVALID");
+    }
     @Test void verifiedGrantIsReservedOnceAndReplayIsImmutable() {
         var first = resolver.claim(42, "source-ref").orElseThrow();
         assertThat(first.userPid()).isEqualTo("recipient"); assertThat(first.values()).containsExactlyEntriesOf(Map.of("thing1", "报价提醒"));
