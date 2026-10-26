@@ -196,4 +196,46 @@ class SkillEngineTest {
                 anyString(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
     }
 
+    @Test
+    void externalSchemaReferenceCannotReachEvenALocalHttpCanary() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger requests = new java.util.concurrent.atomic.AtomicInteger();
+        com.sun.net.httpserver.HttpServer canary = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        canary.createContext("/schema", exchange -> {
+            requests.incrementAndGet();
+            byte[] body = "{\"type\":\"object\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        canary.start();
+        try {
+            when(agentSkillService.loadSkill(1L, "external-schema")).thenReturn(Map.of(
+                    "skill_input_schema", Map.of("$ref", "http://127.0.0.1:" + canary.getAddress().getPort() + "/schema")));
+            SkillResult result = skillEngine.execute(1L, "run", "external-schema",
+                    SkillInput.builder().parameters(Map.of()).build(), null, null, null);
+            assertThat(result.getStatus()).isEqualTo(SkillResult.Status.FAILED);
+            assertThat(result.getErrorMessage()).contains("schema");
+            assertThat(requests.get()).isZero();
+            verify(agentSkillService, never()).resolveSkillTools(anyLong(), anyString());
+        } finally {
+            canary.stop(0);
+        }
+    }
+
+    @Test
+    void inlineSchemaDefinitionsStillValidateWithoutExternalLoading() {
+        when(agentSkillService.loadSkill(1L, "inline-schema")).thenReturn(Map.of(
+                "execution_mode", "template", "skill_tools", List.of("read"),
+                "skill_input_schema", Map.of("type", "object", "$defs", Map.of("count", Map.of("type", "integer")),
+                        "properties", Map.of("count", Map.of("$ref", "#/$defs/count")))));
+        AgentToolDefinition tool = AgentToolDefinition.builder().name("read").build();
+        when(agentSkillService.resolveSkillTools(1L, "inline-schema")).thenReturn(List.of(tool));
+        when(toolLoopService.executeToolCall(anyLong(), anyString(), any(), any(), anyString(), any(), any(), any()))
+                .thenReturn("{\"success\":true}");
+        SkillResult result = skillEngine.execute(1L, "run", "inline-schema",
+                SkillInput.builder().parameters(Map.of("count", 1)).build(), null, null, null);
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+    }
+
 }

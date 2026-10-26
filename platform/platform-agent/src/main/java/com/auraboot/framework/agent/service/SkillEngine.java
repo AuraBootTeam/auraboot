@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.JsonSchemaException;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import java.util.stream.Collectors;
@@ -544,12 +545,22 @@ public class SkillEngine {
         } else {
             schemaNode = objectMapper.valueToTree(inputSchemaRaw);
         }
-        JsonSchema schema = JsonSchemaFactory
-                .getInstance(SpecVersion.VersionFlag.V202012).getSchema(schemaNode);
-        Set<ValidationMessage> errors = schema.validate(
-                objectMapper.valueToTree(input.getParameters() != null ? input.getParameters() : Map.of()));
-        return errors.isEmpty() ? null : errors.stream().map(Object::toString).sorted()
-                .collect(Collectors.joining("; "));
+        try {
+            JsonSchema schema = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012,
+                    builder -> builder.schemaLoaders(loaders -> loaders.values(values -> {
+                        values.clear();
+                        values.add(uri -> {
+                            throw new IllegalArgumentException("External skill schema loading is disabled");
+                        });
+                    }))).getSchema(schemaNode);
+            Set<ValidationMessage> errors = schema.validate(
+                    objectMapper.valueToTree(input.getParameters() != null ? input.getParameters() : Map.of()));
+            return errors.isEmpty() ? null : errors.stream().map(Object::toString).sorted()
+                    .collect(Collectors.joining("; "));
+        } catch (JsonSchemaException | IllegalArgumentException invalid) {
+            // CATCH: expected configuration validation; schema loading must never perform external IO.
+            return "Invalid skill input schema or external schema reference";
+        }
     }
 
     // =========================================================================
