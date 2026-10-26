@@ -53,7 +53,7 @@ class CommandTargetFileAppendIT {
         assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(database);
         actor();
         model="file_append_"+Long.toString(System.currentTimeMillis(),36); table="mt_"+model; command=model+":repair";
-        var photos=FieldDefinition.builder().code("photos").columnName("photos").dataType("file").maxLength(32768)
+        var photos=FieldDefinition.builder().code("photos").columnName("photos").dataType("file").length(32768).maxLength(32768)
                 .extraProps(Map.of("multiple",true,"maxCount",10)).allowedWriterCommands(List.of(command)).build();
         var evidence=FieldDefinition.builder().code("evidence").columnName("evidence").dataType("string").maxLength(128).build();
         models.saveDefinition(ModelDefinition.builder().code(model).tableName(table).status("published")
@@ -114,16 +114,19 @@ class CommandTargetFileAppendIT {
 
     @Test void appendPreservesExistingRelationsAndRepeatIsIdempotent() {
         String parent=parent(), first=upload(TENANT,USER,"success"), second=upload(TENANT,USER,"success");
-        command(parent,a->a.appendAndRetainExistingToTarget(first,"photos"));
-        command(parent,a->{a.appendAndRetainExistingToTarget(first,"photos"); a.appendAndRetainExistingToTarget(second,"photos"); a.appendAndRetainExistingToTarget(first,"photos");});
+        String firstProjection="[\""+first+"\"]", bothProjection="[\""+first+"\",\""+second+"\"]";
+        command(parent,a->{data.update(model,parent,Map.of("photos",firstProjection)); a.appendAndRetainExistingToTarget(first,"photos");});
+        command(parent,a->{data.update(model,parent,Map.of("photos",bothProjection));
+            a.appendAndRetainExistingToTarget(first,"photos"); a.appendAndRetainExistingToTarget(second,"photos"); a.appendAndRetainExistingToTarget(first,"photos");});
+        assertThat(jdbc.queryForObject("SELECT photos FROM "+table+" WHERE pid=?",String.class,parent)).isEqualTo(bothProjection);
         assertThat(relationCount(parent)).isEqualTo(2); assertThat(retained(first)).isTrue(); assertThat(retained(second)).isTrue();
         assertThat(evidence(parent)).isEqualTo("after");
         actor(); assertThatThrownBy(()->files.deleteFile(first,USER)).hasMessageContaining("retention");
     }
     @Test void outerFailureRollsBackRetentionRelationsProjectionAndEvidence() {
         String parent=parent(), file=upload(TENANT,USER,"success");
-        assertThatThrownBy(()->command(parent,a->{a.appendAndRetainExistingToTarget(file,"photos");
-            data.update(model,parent,Map.of("photos","[\""+file+"\"]")); throw new IllegalStateException("domain evidence failed");}))
+        assertThatThrownBy(()->command(parent,a->{data.update(model,parent,Map.of("photos","[\""+file+"\"]"));
+            a.appendAndRetainExistingToTarget(file,"photos"); throw new IllegalStateException("domain evidence failed");}))
                 .hasMessageContaining("domain evidence failed");
         assertThat(relationCount(parent)).isZero(); assertThat(retained(file)).isFalse(); assertThat(evidence(parent)).isEqualTo("before");
         assertThat(jdbc.queryForObject("SELECT photos FROM "+table+" WHERE pid=?",String.class,parent)).isNull();

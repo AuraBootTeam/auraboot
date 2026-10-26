@@ -211,6 +211,23 @@ class CommandTargetFileAccessorFactoryTest {
             assertThat(factory.forCommand(ctx)).isNull(); return null;
         }); verifyNoInteractions(fileMapper,files);
     }
+    @Test void nestedCommandBeforeOuterCapabilityInstallationCannotAcquireOne() {
+        command(() -> {
+            MetaContext.runWithAuthorizedCommandCode("order:repair",()->assertThat(factory.forCommand(ctx)).isNull());
+            try(var scope=factory.forCommand(ctx)) { assertThat(scope).isNotNull(); }
+            return null;
+        });
+    }
+    @Test void claimedAsyncTaskCannotInstallTheCapabilityWithRestoredHumanIdentity() {
+        command(() -> {
+            var snapshot=new com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext.Snapshot(1L,"task",1L,42L,"token");
+            try(var ignored=(AutoCloseable)org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                    com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext.class,"enter",snapshot)) {
+                assertThat(factory.forCommand(ctx)).isNull();
+            } catch(Exception error) {throw new AssertionError(error);}
+            return null;
+        });
+    }
     @Test void legacyConstructorDoesNotGrantTargetCapability() {
         assertThatThrownBy(()->new FileAccessorImpl(files,storage,42L).appendAndRetainExistingToTarget("file-pid","photos"))
                 .isInstanceOf(UnsupportedOperationException.class); verifyNoInteractions(files,fileMapper,relations,storage);
