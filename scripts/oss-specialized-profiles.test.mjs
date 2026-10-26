@@ -1,13 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const web = fileURLToPath(new URL('../web-admin/', import.meta.url));
+const requireWeb = createRequire(new URL('../web-admin/package.json', import.meta.url));
 const specialized = [
+  'agent-approval/permissions.spec.ts',
   'project-delivery-automation-dashboard.spec.ts',
   'customer-bpm-roundtrip.spec.ts',
   'customer-delivery-dashboard.spec.ts',
@@ -20,7 +23,9 @@ const specialized = [
 function collect(config, overrides = {}, projects = [], files = []) {
   const root = mkdtempSync(join(tmpdir(), 'oss-profile-contract-'));
   try {
-    const result = spawnSync('pnpm', ['exec', 'playwright', 'test', '-c', config,
+    // Resolve the test SDK itself; a global "playwright" binary may be a different CLI.
+    const cli = requireWeb.resolve('@playwright/test/cli');
+    const result = spawnSync(process.execPath, [cli, 'test', '-c', config,
       '--list', '--reporter=json', ...projects.map(name => `--project=${name}`), ...files], {
       cwd: web, encoding: 'utf8', timeout: 60_000, maxBuffer: 32 * 1024 * 1024,
       env: { ...process.env, PW_PROFILE: 'full', PW_ROLE_PROJECTS: '1', PW_SKIP_WEBSERVER: '1',
@@ -101,4 +106,46 @@ test('workflow profile rejects implicit runtime and authentication', () => {
   const result = collect('playwright.workflow.config.ts', { PW_ADMIN_STORAGE_STATE: '', PLAYWRIGHT_BASE_URL: '' });
   assert.notEqual(result.status, 0);
   assert.match(result.stdout + result.stderr, /Workflow tests require an explicit owned/);
+});
+
+test('agent permission profile rejects implicit model usage or private fixtures', () => {
+  const result = collect('playwright.agent-approval.config.ts', {
+    AGENT_PERMISSION_FIXTURE: '', AGENT_PERMISSION_EVIDENCE: '', AGENT_ACCEPTANCE_REAL_MODEL: '',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr + result.stdout, /Agent permission UI requires explicit owned URLs/);
+});
+
+test('agent permission profile collects exactly the three real UI journeys without setup mutations', () => {
+  const root = mkdtempSync(join(tmpdir(), 'agent-ui-profile-contract-'));
+  try {
+    const fixture = join(root, 'private-fixture.json');
+    writeFileSync(fixture, JSON.stringify({
+      baseURL: 'http://localhost:5173', backendURL: 'http://localhost:6443',
+      admin: { email: 'admin@example.invalid', password: 'fixture-only' },
+      reader: { email: 'reader@example.invalid', password: 'fixture-only' },
+      modelCode: 'controlled_model', modelName: 'Controlled model', tenantId: '1',
+      adminConversationId: 1, privateHistoryValue: 'Private fixture history',
+      database: { database: 'controlled_database' }, productIdentity: join(root, 'identity.json'),
+      bundleSha256: 'a'.repeat(64),
+    }), { mode: 0o600 });
+    const result = collect('playwright.agent-approval.config.ts', {
+      PLAYWRIGHT_BASE_URL: 'http://localhost:5173', BACKEND_URL: 'http://localhost:6443',
+      BE_PORT: '6443', VITE_PORT: '5173', BFF_PORT: '3500',
+      AGENT_PERMISSION_FIXTURE: fixture, AGENT_PERMISSION_EVIDENCE: root,
+      AGENT_ACCEPTANCE_REAL_MODEL: 'deepseek',
+    });
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    const report = JSON.parse(result.stdout);
+    assert.deepEqual(report.errors, []);
+    const identities = caseIdentities(report);
+    assert.equal(identities.length, 3);
+    assert.ok(identities.every(value => value.includes('permissions.spec.ts')));
+    assert.ok(!identities.some(value => value.includes('setup')));
+    assert.match(result.stdout, /ordinary member reads model metadata/);
+    assert.match(result.stdout, /ordinary member cannot create a model/);
+    assert.match(result.stdout, /switching from admin to a nonmember/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

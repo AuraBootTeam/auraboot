@@ -12,7 +12,7 @@
 # gate rather than a convention. Pre-existing violations are recorded in each
 # gate's baseline file and warn; new ones fail.
 #
-# Owner has no CI — run before push and at release time.
+# Run before push and at release time; child failures must reach the caller.
 #   ./scripts/check-test-system.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -25,7 +25,7 @@ status=0
 # covered, which is the failure this whole gate exists to prevent. Both directions
 # are pinned in the unit test, so run it before the gates that read its output.
 echo "───── gen-coverage-manifest (unit)"
-if ! node --test scripts/gen-coverage-manifest.test.mjs scripts/oss-backend-nightly-coverage.test.mjs; then
+if ! node --test scripts/check-test-system.test.mjs scripts/gen-coverage-manifest.test.mjs scripts/oss-backend-nightly-coverage.test.mjs; then
   status=1
 fi
 echo
