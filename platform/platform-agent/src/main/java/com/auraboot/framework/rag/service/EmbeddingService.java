@@ -252,6 +252,9 @@ public class EmbeddingService {
                 Map<String, Object> cfg = objectMapper.readValue(cc.getConfig(), Map.class);
                 String apiKey = (String) cfg.get("apiKey");
                 if (apiKey != null && !apiKey.isBlank()) {
+                    if (cfg.get("spaceVersion") != null && !(cfg.get("spaceVersion") instanceof String)) {
+                        throw new IllegalArgumentException("Embedding spaceVersion must be a string");
+                    }
                     return new EmbeddingConfig(
                             apiKey,
                             getStr(cfg, "baseUrl", "https://api.openai.com"),

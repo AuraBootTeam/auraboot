@@ -209,6 +209,10 @@ class EmbeddingServiceBranchTest {
         float[] source={1,0};var vector=new EmbeddingService.EmbeddedVector(source,space);
         source[0]=99;vector.values()[0]=77;
         assertEquals(1,vector.values()[0]);
+        CloudConfig invalid = new CloudConfig();
+        invalid.setConfig("{\"apiKey\":\"fixture-only\",\"spaceVersion\":3}");
+        when(cloudConfigService.getEffectiveConfig(1L,"embedding","openai")).thenReturn(invalid);
+        assertNull(service.currentSpace(1L,"openai",1536), "Invalid epoch configuration must fail closed, never silently use the unversioned space");
     }
 
 }
