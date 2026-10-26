@@ -1235,4 +1235,53 @@ class HandlerPhaseTest {
         }
     }
 
+    @Test
+    void precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability() {
+        var source = org.mockito.Mockito.mock(javax.sql.DataSource.class);
+        var connection = org.mockito.Mockito.mock(java.sql.Connection.class);
+        var sessions = org.mockito.Mockito.mock(org.apache.ibatis.session.SqlSessionFactory.class);
+        var config = new org.apache.ibatis.session.Configuration(new org.apache.ibatis.mapping.Environment(
+                "test", new org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory(), source));
+        lenient().when(sessions.getConfiguration()).thenReturn(config);
+        var holder = new org.springframework.jdbc.datasource.ConnectionHolder(connection);
+        holder.setSynchronizedWithTransaction(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.bindResource(source, holder);
+        var realFactory = new com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory(
+                fileService, storageProvider, null, null, sessions, metaModelService, dynamicDataService, dynamicDataMapper);
+        var nested = buildContext("other:attach", "other", Map.of("type","update"));
+        nested.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("other.attach"));
+        nested.setPermitPlan(new com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan(
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.Decision.PERMIT, null, null, null,
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.TARGET, 1L));
+        nested.setTargetRecordReadable(true);
+        var seen = new java.util.concurrent.atomic.AtomicBoolean();
+        CommandHandler prelude = new CommandHandler() {
+            @Override public String getHandlerName() { return "prelude"; }
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ignored) {
+                assertThat(MetaContext.isRootAuthorizedCommand()).isTrue();
+                MetaContext.runWithCommandPermitPlan("TARGET",1L,"other","other-pid",()->
+                        MetaContext.runWithAuthorizedCommandCode("other:attach",()->{
+                            try(var scope = realFactory.forCommand(nested)) { assertThat(scope).isNull(); }
+                            seen.set(true);
+                        }));
+                return Map.of();
+            }
+        };
+        when(applicationContext.getBean("prelude",CommandHandler.class)).thenReturn(prelude);
+        var root = buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","update"));
+        BindingRule rule = new BindingRule(); rule.setHandlerClass("prelude");
+        root.setRulesByType(Map.of("handler",List.of(rule))); root.setHandlerOwnedMutation(true);
+        MetaContext.setContext(1L,2L,"actor","actor"); MetaContext.setMemberId(3L);
+        try {
+            MetaContext.runWithCommandPermitPlan("TARGET",1L,"pr_purchase_order","po-1",()->
+                    MetaContext.runWithAuthorizedCommandCode(BUSINESS_COMMAND_CODE,()->phase.execute(root)));
+            assertThat(seen).isTrue();
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.unbindResourceIfPossible(source);
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
+    }
+
 }
