@@ -113,6 +113,14 @@ class ReliableIntegrationReplayHttpIT {
         // The public error context echoes the caller's path, but never returns stored event data.
         assertThat(json.readTree(anonymous.getBody()).path("data").isNull()).isTrue();
         assertThat(anonymous.getBody()).doesNotContain(correlation, EVENT_TYPE, CONSUMER, "replayHistory");
+        var anonymousReplay = rest.postForEntity(OPERATOR_PATH + eventId + "/replay",
+                Map.of("reason", "unauthenticated replay must fail", "expectedReplayCount", 0), String.class);
+        assertThat(anonymousReplay.getStatusCode().value()).isEqualTo(401);
+        assertThat(json.readTree(anonymousReplay.getBody()).path("code").asText())
+                .isEqualTo(ResponseCode.MissingAuthorizationHeader.getCode());
+        assertThat(outboxStatus(tenant, eventId)).isEqualTo("failed");
+        assertThat(ok(OPERATOR_PATH + eventId, token, null).path("replayHistory").size()).isZero();
+        assertThat(receiver.requests.get()).isEqualTo(1);
 
         receiver.reject.set(false);
         JsonNode accepted;

@@ -406,6 +406,7 @@ The independent published-library consumer in [fixtures/agent-artifact-consumer]
 | `dev/plugin-assembly.mjs` | Shared plugin profile assembly decision: accept only verified v1 agent installation, omit declared optional AI resources from base profiles, and reject explicit/unknown required-module imports before any selected plugin writes. |
 
 | `application/verify-agent-im-history.mjs` | Real-backend retained mixed IM fixture: create under full, verify under base, then restore full against the same database. Checks member identities, nullable legacy availability, all prior human messages and a new persisted human message in each phase. Requires bootstrap credentials and a known owned-tenant agent ID for creation. |
+| `application/verify-agent-base-business.mjs` | Owned no-AI business acceptance: explicit origin, fresh evidence directory, bootstrap credentials and `core` or `workflow` mode. Verifies capability absence, department create/update/read and human IM persistence. Workflow mode additionally requires an installed BPM product and proves an ordinary update succeeds while a mixed LLM flow is refused before its first write. Retains all uniquely marked fixtures; no model or vendor calls, resets or retries. |
 
 The targeted `web-admin/tests/e2e/platform/agent-assembly.spec.ts` suite uses the
 isolated bootstrap with no enabled tenant or platform LLM provider. Pin
