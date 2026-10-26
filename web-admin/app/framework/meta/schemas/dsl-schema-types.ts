@@ -91,6 +91,8 @@ export interface StrictBlockConfig {
   title?: string | LocalizedText;
   layout?: BlockLayoutConfig;
   visibleWhen?: string;
+  /** Existing block visibility and named-source permission gate. */
+  permissionCode?: string;
   className?: string;
   imageField?: string;
   imageViewports?: Record<string, CardImageViewport>;

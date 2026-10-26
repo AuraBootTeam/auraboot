@@ -22,7 +22,13 @@ vi.mock('~/contexts/I18nContext', () => ({
 }));
 vi.mock('~/contexts/TimezoneContext', () => ({ useTimezone: () => ({ timezone: 'UTC' }) }));
 vi.mock('../../DynamicPageRenderer', () => ({
-  default: ({ tableName, recordPid }: { tableName: string; recordPid: string }) => {
+  default: function MockDynamicDetail({
+    tableName,
+    recordPid,
+  }: {
+    tableName: string;
+    recordPid: string;
+  }) {
     useDetailPresentationTitle(`Event ${recordPid}`);
     const open = useDetailModal();
     const [identity] = useState(`${tableName}:${recordPid}`);

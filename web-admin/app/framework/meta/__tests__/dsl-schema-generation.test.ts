@@ -191,6 +191,7 @@ describe('DSL Generated Schema', () => {
     const timeline = {
       id: 'history',
       blockType: 'activity-timeline',
+      permissionCode: 'model.case_action.read',
       businessOnly: true,
       businessDataSource: 'caseHistory',
       businessRecordMapping: {
@@ -209,6 +210,7 @@ describe('DSL Generated Schema', () => {
       previewLimit: 100,
     };
     expect(validate(timeline)).toBe(true);
+    expect(validate({ ...timeline, permissionCode: ['model.case_action.read'] })).toBe(false);
     expect(validate({ ...timeline, businessDataSource: 12 })).toBe(false);
     expect(validate({ ...timeline, businessSnapshotFields: [{ field: 'previous_note' }] })).toBe(
       false,
