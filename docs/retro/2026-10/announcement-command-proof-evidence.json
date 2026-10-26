@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "claim": "targeted current-actor exact-version acknowledgement provider; product application journey not executed",
+  "sourceProducer": "65eaa208431094adaf70356f67683dd4fde91c6a",
+  "unitProducer": "cac499fb293b4d66dc868f1c5079ef24293a5481",
+  "runtime": "maritime-parallel-core",
+  "slot": 26,
+  "database": "auraboot_26",
+  "stackReason": "standalone Core provider tests; Anchorage product17 stays suspended, no third production database",
+  "sourceSetSha256": "556faead17d675497bfc78672527b735d1d8d1cc0349a20020ec50f929057c0f",
+  "evidenceRoot": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core",
+  "selectedExecution": [
+    {
+      "class": "com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessorTest",
+      "producer": "cac499fb293b4d66dc868f1c5079ef24293a5481",
+      "layer": "hermetic/api",
+      "tests": 4,
+      "originalJUnit": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/cac-checks/TEST-com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessorTest.xml",
+      "sha256": "005777a92e315eb6658857687b11df09b9ce8cd037681480d23fced7d607aaf5",
+      "cases": [
+        "aHostInstalledBridgeRetainsItsExactType()",
+        "satisfiedCannotMeanReadOnlyWrongVersionWrongHashOrExpired()",
+        "oldHostsAndPlainSettingsCannotManufactureACapability()",
+        "requirementsNeedExactPublicIdentitiesAndAFullSnapshotHash()"
+      ]
+    },
+    {
+      "class": "com.auraboot.framework.workbench.service.AnnouncementAcknowledgementAccessorImplTest",
+      "producer": "cac499fb293b4d66dc868f1c5079ef24293a5481",
+      "layer": "hermetic/service",
+      "tests": 27,
+      "originalJUnit": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/cac-checks/TEST-com.auraboot.framework.workbench.service.AnnouncementAcknowledgementAccessorImplTest.xml",
+      "sha256": "fe712e59e65ef992f8eefaf4d0420ed8cce76fb83a0e3d7d7c1a586a9f39d585",
+      "cases": [
+        "nonRecipientsCannotAcquireProofByKnowingTheVersionPid()",
+        "exactRecipientVersionAndHashProduceAnImmutableProof()",
+        "aChangedConfiguredSnapshotDoesNotPass()",
+        "[1] state=read-only",
+        "[2] state=no-ack",
+        "[3] state=wrong-hash",
+        "[4] state=future-ack",
+        "sameTransactionSnapshotChangeCannotCommitUsingAnEarlierSatisfiedProof()",
+        "missingAuthenticationDoesNotQueryAnyRecipient()",
+        "expiryIsCheckedAgainBeforeTheBusinessTransactionCommits()",
+        "missingVersionIsNotAcknowledged()",
+        "freshProofAllowsTheTransactionCommitCheck()",
+        "[1] state=withdrawn",
+        "[2] state=expired",
+        "[3] state=superseded",
+        "duplicateEmptyAndOversizedPlansAreRejectedBeforeDataAccess()",
+        "databaseExpiryBoundaryIsExclusive()",
+        "[1] failure=no-transaction",
+        "[2] failure=read-only",
+        "[3] failure=no-sync",
+        "[1] failure=inactive",
+        "[2] failure=context-incarnation",
+        "[3] failure=requested-incarnation",
+        "sameTransactionWithdrawalCannotCommitUsingAnEarlierSatisfiedProof()",
+        "sameTransactionMemberChangeCannotCommitUsingAnEarlierSatisfiedProof()",
+        "rootLocksUseStableOrderAndMutableControlIsRereadAfterLocking()",
+        "anOrdinaryAnnouncementCannotSatisfyAnExplicitAcknowledgementGate()"
+      ]
+    },
+    {
+      "class": "com.auraboot.framework.workbench.AnnouncementAcknowledgementCapabilityIntegrationTest",
+      "producer": "65eaa208431094adaf70356f67683dd4fde91c6a",
+      "layer": "real-pg/service",
+      "tests": 6,
+      "originalJUnit": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/final65/TEST-com.auraboot.framework.workbench.AnnouncementAcknowledgementCapabilityIntegrationTest.xml",
+      "sha256": "79b274cff6c9de6d08b6dcb5c5a229eba16299b676c6fd54ac9259122565c0c7",
+      "cases": [
+        "everyRequiredVersionInABatchMustRemainSatisfiedThroughCommit()",
+        "aConcurrentWithdrawalWaitsForTheProofTransactionThenInvalidatesFutureChecks()",
+        "onlyOfficialExactVersionAcknowledgementSatisfiesTheGate()",
+        "aWithdrawalInsideTheBusinessTransactionInvalidatesAndRollsBackItsEarlierProof()",
+        "anActualExpiryChangeInsideTheTransactionCannotCommitAnEarlierProof()",
+        "sealedAcknowledgementDoesNotTransferToANewMemberIncarnation()"
+      ]
+    }
+  ],
+  "unitReuse": {
+    "unitProducer": "cac499fb293b4d66dc868f1c5079ef24293a5481",
+    "currentIntegrationProducer": "65eaa208431094adaf70356f67683dd4fde91c6a",
+    "unchangedSources": {
+      "platform/src/main/java/com/auraboot/framework/workbench/service/AnnouncementAcknowledgementAccessorImpl.java": "23bef16326339a85acd2fa7f46c9d2e0a82c06f61e49e1ba28cf7beea6cf57dc",
+      "platform/src/test/java/com/auraboot/framework/workbench/service/AnnouncementAcknowledgementAccessorImplTest.java": "22e8d7f3d4d273a8065efe21eb743edf4cb479d1a1645cbd2cb6096028b455d5",
+      "platform/platform-plugin-api/src/main/java/com/auraboot/framework/plugin/extension/AnnouncementAcknowledgementAccessor.java": "3bdf3f62e52349de520fc5af5379a278fa7e58fd261b26b3eab0ac9327b91bfe",
+      "platform/platform-plugin-api/src/test/java/com/auraboot/framework/plugin/extension/AnnouncementAcknowledgementAccessorTest.java": "b2f7f0839cae876435a7f5b76dfc423e640316d3fd79062fcd1b6baeb01b5629"
+    },
+    "mapperSqlAndIntegrationTestChanged": true,
+    "rootUnitCases": 27,
+    "apiCases": 4,
+    "freshUnitReexecutionAt65": false
+  },
+  "build": {
+    "sourceCommit": "65eaa208431094adaf70356f67683dd4fde91c6a",
+    "runtime": "maritime-parallel-core",
+    "database": "auraboot_26",
+    "purpose": "standalone Core provider validation; not a third Anchorage product database",
+    "runtimeJar": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-app/build/libs/AuraBoot-1.0.0-boot.jar",
+      "sha256": "8ec28a9878b208115d82429fd4a7f257ac64aa2615dbff340033951ef943f517",
+      "bytes": 245773459
+    },
+    "apiJar": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar",
+      "sha256": "51dd8f6d58853b5cb0974204684b90ea76bf488f21d7d0259c894a95ea8dd16b",
+      "bytes": 182520
+    },
+    "nestedApiExactlyMatches": true,
+    "providerClasses": {
+      "com/auraboot/framework/workbench/service/AnnouncementAcknowledgementAccessorImpl.class": "fa30c37af2694585068b4ab25298de2a7e57aa85f4ffed2d04ce93fdf356ae34",
+      "com/auraboot/framework/workbench/service/AnnouncementAcknowledgementAccessorImpl$1.class": "c1f1ccd3b111ac7ee73d768256008eaf76cc906360dd7748406ea065324ff4ad",
+      "com/auraboot/framework/workbench/mapper/AnnouncementAcknowledgementMapper.class": "898802ddcc037cb142ef7718e8bc4f20f3eef9db246be36b7e6884f30f1ded99"
+    },
+    "productPlatformLockUpdated": false,
+    "productRuntimeExecuted": false,
+    "browserExecuted": 0
+  },
+  "beforeFailures": [
+    {
+      "scope": "wrong app test task for library unit test",
+      "result": "no matching tests; corrected to root :test; not a pass"
+    },
+    {
+      "scope": "missing authentication context",
+      "result": "23/24 hermetic passed, one unexpected exception; corrected before frozen green"
+    },
+    {
+      "scope": "same-transaction stale proofs",
+      "result": "3 newly specified unit assertions fail against unchanged pre-fix service; full commit revalidation added"
+    },
+    {
+      "scope": "FOR SHARE OF syntax through MyBatis parser",
+      "result": "first real PG suite 0/5 pass; parser-compatible FOR UPDATE added"
+    },
+    {
+      "scope": "unread all-null projection",
+      "result": "next real PG suite 4/5 pass; non-null recipient version projection added"
+    }
+  ],
+  "limits": [
+    "31 hermetic cases retain CAC producer; not fresh 37-case execution on one source",
+    "direct service and real Spring transactions, no real plugin command HTTP application journey",
+    "actual before-commit boundary, not an exact wall-clock deadline after commit",
+    "no authenticated-device, safety or legal-authority claim",
+    "current recipient only; staff may not substitute its own acknowledgement for an applicant",
+    "missing bridge tested with current context type; no binary downgrade compatibility claim",
+    "product lock and consumer runtime not yet upgraded; no browser or deployment acceptance"
+  ],
+  "rawEvidence": [
+    {
+      "path": "acknowledgement-first-unit.log",
+      "sha256": "d8e446288711ba0f9e3b6afc6488bf80505c796367da3f737fc145fe574c2525"
+    },
+    {
+      "path": "acknowledgement-unit.log",
+      "sha256": "4e47aa2d12b7f12300bba239c99de6152b60dd97c08dcc8106534d10c4c58eb7"
+    },
+    {
+      "path": "acknowledgement-frozen-unit.log",
+      "sha256": "507c1f795bd8c76008cb95dc5afc38b37d6de13b0ab797ed71bc815c9efaabb0"
+    },
+    {
+      "path": "acknowledgement-before-commit-red.log",
+      "sha256": "add5616f1aeeb4f37dcd1aab99fc5278ba3dab895072231eebe12453367a7d31"
+    },
+    {
+      "path": "acknowledgement-cac-checks.log",
+      "sha256": "732b2a108e59bd9178d6b569c5c90e57497cba68262dfbaf43d172dfcb4ffe57"
+    },
+    {
+      "path": "acknowledgement-a7-it.log",
+      "sha256": "5bc594d3a18d5c15a6d012ad4c06dd78f9721ec59cde39ebf319794d38f13a98"
+    },
+    {
+      "path": "acknowledgement-65-it.log",
+      "sha256": "6a71c38d9c71f61ed2bdc7c50dc47fa8269d7fc094913906b87aa631c532f842"
+    },
+    {
+      "path": "acknowledgement-65-build.log",
+      "sha256": "6d1546fc221db661d30a73eeb5ff4d1e9148f76eeda4150373c7ed2b6cdf2ce9"
+    },
+    {
+      "path": "acknowledgement-65-build.json",
+      "sha256": "6d67a6b0b86d3ce5c7a0b5b551c0c2dc9d6063b0f58c0cb4f3a01bbc41813353"
+    },
+    {
+      "path": "reused-unit-source-proof.json",
+      "sha256": "7606267ea8ea706b0e3fb7b1dcd32df70eca8f841594d0a32b9ffa7e1a9f8e8d"
+    },
+    {
+      "path": "announcement-schema-columns.txt",
+      "sha256": "e021fb07bfd3e96307ff0f3b04ddbc684cf8460b18b2cba4f56ceb7b02f51567"
+    },
+    {
+      "path": "run-acknowledgement-checks.py",
+      "sha256": "b9faf42495047a31c7bf6ae7661be65b869b8464dbef7d923d9ef0852bc1aa86"
+    },
+    {
+      "path": "run-acknowledgement-it-a7.py",
+      "sha256": "558e00990ab277b0515727824b5c9728d690c913dffdc9a9ee87bcec118990e0"
+    },
+    {
+      "path": "run-acknowledgement-it-65.py",
+      "sha256": "12e32806cfd337489db7582ce798d3f622b0b85d1082d6790ce93d43e4cf9517"
+    }
+  ]
+}

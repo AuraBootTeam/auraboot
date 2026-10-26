@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-24
-updated: 2026-10-26
+updated: 2026-10-27
 implementation_status: implemented-local-validated-pr-open
 ---
 
@@ -1358,9 +1358,9 @@ OSS/BPM 原 runtime 已暂停，DB、构件、备份与证据保留；地址仍�
 
 ## 19. Command-scoped exact-version acknowledgement proof
 
-This follow-up adds a public plugin bridge for business commands that require a particular effective regulation version. It reuses the existing announcement version, sealed recipient and acknowledgement facts; it does not create a second acceptance table, write acknowledgement automatically or change the official reader UI. Existing announcement delivery evidence above remains tied to its original producer. This extension is under development; source compilation and targeted unit checks do not prove real PostgreSQL concurrency or product integration.
+This follow-up adds a public plugin bridge for business commands that require a particular effective regulation version. It reuses the existing announcement version, sealed recipient and acknowledgement facts; it does not create a second acceptance table, write acknowledgement automatically or change the official reader UI. Existing announcement delivery evidence above remains tied to its original producer. The provider now has targeted local Spring/MyBatis/PostgreSQL transaction evidence and a paired Core/API build; product command/UI integration remains pending. Exact producers, failures and remaining limits are in the [targeted acceptance record](../retro/2026-10/2026-10-27-announcement-command-proof-acceptance.md).
 
-`CommandContext.announcementAcknowledgementAccessor()` returns the optional host `AnnouncementAcknowledgementAccessor`, or null on older hosts. Business handlers must fail closed when absent. `checkForCommand` accepts one to thirty-two unique `Requirement(versionPid, snapshotHash, memberPid)` values. The host derives tenant, actor user and current member ID from authenticated `MetaContext`; payload-supplied tenant or actor identities cannot select another recipient. Installed-integration/background settings do not expose this bridge.
+`CommandContext.announcementAcknowledgementAccessor()` returns the optional host `AnnouncementAcknowledgementAccessor`, or null when that context has no installed host bridge. Consumers require a paired admitted Core runtime/API that includes this accessor; this does not establish binary compatibility with pre-accessor hosts. Business handlers must fail closed when absent. `checkForCommand` accepts one to thirty-two unique `Requirement(versionPid, snapshotHash, memberPid)` values. The host derives tenant, actor user and current member ID from authenticated `MetaContext`; payload-supplied tenant or actor identities cannot select another recipient. Installed-integration/background settings do not expose this bridge.
 
 The call requires an existing writable, synchronized Core transaction (`MANDATORY`). It locks the enabled current user/member and announcement roots, ordering root PIDs consistently. Publication control is re-read after taking the same root lock used by publication, withdrawal, replacement, expiry and recipient actions. Locks remain until the caller transaction completes. Every satisfied proof rechecks member identity, active version, visibility, acknowledgement and database expiry before commit. This also catches changes made by the caller itself inside the same transaction; row locks alone cannot exclude its own writes. Any invalidated proof makes that transaction fail. This does not promise a wall-clock deadline beyond the database commit-check boundary.
 
