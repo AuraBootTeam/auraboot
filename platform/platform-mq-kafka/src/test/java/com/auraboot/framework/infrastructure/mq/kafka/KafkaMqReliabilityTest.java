@@ -85,6 +85,17 @@ class KafkaMqReliabilityTest {
     }
 
     @Test
+    void acknowledgementWithoutMetadataIsNotReportedAsSuccess() {
+        CompletableFuture<RecordMetadata> result = provider.sendConfirmed(TOPIC, "key", "body", null)
+                .toCompletableFuture();
+        ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
+        verify(producer).send(any(), callback.capture());
+        callback.getValue().onCompletion(null, null);
+        assertInstanceOf(IllegalStateException.class,
+                assertThrows(java.util.concurrent.CompletionException.class, result::join).getCause());
+    }
+
+    @Test
     void confirmedSendExposesSynchronousFailureAndRejectsMissingKey() {
         IllegalStateException failure = new IllegalStateException("producer is closed");
         when(producer.send(any(), any())).thenThrow(failure);
@@ -239,6 +250,80 @@ class KafkaMqReliabilityTest {
                 .toCompletableFuture();
         assertSame(failure, assertThrows(ExecutionException.class, () -> stopped.get(5, TimeUnit.SECONDS)).getCause());
         assertEquals(0, provider.activeSubscriptionCount());
+    }
+
+    @Test
+    void unexpectedWakeupIsObservableAsFailure() {
+        org.apache.kafka.common.errors.WakeupException failure = new org.apache.kafka.common.errors.WakeupException();
+        when(consumer.poll(any(Duration.class))).thenThrow(failure);
+        CompletableFuture<Void> stopped = provider.subscribeDurably(TOPIC, GROUP, record -> fail())
+                .toCompletableFuture();
+        assertSame(failure, assertThrows(ExecutionException.class, () -> stopped.get(5, TimeUnit.SECONDS)).getCause());
+        verify(consumer, never()).commitSync(anyMap());
+    }
+
+    @Test
+    void consumerCloseFailureIsObservableAfterRequestedStop() {
+        IllegalStateException failure = new IllegalStateException("consumer close failed");
+        when(consumer.poll(any(Duration.class))).thenAnswer(invocation -> {
+            provider.unsubscribe(TOPIC, GROUP);
+            return ConsumerRecords.empty();
+        });
+        doThrow(failure).when(consumer).close();
+        CompletableFuture<Void> stopped = provider.subscribeDurably(TOPIC, GROUP, record -> fail())
+                .toCompletableFuture();
+        assertSame(failure, assertThrows(ExecutionException.class, () -> stopped.get(5, TimeUnit.SECONDS)).getCause());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void legacyFailureRetainsRetryTopicKeyAndHeaders() throws Exception {
+        ConsumerRecords<String, String> batch = records(41);
+        batch.iterator().next().headers().add("event-id", "id-17".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        runFailingLegacyHandler(batch);
+        ArgumentCaptor<ProducerRecord<String, String>> retry = ArgumentCaptor.forClass(ProducerRecord.class);
+        verify(producer).send(retry.capture(), any());
+        assertEquals(TOPIC, retry.getValue().topic());
+        assertEquals("target-7", retry.getValue().key());
+        assertEquals("event-41", retry.getValue().value());
+        assertArrayEquals(new byte[] {'1'}, retry.getValue().headers().lastHeader("x-retry-count").value());
+        assertArrayEquals("id-17".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                retry.getValue().headers().lastHeader("event-id").value());
+        verify(consumer, never()).commitSync(anyMap());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void legacyExhaustedFailureRetainsDeadLetterRouting() throws Exception {
+        ConsumerRecords<String, String> batch = records(41);
+        batch.iterator().next().headers().add("x-retry-count", new byte[] {'2'});
+        runFailingLegacyHandler(batch);
+        ArgumentCaptor<ProducerRecord<String, String>> dlt = ArgumentCaptor.forClass(ProducerRecord.class);
+        verify(producer).send(dlt.capture(), any());
+        assertEquals(TOPIC + ".DLT", dlt.getValue().topic());
+        assertEquals("target-7", dlt.getValue().key());
+        assertArrayEquals(new byte[] {'3'}, dlt.getValue().headers().lastHeader("x-retry-count").value());
+    }
+
+    @Test
+    void legacyDisabledDlqDoesNotRepublish() throws Exception {
+        provider = spy(new KafkaMqProvider(producer, "unused:9092", GROUP,
+                new DeadLetterQueueHandler(producer, ".DLT", 3, false)));
+        doReturn(consumer).when(provider).createSubscriptionConsumer(anyString(), anyBoolean());
+        runFailingLegacyHandler(records(41));
+        verifyNoInteractions(producer);
+    }
+
+    private void runFailingLegacyHandler(ConsumerRecords<String, String> batch) throws Exception {
+        CountDownLatch closed = new CountDownLatch(1);
+        doAnswer(invocation -> { closed.countDown(); return null; }).when(consumer).close();
+        when(consumer.poll(any(Duration.class))).thenReturn(batch).thenAnswer(invocation -> {
+            provider.unsubscribe(TOPIC, GROUP);
+            return ConsumerRecords.empty();
+        });
+        provider.subscribe(TOPIC, GROUP, (topic, body, headers) -> { throw new IllegalArgumentException("legacy failure"); });
+        assertTrue(closed.await(5, TimeUnit.SECONDS));
+        verify(provider).createSubscriptionConsumer(GROUP, false);
     }
 
     @Test
