@@ -25,3 +25,7 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 - Architecture overview: start at [ARCHITECTURE.md](../ARCHITECTURE.md) (repo root), then dive into `system-reference/` for operational detail.
 - Internal process documents (session handovers, plans, retrospectives) are intentionally **not tracked in this public repository** — `scripts/check-oss-no-internal-docs.sh` enforces this; they live in the team's private documentation repos.
 - Documentation changes are gated by `docs.yml` / `docs-quality.yml` (markdown lint, link check, frontmatter governance via `scripts/check-docs-governance.mjs`).
+
+## Shared web identity primitives
+
+[WeChat code exchange and trusted client addresses](system-reference/wechat-code-exchange-and-client-address.md) documents the server-only contracts and caller-owned state, business authorization and ingress obligations.
