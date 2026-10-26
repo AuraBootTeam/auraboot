@@ -2,6 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-23
+updated: 2026-10-27
 ---
 
 # Command transaction isolation
@@ -30,3 +31,17 @@ The host supplies immutable current root/related records and the intended change
 ## Client command payload isolation
 
 DSL command actions may declare `includeRecordPayload: false`. The shared action hook then sends only explicitly configured `payload` fields and values collected by `inputFields`; the ambient record remains available to expressions, target resolution and optimistic-version checks, but its fields are not copied into the request payload. This also applies after the pre-dialog fresh-record read. Omission or `true` retains legacy record merging; any other supplied value fails before a command request. This client option does not change server input validation, permissions or command CAS semantics.
+
+## Exact tenant identity locks
+
+On a paired supporting Core/API, synchronous native command handlers obtain `CommandContext.commandMembershipLockAccessor()`. A missing or untyped bridge returns null and consumers must fail closed. This does not establish binary compatibility with hosts whose API predates the method. Installed integration settings remove the capability; asynchronous settings do not install it. The existing `IdentityDirectoryAccessor` retains its read-only directory responsibility.
+
+`CommandMembershipLockAccessor.requireEnabledMemberships(List<MembershipAssertion(userPid, memberPid)>)` accepts one to thirty-two distinct exact pairs. The batch must include the authenticated current actor, with tenant, numeric user ID, user PID and member incarnation checked against trusted MetaContext. Recipient pairs are identity assertions within that tenant, not permission grants. Business function, vessel binding, object/action scope and grant validity remain independent mandatory decisions; numeric directory IDs are server-side results, not UI/REST identifiers.
+
+The call requires an existing writable, synchronized physical transaction on the actual Core MyBatis datasource. An unrelated datasource transaction, even against the same database, is insufficient. It neither creates an independent transaction nor writes identity/status/audit/version fields to acquire a lock. Resolve exact pairs, lock every user row in ascending numeric ID order, then every member row in ascending numeric ID order, and re-read enabled, active, non-deleted identities with no leave date. An old member PID is never replaced by a later incarnation. Exact-pair reads explicitly flush/bypass MyBatis caches so an earlier lookup cannot conceal concurrent or caller-owned changes.
+
+Declare the complete participant set before the first identity lock. Subsequent calls in the same physical transaction may reuse a subset, preserving their request order, but cannot add participants after member locks; this rejects a user/member order inversion. The transaction's proof is associated with its current synchronization and connection. A separately authorized Core REQUIRES_NEW transaction has its own proof and cannot carry the original locks or make independently committed effects atomic with the original command. Business consumers must keep admission and all resulting effects in their original command transaction.
+
+Locks survive until that transaction commits or rolls back. The beforeCommit check revalidates every captured user/member pair, including changes made by the caller itself; any invalidated identity refuses commit. This does not lock role assignments or substitute for command authorization. Domain owners must also use a consistent domain-root order. Maritime consumers use sorted vessel roots, the complete identity batch, then sorted announcement roots; reverse composition or late batch growth is not supported.
+
+Announcement acknowledgement proofs now reuse this shared identity capability before taking announcement roots. Their current-actor-only, exact-version/hash and sealed-recipient semantics remain as documented in [announcement management](announcement-management.md#19-command-scoped-exact-version-acknowledgement-proof). The identity capability does not acknowledge anything or authorize a reviewer to act as the applicant. Targeted component evidence, exact producers and pending product consumption are recorded in the [membership acceptance report](../retro/2026-10/2026-10-27-command-membership-lock-acceptance.md).

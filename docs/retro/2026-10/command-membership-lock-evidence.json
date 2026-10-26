@@ -1,0 +1,209 @@
+{
+  "producer": "31caa1b0b728ec787b1d4182c92c6cf513d49eff",
+  "runtime": "maritime-parallel-core",
+  "sourceSetSha256": "71105dff321d11ebc449e8db814b0d81ab4908a40c2b863391f4ae1769316b5a",
+  "hermeticExecuted": 55,
+  "hermetic": [
+    {
+      "name": "com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessorTest",
+      "tests": 4,
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/final31-junit/TEST-com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessorTest.xml",
+      "sha256": "28ab5f402278080b64ae458b018921ba508068228553f418431ff206f46e6903",
+      "cases": [
+        "aHostInstalledBridgeRetainsItsExactType()",
+        "satisfiedCannotMeanReadOnlyWrongVersionWrongHashOrExpired()",
+        "oldHostsAndPlainSettingsCannotManufactureACapability()",
+        "requirementsNeedExactPublicIdentitiesAndAFullSnapshotHash()"
+      ]
+    },
+    {
+      "name": "com.auraboot.framework.plugin.extension.CommandMembershipLockAccessorTest",
+      "tests": 3,
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/final31-junit/TEST-com.auraboot.framework.plugin.extension.CommandMembershipLockAccessorTest.xml",
+      "sha256": "439bfb750c782b9ed000d9c93b073db070fa0ab4c97a07825860c719c35fa8c7",
+      "cases": [
+        "theInstalledBridgeRetainsItsExactPublicType()",
+        "assertionsRejectAliasesAndNonPublicControlText()",
+        "absentOrUntypedSettingsDoNotManufactureAHostCapability()"
+      ]
+    },
+    {
+      "name": "com.auraboot.framework.plugin.pf4j.CommandMembershipLockAccessorImplTest",
+      "tests": 21,
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/final31-junit/TEST-com.auraboot.framework.plugin.pf4j.CommandMembershipLockAccessorImplTest.xml",
+      "sha256": "dbf8e04fb69d34ead745d462a4429a30801e3904b8e6915aae37cb039f2a0521",
+      "cases": [
+        "[1] fault=disabled",
+        "[2] fault=user-deleted",
+        "[3] fault=member-deleted",
+        "[4] fault=inactive",
+        "[5] fault=leave-date",
+        "[6] fault=user-id",
+        "[7] fault=member-id",
+        "[8] fault=member-pid",
+        "[1] fault=no-tx",
+        "[2] fault=read-only",
+        "[3] fault=no-sync",
+        "[4] fault=foreign-resource",
+        "[5] fault=not-synchronized",
+        "[6] fault=autocommit",
+        "[7] fault=physical-read-only",
+        "[8] fault=closed",
+        "requiresTrustedExactActorAndDistinctCompleteAssertions()",
+        "locksAllUsersThenAllMembersInNumericOrderAndKeepsRequestOrder()",
+        "subsetReuseDoesNotGrowOrInvertTheTransactionLockSet()",
+        "changingTheTrustedActorCannotReuseAnEarlierProof()",
+        "anIdentityRaceBeforeTheLockIsRecheckedAfterAllLocks()"
+      ]
+    },
+    {
+      "name": "com.auraboot.framework.workbench.service.AnnouncementAcknowledgementAccessorImplTest",
+      "tests": 27,
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/final31-junit/TEST-com.auraboot.framework.workbench.service.AnnouncementAcknowledgementAccessorImplTest.xml",
+      "sha256": "817d303c8d84621e05828699a74c40c3046da84d25cb816bd12d687011b5ad24",
+      "cases": [
+        "nonRecipientsCannotAcquireProofByKnowingTheVersionPid()",
+        "exactRecipientVersionAndHashProduceAnImmutableProof()",
+        "aChangedConfiguredSnapshotDoesNotPass()",
+        "[1] state=read-only",
+        "[2] state=no-ack",
+        "[3] state=wrong-hash",
+        "[4] state=future-ack",
+        "sameTransactionSnapshotChangeCannotCommitUsingAnEarlierSatisfiedProof()",
+        "missingAuthenticationDoesNotQueryAnyRecipient()",
+        "expiryIsCheckedAgainBeforeTheBusinessTransactionCommits()",
+        "missingVersionIsNotAcknowledged()",
+        "freshProofAllowsTheTransactionCommitCheck()",
+        "[1] state=withdrawn",
+        "[2] state=expired",
+        "[3] state=superseded",
+        "duplicateEmptyAndOversizedPlansAreRejectedBeforeDataAccess()",
+        "databaseExpiryBoundaryIsExclusive()",
+        "[1] failure=no-transaction",
+        "[2] failure=read-only",
+        "[3] failure=no-sync",
+        "[1] failure=inactive",
+        "[2] failure=context-incarnation",
+        "[3] failure=requested-incarnation",
+        "sameTransactionWithdrawalCannotCommitUsingAnEarlierSatisfiedProof()",
+        "sameTransactionMemberChangeCannotCommitUsingAnEarlierSatisfiedProof()",
+        "rootLocksUseStableOrderAndMutableControlIsRereadAfterLocking()",
+        "anOrdinaryAnnouncementCannotSatisfyAnExplicitAcknowledgementGate()"
+      ]
+    }
+  ],
+  "realPostgres": {
+    "producer": "31caa1b0b728ec787b1d4182c92c6cf513d49eff",
+    "sourceSetSha256": "71105dff321d11ebc449e8db814b0d81ab4908a40c2b863391f4ae1769316b5a",
+    "database": "auraboot_26",
+    "runtime": "maritime-parallel-core",
+    "selected": [
+      {
+        "name": "com.auraboot.framework.plugin.CommandMembershipLockCapabilityIntegrationTest",
+        "tests": 13,
+        "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/pg31-junit/TEST-com.auraboot.framework.plugin.CommandMembershipLockCapabilityIntegrationTest.xml",
+        "sha256": "f96ca1fed064b63d6602e1ce877989631118678cad01415c76b315cd957a74bb",
+        "cases": [
+          "memberOffboardingWaitsForTheSamePhysicalTransaction()",
+          "globalDisableOfTheAuthenticatedActorWaitsForItsCommandTransaction()",
+          "lateBatchExpansionAndForeignTenantCannotAcquireAValidProof()",
+          "[1] fault=disable-actor",
+          "[2] fault=disable-recipient",
+          "[3] fault=leave",
+          "[4] fault=leave-date",
+          "[5] fault=delete-rejoin",
+          "exactBatchAndSubsetHaveNoIdentityFieldOrVersionSideEffects()",
+          "globalDisableOfARecipientWaitsForTheCompleteIdentityBatch()",
+          "removedAndReaddedMembershipNeverReplacesAnAssertedOldPid()",
+          "requiresNewUsesItsOwnProofAndResumesTheOriginalTransactionProof()",
+          "aMandatoryProxyRejectsNoTransactionAndAForeignDatasourceTransaction()"
+        ]
+      },
+      {
+        "name": "com.auraboot.framework.workbench.AnnouncementAcknowledgementCapabilityIntegrationTest",
+        "tests": 7,
+        "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/pg31-junit/TEST-com.auraboot.framework.workbench.AnnouncementAcknowledgementCapabilityIntegrationTest.xml",
+        "sha256": "d32ffb11a6d59dfe293c5f05fddf21758c8a9f89fd1b1def50edf27af1917aae",
+        "cases": [
+          "everyRequiredVersionInABatchMustRemainSatisfiedThroughCommit()",
+          "aConcurrentWithdrawalWaitsForTheProofTransactionThenInvalidatesFutureChecks()",
+          "onlyOfficialExactVersionAcknowledgementSatisfiesTheGate()",
+          "anExistingIdentityBatchIsReusedBeforeAnnouncementRoots()",
+          "aWithdrawalInsideTheBusinessTransactionInvalidatesAndRollsBackItsEarlierProof()",
+          "anActualExpiryChangeInsideTheTransactionCannotCommitAnEarlierProof()",
+          "sealedAcknowledgementDoesNotTransferToANewMemberIncarnation()"
+        ]
+      }
+    ],
+    "executed": 20
+  },
+  "mutation": {
+    "mutation": "Only the owned compiled Proof.beforeCommit body is replaced with return; source and other classes unchanged",
+    "producer": "31caa1b0b728ec787b1d4182c92c6cf513d49eff",
+    "executed": 8,
+    "expectedFailures": 8,
+    "errors": 0,
+    "exitCode": 1,
+    "originalClassSha256": "1c8c203ec6502e0fcc0324ab9c4bd81fd01925cbf66ae117ab24e41fdd34e677",
+    "mutantClassSha256": "aec79e3436368b1c0520c9a11fbf059cedf14ae6f089cb22ac8861a7d2fe62ba",
+    "originalClassRestored": true
+  },
+  "build": {
+    "boot": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-app/build/libs/AuraBoot-1.0.0-boot.jar",
+      "sha256": "988ff63e3f86d92adf83358737a49470987638377684b7a12867aece5ee858a6",
+      "bytes": 245788750
+    },
+    "api": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar",
+      "sha256": "d7c2abc003f430bbf60f45c04ec3715fbb65c2b39509f05a645dcc1c006ee543",
+      "bytes": 184839
+    },
+    "externalApiEqualsEmbedded": true,
+    "restoredProofPackaged": true,
+    "requiredClassesPresent": [
+      "com/auraboot/framework/plugin/pf4j/CommandMembershipLockAccessorImpl.class",
+      "com/auraboot/framework/plugin/mapper/CommandMembershipLockMapper.class",
+      "com/auraboot/framework/workbench/service/AnnouncementAcknowledgementAccessorImpl.class"
+    ],
+    "newInterfaceAndGetterMirrored": true
+  },
+  "productAdmissionPending": true,
+  "browserExecuted": 0,
+  "mainMerged": false,
+  "productionDeployed": false,
+  "logs": {
+    "unit-457.log": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/unit-457.log",
+      "sha256": "aef903653807a8bc21950e7ac1bf28da178320e76d7ea6568c8719081df50b7d"
+    },
+    "pg31.log": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/pg31.log",
+      "sha256": "4e3353a2cb69685fc0e9e80c8f63d7088a39dde1529d95a44aebcc0f619c5d4c"
+    },
+    "run-pg31.py": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/run-pg31.py",
+      "sha256": "70e8d0190bd6e61783194caaaa52d370993bb83e34f97eaa39cef6c2ce8cebc5"
+    },
+    "mutation-classpath.log": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/mutation-classpath.log",
+      "sha256": "c559c617051544b68ae743f5bb095470e90ce4ec668fd9227406d37c4d65d1c7"
+    },
+    "falsify-before-commit.py": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/falsify-before-commit.py",
+      "sha256": "bf497457c994c07523105ae567acdc742476213bde0e7bb36b2c9f005bfa3294"
+    },
+    "mutation-before-commit.log": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/mutation-before-commit.log",
+      "sha256": "cd669d18b329f796980e21df825a5df16b10ee5528177ab616c1c9967c0ae86f"
+    },
+    "mutation-before-commit.xml": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/mutation-before-commit.xml",
+      "sha256": "f21faaa72a9bc25d0f91a580f5c6424db038c965483788553e7b85736812aa68"
+    },
+    "final31-unit-build.log": {
+      "path": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/membership-lock/final31-unit-build.log",
+      "sha256": "b30d1e3994a82e45b4c74a1583aa4e7eaa4f40ee83ad5179a9fbbb5ec979c449"
+    }
+  }
+}
