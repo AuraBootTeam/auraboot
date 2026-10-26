@@ -7,7 +7,7 @@ import { resolveAuthAppearance, resolveAuthContent, type AuthAppearance, type Au
 import { get, put, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import AuthAppearanceShell from '~/auth/AuthAppearanceShell';
-import appearanceCss from '~/auth/auth-appearance.css?inline';
+import appearanceCss from '../../../auth/auth-appearance.css?inline';
 
 interface Revision { version: number; action: string; actorId: number; createdAt: string }
 interface AppearanceView { version: number; publishedVersion: number; draft: AuthAppearance | null; published: AuthAppearance | null; history: Revision[] }
