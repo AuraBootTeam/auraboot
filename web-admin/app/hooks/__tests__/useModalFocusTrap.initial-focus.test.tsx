@@ -21,6 +21,24 @@ function Harness() {
   );
 }
 describe('shared modal initial focus', () => {
+  it('captures the opener before native inert activation blurs it', async () => {
+    render(<Harness />);
+    const opener = screen.getByRole('button', { name: 'Open' });
+    let inert = false;
+    Object.defineProperty(opener, 'inert', {
+      configurable: true,
+      get: () => inert,
+      set: (next: boolean) => {
+        inert = next;
+        if (next) opener.blur();
+      },
+    });
+    opener.focus();
+    fireEvent.click(opener);
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Reason' })).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
   it('focuses the requested input ahead of X, then restores the actual opener', async () => {
     render(<Harness />);
     const opener = screen.getByRole('button', { name: 'Open' });
