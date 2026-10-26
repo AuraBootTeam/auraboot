@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.auraboot.framework.agent.memory.MemoryReadPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,15 +68,15 @@ public class AgentPromptAssemblyService {
         }
 
         // 3. AGENT-LEVEL MEMORIES — shared knowledge, importance DESC
-        String agentMemories = loadMemoriesByCategory(tenantId, agentCode, "agent", AGENT_MEMORY_MAX_CHARS);
+        String agentMemories = loadMemoriesByCategory(tenantId, userId, agentCode, "agent", AGENT_MEMORY_MAX_CHARS);
         appendSection(sb, "SHARED KNOWLEDGE", agentMemories, AGENT_MEMORY_MAX_CHARS);
 
         // 4. USER-LEVEL MEMORIES — personal preferences, importance DESC
-        String userMemories = loadMemoriesByCategory(tenantId, agentCode, "user", USER_MEMORY_MAX_CHARS);
+        String userMemories = loadMemoriesByCategory(tenantId, userId, agentCode, "user", USER_MEMORY_MAX_CHARS);
         appendSection(sb, "USER MEMORY", userMemories, USER_MEMORY_MAX_CHARS);
 
         // 5. SESSION MEMORIES — current conversation context, importance DESC then recency DESC
-        String sessionMemories = loadMemoriesByCategory(tenantId, agentCode, "session", SESSION_MEMORY_MAX_CHARS);
+        String sessionMemories = loadMemoriesByCategory(tenantId, userId, agentCode, "session", SESSION_MEMORY_MAX_CHARS);
         appendSection(sb, "RECENT CONTEXT", sessionMemories, SESSION_MEMORY_MAX_CHARS);
 
         return sb.toString();
@@ -188,17 +189,16 @@ public class AgentPromptAssemblyService {
      * Order: importance DESC (deterministic primary key), then created_at DESC for recency tie-breaking.
      * Rows are accumulated until the char budget is consumed; partial content is never included.
      */
-    private String loadMemoriesByCategory(Long tenantId, String agentCode,
+    private String loadMemoriesByCategory(Long tenantId, Long userId, String agentCode,
                                            String category, int maxChars) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT memory_title, memory_content, importance, shadow_mode "
                 + "FROM ab_agent_memory "
-                + "WHERE tenant_id = ? AND memory_agent_id = ? AND category = ? "
-                + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "AND (valid_until IS NULL OR valid_until > NOW()) "
+                + "WHERE memory_agent_id = ? AND category = ? "
+                + "AND " + MemoryReadPolicy.VISIBLE + " "
                 + "ORDER BY importance DESC, created_at DESC "
                 + "LIMIT ?",
-                tenantId, agentCode, category, MEMORY_ROW_LIMIT);
+                agentCode, category, tenantId, MemoryReadPolicy.userKey(tenantId, userId == null ? null : userId.toString()), MEMORY_ROW_LIMIT);
 
         if (rows.isEmpty()) {
             return null;
@@ -262,8 +262,7 @@ public class AgentPromptAssemblyService {
                 + "FROM ab_agent_memory "
                 + "WHERE tenant_id = ? AND shareable = TRUE "
                 + "AND category IN ('agent', 'user') "
-                + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "AND (valid_until IS NULL OR valid_until > NOW()) "
+                + "AND " + MemoryReadPolicy.SHARED + " "
                 + "ORDER BY importance DESC, created_at DESC "
                 + "LIMIT ?",
                 tenantId, MEMORY_ROW_LIMIT);

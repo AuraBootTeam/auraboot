@@ -127,7 +127,8 @@ public class TurnCompletionMemoryListener {
             return;
         }
 
-        String agentCode = ActiveMemoryService.DEFAULT_AGENT;
+        String agentCode = ctx.agentCode() == null || ctx.agentCode().isBlank()
+                ? ActiveMemoryService.DEFAULT_AGENT : ctx.agentCode();
         int importance = importanceFor(bucket);
         String content = finalResponse.length() > MAX_CONTENT_CHARS
                 ? finalResponse.substring(0, MAX_CONTENT_CHARS) + "..."
@@ -144,7 +145,10 @@ public class TurnCompletionMemoryListener {
                 importance,
                 false,                                 // shareable: stay private to user by default
                 "user",
-                userId.toString());
+                userId.toString(),
+                "kind=episodic;source_turn_id=" + ctx.turnId()
+                        + ";source_task_id=" + ctx.taskPid() + ";observed_at=" + ctx.beginAt()
+                        + ";authority=model_response;requires_current_data_verification=true");
 
         log.debug("L1 memory written for turn {} (tenant={} user={} bucket={} importance={})",
                 ctx.turnId(), tenantId, userId, bucket, importance);

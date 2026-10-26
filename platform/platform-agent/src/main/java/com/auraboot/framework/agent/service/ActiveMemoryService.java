@@ -280,6 +280,9 @@ public class ActiveMemoryService {
         Object shadow = row.get("shadow_mode");
         boolean isShadow = shadow instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(shadow));
         contentStr = applyShadowMarker(contentStr, isShadow);
+        if ("conversation_turn".equals(row.get("category"))) {
+            contentStr = "[Historical model response; verify current business data] " + contentStr;
+        }
         m.put("content", contentStr);
         m.put("importance", row.get("importance"));
         m.put("scope", row.get("scope"));
