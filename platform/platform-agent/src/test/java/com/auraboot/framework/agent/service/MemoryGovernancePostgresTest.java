@@ -137,6 +137,10 @@ class MemoryGovernancePostgresTest {
                 .anySatisfy(row -> assertThat((String)row.get("content"))
                         .startsWith("[Historical model response; verify current business data]"));
         assertThat(recall.preRecall(TENANT_B, "alice", agent, "balance")).isEmpty();
+        jdbc.update("UPDATE ab_agent_memory SET category='user' WHERE pid=?", pid);
+        assertThat(recall.preRecall(TENANT_A, "alice", agent, "balance"))
+                .anySatisfy(row -> assertThat((String)row.get("content"))
+                        .startsWith("[Historical model response; verify current business data]"));
     }
 
 }

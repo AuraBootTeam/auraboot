@@ -104,6 +104,14 @@ public class ActiveMemoryService {
         return SHADOW_ANNOTATION_PREFIX + content;
     }
 
+    /** Episodic trust survives lifecycle category changes such as L1-to-L2 promotion. */
+    public static String applyHistoricalMarker(String content, Object memoryType, Object category) {
+        String prefix = "[Historical model response; verify current business data] ";
+        if (content == null || content.startsWith(prefix)) return content;
+        return "turn_summary".equals(memoryType) || "conversation_turn".equals(category)
+                ? prefix + content : content;
+    }
+
     /** Hard cap on snippets returned to Grounding — keep prompt size bounded. */
     private static final int MAX_SNIPPETS = 8;
     /** Keyword hits weighted more heavily than importance recall. */
@@ -279,10 +287,8 @@ public class ActiveMemoryService {
         // "这条不对" retract button keyed on the marker.
         Object shadow = row.get("shadow_mode");
         boolean isShadow = shadow instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(shadow));
+        contentStr = applyHistoricalMarker(contentStr, row.get("memory_type"), row.get("category"));
         contentStr = applyShadowMarker(contentStr, isShadow);
-        if ("conversation_turn".equals(row.get("category"))) {
-            contentStr = "[Historical model response; verify current business data] " + contentStr;
-        }
         m.put("content", contentStr);
         m.put("importance", row.get("importance"));
         m.put("scope", row.get("scope"));

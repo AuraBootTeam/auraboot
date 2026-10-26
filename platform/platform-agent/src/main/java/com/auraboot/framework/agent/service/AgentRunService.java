@@ -1479,6 +1479,7 @@ public class AgentRunService {
                 Object shadowObj = mem.get("shadow_mode");
                 boolean isShadow = shadowObj instanceof Boolean shadowBool ? shadowBool
                         : Boolean.parseBoolean(String.valueOf(shadowObj));
+                content = ActiveMemoryService.applyHistoricalMarker(content, mem.get("memory_type"), mem.get("category"));
                 content = ActiveMemoryService.applyShadowMarker(content, isShadow);
 
                 StringBuilder entry = new StringBuilder();
