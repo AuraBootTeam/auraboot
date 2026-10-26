@@ -62,8 +62,23 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
     private final Map<String, ConsumerEntry> consumers = new ConcurrentHashMap<>();
     private final java.util.concurrent.locks.ReentrantLock closeLock = new java.util.concurrent.locks.ReentrantLock();
     private final ThreadLocal<Boolean> producerCallback = new ThreadLocal<>();
-    private boolean destroyed;
-    private RuntimeException closeFailure;
+    private volatile boolean destroyed;
+    private volatile RuntimeException closeFailure;
+    private volatile Thread producerCloser;
+    private final CompletableFuture<Void> producerClosed = new CompletableFuture<>();
+
+    /** Failure never means the SDK's resources have terminated; supervisors retain this observation. */
+    public record CloseStatus(boolean requested, int liveConsumers, long producerCloserThreadId,
+                              boolean producerCloserAlive, boolean producerCleanupSucceeded, boolean successful) {}
+
+    public CloseStatus closeStatus() {
+        Thread closer = producerCloser;
+        int live = (int) consumers.values().stream().filter(entry -> entry.thread().isAlive()).count();
+        boolean producerSucceeded = producerClosed.isDone() && !producerClosed.isCompletedExceptionally();
+        return new CloseStatus(destroyed, live, closer == null ? 0 : closer.threadId(),
+                closer != null && closer.isAlive(), producerSucceeded,
+                destroyed && closeFailure == null && producerSucceeded && live == 0 && closer != null && !closer.isAlive());
+    }
 
     /** Trusted, bounded producer budgets; no arbitrary producer configuration is exposed. */
     public record ProducerTimeouts(Duration maxBlockTimeout, Duration requestTimeout, Duration deliveryTimeout) {
@@ -378,11 +393,8 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
                     }
                 }
             }
-            try { producer.close(Duration.ofNanos(Math.max(0, deadline - System.nanoTime()))); }
-            catch (RuntimeException error) {
-                if (error instanceof org.apache.kafka.common.errors.InterruptException) interrupted = true;
-                failure = combineCloseFailure(failure, error);
-            }
+            var producerFailure = closeProducer(deadline);
+            if (producerFailure != null) failure = combineCloseFailure(failure, producerFailure);
             if (Thread.currentThread().isInterrupted()) {
                 interrupted = true;
                 failure = combineCloseFailure(failure,
@@ -397,6 +409,41 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         }
         closeFailure = null;
         log.info("KafkaMqProvider shutdown complete");
+    }
+
+    /** Kafka's force-close contains an unbounded internal join. Never run it on the supervising caller. */
+    private RuntimeException closeProducer(long deadline) {
+        Duration sdkBudget = Duration.ofNanos(Math.max(0, deadline - System.nanoTime()));
+        var closer = new Thread(() -> {
+            try { producer.close(sdkBudget); producerClosed.complete(null); }
+            catch (Throwable error) {
+                // This owned thread must publish Errors as failed cleanup, never disappear as success.
+                producerClosed.completeExceptionally(error);
+            }
+        }, "auraboot-kafka-producer-close-" + UUID.randomUUID());
+        closer.setDaemon(true);
+        producerCloser = closer;
+        closer.start();
+        long remaining = Math.max(0, deadline - System.nanoTime());
+        try {
+            if (remaining > 0) closer.join(remaining / 1_000_000, (int)(remaining % 1_000_000));
+        } catch (InterruptedException error) {
+            closer.interrupt(); Thread.currentThread().interrupt();
+            return new IllegalStateException("Awaiting the owned Kafka producer closer was interrupted", error);
+        }
+        if (closer.isAlive()) {
+            closer.interrupt();
+            return new IllegalStateException("Owned Kafka producer cleanup exceeded its deadline; inspect closeStatus and retain process ownership",
+                    new java.util.concurrent.TimeoutException("Kafka SDK cleanup has not terminated"));
+        }
+        if (!producerClosed.isDone()) return new IllegalStateException("Kafka producer closer has no terminal result");
+        try { producerClosed.join(); return null; }
+        catch (java.util.concurrent.CompletionException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof org.apache.kafka.common.errors.InterruptException) Thread.currentThread().interrupt();
+            return cause instanceof RuntimeException runtime ? runtime
+                    : new IllegalStateException("Kafka producer cleanup failed", cause);
+        }
     }
 
     private static RuntimeException combineCloseFailure(RuntimeException previous, RuntimeException next) {

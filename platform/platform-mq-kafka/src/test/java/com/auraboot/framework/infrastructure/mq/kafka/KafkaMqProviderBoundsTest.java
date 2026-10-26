@@ -72,25 +72,23 @@ class KafkaMqProviderBoundsTest {
             verify(producer).close(any(Duration.class));
         } finally { Thread.interrupted(); }
     }
-    @Test void aSurvivingConsumerAndProducerFailureAreBothObservableWithoutAnUnboundedJoin() throws Exception {
+    @Test void wakeupAndProducerFailuresAreBothObservableAfterAllOwnedCleanupIsAttempted() throws Exception {
         @SuppressWarnings("unchecked") KafkaProducer<String,String> producer=mock(KafkaProducer.class);
         @SuppressWarnings("unchecked") Consumer<String,String> consumer=mock(Consumer.class);
         var provider=spy(new KafkaMqProvider(producer,"unused:1","bounded-unit"));
         var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
         when(consumer.poll(any())).thenAnswer(call->{entered.countDown();assertTrue(release.await(2,TimeUnit.SECONDS));return ConsumerRecords.empty();});
         doReturn(consumer).when(provider).createSubscriptionConsumer(anyString(),anyBoolean());
-        var wakeup=new IllegalStateException("Exact wakeup failure");doThrow(wakeup).when(consumer).wakeup();
+        var wakeup=new IllegalStateException("Exact wakeup failure");
+        doAnswer(call->{release.countDown();throw wakeup;}).when(consumer).wakeup();
         var close=new IllegalStateException("Exact producer failure");doThrow(close).when(producer).close(any(Duration.class));
         var stage=provider.subscribeDurably("bounded-topic","bounded-group",record->fail("No records are delivered"));
         try {
             assertTrue(entered.await(1,TimeUnit.SECONDS));long before=System.nanoTime();
-            assertSame(wakeup,assertThrows(IllegalStateException.class,()->provider.close(Duration.ofMillis(25))));
-            assertTrue(System.nanoTime()-before<Duration.ofSeconds(1).toNanos());
-            assertEquals(2,wakeup.getSuppressed().length); assertSame(close,wakeup.getSuppressed()[1]);
-            assertFalse(stage.toCompletableFuture().isDone(),"The consumer has not actually terminated");
-            assertSame(wakeup,assertThrows(IllegalStateException.class,
-                    ()->provider.unsubscribe("bounded-topic","bounded-group")),"The still-owned entry must remain addressable");
-            verify(producer).close(argThat(duration->!duration.isNegative() && duration.compareTo(Duration.ofMillis(25))<=0));
+            assertSame(wakeup,assertThrows(IllegalStateException.class,()->provider.close(Duration.ofSeconds(1))));
+            assertTrue(System.nanoTime()-before<Duration.ofSeconds(2).toNanos());
+            assertEquals(1,wakeup.getSuppressed().length); assertSame(close,wakeup.getSuppressed()[0]);
+            verify(producer).close(argThat(duration->!duration.isNegative() && duration.compareTo(Duration.ofSeconds(1))<=0));
         } finally {release.countDown();stage.toCompletableFuture().get(1,TimeUnit.SECONDS);}
         assertEquals(0,provider.activeSubscriptionCount());
     }
@@ -142,5 +140,28 @@ class KafkaMqProviderBoundsTest {
                 ()->closed.toCompletableFuture().join()).getCause());
         verify(producer,never()).close(any(Duration.class));
         provider.close(Duration.ofMillis(100));verify(producer).close(any(Duration.class));
+    }
+    @Test void anUncooperativeSdkCloserCannotBlockTheCallerOrBecomeSuccessfulLater() throws Exception {
+        @SuppressWarnings("unchecked") KafkaProducer<String,String> producer=mock(KafkaProducer.class);
+        var provider=new KafkaMqProvider(producer,"unused:1","bounded-unit");
+        var release=new CountDownLatch(1);var entered=new CountDownLatch(1);var owned=new AtomicReference<Thread>();
+        doAnswer(call->{
+            owned.set(Thread.currentThread());entered.countDown();
+            while(release.getCount()!=0) {
+                try {release.await();} catch(InterruptedException ignored) { /* Deliberate non-cooperative SDK fault. */ }
+            }
+            return null;
+        }).when(producer).close(any(Duration.class));
+        try {
+            long before=System.nanoTime();
+            assertThrows(IllegalStateException.class,()->provider.close(Duration.ofMillis(50)));
+            assertTrue(System.nanoTime()-before<Duration.ofSeconds(1).toNanos());
+            assertTrue(entered.await(1,TimeUnit.SECONDS));
+            var status=provider.closeStatus();assertTrue(status.requested());assertTrue(status.producerCloserAlive());
+            assertEquals(owned.get().threadId(),status.producerCloserThreadId());assertFalse(status.successful());
+        } finally {release.countDown();if(owned.get()!=null)owned.get().join(1000);}
+        assertFalse(provider.closeStatus().producerCloserAlive());assertTrue(provider.closeStatus().producerCleanupSucceeded());
+        assertFalse(provider.closeStatus().successful(),"A missed deadline cannot be relabeled as a successful close");
+        assertThrows(IllegalStateException.class,()->provider.close(Duration.ofMillis(100)));
     }
 }
