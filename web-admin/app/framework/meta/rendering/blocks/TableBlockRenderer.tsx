@@ -1282,7 +1282,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             stateTitle('error', errorStatus ? `Request failed (${errorStatus})` : 'Request failed'),
           )}
         </div>
-        <div className="text-text-2 mt-1 text-sm">{String(dataSourceError?.message || '')}</div>
+        <div className="text-text-2 mt-1 text-sm">
+          {stateConfig[errorStateKey]?.description || stateConfig.error?.description
+            ? getLocalizedText(
+                stateConfig[errorStateKey]?.description ?? stateConfig.error.description,
+                locale,
+                t,
+              )
+            : String(dataSourceError?.message || '')}
+        </div>
         {dataSourceId && (
           <button
             type="button"

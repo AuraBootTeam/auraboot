@@ -40,7 +40,10 @@ const block = {
   columns: [{ field: 'name', label: 'Name' }],
   states: {
     loading: { title: { en: 'Loading onboarding batches…' } },
-    '403': { title: { en: 'You cannot view these batches' } },
+    '403': {
+      title: { en: 'You cannot view these batches' },
+      description: { en: 'Ask the owner to grant read access, then retry.' },
+    },
     stale: { title: { en: 'Connection lost; preserved rows are read-only until retry' } },
   },
 } as any;
@@ -71,6 +74,8 @@ describe('TableBlockRenderer data-source states', () => {
     expect(screen.getByTestId('table-error-state-403')).toHaveTextContent(
       'You cannot view these batches',
     );
+    expect(screen.getByText('Ask the owner to grant read access, then retry.')).toBeInTheDocument();
+    expect(screen.queryByText('Forbidden')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('table-error-retry'));
     expect(reload).toHaveBeenCalledWith('rows');
   });
