@@ -49,6 +49,7 @@ class AnnouncementAcknowledgementCapabilityIntegrationTest extends BaseIntegrati
     @Autowired private PlatformTransactionManager transactions;
     @Autowired private TenantMemberService memberships;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor identityLocks;
 
     private record Fixture(String root, String version, String hash) {}
 
@@ -155,6 +156,17 @@ class AnnouncementAcknowledgementCapabilityIntegrationTest extends BaseIntegrati
             });
         } finally { identity(); }
         assertEquals(Status.SATISFIED, check(fixture).status());
+    }
+
+    @Test void anExistingIdentityBatchIsReusedBeforeAnnouncementRoots() {
+        var fixture = acknowledged();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            var actor = new com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.MembershipAssertion(
+                    getTestUser().getPid(), getTestTenantMember().getPid());
+            assertEquals(getTestTenantMember().getPid(), identityLocks.requireEnabledMemberships(List.of(actor)).getFirst().memberPid());
+            assertEquals(Status.SATISFIED, capability.checkForCommand(required(fixture)).getFirst().status());
+            assertEquals(getTestTenantMember().getPid(), identityLocks.requireEnabledMemberships(List.of(actor)).getFirst().memberPid());
+        });
     }
 
     @Test void aConcurrentWithdrawalWaitsForTheProofTransactionThenInvalidatesFutureChecks() throws Exception {
