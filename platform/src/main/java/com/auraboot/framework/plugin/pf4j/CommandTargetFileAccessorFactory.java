@@ -53,6 +53,7 @@ public class CommandTargetFileAccessorFactory {
         private FileAccessor accessor;
         private java.util.function.BooleanSupplier valid;
         private java.util.function.Supplier<String> physicalTransaction;
+        private java.util.function.BooleanSupplier creationValid;
         private final Map<CreatedKey,Created> created = new java.util.HashMap<>();
         private final java.util.SortedSet<String> lockedFiles = new java.util.TreeSet<>();
         public FileAccessor accessor() { return accessor; }
@@ -109,6 +110,7 @@ public class CommandTargetFileAccessorFactory {
                 && Objects.equals(target, MetaContext.getCommandPermitTargetFor(model))
                 && TransactionSynchronizationManager.getSynchronizations().contains(lifetime)
                 && TransactionSynchronizationManager.getResource(source) == holder && holder.getConnection() == connection;
+        scope.creationValid = () -> scope.valid.getAsBoolean() && !holder.isRollbackOnly() && physicalWritable(connection);
         scope.accessor = new FileAccessorImpl(files, storage, actor.user()) {
             @Override public void appendAndRetainExistingToTarget(String filePid, String fieldCode) {
                 try {
@@ -121,7 +123,7 @@ public class CommandTargetFileAccessorFactory {
             }
             @Override public void linkAndRetainExistingToCreatedRecord(String filePid,String modelCode,String recordPid,String fieldCode) {
                 try {
-                    if (!scope.valid.getAsBoolean()) throw denied();
+                    if (!scope.creationValid.getAsBoolean()) throw denied();
                     linkCreated(scope, actor, filePid, modelCode, recordPid, fieldCode);
                 } catch (RuntimeException failure) {
                     if (scope.active && scope.thread == Thread.currentThread()) holder.setRollbackOnly();
@@ -138,7 +140,7 @@ public class CommandTargetFileAccessorFactory {
     /** Only the host DataAccessor's successful singleton insert path calls this hook. */
     static void recordCreated(String model,Map<String,Object> row) {
         Scope scope = ACTIVE_HANDLER.get();
-        if (scope == null || !scope.valid.getAsBoolean() || row == null
+        if (scope == null || !scope.creationValid.getAsBoolean() || row == null
                 || !(row.get("pid") instanceof String pid) || pid.isBlank()
                 || !(row.get("tenant_id") instanceof Number tenant) || tenant.longValue() != current().tenant()
                 || !(row.get("created_by") instanceof Number actor) || actor.longValue() != current().user()
@@ -237,6 +239,11 @@ public class CommandTargetFileAccessorFactory {
                 .setEntityType(modelCode).setEntityId(target).setFieldName(fieldCode)
                 .setFileId(String.valueOf(file.getId())).setSortOrder(order).setDeletedFlag(false);
         if (relations.insert(relation) != 1) throw new IllegalStateException("Attachment relation was not persisted");
+    }
+
+    private static boolean physicalWritable(Connection connection) {
+        try { return !connection.isClosed() && !connection.isReadOnly() && !connection.getAutoCommit(); }
+        catch (SQLException failure) { throw new IllegalStateException("Cannot validate the physical creation transaction",failure); }
     }
 
     private static Actor current() {

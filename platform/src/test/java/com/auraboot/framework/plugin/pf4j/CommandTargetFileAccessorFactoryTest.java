@@ -91,16 +91,18 @@ class CommandTargetFileAccessorFactoryTest {
         when(data.getById("child","new-child")).thenReturn(row);
         when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
         command(()->{try(var scope=factory.forCommand(ctx)) {
-            // A lookup cannot attest CREATE, even when actor, PID and version look plausible.
-            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
-                    .isInstanceOf(AccessDeniedException.class);
-        }return null;});
-        command(()->{try(var scope=factory.forCommand(ctx)) {
             var delegate=mock(DynamicDataService.class);when(delegate.create(eq("child"),anyMap())).thenReturn(row);
             new DynamicDataAccessorImpl(delegate).create("child",Map.of("proof","file-pid"));
             scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof");
         }return null;});
         verify(files).lockRetention("file-pid");verify(relations).insert(any(FileRelationEntity.class));
+    }
+    @Test void aPlausibleLookupDoesNotAttestCreation() {
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
+                    .isInstanceOf(AccessDeniedException.class);
+        }return null;});
+        verify(files,never()).lockRetention(anyString());
     }
     @Test void creationOnlyNoTargetScopeStillCannotAppendToAParent() {
         ctx.setTargetRecordReadable(null);ctx.getRequest().setTargetRecordId(null);
