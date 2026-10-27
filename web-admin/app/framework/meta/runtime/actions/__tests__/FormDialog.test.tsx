@@ -685,3 +685,38 @@ describe('FormDialog unavailable grouped options', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
+
+
+describe('FormDialog fixed-key string maps', () => {
+  it('edits each labeled value without changing keys, coercing numbers or mutating the source', () => {
+    const axes = { color: 'Red', size: 'M' }, onSubmit = vi.fn();
+    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', required: true,
+      props: { keyLabels: { color: 'Colour', size: 'Size' }, maxValueLength: 128 } }], defaults: { axes }, onSubmit });
+    expect(screen.getByRole('group', { name: 'Options' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Colour'), { target: { value: 'Wine red' } });
+    fireEvent.change(screen.getByLabelText('Size'), { target: { value: '007' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(onSubmit).toHaveBeenCalledWith({ axes: { color: 'Wine red', size: '007' } });
+    expect(axes).toEqual({ color: 'Red', size: 'M' });
+  });
+  it('keeps empty values in the dialog and does not submit malformed maps as valid empty options', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', props: { invalidMessage: 'Review options' } }],
+      defaults: { axes: { Colour: 'Red' } }, onSubmit });
+    fireEvent.change(screen.getByLabelText('Colour'), { target: { value: ' ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(screen.getByText('Review options')).toBeTruthy(); expect(onSubmit).not.toHaveBeenCalled();
+  });
+  it.each([null, ['Red'], { colour: 7 }])('rejects a non-string-map source: %j', (axes) => {
+    const onSubmit = vi.fn();
+    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', props: { invalidMessage: 'Reload options' } }], defaults: { axes }, onSubmit });
+    expect(screen.getByRole('alert').textContent).toBe('Reload options');
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true })); expect(onSubmit).not.toHaveBeenCalled();
+  });
+  it('accepts the explicit empty map of a single variant without inventing options', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', required: true, props: { emptyMessage: 'No options needed' } }], defaults: { axes: {} }, onSubmit });
+    expect(screen.getByText('No options needed')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true })); expect(onSubmit).toHaveBeenCalledWith({ axes: {} });
+  });
+});

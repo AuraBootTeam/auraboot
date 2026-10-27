@@ -41,6 +41,7 @@ interface FormFieldConfig {
   helpText?: string | Record<string, string>;
   type?:
     | 'text'
+    | 'string-map'
     | 'select'
     | 'number'
     | 'textarea'
@@ -145,6 +146,13 @@ function translatedOrFallback(t: (key: string) => string, key: string, fallback:
   return translated && translated !== key ? translated : fallback;
 }
 
+/** Fixed-key string maps are edited structurally; malformed values never become an empty map. */
+function isStringMap(value: unknown): value is Record<string, string> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && [Object.prototype, null].includes(Object.getPrototypeOf(value))
+    && Object.values(value).every((item) => typeof item === 'string');
+}
+
 function isMissing(value: any) {
   return (
     value === undefined ||
@@ -236,6 +244,16 @@ export default function FormDialog() {
             locale,
             t,
           });
+        }
+      }
+      if (field.type === 'string-map') {
+        const maximum = field.props?.maxValueLength;
+        if (!isStringMap(value) || Object.values(value).some((entry) => !entry.trim()
+            || (Number.isInteger(maximum) && maximum > 0 && entry.length > maximum))) {
+          const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+          newErrors[field.field] = field.props?.invalidMessage
+            ? getLocalizedText(field.props.invalidMessage, locale, t)
+            : buildRequiredFieldMessage(label, { dataType: 'text', locale, t });
         }
       }
       if (field.type === 'grouped-multiselect') {
@@ -488,6 +506,24 @@ export default function FormDialog() {
                       multiple={field.props?.multiple === true}
                       placeholder={placeholder || undefined}
                     />
+                  ) : fieldType === 'string-map' ? (
+                    <fieldset aria-label={label} data-testid={`form-dialog-field-${field.field}`} className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-600">
+                      {!isStringMap(formData[field.field]) ? (
+                        <p role="alert" className="text-sm text-red-600">{getLocalizedText(field.props?.invalidMessage, locale, t) || buildRequiredFieldMessage(label, { dataType: 'text', locale, t })}</p>
+                      ) : Object.entries(formData[field.field]).length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-300">{getLocalizedText(field.props?.emptyMessage, locale, t) || translatedOrFallback(t, 'common.noData', 'No options')}</p>
+                      ) : Object.entries(formData[field.field] as Record<string, string>).map(([key, value], index) => (
+                        <div key={key}>
+                          <label htmlFor={`form-dialog-${field.field}-${sourceIndex}-${index}`} className="mb-1 block text-sm text-gray-700 dark:text-gray-300">{getLocalizedText(field.props?.keyLabels?.[key], locale, t) || key}</label>
+                          <input id={`form-dialog-${field.field}-${sourceIndex}-${index}`} type="text" value={value}
+                            ref={isFirst && index === 0 ? firstInputRef as React.RefObject<HTMLInputElement> : undefined}
+                            maxLength={Number.isInteger(field.props?.maxValueLength) && field.props.maxValueLength > 0 ? field.props.maxValueLength : undefined}
+                            placeholder={placeholder} aria-invalid={Boolean(error)}
+                            onChange={(event) => updateField(field.field, { ...formData[field.field], [key]: event.target.value })}
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                        </div>
+                      ))}
+                    </fieldset>
                   ) : fieldType === 'select' ? (
                     <select
                       id={`form-dialog-${field.field}-${sourceIndex}`}
