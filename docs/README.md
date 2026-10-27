@@ -36,3 +36,5 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 - Documentation changes are gated by `docs.yml` / `docs-quality.yml` (markdown lint, link check, frontmatter governance via `scripts/check-docs-governance.mjs`).
 
 CRUD runtime reference: [Generated CRUD default presentation](./system-reference/crud-default-presentation.md).
+
+Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md).

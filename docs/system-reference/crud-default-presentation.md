@@ -34,3 +34,7 @@ Dictionary bind/unbind uses the same cache invalidation contract as field update
 ## Verification boundary
 
 The task implementation plan and acceptance ledger live in the Workspace documentation. Hermetic generator/property tests do not prove real-stack CRUD, child-table persistence, modal behavior or visual quality. Those require the same-runtime browser journey and reviewed original screenshots. No production rollout is implied.
+
+## Repeatable regression
+
+See [the focused browser gate](crud-regression.md) for owned-runtime inputs, fixture provenance, fresh-generation versus restored-case assertions, and evidence limits. `pnpm test:crud` executes the registered journeys; collection alone is not execution.
