@@ -103,6 +103,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     private String suffix;
     private Map<String, Object> initialRow;
     private final List<Map<String, Object>> samples = new ArrayList<>();
+    private final Map<String, Object> retainedMemoryFlags = new LinkedHashMap<>();
 
     @BeforeEach
     void prepare() throws Exception {
@@ -110,6 +111,10 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         assertThat(live).as("Explicit live provider profile is required; this suite never skips").isNotNull();
         assertThat(System.getenv("AURA_EFFECTIVENESS_REPORT")).as("Evidence output path is required").isNotBlank();
         tenantId = getTestTenant().getId();
+        // Temporarily isolate prior evidence rows; restore their exact flags even when a live sample fails.
+        for (var row : jdbc.queryForList("SELECT pid,deleted_flag FROM ab_agent_memory WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId)) {
+            retainedMemoryFlags.put(row.get("pid").toString(), row.get("deleted_flag"));
+        }
         LiveLlmSeeder.seed(live, tenantId, cloud, jdbc);
         doAnswer(call -> {
             LlmChatRequest request = call.getArgument(0);
@@ -153,7 +158,10 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                         "modelCode", modelCode, "fixture", initialRow, "profile", effectivenessProfile(), "expectedSamples", expectedSampleCount(),
                         "businessRetries", 0, "samples", samples));
             }
-        } finally { MetaContext.clear(); }
+        } finally {
+            retainedMemoryFlags.forEach((pid, flag) -> jdbc.update("UPDATE ab_agent_memory SET deleted_flag=? WHERE tenant_id=? AND pid=?", flag, tenantId, pid));
+            MetaContext.clear();
+        }
     }
 
     @Test
@@ -167,7 +175,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                 for (boolean enabled : repeat == 0 ? List.of(false, true) : List.of(true, false)) {
                     wireCalls.clear();
                     // A prior model answer may be written back; never let it become the next sample's baseline.
-                    jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);
+                    jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId);
                     if (scenario.startsWith("ME")) measureMemory(scenario, repeat, enabled);
                     else measureProcedure(scenario, repeat, enabled);
                     writeCheckpoint();
@@ -327,7 +335,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             if (existing != null && tenantId.equals(existing.getTenantId())) config.setPid(existing.getPid());
             cloud.saveConfig(config);
             assertThat(ReflectionTestUtils.getField(recall, "semanticRecallEnabled")).isEqualTo(false);
-            jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);
+            jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId);
             for (var doc : definition.path("documents")) {
                 String pid = memory.createScopedMemory(tenantId, "aurabot", "fact", "test", doc.path("title").asText(),
                         doc.path("content").asText(), 5, false, "user", user);
@@ -414,7 +422,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             for (int repeat = 0; repeat < definition.path("repeats").asInt(); repeat++) {
                 for (boolean enabled : repeat % 2 == 0 ? List.of(false, true) : List.of(true, false)) {
                     wireCalls.clear();
-                    jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);
+                    jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId);
                     measureExpanded(scenario, repeat, enabled);
                     samples.get(samples.size() - 1).put("businessUnchanged", before.equals(businessSnapshot()));
                     writeCheckpoint();

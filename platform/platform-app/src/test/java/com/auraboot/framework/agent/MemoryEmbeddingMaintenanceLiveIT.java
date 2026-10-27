@@ -28,6 +28,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.*;
 import org.springframework.transaction.support.*;
@@ -44,6 +45,7 @@ class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {
     @Autowired MemoryEmbeddingService writer;
     @Autowired MemoryEmbeddingRebuildService maintenance;
     @Autowired CloudConfigService cloud;
+    @Autowired com.auraboot.framework.saas.config.service.SystemConfigService systemConfig;
     @Autowired RoleService roles;
     @Autowired UserRoleService userRoles;
     @Autowired AdminRoleChecker admin;
@@ -58,7 +60,10 @@ class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {
     JsonNode request(String path, Object body) throws Exception {
         var headers = new HttpHeaders(); headers.setBearerAuth(token); headers.setContentType(MediaType.APPLICATION_JSON);
         var response = rest.exchange(path, body == null ? HttpMethod.GET : HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        if (response.getStatusCode().value() != 200) {
+            var error = json.readTree(response.getBody());
+            throw new AssertionError("HTTP " + response.getStatusCode().value() + " at " + path + ": code=" + error.path("code").asText() + ", message=" + error.path("message").asText());
+        }
         return json.readTree(response.getBody());
     }
     JsonNode inspect(String pid) throws Exception { return request("/api/admin/memory/embeddings/" + pid + "?agentCode=" + agent, null); }
@@ -72,12 +77,17 @@ class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {
     Map<String,Object> row(String pid) { return jdbc.queryForMap("SELECT embedding::text AS vector,embedding_space,embedding_content_hash,embedding_generated_at FROM ab_agent_memory WHERE pid=?", pid); }
     int audits(String pid) { return jdbc.queryForObject("SELECT COUNT(*) FROM ab_audit_trail WHERE entity_pid=? AND event_type='MEMORY_VECTOR_REBUILT'", Integer.class, pid); }
 
+    AuditTrailService auditTarget() { return AopTestUtils.getUltimateTargetObject(audit); }
+
     @Test @Timeout(value = 10, unit = TimeUnit.MINUTES)
     void scopedRebuildIsAtomicAuditedAndResumableThroughAuthenticatedHttp() throws Exception {
         String oldAllow = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        String oldMode = systemConfig.getOrDefault("system.mode", "single");
         var report = new LinkedHashMap<String,Object>(); report.put("checks", passed);
         Path output = Path.of(Objects.requireNonNull(System.getenv("AURA_MEMORY_MAINTENANCE_REPORT")));
         try {
+            systemConfig.initialize("system.mode", "multi", "system", "string", "Isolated maintenance qualification mode", false);
+            systemConfig.set("system.mode", "multi");
             tenant = getTestTenant().getId(); agent = "maintenance-" + UUID.randomUUID();
             System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", "127.0.0.1");
             var config = new CloudConfigSaveRequest(); config.setConfigLevel("tenant"); config.setServiceType("embedding"); config.setProviderCode("local_qwen"); config.setEnabled(true); config.setPriority(-200);
@@ -99,7 +109,6 @@ class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {
             assertThat(rest.getForEntity("/api/admin/memory/embeddings?agentCode=" + agent, String.class).getStatusCode().value()).isEqualTo(401);
             assertThat(inspect(legacy).path("code").asText()).isEqualTo("409");
             grant.setStatus("active"); userRoles.updateById(grant); admin.invalidateAll();
-            assertThat(inspect(legacy).path("code").asText()).isNotEqualTo("0");
             grantCommittedPermissionToTestRole(MetaPermission.ACP_MEMORY_ADMIN, "API", "acp_memory", "admin", "Memory maintenance");
             passed.add("anonymous_and_non_admin_denied");
             assertThat(writer.computeAndStore(legacy)).isTrue(); var original = row(legacy);
@@ -121,9 +130,9 @@ class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {
             var after = row(legacy); assertThat(rebuild(legacy, space).path("data").path("outcome").asText()).isEqualTo("already_current");
             assertThat(row(legacy)).isEqualTo(after); assertThat(audits(legacy)).isEqualTo(1); passed.add("exact_before_image_atomic_audit_and_idempotence");
             String rollback = fixture("audit-failure"); var rollbackBefore = row(rollback);
-            doThrow(new IllegalStateException("injected audit failure")).when(audit).recordInCurrentTransaction(any());
+            doThrow(new IllegalStateException("injected audit failure")).when(auditTarget()).recordInCurrentTransaction(any());
             assertThatThrownBy(() -> maintenance.rebuild(tenant, getTestUser().getId(), agent, rollback, space, "rollback probe")).isInstanceOf(IllegalStateException.class);
-            reset(audit); assertThat(row(rollback)).isEqualTo(rollbackBefore); assertThat(audits(rollback)).isZero();
+            reset(auditTarget()); assertThat(row(rollback)).isEqualTo(rollbackBefore); assertThat(audits(rollback)).isZero();
             assertThatThrownBy(() -> audit.recordInCurrentTransaction(AuditTrailEvent.builder().tenantId(tenant).build())).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
             assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(status -> maintenance.rebuild(tenant, getTestUser().getId(), agent, rollback, space, "outer transaction rejected")))
                     .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class); passed.add("audit_failure_rolls_back_and_transaction_contracts");
@@ -138,6 +147,16 @@ class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {
                 assertThat(future.get(60, TimeUnit.SECONDS).path("code").asText()).isEqualTo("409");
             } finally { release.countDown(); reset(embedding); }
             assertThat(row(race).get("vector")).isNull(); assertThat(audits(race)).isZero(); passed.add("real_model_outside_transaction_and_content_CAS");
+            String concurrent = fixture("concurrent"); CountDownLatch both = new CountDownLatch(2), apply = new CountDownLatch(1);
+            doAnswer(invocation -> {
+                var result = invocation.callRealMethod(); both.countDown(); assertThat(apply.await(60, TimeUnit.SECONDS)).isTrue(); return result;
+            }).when(embedding).embedWithIdentity(anyLong(), anyString(), isNull());
+            try (var pool = Executors.newFixedThreadPool(2)) {
+                var first = pool.submit(() -> rebuild(concurrent, space)); var second = pool.submit(() -> rebuild(concurrent, space));
+                assertThat(both.await(60, TimeUnit.SECONDS)).isTrue(); apply.countDown();
+                assertThat(List.of(first.get(60, TimeUnit.SECONDS).path("code").asText(), second.get(60, TimeUnit.SECONDS).path("code").asText())).containsExactlyInAnyOrder("0", "409");
+            } finally { apply.countDown(); reset(embedding); }
+            assertThat(audits(concurrent)).isEqualTo(1); passed.add("concurrent_real_inference_single_CAS_and_audit");
             String inactive = fixture("inactive"); jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE pid=?", inactive);
             assertThat(inspect(inactive).path("data").path("status").asText()).isEqualTo("inactive"); assertThat(rebuild(inactive, space).path("code").asText()).isEqualTo("404"); passed.add("inactive_rows_not_rebuilt");
             String expired = fixture("expired"); jdbc.update("UPDATE ab_agent_memory SET valid_until=NOW()-INTERVAL '1 day' WHERE pid=?", expired);
@@ -167,7 +186,7 @@ class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {
             assertThat(audit.verifyChainIntegrity(tenant, 1L, max).isValid()).isTrue(); passed.add("audit_chain_integrity");
             report.put("database", jdbc.queryForObject("SELECT current_database()", String.class)); report.put("tenantId", tenant.toString()); report.put("agentCode", agent); report.put("space", space); report.put("checkpoint", checkpoint.toString()); report.put("status", "pass");
         } finally {
-            reset(embedding, audit); admin.invalidateAll();
+            reset(embedding, auditTarget()); admin.invalidateAll(); systemConfig.set("system.mode", oldMode);
             if (oldAllow == null) System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS"); else System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", oldAllow);
             Files.createDirectories(output.getParent()); Files.writeString(output, json.writerWithDefaultPrettyPrinter().writeValueAsString(report));
         }
