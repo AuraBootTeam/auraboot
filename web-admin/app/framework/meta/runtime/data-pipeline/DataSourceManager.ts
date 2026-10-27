@@ -328,7 +328,7 @@ export class DataSourceManager {
     // owner's declared reads after its context and dependencies are bound.
     if (scopeChanged) {
       this.dataSources.forEach((config, id) => {
-        if (config.autoFetch && !config.pagination) this.scheduleAutoFetch(id, config);
+        if (config.autoFetch || Boolean(config.dependOn?.length)) this.scheduleAutoFetch(id, config);
       });
     }
   }
@@ -419,8 +419,10 @@ export class DataSourceManager {
     };
     this.dataSourceStates.set(id, initialState);
 
-    // 如果配置了 autoFetch，立即获取数据
-    if (configWithDefaults.autoFetch) {
+    // Declared dependencies require an initial read even when pagination
+    // disables autoFetch. Defer it until the surviving mount owns the scope;
+    // fetch still blocks missing parent paths before making any request.
+    if (configWithDefaults.autoFetch || Boolean(configWithDefaults.dependOn?.length)) {
       this.scheduleAutoFetch(id, configWithDefaults);
     }
 
@@ -1049,10 +1051,13 @@ export class DataSourceManager {
    */
   setupDependencyTracking(id: string, dependencies: string[]): (() => void) | null {
     const config = this.dataSources.get(id);
-    if (!config || !config.autoFetch) {
+    if (!config) {
       return null;
     }
 
+    // 事件驱动的依赖订阅对所有声明 dependOn 的数据源生效——包括被分页规则强制
+    // autoFetch=false 的源与注册时依赖未就绪而被延后的源，否则它们在依赖首次被
+    // 写入时不会重取（首取已由 register() 保证，这里保证“重取”）。
     const unsubscribe = this.subscribeDependencies(id, dependencies);
     if (unsubscribe) {
       return unsubscribe;
@@ -1060,6 +1065,11 @@ export class DataSourceManager {
 
     // Fallback: periodic check only when event-driven subscription is unavailable.
     // Pauses when page is hidden to avoid wasting CPU.
+    // 兜底轮询仍只对 autoFetch 源启用，避免为延后源引入无意义的定时器。
+    if (!config.autoFetch) {
+      return null;
+    }
+
     let lastDeps: any = null;
 
     const checkInterval = setInterval(() => {

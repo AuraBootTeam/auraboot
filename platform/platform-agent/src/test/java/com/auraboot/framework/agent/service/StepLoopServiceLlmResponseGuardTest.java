@@ -91,6 +91,27 @@ class StepLoopServiceLlmResponseGuardTest {
                 .isFalse();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"max_tokens", "end_turn"})
+    void replanPreservesOriginalStepsUnlessTheMachineReplyCompleted(String stopReason) throws Exception {
+        StepLoopService service = newService();
+        LlmProvider provider = mock(LlmProvider.class);
+        when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
+                .thenReturn(LlmChatResponse.builder().stopReason(stopReason)
+                        .content(List.of(LlmChatResponse.ContentBlock.builder().type("text")
+                                .text("[{\"description\":\"Replacement step\",\"toolCode\":null,\"requiresApproval\":false}]")
+                                .build())).build());
+        AgentPlanStep remaining = new AgentPlanStep(1, "Original remaining step");
+        List<AgentPlanStep> plan = new java.util.ArrayList<>(List.of(new AgentPlanStep(0, "Failed step"), remaining));
+        boolean replanned = service.attemptReplan(plan, 0, "failure", provider, providerConfig(), "model",
+                "system", List.of(), List.of(), null);
+        assertThat(replanned).isEqualTo("end_turn".equals(stopReason));
+        assertThat(plan).hasSize(2);
+        if (replanned) assertThat(plan.get(1).getDescription()).isEqualTo("Replacement step");
+        else assertThat(plan.get(1)).isSameAs(remaining);
+        verify(provider, times(1)).chat(any(LlmChatRequest.class), anyString(), anyString());
+    }
+
     @Test
     @DisplayName("executePlanSteps propagates plan persistence failures")
     void executePlanSteps_planPersistenceFailure_propagates() throws Exception {

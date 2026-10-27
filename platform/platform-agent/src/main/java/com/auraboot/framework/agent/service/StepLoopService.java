@@ -588,7 +588,7 @@ public class StepLoopService {
                     // knob flow through.
                     .thinking(thinkingConfig).build();
 
-            LlmChatResponse resp = LlmResponseGuard.requireContent(
+            LlmChatResponse resp = LlmResponseGuard.requireCompleteContent(
                     provider.chat(req, config.getApiKey(), config.getBaseUrl()),
                     "ACP replan");
             String content = resp.getContent().stream()

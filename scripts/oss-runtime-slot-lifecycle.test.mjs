@@ -38,7 +38,7 @@ for (const scenario of ['passed', 'skip-setup', 'skip-route']) {
       writeFileSync(join(fixture, 'pnpm'), `#!/usr/bin/env node
 const fs=require('fs'),path=require('path');
 const args=process.argv.slice(2),project=args.find(a=>a.startsWith('--project=')).split('=')[1];
-fs.appendFileSync(path.join(process.env.FIXTURE_ROOT,'calls.jsonl'),JSON.stringify({project,profile:process.env.PW_PROFILE,args})+'\\n');
+fs.appendFileSync(path.join(process.env.FIXTURE_ROOT,'calls.jsonl'),JSON.stringify({project,profile:process.env.PW_PROFILE,roleProjects:process.env.PW_ROLE_PROJECTS ?? null,args})+'\\n');
 const skip=(process.env.SCENARIO==='skip-setup'&&project==='setup')||(process.env.SCENARIO==='skip-route'&&project==='chromium');
 const file=process.env.PLAYWRIGHT_JSON_OUTPUT_FILE;fs.mkdirSync(path.dirname(file),{recursive:true});
 fs.writeFileSync(file,JSON.stringify({suites:[{specs:[{tests:[{expectedStatus:'passed',results:[{status:skip?'skipped':'passed',retry:0}]}]}]}],errors:[]}));
@@ -66,6 +66,12 @@ cmd_warm sample
       assert.equal(calls[0].project, 'setup');
       assert.equal(calls[0].args.some(arg => arg.startsWith('tests/')), false, 'setup must execute the complete canonical project');
       assert.equal(calls.length, scenario === 'skip-setup' ? 1 : 3);
+      if (scenario === 'passed') {
+        assert.equal(calls[1].project, 'auth');
+        assert.equal(calls[1].roleProjects, '1',
+          'warm auth must pass PW_ROLE_PROJECTS=1 so the role logins execute for real; '
+          + 'without it auth.setup.ts structurally skips 3 of 4 tests and the zero-skip gate fails');
+      }
       if (scenario === 'skip-route') assert.match(result.stderr, /route execution evidence incomplete/);
     } finally { rmSync(fixture, { recursive: true, force: true }); }
   });

@@ -13,18 +13,26 @@ const BACKEND_PLUGIN_ROOT =
   process.env.BACKEND_PLUGIN_ROOT ??
   resolve(__dirname, '../../../../plugins');
 
+// ORDER MATTERS: plugins are imported sequentially and the backend import validator
+// (PluginManifestValidator) checks each command's modelCode against models declared in
+// the same manifest or already registered in the tenant. platform-admin's command
+// admin:provision_member_from_employee references model org_employee, which is owned by
+// org-management — so org-management MUST be imported before platform-admin, otherwise
+// platform-admin's import fails with "Command ... references missing model: org_employee".
+// The per-plugin probes below are order-independent (each only checks its own plugin's
+// model/command); only the import sequence carries the constraint. Do not reorder.
 const REQUIRED_OSS_PLUGINS = [
-  {
-    name: 'platform-admin',
-    pluginId: 'com.auraboot.platform-admin',
-    probeModelCode: 'tenant_member',
-    probeCommandCode: 'admin:create_member',
-  },
   {
     name: 'org-management',
     pluginId: 'com.auraboot.org-management',
     probeModelCode: 'org_department',
     probeCommandCode: 'org:create_department',
+  },
+  {
+    name: 'platform-admin',
+    pluginId: 'com.auraboot.platform-admin',
+    probeModelCode: 'tenant_member',
+    probeCommandCode: 'admin:create_member',
   },
   {
     name: 'core-announcement',

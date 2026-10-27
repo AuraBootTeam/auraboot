@@ -7,7 +7,7 @@ import baseConfig from './playwright.config';
 const fixture = process.env.AGENT_PERMISSION_FIXTURE;
 const evidence = process.env.AGENT_PERMISSION_EVIDENCE;
 const scope = process.env.AGENT_ACCEPTANCE_SCOPE ?? 'permissions';
-const agentApprovalSpecNames = ['permissions', 'memory'];
+const agentApprovalSpecNames = ['permissions', 'memory', 'steady'];
 if (!agentApprovalSpecNames.includes(scope)) throw new Error('Unknown agent acceptance scope');
 if (!fixture || !isAbsolute(fixture) || !existsSync(fixture)
     || !evidence || !isAbsolute(evidence)
@@ -32,6 +32,13 @@ if (scope === 'memory' && (!inputs.owner?.email || !inputs.owner?.password
     || !inputs.memory?.actualTitle || !inputs.memory?.value || !inputs.memory?.question
     || !inputs.memory?.missingQuestion || !inputs.memory?.missingMarker)) {
   throw new Error('Agent memory fixture requires distinct accounts and actual persisted source data');
+}
+if (scope === 'steady' && (!inputs.owner?.email || !inputs.owner?.password || !inputs.owner?.userId
+    || !inputs.modelCode || !inputs.businessPid || !inputs.expectedBusiness || !inputs.memory?.pid
+    || !inputs.memory?.value || !inputs.memory?.foreignValue || !inputs.memory?.expectedSpace
+    || !inputs.memory?.question || !inputs.runtime?.workspace || !inputs.runtime?.processDirectory
+    || !inputs.runtime?.name)) {
+  throw new Error('Steady product qualification requires the frozen business/memory truth and exact owned process identities');
 }
 
 export default defineConfig({

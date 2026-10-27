@@ -569,6 +569,15 @@ public class ChatTurnRuntime {
             runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.modelResponse(
                     round, stopReason, Map.of("contentBlockCount", response.getContent().size())));
             lastRuntimeState = runtimeState;
+            if (responseHasToolUse && "max_tokens".equals(stopReason)) {
+                runtimeState = reduceRuntimeState(callbacks, runtimeState,
+                        AgentRuntimeEvent.turnFailed(round, "incomplete_tool_call"));
+                lastRuntimeState = runtimeState;
+                String msg = "LLM tool response was truncated; no tools were executed.";
+                callbacks.afterProviderFailure(roundContext, providerSpan, msg, null);
+                spec.sink().onError(msg, spec.traceId());
+                return new TurnOutcome.Failed(msg, null);
+            }
             if ("required".equals(toolChoice) && !responseHasToolUse) {
                 runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnFailed(
                         round, "required_tool_call_missing"));
