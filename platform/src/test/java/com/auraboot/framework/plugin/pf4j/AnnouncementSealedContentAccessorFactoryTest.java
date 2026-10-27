@@ -77,6 +77,27 @@ class AnnouncementSealedContentAccessorFactoryTest {
         when(content.requirePublished(expected,"member")).thenThrow(new IllegalStateException("withdrawn"));
         assertThrows(IllegalStateException.class,()->TransactionSynchronizationManager.getSynchronizations().forEach(s->s.beforeCommit(false)));
     }
+    @Test void dryRunReadOnlyAndDeniedTargetsNeverReceiveCapabilities() {
+        command(()->{
+            context.getRequest().setDryRun(true);assertNull(factory.forCommand(context));context.getRequest().setDryRun(false);
+            TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);assertNull(factory.forCommand(context));
+            TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
+            context.setTargetRecordReadable(false);assertNull(factory.forCommand(context));return null;
+        });verifyNoInteractions(content);
+    }
+    @Test void asynchronousUseDoesNotInheritTheOriginalCapability() throws Exception {
+        command(()->{
+            try(var scope=factory.forCommand(context)) {
+                var worker=java.util.concurrent.Executors.newSingleThreadExecutor();
+                try {
+                    var failure=worker.submit(()->assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                            ()->scope.accessor().requirePublishedContentForCommand(expected)));
+                    assertNotNull(failure.get(5,java.util.concurrent.TimeUnit.SECONDS));
+                } catch(Exception failure){throw new IllegalStateException(failure);}
+                finally{worker.shutdownNow();}
+            }return null;
+        });assertFalse(holder.isRollbackOnly());verifyNoInteractions(content);
+    }
     @Test void oneCommandCannotGrowItsAnnouncementLockSet() {
         command(()->{try(var scope=factory.forCommand(context)) {
             scope.accessor().requirePublishedContentForCommand(expected);

@@ -93,6 +93,22 @@ class AnnouncementContentSealServiceTest {
         version.put("authorization_basis","approved");root.setActiveVersionPid(ROOT);
         assertThrows(IllegalStateException.class,()->service.requirePublished(expected(),"member"));
     }
+    @Test void releaseRechecksOnlyAnExistingSealAndNeverBackfillsLegacyVersions() {
+        service.verifyForRelease(1L,VERSION,hash,snapshot);
+        verify(seals,never()).insert(anyLong(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString());
+        capture();service.verifyForRelease(1L,VERSION,hash,snapshot);
+        TransactionSynchronizationManager.getSynchronizations().forEach(s->s.beforeCommit(false));
+        file.setRetentionLocked(false);
+        assertThrows(IllegalStateException.class,()->service.verifyForRelease(1L,VERSION,hash,snapshot));
+    }
+    @Test void actorLocksReuseTheOfficialExactMembershipService() {
+        when(identities.findEnabledTenantMembership(1L,"actor")).thenReturn(new IdentityDirectoryAccessor.TenantUserIdentity(
+                new IdentityDirectoryAccessor.UserIdentity(2L,"actor","actor","Actor"),"member",3L));
+        assertEquals("member",service.lockActor());
+        verify(locks).requireEnabledMemberships(List.of(new CommandMembershipLockAccessor.MembershipAssertion("actor","member")));
+        MetaContext.setMemberId(4L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,service::lockActor);
+    }
     @Test void sameTransactionExpiryAndMalformedMetadataFailClosed() {
         capture();version.put("expires_at",Instant.parse("2029-12-31T23:59:59Z"));
         assertThrows(IllegalStateException.class,()->service.requirePublished(expected(),"member"));
