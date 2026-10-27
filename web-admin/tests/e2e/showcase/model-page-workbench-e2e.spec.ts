@@ -19,7 +19,7 @@ test.describe('Model Page Workbench E2E', () => {
     page,
     api,
   }) => {
-    test.setTimeout(45_000);
+    test.setTimeout(120_000);
 
     const modelData = createModelData({
       code: `mw_${Date.now().toString(36)}`,
@@ -54,14 +54,17 @@ test.describe('Model Page Workbench E2E', () => {
           createFieldBindingData(fieldResp.data!.pid, {
             visible: true,
             displayOrder: index + 1,
+            required: index === 0,
           }),
         );
         expect(bindResp.code).toBe('0');
       }
 
-      await page
-        .goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' })
-        .catch(() => {});
+      const published = await api.publishModel(modelPid, 'CRUD browser regression fixture');
+      expect(published.code).toBe('0');
+      modelPid = published.data!.pid;
+
+      await page.goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' });
       await openPagesTab(page);
 
       await expect(page.getByRole('heading', { name: '页面工作台' })).toBeVisible({
@@ -97,6 +100,9 @@ test.describe('Model Page Workbench E2E', () => {
       expect(submittedConfig).not.toHaveProperty('presentation');
       expect(submittedConfig).toMatchObject({ createPermissions: false, assignRoles: false });
 
+      await test.info().attach('default-generation-request.json', {
+        body: JSON.stringify(submittedRequest), contentType: 'application/json',
+      });
       const generateBody = await generateResp.json();
       expect(generateBody.code).toBe('0');
       expect(generateBody.data?.generatedResources?.pages?.length).toBe(3);
@@ -106,15 +112,59 @@ test.describe('Model Page Workbench E2E', () => {
       await expect(page.getByTestId('dynamic-list')).toBeVisible();
       await expect(page.locator('body')).not.toContainText(/Page not found|Access forbidden|404/i);
 
+      // Core mutations must originate in the generated UI, with real persistence readback.
+      await page.getByTestId('toolbar-btn-create').click();
+      await expect(page.getByTestId('dynamic-form')).toBeVisible();
+      await page.getByTestId('form-btn-submit').click();
+      await expect(page.getByText('请填写MW Field 1', { exact: true })).toBeVisible();
+      await page.locator(`#${modelData.code}_f1`).fill('默认生成 · 首次保存');
+      await page.locator(`#${modelData.code}_f2`).fill('42');
+      const createResponse = page.waitForResponse(response =>
+        new URL(response.url()).pathname === `/api/dynamic/${modelData.code}` && response.request().method() === 'POST');
+      await page.getByTestId('form-btn-submit').click();
+      const created = await createResponse;
+      expect(created.status()).toBe(200);
+      const createdBody = await created.json();
+      expect(createdBody.code).toBe('0');
+      const recordPid = createdBody.data?.pid;
+      expect(recordPid).toEqual(expect.any(String));
+      await expect(page.getByTestId('dynamic-list')).toBeVisible();
+      const row = page.getByRole('row').filter({ hasText: '默认生成 · 首次保存' });
+      await expect(row).toContainText('42');
+      await row.getByRole('button', { name: '更多操作', exact: true }).click();
+      await page.getByRole('menuitem', { name: /编辑|Edit/ }).click();
+      await expect(page.locator(`#${modelData.code}_f1`)).toHaveValue('默认生成 · 首次保存');
+      await page.locator(`#${modelData.code}_f1`).fill('默认生成 · 编辑重开');
+      await page.locator(`#${modelData.code}_f2`).fill('84');
+      const updateResponse = page.waitForResponse(response =>
+        response.url().includes(`/api/dynamic/${modelData.code}/`) && response.request().method() === 'PUT');
+      await page.getByTestId('form-btn-submit').click();
+      const updated = await updateResponse;
+      expect(updated.status()).toBe(200);
+      expect((await updated.json()).code).toBe('0');
+      await expect(page.getByTestId('dynamic-list')).toBeVisible();
+      await page.reload();
+      const savedRow = page.getByRole('row').filter({ hasText: '默认生成 · 编辑重开' });
+      await expect(savedRow).toContainText('84');
+      await savedRow.getByRole('button', { name: /查看|详情|View/ }).click();
+      await expect(page).toHaveURL(new RegExp(`/view/${recordPid}$`));
+      await expect(page.locator('main')).toContainText('默认生成 · 编辑重开');
+      await expect(page.locator('main')).toContainText('84');
+      const readback = await page.request.get(`/api/dynamic/${modelData.code}/${recordPid}`);
+      expect(readback.status()).toBe(200);
+      expect((await readback.json()).data).toMatchObject({
+        [`${modelData.code}_f1`]: '默认生成 · 编辑重开',
+        [`${modelData.code}_f2`]: 84,
+      });
+      await test.info().attach('generated-detail', { body: await page.screenshot(), contentType: 'image/png' });
+
       const relatedPagesResp = await page.request.get(`/api/meta/models/${modelPid}/pages`);
       expect(relatedPagesResp.ok()).toBeTruthy();
       const relatedPagesBody = await relatedPagesResp.json();
       expect(relatedPagesBody.code).toBe('0');
       expect((relatedPagesBody.data ?? []).length).toBeGreaterThanOrEqual(3);
 
-      await page
-        .goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' })
-        .catch(() => {});
+      await page.goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' });
       await openPagesTab(page);
       await expect(page.getByRole('heading', { name: '页面工作台' })).toBeVisible({
         timeout: 10_000,
@@ -134,9 +184,7 @@ test.describe('Model Page Workbench E2E', () => {
       await reopenDesignerPromise;
       await expect(page.locator('body')).not.toContainText(/Page not found|Access forbidden|404/i);
 
-      await page
-        .goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' })
-        .catch(() => {});
+      await page.goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' });
       await openPagesTab(page);
       const modelDetailPath = new URL(page.url()).pathname;
       await page.getByTestId('standard-page-detail-preview').click();

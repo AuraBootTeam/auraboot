@@ -37,6 +37,7 @@
     "test:enterprise:smoke": "PW_PROFILE=enterprise-smoke playwright test",
     "test:enterprise:full": "PW_PROFILE=enterprise-full playwright test",
     "test:quoteops": "PW_PROFILE=quoteops playwright test",
+    "test:crud": "playwright test -c playwright.crud.config.ts",
     "test:auth-regression": "node scripts/run-auth-regression.mjs",
     "test:rbac-golden": "playwright test tests/e2e/rbac/ --project=chromium --no-deps",
     "test:scope:audit": "node scripts/e2e-scope-audit.mjs",

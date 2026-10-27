@@ -18,6 +18,7 @@ const specialized = [
   'oss-performance.spec.ts',
   'automation-designer-golden.spec.ts',
   'automation-deep.spec.ts',
+  'crud-default-case.spec.ts',
 ];
 
 function collect(config, overrides = {}, projects = [], files = []) {
@@ -81,6 +82,31 @@ function caseIdentities(report) {
   visit(report);
   return rows.sort();
 }
+
+test('CRUD profile retains the original workbench journey and real administrator auth', () => {
+  const profile = collect('playwright.crud.config.ts', {
+    PLAYWRIGHT_BASE_URL: 'http://localhost:5173', PW_STORAGE_DIR: '/tmp/crud-profile-private',
+  });
+  assert.equal(profile.status, 0, profile.stderr);
+  const report = JSON.parse(profile.stdout);
+  assert.deepEqual(report.errors, []);
+  const rows = caseIdentities(report);
+  assert.equal(rows.filter(row => row.includes('authenticate as admin')).length, 1);
+  assert.equal(rows.filter(row => row.includes('crud-default-case.spec.ts')).length, 4);
+  const original = collect('playwright.config.ts', { PLAYWRIGHT_BASE_URL: 'http://localhost:5173' },
+    ['chromium'], ['--no-deps', 'tests/e2e/showcase/model-page-workbench-e2e.spec.ts']);
+  assert.equal(original.status, 0, original.stderr);
+  assert.deepEqual(rows.filter(row => row.includes('model-page-workbench-e2e.spec.ts')),
+    caseIdentities(JSON.parse(original.stdout)));
+});
+
+test('CRUD profile rejects implicit runtime or shared authentication', () => {
+  const result = collect('playwright.crud.config.ts', {
+    PLAYWRIGHT_BASE_URL: '', PW_STORAGE_DIR: '',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout + result.stderr, /CRUD regression requires explicit owned/);
+});
 
 test('workflow profile retains every original automation case and adds an application preflight', () => {
   const env = { PLAYWRIGHT_BASE_URL: 'http://localhost:5173' };
