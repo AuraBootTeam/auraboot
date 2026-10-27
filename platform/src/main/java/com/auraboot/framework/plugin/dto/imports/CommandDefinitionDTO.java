@@ -331,6 +331,11 @@ public class CommandDefinitionDTO {
             }
 
             @Override
+            public Boolean getAbsentValue(com.fasterxml.jackson.databind.DeserializationContext context) {
+                return null;
+            }
+
+            @Override
             public Boolean getNullValue(com.fasterxml.jackson.databind.DeserializationContext context)
                     throws com.fasterxml.jackson.databind.JsonMappingException {
                 throw com.fasterxml.jackson.databind.JsonMappingException.from(context.getParser(), "cacheResult must be a boolean");
