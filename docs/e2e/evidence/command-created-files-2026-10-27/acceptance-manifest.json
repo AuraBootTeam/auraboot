@@ -1,0 +1,188 @@
+{
+  "run": {
+    "id": "command-created-files-2026-10-27",
+    "target": "Bounded command-created scalar file association component",
+    "sot": "docs/system-reference/command-transaction-isolation.md#original-command-created-record-files",
+    "runtime": "maritime-parent-file-append",
+    "commit": "db06c9f3db3b8c9841638cbfd2e63c4e12a6cbd0"
+  },
+  "groups": [
+    {
+      "id": "component",
+      "title": "Source component evidence",
+      "rows": [
+        {
+          "id": "C01",
+          "action": "Immutable child CREATE association",
+          "assertion": "Same-transaction actual create with scalar PID gets exactly one retained relation and unchanged row version; exact repeat idempotent.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT.xml"
+          ]
+        },
+        {
+          "id": "C02",
+          "action": "Targetless creation command",
+          "assertion": "No root target can complete only its exact new child; parent append remains denied.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT.xml"
+          ]
+        },
+        {
+          "id": "C03",
+          "action": "Creation provenance",
+          "assertion": "Prior-transaction record with same actor/file/projection and nested-command creation are refused.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT.xml"
+          ]
+        },
+        {
+          "id": "C04",
+          "action": "Atomic SQL result",
+          "assertion": "Domain failure rolls back new record, relation and retention together; legacy UPDATE path remains denied.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT.xml"
+          ]
+        },
+        {
+          "id": "C05",
+          "action": "Owner and exact file",
+          "assertion": "Nonowner finalized upload and mismatched scalar PID are denied without retaining.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT.xml"
+          ]
+        },
+        {
+          "id": "C06",
+          "action": "Scope and physical transaction",
+          "assertion": "Different PG identity, rollback-only, closed/read-only/autocommit connection, scope close, thread, actor, tenant and nested command are denied.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ]
+        },
+        {
+          "id": "C07",
+          "action": "Formal file and writer policy",
+          "assertion": "String/multiple/virtual fields, wrong CREATE/field writer, changed projection/version and occupied single slot are denied before retention.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ]
+        },
+        {
+          "id": "C08",
+          "action": "Parent append regression",
+          "assertion": "Existing target append, locking, retention/deletion arbitration and concurrency selections execute successfully.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml"
+          ]
+        },
+        {
+          "id": "C09",
+          "action": "Falsification and native identity",
+          "assertion": "Lookup-as-creation mutation makes actual old-record test red; source restored, final suites pass; primary JARs and six class bytes verified.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "mutation-lookup.xml",
+            "mutation-receipt.json",
+            "native-candidate-receipt.json",
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT.xml"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "consumer",
+      "title": "Unexecuted consumer integration",
+      "rows": [
+        {
+          "id": "C10",
+          "action": "Root rich composition",
+          "assertion": "Integrate the exact delta into Root rich Core/API; preserve Root [] deny-all semantics; build one combined artifact and issue the existing file scope.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "http",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        },
+        {
+          "id": "C11",
+          "action": "A actual public command and download journeys",
+          "assertion": "Run verify/reverify/grant/import prepare and browser/download behavior with original authenticated principals on A owned runtime.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "http",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        },
+        {
+          "id": "C12",
+          "action": "Separate historical and generated export paths",
+          "assertion": "Nonowner historical relation reuse and empty-slot generated export require their independently owned paths; this SPI grants neither generic UPDATE nor arbitrary linking.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "http",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        }
+      ]
+    }
+  ]
+}

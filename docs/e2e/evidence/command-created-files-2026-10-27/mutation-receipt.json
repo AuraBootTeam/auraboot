@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "72c48018ef056b9520011345e3c9f066ec476289",
+  "dirtySourceSha256": "838e38fa2f35e5ffd86d92f6f66402b19635f05b944faed31784116ac787bebb",
+  "patchSha256": "f8f9fe9b2a6a546125c87f8913e4fd1d8cbde9a048ac37e850cd326108e0f9a6",
+  "commandExit": 1,
+  "testCount": 1,
+  "failures": 1,
+  "reason": "Expected RuntimeException to be thrown, but nothing was thrown",
+  "mutant": "Replace absent creation receipt with current row lookup; existing row wrongly accepted",
+  "runtimeSourceSetDigest": "aa6365bcc6adf23617f78d07260ee4eba085efabea05ecedc01790c174698838"
+}

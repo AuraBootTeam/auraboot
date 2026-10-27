@@ -2,3 +2,4 @@
 docs/e2e/evidence/command-target-files-2026-10-27/mutation-*.xml whitespace=-blank-at-eol
 docs/e2e/evidence/query-result-cache-2026-10-27/mutation-*.xml whitespace=-blank-at-eol
 docs/e2e/evidence/announcement-sealed-content-2026-10-27/mutation-*.xml whitespace=-blank-at-eol
+docs/e2e/evidence/command-created-files-2026-10-27/mutation-*.xml whitespace=-blank-at-eol

@@ -1,0 +1,74 @@
+{
+  "sourceCommit": "db06c9f3db3b8c9841638cbfd2e63c4e12a6cbd0",
+  "scope": "bounded Core component; selected regression suites",
+  "layers": {
+    "unit": {
+      "totals": {
+        "tests": 92,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": [
+        {
+          "name": "com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest",
+          "tests": "4",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-27T05:26:04.236Z"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest",
+          "tests": "41",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-27T05:26:03.789Z"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest",
+          "tests": "30",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-27T05:26:04.251Z"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.FileAccessorImplTest",
+          "tests": "17",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-27T05:26:04.358Z"
+        }
+      ]
+    },
+    "postgres": {
+      "totals": {
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": [
+        {
+          "name": "com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT",
+          "tests": "7",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-27T05:26:43.381Z"
+        },
+        {
+          "name": "com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT",
+          "tests": "12",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-27T05:26:50.088Z"
+        }
+      ]
+    }
+  }
+}

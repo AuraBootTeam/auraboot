@@ -25,7 +25,7 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 
 - Scheduled command delegation: [deployment bindings and execution boundaries](./system-reference/scheduled-command-bindings.md).
 - Notification source delivery: [deployment descriptors and configuration boundaries](./system-reference/notification-source-bindings.md).
-- Command consistency: [transaction isolation, original-target attachments and query result reuse](./system-reference/command-transaction-isolation.md); [file capability verification](./system-reference/2026-10-27-command-target-files-testing-gate-acceptance-report.md); [query result reuse verification](./system-reference/2026-10-27-query-result-cache-testing-gate-acceptance-report.md).
+- Command consistency: [transaction isolation, original-target attachments and query result reuse](./system-reference/command-transaction-isolation.md); [file capability verification](./system-reference/2026-10-27-command-target-files-testing-gate-acceptance-report.md); [query result reuse verification](./system-reference/2026-10-27-query-result-cache-testing-gate-acceptance-report.md). [Created-record scalar files](./system-reference/command-transaction-isolation.md#original-command-created-record-files) and [component verification](./system-reference/2026-10-27-command-created-files-testing-gate-acceptance-report.md).
 
 - Architecture overview: start at [ARCHITECTURE.md](../ARCHITECTURE.md) (repo root), then dive into `system-reference/` for operational detail.
 - Internal process documents (session handovers, plans, retrospectives) are intentionally **not tracked in this public repository** — `scripts/check-oss-no-internal-docs.sh` enforces this; they live in the team's private documentation repos.

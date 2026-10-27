@@ -81,6 +81,21 @@ links only its original root target. Backend qualification and explicitly unexec
 layers are recorded in the [file capability verification report](./2026-10-27-command-target-files-testing-gate-acceptance-report.md).
 
 
+## Original command created-record files
+
+`CommandContext.fileAccessor().linkAndRetainExistingToCreatedRecord(filePid, modelCode, recordPid, fieldCode)` completes an exact single-file association after the original synchronous human command has successfully called its `DataAccessor.create` or `tryCreate`. The create payload and returned persisted row must already contain this same public file PID in the formal physical single-file field. This allows an immutable verification, grant or import-batch record to receive its retained relation without updating the business row. Older and unscoped hosts reject the default method.
+
+The host records successful singleton creation privately; callers cannot register receipts or establish provenance with a lookup. The receipt copies the scalar projection and row identity/version, and binds the original command scope, tenant, user/member, thread, physical Core holder/connection and fresh PostgreSQL transaction identity. Nested commands, other transactions, rollback-only/closed/read-only/autocommit connections, escaped scopes, machine/installed/impersonated and asynchronous contexts are refused. Bulk/batch creation does not produce these receipts.
+
+At association the host requires the current CREATE and field writer, a published physical single-file field, and the exact newly created row under its writer lock. It rechecks tenant, creator, identity/version and scalar projection. An internal exact-row read under host scope is limited to this already-created receipt; the void API grants the caller no general READ or UPDATE capability. Formal field codes are required; string placeholders, multiple/virtual fields and replacement of an occupied different relation are refused.
+
+The host then locks the owned finalized active file, applies official retention and inserts one tenant/model/record/field/file relation. An exact repeat is idempotent. Retention, relation and original create share the physical SQL transaction; a caught association failure marks that transaction rollback-only. Distinct file PIDs follow the existing ascending lock order. The scalar business field and its row version are unchanged by this operation.
+
+A permitted original create command with no target can receive this creation-only capability. Original-parent append still requires its explicit readable root target. Existing rows, nonowner historical evidence, empty-slot generated export workflows and arbitrary model/PID relationships are outside this API. Its CREATE checks reuse the existing model policy, including the integrating host's command-writer semantics; it does not relax immutable models or introduce a generic relation permission. No schema or HTTP endpoint is added.
+
+[Component verification and integration limits](./2026-10-27-command-created-files-testing-gate-acceptance-report.md) records the actual selected tests, falsification, exact source/native identity and unexecuted consumer layers. A consumer must integrate the small delta into its richer host/API and qualify its actual public command and download journey.
+
+
 ## Query result reuse
 
 A published query command can explicitly declare `executionConfig.cacheResult: false`:

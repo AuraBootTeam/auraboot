@@ -1,0 +1,18 @@
+diff --git a/platform/src/main/java/com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory.java b/platform/src/main/java/com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory.java
+index 91c6d68dd..a28f1cf03 100644
+--- a/platform/src/main/java/com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory.java
++++ b/platform/src/main/java/com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory.java
+@@ -155,6 +155,13 @@ public class CommandTargetFileAccessorFactory {
+     private void linkCreated(Scope scope,Actor actor,String filePid,String modelCode,String pid,String fieldCode) {
+         exact(filePid,64);exact(modelCode,128);exact(pid,64);exact(fieldCode,128);
+         Created created = scope.created.get(new CreatedKey(modelCode,pid));
++        if (created == null) {
++            var lookup = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(modelCode,pid));
++            var strings = new java.util.HashMap<String,String>();
++            lookup.forEach((key,value) -> {if (value instanceof String text) strings.put(key,text);});
++            created = new Created(((Number)lookup.get("row_version")).longValue(),Objects.toString(lookup.get("id"),null),
++                    scope.physicalTransaction.get(),Map.copyOf(strings));
++        }
+         if (created == null || !filePid.equals(created.strings().get(fieldCode))
+                 || !created.transaction().equals(scope.physicalTransaction.get())) throw denied();
+         ModelDefinition model = models.getModelDefinition(modelCode).orElseThrow(CommandTargetFileAccessorFactory::denied);

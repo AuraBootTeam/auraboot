@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T05:26:04.236Z" hostname="Mac" time="0.011">
+  <properties/>
+  <testcase name="broadParentUpdateDoesNotGrantAFieldWriterIncludingPhysicalAliases()" classname="com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest" time="0.002"/>
+  <testcase name="modelWriterPolicyAppliesEvenToOpaqueLegacySlots()" classname="com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest" time="0.001"/>
+  <testcase name="exactWriterAllowsMutableFileButCannotOverrideFieldOrModelImmutability()" classname="com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest" time="0.003"/>
+  <testcase name="ordinaryLegacyFileAndOpaqueExportSlotsRetainTheirExistingMutableSemantics()" classname="com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest" time="0.001"/>
+</testsuite>

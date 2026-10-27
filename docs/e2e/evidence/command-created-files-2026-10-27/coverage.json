@@ -1,0 +1,30 @@
+{
+  "total": 12,
+  "counts": {
+    "green": 9,
+    "amber": 0,
+    "red": 0,
+    "hollow": 3
+  },
+  "strength": {
+    "spec": 9,
+    "metric": 0,
+    "vision": 0,
+    "exit": 0
+  },
+  "reds": [],
+  "untested": [
+    {
+      "action": "Root rich composition",
+      "reason": "未测 (verdict=untested)"
+    },
+    {
+      "action": "A actual public command and download journeys",
+      "reason": "未测 (verdict=untested)"
+    },
+    {
+      "action": "Separate historical and generated export paths",
+      "reason": "未测 (verdict=untested)"
+    }
+  ]
+}

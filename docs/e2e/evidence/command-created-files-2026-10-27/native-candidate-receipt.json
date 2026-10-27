@@ -1,0 +1,72 @@
+{
+  "sourceCommit": "db06c9f3db3b8c9841638cbfd2e63c4e12a6cbd0",
+  "inventorySha256": "9c840ed898a976ec4cbd670f48fad7280f164f1c4ab4758647980e13460ea02a",
+  "publications": [
+    {
+      "project": ":",
+      "coordinate": {
+        "group": "com.auraboot",
+        "artifact": "auraboot-core",
+        "version": "1.0.1-rc.3"
+      },
+      "primaryJar": "com/auraboot/auraboot-core/1.0.1-rc.3/auraboot-core-1.0.1-rc.3.jar",
+      "sha256": "db5263a932e77202728fa19af667115119bc8ce781c8dd14865d58c6adc0727e",
+      "equalsInventoryCompiledJar": true,
+      "classMatches": [
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory.class",
+          "sha256": "167c608e44b845b70805411561837c67fceebe1f68d95485642bf0e7dffd04b9",
+          "matchesTestCompilation": true,
+          "matchesNativeApiCompilation": false
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory$1.class",
+          "sha256": "d40d3b3e8f0a8aaa1b28dceec26840b9c7acb904f9198bc573f13b4aa784996b",
+          "matchesTestCompilation": true,
+          "matchesNativeApiCompilation": false
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory$Scope.class",
+          "sha256": "268aca510357a350d90c346a415e7a955c3b66b7fb2b85437e6f59aced4b9e7d",
+          "matchesTestCompilation": true,
+          "matchesNativeApiCompilation": false
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/DynamicDataAccessorImpl.class",
+          "sha256": "6b8bb50437269e03e787be064de5b426aca5b342b10152aaf19ce278cb81cc52",
+          "matchesTestCompilation": true,
+          "matchesNativeApiCompilation": false
+        },
+        {
+          "class": "com/auraboot/framework/file/dao/mapper/FileMapper.class",
+          "sha256": "bf861899844d27e5e1f8238e733ffcc8d0e0bb5824df5d668e4581207175dade",
+          "matchesTestCompilation": true,
+          "matchesNativeApiCompilation": false
+        }
+      ]
+    },
+    {
+      "project": ":platform-plugin-api",
+      "coordinate": {
+        "group": "com.auraboot",
+        "artifact": "platform-plugin-api",
+        "version": "1.0.1-rc.3"
+      },
+      "primaryJar": "com/auraboot/platform-plugin-api/1.0.1-rc.3/platform-plugin-api-1.0.1-rc.3.jar",
+      "sha256": "3d9ff631223e39a026e8a3ddbb5f6e861647e67835f4dfdeab6c00f96a8d881b",
+      "equalsInventoryCompiledJar": true,
+      "classMatches": [
+        {
+          "class": "com/auraboot/framework/plugin/extension/FileAccessor.class",
+          "sha256": "3174535f0f0b0247a9893381912dc0ecf1442951c18083c0083124f06c6d07a5",
+          "matchesTestCompilation": false,
+          "matchesNativeApiCompilation": true
+        }
+      ]
+    }
+  ],
+  "classMatchCount": 6,
+  "remotePublication": "did_not_run",
+  "releaseQualification": false,
+  "richerApiReplacement": false
+}

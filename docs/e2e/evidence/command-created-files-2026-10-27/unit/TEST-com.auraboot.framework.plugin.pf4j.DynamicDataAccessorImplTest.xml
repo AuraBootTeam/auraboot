@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" tests="30" skipped="0" failures="0" errors="0" timestamp="2026-10-27T05:26:04.251Z" hostname="Mac" time="0.105">
+  <properties/>
+  <testcase name="getByIdOrNull_reraisesUnrelatedFailures()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.012"/>
+  <testcase name="create_delegates()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.007"/>
+  <testcase name="queryIn_builds_IN_condition_from_distinct_non_null_values()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.014"/>
+  <testcase name="queryPage_preservesHostPermissionDenial()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.004"/>
+  <testcase name="queryPage_rejectsIncompleteHostResultsInsteadOfPretendingTheListIsEmpty()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="getByIdOrNull_returnsRecord_whenPresent()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="queryPage_sendsOneBoundedOrderedAndFilteredDatabaseQueryForALargeMatchSet()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.007"/>
+  <testcase name="query_with_null_filters_uses_empty_conditions()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="delete_delegates()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="compareAndSet_delegatesAtomicMultiFieldTransition()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="update_delegates()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="atomicIncrementDelegatesWithoutReadModifyWrite()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="tryCreate_returnsEmptyForStructuredUniqueValidation()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.005"/>
+  <testcase name="query_collects_every_page_promised_by_the_data_accessor_contract()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="tryCreate_returnsEmptyOnlyForUniqueViolation()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="create_defensivelyCopiesImmutablePluginPayload()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="batchCreate_returns_successItems_when_present()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="queryPage_preservesExplicitPublicPidOrdering()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="getById_delegates()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="update_defensivelyCopiesImmutablePluginPayload()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="query_builds_EQ_conditions_from_filters_map()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="queryPage_omitsAbsentKeywordForTheRealMachineQueryGuard()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.005"/>
+  <testcase name="batchCreate_falls_back_to_input_when_response_null()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.002"/>
+  <testcase name="query_returns_empty_list_when_records_null()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="getByIdOrNull_mapsTypedNotFoundToNull_regression()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="getById_translatesHostPermissionDenialToStablePluginErrorCode()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="batchDelete_delegatesOneDistinctNonBlankIdList()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.002"/>
+  <testcase name="queryIn_returns_empty_without_query_when_values_are_empty_or_null_only()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+  <testcase name="compareAndSet_delegatesAtomicTransition()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.001"/>
+  <testcase name="batchCreate_returns_empty_list_when_response_null_and_input_null()" classname="com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImplTest" time="0.0"/>
+</testsuite>

@@ -1,0 +1,41 @@
+{
+  "sourceCommit": "db06c9f3db3b8c9841638cbfd2e63c4e12a6cbd0",
+  "deltaBase": "31ac74ac5344666f4689ee922f7016944dcd941b",
+  "runtime": "maritime-parent-file-append",
+  "slot": 72,
+  "database": "auraboot_72",
+  "productRuntimeManifest": "missing; no HTTP/browser admission claim",
+  "sourceSha256": {
+    "platform/platform-plugin-api/src/main/java/com/auraboot/framework/plugin/extension/FileAccessor.java": "6d6d090c0e15e93fc538cd39cd274a8a4ddb501894f112557fc87c9b4a2f2b12",
+    "platform/src/main/java/com/auraboot/framework/plugin/extension/FileAccessor.java": "d8e8045b4f7cf1c33f146d32a266acabeae4b34cf3218396033f2d816f826cba",
+    "platform/src/main/java/com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory.java": "0fafa77933bdf927382653104e1105abba7eefdbab3476b524a1bf7f9c5f94cc",
+    "platform/src/main/java/com/auraboot/framework/plugin/pf4j/DynamicDataAccessorImpl.java": "e11f11e67d70afac1171a4ef96b933f55c14b50624cd91fee69498542a660049",
+    "platform/src/main/java/com/auraboot/framework/file/dao/mapper/FileMapper.java": "4f158bbb875276bf7e4f5fcb2ec74f732bdef293ba02a1454e31d2a8c6dd0ac8"
+  },
+  "commands": [
+    {
+      "selection": ":test --rerun --tests *CommandTargetFileAccessorFactoryTest --tests *DynamicDataAccessorImplTest --tests *FileAccessorImplTest --tests *FileRelationMutationGuardTest",
+      "exit": 0
+    },
+    {
+      "selection": ":platform-app:test --rerun --tests *CommandCreatedFileLinkIT --tests *CommandTargetFileAppendIT --no-build-cache",
+      "exit": 0
+    },
+    {
+      "selection": "prepareLibraryCandidate roots=:,:platform-plugin-api isolated output",
+      "exit": 0
+    }
+  ],
+  "identityFixture": "synthetic MetaContext actor plus real authorized command frame, actual Core transaction/PG/local FileService; not HTTP authentication or directory qualification",
+  "schemaChange": false,
+  "newPGCases": 7,
+  "existingParentAppendPGCases": 12,
+  "selectedUnitTests": 92,
+  "sourceFilesUntouched": [
+    "HandlerPhase",
+    "CommandPermitPlan",
+    "ModelMutationGuard"
+  ],
+  "rawEvidenceOwner": "registered maritime-parent-file-append runtime evidence",
+  "mutationRestored": true
+}

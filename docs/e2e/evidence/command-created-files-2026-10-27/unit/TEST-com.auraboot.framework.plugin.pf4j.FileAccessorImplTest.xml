@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-10-27T05:26:04.358Z" hostname="Mac" time="0.042">
+  <properties/>
+  <testcase name="linkExisting_is_idempotent_for_an_already_linked_upload()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.002"/>
+  <testcase name="legacyLinkChecksTheFieldBeforeLookupOrItsAlreadyLinkedShortCircuit()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="open_reads_file_bytes_from_platform_storage_by_file_id()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.004"/>
+  <testcase name="open_rejects_storageAliasesAndUnfinalizedMetadata()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="describe_rejects_storage_keys_and_internal_aliases()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.0"/>
+  <testcase name="saveAndLink_failsClosedWhenTheHostCannotPersistTheRelation()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.002"/>
+  <testcase name="saveAndAppendLink_neverUsesTheReplacingRelationOperation()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.006"/>
+  <testcase name="retain_applies_monotonic_host_retention_to_the_exact_public_pid()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="save_uploads_generated_bytes_and_returns_platform_file_id()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="isLinkedTo_requires_the_exact_public_pid_in_the_business_field_relation()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.0"/>
+  <testcase name="saveAndAppendLink_failsClosedWhenAppendIsUnavailable()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="linkExisting_fails_when_the_public_file_is_not_visible()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="describe_returns_storage_opaque_metadata_for_a_public_file_pid()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.003"/>
+  <testcase name="linkExisting_rejects_another_owner_before_replacing_any_relation()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="saveAndLink_registersTheGeneratedFileAgainstTheExactBusinessField()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="save_recoversMojibakeOriginalNameBeforeUpload()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.001"/>
+  <testcase name="linkExisting_persists_uploaded_file_relation_without_copying_bytes()" classname="com.auraboot.framework.plugin.pf4j.FileAccessorImplTest" time="0.0"/>
+</testsuite>

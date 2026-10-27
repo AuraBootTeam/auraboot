@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-27T05:23:40.310Z" hostname="Mac" time="0.554">
+  <properties/>
+  <testcase name="priorTransactionRecordWithSameActorFileAndProjectionIsNotCreationProof()" classname="com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT" time="0.554">
+    <failure message="org.opentest4j.AssertionFailedError: Expected java.lang.RuntimeException to be thrown, but nothing was thrown." type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: Expected java.lang.RuntimeException to be thrown, but nothing was thrown.
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at app//org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:73)
+	at app//org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at app//org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3128)
+	at app//com.auraboot.framework.file.service.impl.CommandCreatedFileLinkIT.priorTransactionRecordWithSameActorFileAndProjectionIsNotCreationProof(CommandCreatedFileLinkIT.java:97)
+	at java.base@21.0.8/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+</failure>
+  </testcase>
+</testsuite>
