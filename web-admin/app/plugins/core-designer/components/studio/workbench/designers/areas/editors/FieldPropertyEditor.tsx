@@ -191,9 +191,18 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
     (fieldName: string, value: any) => {
       // Convert empty strings to undefined for cleaner DSL
       const cleanValue = value === '' ? undefined : value;
-      onChange({ [fieldName]: cleanValue });
+      if (fieldName === 'required' && fieldData.validation) {
+        const remaining = fieldData.validation.filter(rule => rule.type !== 'required');
+        const required = fieldData.validation.find(rule => rule.type === 'required');
+        onChange({ required: Boolean(value), validation: value
+          ? [...remaining, required ?? { type: 'required' }] : remaining });
+      } else if (fieldName === 'span' && fieldData.layout) {
+        onChange({ span: Number(value), layout: { ...fieldData.layout, colSpan: Math.min(12, Number(value) * 6) } });
+      } else {
+        onChange({ [fieldName]: cleanValue });
+      }
     },
-    [onChange],
+    [onChange, fieldData],
   );
 
   // Read current fieldPermission from props bag
@@ -244,7 +253,10 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
         return null;
       }
 
-      const fieldValue = (fieldData as any)[fieldConfig.field];
+      const fieldValue = fieldConfig.field === 'required'
+        ? fieldData.required ?? fieldData.validation?.some(rule => rule.type === 'required')
+        : fieldConfig.field === 'span' && fieldData.layout?.colSpan != null
+          ? fieldData.layout.colSpan / 6 : (fieldData as any)[fieldConfig.field];
       const colSpan = fieldConfig.layout?.colSpan || 1;
       const isDisabled = readonly || fieldConfig.props?.disabled;
       const controlTestId = `field-property-${fieldConfig.field}`;
@@ -255,6 +267,10 @@ export const FieldPropertyEditor: React.FC<FieldPropertyEditorProps> = ({
         // getComponentOptions() is guaranteed non-undefined via FALLBACK map, but
         // guard with `?? []` as defence-in-depth against unexpected registry shapes.
         options = getComponentOptions() ?? [];
+        // Preserve the exact generated/registered alias instead of displaying an empty selection.
+        if (fieldData.component && !options.some(option => option.value === fieldData.component)) {
+          options = [...options, { label: WidgetRegistry.getName(fieldData.component) || fieldData.component, value: fieldData.component }];
+        }
       }
 
       const label = getLocalizedText(fieldConfig.props?.label, locale, t);

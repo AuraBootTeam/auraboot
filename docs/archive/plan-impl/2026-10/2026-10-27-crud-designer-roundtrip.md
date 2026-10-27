@@ -1,6 +1,9 @@
 ---
 type: plan-impl
-status: active
+status: closed
+distilled_to:
+  - docs/system-reference/crud-default-presentation.md
+  - docs/system-reference/crud-regression.md
 created: 2026-10-27
 ---
 
@@ -48,3 +51,24 @@ created: 2026-10-27
 ## SOT Updates
 
 完成后更新docs/system-reference/crud-default-presentation.md、crud-regression.md及docs/README.md；过程记录按现行文档流程归档，运行证据独立保留。默认到验证PR；自动合并仅沿用本任务已确认范围授权，不发布宣传。
+
+## 当前检查点（2026-10-27）
+
+共享默认列有界收缩和紧凑间距已实现，暂未提交实现代码。相关3个单测文件37项通过；真实BFF登录后的DR-02浏览器旅程在1280/1440/1920验证七个业务列、预算/进度/操作可读且无横向溢出，定向运行2项通过（含认证）。第一轮暴露宽屏sticky边界2px覆盖单元格边界；最终断言直接测量进度文本右边界，验证文字未被操作区遮挡，不以单元格边框相接替代可读性。紧凑表头不再让不可见拖拽柄占据文字宽度，长标题允许换行。
+
+证据：.workspace/evidence/crud-designer-roundtrip/responsive-r2；仅该定向场景通过，不代表全量门禁或设计器闭环已通过。下一步DR-04至DR-10设计器真实交互、完整CRUD回归/类型检查与原图复核，最后统一Review。MES与旧依赖工作区保持原样。
+
+## 修复与定向验证
+
+- 已修复默认列表负空间和表头拖拽柄占位；显式/保存宽度保留。已补真实三档桌面验证。
+- 已修复生成字段validation必填、组件别名和layout跨度在属性面板中的回显/写回，以及未知字段扩展和false标志序列化丢失风险。
+- 已修复中文标题/占位提示普通字符串导致真实保存422；统一LocalizedTextInput，保留后端i18n门禁。
+- 已修复提示消息遮挡保存按钮：消息体穿透，关闭按钮保持交互；共享UI源码必须来自当前checkout，Vite/Vitest显式解析本树。
+- 指针拖拽后立即点击被dnd-kit的50ms防误触拦截属于测试时序，使用真实按下/释放和截图后点击，保留撤销重做顺序断言。
+- 运行页“配置此页”为ChangeSet模式，模型工作台“打开页面设计”为Studio；测试按实际入口分开，不把前者当作后者。
+- 定向真实浏览器旅程已跑通至发布与业务保存读回（designer-r9），9个单测文件73项通过；最终冻结后的全量门禁待收据独立裁决，不能以定向绿色代替。
+
+
+## 萃取与冻结
+
+本方案的稳定契约已进入以上两份SoT，过程计划归档。真实旅程designer-r10已通过至发布与运行读回，字段库空白问题复用FieldLibraryPanel修复；最终验收结果以外部唯一acceptance-matrix.json和冻结版本收据为准，本归档不替代门禁结果。MES原进程、目录、数据库、用户文件和历史证据未更改。

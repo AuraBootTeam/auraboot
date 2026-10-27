@@ -469,3 +469,27 @@ describe('ListTable expandable tree rows (T10)', () => {
     expect(toggleAfter).toHaveAttribute('aria-label', 'Expand row');
   });
 });
+
+
+it('uses the same compact widths and spacing for headers, rows and aggregates', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 480 });
+  try {
+    const { container } = renderListTable({ columns: [
+      { field: 'name', label: 'Project', presentation: { kind: 'object' } },
+      { field: 'amount', label: 'Budget', valueType: 'currency', aggregate: 'sum' },
+      { field: 'status', label: 'Status', valueType: 'tag' },
+    ], data: [{ pid: 'one', name: 'Delivery', amount: 680000, status: 'Active' }] });
+    await waitFor(() => expect(Number.parseFloat(container.querySelector('table')!.style.width)).toBeLessThanOrEqual(480));
+    const widths = Array.from(container.querySelectorAll('col')).map(col => Number.parseFloat((col as HTMLTableColElement).style.width));
+    expect(widths.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(480);
+    for (const field of ['name', 'amount', 'status']) {
+      expect(screen.getByTestId(`table-header-${field}`)).toHaveClass('px-3');
+      expect(screen.getByTestId(`table-cell-0-${field}`)).toHaveClass('px-3');
+      expect(screen.getByTestId(`summary-cell-${field}`)).toHaveClass('px-3');
+    }
+  } finally {
+    if (descriptor) Object.defineProperty(HTMLElement.prototype, 'clientWidth', descriptor);
+    else delete (HTMLElement.prototype as any).clientWidth;
+  }
+});

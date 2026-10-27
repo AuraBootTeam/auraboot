@@ -37,4 +37,4 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 
 CRUD runtime reference: [Generated CRUD default presentation](./system-reference/crud-default-presentation.md).
 
-Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md).
+Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md), including responsive lists and the real Page Designer save/publish/runtime roundtrip.

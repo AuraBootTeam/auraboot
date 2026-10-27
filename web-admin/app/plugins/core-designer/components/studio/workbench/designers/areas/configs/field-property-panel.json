@@ -23,7 +23,7 @@
         },
         {
           "field": "placeholder",
-          "component": "SmartInput",
+          "component": "LocalizedTextInput",
           "props": { "label": { "zh-CN": "占位符", "en-US": "Placeholder" }, "placeholder": { "zh-CN": "请输入...", "en-US": "Enter a value..." }, "size": "small" },
           "visible": "blockType !== 'table'"
         },

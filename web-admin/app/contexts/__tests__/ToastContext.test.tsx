@@ -41,6 +41,8 @@ describe('ToastProvider', () => {
     for (const alert of alerts) {
       expect(stack).toContainElement(alert);
       expect(alert).not.toHaveClass('fixed');
+      expect(alert).toHaveClass('pointer-events-none');
+      expect(alert.querySelector('button')).toHaveClass('pointer-events-auto');
     }
   });
 

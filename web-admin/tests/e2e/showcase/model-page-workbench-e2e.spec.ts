@@ -23,7 +23,7 @@ test.describe('Model Page Workbench E2E', () => {
 
     const modelData = createModelData({
       code: `mw_${Date.now().toString(36)}`,
-      displayName: `MW ${Date.now().toString(36)}`,
+      displayName: '交付需求登记',
       description: 'Model page workbench E2E',
       modelType: 'entity',
     });
@@ -42,7 +42,7 @@ test.describe('Model Page Workbench E2E', () => {
         const fieldResp = await api.createField(
           createFieldData(dataType, {
             code: `${modelData.code}_f${index + 1}`,
-            uiSchema: { label: `MW Field ${index + 1}` },
+            uiSchema: { label: index === 0 ? '需求标题' : '预计工期（天）' },
           }),
         );
         expect(fieldResp.code).toBe('0');
@@ -117,10 +117,10 @@ test.describe('Model Page Workbench E2E', () => {
       await page.getByTestId('toolbar-btn-create').click();
       await expect(page.getByTestId('dynamic-form')).toBeVisible();
       await page.getByTestId('form-btn-submit').click();
-      await expect(page.getByText('请填写MW Field 1', { exact: true })).toBeVisible();
+      await expect(page.getByText('请填写需求标题', { exact: true })).toBeVisible();
       await test.info().attach('ZC-02a', { body: await page.screenshot(), contentType: 'image/png' });
-      await page.locator(`#${modelData.code}_f1`).fill('默认生成 · 首次保存');
-      await page.locator(`#${modelData.code}_f2`).fill('42');
+      await page.locator(`#${modelData.code}_f1`).fill('供应链接口联调');
+      await page.locator(`#${modelData.code}_f2`).fill('7');
       const createResponse = page.waitForResponse(response =>
         new URL(response.url()).pathname === `/api/dynamic/${modelData.code}` && response.request().method() === 'POST');
       await page.getByTestId('form-btn-submit').click();
@@ -131,13 +131,13 @@ test.describe('Model Page Workbench E2E', () => {
       const recordPid = createdBody.data?.pid;
       expect(recordPid).toEqual(expect.any(String));
       await expect(page.getByTestId('dynamic-list')).toBeVisible();
-      const row = page.getByRole('row').filter({ hasText: '默认生成 · 首次保存' });
-      await expect(row).toContainText('42');
+      const row = page.getByRole('row').filter({ hasText: '供应链接口联调' });
+      await expect(row).toContainText('7');
       await row.getByRole('button', { name: '更多操作', exact: true }).click();
       await page.getByRole('menuitem', { name: /编辑|Edit/ }).click();
-      await expect(page.locator(`#${modelData.code}_f1`)).toHaveValue('默认生成 · 首次保存');
-      await page.locator(`#${modelData.code}_f1`).fill('默认生成 · 编辑重开');
-      await page.locator(`#${modelData.code}_f2`).fill('84');
+      await expect(page.locator(`#${modelData.code}_f1`)).toHaveValue('供应链接口联调');
+      await page.locator(`#${modelData.code}_f1`).fill('供应链接口联调与交付培训');
+      await page.locator(`#${modelData.code}_f2`).fill('14');
       const updateResponse = page.waitForResponse(response =>
         response.url().includes(`/api/dynamic/${modelData.code}/`) && response.request().method() === 'PUT');
       await page.getByTestId('form-btn-submit').click();
@@ -146,17 +146,17 @@ test.describe('Model Page Workbench E2E', () => {
       expect((await updated.json()).code).toBe('0');
       await expect(page.getByTestId('dynamic-list')).toBeVisible();
       await page.reload();
-      const savedRow = page.getByRole('row').filter({ hasText: '默认生成 · 编辑重开' });
-      await expect(savedRow).toContainText('84');
+      const savedRow = page.getByRole('row').filter({ hasText: '供应链接口联调与交付培训' });
+      await expect(savedRow).toContainText('14');
       await savedRow.getByRole('button', { name: /查看|详情|View/ }).click();
       await expect(page).toHaveURL(new RegExp(`/view/${recordPid}$`));
-      await expect(page.locator('main')).toContainText('默认生成 · 编辑重开');
-      await expect(page.locator('main')).toContainText('84');
+      await expect(page.locator('main')).toContainText('供应链接口联调与交付培训');
+      await expect(page.locator('main')).toContainText('14');
       const readback = await page.request.get(`/api/dynamic/${modelData.code}/${recordPid}`);
       expect(readback.status()).toBe(200);
       expect((await readback.json()).data).toMatchObject({
-        [`${modelData.code}_f1`]: '默认生成 · 编辑重开',
-        [`${modelData.code}_f2`]: 84,
+        [`${modelData.code}_f1`]: '供应链接口联调与交付培训',
+        [`${modelData.code}_f2`]: 14,
       });
       await test.info().attach('ZC-02b', { body: await page.screenshot(), contentType: 'image/png' });
 
