@@ -37,6 +37,7 @@ export function renderListPage(model: ListPageModel) {
     handleToolbarConfigChange,
     resolveButtonLabel,
     evaluateButtonVisible,
+    evaluateButtonDisabled,
     setImportOpen,
     handleExport,
     exportFilterConditions,
@@ -116,6 +117,7 @@ export function renderListPage(model: ListPageModel) {
       resolveLabel={resolveButtonLabel}
       t={t}
       evaluateVisible={evaluateButtonVisible}
+      evaluateDisabled={evaluateButtonDisabled}
       onImport={() => setImportOpen(true)}
       onExport={handleExport}
       exportFilters={exportFilterConditions}
@@ -157,16 +159,18 @@ export function renderListPage(model: ListPageModel) {
         buttons={actionBlock?.buttons || []}
         evaluateVisible={evaluateButtonVisible}
         resolveLabel={resolveButtonLabel}
-        onNavigate={to => navigateAwayFromList(to)}
+        onNavigate={(to) => navigateAwayFromList(to)}
         error={error}
         errorTitle={getLocalizedText({ 'zh-CN': '加载失败', en: 'Unable to load' }, locale, t)}
         retryLabel={getLocalizedText({ 'zh-CN': '重试', en: 'Retry' }, locale, t)}
         onRetry={() => {
           setError(null);
           const retryRequest = getFailedApiRequest();
-          void loadData(retryRequest
-            ? { retryRequest }
-            : { page: pagination.current - 1, size: pagination.pageSize, filters });
+          void loadData(
+            retryRequest
+              ? { retryRequest }
+              : { page: pagination.current - 1, size: pagination.pageSize, filters },
+          );
         }}
       />
     );

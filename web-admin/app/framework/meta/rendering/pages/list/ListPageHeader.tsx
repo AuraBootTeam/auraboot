@@ -44,6 +44,7 @@ export interface ListPageHeaderProps {
   resolveLabel: (button: ButtonConfig) => string;
   t?: (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   evaluateVisible: (button: ButtonConfig) => boolean;
+  evaluateDisabled?: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
   /** Current filter conditions for export */
@@ -81,6 +82,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   resolveLabel,
   t: providedT,
   evaluateVisible,
+  evaluateDisabled,
   onImport,
   onExport,
   exportFilters,
@@ -169,6 +171,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
             resolveLabel={resolveLabel}
             t={t}
             evaluateVisible={evaluateVisible}
+            evaluateDisabled={evaluateDisabled}
             onImport={onImport}
             onExport={onExport}
             modelCode={modelCode}

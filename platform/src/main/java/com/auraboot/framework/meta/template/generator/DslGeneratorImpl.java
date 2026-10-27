@@ -190,16 +190,20 @@ public class DslGeneratorImpl implements DslGenerator {
                 model.getDisplayName() + "表单",
                 model.getDisplayName() + " Form"
         ));
+        Map<String, Object> formExtension = new LinkedHashMap<>();
+        formExtension.put("createTitle", Map.of("zh-CN", "新建" + model.getDisplayName(), "en", "New " + model.getDisplayName()));
+        formExtension.put("editTitle", Map.of("zh-CN", "编辑" + model.getDisplayName(), "en", "Edit " + model.getDisplayName()));
         if (config.getFormPresentation() != null) {
             Integer columns = config.getFormPresentation().getColumns();
             if (columns == null || columns < 1 || columns > 3) {
                 throw new BusinessException("Form columns must be between 1 and 3");
             }
-            var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
-            extension.setExtension(Map.of("formPresentation", objectMapper.convertValue(
-                    config.getFormPresentation(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {})));
-            pageSchema.setExtension(extension);
+            formExtension.put("formPresentation", objectMapper.convertValue(
+                    config.getFormPresentation(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
         }
+        var formExtensionBean = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        formExtensionBean.setExtension(formExtension);
+        pageSchema.setExtension(formExtensionBean);
         pageSchema.setKind("form");
         pageSchema.setSchemaVersion(com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         pageSchema.setProfile("admin");
@@ -502,7 +506,7 @@ public class DslGeneratorImpl implements DslGenerator {
         button.put("danger", true);
         // 权限码格式: model.{modelCode}.delete
         button.put("permissionCode", "model." + model.getCode() + ".delete");
-        button.put("enableWhen", "${state.selectedIds.length > 0}");
+        button.put("enableWhen", "${state.selectedCount > 0}");
 
         Map<String, Object> events = new LinkedHashMap<>();
         Map<String, Object> onClick = new LinkedHashMap<>();
@@ -1020,7 +1024,7 @@ public class DslGeneratorImpl implements DslGenerator {
     private Map<String, Object> buildDetailButtons(Model model) {
         Map<String, Object> buttonsBlock = new LinkedHashMap<>();
         buttonsBlock.put("id", "block_" + model.getCode() + "_actions");
-        buttonsBlock.put("blockType", "form-buttons");
+        buttonsBlock.put("blockType", "toolbar");
 
         Map<String, Object> layout = new LinkedHashMap<>();
         layout.put("colSpan", 12);
@@ -1044,18 +1048,6 @@ public class DslGeneratorImpl implements DslGenerator {
         editEvents.put("onClick", editOnClick);
         editBtn.put("events", editEvents);
         buttons.add(editBtn);
-
-        // Back button
-        Map<String, Object> backBtn = new LinkedHashMap<>();
-        backBtn.put("code", "back");
-        backBtn.put("action", "back");
-        // Label resolved by frontend: action.back
-        Map<String, Object> backEvents = new LinkedHashMap<>();
-        Map<String, Object> backOnClick = new LinkedHashMap<>();
-        backOnClick.put("handler", "goBack");
-        backEvents.put("onClick", backOnClick);
-        backBtn.put("events", backEvents);
-        buttons.add(backBtn);
 
         buttonsBlock.put("buttons", buttons);
         return buttonsBlock;

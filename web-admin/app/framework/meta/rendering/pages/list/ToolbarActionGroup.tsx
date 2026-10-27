@@ -30,6 +30,7 @@ export interface ToolbarActionGroupProps {
   resolveLabel: (button: ButtonConfig) => string;
   t?: (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   evaluateVisible: (button: ButtonConfig) => boolean;
+  evaluateDisabled?: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
   onPrint?: () => void;
@@ -45,8 +46,9 @@ export function buildDefaultConfig(buttons: ButtonConfig[]): ToolbarActionConfig
   let nonPrimaryCount = 0;
   return buttons.map((btn, idx) => {
     const isPrimary = btn.primary || btn.variant === 'primary';
-    const pinned = isPrimary || nonPrimaryCount < 2;
-    if (!isPrimary) nonPrimaryCount++;
+    const destructive = btn.danger || btn.variant === 'danger';
+    const pinned = isPrimary || (!destructive && nonPrimaryCount < 2);
+    if (!isPrimary && !destructive) nonPrimaryCount++;
     return {
       code: btn.code,
       visible: true,
@@ -98,6 +100,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
   resolveLabel,
   t: providedT,
   evaluateVisible,
+  evaluateDisabled,
   onImport,
   onExport,
   onPrint,
@@ -245,9 +248,10 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
           type="button"
           key={button.code}
           data-testid={`toolbar-btn-${button.code}`}
+          disabled={evaluateDisabled?.(button) ?? Boolean(button.disabled)}
           onClick={() => onAction(button)}
           className={cn(
-            'rounded-card px-4 py-2 text-sm font-medium transition-colors duration-150',
+            'rounded-card px-4 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
             button.primary || button.variant === 'primary'
               ? 'bg-accent hover:bg-accent-hover text-white shadow-sm'
               : button.variant === 'danger' || button.danger
@@ -292,11 +296,12 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                   key={button.code}
                   type="button"
                   data-testid={`more-menu-action-${button.code}`}
+                  disabled={evaluateDisabled?.(button) ?? Boolean(button.disabled)}
                   onClick={() => {
                     setMenuOpen(false);
                     onAction(button);
                   }}
-                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {resolveLabel(button)}
                 </button>
@@ -313,7 +318,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                     setMenuOpen(false);
                     onImport();
                   }}
-                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg
                     className="text-text-3 h-4 w-4"
@@ -340,7 +345,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                     setMenuOpen(false);
                     onExport('xlsx');
                   }}
-                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg
                     className="text-text-3 h-4 w-4"
@@ -367,7 +372,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                     setMenuOpen(false);
                     onExport('csv');
                   }}
-                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg
                     className="text-text-3 h-4 w-4"
@@ -391,7 +396,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                   type="button"
                   data-testid="more-menu-print"
                   onClick={handlePrint}
-                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                  className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg
                     className="text-text-3 h-4 w-4"
@@ -424,7 +429,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                         type="button"
                         data-testid={`more-menu-report-${tpl.code}`}
                         onClick={() => handleGenerateReport(tpl)}
-                        className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm"
+                        className="text-text-2 hover:bg-hover flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <span className="truncate">{tpl.name}</span>
                         <span

@@ -512,6 +512,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions", "modelFieldBindings", "metaField", "viewModelFields", "viewModelSummary"
+    }, allEntries = true)
     public boolean bindDictionary(String fieldPid, String dictCode) {
         log.info("绑定字典到字段: fieldPid={}, dictCode={}", logSafe(fieldPid), logSafe(dictCode));
         
@@ -582,6 +585,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions", "modelFieldBindings", "metaField", "viewModelFields", "viewModelSummary"
+    }, allEntries = true)
     public boolean unbindDictionary(String fieldPid) {
         log.info("解绑字段的字典: fieldPid={}", logSafe(fieldPid));
         

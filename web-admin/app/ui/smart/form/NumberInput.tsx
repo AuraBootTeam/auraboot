@@ -6,13 +6,14 @@
  * @since 3.2.0
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import type { NumberInputProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/ui/ui/field-base';
+import { Input as BaseInput } from '~/ui/ui/input';
 import {
   fieldInputHeightStyles,
   fieldSizeStyles,
@@ -92,6 +93,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
     onBlur,
   });
 
+  const [editingText, setEditingText] = useState<string | null>(null);
   const meta = useSmartFieldMeta({ field });
   const errorText = meta.meta.error ? st(meta.meta.error) : undefined;
 
@@ -140,7 +142,9 @@ const NumberInput: React.FC<NumberInputProps> = ({
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseValue(e.target.value);
+    const text = e.target.value;
+    setEditingText(text);
+    const parsed = parseValue(text);
     field.setValue(parsed);
   };
 
@@ -151,6 +155,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
     if (clamped !== currentValue) {
       field.setValue(clamped);
     }
+    setEditingText(null);
     field.onBlur();
   };
 
@@ -158,6 +163,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
     if (disabledValue || readOnly) return;
     const currentValue = toFiniteNumber(field.value) ?? 0;
     const newValue = clampValue(currentValue + step);
+    setEditingText(null);
     field.setValue(newValue);
   };
 
@@ -165,6 +171,7 @@ const NumberInput: React.FC<NumberInputProps> = ({
     if (disabledValue || readOnly) return;
     const currentValue = toFiniteNumber(field.value) ?? 0;
     const newValue = clampValue(currentValue - step);
+    setEditingText(null);
     field.setValue(newValue);
   };
 
@@ -223,20 +230,23 @@ const NumberInput: React.FC<NumberInputProps> = ({
           </button>
         )}
 
-        <input
+        <BaseInput
           ref={inputRef}
           id={name}
           name={name}
           type="text"
           inputMode="decimal"
-          value={formatValue(field.value)}
+          value={editingText ?? formatValue(field.value)}
           placeholder={placeholderText}
           disabled={disabledValue}
           readOnly={readOnly}
           className={`w-full ${inputClasses} ${showButtons ? 'px-9' : ''} ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-8' : ''}`}
           onChange={handleChange}
           onBlur={handleBlur}
-          onFocus={onFocus}
+          onFocus={() => {
+            setEditingText(toFiniteNumber(field.value)?.toString() ?? '');
+            onFocus?.();
+          }}
           onKeyDown={handleKeyDown}
           aria-required={requiredValue}
           aria-valuemin={min}

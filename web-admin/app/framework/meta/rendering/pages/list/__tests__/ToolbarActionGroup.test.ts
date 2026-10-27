@@ -48,6 +48,18 @@ describe('buildDefaultConfig', () => {
     expect(config[3].pinned).toBe(false);
   });
 
+  it('keeps destructive defaults secondary while retaining explicit saved pinning', () => {
+    const buttons = [
+      makeButton('create', { primary: true }),
+      makeButton('delete', { danger: true }),
+      makeButton('export'),
+    ];
+    expect(buildDefaultConfig(buttons).map((c) => c.pinned)).toEqual([true, false, true]);
+    expect(
+      mergeConfig(buttons, [{ code: 'delete', visible: true, pinned: true, order: 0 }])[0].pinned,
+    ).toBe(true);
+  });
+
   it('handles empty buttons array', () => {
     const config = buildDefaultConfig([]);
     expect(config).toEqual([]);

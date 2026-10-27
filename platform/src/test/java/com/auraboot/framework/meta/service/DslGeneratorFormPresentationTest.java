@@ -134,4 +134,17 @@ class DslGeneratorFormPresentationTest {
         assertThat(columns.get(0).path("field").asText()).isEqualTo("f1");
     }
 
+    @Test void generatesOneDetailToolbarAndModeAwareFormTitlesWithoutVisualOverrides() throws Exception {
+        var config = new CrudTemplateConfig();
+        var form = generator.generateFormPage(model, List.of(), List.of(), config);
+        assertThat(form.getExtension().get("formPresentation")).isNull();
+        assertThat(form.getExtension().get("createTitle")).isEqualTo(java.util.Map.of("zh-CN", "新建Delivery", "en", "New Delivery"));
+        assertThat(form.getExtension().get("editTitle")).isEqualTo(java.util.Map.of("zh-CN", "编辑Delivery", "en", "Edit Delivery"));
+        var detail = json.readTree(generator.generateDetailPage(model, List.of(), List.of(), config).getBlocks());
+        assertThat(detail.get(1).path("blockType").asText()).isEqualTo("toolbar");
+        assertThat(detail.get(1).path("buttons").size()).isEqualTo(1);
+        assertThat(detail.get(1).path("buttons").get(0).path("code").asText()).isEqualTo("edit");
+        assertThat(detail.get(1).path("buttons").get(0).path("permissionCode").asText()).isEqualTo("model.delivery.update");
+    }
+
 }

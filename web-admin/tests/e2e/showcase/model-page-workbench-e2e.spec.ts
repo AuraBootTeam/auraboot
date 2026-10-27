@@ -90,7 +90,9 @@ test.describe('Model Page Workbench E2E', () => {
       await page.getByTestId('crud-generate-submit').click();
 
       const generateResp = await generateRespPromise;
-      const submittedConfig = generateResp.request().postDataJSON();
+      const submittedRequest = generateResp.request().postDataJSON();
+      expect(submittedRequest.modelCode).toBe(modelData.code);
+      const submittedConfig = submittedRequest.config;
       expect(submittedConfig).not.toHaveProperty('formPresentation');
       expect(submittedConfig).not.toHaveProperty('presentation');
       expect(submittedConfig).toMatchObject({ createPermissions: false, assignRoles: false });
