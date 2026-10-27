@@ -312,6 +312,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
          * Get the host file byte bridge from the settings map.
          * Returns null if the host application has no file service bridge.
          */
+        /** Exact published content proof, available only from a supporting original command host. */
+        public AnnouncementSealedContentAccessor announcementSealedContentAccessor() {
+            Object value = settings != null ? settings.get(AnnouncementSealedContentAccessor.SETTINGS_KEY) : null;
+            return value instanceof AnnouncementSealedContentAccessor accessor ? accessor : null;
+        }
+
         public FileAccessor fileAccessor() {
             Object accessor = settings != null ? settings.get(FILE_ACCESSOR_KEY) : null;
             return accessor instanceof FileAccessor ? (FileAccessor) accessor : null;
