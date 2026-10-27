@@ -12,6 +12,18 @@ vi.mock('~/shared/services/http-client', () => ({
 const mockedFetchResult = vi.mocked(fetchResult);
 
 describe('DataSourceManager', () => {
+  it.each([{records:[]}, {records:[{mediaPid:'media-1',altText:'Front view'}]}])('preserves raw page rows and metadata instead of projecting option labels: %j', async ({records}) => {
+    const manager=new DataSourceManager(createExpressionContext());
+    manager.register('media',{type:'api',method:'get',endpoint:'/api/media',adaptor:'raw',autoFetch:false});
+    const page={records,total:records.length,current:1,pageSize:10,revision:'revision-1',storePid:'store-1',productPid:'product-1'};
+    mockedFetchResult.mockResolvedValueOnce({code:'0',data:page} as any);
+    expect(await manager.fetch('media')).toEqual(page);
+    expect(manager.getData('media')).toEqual(page);
+    expect(manager.getBindingContext(createExpressionContext()).dataSource.media.revision).toBe('revision-1');
+    expect(manager.getBindingContext(createExpressionContext()).data.media).toEqual(records[0]);
+    expect(manager.getConfig('media')?.adaptor).toBe('raw');
+  });
+
   beforeEach(() => {
     mockedFetchResult.mockReset();
   });

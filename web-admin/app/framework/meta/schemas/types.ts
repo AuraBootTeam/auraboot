@@ -110,7 +110,7 @@ export interface DataSourceConfig {
   body?: string | Record<string, any>;
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
-  adaptor?: string; // Default: 'optionList'
+  adaptor?: string; // Default: 'optionList'; 'raw' preserves the full response and collection metadata.
   /** Explicit path inside completed command data; no fallback. */
   dataPath?: string;
   /** Optional safe projection before commandArray rows seed a scoped form. */

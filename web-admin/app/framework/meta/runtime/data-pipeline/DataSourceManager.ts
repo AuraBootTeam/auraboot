@@ -752,6 +752,9 @@ export class DataSourceManager {
     }
 
     switch (config.adaptor) {
+      // Explicit identity adaptation keeps page metadata and non-option records.
+      case 'raw':
+        return data;
       case 'commandArray':
         return completedCommandArray(data, config);
       case 'commandOptions':
