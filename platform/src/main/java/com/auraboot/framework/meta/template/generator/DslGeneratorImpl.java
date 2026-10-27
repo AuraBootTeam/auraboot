@@ -34,6 +34,12 @@ public class DslGeneratorImpl implements DslGenerator {
     private final FieldTypeMapper fieldTypeMapper;
     private final MetaFieldDictBindingMapper fieldDictBindingMapper;
 
+    private Object localizedFieldText(String value) {
+        if (value.startsWith("$i18n:") || value.chars().allMatch(c -> c <= 0x7f)) return value;
+        // Field metadata has a single source-language string, not translated copies.
+        return Map.of("zh-CN", value);
+    }
+
     private String buildLocalizedTitleJson(String zhTitle, String enTitle) {
         try {
             return objectMapper.writeValueAsString(Map.of(
@@ -827,8 +833,8 @@ public class DslGeneratorImpl implements DslGenerator {
             formField.put("refTarget", objectMapper.convertValue(field.getRefTarget(), Map.class));
         }
         if (field.getUiSchema() != null) {
-            if (field.getUiSchema().getHelpText() != null) formField.put("helpText", field.getUiSchema().getHelpText());
-            if (field.getUiSchema().getPlaceholder() != null) formField.put("placeholder", field.getUiSchema().getPlaceholder());
+            if (field.getUiSchema().getHelpText() != null) formField.put("helpText", localizedFieldText(field.getUiSchema().getHelpText()));
+            if (field.getUiSchema().getPlaceholder() != null) formField.put("placeholder", localizedFieldText(field.getUiSchema().getPlaceholder()));
         }
 
         Map<String, Object> layout = new LinkedHashMap<>();

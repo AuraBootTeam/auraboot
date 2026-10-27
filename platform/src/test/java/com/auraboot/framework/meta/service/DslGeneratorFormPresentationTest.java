@@ -149,4 +149,16 @@ class DslGeneratorFormPresentationTest {
         assertThat(detail.get(1).path("buttons").get(0).path("permissionCode").asText()).isEqualTo("model.delivery.update");
     }
 
+    @Test void preservesFieldGuidanceWithoutViolatingPageI18nContract() throws Exception {
+        var field = field(1, "stage", "string");
+        var ui = new com.auraboot.framework.meta.entity.payload.FieldUiSchemaBean();
+        ui.setHelpText("按实际交付阶段维护项目状态。");
+        ui.setPlaceholder("$i18n:delivery.stage.placeholder"); field.setUiSchema(ui);
+        var page = generator.generateFormPage(model, List.of(binding(1)), List.of(field), new CrudTemplateConfig());
+        var blocks = json.readTree(page.getBlocks());
+        assertThat(blocks.get(0).path("fields").get(0).path("helpText").path("zh-CN").asText()).isEqualTo(ui.getHelpText());
+        assertThat(blocks.get(0).path("fields").get(0).path("placeholder").asText()).isEqualTo(ui.getPlaceholder());
+        var schema = java.util.Map.<String, Object>of("blocks", json.readValue(page.getBlocks(), List.class));
+        assertThatCode(() -> com.auraboot.framework.meta.validator.PageSchemaDslI18nValidator.validatePageSchema(schema, "delivery_form")).doesNotThrowAnyException();
+    }
 }
