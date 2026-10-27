@@ -72,6 +72,7 @@ import type {
   PageDataSourceConfig,
 } from './types';
 import type { PageExtensionConfig as RuntimePageExtensionConfig } from './types';
+import type { AuthoritativeSourceConfig } from './source-state';
 
 /** Serializable open extension boundary; retain the runtime's legacy any compatibility. */
 export interface PageExtensionConfig {
@@ -86,6 +87,7 @@ export interface PageExtensionConfig {
 // ---------------------------------------------------------------------------
 
 export interface StrictBlockConfig {
+  props?: Record<string, unknown> & { sourceState?: AuthoritativeSourceConfig };
   id: string;
   blockType: string;
   title?: string | LocalizedText;

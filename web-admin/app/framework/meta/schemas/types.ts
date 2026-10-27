@@ -1,4 +1,11 @@
 import type { CardRowSelection } from '../runtime/expression/row-selection';
+import type { AuthoritativeSourceConfig } from './source-state';
+export type {
+  AuthoritativeSourceConfig,
+  SourceStateField,
+  SourceStateIndicator,
+  SourceStateTone,
+} from './source-state';
 import type { RowProjection } from '../runtime/expression/row-projection';
 import type { WorkspaceCellPresentation } from '../runtime/renderers/WorkspaceCells';
 /**
@@ -107,6 +114,7 @@ export interface BlockConfig {
   /** Existing block visibility and named-source permission gate. */
   permissionCode?: string;
   className?: string;
+  props?: Record<string, any> & { sourceState?: AuthoritativeSourceConfig };
   imageField?: string;
   imageViewports?: Record<string, CardImageViewport>;
 
@@ -168,6 +176,16 @@ export interface BlockLayoutConfig {
 }
 
 // DataSource 配置
+export interface PaginationRequestConfig {
+  /**
+   * Nonempty object-key paths; unsafe, overlapping and identity paths are rejected.
+   * @maxItems 8
+   */
+  pageNumPath: [string, ...string[]];
+  /** @maxItems 8 */
+  pageSizePath: [string, ...string[]];
+}
+
 export interface DataSourceConfig {
   id?: string;
   type?: 'api' | 'static' | 'namedQuery'; // 'namedQuery' delegates to nq:{queryCode} format
@@ -179,6 +197,8 @@ export interface DataSourceConfig {
   body?: string | Record<string, any>;
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
+  /** Explicit placement of runtime pageNum/pageSize, without changing other request inputs. */
+  paginationRequest?: PaginationRequestConfig;
   /** Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata. */
   adaptor?: string;
   /** Explicit path inside completed command data; no fallback. */
@@ -415,6 +435,20 @@ export interface ColumnConfig {
   tagConfig?: Record<string, unknown>;
 }
 
+export interface UploadedFilesInputConfig {
+  /** @minimum 1
+   * @maximum 10
+   * @multipleOf 1
+   */
+  maxCount: number;
+  /** File chooser/type hint; server byte validation remains authoritative. */
+  accept: string;
+  /** @minimum 1
+   * @multipleOf 1
+   */
+  maxBytes?: number;
+}
+
 export interface CommandInputFieldConfig {
   field: string;
   label?: string | LocalizedText;
@@ -423,6 +457,8 @@ export interface CommandInputFieldConfig {
   helpText?: string | LocalizedText;
   placeholder?: string | LocalizedText;
   type?: string;
+  /** Configuration for type: uploaded-files; its submitted value is public file PID[]. */
+  uploadedFiles?: UploadedFilesInputConfig;
   /** Static dictionary used to populate select/segmented choice fields. */
   dictCode?: string;
   required?: boolean;

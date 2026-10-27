@@ -30,6 +30,11 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
   const conditional = Boolean(block.visibleWhen);
   useEffect(() => {
     if (!conditional) return;
+    if (runtime.subscribeContext) {
+      const unsubscribe = runtime.subscribeContext(() => refreshCondition());
+      refreshCondition();
+      return unsubscribe;
+    }
     const store = runtime.getStateManager?.().getStore?.(runtime.getScopeId?.());
     if (!store?.subscribe) return;
     const unsubscribe = store.subscribe(() => refreshCondition());

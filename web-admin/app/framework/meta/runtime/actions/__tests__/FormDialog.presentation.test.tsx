@@ -27,6 +27,32 @@ function Root({ children }: { children?: React.ReactNode }) {
   );
 }
 describe('shared FormDialog presentation', () => {
+  it('preserves business line breaks in the frozen summary without submitting its contents', async () => {
+    render(<Root />);
+    const comparison = '范围：锚地甲\n\n风速：严格 > 10 m/s\n有效期：本次批准后生效';
+    let pending!: Promise<Record<string, unknown>>;
+    act(() => {
+      pending = promptInputForm(
+        [{ field: 'note', type: 'textarea' }],
+        'Review',
+        undefined,
+        'Submit',
+        { record: { comparison } },
+        { locale: 'en' },
+        { summary: { columns: 1, fields: [{ field: 'comparison', label: 'Review items' }] } },
+      );
+    });
+    const settled = pending.catch(() => null);
+    const summary = await screen.findByTestId('form-dialog-summary');
+    const content = summary.querySelector('[data-summary-field="comparison"]')!;
+    expect(content.textContent).toBe(comparison);
+    expect(content).toHaveClass('whitespace-pre-wrap');
+    fireEvent.change(screen.getByTestId('form-dialog-field-note'), {
+      target: { value: 'Explicit review' },
+    });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(await settled).toEqual({ note: 'Explicit review' });
+  });
   it('has one host, freezes object/title, deduplicates dictionaries, and submits no summary values', async () => {
     render(<Root />);
     const record = { title: 'Case A', status: 'new' };

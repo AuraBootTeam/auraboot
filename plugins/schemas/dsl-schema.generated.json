@@ -403,6 +403,14 @@
     "BlockConfig": {
       "type": "object",
       "properties": {
+        "props": {
+          "type": "object",
+          "properties": {
+            "sourceState": {
+              "$ref": "#/definitions/AuthoritativeSourceConfig"
+            }
+          }
+        },
         "id": {
           "type": "string"
         },
@@ -645,6 +653,264 @@
         "blockType"
       ],
       "additionalProperties": false
+    },
+    "AuthoritativeSourceConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "authoritative"
+        },
+        "identity": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "responsePath": {
+                "type": "string"
+              },
+              "contextPath": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "responsePath",
+              "contextPath"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "scopePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Scope-only inputs, such as a requested range which is not echoed by the API."
+        },
+        "valuePath": {
+          "type": "string"
+        },
+        "valueLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SourceStateText"
+          }
+        },
+        "unitPath": {
+          "type": "string"
+        },
+        "precision": {
+          "type": "number"
+        },
+        "metadata": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceStateField"
+          }
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceStateIndicator"
+          }
+        },
+        "series": {
+          "type": "object",
+          "properties": {
+            "pointsPath": {
+              "type": "string"
+            },
+            "timePath": {
+              "type": "string"
+            },
+            "valuePath": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "line",
+                "scatter"
+              ]
+            },
+            "identity": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pointPath": {
+                    "type": "string"
+                  },
+                  "responsePath": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pointPath",
+                  "responsePath"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "gapWhen": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    }
+                  },
+                  "knownValues": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    },
+                    "description": "Unknown quality/state codes cannot silently become valid measurements."
+                  }
+                },
+                "required": [
+                  "path",
+                  "values",
+                  "knownValues"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "domain": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "color": {
+              "type": "string"
+            },
+            "height": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "pointsPath",
+            "timePath",
+            "valuePath",
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "mode",
+        "identity"
+      ],
+      "additionalProperties": false,
+      "description": "Opt-in view over one existing named DMS source. No second transport."
+    },
+    "SourceStateText": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/definitions/LocalizedText"
+        }
+      ]
+    },
+    "SourceStateField": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/definitions/SourceStateText"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "text",
+            "datetime"
+          ]
+        },
+        "valueLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SourceStateText"
+          }
+        },
+        "optional": {
+          "type": "boolean",
+          "description": "Explicitly allow an omitted/null field; it remains visibly unavailable."
+        }
+      },
+      "required": [
+        "path",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "SourceStateIndicator": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/definitions/SourceStateText"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "$ref": "#/definitions/SourceStateText"
+              },
+              "tone": {
+                "$ref": "#/definitions/SourceStateTone"
+              },
+              "hideValue": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "label"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "path",
+        "label",
+        "values"
+      ],
+      "additionalProperties": false,
+      "description": "An explicit business-state codebook, never a raw-code display fallback."
+    },
+    "SourceStateTone": {
+      "type": "string",
+      "enum": [
+        "neutral",
+        "success",
+        "warning",
+        "danger"
+      ]
     },
     "BlockLayoutConfig": {
       "type": "object",
@@ -980,6 +1246,10 @@
         "pagination": {
           "type": "boolean"
         },
+        "paginationRequest": {
+          "$ref": "#/definitions/PaginationRequestConfig",
+          "description": "Explicit placement of runtime pageNum/pageSize, without changing other request inputs."
+        },
         "adaptor": {
           "type": "string",
           "description": "Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata."
@@ -1036,6 +1306,33 @@
           ]
         }
       },
+      "additionalProperties": false
+    },
+    "PaginationRequestConfig": {
+      "type": "object",
+      "properties": {
+        "pageNumPath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Nonempty object-key paths; unsafe, overlapping and identity paths are rejected.",
+          "maxItems": 8
+        },
+        "pageSizePath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "pageNumPath",
+        "pageSizePath"
+      ],
       "additionalProperties": false
     },
     "RowProjection": {
@@ -1768,6 +2065,10 @@
         "type": {
           "type": "string"
         },
+        "uploadedFiles": {
+          "$ref": "#/definitions/UploadedFilesInputConfig",
+          "description": "Configuration for type: uploaded-files; its submitted value is public file PID[]."
+        },
         "dictCode": {
           "type": "string",
           "description": "Static dictionary used to populate select/segmented choice fields."
@@ -1780,6 +2081,31 @@
         "field"
       ],
       "additionalProperties": {}
+    },
+    "UploadedFilesInputConfig": {
+      "type": "object",
+      "properties": {
+        "maxCount": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "multipleOf": 1
+        },
+        "accept": {
+          "type": "string",
+          "description": "File chooser/type hint; server byte validation remains authoritative."
+        },
+        "maxBytes": {
+          "type": "number",
+          "minimum": 1,
+          "multipleOf": 1
+        }
+      },
+      "required": [
+        "maxCount",
+        "accept"
+      ],
+      "additionalProperties": false
     },
     "CommandInputPresentation": {
       "type": "object",

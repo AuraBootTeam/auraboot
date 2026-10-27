@@ -1,3 +1,4 @@
+import { resolveRowActionModel } from './rowActionModel';
 import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { Pagination } from '~/ui/Pagination';
 import { readServerTablePage, ServerTablePageError, type ServerTablePage } from './serverTablePage';
@@ -174,8 +175,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
   const { token, hasPermission } = useAuth();
-  const schema = runtime.getSchema();
-  const tableName = (schema as any).modelCode || schema.id || '';
+  const tableName = resolveRowActionModel(block, runtime);
 
   const { handleAction: dispatchAction } = useActionHandler({
     runtime,
@@ -308,8 +308,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
   const paging = block.table?.pagination;
   const serverPaging = paging?.mode === 'server';
-  const pagingAttempt = useRef<{ pageNum: number; pageSize: number } | null>(null);
-  const parentPid = getLegacyCompatibleRecordPid((context as any).record);
+  const pagingAttempt = useRef<{ pageNum: number; pageSize: number; parentPid: string | undefined } | null>(null);
+  const parentPid = getLegacyCompatibleRecordPid((context as any).record) || (context as any).$page?.recordPid;
   useEffect(() => {
     pagingAttempt.current = null;
   }, [runtime, dataSourceId, parentPid]);
@@ -320,6 +320,13 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     if (page !== undefined && page !== null) {
       try {
         serverPage = readServerTablePage(page, paging?.pageField);
+        const localAttempt = pagingAttempt.current;
+        const attempt = dataSourceState?.requestedPage ??
+          (localAttempt?.parentPid === parentPid ? localAttempt : undefined);
+        if (attempt && !dataSourceState?.loading && !dataSourceState?.error &&
+          (serverPage.current !== attempt.pageNum || serverPage.pageSize !== attempt.pageSize)) {
+          pagingInvalid = true;
+        }
       } catch (failure) {
         if (!(failure instanceof ServerTablePageError)) throw failure;
         pagingInvalid = true;
@@ -328,7 +335,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   }
   const runPageRequest = (params: { pageNum: number; pageSize: number }, force = false) => {
     if (!dataSourceId) return;
-    pagingAttempt.current = params;
+    pagingAttempt.current = { ...params, parentPid };
     // The subscribed data source preserves its error and last accepted rows; this UI boundary retains diagnostics.
     void dataSourceManager
       .fetch(dataSourceId, params, { force })
@@ -336,8 +343,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   };
   const retryDataSource = () => {
     if (!dataSourceId) return;
-    if (serverPaging && pagingAttempt.current) runPageRequest(pagingAttempt.current, true);
-    else void dataSourceManager.reload(dataSourceId);
+    if (serverPaging && dataSourceState?.requestedPage) {
+      runPageRequest(dataSourceState.requestedPage, true);
+    } else if (serverPaging && pagingAttempt.current?.parentPid === parentPid && pagingAttempt.current) {
+      runPageRequest({ pageNum: pagingAttempt.current.pageNum, pageSize: pagingAttempt.current.pageSize }, true);
+    } else void dataSourceManager.reload(dataSourceId);
   };
   const acceptedPage = serverPage;
   const pagination = acceptedPage ? (

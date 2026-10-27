@@ -37,6 +37,11 @@ import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMess
 import MemberPicker from '~/ui/smart/picker/MemberPicker';
 import BomUploadReviewField, { type BomUploadReviewValue } from './BomUploadReviewField';
 import PagedChoiceField from './PagedChoiceField';
+import { UploadedFilesPromptField } from './UploadedFilesPromptField';
+import { uploadedFilesConfig, validUploadedFilePids } from './uploadedFiles';
+import type { UploadedFilesInputConfig } from '../../schemas/types';
+import type { FileUploadState } from '~/ui/smart/display/FileAttachmentField';
+import UPLOAD_TEXT from '~/ui/smart/display/StagedFileAttachmentField.i18n.json';
 
 interface VisibilityRule {
   field: string;
@@ -71,6 +76,7 @@ interface FormFieldConfig {
     | 'segmented'
     | 'checkbox'
     | 'file'
+    | 'uploaded-files'
     | 'reference'
     | 'bom-upload-review';
   component?: string;
@@ -84,6 +90,7 @@ interface FormFieldConfig {
   maxBytes?: number;
   fileNameField?: string;
   fileValueMode?: 'text' | 'file';
+  uploadedFiles?: UploadedFilesInputConfig;
   visibleWhen?: VisibilityRule;
   dataSource?: {
     type: 'api' | 'static';
@@ -101,6 +108,7 @@ function localDateTimeValue(value: unknown, timezone: string): string {
 
 interface FormDialogState {
   open: boolean;
+  inputSession?: number;
   requestId?: number;
   submission?: PromptSubmissionFeedback;
   submissionState?: Readonly<PromptSubmissionState>;
@@ -213,7 +221,11 @@ function FormDialogHost() {
   const stateRef = useRef(state);
   stateRef.current = state;
   const containerRef = useRef<HTMLDivElement>(null);
+  const feedbackRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const inputSession = useRef(0);
+  const uploadStatesRef = useRef<Record<string, FileUploadState>>({});
+  const [uploadStates, setUploadStates] = useState<Record<string, FileUploadState>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dateTimeErrors, setDateTimeErrors] = useState<Record<string, string>>({});
   const [dateTimeDrafts, setDateTimeDrafts] = useState<Record<string, string>>({});
@@ -229,7 +241,7 @@ function FormDialogHost() {
       wrappers
         .map((wrapper) =>
           wrapper.querySelector<HTMLElement>(
-            'input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),[tabindex]:not([tabindex="-1"])',
+            'input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),[tabindex]:not([tabindex="-1"])',
           ),
         )
         .find((element): element is HTMLElement => Boolean(element)) ?? null;
@@ -246,6 +258,7 @@ function FormDialogHost() {
       const defaults = detail.defaults || {};
       const next: FormDialogState = {
         open: true,
+        inputSession: ++inputSession.current,
         requestId: detail.requestId,
         submission: detail.submission,
         submissionState: detail.submission?.getState(),
@@ -261,6 +274,8 @@ function FormDialogHost() {
       stateRef.current = next;
       setState(next);
       setFormData({ ...defaults });
+      uploadStatesRef.current = {};
+      setUploadStates({});
       setErrors({});
       setDateTimeErrors({});
       setDateTimeDrafts({});
@@ -302,6 +317,13 @@ function FormDialogHost() {
     current.submission?.dispose();
   }, []);
   useModalFocusTrap(state.open, containerRef, handleCancel, firstInputRef);
+  useLayoutEffect(() => {
+    if (!state.open || state.submissionState?.phase !== 'failed') return;
+    // Reveal a newly settled failure even when a long summary was scrolled past.
+    // Field edits keep the same feedback object and do not steal focus again.
+    feedbackRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' });
+    feedbackRef.current?.focus({ preventScroll: true });
+  }, [state.open, state.inputSession, state.submissionState]);
   useEffect(() => {
     const submission = state.submission;
     if (!submission) return;
@@ -383,6 +405,18 @@ function FormDialogHost() {
     );
     for (const field of visibleFields) {
       const value = formData[field.field];
+      if (field.type === 'uploaded-files') {
+        try {
+          const config = uploadedFilesConfig(field.uploadedFiles);
+          if (
+            !validUploadedFilePids(value ?? [], config.maxCount) ||
+            uploadStatesRef.current[field.field]?.blocked !== false
+          )
+            newErrors[field.field] = getLocalizedText(UPLOAD_TEXT.resolve, locale, t);
+        } catch {
+          newErrors[field.field] = getLocalizedText(UPLOAD_TEXT.invalid, locale, t);
+        }
+      }
       if (field.required) {
         if (isMissing(value) || (field.mustBeTrue && value !== true)) {
           const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
@@ -464,7 +498,12 @@ function FormDialogHost() {
 
     const submitted = Object.fromEntries(
       visibleFields.flatMap((field) => {
-        const entries: [string, any][] = [[field.field, formData[field.field]]];
+        const entries: [string, any][] = [
+          [
+            field.field,
+            field.type === 'uploaded-files' ? (formData[field.field] ?? []) : formData[field.field],
+          ],
+        ];
         if (field.type === 'file' && field.fileNameField) {
           entries.push([field.fileNameField, formData[field.fileNameField]]);
         }
@@ -665,6 +704,8 @@ function FormDialogHost() {
         >
           {submissionState && submissionState.phase !== 'idle' && (
             <div
+              ref={feedbackRef}
+              tabIndex={-1}
               role={submissionState.phase === 'failed' ? 'alert' : 'status'}
               aria-live="polite"
               data-testid="form-dialog-submit-feedback"
@@ -702,7 +743,7 @@ function FormDialogHost() {
                 <div key={item.field} className="min-w-0">
                   <dt className="text-text-3 text-xs">{getLocalizedText(item.label, locale, t)}</dt>
                   <dd
-                    className="text-text mt-1 text-sm break-words"
+                    className="text-text mt-1 text-sm [overflow-wrap:anywhere] break-words whitespace-pre-wrap"
                     data-summary-field={item.field}
                   >
                     {getLocalizedText(item.value, locale, t)}
@@ -1022,6 +1063,31 @@ function FormDialogHost() {
                         previewRowCount={field.props?.previewRowCount}
                         onChange={(value) => updateField(field.field, value)}
                       />
+                    ) : fieldType === 'uploaded-files' ? (
+                      <UploadedFilesPromptField
+                        key={`${state.inputSession}:${field.field}`}
+                        config={field.uploadedFiles}
+                        value={formData[field.field]}
+                        onChange={(value) => {
+                          if (
+                            stateRef.current.open &&
+                            stateRef.current.inputSession === state.inputSession
+                          )
+                            updateField(field.field, value);
+                        }}
+                        onStatus={(status) => {
+                          if (
+                            !stateRef.current.open ||
+                            stateRef.current.inputSession !== state.inputSession
+                          )
+                            return;
+                          uploadStatesRef.current = {
+                            ...uploadStatesRef.current,
+                            [field.field]: status,
+                          };
+                          setUploadStates(uploadStatesRef.current);
+                        }}
+                      />
                     ) : fieldType === 'file' ? (
                       <div
                         data-testid={`form-dialog-dropzone-${field.field}`}
@@ -1272,7 +1338,14 @@ function FormDialogHost() {
             data-testid="form-dialog-submit"
             onClick={handleSubmit}
             disabled={
-              Boolean(state.submission && submissionState?.phase !== 'idle') || state.refreshing
+              Boolean(state.submission && submissionState?.phase !== 'idle') ||
+              state.refreshing ||
+              state.fields.some(
+                (field) =>
+                  field.type === 'uploaded-files' &&
+                  matchesVisibility(field.visibleWhen, formData) &&
+                  uploadStates[field.field]?.blocked !== false,
+              )
             }
             className="bg-accent enabled:hover:bg-accent-hover focus:ring-accent rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >

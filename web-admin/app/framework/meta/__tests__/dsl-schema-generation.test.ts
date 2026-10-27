@@ -16,8 +16,8 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes shared presentation types in the 55-definition contract', () => {
-    expect(Object.keys(defs).length).toBe(55);
+  it('includes shared presentation types in the 62-definition contract', () => {
+    expect(Object.keys(defs).length).toBe(62);
     expect(defs).toHaveProperty('CardImageViewport');
   });
 
@@ -176,6 +176,19 @@ describe('DSL Generated Schema', () => {
     ).toBe(false);
   });
 
+
+  it('publishes explicit nested paging paths and rejects malformed declarations', () => {
+    const validate = new Ajv({ strict:false }).compile({ ...defs.DataSourceConfig, definitions:defs });
+    const source = { type:'api',method:'post',paginationRequest:{pageNumPath:['payload','pageNum'],pageSizePath:['payload','pageSize']} };
+    expect(validate(source)).toBe(true);
+    for (const paginationRequest of [
+      {pageNumPath:[],pageSizePath:['size']},
+      {pageNumPath:['page'],pageSizePath:'size'},
+      {pageNumPath:['page'],pageSizePath:['size'],unknown:true},
+      {pageNumPath:Array(9).fill('deep'),pageSizePath:['size']},
+    ]) expect(validate({...source,paginationRequest})).toBe(false);
+  });
+
   it('publishes the real page key in server pagination without changing the response', () => {
     const validate = new Ajv({ strict: false }).compile({
       ...defs.PaginationConfig,
@@ -302,6 +315,30 @@ describe('DSL Generated Schema', () => {
     ).toBe(true);
   });
 
+  it('publishes strict uploaded-files configuration without changing legacy file hints', () => {
+    const validate = new Ajv({ strict: false }).compile({
+      ...defs.CommandInputFieldConfig,
+      definitions: defs,
+    });
+    const field = {
+      field: 'filePids',
+      type: 'uploaded-files',
+      uploadedFiles: { maxCount: 10, accept: 'image/*,.pdf', maxBytes: 10485760 },
+    };
+    expect(validate(field)).toBe(true);
+    for (const uploadedFiles of [
+      { maxCount: 11, accept: '.pdf' },
+      { maxCount: 0, accept: '.pdf' },
+      { maxCount: 1.5, accept: '.pdf' },
+      { maxCount: 1 },
+      { maxCount: 1, accept: '.pdf', link: true },
+    ])
+      expect(validate({ ...field, uploadedFiles })).toBe(false);
+    expect(
+      validate({ field: 'csvText', type: 'file', fileValueMode: 'text', accept: '.csv' }),
+    ).toBe(true);
+  });
+
   it('SelectionConfig should publish the grouped-radio contract', () => {
     const selectionDefinition = defs.SelectionConfig;
     const selection = selectionDefinition.properties;
@@ -402,6 +439,37 @@ describe('DSL Generated Schema', () => {
   it('BlockConfig should require id and blockType', () => {
     expect(defs.BlockConfig.required).toContain('id');
     expect(defs.BlockConfig.required).toContain('blockType');
+  });
+
+  it('validates authoritative source bindings while preserving legacy block props', () => {
+    const validate = new Ajv({ strict: false }).compile({ ...defs.BlockConfig, definitions: defs });
+    const base = { id: 'reading', blockType: 'stat-card' };
+    const binding = {
+      mode: 'authoritative',
+      identity: [{ responsePath: 'source', contextPath: 'state.source' }],
+      valuePath: 'value',
+      states: [
+        {
+          path: 'quality',
+          label: 'Quality',
+          values: { MISSING: { label: 'Missing', hideValue: true } },
+        },
+      ],
+    };
+    expect(validate({ ...base, props: { sourceState: binding } })).toBe(true);
+    expect(validate({ ...base, props: { sourceState: { ...binding, mode: 'fallback' } } })).toBe(
+      false,
+    );
+    expect(
+      validate({
+        ...base,
+        props: { sourceState: { ...binding, identity: [{ responsePath: 1 }] } },
+      }),
+    ).toBe(false);
+    expect(validate({ ...base, props: { sourceState: { ...binding, inlineValue: 99 } } })).toBe(
+      false,
+    );
+    expect(validate({ ...base, props: { legacyLayout: 'compact' } })).toBe(true);
   });
 
   it('BlockConfig.subTable should reference SubTableConfig', () => {
