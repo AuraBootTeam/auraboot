@@ -7,8 +7,8 @@ import baseConfig from './playwright.config';
 const fixture = process.env.AGENT_PERMISSION_FIXTURE;
 const evidence = process.env.AGENT_PERMISSION_EVIDENCE;
 const scope = process.env.AGENT_ACCEPTANCE_SCOPE ?? 'permissions';
-if (!['permissions', 'memory'].includes(scope)) throw new Error('Unknown agent acceptance scope');
-const agentApprovalSpecNames = [scope];
+const agentApprovalSpecNames = ['permissions', 'memory'];
+if (!agentApprovalSpecNames.includes(scope)) throw new Error('Unknown agent acceptance scope');
 if (!fixture || !isAbsolute(fixture) || !existsSync(fixture)
     || !evidence || !isAbsolute(evidence)
     || !process.env.PLAYWRIGHT_BASE_URL || !process.env.BACKEND_URL
@@ -37,7 +37,7 @@ if (scope === 'memory' && (!inputs.owner?.email || !inputs.owner?.password
 export default defineConfig({
   ...baseConfig,
   testDir: './tests/acceptance/agent-approval',
-  testMatch: agentApprovalSpecNames.map(name => '**/' + name + '.spec.ts'),
+  testMatch: agentApprovalSpecNames.filter(name => name === scope).map(name => '**/' + name + '.spec.ts'),
   globalSetup: undefined,
   globalTeardown: undefined,
   outputDir: evidence + '/artifacts',
