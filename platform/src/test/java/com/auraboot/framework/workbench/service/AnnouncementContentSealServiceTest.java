@@ -15,6 +15,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
 import java.util.*;
+import java.sql.Connection;
+import javax.sql.DataSource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.junit.jupiter.api.*;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import static org.junit.jupiter.api.Assertions.*;
@@ -108,6 +113,52 @@ class AnnouncementContentSealServiceTest {
         verify(locks).requireEnabledMemberships(List.of(new CommandMembershipLockAccessor.MembershipAssertion("actor","member")));
         MetaContext.setMemberId(4L);
         assertThrows(org.springframework.security.access.AccessDeniedException.class,service::lockActor);
+    }
+    @Test void releaseCommitRetainsPublisherAfterWorkerClearsContextInTheOriginalTransaction() throws Exception {
+        TransactionSynchronizationManager.clearSynchronization();
+        DataSource dataSource=mock(DataSource.class);Connection connection=mock(Connection.class);
+        when(dataSource.getConnection()).thenReturn(connection);when(connection.getAutoCommit()).thenReturn(true);
+        var transaction=new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+        transaction.setName("announcement-release-seal-test");
+        MetaContext.setContext(1L,2L,"actor","actor",Set.of(7L));MetaContext.setMemberId(3L);
+        var publisher=MetaContext.snapshot();Thread originalThread=Thread.currentThread();
+        when(seals.seal(1L,VERSION)).thenAnswer(i->{
+            assertEquals(1L,MetaContext.getCurrentTenantId());
+            assertEquals(publisher,MetaContext.snapshot());
+            assertSame(originalThread,Thread.currentThread());
+            assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
+            assertSame(connection,DataSourceUtils.getConnection(dataSource));
+            return stored;
+        });
+        doAnswer(i->{assertFalse(MetaContext.exists(),"Publisher context must not leak into the worker");return null;}).when(connection).commit();
+        transaction.executeWithoutResult(status->{
+            capture();service.verifyForRelease(1L,VERSION,hash,snapshot);
+            // Matches ReleaseService.perform's finally before the outer Spring AOP commit.
+            MetaContext.clear();
+        });
+        assertFalse(MetaContext.exists());verify(connection).commit();verify(connection,never()).rollback();
+        verify(dataSource,times(1)).getConnection();verify(seals,times(5)).seal(1L,VERSION);
+    }
+    @Test void commitTamperingStillRollsBackAndRestoresAnUnrelatedOuterContext() throws Exception {
+        TransactionSynchronizationManager.clearSynchronization();
+        DataSource dataSource=mock(DataSource.class);Connection connection=mock(Connection.class);
+        when(dataSource.getConnection()).thenReturn(connection);when(connection.getAutoCommit()).thenReturn(true);
+        var transaction=new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+        var publisher=MetaContext.snapshot();
+        var outer=new java.util.concurrent.atomic.AtomicReference<MetaContext.Snapshot>();
+        when(seals.seal(1L,VERSION)).thenAnswer(i->{
+            assertEquals(1L,MetaContext.getCurrentTenantId());assertEquals(publisher,MetaContext.snapshot());
+            assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
+            assertSame(connection,DataSourceUtils.getConnection(dataSource));return stored;
+        });
+        assertThrows(IllegalStateException.class,()->transaction.executeWithoutResult(status->{
+            capture();service.verifyForRelease(1L,VERSION,hash,snapshot);
+            when(storage.download("private/key.txt")).thenAnswer(i->new ByteArrayInputStream(new byte[]{1,2,4}));
+            MetaContext.setContext(9L,22L,"scheduler","Scheduler",Set.of(88L));MetaContext.setMemberId(23L);
+            outer.set(MetaContext.snapshot());
+        }));
+        assertEquals(outer.get(),MetaContext.snapshot(),"Failed seal verification must restore the prior caller exactly");
+        verify(connection).rollback();verify(connection,never()).commit();verify(dataSource,times(1)).getConnection();
     }
     @Test void sameTransactionExpiryAndMalformedMetadataFailClosed() {
         capture();version.put("expires_at",Instant.parse("2029-12-31T23:59:59Z"));
