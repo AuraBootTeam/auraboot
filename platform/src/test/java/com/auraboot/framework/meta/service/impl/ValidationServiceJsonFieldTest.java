@@ -59,6 +59,8 @@ class ValidationServiceJsonFieldTest {
         assertFalse(service.validateJsonField(field, DoubleNode.valueOf(Double.POSITIVE_INFINITY), ValidationContext.CUSTOM).isValid());
         field.setPrecision(2); field.setScale(3); assertFalse(valid(field, "1"));
         field.setPrecision(0); field.setScale(0); assertFalse(valid(field, "1"));
+        field.setPrecision(2); field.setScale(2); field.setMinValue(null); field.setMaxValue(null);
+        assertTrue(valid(field, "0.0000")); assertTrue(valid(field, "0.99")); assertFalse(valid(field, "1"));
     }
 
     @Test void stringsBooleanAndUnknownTypesCannotCoerceOrSilentlyPass() throws Exception {

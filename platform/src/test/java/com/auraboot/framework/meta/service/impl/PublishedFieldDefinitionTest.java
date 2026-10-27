@@ -39,7 +39,7 @@ class PublishedFieldDefinitionTest {
         field.setTenantId(101L); field.setVersion(2); field.setStatus("published"); field.setDataType("decimal");
         var feature = new FieldFeatureBean(); feature.setRequired(true); feature.setSearchable(true); field.setFeature(feature);
         field.setExtension(new ExtensionConverter().toBean(Map.of("displayName", "Capacity", "constraints",
-                Map.of("minValue", 1, "maxValue", 2000, "precision", 5, "scale", 2))));
+                Map.of("min", 1, "max", 2000, "precision", 5, "scale", 2))));
         return field;
     }
 

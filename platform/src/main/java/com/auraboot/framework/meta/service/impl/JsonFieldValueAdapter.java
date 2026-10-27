@@ -69,7 +69,8 @@ final class JsonFieldValueAdapter {
                 || (precision != null && scale != null && scale > precision)) {
             throw invalid(field, "invalid precision or scale declaration");
         }
-        int fraction = Math.max(0, number.scale()), whole = Math.max(0, number.precision() - number.scale());
+        int fraction = Math.max(0, number.scale());
+        int whole = number.signum() == 0 ? 0 : Math.max(0, number.precision() - number.scale());
         if ((scale != null && fraction > scale)
                 || (precision != null && (scale == null ? whole + fraction > precision : whole > precision - scale))) {
             throw invalid(field, "value exceeds numeric precision or scale; rounding is forbidden");
