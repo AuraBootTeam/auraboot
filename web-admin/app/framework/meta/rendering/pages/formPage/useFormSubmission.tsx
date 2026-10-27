@@ -451,6 +451,25 @@ export function useFormSubmission({
           initialFormData,
         );
 
+        if (dynamicCrudOperation === 'update' && Object.keys(normalizedPayload).length === 0) {
+          setError(null);
+          setFieldErrors({});
+          setSummaryErrors([]);
+          dirtyFieldsRef.current.clear();
+          clearFormDraftRef.current();
+          showInfoToast(
+            getLocalizedText(
+              {
+                'zh-CN': '内容未修改，无需保存。',
+                'en-US': 'No changes to save.',
+              },
+              locale,
+              t,
+            ),
+          );
+          navigate(resolveAfterSubmitRedirect(schema, targetModelCode, undefined, recordPid));
+          return;
+        }
         setSubmitting(true);
         return fetchResult(endpoint, {
           method,

@@ -40,8 +40,19 @@ function renderListTable(overrides: Partial<ListTableProps> = {}) {
 }
 
 describe('ListTable selection column layout', () => {
+  it('gives the business identity readable default space while preserving saved widths', () => {
+    const identity = { field: 'name', label: 'Project', presentation: { kind: 'object' as const } };
+    const { container, unmount } = renderListTable({ columns: [identity] });
+    expect(container.querySelector('col')).toHaveStyle({ width: '280px' });
+    unmount();
+    const saved = renderListTable({ columns: [identity], columnWidths: { name: 210 } });
+    expect(saved.container.querySelector('col')).toHaveStyle({ width: '210px' });
+  });
+
   it('declares column scope on data and action headers for browser table semantics', () => {
-    renderListTable({ columns: [...columns, { field: 'actions', label: 'Actions', isActionColumn: true }] });
+    renderListTable({
+      columns: [...columns, { field: 'actions', label: 'Actions', isActionColumn: true }],
+    });
     for (const field of ['name', 'kind', 'actions']) {
       expect(screen.getByTestId(`table-header-${field}`)).toHaveAttribute('scope', 'col');
     }
@@ -80,8 +91,10 @@ describe('ListTable selection column layout', () => {
 
   it('honors explicit non-ellipsis columns without changing the exact displayed value', () => {
     const quantity = '12345678901234567890.000001';
-    renderListTable({ columns: [{ field: 'quantity', label: 'Quantity', width: 140, ellipsis: false }],
-      data: [{ pid: 'row-1', quantity }] });
+    renderListTable({
+      columns: [{ field: 'quantity', label: 'Quantity', width: 140, ellipsis: false }],
+      data: [{ pid: 'row-1', quantity }],
+    });
     const cell = screen.getByTestId('table-cell-0-quantity');
     expect(cell).toHaveTextContent(quantity);
     expect(cell.querySelector('div.truncate')).toBeNull();
