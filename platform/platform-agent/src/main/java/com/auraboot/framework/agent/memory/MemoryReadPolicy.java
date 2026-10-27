@@ -7,6 +7,7 @@ public final class MemoryReadPolicy {
     private MemoryReadPolicy() {}
 
     public static final String LIVE = "(deleted_flag IS NULL OR deleted_flag = FALSE) "
+            + "AND (valid_from IS NULL OR valid_from <= NOW()) "
             + "AND (valid_until IS NULL OR valid_until > NOW())";
     public static final String VISIBLE = LIVE + " AND (scope = 'global' "
             + "OR (tenant_id = ? AND (scope = 'tenant' OR (scope = 'user' AND scope_key = ?))))";
