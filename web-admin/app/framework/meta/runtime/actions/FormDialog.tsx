@@ -221,6 +221,7 @@ function FormDialogHost() {
   const stateRef = useRef(state);
   stateRef.current = state;
   const containerRef = useRef<HTMLDivElement>(null);
+  const feedbackRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const inputSession = useRef(0);
   const uploadStatesRef = useRef<Record<string, FileUploadState>>({});
@@ -316,6 +317,13 @@ function FormDialogHost() {
     current.submission?.dispose();
   }, []);
   useModalFocusTrap(state.open, containerRef, handleCancel, firstInputRef);
+  useLayoutEffect(() => {
+    if (!state.open || state.submissionState?.phase !== 'failed') return;
+    // Reveal a newly settled failure even when a long summary was scrolled past.
+    // Field edits keep the same feedback object and do not steal focus again.
+    feedbackRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' });
+    feedbackRef.current?.focus({ preventScroll: true });
+  }, [state.open, state.inputSession, state.submissionState]);
   useEffect(() => {
     const submission = state.submission;
     if (!submission) return;
@@ -696,6 +704,8 @@ function FormDialogHost() {
         >
           {submissionState && submissionState.phase !== 'idle' && (
             <div
+              ref={feedbackRef}
+              tabIndex={-1}
               role={submissionState.phase === 'failed' ? 'alert' : 'status'}
               aria-live="polite"
               data-testid="form-dialog-submit-feedback"
@@ -733,7 +743,7 @@ function FormDialogHost() {
                 <div key={item.field} className="min-w-0">
                   <dt className="text-text-3 text-xs">{getLocalizedText(item.label, locale, t)}</dt>
                   <dd
-                    className="text-text mt-1 text-sm break-words"
+                    className="text-text mt-1 text-sm [overflow-wrap:anywhere] break-words whitespace-pre-wrap"
                     data-summary-field={item.field}
                   >
                     {getLocalizedText(item.value, locale, t)}

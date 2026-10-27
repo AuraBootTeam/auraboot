@@ -239,6 +239,9 @@ describe('actual FormDialog and native executor result handshake', () => {
     });
     expect(request.clientRequestId).toEqual(expect.any(String));
     expect(Object.keys(request.payload).sort()).toEqual(['conclusion', 'note']);
+    const feedback = screen.getByTestId('form-dialog-submit-feedback');
+    const scrollFeedback = vi.fn();
+    feedback.scrollIntoView = scrollFeedback;
     await act(async () => {
       fixture.pending.resolve(conflict);
     });
@@ -249,6 +252,8 @@ describe('actual FormDialog and native executor result handshake', () => {
       ),
     );
     expect(screen.getByRole('dialog', { name: 'Close · Case A' })).toBeInTheDocument();
+    expect(feedback).toHaveFocus();
+    expect(scrollFeedback).toHaveBeenCalledExactlyOnceWith({ block: 'start', inline: 'nearest' });
     expect(screen.getByTestId('form-dialog-field-note')).toHaveValue('Retain this exact note');
     expect(screen.getByTestId('form-dialog-field-conclusion')).toHaveValue('confirmed');
     expect(screen.getByTestId('form-dialog-summary')).toHaveTextContent('Case A');
