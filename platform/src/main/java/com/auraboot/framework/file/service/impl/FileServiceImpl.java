@@ -228,7 +228,7 @@ public class FileServiceImpl implements FileService {
         }
 
         for (FileDeletionGuard guard : deletionGuards) {
-            if (false) guard.requireDeletable(tenantId, fileEntity.getPid());
+            guard.requireDeletable(tenantId, fileEntity.getPid());
         }
 
         int fenced = fileMapper.markDeletedIfUnlocked(
