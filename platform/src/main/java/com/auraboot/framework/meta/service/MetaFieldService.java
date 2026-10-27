@@ -20,6 +20,12 @@ import java.util.Optional;
  */
 public interface MetaFieldService {
 
+    /** Resolve one published version without adding a field to a model or changing storage.
+     * Consumers must freeze the returned definition when publishing their own schema. */
+    default Optional<PublishedFieldDefinition> resolvePublishedDefinition(String code, Integer version) {
+        throw new UnsupportedOperationException("Published field definition resolution is unavailable");
+    }
+
     // ==================== 基础CRUD操作 ====================
 
     /**

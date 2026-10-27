@@ -356,6 +356,28 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     // ==================== 字段查询 ====================
 
     @Override
+    public Optional<PublishedFieldDefinition> resolvePublishedDefinition(String code, Integer version) {
+        Long tenant = MetaContext.getCurrentTenantId();
+        if (tenant == null || tenant <= 0) throw new IllegalStateException("A trusted tenant is required");
+        if (code == null || code.isBlank() || version == null || version < 1) {
+            throw new IllegalArgumentException("An exact field code and positive version are required");
+        }
+        Field field = metaFieldMapper.findByCodeAndVersion(code, version);
+        if (field == null || Boolean.TRUE.equals(field.getDeletedFlag())
+                || !tenant.equals(field.getTenantId()) || !code.equals(field.getCode())
+                || !version.equals(field.getVersion()) || !"published".equals(field.getStatus())) {
+            return Optional.empty();
+        }
+        // The canonical assembler does not yet translate rule_schema. Never silently discard it.
+        if (field.getRuleSchema() != null && !objectMapper.valueToTree(field.getRuleSchema()).isEmpty()) {
+            throw new UnsupportedOperationException("Published rule_schema requires an explicit rule adapter");
+        }
+        FieldDefinition definition = new ModelFieldDefinitionAssembler(
+                fieldBindingMapper, metaFieldMapper, objectMapper).convertToFieldDefinition(field, null);
+        return Optional.of(new PublishedFieldDefinition(tenant, field.getPid(), code, version, definition));
+    }
+
+    @Override
     public Optional<MetaFieldDTO> findCurrentByCode(String code) {
         log.debug("根据字段键查询当前版本字段: code={}", logSafe(code));
 
