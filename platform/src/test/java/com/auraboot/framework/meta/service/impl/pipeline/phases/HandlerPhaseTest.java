@@ -1293,22 +1293,37 @@ class HandlerPhaseTest {
         }
     }
 
-    @Test
-    void sealedContentInitializationFailureClosesTheAlreadyCreatedFileAndQueryScopes() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void sealedContentInitializationFailureClosesOwnedScopesAndPreservesTheCaller(boolean outerScope) {
         var factory = mock(com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory.class);
         ReflectionTestUtils.setField(phase, "sealedContentFactory", factory);
         var files = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
         ReflectionTestUtils.setField(phase, "commandTargetFiles", files);
-        var fileScope = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
-        var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
-                Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
-        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE))
-                .thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
-        when(files.forCommand(ctx)).thenReturn(fileScope);
-        when(factory.forCommand(ctx)).thenThrow(new IllegalStateException("sealed initialization failed"));
-        assertThatThrownBy(() -> phase.execute(ctx)).hasMessageContaining("sealed initialization failed");
-        verify(fileScope).close();
-        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        for (RuntimeException failure : List.of(new IllegalStateException("sealed initialization failed"),
+                new AccessDeniedException("publisher permission revoked"),
+                new com.auraboot.framework.exception.ConflictException("CAS_VERSION_CONFLICT", "changed", Map.of()))) {
+            var fileScope = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
+            var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
+                    Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE))
+                    .thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
+            when(files.forCommand(ctx)).thenReturn(fileScope);
+            when(factory.forCommand(ctx)).thenThrow(failure);
+            var callerScope = outerScope
+                    ? com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open() : null;
+            try {
+                assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+                verify(fileScope).close();
+                assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isEqualTo(outerScope);
+                if (callerScope != null) callerScope.close();
+                assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+            } finally {
+                if (callerScope != null) callerScope.close();
+                ((ThreadLocal<?>) ReflectionTestUtils.getField(
+                        com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.class, "CURRENT")).remove();
+            }
+        }
     }
 
     @Test
