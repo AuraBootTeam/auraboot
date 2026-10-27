@@ -507,7 +507,7 @@ export async function executeSimpleWorkbenchAction(
     // Upload only after the form and command preflight succeed. Reuse the platform
     // multipart bridge; browser authentication stays in the same-origin BFF session.
     // Neither File bytes nor a DSL-supplied upload URL belong in command JSON.
-    if (args.promptUpload) {
+    if (false && args.promptUpload) {
       const promptUpload = args.promptUpload;
       const file =
         resolvePromptUploadFile(promptUpload, params.payload) ??
