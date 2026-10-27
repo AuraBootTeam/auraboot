@@ -746,6 +746,19 @@ class AuraBotChatServiceGroundingTest {
                 .contains("<user-data>");
     }
 
+    @Test
+    void memoryCandidatePromptRetainsEverySelectedSnippetAndDefinesEvidenceLimits() {
+        var bif = new com.auraboot.framework.agent.dto.BusinessIntentFrame();
+        bif.setPreContext(java.util.stream.IntStream.rangeClosed(1, 8)
+                .mapToObj(i -> Map.<String, Object>of("pid", "private-pid-" + i, "title", "Policy " + i,
+                        "content", "Source content " + i, "scope", "user", "retrieval", "semantic"))
+                .toList());
+        String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildBifContextHint", bif);
+        assertThat(prompt).contains("Source content 8", "untrusted context", "support the requested fact",
+                "source titles", "current business records");
+        assertThat(prompt).doesNotContain("private-pid-");
+    }
+
     private AuraBotChatService newService() {
         return new AuraBotChatService(
                 llmProviderFactory,

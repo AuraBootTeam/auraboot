@@ -113,7 +113,7 @@ public class ActiveMemoryService {
     }
 
     /** Hard cap on snippets returned to Grounding — keep prompt size bounded. */
-    private static final int MAX_SNIPPETS = 8;
+    public static final int MAX_SNIPPETS = 8;
     /** Keyword hits weighted more heavily than importance recall. */
     private static final int KEYWORD_LIMIT = 5;
     private static final int IMPORTANCE_LIMIT = 5;
