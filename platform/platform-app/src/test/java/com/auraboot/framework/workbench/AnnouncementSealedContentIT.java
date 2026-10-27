@@ -59,6 +59,7 @@ class AnnouncementSealedContentIT {
     @Autowired IdentityDirectoryAccessor identities;
     @Autowired PermissionService permissions;
     @Autowired UserPermissionService userPermissions;
+    @Autowired com.auraboot.framework.permission.service.impl.PermissionSnapshotCache permissionSnapshots;
     @Autowired RolePermissionMapper rolePermissions;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
@@ -150,10 +151,47 @@ class AnnouncementSealedContentIT {
         freeze(true);Files.write(STORAGE.resolve(fileKey),"tampered byte data!".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         assertThrows(IllegalStateException.class,()->command(bridge->bridge.requirePublishedContentForCommand(expected())));
     }
+    @Test void sourceByteChangeAfterProofIsRejectedAtCommit() {
+        freeze(true);
+        assertThrows(RuntimeException.class,()->command(bridge->{bridge.requirePublishedContentForCommand(expected());
+            try {Files.write(STORAGE.resolve(fileKey),"tampered byte data!".getBytes(java.nio.charset.StandardCharsets.UTF_8));}
+            catch(java.io.IOException failure){throw new java.io.UncheckedIOException(failure);}
+        }));
+    }
+    @Test void anActiveOwnerWithoutPublishCannotBorrowContentAuthority() {
+        freeze(true);jdbc.update("UPDATE ab_role_permission SET deleted_flag=true WHERE tenant_id=?",tenant.getId());
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->command(bridge->bridge.requirePublishedContentForCommand(expected())));
+    }
     @Test void publisherPermissionRevocationCannotReuseAProofAtCommit() {
-        freeze(true);assertThrows(RuntimeException.class,()->command(bridge->{bridge.requirePublishedContentForCommand(expected());
+        freeze(true);assertTrue(userPermissions.hasPermission(user.getId(),"announcement.announcement.publish"));
+        assertThrows(RuntimeException.class,()->command(bridge->{bridge.requirePublishedContentForCommand(expected());
             jdbc.update("UPDATE ab_role_permission SET deleted_flag=true WHERE tenant_id=?",tenant.getId());
         }));
+        assertTrue(onAnotherThread(()->userPermissions.hasPermission(user.getId(),"announcement.announcement.publish")));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE tenant_id=? AND deleted_flag=true",Integer.class,tenant.getId()));
     }
+    @Test void uncommittedFreshGrantIsNeverPublishedToAnotherThreadOrRollbackCache() {
+        var definition=new PermissionCreateRequest();definition.setCode("announcement.announcement.manage");definition.setName("Manage official announcement");
+        definition.setResourceType("model");definition.setResourceCode("announcement.announcement");definition.setAction("manage");definition.setSource("integration_test");
+        var created=permissions.create(definition);userPermissions.evictPermissionDefinitions(tenant.getId());
+        assertFalse(userPermissions.hasPermission(user.getId(),definition.getCode()));
+        long role=jdbc.queryForObject("SELECT role_id FROM ab_user_role WHERE tenant_id=? AND member_id=?",Long.class,tenant.getId(),memberId);
+        new TransactionTemplate(transactions).executeWithoutResult(status->{
+            var grant=new RolePermission();grant.setPid(UniqueIdGenerator.generate());grant.setTenantId(tenant.getId());grant.setRoleId(role);
+            grant.setPermissionId(created.getId());grant.setGrantType("grant");grant.setStatus("active");grant.setPriority(100);grant.setDeletedFlag(false);
+            grant.setCreatedAt(Instant.now());grant.setUpdatedAt(Instant.now());rolePermissions.insert(grant);
+            assertTrue(permissionSnapshots.withFreshReads(()->userPermissions.hasPermission(user.getId(),definition.getCode())));
+            assertFalse(onAnotherThread(()->userPermissions.hasPermission(user.getId(),definition.getCode())));
+            status.setRollbackOnly();
+        });
+        assertFalse(onAnotherThread(()->userPermissions.hasPermission(user.getId(),definition.getCode())));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE tenant_id=? AND permission_id=?",Integer.class,tenant.getId(),created.getId()));
+    }
+    boolean onAnotherThread(java.util.function.Supplier<Boolean> task) {
+        var identity=MetaContext.snapshot();var executor=java.util.concurrent.Executors.newSingleThreadExecutor();
+        try{return executor.submit(()->{MetaContext.restore(identity);try{return task.get();}finally{MetaContext.clear();}}).get(10,java.util.concurrent.TimeUnit.SECONDS);}
+        catch(Exception failure){throw new IllegalStateException(failure);}
+        finally{executor.shutdownNow();}
+    }
+
 }

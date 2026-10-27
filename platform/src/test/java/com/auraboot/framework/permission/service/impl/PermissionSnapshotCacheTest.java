@@ -342,6 +342,53 @@ class PermissionSnapshotCacheTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test
+    void freshReadsBypassAllSnapshotLayersWithoutPublishingTheirValues() {
+        stubUserRole(100L,5L,7L);stubBaseline(100L,8L);
+        when(rolePermissionMapper.findPermissionIdsByRole(7L)).thenReturn(Set.of(50L),Set.of(51L));
+        when(rolePermissionMapper.findPermissionIdsByRole(8L)).thenReturn(Set.of(60L),Set.of(61L));
+        assertThat(cache.getEffectivePermissionIds(100L,1L,5L)).containsExactlyInAnyOrder(50L,60L);
+        assertThat(cache.withFreshReads(()->cache.getEffectivePermissionIds(100L,1L,5L))).containsExactlyInAnyOrder(51L,61L);
+        assertThat(cache.getEffectivePermissionIds(100L,1L,5L)).containsExactlyInAnyOrder(50L,60L);
+        verify(roleMapper,times(2)).findByTenantIdAndCode(100L,"tenant_member");
+        verify(userRoleMapper,times(2)).findEffectiveByMemberIdAndTenantId(eq(5L),eq(100L),any(LocalDate.class));
+        verify(rolePermissionMapper,times(2)).findPermissionIdsByRole(7L);
+    }
+
+    @Test
+    void nestedFreshScopesAndExceptionalExitRestoreTheOriginalCacheMode() {
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")),List.of(permission(60L,"code")));
+        assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
+        cache.withFreshReads(()->{
+            assertThatThrownBy(()->cache.withFreshReads(()->{assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(60L);throw new IllegalStateException("fixture");}))
+                    .isInstanceOf(IllegalStateException.class);
+            assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(60L);
+            return null;
+        });
+        assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
+        verify(permissionMapper,times(3)).findResolvableDefinitions(100L);
+    }
+
+    @Test
+    void freshScopeIsNotInheritedByWorkersOrOtherTenantCachedReaders() throws Exception {
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")),List.of(permission(60L,"code")));
+        when(permissionMapper.findResolvableDefinitions(200L)).thenReturn(List.of(permission(70L,"other")));
+        assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
+        assertThat(cache.resolvePermissionId(200L,"other")).isEqualTo(70L);
+        ExecutorService worker=Executors.newSingleThreadExecutor();
+        try {
+            cache.withFreshReads(()->{
+                assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(60L);
+                try {
+                    assertThat(worker.submit(()->cache.resolvePermissionId(100L,"code")).get(5,TimeUnit.SECONDS)).isEqualTo(50L);
+                    assertThat(worker.submit(()->cache.resolvePermissionId(200L,"other")).get(5,TimeUnit.SECONDS)).isEqualTo(70L);
+                } catch(Exception failure){throw new IllegalStateException(failure);}
+                return null;
+            });
+        } finally {worker.shutdownNow();}
+        verify(permissionMapper,times(1)).findResolvableDefinitions(200L);
+    }
+
     private void stubUserRole(Long tenantId, Long memberId, Long roleId) {
         UserRole userRole = new UserRole();
         userRole.setRoleId(roleId);

@@ -57,6 +57,23 @@ public class PermissionSnapshotCache {
 
     private static final String BASELINE_ROLE_CODE = "tenant_member";
 
+    private final ThreadLocal<Integer> freshReadDepth = new ThreadLocal<>();
+
+    /**
+     * Host-only, thread-bound fresh reads through the same loaders. No shared cache is read or
+     * populated in this scope; this does not change transaction visibility or contributor caches.
+     */
+    public <T> T withFreshReads(Supplier<T> read) {
+        Objects.requireNonNull(read, "read");
+        Integer previous = freshReadDepth.get();
+        freshReadDepth.set(previous == null ? 1 : previous + 1);
+        try { return read.get(); }
+        finally {
+            if (previous == null) freshReadDepth.remove();
+            else freshReadDepth.set(previous);
+        }
+    }
+
     private final PermissionMapper permissionMapper;
     private final UserRoleMapper userRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
@@ -314,6 +331,7 @@ public class PermissionSnapshotCache {
     }
 
     private <T> T getOrLoad(String cacheName, Object key, Supplier<T> loader) {
+        if (freshReadDepth.get() != null) return loader.get();
         return cache(cacheName).get(key, loader::get);
     }
 
