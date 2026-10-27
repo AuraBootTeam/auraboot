@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { downloadWithAuth } from '~/framework/meta/utils/commandDownload';
+import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
+import {
+  pickFile,
+  resolvePromptUploadAccept,
+  resolvePromptUploadFile,
+  resolvePromptUploadFilenameKey,
+  resolvePromptUploadKey,
+  resolvePromptUploadReviewPayload,
+  uploadCommandFile,
+} from '~/framework/meta/utils/promptUpload';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
@@ -466,8 +476,9 @@ export async function executeSimpleWorkbenchAction(
           args.inputFieldsSubmitLabel,
           runtime.getContext(),
         );
-      } catch {
-        return; // user cancelled the form — abort without executing the command
+      } catch (error) {
+        if (error instanceof ActionCancelledError) return;
+        throw error;
       }
     }
 
@@ -493,6 +504,34 @@ export async function executeSimpleWorkbenchAction(
       operationType,
       payload: { ...(args.payload || {}), ...collectedInputs },
     };
+    // Upload only after the form and command preflight succeed. Reuse the platform
+    // multipart bridge; browser authentication stays in the same-origin BFF session.
+    // Neither File bytes nor a DSL-supplied upload URL belong in command JSON.
+    if (args.promptUpload) {
+      const promptUpload = args.promptUpload;
+      const file =
+        resolvePromptUploadFile(promptUpload, params.payload) ??
+        (await pickFile(resolvePromptUploadAccept(promptUpload)));
+      if (!file) return;
+      try {
+        const fileId = await uploadCommandFile(file);
+        params.payload = {
+          ...params.payload,
+          ...resolvePromptUploadReviewPayload(promptUpload, params.payload),
+          [resolvePromptUploadKey(promptUpload)]: fileId,
+          [resolvePromptUploadFilenameKey(promptUpload)]: file.name,
+        };
+      } catch (error) {
+        showCommandFeedback(
+          runtime,
+          feedback,
+          'errorMessage',
+          'error',
+          error instanceof Error ? error.message : `${command} failed`,
+        );
+        throw error;
+      }
+    }
     if (targetRecordPid) {
       params.targetRecordPid = targetRecordPid;
     }

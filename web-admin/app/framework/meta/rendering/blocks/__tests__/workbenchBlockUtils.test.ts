@@ -85,6 +85,194 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
+  it('uploads confirmed form bytes before sending only the file identity and filename', async () => {
+    const runtime = makeRuntime() as any;
+    const file = new File(['actual image bytes'], 'catalog.png', { type: 'image/png' });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ code: '0', data: { fileId: 'file-owned-1' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.addEventListener(
+      'dialog:form',
+      ((event: CustomEvent) => {
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(fetchResultMock).not.toHaveBeenCalled();
+        event.detail.onSubmit({ sourceFileId: file, altText: 'Front view' });
+      }) as EventListener,
+      { once: true },
+    );
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'catalog:attach_media',
+        payload: { product: 'product-1' },
+        inputFields: [{ field: 'sourceFileId', type: 'file', fileValueMode: 'file' }],
+        promptUpload: {
+          key: 'sourceFileId',
+          accept: 'image/png',
+          uploadUrl: 'https://untrusted.invalid/upload',
+        },
+        reload: ['media'],
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, request] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/file/upload');
+    expect(request).toMatchObject({ method: 'POST', credentials: 'include', headers: {} });
+    const uploaded = request.body.get('file') as File;
+    expect(uploaded.name).toBe('catalog.png');
+    expect(uploaded.type).toBe('image/png');
+    const text = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsText(uploaded);
+    });
+    expect(text).toBe('actual image bytes');
+    expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchResultMock.mock.invocationCallOrder[0],
+    );
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/catalog:attach_media',
+      {
+        method: 'post',
+        params: {
+          payload: {
+            product: 'product-1',
+            sourceFileId: 'file-owned-1',
+            sourceFilename: 'catalog.png',
+            altText: 'Front view',
+          },
+        },
+      },
+    );
+    expect(runtime.__reload).toHaveBeenCalledWith(['media']);
+  });
+
+  it('does not upload or execute a command when the input form is cancelled', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    window.addEventListener(
+      'dialog:form',
+      ((event: CustomEvent) => {
+        event.detail.onCancel();
+      }) as EventListener,
+      { once: true },
+    );
+    await executeSimpleWorkbenchAction(makeRuntime(), {
+      action: 'command.execute',
+      args: {
+        command: 'catalog:attach_media',
+        promptUpload: true,
+        inputFields: [{ field: 'source_file_id', type: 'file', fileValueMode: 'file' }],
+      },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchResultMock).not.toHaveBeenCalled();
+  });
+
+  it('propagates input option errors instead of treating them as cancellation', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    fetchResultMock.mockRejectedValueOnce(new Error('option request failed'));
+    await expect(
+      executeSimpleWorkbenchAction(makeRuntime(), {
+        action: 'command.execute',
+        args: {
+          command: 'catalog:attach_media',
+          promptUpload: true,
+          inputFields: [{ field: 'kind', dictCode: 'media_kind' }],
+        },
+      }),
+    ).rejects.toThrow('option request failed');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchResultMock).toHaveBeenCalledTimes(1);
+    expect(fetchResultMock.mock.calls[0][0]).toContain('/api/meta/dict/');
+  });
+
+  it.each([
+    {
+      name: 'HTTP rejection',
+      response: { ok: false, status: 403, json: async () => ({ message: 'Upload denied' }) },
+      error: 'Upload denied',
+    },
+    {
+      name: 'missing file identity',
+      response: { ok: true, json: async () => ({ code: '0', data: {} }) },
+      error: 'no fileId',
+    },
+  ])('does not execute or reload after upload $name', async ({ response, error }) => {
+    const runtime = makeRuntime() as any;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    window.addEventListener(
+      'dialog:form',
+      ((event: CustomEvent) => {
+        event.detail.onSubmit({ source_file_id: new File(['bytes'], 'asset.png') });
+      }) as EventListener,
+      { once: true },
+    );
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: 'command.execute',
+        args: {
+          command: 'catalog:attach_media',
+          promptUpload: true,
+          reload: ['media'],
+          inputFields: [{ field: 'source_file_id', type: 'file', fileValueMode: 'file' }],
+        },
+      }),
+    ).rejects.toThrow(error);
+    expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(runtime.__reload).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid command versions before any upload or picker', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      executeSimpleWorkbenchAction(makeRuntime(), {
+        action: 'command.execute',
+        args: {
+          command: 'catalog:attach_media',
+          expectedVersion: -1,
+          promptUpload: true,
+        },
+      }),
+    ).rejects.toThrow('expectedVersion');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+  });
+
+  it('stops when the standalone file picker is cancelled', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      expect(this.accept).toBe('image/png');
+      this.dispatchEvent(new Event('cancel'));
+    });
+    try {
+      await executeSimpleWorkbenchAction(makeRuntime(), {
+        action: 'command.execute',
+        args: {
+          command: 'catalog:attach_media',
+          promptUpload: { key: 'sourceFileId', accept: 'image/png' },
+        },
+      });
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(fetchResultMock).not.toHaveBeenCalled();
+      expect(document.querySelector('input[type="file"]')).toBeNull();
+    } finally {
+      click.mockRestore();
+    }
+  });
+
   it('navigates workbench actions to an explicit path or custom page key', async () => {
     const navigateTo = vi.fn();
     const runtime = makeRuntime({ navigateTo }) as any;

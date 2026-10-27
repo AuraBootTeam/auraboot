@@ -51,6 +51,7 @@
         "path",
         "payload",
         "pollIntervalMs",
+        "promptUpload",
         "reload",
         "reloadIntervalMs",
         "reloadOnError",
