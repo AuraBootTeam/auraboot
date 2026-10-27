@@ -23,6 +23,18 @@ class CommandDefinitionDTOTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    void formalExecutionSchemaAcceptsOnlyBooleanCachePolicy() throws Exception {
+        var manifest = mapper.readTree(java.nio.file.Files.readString(
+                java.nio.file.Path.of("../plugins/schemas/plugin-manifest.schema.json")));
+        var schema = com.networknt.schema.JsonSchemaFactory.getInstance(com.networknt.schema.SpecVersion.VersionFlag.V7)
+                .getSchema(manifest.at("/$defs/commandDefinition/properties/executionConfig"));
+        for (String value : java.util.List.of("true", "false"))
+            assertTrue(schema.validate(mapper.readTree("{\"cacheResult\":" + value + "}")).isEmpty());
+        for (String value : java.util.List.of("\"false\"", "null", "0", "{}", "[]"))
+            assertFalse(schema.validate(mapper.readTree("{\"cacheResult\":" + value + "}")).isEmpty());
+    }
+
+    @Test
     void resultCachePolicySurvivesTypedImportAndStoredJson() throws Exception {
         for (boolean cache : new boolean[]{false, true}) {
             var dto = mapper.readValue("{\"code\":\"fixture:query\",\"type\":\"query\","
