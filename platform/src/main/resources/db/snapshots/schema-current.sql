@@ -1033,6 +1033,26 @@ $$;
 
 
 --
+-- Name: guard_announcement_content_seal(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.guard_announcement_content_seal() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP <> 'INSERT' THEN RAISE EXCEPTION 'Announcement content seals are immutable'; END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM ab_announcement_version v
+        WHERE v.tenant_id=NEW.tenant_id AND v.announcement_pid=NEW.announcement_pid
+          AND v.pid=NEW.version_pid AND v.snapshot_hash=NEW.snapshot_hash
+          AND v.snapshot_schema='announcement.v1'
+          AND v.xmin::text::bigint = mod(pg_current_xact_id()::text::numeric,4294967296)::bigint
+    ) THEN RAISE EXCEPTION 'Content seal requires the same transaction as a new official frozen version'; END IF;
+    RETURN NEW;
+END $$;
+
+
+--
 -- Name: protect_notification_durable_intent(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3931,6 +3951,29 @@ CREATE TABLE public.ab_announcement_audit (
     previous_revision integer,
     resulting_revision integer NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: ab_announcement_content_seal; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_announcement_content_seal (
+    tenant_id bigint NOT NULL,
+    announcement_pid character varying(36) NOT NULL,
+    version_pid character varying(36) NOT NULL,
+    snapshot_hash character varying(64) NOT NULL,
+    projection_schema character varying(64) NOT NULL,
+    canonical_projection text NOT NULL,
+    seal_identity character varying(64) NOT NULL,
+    document_digest character varying(64) NOT NULL,
+    source_identity_kind character varying(32) NOT NULL,
+    sealed_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT ab_announcement_content_seal_document_digest_check CHECK (((document_digest)::text ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ab_announcement_content_seal_projection_schema_check CHECK (((projection_schema)::text = 'operating-policy-document.v1'::text)),
+    CONSTRAINT ab_announcement_content_seal_seal_identity_check CHECK (((seal_identity)::text ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ab_announcement_content_seal_snapshot_hash_check CHECK (((snapshot_hash)::text ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ab_announcement_content_seal_source_identity_kind_check CHECK (((source_identity_kind)::text = 'SEAL_OBSERVED_CONTENT'::text))
 );
 
 
@@ -20360,6 +20403,14 @@ ALTER TABLE ONLY public.ab_announcement_audit
 
 
 --
+-- Name: ab_announcement_content_seal ab_announcement_content_seal_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_content_seal
+    ADD CONSTRAINT ab_announcement_content_seal_pkey PRIMARY KEY (tenant_id, version_pid);
+
+
+--
 -- Name: ab_announcement_delivery ab_announcement_delivery_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -31671,6 +31722,13 @@ CREATE TRIGGER ab_announcement_approval_binding_guard BEFORE UPDATE ON public.ab
 
 
 --
+-- Name: ab_announcement_content_seal ab_announcement_content_seal_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_announcement_content_seal_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_announcement_content_seal FOR EACH ROW EXECUTE FUNCTION public.guard_announcement_content_seal();
+
+
+--
 -- Name: ab_announcement_audience_estimate_header ab_announcement_estimate_header_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -32094,6 +32152,14 @@ ALTER TABLE ONLY public.ab_announcement_audience_estimate
 
 ALTER TABLE ONLY public.ab_announcement_audit
     ADD CONSTRAINT ab_announcement_audit_tenant_id_announcement_pid_fkey FOREIGN KEY (tenant_id, announcement_pid) REFERENCES public.ab_announcement(tenant_id, pid);
+
+
+--
+-- Name: ab_announcement_content_seal ab_announcement_content_seal_tenant_id_announcement_pid_ve_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_announcement_content_seal
+    ADD CONSTRAINT ab_announcement_content_seal_tenant_id_announcement_pid_ve_fkey FOREIGN KEY (tenant_id, announcement_pid, version_pid) REFERENCES public.ab_announcement_version(tenant_id, announcement_pid, pid);
 
 
 --
