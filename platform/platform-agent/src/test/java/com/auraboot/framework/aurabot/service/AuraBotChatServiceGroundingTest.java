@@ -755,8 +755,9 @@ class AuraBotChatServiceGroundingTest {
                 .toList());
         String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildBifContextHint", bif);
         assertThat(prompt).contains("Source content 8", "untrusted context", "support the requested fact",
-                "source titles", "current business records", "exact substring of the source content alone");
-        assertThat(prompt).doesNotContain("private-pid-");
+                "source titles", "current business records", "exact substring of the source content alone",
+                "\"title\":\"Policy 8\"", "\"content\":\"Source content 8\"", "\"scope\":\"user\"");
+        assertThat(prompt).doesNotContain("private-pid-", "[user] Policy");
     }
 
     @Test
