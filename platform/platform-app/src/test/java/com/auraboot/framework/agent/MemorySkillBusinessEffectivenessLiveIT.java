@@ -348,7 +348,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             }
             var before = businessSnapshot();
             wireCalls.clear(); long started = System.nanoTime();
-            String prompt = scenario.path("prompt").asText()
+            String prompt = lifecycleText(scenario.path("prompt").asText())
                     + " 先查询实时记录。最后独立一行输出 status=<order_status原始值>; days_late=<整数>。";
             String conversation = UniqueIdGenerator.generate();
             ChatRequest chat = new ChatRequest(); chat.setAgentCode("aurabot"); chat.setSessionId(conversation); chat.setMessage(prompt);
@@ -370,7 +370,8 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             String plain = answer == null ? "" : answer.replace("*", "").replace("`", "");
             sample.put("businessCorrect", plain.matches("(?s).*status\\s*=\\s*" + scenario.path("status").asText()
                     + "\\s*;\\s*days_late\\s*=\\s*" + scenario.path("daysLate").asInt() + "(?:\\s|$).*"));
-            sample.put("headingCorrect", plain.stripLeading().startsWith(scenario.path("heading").asText()));
+            sample.put("headingCorrect", plain.stripLeading().replaceFirst("^#{1,6}\\s+", "")
+                    .startsWith(lifecycleText(scenario.path("heading").asText())));
             sample.put("observedBusinessRead", observedBusinessRead(json, wireCalls, scenario.path("status").asText(), scenario.path("daysLate").asInt()));
             sample.put("businessUnchanged", before.equals(businessSnapshot()));
             sample.put("foreignLeak", wire.contains(foreign) || plain.contains(foreign));
@@ -399,6 +400,11 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             sample.put("turnId", turnId); sample.put("writtenMemoryPid", written.getFirst()); writeCheckpoint();
         }
         assertThat(samples).hasSize(8);
+    }
+
+    private String lifecycleText(String value) {
+        return value.replace("【星河周会】", "【星河周会/A" + suffix + "】")
+                .replace("【星河复盘】", "【星河复盘/A" + suffix + "】");
     }
 
     private void recallAnswerMeasurement() throws Exception {
@@ -763,6 +769,12 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         if (recallAnswers()) {
             Map<String, Object> enriched = new LinkedHashMap<>(json.convertValue(report, Map.class));
             enriched.put("recallEvidence", recallEvidence); report = enriched;
+        }
+        if (lifecycle()) {
+            Map<String, Object> enriched = new LinkedHashMap<>(json.convertValue(report, Map.class));
+            enriched.put("modelCode", modelCode);
+            enriched.put("journeyMarker", "A" + suffix);
+            report = enriched;
         }
         String serialized = json.writerWithDefaultPrettyPrinter().writeValueAsString(report);
         String keyName = System.getenv("AURA_LIVE_LLM_API_KEY_ENV");
