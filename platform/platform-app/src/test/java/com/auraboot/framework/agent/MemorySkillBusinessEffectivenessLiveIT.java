@@ -315,7 +315,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         if (isMemory && enabled) memory.createScopedMemory(tenantId, "aurabot", "turn_summary", "test",
                 "ACME-184 MISSING-404 order reference", memoryText, 9, false, "user", getTestUser().getId().toString());
         String prompt = scenario.path("prompt").asText()
-                + " 请先查询实时记录。末尾独立一行输出 status=<raw enum or NOT_FOUND>; days_late=<integer or NA>; amount=<integer or NA>。"
+                + " 请先查询实时记录。末尾独立一行输出 status=<order_status 的原始值，不能用 order_priority；缺记录用 NOT_FOUND>; days_late=<integer or NA>; amount=<integer or NA>。"
                 + " 再单独一行输出 decision=<FACTS|NOT_FOUND|ESCALATE|NO_ESCALATION|REQUIRED|NOT_REQUIRED|NEEDS_INPUT>。不要输出多个决定。";
         long started = System.nanoTime(); String answer; String outcome; boolean pending = false;
         Map<String, Object> routing = new LinkedHashMap<>();
@@ -348,6 +348,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             jdbc.update("INSERT INTO ab_agent_skill (pid,tenant_id,skill_code,skill_name,skill_level,skill_category,skill_tools,execution_mode,prompt_template,max_steps,max_retry,skill_status,deleted_flag) VALUES (?,?,?,?,'workflow','test',?::jsonb,'orchestration',?,4,0,'active',FALSE)",
                     UniqueIdGenerator.generate(), tenantId, code, code, json.writeValueAsString(List.of("list:" + modelCode)), procedure);
             var resolution = providers.resolveProvider(tenantId, live.providerCode()); assertThat(resolution).isNotNull();
+            resolution.getConfig().setMaxTokens(768);
             String runId = UniqueIdGenerator.generate();
             SkillResult result = engine.execute(tenantId, runId, code, SkillInput.builder().intent("query").object(modelCode).userMessage(prompt).build(),
                     null, resolution.getProvider(), resolution.getConfig());
@@ -388,9 +389,26 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         String status = missing ? "NOT_FOUND" : f.path("order_status").asText();
         String days = missing ? "NA" : f.path("days_late").asText();
         String amount = missing || f.path("order_amount").isNull() ? "NA" : f.path("order_amount").asText();
-        String expected = "status=" + status + ";days_late=" + days + ";amount=" + amount;
-        return answer.replace("`", "").replace("*", "").lines()
-                .anyMatch(line -> line.replaceAll("\\s", "").equalsIgnoreCase(expected));
+        return structuredFacts(answer).equals(Map.of("status", status, "days_late", days, "amount", amount));
+    }
+
+    static Map<String, String> structuredFacts(String answer) {
+        if (answer == null) return Map.of();
+        var values = new LinkedHashMap<String, String>();
+        var token = java.util.regex.Pattern.compile("(?i)^(status|order_status|days_late|amount|order_amount)\\s*=\\s*([A-Z_]+|[0-9]+)$");
+        for (String line : answer.replace("`", "").replace("*", "").lines().toList()) {
+            String[] parts = line.strip().split(";", -1);
+            var fields = new LinkedHashMap<String, String>(); boolean assignments = true;
+            for (String part : parts) {
+                var match = token.matcher(part.strip());
+                if (!match.matches()) { assignments = false; break; }
+                String key = match.group(1).toLowerCase(java.util.Locale.ROOT).replace("order_", "");
+                if (fields.put(key, match.group(2).toUpperCase(java.util.Locale.ROOT)) != null) return Map.of();
+            }
+            if (!assignments) continue;
+            for (var field : fields.entrySet()) if (values.put(field.getKey(), field.getValue()) != null) return Map.of();
+        }
+        return values;
     }
 
     static boolean expandedBusinessRead(ObjectMapper json, List<Map<String, Object>> wireCalls, com.fasterxml.jackson.databind.JsonNode scenario) {
@@ -410,7 +428,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                             && record.path("order_status").asText().equals(f.path("order_status").asText())
                             && record.path("order_priority").asText().equals(f.path("order_priority").asText())
                             && record.path("days_late").asInt(-1) == f.path("days_late").asInt()
-                            && (f.path("order_amount").isNull() ? record.path("order_amount").isNull()
+                            && (f.path("order_amount").isNull() ? record.path("order_amount").isNull() || record.path("order_amount").isMissingNode()
                             : record.path("order_amount").asInt(-1) == f.path("order_amount").asInt())) return true;
                 }
             } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
@@ -468,6 +486,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     }
 
     private Map<String, Object> recordRequest(LlmChatRequest request) throws Exception {
+        if (expanded() && request.getMaxTokens() > 768) throw new IllegalStateException("Per-request token budget exceeded");
         if (++providerCalls > (expanded() ? 288 : 96)) throw new IllegalStateException("Provider call budget exhausted");
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("requestedModel", request.getModel());

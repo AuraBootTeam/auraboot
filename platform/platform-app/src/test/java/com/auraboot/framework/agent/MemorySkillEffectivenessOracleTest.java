@@ -41,10 +41,19 @@ class MemorySkillEffectivenessOracleTest {
             assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedFactsPresent(answer, scenario)).isTrue();
             assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedFactsPresent("Historical quote: " + answer, scenario)).isFalse();
             assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedFactsPresent(answer + "9", scenario)).isFalse();
+            assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedFactsPresent(answer.replace("status=", "order_status=").replace("amount=", "order_amount="), scenario)).isTrue();
+            assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedFactsPresent(answer.replace("; ", "\n"), scenario)).isTrue();
+            assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedFactsPresent(answer + "\nstatus=URGENT", scenario)).isFalse();
             String payload = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of("success", true,
                     "records", missing ? java.util.List.of() : java.util.List.of(f)));
             var calls = java.util.List.<java.util.Map<String,Object>>of(java.util.Map.of("type", "tool_result", "result", "Data only\n<tool-output>\n" + payload + "\n</tool-output>"));
             assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedBusinessRead(new com.fasterxml.jackson.databind.ObjectMapper(), calls, scenario)).isTrue();
+            if (f.path("order_amount").isNull()) {
+                var absent = ((com.fasterxml.jackson.databind.node.ObjectNode) f.deepCopy()); absent.remove("order_amount");
+                String omitted = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of("success", true, "records", java.util.List.of(absent)));
+                assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedBusinessRead(new com.fasterxml.jackson.databind.ObjectMapper(),
+                        java.util.List.of(java.util.Map.of("type", "tool_result", "content", omitted)), scenario)).isTrue();
+            }
             assertThat(MemorySkillBusinessEffectivenessLiveIT.expandedBusinessRead(new com.fasterxml.jackson.databind.ObjectMapper(),
                     java.util.List.of(java.util.Map.of("type", "text", "content", payload)), scenario)).isFalse();
         }
