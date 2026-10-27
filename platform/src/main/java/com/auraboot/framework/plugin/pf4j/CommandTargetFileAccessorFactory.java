@@ -12,9 +12,6 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
-import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
-import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
-import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
 import com.auraboot.framework.meta.service.impl.RecordMutationLockGuard;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.plugin.extension.FileAccessor;
@@ -128,8 +125,6 @@ public class CommandTargetFileAccessorFactory {
                 .filter(f -> fieldCode.equals(f.getCode())).findFirst().orElseThrow(CommandTargetFileAccessorFactory::denied);
         if (!"file".equals(field.getDataType()) || field.isVirtual() || field.isJsonbVirtual()
                 || field.getExtraProps() == null || !Boolean.TRUE.equals(field.getExtraProps().get("multiple"))) throw denied();
-        FieldWriterGuard.assertFieldWriteAllowed(model, fieldCode);
-        ModelMutationGuard.assertMutable(model, "update");
         // Parent locks always precede file locks. The original command's scoped read rechecks
         // visibility while the root is locked; no arbitrary model/PID enters the public API.
         var conditions = Map.<String,Object>of("tenant_id", actor.tenant(), "pid", target);
@@ -145,12 +140,9 @@ public class CommandTargetFileAccessorFactory {
                 || version.longValue() != expectedVersion)) {
             throw new com.auraboot.framework.exception.ConflictException("iot.error.version_conflict");
         }
-        RecordCommandWriterGuard.assertStoredAllowed(model, parent, "update");
+        com.auraboot.framework.file.service.impl.FileRelationMutationGuard.assertWritableMetadata(model,field,parent);
         RecordMutationLockGuard.guardTargets(records, model, code -> models.getModelDefinition(code).orElse(null),
                 "update", conditions, Map.of());
-        if (field.isImmutable() || (field.getImmutableWhen() != null && field.getImmutableWhen().getIn() != null
-                && field.getImmutableWhen().getIn().contains(Objects.toString(parent.get(field.getImmutableWhen().getField()), null))))
-            throw denied();
         // A command may append several uploads. Require a stable order across distinct files
         // so two different roots cannot deadlock while retaining overlapping upload sets.
         if (!scope.lockedFiles.contains(filePid) && !scope.lockedFiles.isEmpty()

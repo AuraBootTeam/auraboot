@@ -55,9 +55,12 @@ class CommandTargetFileAppendIT {
         model="file_append_"+Long.toString(System.currentTimeMillis(),36); table="mt_"+model; command=model+":repair";
         var photos=FieldDefinition.builder().code("photos").columnName("photos").dataType("file").length(32768).maxLength(32768)
                 .extraProps(Map.of("multiple",true,"maxCount",10)).allowedWriterCommands(List.of(command)).build();
+        var legacy=FieldDefinition.builder().code("legacy_photos").columnName("legacy_photos").dataType("file").build();
+        var frozen=FieldDefinition.builder().code("frozen_photos").columnName("frozen_photos").dataType("file")
+                .immutable(true).allowedWriterCommands(List.of(command)).build();
         var evidence=FieldDefinition.builder().code("evidence").columnName("evidence").dataType("string").maxLength(128).build();
         models.saveDefinition(ModelDefinition.builder().code(model).tableName(table).status("published")
-                .modelType("entity").displayName("Command target append IT").fields(List.of(photos,evidence)).build());
+                .modelType("entity").displayName("Command target append IT").fields(List.of(photos,evidence,legacy,frozen)).build());
         // Explicit model initialization through the official schema service, never ad-hoc ALTER.
         var result=schema.createTableByModel(model);
         assertThat(result.isSuccess()).as(result.getErrorMessage()).isTrue();
@@ -180,6 +183,63 @@ class CommandTargetFileAppendIT {
         String parent=parent(), file=upload(TENANT,USER,"success"); actor(); assertThat(files.deleteFile(file,USER)).isTrue();
         assertThatThrownBy(()->command(parent,a->a.appendAndRetainExistingToTarget(file,"photos"))).isInstanceOf(AccessDeniedException.class);
         assertThat(relationCount(parent)).isZero(); assertThat(retained(file)).isFalse(); assertThat(evidence(parent)).isEqualTo("before");
+    }
+    @Test void legacyRelationEntrypointsCannotReplaceOrRemoveACommandOwnedFileField() {
+        String parent=parent(), first=upload(TENANT,USER,"success"), second=upload(TENANT,USER,"success");
+        String projection="[\""+first+"\"]";
+        command(parent,a->{data.update(model,parent,Map.of("photos",projection)); a.appendAndRetainExistingToTarget(first,"photos");});
+        var before=jdbc.queryForMap("SELECT photos,evidence,row_version FROM "+table+" WHERE pid=?",parent);
+        actor();
+        var request=new com.auraboot.framework.file.dto.FileRelationRequestDTO();
+        request.setEntityType(model); request.setEntityId(parent); request.setFieldName("photos"); request.setFileIds(new String[]{second});
+        var old=new com.auraboot.framework.plugin.pf4j.FileAccessorImpl(files,storage,USER);
+        // A broad parent UPDATE permit is deliberately present, but no exact field writer.
+        MetaContext.runWithCommandPermitScope("ALL",()->{
+            assertThatThrownBy(()->files.createFileRelation(request,USER)).hasMessageContaining("FIELD_WRITER_DENIED");
+            assertThatThrownBy(()->files.removeFileRelation(model,parent,"photos")).hasMessageContaining("FIELD_WRITER_DENIED");
+            assertThatThrownBy(()->files.appendFileRelation(request,USER)).hasMessageContaining("FIELD_WRITER_DENIED");
+            assertThatThrownBy(()->old.linkExisting(second,model,parent,"photos")).hasMessageContaining("FIELD_WRITER_DENIED");
+            assertThatThrownBy(()->old.linkExisting(first,model,parent,"photos")).hasMessageContaining("FIELD_WRITER_DENIED");
+        });
+        assertThat(relationCount(parent)).isEqualTo(1); assertThat(retained(first)).isTrue(); assertThat(retained(second)).isFalse();
+        assertThat(jdbc.queryForMap("SELECT photos,evidence,row_version FROM "+table+" WHERE pid=?",parent)).isEqualTo(before);
+        command(parent,a->{data.update(model,parent,Map.of("photos","[\""+first+"\",\""+second+"\"]"));
+            a.appendAndRetainExistingToTarget(second,"photos");});
+        assertThat(relationCount(parent)).isEqualTo(2); assertThat(retained(second)).isTrue();
+    }
+    @Test void ordinaryLegacyFileFieldStillReplacesItsRelations() {
+        String parent=parent(), first=upload(TENANT,USER,"success"), second=upload(TENANT,USER,"success"); actor();
+        var request=new com.auraboot.framework.file.dto.FileRelationRequestDTO();
+        request.setEntityType(model); request.setEntityId(parent); request.setFieldName("legacy_photos");
+        MetaContext.runWithCommandPermitScope("ALL",()->{
+            request.setFileIds(new String[]{first}); assertThat(files.createFileRelation(request,USER)).isTrue();
+            request.setFileIds(new String[]{second}); assertThat(files.createFileRelation(request,USER)).isTrue();
+        });
+        assertThat(files.getFilesByEntityAndField(model,parent,"legacy_photos")).extracting(com.auraboot.framework.file.entity.FileEntity::getPid)
+                .containsExactly(second);
+        assertThat(retained(first)).isFalse(); assertThat(retained(second)).isFalse(); assertThat(evidence(parent)).isEqualTo("before");
+    }
+    @Test void anExactCommandWriterStillCannotMutateAnImmutableFileFieldThroughLegacyApi() {
+        String parent=parent(), file=upload(TENANT,USER,"success");
+        var request=new com.auraboot.framework.file.dto.FileRelationRequestDTO();
+        request.setEntityType(model); request.setEntityId(parent); request.setFieldName("frozen_photos"); request.setFileIds(new String[]{file});
+        assertThatThrownBy(()->command(parent,a->files.createFileRelation(request,USER))).isInstanceOf(AccessDeniedException.class);
+        assertThat(files.getFilesByEntityAndField(model,parent,"frozen_photos")).isEmpty();
+        assertThat(retained(file)).isFalse(); assertThat(evidence(parent)).isEqualTo("before");
+    }
+    @Test void officialMultipartUploadIsAnOwnedUnboundStageUntilTheOriginalCommandAppendsIt() throws Exception {
+        actor();
+        org.mockito.Mockito.when(storage.type()).thenReturn(com.auraboot.framework.file.constant.StorageType.LOCAL);
+        org.mockito.Mockito.when(storage.upload(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.anyString())).thenReturn("staged-object");
+        byte[] bytes="%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        var uploaded=files.uploadFile(new org.springframework.mock.web.MockMultipartFile("file","repair.pdf","application/pdf",bytes),USER);
+        String file=uploaded.getFileId();
+        assertThat(jdbc.queryForMap("SELECT tenant_id,created_by,status,retention_locked FROM ab_file WHERE pid=?",file))
+                .containsEntry("tenant_id",TENANT).containsEntry("created_by",USER).containsEntry("status","success").containsEntry("retention_locked",false);
+        assertThat(files.getFileRelations(file)).isEmpty();
+        String parent=parent(); command(parent,a->a.appendAndRetainExistingToTarget(file,"photos"));
+        assertThat(retained(file)).isTrue(); assertThat(relationCount(parent)).isEqualTo(1);
     }
     private static void await(CyclicBarrier start) { try {start.await(10,TimeUnit.SECONDS);} catch(Exception e){throw new AssertionError(e);} }
 }
