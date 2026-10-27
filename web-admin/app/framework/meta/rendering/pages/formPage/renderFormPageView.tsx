@@ -24,6 +24,7 @@ import {
   isFormButtonDisabled,
   canRenderFormButton,
   isFormAuthoringDenied,
+  isPureCrudFormAuthoringDenied,
   resolveFormBackLink,
   resolveCreateSubTableEmptyState,
 } from './formActions';
@@ -42,6 +43,7 @@ type RenderFormPageViewArgs = Pick<
   | 'isEditMode'
   | 'onCancelOverride'
   | 'onSubmitOverride'
+  | 'urlCommandCode'
   | 'summaryErrors'
   | 'fieldErrors'
   | 'fieldPermissions'
@@ -100,6 +102,7 @@ export function renderFormPageView({
   t,
   onCancelOverride,
   onSubmitOverride,
+  urlCommandCode,
   summaryErrors,
   error,
   restorableDraft,
@@ -186,7 +189,16 @@ export function renderFormPageView({
   const activeButtons = (effectiveButtonBlock?.buttons || []).filter(
     (button: any) => !button.visibleWhen || evaluateCondition(button.visibleWhen, pageContext),
   );
-  if (isFormAuthoringDenied(activeButtons, hasPermission)) {
+  if (
+    isFormAuthoringDenied(activeButtons, hasPermission) ||
+    isPureCrudFormAuthoringDenied(
+      schema,
+      effectiveButtonBlock?.buttons || [],
+      isEditMode,
+      embedded || Boolean(urlCommandCode),
+      hasPermission,
+    )
+  ) {
     return <DynamicPageUnavailable message="Access denied" />;
   }
 

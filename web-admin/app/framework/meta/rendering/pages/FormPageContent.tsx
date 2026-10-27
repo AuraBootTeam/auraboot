@@ -241,6 +241,7 @@ export function FormPageContent(props: PageContentProps) {
   });
   return renderFormPageView({
     schema,
+    urlCommandCode,
     mainRecordLoaded,
     schemaFieldNames,
     fieldMetaLoaded,
