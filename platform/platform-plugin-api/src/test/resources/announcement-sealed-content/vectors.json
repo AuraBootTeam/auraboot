@@ -9,7 +9,67 @@
       "body": "<p>甲\r\n乙😀</p>",
       "attachments": [],
       "canonicalJson": "{\"schemaId\":\"operating-policy-document.v1\",\"title\":\" 制度é \",\"bodyFormat\":\"announcement-html-raw.v1\",\"body\":\"<p>甲\\u000d\\u000a乙😀</p>\",\"attachments\":[]}",
-      "documentDigest": "8477f9db844fbcfa86c3c84cca81420bf110895cb7f3aab640a2d1a551e11b0d"
+      "documentDigest": "8477f9db844fbcfa86c3c84cca81420bf110895cb7f3aab640a2d1a551e11b0d",
+      "snapshotA": {
+        "title": " 制度é ",
+        "content": "<p>甲\r\n乙😀</p>",
+        "importance": "normal",
+        "pinned": false,
+        "expiresAt": null,
+        "policy": {
+          "audience": [
+            {
+              "type": "all"
+            }
+          ],
+          "attachmentPids": [],
+          "attachmentMetadata": [],
+          "approvalMode": "required"
+        },
+        "lateWindowMinutes": 30,
+        "reminderPolicy": {
+          "at": "09:00",
+          "limit": 3,
+          "dedupeMinutes": 30,
+          "quietStart": "22:00",
+          "quietEnd": "08:00"
+        },
+        "timezone": "Asia/Shanghai",
+        "authorizationHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "estimatedRecipientCount": 2,
+        "estimatedAt": "2030-01-01T00:00:00Z"
+      },
+      "snapshotB": {
+        "title": " 制度é ",
+        "content": "<p>甲\r\n乙😀</p>",
+        "importance": "normal",
+        "pinned": false,
+        "expiresAt": null,
+        "policy": {
+          "audience": [
+            {
+              "type": "all"
+            }
+          ],
+          "attachmentPids": [],
+          "attachmentMetadata": [],
+          "approvalMode": "required"
+        },
+        "lateWindowMinutes": 30,
+        "reminderPolicy": {
+          "at": "09:00",
+          "limit": 3,
+          "dedupeMinutes": 30,
+          "quietStart": "22:00",
+          "quietEnd": "08:00"
+        },
+        "timezone": "Asia/Shanghai",
+        "authorizationHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "estimatedRecipientCount": 5,
+        "estimatedAt": "2030-01-02T00:00:00Z"
+      },
+      "announcementSnapshotHashA": "2dbb7f603ac2330943aac8bd2e771b4116ccdf6bd0a64eb8930e7675bc1e462c",
+      "announcementSnapshotHashB": "d701402dc405ccfe09532bc81fe6e983dd94fcbd842d1c34f4928b55d6af5723"
     }
   ]
 }
