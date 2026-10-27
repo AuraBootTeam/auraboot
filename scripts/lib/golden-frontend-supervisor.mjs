@@ -15,6 +15,28 @@ if (realpathSync(process.cwd()) !== cwd) { console.error('Frontend supervisor so
 // A stable registered parent outlives pnpm/concurrently execs and all automatic child restarts.
 await registerGoldenSupervisor(runtime, repo, cli, process.pid);
 const preload = pathToFileURL(join(here, 'golden-frontend-registration.mjs')).href;
+// A vite that dies on EADDRINUSE while an impostor process serves the port is the worst
+// failure mode a golden stack can have: the supervisor stays up, the port answers 200, and
+// every browser run silently exercises a foreign stack. Detect a foreign listener on the
+// web port before spawning and fail loudly instead.
+// The web port reaches the dev command through the VITE_PORT env assignment in the
+// launch prefix (there is no --port argv to read).
+const webPort = process.env.VITE_PORT;
+if (webPort && /^\d+$/.test(webPort)) {
+  let listeners = '';
+  try {
+    listeners = execFileSync('/usr/sbin/lsof', ['-nP', `-iTCP:${webPort}`, '-sTCP:LISTEN'],
+      { encoding: 'utf8' }).trim();
+  } catch { /* nothing listens */ }
+  const lines = listeners.split('\n').slice(1).filter(Boolean);
+  if (lines.length > 0) {
+    console.error(`[golden-frontend] port ${webPort} is already served by another process;` +
+      ' refusing to start (a foreign frontend would silently serve a foreign stack):');
+    for (const line of lines) console.error('  ' + line.trim());
+    process.exit(2);
+  }
+}
+
 const child = spawn(command[0], command.slice(1), { cwd, stdio: 'inherit', env: { ...process.env,
   AURA_GOLDEN_FRONTEND_SUPERVISOR_PID: String(process.pid), AURA_GOLDEN_FRONTEND_REPO: repo,
   AURA_GOLDEN_FRONTEND_CLI: cli,
