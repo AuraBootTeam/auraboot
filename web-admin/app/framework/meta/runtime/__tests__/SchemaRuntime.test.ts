@@ -39,6 +39,37 @@ const minimalSchema: UnifiedSchema = {
 };
 
 describe('SchemaRuntime', () => {
+  it('exposes raw source metadata and empty-page revision in the action binding context', async () => {
+    const manager = createManager();
+    manager.register('media', { type: 'api', endpoint: '/api/media', autoFetch: false });
+    const runtime = new SchemaRuntime({ schema: minimalSchema, globalState: createGlobalState(), dataSourceManager: manager, disableAutoFetch: true });
+    const page = { productPid: 'product-1', records: [], revision: 'empty-revision', totalCount: 0 };
+    mockedFetchResult.mockResolvedValueOnce({ code: '0', data: page } as any);
+    await manager.fetch('media');
+    expect(runtime.getContext().dataSource.media).toEqual(page);
+    expect(runtime.getContext().dataSources.media).toEqual(page);
+    expect(runtime.getContext().data.media).toBeUndefined();
+    expect(runtime.getContext().dataSourceStatus.media).toEqual({ loading: false, error: false });
+    expect(runtime.getContext().__dataSourceManager).toBe(manager);
+    expect(runtime.getContext().locale).toBe('zh-CN');
+    runtime.destroy();
+  });
+
+  it('exposes current loading and sanitized failure flags without mutating scoped state', () => {
+    const manager = createManager();
+    manager.register('media', { type: 'api', endpoint: '/api/media', autoFetch: false });
+    const runtime = new SchemaRuntime({ schema: minimalSchema, globalState: createGlobalState(), dataSourceManager: manager, disableAutoFetch: true });
+    manager.setData('media', { records: [{ label: 'Front' }], revision: 'r1' });
+    manager.setLoading('media', true);
+    expect(runtime.getContext().dataSourceStatus.media).toEqual({ loading: true, error: false });
+    expect(runtime.getContext().data.media).toEqual({ label: 'Front' });
+    manager.setError('media', new Error('private database detail'));
+    expect(runtime.getContext().dataSourceStatus.media).toEqual({ loading: false, error: true });
+    expect(JSON.stringify(runtime.getContext().dataSourceStatus)).not.toContain('private database detail');
+    expect(runtime.getStateManager().getContext(runtime.getScopeId()).dataSourceStatus).toBeUndefined();
+    runtime.destroy();
+  });
+
   it('registers missing data sources and cleans up only those it owns', () => {
     const manager = createManager();
 
