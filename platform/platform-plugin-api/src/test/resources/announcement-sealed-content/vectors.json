@@ -1,0 +1,15 @@
+{
+  "schemaId": "operating-policy-document.v1",
+  "algorithm": "fixed-field-order-json.1",
+  "domain": "auraboot.announcement.document.v1\n",
+  "vectors": [
+    {
+      "name": "raw-unicode-and-crlf",
+      "title": " 制度é ",
+      "body": "<p>甲\r\n乙😀</p>",
+      "attachments": [],
+      "canonicalJson": "{\"schemaId\":\"operating-policy-document.v1\",\"title\":\" 制度é \",\"bodyFormat\":\"announcement-html-raw.v1\",\"body\":\"<p>甲\\u000d\\u000a乙😀</p>\",\"attachments\":[]}",
+      "documentDigest": "8477f9db844fbcfa86c3c84cca81420bf110895cb7f3aab640a2d1a551e11b0d"
+    }
+  ]
+}
