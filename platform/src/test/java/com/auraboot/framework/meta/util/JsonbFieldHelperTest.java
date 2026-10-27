@@ -15,6 +15,22 @@ import static org.junit.jupiter.api.Assertions.*;
 class JsonbFieldHelperTest {
 
     @Test
+    void nativeFileColumnsUseJsonbBindingAndReadShape() {
+        ModelDefinition model = ModelDefinition.builder().code("delivery").tableName("mt_delivery")
+                .fields(List.of(FieldDefinition.builder().code("attachments").columnName("files")
+                        .dataType("FILE").build(), FieldDefinition.builder().code("title")
+                        .columnName("title").dataType("string").build())).build();
+        assertEquals(java.util.Set.of("files"), JsonbFieldHelper.getJsonbHostColumns(model));
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("files", List.of(Map.of("fileId", "owned-file", "name", "scope.pdf")));
+        record.put("title", "Delivery");
+        JsonbFieldHelper.normalizeJsonReadValues(model, record);
+        assertInstanceOf(String.class, record.get("files"));
+        assertTrue(record.get("files").toString().contains("owned-file"));
+        assertEquals("Delivery", record.get("title"));
+    }
+
+    @Test
     void mergeJsonbFields_mergesVirtualFieldsIntoHostColumn() {
         ModelDefinition model = buildTestModel();
 

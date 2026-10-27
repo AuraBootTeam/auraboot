@@ -169,7 +169,7 @@ public class JsonbFieldHelper {
         Set<String> hostColumns = new LinkedHashSet<>();
         for (FieldDefinition field : model.getFields()) {
             String dt = field.getDataType();
-            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt)) && !field.isJsonbVirtual()) {
+            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt) || "file".equalsIgnoreCase(dt)) && !field.isJsonbVirtual()) {
                 hostColumns.add(field.getColumnName());
             }
         }
@@ -234,12 +234,12 @@ public class JsonbFieldHelper {
         normalizeRecord(jsonReadKeys(model), record);
     }
 
-    /** [columnName, code] pairs for every non-virtual json/jsonb field. */
+    /** [columnName, code] pairs for every non-virtual JSON-backed field, including native files. */
     private static List<String[]> jsonReadKeys(ModelDefinition model) {
         List<String[]> keys = new ArrayList<>();
         for (FieldDefinition field : model.getFields()) {
             String dt = field.getDataType();
-            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt)) && !field.isJsonbVirtual()) {
+            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt) || "file".equalsIgnoreCase(dt)) && !field.isJsonbVirtual()) {
                 keys.add(new String[]{field.getColumnName(), field.getCode()});
             }
         }
