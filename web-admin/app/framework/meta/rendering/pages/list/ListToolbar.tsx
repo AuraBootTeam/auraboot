@@ -47,6 +47,7 @@ export interface ListToolbarProps {
 
   /** Column settings */
   onColumnSettingsOpen: () => void;
+  columnSettingsLoading?: boolean;
   /** Open current-view self-service analysis. */
   onAnalysisOpen?: () => void;
 
@@ -95,6 +96,7 @@ export function ListToolbar({
   rowHeight,
   onRowHeightChange,
   onColumnSettingsOpen,
+  columnSettingsLoading = false,
   onAnalysisOpen,
   chipFilters,
   onChipFiltersChange,
@@ -211,7 +213,9 @@ export function ListToolbar({
           <button
             type="button"
             onClick={onColumnSettingsOpen}
-            className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
+            disabled={columnSettingsLoading}
+            aria-busy={columnSettingsLoading}
+            className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors disabled:cursor-wait disabled:opacity-50"
             data-testid="column-settings-btn"
             style={workspace ? { order: 4 } : undefined}
           >

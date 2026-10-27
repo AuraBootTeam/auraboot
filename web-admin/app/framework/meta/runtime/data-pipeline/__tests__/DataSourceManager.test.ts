@@ -17,6 +17,39 @@ vi.mock('~/shared/services/http-client', () => ({
 const mockedFetchResult = vi.mocked(fetchResult);
 
 describe('DataSourceManager', () => {
+  it('reloads automatic reads in the new scope and discards the previous scope response', async () => {
+    const pending: Array<(result: any) => void> = [];
+    mockedFetchResult.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    const manager = new DataSourceManager(createExpressionContext({}));
+    const oldScope = new ScopedStateManager({} as any);
+    oldScope.createScope('old', { state: { project: 'old-project' } });
+    manager.bindStateManager(oldScope, 'old');
+    manager.register('projects', {
+      type: 'namedQuery',
+      queryCode: 'delivery',
+      format: 'records',
+      adaptor: 'table',
+      params: { project: '${state.project}' },
+    });
+    await Promise.resolve();
+    manager.register('manual', { type: 'namedQuery', queryCode: 'manual', autoFetch: false });
+    manager.register('paged', { type: 'namedQuery', queryCode: 'paged', pagination: true });
+    const nextScope = new ScopedStateManager({} as any);
+    nextScope.createScope('next', { state: { project: 'next-project' } });
+    manager.bindStateManager(nextScope, 'next');
+    await Promise.resolve();
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+    expect(mockedFetchResult.mock.calls[1][1]?.params).toMatchObject({ project: 'next-project' });
+    pending[1]({ code: '0', data: { records: [{ pid: 'new' }], total: 1 } });
+    await waitFor(() => expect(manager.getData('projects')?.records).toEqual([{ pid: 'new' }]));
+    pending[0]({ code: '0', data: { records: [{ pid: 'old' }], total: 1 } });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(manager.getData('projects')?.records).toEqual([{ pid: 'new' }]);
+    expect(manager.getData('manual')).toBeNull();
+    expect(manager.getData('paged')).toBeNull();
+    manager.clear();
+  });
   it('preserves real paging metadata through the native statistics configuration and manager defaults', async () => {
     const pages = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../../../plugins/core-announcement/config/pages.json'), 'utf8'));
     const page = canonicalizePageSchemaDto(pages.find((candidate: any) => candidate.pageKey === 'announcement_statistics_detail'));
@@ -1278,7 +1311,9 @@ describe('rebind re-issues invalidated initial fetches', () => {
     } as any);
 
     const manager = new DataSourceManager(createExpressionContext({ state: {} } as any));
-    registerReworkQueue(manager); // fetch #1 hangs on the gated promise
+    registerReworkQueue(manager);
+    // Make the old-scope read genuinely in-flight before rebinding.
+    await waitFor(() => expect(mockedFetchResult).toHaveBeenCalledTimes(1));
     manager.bindStateManager(createStateManager(), 'scope-wb');
     manager.bindStateManager(createStateManager(), 'scope-wb'); // rebind → refetch resolves
 
@@ -1288,6 +1323,8 @@ describe('rebind re-issues invalidated initial fetches', () => {
       current: 1,
       pageSize: 50,
     }));
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
 
     // The old-scope response lands late; it must not overwrite the new scope.
     releaseOldScopeResponse({
@@ -1391,6 +1428,25 @@ describe('dependOn gates re-fetches, not the initial fetch', () => {
 
     await waitFor(() => expect(mockedFetchResult).toHaveBeenCalledTimes(2));
 
+    manager.clear();
+  });
+
+
+  it.each([false, true])('coalesces a pending dependOn registration across scope rebinds (pagination=%s)', async (pagination) => {
+    const manager = new DataSourceManager(createExpressionContext({ state: { searchKeyword: 'old' } } as any));
+    manager.register('queue', {
+      type: 'api', endpoint: '/api/dynamic/faq_candidate_list/list', adaptor: 'table', pagination,
+      params: { keyword: '${state.searchKeyword}', pageNum: 1, pageSize: 20 },
+      dependOn: ['state.searchKeyword'],
+    });
+    for (const keyword of ['middle', 'final']) {
+      const state = new ScopedStateManager({} as any);
+      state.createScope('queue-scope', { state: { searchKeyword: keyword } });
+      manager.bindStateManager(state, 'queue-scope');
+    }
+    await waitFor(() => expect(manager.getState('queue')?.lastFetch).not.toBeNull());
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+    expect(mockedFetchResult.mock.calls[0][1]?.params).toMatchObject({ keyword: 'final', pageNum: 1, pageSize: 20 });
     manager.clear();
   });
 

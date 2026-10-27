@@ -86,7 +86,7 @@
     "code": "tpm_ac_files",
     "displayName:zh-CN": "交付材料",
     "displayName:en": "Delivery materials",
-    "dataType": "jsonb",
+    "dataType": "file",
     "extension": {
       "multiple": true,
       "maxCount": 5,

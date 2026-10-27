@@ -91,7 +91,9 @@ test('named owner verifier reviewer and viewer complete one corrected delivery @
     await owner.getByTestId('toolbar-btn-edit').click();
     const confirmedScope='林晓负责客户门户交付，周宁独立审核材料；客户已确认门户、权限与培训交付范围。';
     await owner.locator('#tpm_pj_description').fill(confirmedScope);await shot(owner,'MR00c-project-edit');
-    await command(owner,'tpm:update_project',()=>owner.getByTestId('form-btn-submit').click());
+    await expect(owner.getByTestId('form-btn-submit')).toHaveCount(0);
+    await expect(owner.getByTestId('form-btn-update')).toBeVisible();
+    await command(owner,'tpm:update_project',()=>owner.getByTestId('form-btn-update').click());
     await open(owner,'项目',projectName);await owner.reload();await expect(owner.getByRole('main')).toContainText(confirmedScope);await expect(owner.getByTestId('object-summary')).toContainText('286,000');await expect(owner.getByRole('main')).not.toContainText(/加载中\.\.\.|加载活动记录/);await shot(owner,'MR00d-project-reopened');
     await menu(owner,'交付验收');await owner.getByRole('button',{name:'新建验收',exact:true}).click();const name=`华辰制造 · 第${batch}批交接验收`;
     await owner.locator('#tpm_ac_name').fill(name);await owner.getByTestId('select-trigger-tpm_ac_project').click();await owner.getByRole('option',{name:projectName,exact:true}).click();

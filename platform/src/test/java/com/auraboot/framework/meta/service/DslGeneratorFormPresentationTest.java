@@ -105,6 +105,31 @@ class DslGeneratorFormPresentationTest {
         assertThat(value.path("readOnly").asBoolean()).isTrue();
         assertThat(value.path("validation").isMissingNode()).isTrue();
     }
+    @Test void defaultFormOmitsInfrastructureButDetailRetainsVisibleAuditFields() throws Exception {
+        var created = binding(1); created.setVisible(true);
+        var updated = binding(2); updated.setVisible(true);
+        var due = binding(3); due.setVisible(true);
+        var bindings = List.of(created, updated, due);
+        var fields = List.of(field(1, "created_at", "datetime"),
+                field(2, "updated_at", "datetime"), field(3, "due_date", "datetime"));
+        var form = json.readTree(generator.generateFormPage(model, bindings, fields, new CrudTemplateConfig()).getBlocks());
+        var inputs = form.get(0).path("fields");
+        assertThat(inputs.size()).isEqualTo(1);
+        assertThat(inputs.get(0).path("field").asText()).isEqualTo("due_date");
+        assertThat(inputs.get(0).path("readOnly").asBoolean()).isFalse();
+        var detail = json.readTree(generator.generateDetailPage(model, bindings, fields, new CrudTemplateConfig()).getBlocks());
+        assertThat(detail.get(0).path("fields").findValuesAsText("field"))
+                .contains("created_at", "updated_at", "due_date");
+    }
+    @Test void explicitlySelectedInfrastructureRemainsReadOnlyEvenWithEditableBinding() throws Exception {
+        var config = new CrudTemplateConfig(); config.setFormFields(List.of("created_at"));
+        var created = binding(1); created.setVisible(true); created.setRequired(true);
+        var page = generator.generateFormPage(model, List.of(created),
+                List.of(field(1, "created_at", "datetime")), config);
+        var input = json.readTree(page.getBlocks()).get(0).path("fields").get(0);
+        assertThat(input.path("readOnly").asBoolean()).isTrue();
+        assertThat(input.path("validation").isMissingNode()).isTrue();
+    }
     @Test void declaredIdentityMustBeVisibleAndBound() {
         model.getExtension().setExtension(java.util.Map.of("titleField", "secret"));
         var one = binding(1); one.setVisible(false);

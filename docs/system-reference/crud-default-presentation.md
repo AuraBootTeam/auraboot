@@ -13,6 +13,7 @@ The standard model page workbench generates usable list, form and detail pages w
 - Model/field metadata supplies types, dictionaries, reference targets, display identity and visibility/editability. Declared model `titleField`, or an existing field `displayField` declaration, identifies the detail record when it is bound and visible.
 - The generator emits structural blocks and business bindings. The default list selects up to seven compact fields in binding order, prioritizing a declared display identity; explicit `listColumns` retain their selection and order. Saved views can add other authorized model fields.
 - Generated forms carry localized create/edit titles. Generated details put their single edit action in the existing header toolbar, avoiding a second runtime footer.
+- Default generated forms omit canonical system fields such as `created_at` and `updated_at`; visible audit fields remain available in details. Explicit form selections may show system fields only as read-only, without required-input validation, even when a legacy binding says editable. Business date fields remain normal inputs. This affects new generation; existing page schemas are not rewritten.
 - The declared object identity receives a readable default column width. Shared tables shrink only unconfigured default columns to type-specific readable floors when space is constrained; headers, data and aggregates share compact padding. Explicit column widths and saved view widths are never compressed. Tables wider than those floors remain horizontally scrollable; no fields are hidden to fit. Existing workspace presentation and wide-screen growth remain compatible.
 - Destructive list actions default to the overflow menu. Existing saved pinning remains authoritative; enable/disable expressions are evaluated against the current selection, including all-matching selection.
 - Shared renderers own page spacing, hierarchy and responsive presentation. Workspace-specific tabs, layout and actions remain compatible; default list headings receive the same visual hierarchy without selecting workspace behavior.
@@ -47,3 +48,15 @@ Page Designer edits the generated DSL rather than creating bespoke business Reac
 Localized titles and placeholders use `LocalizedTextInput`. Non-ASCII text is stored as a locale object even when language controls remain collapsed, satisfying the server i18n validator without user workarounds. ASCII strings and `$i18n:` references remain compatible. Acknowledgement toast bodies do not intercept clicks; their close buttons remain interactive.
 
 The contextual “configure this page” entry opens the ChangeSet authoring surface. The model pages workbench opens Page Designer. These are separate real product entries, not interchangeable test locators. Optional layout fine-tuning should use an independent page when preserving a zero-visual-config reference for comparison.
+
+## Personal list presentation
+
+`hideSavedViews` hides the view switcher, not persisted personal settings. Model-backed lists still load the authorized effective view when `dashboard.saved_view.read` is available. External-data pages that skip list data and pages without a schema do not load those views.
+
+Explicit personal column widths remain exact during viewport fill. Only columns without a personal width absorb spare space; when every column has a personal width, the table may leave unused horizontal space. Default layouts keep their responsive fill behavior. Saving, refreshing, leaving and reopening must preserve both the configuration and the rendered width without changing business records.
+
+## Native attachment storage
+
+A scalar `file` field stores a file identifier in its existing string column. A native `file` field with explicit `extension.multiple: true` stores the attachment collection in PostgreSQL JSONB. DDL generation, structured write binding and JSON-string read normalization use the same multiple-file predicate. Display component selection does not change the storage contract: selecting `fileattachment` on a generic JSON field does not grant file-relation mutation authority.
+
+Project and acceptance template attachment fields declare native multiple files. An existing model with a mismatched physical column requires the normal explicit schema comparison and publication workflow; startup does not alter a user table. File upload, business update, relation authorization and permitted download remain separate checks. A storage integration test with an internal command permit does not prove browser or user permission behavior.

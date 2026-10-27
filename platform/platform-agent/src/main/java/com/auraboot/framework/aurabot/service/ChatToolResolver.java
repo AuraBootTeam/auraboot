@@ -288,9 +288,15 @@ public class ChatToolResolver {
     private static final LlmChatRequest.Tool PLATFORM_CHAT_BI_TOOL =
             LlmChatRequest.Tool.builder()
                     .name("aurabot_chat-bi")
-                    .description("Analyze business data within AuraBot. First use action=catalog for governed metrics, "
+                    .description("Create a real analysis result card with a refreshable aggregate data source in AuraBot. "
+                            + "Use this tool for grouped metrics, charts, or requests to save/export a refreshable report. "
+                            + "Domain list/get tools only return records: they do not create analysis cards or report-save actions. "
+                            + "Only a successful query produces the analysis card; it does not save a report. "
+                            + "Never claim a saved report or exported file until a separate save/export action returns its real result. "
+                            + "First use action=catalog for governed metrics, "
                             + "then action=query with a catalog semanticModelCode, metrics, dimensions and filters. CRITICAL: before any query about records belonging to a named customer/person/business entity, resolve that name with platform_resolve_reference(modelCode, fieldCode, displayValue), then filter the declared reference field EQ returned storedValue. Reference fields store IDs, not labels. Never use a project-name prefix or legacy text to decide customer membership. "
-                            + "Ask the user to clarify ambiguous metrics. Preserve timeRange, orderBy and limit. "
+                            + "Preserve complete business names, including parenthetical qualifiers; do not shorten them. "
+                            + "Ask the user to clarify ambiguous metrics or entity matches. Preserve timeRange, orderBy and limit. "
                             + "Raw model aggregation is available for explicit ad-hoc exploration; do not substitute "
                             + "raw aggregates for unavailable governed KPIs.")
                     .inputSchema(com.auraboot.framework.aurabot.skill.builtin.ChatBiSkill.inputSchema())
@@ -304,7 +310,10 @@ public class ChatToolResolver {
      */
     private static final LlmChatRequest.Tool PLATFORM_REFERENCE_TOOL = LlmChatRequest.Tool.builder()
             .name("platform_resolve_reference")
-            .description("Resolve a customer or other business reference label to its exact stored value using its DSL reference field. Use before filtering reference fields; do not guess IDs or infer relationships from names.")
+            .description("Resolve a customer or other business reference label to its exact stored value using its DSL reference field. "
+                    + "Preserve the complete user-provided name, including parenthetical qualifiers; never shorten it or drop a suffix. "
+                    + "Use before filtering reference fields; do not guess IDs or infer relationships from names. "
+                    + "Inspect the matched display name and ask for clarification when it does not identify the requested business entity.")
             .inputSchema(com.auraboot.framework.meta.service.ModelReferenceLookupService.inputSchema()).build();
 
     private void ensurePlatformTools(List<LlmChatRequest.Tool> tools) {

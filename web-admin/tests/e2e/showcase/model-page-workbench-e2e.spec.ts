@@ -116,6 +116,8 @@ test.describe('Model Page Workbench E2E', () => {
       // Core mutations must originate in the generated UI, with real persistence readback.
       await page.getByTestId('toolbar-btn-create').click();
       await expect(page.getByTestId('dynamic-form')).toBeVisible();
+      await expect(page.locator('#created_at')).toHaveCount(0);
+      await expect(page.locator('#updated_at')).toHaveCount(0);
       await page.getByTestId('form-btn-submit').click();
       await expect(page.getByText('请填写需求标题', { exact: true })).toBeVisible();
       await test.info().attach('ZC-02a', { body: await page.screenshot(), contentType: 'image/png' });
@@ -135,6 +137,8 @@ test.describe('Model Page Workbench E2E', () => {
       await expect(row).toContainText('7');
       await row.getByRole('button', { name: '更多操作', exact: true }).click();
       await page.getByRole('menuitem', { name: /编辑|Edit/ }).click();
+      await expect(page.locator('#created_at')).toHaveCount(0);
+      await expect(page.locator('#updated_at')).toHaveCount(0);
       await expect(page.locator(`#${modelData.code}_f1`)).toHaveValue('供应链接口联调');
       await page.locator(`#${modelData.code}_f1`).fill('供应链接口联调与交付培训');
       await page.locator(`#${modelData.code}_f2`).fill('14');

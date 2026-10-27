@@ -41,7 +41,6 @@ export function useListSavedViewState({
   modelCode,
   pageKey,
   schema,
-  hideSavedViews,
   skipListData,
   hideQuickFilters,
   hasPermission,
@@ -73,7 +72,8 @@ export function useListSavedViewState({
     modelCode,
     pageKey,
     scopeFilter: 'all',
-    autoLoad: !!schema && !hideSavedViews && !skipListData,
+    // Hiding switcher chrome does not disable persisted personal settings.
+    autoLoad: !!schema && !skipListData && hasPermission('dashboard.saved_view.read'),
   });
 
   const availableViewTypes = useMemo<ViewType[]>(() => {

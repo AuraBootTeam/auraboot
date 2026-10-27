@@ -283,15 +283,8 @@ export class DataSourceManager {
    * 绑定 ScopedStateManager,用于依赖追踪和上下文刷新
    */
   bindStateManager(stateManager: ScopedStateManager, scopeId: string) {
-    // A rebind (runtime recreated over the shared manager) invalidates every
-    // in-flight response via the version bump below. Without re-issuing the
-    // initial loads those responses are silently dropped and NOTHING re-triggers
-    // them: the new scope would render empty until a user action writes state
-    // (workbench queue tables stayed blank on first paint). Re-fetch under the
-    // new binding — old-scope responses stay discarded (isolation preserved),
-    // new-scope responses carry the bumped version and are accepted.
-    const rebinding = Boolean(this.stateManager && !this.isBoundTo(stateManager, scopeId));
-    if (rebinding) {
+    const scopeChanged = Boolean(this.stateManager && !this.isBoundTo(stateManager, scopeId));
+    if (scopeChanged) {
       this.dataSourceStates.forEach((state, id) => {
         this.fetchVersions.set(id, (this.fetchVersions.get(id) ?? 0) + 1);
         this.dataSourceStates.set(id, { ...state, data: null, error: null, loading: false });
@@ -330,14 +323,23 @@ export class DataSourceManager {
       this.cleanupDependency(id);
       this.registerDependencies(id, config);
     });
-
-    if (rebinding) {
+    // Rebinding invalidates requests owned by the previous scope. Page hooks
+    // can retain registration across a runtime reconnect, so start the new
+    // owner's declared reads after its context and dependencies are bound.
+    if (scopeChanged) {
       this.dataSources.forEach((config, id) => {
-        if (config.autoFetch || (config.dependOn && config.dependOn.length > 0)) {
-          this.fetch(id);
-        }
+        if (config.autoFetch || Boolean(config.dependOn?.length)) this.scheduleAutoFetch(id, config);
       });
     }
+  }
+
+  private scheduleAutoFetch(id: string, config: DataSourceConfig): void {
+    // Mount effects can register, dispose and reconnect before this turn ends.
+    // Read only from the surviving registration and its final bound context;
+    // simultaneous requests then share the existing in-flight read.
+    queueMicrotask(() => {
+      if (this.dataSources.get(id) === config) void this.fetch(id);
+    });
   }
 
   isBoundTo(stateManager: ScopedStateManager, scopeId: string): boolean {
@@ -417,17 +419,11 @@ export class DataSourceManager {
     };
     this.dataSourceStates.set(id, initialState);
 
-    // 如果配置了 autoFetch，立即获取数据。
-    // dependOn 只允许门控“重取”，不允许吞掉“首取”：声明了 dependOn 的数据源
-    // （含被上方分页规则强制 autoFetch=false 的分页源）注册时必须发起一次初始
-    // 获取——未赋值的过滤叶子会被 removeBlankFilters/查询序列化丢弃，首取是安
-    // 全的；真正缺父路径的依赖（如未选行的明细源）仍由 fetch() 的
-    // hasMissingDependencyParent 门控延后，不会发出无过滤请求。
-    if (
-      configWithDefaults.autoFetch ||
-      (configWithDefaults.dependOn && configWithDefaults.dependOn.length > 0)
-    ) {
-      this.fetch(id);
+    // Declared dependencies require an initial read even when pagination
+    // disables autoFetch. Defer it until the surviving mount owns the scope;
+    // fetch still blocks missing parent paths before making any request.
+    if (configWithDefaults.autoFetch || Boolean(configWithDefaults.dependOn?.length)) {
+      this.scheduleAutoFetch(id, configWithDefaults);
     }
 
     this.registerDependencies(id, configWithDefaults);

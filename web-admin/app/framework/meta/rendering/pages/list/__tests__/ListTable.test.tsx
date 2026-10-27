@@ -40,6 +40,24 @@ function renderListTable(overrides: Partial<ListTableProps> = {}) {
 }
 
 describe('ListTable selection column layout', () => {
+  it('fills spare viewport space without expanding personalized column widths', () => {
+    const viewport = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    try {
+      const mixed = renderListTable({ columnWidths: { name: 310 } });
+      expect(screen.getByTestId('table-cell-0-name')).toHaveStyle({ width: '310px' });
+      expect(mixed.container.querySelector('table')).toHaveStyle({ width: '1000px' });
+      mixed.unmount();
+      const fixed = renderListTable({ columnWidths: { name: 310, kind: 110 } });
+      expect(screen.getByTestId('table-cell-0-name')).toHaveStyle({ width: '310px' });
+      expect(fixed.container.querySelector('table')).toHaveStyle({ width: '420px' });
+      fixed.unmount();
+      const defaults = renderListTable();
+      expect(defaults.container.querySelector('table')).toHaveStyle({ width: '1000px' });
+      defaults.unmount();
+    } finally {
+      viewport.mockRestore();
+    }
+  });
   it('gives the business identity readable default space while preserving saved widths', () => {
     const identity = { field: 'name', label: 'Project', presentation: { kind: 'object' as const } };
     const { container, unmount } = renderListTable({ columns: [identity] });
