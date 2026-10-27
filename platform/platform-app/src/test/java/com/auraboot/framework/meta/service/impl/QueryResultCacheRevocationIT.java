@@ -40,6 +40,9 @@ class QueryResultCacheRevocationIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
     @Autowired ObjectMapper json;
+    @Autowired com.auraboot.framework.permission.service.PermissionService permissions;
+    @Autowired com.auraboot.framework.permission.service.UserPermissionService userPermissions;
+    @Autowired com.auraboot.framework.rbac.mapper.RolePermissionMapper rolePermissions;
     private Tenant tenant;
     private User user;
     private String model, record, policy, key;
@@ -78,6 +81,19 @@ class QueryResultCacheRevocationIT {
                 roleId + 2, tenant.getId(), policy, role);
         jdbc.update("INSERT INTO ab_user_role (id,pid,member_id,tenant_id,role_id,deleted_flag) VALUES (?,?,?,?,?,false)",
                 roleId + 3, UniqueIdGenerator.generate(), member, tenant.getId(), roleId);
+        var permission = new com.auraboot.framework.permission.dto.PermissionCreateRequest();
+        permission.setCode(model + ":read"); permission.setName("Query cache record read");
+        permission.setResourceType("model"); permission.setResourceCode(model); permission.setAction("read");
+        permission.setSource("integration_test");
+        var created = permissions.create(permission);
+        var grant = new com.auraboot.framework.rbac.entity.RolePermission();
+        grant.setPid(UniqueIdGenerator.generate()); grant.setTenantId(tenant.getId());
+        grant.setRoleId(roleId); grant.setPermissionId(created.getId()); grant.setGrantType("grant");
+        grant.setStatus("active"); grant.setPriority(100); grant.setDeletedFlag(false);
+        grant.setCreatedAt(java.time.Instant.now()); grant.setUpdatedAt(java.time.Instant.now());
+        rolePermissions.insert(grant);
+        userPermissions.evictPermissionDefinitions(tenant.getId());
+        userPermissions.evictRoleUsers(tenant.getId(), roleId);
         key = "same-query-" + suffix;
     }
 
