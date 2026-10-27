@@ -1,0 +1,28 @@
+{
+  "phase": "after-native-workload",
+  "firstPublicAttemptPassed": true,
+  "portsFree": [
+    6501,
+    5401
+  ],
+  "ownerGenerations": [
+    {
+      "key": "backend",
+      "pid": 15192,
+      "group": 15192,
+      "startedAt": "Mon Oct 26 14:56:46 2026",
+      "stoppedAt": "2026-10-26T06:59:47.561Z"
+    },
+    {
+      "key": "web",
+      "pid": 17136,
+      "group": 17136,
+      "startedAt": "Mon Oct 26 14:57:09 2026",
+      "stoppedAt": "2026-10-26T06:59:47.562Z"
+    }
+  ],
+  "processMetadataPreserved": true,
+  "diagnosticPreloadUsed": false,
+  "secondsFromBackendGracefulBeginToOwnedStopped": 36.635,
+  "originalHarnessExit": "business=1 stop=1 due missing environment in retained-facts and missing prior proof file; public suspend itself succeeded"
+}

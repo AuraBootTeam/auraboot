@@ -104,6 +104,14 @@ public class ActiveMemoryService {
         return SHADOW_ANNOTATION_PREFIX + content;
     }
 
+    /** Episodic trust survives lifecycle category changes such as L1-to-L2 promotion. */
+    public static String applyHistoricalMarker(String content, Object memoryType, Object category) {
+        String prefix = "[Historical model response; verify current business data] ";
+        if (content == null || content.startsWith(prefix)) return content;
+        return "turn_summary".equals(memoryType) || "conversation_turn".equals(category)
+                ? prefix + content : content;
+    }
+
     /** Hard cap on snippets returned to Grounding — keep prompt size bounded. */
     private static final int MAX_SNIPPETS = 8;
     /** Keyword hits weighted more heavily than importance recall. */
@@ -162,9 +170,9 @@ public class ActiveMemoryService {
         // when no embedding provider is wired, or when the embedding call fails.
         if (semanticRecallEnabled && embeddingService != null
                 && snippets.size() < MAX_SNIPPETS && userMessage != null && !userMessage.isBlank()) {
-            float[] q = safeEmbed(tenantId, userMessage.trim());
+            EmbeddingService.EmbeddedVector q = safeEmbed(tenantId, userMessage.trim());
             if (q != null) {
-                for (Map<String, Object> row : memoryService.searchScopedSemantic(
+                for (Map<String, Object> row : memoryService.searchScopedSemanticInSpace(
                         tenantId, userId, agent, q, semanticLimit)) {
                     if (snippets.size() >= MAX_SNIPPETS) break;
                     if (seenPids.add(String.valueOf(row.get("pid")))) {
@@ -226,9 +234,9 @@ public class ActiveMemoryService {
     }
 
     /** Embed the query text for CAP-01 semantic recall; null on any failure (graceful skip). */
-    private float[] safeEmbed(Long tenantId, String text) {
+    private EmbeddingService.EmbeddedVector safeEmbed(Long tenantId, String text) {
         try {
-            return embeddingService.embed(tenantId, text, semanticProvider);
+            return embeddingService.embedWithIdentity(tenantId, text, semanticProvider);
         } catch (Exception e) {
             log.warn("Semantic pre-recall embedding failed for tenant {}: {}", tenantId, e.getMessage());
             return null;
@@ -279,6 +287,7 @@ public class ActiveMemoryService {
         // "这条不对" retract button keyed on the marker.
         Object shadow = row.get("shadow_mode");
         boolean isShadow = shadow instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(shadow));
+        contentStr = applyHistoricalMarker(contentStr, row.get("memory_type"), row.get("category"));
         contentStr = applyShadowMarker(contentStr, isShadow);
         m.put("content", contentStr);
         m.put("importance", row.get("importance"));

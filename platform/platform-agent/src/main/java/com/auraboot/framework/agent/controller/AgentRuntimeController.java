@@ -578,7 +578,7 @@ public class AgentRuntimeController {
         LlmProvider provider = resolution != null ? resolution.getProvider() : null;
         LlmProviderFactory.ProviderConfig config = resolution != null ? resolution.getConfig() : null;
 
-        String runPid = "skill-exec-" + UniqueIdGenerator.generate();
+        String runPid = UniqueIdGenerator.generate();
         SkillResult result = skillEngine.execute(tenantId, runPid, skillCode, skillInput, null, provider, config);
         return ApiResponse.success(result);
     }

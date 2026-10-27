@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "composition": "announcements",
+  "application": {
+    "id": "aura-bpm",
+    "version": "1.0.0"
+  },
+  "source": {
+    "repository": "git@github.com:AuraBootTeam/aura-bpm.git",
+    "commit": "a61fd24781160b6bb0bf686156f06bfab541af83"
+  },
+  "platformSource": {
+    "repository": "git@github.com:AuraBootTeam/auraboot.git",
+    "commit": "2214c7294b2e84083f82483b8657be82282cfe7f"
+  },
+  "lockIdentity": "sha256:efb97764daaa9011464d5975e859ee5b164b05c76ff83f663d3e0ac84621af81",
+  "graphDigest": "sha256:58fcb7f322a353d3a78ecb1192753a45648ad237b0a876633688b984741c4baa",
+  "artifactCount": 22,
+  "image": {
+    "id": "aura-bpm",
+    "digest": null,
+    "layout": null,
+    "skipped": "build ran with --skip-oci"
+  },
+  "sbom": {
+    "format": "CycloneDX-1.5",
+    "path": "sbom.cdx.json",
+    "digest": "sha256:8646ad8cf75698a5e3152eed83f4f34b0e7db23c57b2571b412227985d9f4957"
+  },
+  "deploymentScript": {
+    "path": "bin/aura-bpm-env.sh",
+    "digest": "sha256:8994924572512ee74e4a9cb902cb4760daaae6699c919713361ab478a42859db"
+  },
+  "processOwner": {
+    "path": "bin/process-owner.mjs",
+    "digest": "sha256:163ed0958573337e595abd29c485b3a3a5c7f8d39c8bd83a4834b92ac93438f0"
+  },
+  "compositionSupport": {
+    "path": "bin/application-composition.mjs",
+    "digest": "sha256:fc727942e0f353d88741f92e1198189109dbdff71094cab3d5ce90e9b1c7892e"
+  },
+  "verification": {
+    "platformChecksums": "PASS",
+    "productTests": "PASS",
+    "backendArtifactBuild": "PASS",
+    "webClientSsrBuild": "PASS",
+    "sourceArtifactGraphParity": "PASS",
+    "singleReactRuntime": "PASS"
+  }
+}
