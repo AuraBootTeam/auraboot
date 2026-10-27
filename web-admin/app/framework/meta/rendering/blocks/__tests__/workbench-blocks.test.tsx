@@ -708,15 +708,36 @@ describe('WorkbenchActionBarBlockRenderer', () => {
     ctx.dataSourceStatus = { media: { loading: true, error: false } };
     let changed: (() => void) | undefined;
     const unsubscribe = vi.fn();
-    const subscribe = vi.fn((_id, callback) => { changed = callback; return unsubscribe; });
+    const subscribe = vi.fn((_id, callback) => {
+      changed = callback;
+      return unsubscribe;
+    });
     runtime.getDataSourceManager = () => ({ subscribe });
-    const block = { id: 'media_actions', blockType: 'workbench-action-bar', dataSource: 'media', actions: [{ code: 'add', label: 'Add', disabledWhen: '\$\{dataSourceStatus.media.loading || dataSourceStatus.media.error}', onClick: { action: 'state.set', args: { added: true } } }] } as BlockConfig;
+    const block = {
+      id: 'media_actions',
+      blockType: 'workbench-action-bar',
+      dataSource: 'media',
+      actions: [
+        {
+          code: 'add',
+          label: 'Add',
+          disabledWhen: '\$\{dataSourceStatus.media.loading || dataSourceStatus.media.error}',
+          onClick: { action: 'state.set', args: { added: true } },
+        },
+      ],
+    } as BlockConfig;
     const view = render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
     expect(screen.getByTestId('workbench-action-add')).toBeDisabled();
     expect(subscribe).toHaveBeenCalledWith('media', expect.any(Function));
-    act(() => { ctx.dataSourceStatus.media.loading = false; changed?.(); });
+    act(() => {
+      ctx.dataSourceStatus.media.loading = false;
+      changed?.();
+    });
     expect(screen.getByTestId('workbench-action-add')).toBeEnabled();
-    act(() => { ctx.dataSourceStatus.media.error = true; changed?.(); });
+    act(() => {
+      ctx.dataSourceStatus.media.error = true;
+      changed?.();
+    });
     expect(screen.getByTestId('workbench-action-add')).toBeDisabled();
     view.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();
@@ -729,29 +750,88 @@ describe('WorkbenchActionBarBlockRenderer', () => {
     ctx.state.secret = 'must-not-replace-title';
     ctx.dataSource = { media: { revision: 'revision-1' } };
     let confirm: ((accepted: boolean) => void) | undefined;
-    registerConfirmDialog(() => new Promise<boolean>(resolve => { confirm = resolve; }));
+    registerConfirmDialog(
+      () =>
+        new Promise<boolean>((resolve) => {
+          confirm = resolve;
+        }),
+    );
     try {
-      const block = { id: 'media_actions', blockType: 'workbench-action-bar', actions: [{ code: 'remove', label: 'Remove', confirm: { en: 'Unlink this image?' }, onClick: { action: 'command.execute', args: { command: 'catalog:unlink', payload: { productPid: '\$\{state.selectedProduct.pid}', title: '\$\{state.selectedProduct.title}', expectedRevision: '\$\{dataSource.media.revision}' } } } }] } as BlockConfig;
+      const block = {
+        id: 'media_actions',
+        blockType: 'workbench-action-bar',
+        actions: [
+          {
+            code: 'remove',
+            label: 'Remove',
+            confirm: { en: 'Unlink this image?' },
+            onClick: {
+              action: 'command.execute',
+              args: {
+                command: 'catalog:unlink',
+                payload: {
+                  productPid: '\$\{state.selectedProduct.pid}',
+                  title: '\$\{state.selectedProduct.title}',
+                  expectedRevision: '\$\{dataSource.media.revision}',
+                },
+              },
+            },
+          },
+        ],
+      } as BlockConfig;
       render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
       fireEvent.click(screen.getByTestId('workbench-action-remove'));
       expect(confirm).toBeTypeOf('function');
       expect(fetchResult).not.toHaveBeenCalled();
       ctx.state.selectedProduct = { pid: 'product-2', title: 'Another product' };
       ctx.dataSource.media.revision = 'revision-2';
-      await act(async () => { confirm?.(true); });
-      expect(fetchResult).toHaveBeenCalledWith('/api/meta/commands/execute/catalog:unlink', expect.objectContaining({ params: expect.objectContaining({ payload: { productPid: 'product-1', title: '\$\{state.secret}', expectedRevision: 'revision-1' } }) }));
-    } finally { unregisterConfirmDialog(); }
+      await act(async () => {
+        confirm?.(true);
+      });
+      expect(fetchResult).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/catalog:unlink',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            payload: {
+              productPid: 'product-1',
+              title: '\$\{state.secret}',
+              expectedRevision: 'revision-1',
+            },
+          }),
+        }),
+      );
+    } finally {
+      unregisterConfirmDialog();
+    }
   });
 
   it('executes no command when a prepared confirmation is cancelled', async () => {
     registerConfirmDialog(async () => false);
     try {
       const runtime = makeRuntime() as any;
-      const block = { id: 'media_actions', blockType: 'workbench-action-bar', actions: [{ code: 'remove_cancel', label: 'Remove', confirm: { en: 'Unlink?' }, onClick: { action: 'command.execute', args: { command: 'catalog:unlink', payload: { productPid: 'product-1' } } } }] } as BlockConfig;
+      const block = {
+        id: 'media_actions',
+        blockType: 'workbench-action-bar',
+        actions: [
+          {
+            code: 'remove_cancel',
+            label: 'Remove',
+            confirm: { en: 'Unlink?' },
+            onClick: {
+              action: 'command.execute',
+              args: { command: 'catalog:unlink', payload: { productPid: 'product-1' } },
+            },
+          },
+        ],
+      } as BlockConfig;
       render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
-      await act(async () => { fireEvent.click(screen.getByTestId('workbench-action-remove_cancel')); });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('workbench-action-remove_cancel'));
+      });
       expect(fetchResult).not.toHaveBeenCalled();
-    } finally { unregisterConfirmDialog(); }
+    } finally {
+      unregisterConfirmDialog();
+    }
   });
 
   beforeEach(() => {

@@ -132,13 +132,16 @@ function unwrapApiResult(result: any): any {
   }
 
   const error = new Error(
-    ResultHelper.getErrorDetail(result || {}) ?? (result?.desc || result?.message || 'API request failed'),
+    ResultHelper.getErrorDetail(result || {}) ??
+      (result?.desc || result?.message || 'API request failed'),
   ) as Error & {
     status?: number;
     statusCode?: number;
     code?: string | number;
   };
-  const numericStatus = Number(result?.httpStatus ?? result?.status ?? result?.statusCode ?? result?.code);
+  const numericStatus = Number(
+    result?.httpStatus ?? result?.status ?? result?.statusCode ?? result?.code,
+  );
   if (Number.isFinite(numericStatus) && numericStatus >= 100 && numericStatus <= 599) {
     error.status = numericStatus;
     error.statusCode = numericStatus;
@@ -218,12 +221,15 @@ export class DataSourceManager {
     data: Record<string, any>;
     dataSource: Record<string, any>;
     dataSources: Record<string, any>;
+    dataSourceStatus: Record<string, { loading: boolean; error: boolean }>;
   } {
     const data: Record<string, any> = {};
     const raw: Record<string, any> = {};
+    const status: Record<string, { loading: boolean; error: boolean }> = {};
 
     this.dataSourceStates.forEach((state, id) => {
       raw[id] = state.data;
+      status[id] = { loading: state.loading, error: Boolean(state.error) };
       data[id] = this.readRows(state.data)[0];
     });
 
@@ -231,13 +237,16 @@ export class DataSourceManager {
       data,
       dataSource: raw,
       dataSources: raw,
+      dataSourceStatus: status,
     };
   }
 
-  private withDataSourceContext(context: ExpressionContext): ExpressionContext {
+  /** Share the same source aliases with page bindings and action expressions. */
+  getBindingContext(context: ExpressionContext): ExpressionContext {
     const dataSourceContext = this.buildDataSourceContext();
     const ctx = {
       ...context,
+      dataSourceStatus: dataSourceContext.dataSourceStatus,
       data: {
         ...((context as any).data || {}),
         ...dataSourceContext.data,
@@ -281,7 +290,7 @@ export class DataSourceManager {
           ...((scopedContext as any).$page || {}),
         },
       } as ExpressionContext;
-      return this.withDataSourceContext(ctx);
+      return this.getBindingContext(ctx);
     };
 
     this.dataSources.forEach((config, id) => {
@@ -292,7 +301,7 @@ export class DataSourceManager {
   }
 
   private getContext(): ExpressionContext {
-    return this.contextGetter ? this.contextGetter() : this.withDataSourceContext(this.baseContext);
+    return this.contextGetter ? this.contextGetter() : this.getBindingContext(this.baseContext);
   }
 
   /**

@@ -402,10 +402,45 @@ function openDownloadUrl(url: string): void {
  */
 const KNOWN_WORKBENCH_ACTIONS = ['state.set', 'dataSource.reload', 'navigate', 'command.execute'];
 
+/** Capture a single invocation before a confirmation or other asynchronous UI. */
+export function prepareSimpleWorkbenchAction(
+  runtime: SchemaRuntime,
+  config: any,
+): () => Promise<any> {
+  const resolved = config
+    ? { ...config, args: snapshotActionValue(resolveRuntimeValue(runtime, config.args)) }
+    : config;
+  return () => executePreparedWorkbenchAction(runtime, resolved);
+}
+
+function snapshotActionValue(value: any, seen = new WeakMap<object, any>()): any {
+  if (!value || typeof value !== 'object') return value;
+  // Preserve native File/Date handles while isolating mutable state records.
+  if (
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) !== Object.prototype &&
+    Object.getPrototypeOf(value) !== null
+  )
+    return value;
+  if (seen.has(value)) return seen.get(value);
+  const copy: any = Array.isArray(value) ? [] : {};
+  seen.set(value, copy);
+  for (const [key, item] of Object.entries(value)) {
+    Object.defineProperty(copy, key, {
+      value: snapshotActionValue(item, seen), enumerable: true, writable: true, configurable: true,
+    });
+  }
+  return copy;
+}
+
 export async function executeSimpleWorkbenchAction(
   runtime: SchemaRuntime,
   config: any,
 ): Promise<any> {
+  return prepareSimpleWorkbenchAction(runtime, config)();
+}
+
+async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: any): Promise<any> {
   if (!config) return;
   if (!KNOWN_WORKBENCH_ACTIONS.includes(config.action)) {
     // An unrecognized action used to fall through every branch below and return
@@ -430,20 +465,20 @@ export async function executeSimpleWorkbenchAction(
     throw new Error(message);
   }
   if (config.action === 'state.set' && config.args && typeof config.args === 'object') {
-    Object.entries(resolveRuntimeValue(runtime, config.args)).forEach(([key, value]) => {
+    Object.entries(config.args).forEach(([key, value]) => {
       writeRuntimeState(runtime, key, value);
     });
     return;
   }
 
   if (config.action === 'dataSource.reload') {
-    const args = resolveRuntimeValue(runtime, config.args);
+    const args = config.args;
     await reloadDataSources(runtime, resolveReloadIds(args));
     return;
   }
 
   if (config.action === 'navigate') {
-    const args = resolveRuntimeValue(runtime, config.args || {});
+    const args = config.args || {};
     const path = resolveWorkbenchNavigatePath(args);
     if (!path) {
       throw new Error('[workbench] navigate requires args.path or args.to');
@@ -453,7 +488,7 @@ export async function executeSimpleWorkbenchAction(
   }
 
   if (config.action === 'command.execute') {
-    const args = resolveRuntimeValue(runtime, config.args || {});
+    const args = config.args || {};
     const command = args.command ?? args.commandCode;
     if (!command) {
       throw new Error('[workbench] command.execute requires args.command');

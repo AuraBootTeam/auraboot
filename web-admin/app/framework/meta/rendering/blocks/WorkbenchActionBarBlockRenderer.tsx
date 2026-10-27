@@ -4,7 +4,8 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import {
-  executeSimpleWorkbenchAction,
+  prepareSimpleWorkbenchAction,
+  useDataSourceSubscription,
   readPath,
   useRuntimeStateSubscription,
 } from './workbenchBlockUtils';
@@ -52,6 +53,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const [resultReceipt, setResultReceipt] = useState<{ config: any; data: any } | null>(null);
   useRuntimeStateSubscription(runtime);
+  useDataSourceSubscription(runtime, block.dataSource);
 
   const visibleActions = actions.filter((actionConfig: any) => {
     if (actionConfig?.permissionCode && !hasPermission(actionConfig.permissionCode)) return false;
@@ -95,24 +97,25 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
       : false;
     const disabled = Boolean(disabledByCondition || runningAction);
     const runAction = async () => {
-      if (actionConfig.confirm) {
-        const confirmation =
-          typeof actionConfig.confirm === 'object'
-            ? {
-                title: t('common.confirm') || 'Confirm',
-                content: getLocalizedText(actionConfig.confirm, locale, t),
-              }
-            : resolveConfirmDialog(actionConfig.confirm, t);
-        const confirmed = await confirmDialog({
-          ...confirmation,
-          variant: variant === 'danger' ? 'danger' : 'default',
-        });
-        if (!confirmed) return;
-      }
-
       setRunningAction(code);
       try {
-        const result = await executeSimpleWorkbenchAction(runtime, actionConfig.onClick);
+        const execute = prepareSimpleWorkbenchAction(runtime, actionConfig.onClick);
+        if (actionConfig.confirm) {
+          const confirmation =
+            typeof actionConfig.confirm === 'object'
+              ? {
+                  title: t('common.confirm') || 'Confirm',
+                  content: getLocalizedText(actionConfig.confirm, locale, t),
+                }
+              : resolveConfirmDialog(actionConfig.confirm, t);
+          const confirmed = await confirmDialog({
+            ...confirmation,
+            variant: variant === 'danger' ? 'danger' : 'default',
+          });
+          if (!confirmed) return;
+        }
+
+        const result = await execute();
         const receiptConfig = actionConfig.resultReceipt;
         if (receiptConfig && result && result.success !== false && result.applied !== false) {
           setResultReceipt({ config: receiptConfig, data: result });
