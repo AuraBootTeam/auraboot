@@ -1000,7 +1000,9 @@ public class DslGeneratorImpl implements DslGenerator {
         Map<String, Object> detailField = new LinkedHashMap<>();
         detailField.put("field", field.getCode());
         // Label resolved by frontend: model.{modelCode}.{fieldCode}.label
-        detailField.put("component", "SmartText");
+        // The readonly renderer resolves typed display from authoritative model metadata.
+        // Pinning SmartText here suppresses reference, file, JSON and numeric display components.
+        detailField.put("dataType", field.getDataType());
         detailField.put("readOnly", true);
 
         Map<String, Object> layout = new LinkedHashMap<>();

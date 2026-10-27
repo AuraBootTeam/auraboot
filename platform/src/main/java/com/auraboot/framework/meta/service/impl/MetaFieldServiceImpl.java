@@ -251,7 +251,17 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setPid(UniqueIdGenerator.generate());
         entity.setCode(existingEntity.getCode());
         entity.setDataType(request.getDataType());
-        entity.setDataSourceId(request.getDataSourceId());
+        entity.setDataSourceId(request.getDataSourceId() == null ? existingEntity.getDataSourceId() : request.getDataSourceId());
+        entity.setFeature(request.getFeature() == null ? existingEntity.getFeature()
+                : mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
+        entity.setRefTarget(request.getRefTarget() == null ? existingEntity.getRefTarget()
+                : mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
+        entity.setIndexHint(request.getIndexHint() == null ? existingEntity.getIndexHint()
+                : mapToBean(request.getIndexHint(), com.auraboot.framework.meta.entity.payload.FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(request.getQuerySchema() == null ? existingEntity.getQuerySchema()
+                : mapToBean(request.getQuerySchema(), com.auraboot.framework.meta.entity.payload.FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(request.getRuleSchema() == null ? existingEntity.getRuleSchema()
+                : mapToBean(request.getRuleSchema(), com.auraboot.framework.meta.entity.payload.FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
         entity.setUiSchema(request.getUiSchema() == null ? existingEntity.getUiSchema()
@@ -261,12 +271,21 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setCreatedAt(Instant.now());
         entity.setUpdatedAt(Instant.now());
 
-        if (request.getExtension() != null) {
-            entity.setExtension(extensionConverter.toBean(request.getExtension()));
-        }
+        entity.setExtension(request.getExtension() == null ? existingEntity.getExtension()
+                : extensionConverter.toBean(request.getExtension()));
 
         metaFieldMapper.clearCurrentFlag(existingEntity.getCode());
         metaFieldMapper.insert(entity);
+        FieldDictBinding dictionary = fieldDictBindingMapper.findByFieldPid(existingEntity.getPid(), MetaContext.getCurrentTenantId());
+        if (dictionary != null) {
+            // Keep historical bindings intact while giving the new field version the same semantics.
+            fieldDictBindingMapper.insert(FieldDictBinding.builder()
+                    .pid(UniqueIdGenerator.generate()).fieldId(entity.getId()).fieldPid(entity.getPid())
+                    .fieldCode(entity.getCode()).dictId(dictionary.getDictId()).dictCode(dictionary.getDictCode())
+                    .isRequired(dictionary.getIsRequired()).allowMultiple(dictionary.getAllowMultiple())
+                    .defaultValue(dictionary.getDefaultValue()).remark(dictionary.getRemark())
+                    .tenantId(MetaContext.getCurrentTenantId()).createdAt(Instant.now()).updatedAt(Instant.now()).build());
+        }
         return entity;
     }
 

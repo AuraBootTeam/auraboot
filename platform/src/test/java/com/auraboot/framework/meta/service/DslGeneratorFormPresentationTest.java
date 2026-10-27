@@ -94,6 +94,8 @@ class DslGeneratorFormPresentationTest {
         assertThat(page.getExtension().get("presentation")).isNull();
         var detailFields = json.readTree(page.getBlocks()).get(0).path("fields");
         assertThat(detailFields.get(1).path("layout").path("colSpan").asInt()).isEqualTo(12);
+        assertThat(detailFields.get(1).path("component").isMissingNode()).isTrue();
+        assertThat(detailFields.get(1).path("dataType").asText()).isEqualTo("text");
     }
     @Test void generatedReadOnlyFieldsAreNotRequiredInputs() throws Exception {
         var locked = binding(1); locked.setVisible(true); locked.setEditable(false); locked.setRequired(true);
