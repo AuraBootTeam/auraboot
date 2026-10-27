@@ -5,11 +5,11 @@
   "sourceDigest": "24f5888687f98e702056011c143048599a4aa2f7a14b30b6f134ee03c3262c08",
   "artifacts": {
     "runtime": {
-      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-app/build/libs/AuraBoot-1.0.0-boot.jar",
+      "path": "${CORE_SOURCE_ROOT}/platform/platform-app/build/libs/AuraBoot-1.0.0-boot.jar",
       "sha256": "859fa0071f28b61398d32dbd489f32ea502763a153ed65a9c2e915ff4603374c"
     },
     "api": {
-      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar",
+      "path": "${CORE_SOURCE_ROOT}/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar",
       "sha256": "9ca35017426267e434ecc3c1e1fd63b57e4fdabb0407d61bf2fe6a88658db75f"
     }
   },

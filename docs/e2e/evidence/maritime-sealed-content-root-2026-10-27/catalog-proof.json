@@ -1,5 +1,5 @@
 {
-  "candidate": "/Users/ghj/work/anchorage-maritime-parallel-plan/.tools/admitted-platform-sealed-0c299e0",
+  "candidate": "${ANCHORAGE_SOURCE_ROOT}/.tools/admitted-platform-sealed-0c299e0",
   "catalogSha256": "c0422e78104044ca2b8bb9ae9a7d02a6f1973ebfae2d052619de975fdeca2316",
   "producer": "0c299e033946e1228e0af700bb1abedaaf4ffe0f",
   "changedEntries": [

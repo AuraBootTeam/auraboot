@@ -94,7 +94,7 @@
   "independentMutation": "M af3 component evidence only; not rerun by Root",
   "consumerNative": "did_not_run for this runtime candidate",
   "catalog": {
-    "catalog": "/Users/ghj/work/anchorage-maritime-parallel-plan/.tools/admitted-platform-filequery-778e91a/artifact-catalog.json",
+    "catalog": "${ANCHORAGE_SOURCE_ROOT}/.tools/admitted-platform-filequery-778e91a/artifact-catalog.json",
     "catalogSha256": "41b33e56527440d57b70b2f3afae132eacefc82b2a3caa1d47e274b643070734",
     "runtimeProducer": "778e91aa60765b34a3e40ba5c0dc3c72d9f1b382",
     "apiProducer": "b297c242798bd177e602eb09e483a5ad849f2cc9",

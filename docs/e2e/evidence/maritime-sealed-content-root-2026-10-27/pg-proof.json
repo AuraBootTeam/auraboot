@@ -7,7 +7,7 @@
   "errors": 0,
   "skipped": 0,
   "time": "2.507",
-  "rawXml": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/sealed-content-root/pg-0c299e033.xml",
+  "rawXml": "${WORKSPACE_ROOT}/.workspace/evidence/maritime-parallel-core/sealed-content-root/pg-0c299e033.xml",
   "rawXmlSha256": "a50e3a8b869fa506ba8b8efe74f07f8f88b036c0417c522ed3975d9f65d814da",
   "controlledApprovalFixture": true,
   "actualBpmApproval": false,

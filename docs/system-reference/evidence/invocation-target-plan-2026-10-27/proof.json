@@ -81,7 +81,7 @@
     }
   },
   "catalog": {
-    "catalog": "/Users/ghj/work/anchorage-maritime-parallel-plan/.tools/admitted-platform-target-c1866af/artifact-catalog.json",
+    "catalog": "${ANCHORAGE_SOURCE_ROOT}/.tools/admitted-platform-target-c1866af/artifact-catalog.json",
     "catalogSha256": "06133f5257d3d4291194304126200188927610c343d9cb63bfba63242e3878f4",
     "runtimeProducer": "c1866af4c63539fbeba26451d3adf3c477763ce6",
     "apiProducer": "b297c242798bd177e602eb09e483a5ad849f2cc9",

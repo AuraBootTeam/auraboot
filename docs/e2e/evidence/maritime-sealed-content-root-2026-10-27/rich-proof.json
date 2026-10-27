@@ -16,7 +16,7 @@
     "nativePublisherProofCommitsThroughTheRealRichHost()"
   ],
   "rawXmlSha256": "50793f3a5ba40dab14bb58e350befd226f488e834332f34c5dcd9d0837d698cd",
-  "rawXml": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/sealed-content-root/rich-green-561cb786.xml",
+  "rawXml": "${WORKSPACE_ROOT}/.workspace/evidence/maritime-parallel-core/sealed-content-root/rich-green-561cb786.xml",
   "runtimePrimaryPermissionSource": "bound release role permission catalog plus current exact member-role association; no fallback role_permission publish grant",
   "officialRoleRemovalUsed": true,
   "controlledApprovalFixture": true,
