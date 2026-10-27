@@ -170,6 +170,21 @@ class AnnouncementSealedContentIT {
         assertTrue(onAnotherThread(()->userPermissions.hasPermission(user.getId(),"announcement.announcement.publish")));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE tenant_id=? AND deleted_flag=true",Integer.class,tenant.getId()));
     }
+    @Test void aConcurrentRootWriterCannotPassTheProofRootLockBeforeCommit() {
+        freeze(true);
+        command(bridge->{bridge.requirePublishedContentForCommand(expected());
+            assertTrue(onAnotherThread(()->{
+                try {
+                    new TransactionTemplate(transactions).executeWithoutResult(status->{
+                        jdbc.execute("SET LOCAL lock_timeout='200ms'");
+                        jdbc.queryForMap("SELECT pid FROM ab_announcement WHERE tenant_id=? AND pid=? FOR UPDATE",tenant.getId(),root);
+                    });
+                    return false;
+                } catch(org.springframework.dao.CannotAcquireLockException blocked){return true;}
+            }));
+        });
+        assertNotNull(new TransactionTemplate(transactions).execute(status->roots.lock(tenant.getId(),root)));
+    }
     @Test void uncommittedFreshGrantIsNeverPublishedToAnotherThreadOrRollbackCache() {
         var definition=new PermissionCreateRequest();definition.setCode("announcement.announcement.manage");definition.setName("Manage official announcement");
         definition.setResourceType("model");definition.setResourceCode("announcement.announcement");definition.setAction("manage");definition.setSource("integration_test");
