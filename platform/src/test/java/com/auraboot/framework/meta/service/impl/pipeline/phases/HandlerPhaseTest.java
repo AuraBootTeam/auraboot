@@ -1207,6 +1207,31 @@ class HandlerPhaseTest {
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void targetFileFactoryFailureDoesNotLeakOrCloseTheCallerQueryScope(boolean outerScope) {
+        var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", factory);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE))
+                .thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
+        var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
+                Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+        var failure = new IllegalStateException("attachment transaction initialization failed");
+        when(factory.forCommand(ctx)).thenThrow(failure);
+        var callerScope = outerScope ? com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open() : null;
+        try {
+            assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isEqualTo(outerScope);
+            if (callerScope != null) callerScope.close();
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        } finally {
+            if (callerScope != null) callerScope.close();
+            // Release a deliberately exposed old-implementation leak after the assertions.
+            ((ThreadLocal<?>) ReflectionTestUtils.getField(
+                    com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.class, "CURRENT")).remove();
+        }
+    }
+
     @Test
     void targetFileCapabilityReceivesTrustedPipelineContextAndClosesOnSuccessAndFailure() {
         var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);

@@ -646,9 +646,8 @@ public class HandlerPhase implements CommandPhase {
                 handlerCode, commandCode,
                 handler != null ? handler.getClass().getName() : "<none>", secondaryHandlers.size());
 
-        DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
-        var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext);
-        try {
+        try (DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
+             var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext)) {
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>();
             pluginSettings.putAll(resolveHandlerParams(execConfig));
@@ -870,9 +869,6 @@ public class HandlerPhase implements CommandPhase {
                 throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection, rejection.messageArgs());
             }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
-        } finally {
-            if (fileScope != null) fileScope.close();
-            queryScope.close();
         }
     }
 
