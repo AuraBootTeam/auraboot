@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:39:37.258Z" hostname="Mac" time="0.064">
+  <properties/>
+  <testcase name="targetVersionPolicyRejectsUnknownNullAndNonStringValues()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.01"/>
+  <testcase name="autoSetStrategiesReportOnlyInvalidSpecs()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.002"/>
+  <testcase name="unsupportedRejectsDeclaredCasEvenWhenDtoRetainsItOnlyAsAnUnknownField()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="currentStateImportRetainsItsPreviousStateTransitionWarnings()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="preconditionsKeepIndexedPathsAndDoNotTurnWarningsIntoErrors()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.003"/>
+  <testcase name="unsupportedVersionIntentRoundTripsOnlyItsExplicitOption()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="handlerOnlyConfigurationDoesNotRequireAType()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="transitionsRequireStateFieldAndTargetOrRules()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="[1] type=create" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.004"/>
+  <testcase name="[2] type=update" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="[3] type=delete" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="[4] type=query" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="[5] type=batch" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="[6] type=custom" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="[7] type=action" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="missingCommandsNullEntriesAndNoConfigurationAreAccepted()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="unsupportedRejectsLocalAndGlobalBindingRules()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+  <testcase name="invalidCommandTypeIsAnErrorAtItsExactArrayPath()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="unsupportedRejectsAsyncAndDslPersistenceButAllowsExplicitSyncFalseFlags()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="unsupportedRejectsOtherTypesMissingHandlerAndPreHandlerMutationDeclarations()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.001"/>
+  <testcase name="resultCachePolicyIsValidatedOnConsolidatedExecutionMetadata()" classname="com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest" time="0.0"/>
+</testsuite>

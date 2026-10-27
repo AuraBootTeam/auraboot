@@ -1,0 +1,12 @@
+diff --git a/platform/src/main/java/com/auraboot/framework/meta/constant/CommandResultCachePolicy.java b/platform/src/main/java/com/auraboot/framework/meta/constant/CommandResultCachePolicy.java
+index 2072b3522..3e26c488b 100644
+--- a/platform/src/main/java/com/auraboot/framework/meta/constant/CommandResultCachePolicy.java
++++ b/platform/src/main/java/com/auraboot/framework/meta/constant/CommandResultCachePolicy.java
+@@ -20,6 +20,6 @@ public final class CommandResultCachePolicy {
+         if (parameters instanceof Map<?, ?> params && params.containsKey("targetRecordAction")
+                 && !"read".equals(params.get("targetRecordAction")))
+             throw new IllegalArgumentException("An uncached query cannot declare a target write action");
+-        return false;
++        return true; // Controlled mutation: incorrectly reuse an uncached query outcome.
+     }
+ }

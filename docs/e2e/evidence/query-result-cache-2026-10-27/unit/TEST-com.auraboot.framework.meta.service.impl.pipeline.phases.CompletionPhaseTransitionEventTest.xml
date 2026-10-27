@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseTransitionEventTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:39:37.248Z" hostname="Mac" time="0.004">
+  <properties/>
+  <testcase name="configuredTransitionRetainsPublicOperationAndPublishesAuthoritativeState()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseTransitionEventTest" time="0.002"/>
+  <testcase name="ordinaryOrIncompleteExecutionCannotPublishTransitionMetadata()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseTransitionEventTest" time="0.001"/>
+</testsuite>

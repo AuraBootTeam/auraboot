@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:39:36.743Z" hostname="Mac" time="0.454">
+  <properties/>
+  <testcase name="defaultAndExplicitTruePreserveClaimAndOutcome()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest" time="0.447"/>
+  <testcase name="uncachedQueryCompletionDoesNotRequireOrWriteAnUnclaimedIntent()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest" time="0.003"/>
+  <testcase name="uncachedQuerySkipsClaimEvenWithAClientRequestId()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest" time="0.0"/>
+</testsuite>

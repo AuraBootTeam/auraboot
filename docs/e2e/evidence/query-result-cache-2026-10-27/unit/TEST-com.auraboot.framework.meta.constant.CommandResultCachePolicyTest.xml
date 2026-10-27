@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.constant.CommandResultCachePolicyTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:39:36.684Z" hostname="Mac" time="0.003">
+  <properties/>
+  <testcase name="onlyAnExplicitQueryCanDisableResultReuse()" classname="com.auraboot.framework.meta.constant.CommandResultCachePolicyTest" time="0.001"/>
+  <testcase name="invalidTypesAndContradictoryContractsFailClosed()" classname="com.auraboot.framework.meta.constant.CommandResultCachePolicyTest" time="0.0"/>
+  <testcase name="defaultAndTrueRetainExistingBehavior()" classname="com.auraboot.framework.meta.constant.CommandResultCachePolicyTest" time="0.0"/>
+</testsuite>

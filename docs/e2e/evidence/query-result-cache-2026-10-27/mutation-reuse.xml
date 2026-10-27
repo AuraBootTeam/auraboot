@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-27T01:38:45.578Z" hostname="Mac" time="0.793">
+  <properties/>
+  <testcase name="committedReadRevocationCannotReplayAnOldSameKeyResult()" classname="com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT" time="0.793">
+    <failure message="org.opentest4j.AssertionFailedError: Expected org.springframework.security.access.AccessDeniedException to be thrown, but nothing was thrown." type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: Expected org.springframework.security.access.AccessDeniedException to be thrown, but nothing was thrown.
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at app//org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:73)
+	at app//org.junit.jupiter.api.AssertThrows.assertThrows(AssertThrows.java:35)
+	at app//org.junit.jupiter.api.Assertions.assertThrows(Assertions.java:3128)
+	at app//com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT.committedReadRevocationCannotReplayAnOldSameKeyResult(QueryResultCacheRevocationIT.java:121)
+	at java.base@21.0.8/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+</failure>
+  </testcase>
+</testsuite>

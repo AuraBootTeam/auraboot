@@ -1,0 +1,149 @@
+{
+  "run": {
+    "id": "query-result-cache-2026-10-27",
+    "target": "Explicit query result reuse policy",
+    "sot": "docs/system-reference/command-transaction-isolation.md#query-result-reuse",
+    "runtime": "maritime-parent-file-append",
+    "commit": "af3c6ed89915ff20d8bbe9dc355513857a41c80e"
+  },
+  "groups": [
+    {
+      "id": "core",
+      "title": "Core policy and PostgreSQL result cache seam",
+      "rows": [
+        {
+          "id": "Q01",
+          "action": "Strict typed configuration and formal schema",
+          "assertion": "Both booleans survive import and stored JSON; absent retains default; string/number/null/object/array are rejected.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest.xml"
+          ]
+        },
+        {
+          "id": "Q02",
+          "action": "Query-only contract validation",
+          "assertion": "False requires query type and rejects required keys and explicit target write actions; existing types remain accepted.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.meta.constant.CommandResultCachePolicyTest.xml",
+            "unit/TEST-com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest.xml"
+          ]
+        },
+        {
+          "id": "Q03",
+          "action": "Paired claim and completion policy",
+          "assertion": "Uncached query skips claim/replay and completion outcome without an unclaimed intent error; direct phase invocation is equally bounded.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest.xml"
+          ]
+        },
+        {
+          "id": "Q04",
+          "action": "Existing write idempotency",
+          "assertion": "Absent/true preserve claim+outcome and original intent; PG same-key operation/intent conflict, concurrent winner and rollback retry still hold.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest.xml",
+            "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.CommandIdempotencyIntentTest.xml",
+            "postgres/TEST-com.auraboot.framework.meta.service.impl.IdempotencyServiceImplCoverageIT.xml"
+          ]
+        },
+        {
+          "id": "Q05",
+          "action": "Same-key stale result cannot survive READ revocation",
+          "assertion": "A real cached response is replayable as a control; committed ALL-to-SELF READ restriction rejects uncached same-key result retrieval with real current record authorization.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT.xml"
+          ]
+        },
+        {
+          "id": "Q06",
+          "action": "Fresh allowed query leaves no result cache claim or outcome",
+          "assertion": "After restoring READ, new-key uncached query returns the exact private field and preserves PG idempotency row count.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT.xml"
+          ]
+        },
+        {
+          "id": "Q07",
+          "action": "Failure evidence can falsify stale-cache protection",
+          "assertion": "A controlled reuse mutation causes expected AccessDeniedException not thrown; restoring source reruns the same PG assertion successfully.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT.xml",
+            "mutation-receipt.json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "consumer",
+      "title": "Unexecuted consumer integration",
+      "rows": [
+        {
+          "id": "Q08",
+          "action": "Root rich Core and consumer public HTTP revocation",
+          "assertion": "Integrate exact delta and verify the actual consumer authorization/handler pipeline with same-key old cache after revocation.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "http",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        },
+        {
+          "id": "Q09",
+          "action": "Consumer browser query refresh",
+          "assertion": "Actual UI refresh with changed READ scope never displays cached unauthorized result.",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        }
+      ]
+    }
+  ]
+}

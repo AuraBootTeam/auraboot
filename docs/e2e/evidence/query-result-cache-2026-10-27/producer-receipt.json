@@ -1,0 +1,64 @@
+{
+  "codeAndTestProducer": "af3c6ed89915ff20d8bbe9dc355513857a41c80e",
+  "base": "49af729684876d1f91a9a7b8a27ac5d42acc3fa1",
+  "runtime": "maritime-parent-file-append",
+  "slot": 72,
+  "database": "auraboot_72",
+  "schemaHistory": "ab_flyway_schema_history",
+  "appliedMigrations": 157,
+  "sourceFingerprint": "clean",
+  "driver": "direct composed command pipeline with actual IdempotencyService, CompletionPhase and DynamicDataService",
+  "queryFixture": "new unique tenant/member/role/model/record, actual model READ grant and committed ALL-to-SELF row policy change per execution",
+  "nonGoals": [
+    "HandlerPhase changes",
+    "PermitPlan or READ semantic changes",
+    "Root rich source integration",
+    "public HTTP or browser journey"
+  ],
+  "unit": {
+    "exitCode": 0,
+    "log": "unit.log",
+    "actualTestExecution": true
+  },
+  "postgres": {
+    "exitCode": 0,
+    "log": "postgres-final-executed.log",
+    "actualTestExecution": true,
+    "flags": [
+      ":platform-app:test --rerun",
+      "--no-build-cache"
+    ]
+  },
+  "cachedRestorationAttempt": {
+    "log": "postgres-final.log",
+    "countedAsNewExecution": false
+  },
+  "beforeFix": {
+    "source": "9454dafdb31dca41c7a476e2f7e990068a931a64",
+    "exitCode": 1,
+    "tests": 3,
+    "failures": 2,
+    "evidence": "mutation-before.xml"
+  },
+  "coverage_not_measured": [
+    "complete integration surface",
+    "full platform coverage"
+  ],
+  "evidenceSha256": {
+    "mutation-reuse.xml": "4a854eb7ed287f63aa6dac4e96dd80c8b77ac1313f8abd44bb066df760a7744b",
+    "mutation-receipt.json": "26a432602ee2c4ba744f831786f9439c8554e87efb2793d510571c20862ac680",
+    "mutation-before.xml": "14d3e1597b10134ef0d63c244d5a2a9f6ca18acfa651493ea83dda69e36386e5",
+    "junit-summary.json": "4008ef2590a01226c97116512549f7839800a92a2b50fb6b5adafb8cf68762e2",
+    "reuse-mutation.patch": "2cf62ac0aa9f65f332ae9ed7cf115d2e5d4f0ec4314f50fa716786bb9a816158",
+    "coverage.json": "9c2ad84ab9f82498a5ffc0129afc12c3c92579e9fdff420f886dceb6641f1c86",
+    "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest.xml": "71df5eabc70c7684fcbee9cefa8e8fcff2012e04674221d61b79c6c54e4b045b",
+    "unit/TEST-com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest.xml": "469ebd1176c6cf7f5e1f5473ae467c8b3f9dfcca881075fe847312a4c0f5b7b8",
+    "unit/TEST-com.auraboot.framework.meta.constant.CommandResultCachePolicyTest.xml": "0e222363ccbfacf9d13bfe165a8b795a88ffac58a0bbfbcbb4064b408a5e7a36",
+    "unit/TEST-com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest.xml": "c79cc5ac750a91fcdd398f5ec5944e4ecc71ba7a3c0b0c5fd26c50238a5fc1ec",
+    "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.CommandIdempotencyIntentTest.xml": "692a52decbf15a601638b81ed6ab1fb522f0fab2258db863e7c1d9a4947e31c2",
+    "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseTransitionEventTest.xml": "f1d1de57e94357a784bf956a1e1df4edd690600be413a8ff3e2d1f478f46c4db",
+    "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest.xml": "945a14ef89d25ef36741da33e2fa2a71d4fb222d7a1feca1f94be9a59fc1ffcc",
+    "postgres/TEST-com.auraboot.framework.meta.service.impl.IdempotencyServiceImplCoverageIT.xml": "ae0575abc56a8646f6eb3a4bc6d8830bcd0bf4b2219155cd483b07b51ab1332c",
+    "postgres/TEST-com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT.xml": "37d6ebe7616872ebda1fb8008a89c5a2be5fc2277eee79a40a75e9383c22ff03"
+  }
+}

@@ -1,0 +1,94 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>Explicit query result reuse policy · 验收证据索引</title><style>
+body{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:2rem;color:#1a1a1a}
+.hdr{border-bottom:2px solid #ddd;padding-bottom:.5rem;margin-bottom:1rem}
+.sum{font-size:1.1rem;margin:.5rem 0}.reds{background:#fff3f3;border:1px solid #f5c2c2;padding:.5rem 1rem;border-radius:6px;margin:1rem 0}.reds.ok{background:#f2fbf2;border-color:#bfe6bf}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid #e5e5e5;padding:.35rem .5rem;text-align:left;vertical-align:top}
+.detail{background:#fafafa;font-size:.9rem}.shots img{max-width:360px;border:1px solid #ccc;margin:.25rem}
+.badge{font-family:monospace}.b-solid{color:#1a7f37}.b-dashed{color:#9a6700}.b-hollow{color:#8a8a8a}.b-metric{color:#0a5}.red{color:#c00;font-weight:bold}
+.layer{font-family:monospace;font-size:.85rem;color:#555}.ev{font-family:monospace;font-size:.85rem;color:#555}
+</style></head><body>
+<div class="hdr"><h1>Explicit query result reuse policy · 验收证据索引</h1>
+<div>runtime maritime-parent-file-append · commit af3c6ed89915ff20d8bbe9dc355513857a41c80e · 2026-10-27 01:42 · 修复回路 0 轮</div>
+<div>SoT: docs/system-reference/command-transaction-isolation.md#query-result-reuse</div></div>
+<div class="sum">🟢 7 🟡 0 🔴 0 ⬜ 2 / 9 行动点</div>
+<div class="sum">强度: spec-assert 7 · vision 0 · exit 0 · metric 0</div>
+<div class="reds"><h3>未清零(置顶,永不折叠)</h3><ul><li>⬜ Root rich Core and consumer public HTTP revocation — 未测 (verdict=untested)</li><li>⬜ Consumer browser query refresh — 未测 (verdict=untested)</li></ul></div>
+    <details open><summary>core Core policy and PostgreSQL result cache seam</summary>
+    <table><thead><tr><th></th><th>行动点</th><th>四轴</th><th>成色/证据</th><th>断言</th></tr></thead>
+    <tbody><tr class="dot-🟢">
+    <td>🟢</td><td>Strict typed configuration and formal schema</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Both booleans survive import and stored JSON; absent retains default; string/number/null/object/array are rejected.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Both booleans survive import and stored JSON; absent retains default; string/number/null/object/array are rejected.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Query-only contract validation</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">False requires query type and rejects required keys and explicit target write actions; existing types remain accepted.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> False requires query type and rejects required keys and explicit target write actions; existing types remain accepted.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Paired claim and completion policy</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Uncached query skips claim/replay and completion outcome without an unclaimed intent error; direct phase invocation is equally bounded.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Uncached query skips claim/replay and completion outcome without an unclaimed intent error; direct phase invocation is equally bounded.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Existing write idempotency</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Absent/true preserve claim+outcome and original intent; PG same-key operation/intent conflict, concurrent winner and rollback retry still hold.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Absent/true preserve claim+outcome and original intent; PG same-key operation/intent conflict, concurrent winner and rollback retry still hold.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Same-key stale result cannot survive READ revocation</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">A real cached response is replayable as a control; committed ALL-to-SELF READ restriction rejects uncached same-key result retrieval with real current record authorization.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> A real cached response is replayable as a control; committed ALL-to-SELF READ restriction rejects uncached same-key result retrieval with real current record authorization.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Fresh allowed query leaves no result cache claim or outcome</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">After restoring READ, new-key uncached query returns the exact private field and preserves PG idempotency row count.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> After restoring READ, new-key uncached query returns the exact private field and preserves PG idempotency row count.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Failure evidence can falsify stale-cache protection</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">A controlled reuse mutation causes expected AccessDeniedException not thrown; restoring source reruns the same PG assertion successfully.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> A controlled reuse mutation causes expected AccessDeniedException not thrown; restoring source reruns the same PG assertion successfully.</div>
+
+  </td></tr></tbody></table></details>
+    <details open><summary>consumer Unexecuted consumer integration</summary>
+    <table><thead><tr><th></th><th>行动点</th><th>四轴</th><th>成色/证据</th><th>断言</th></tr></thead>
+    <tbody><tr class="dot-⬜">
+    <td>⬜</td><td>Root rich Core and consumer public HTTP revocation</td><td class="layer">api/real-stack/http [recorded]</td>
+    <td><span class="badge b-none">–</span></td><td class="assert">Integrate exact delta and verify the actual consumer authorization/handler pipeline with same-key old cache after revocation.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Integrate exact delta and verify the actual consumer authorization/handler pipeline with same-key old cache after revocation.</div>
+
+  </td></tr><tr class="dot-⬜">
+    <td>⬜</td><td>Consumer browser query refresh</td><td class="layer">journey/real-stack/browser [recorded]</td>
+    <td><span class="badge b-none">–</span></td><td class="assert">Actual UI refresh with changed READ scope never displays cached unauthorized result.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Actual UI refresh with changed READ scope never displays cached unauthorized result.</div>
+
+  </td></tr></tbody></table></details></body></html>

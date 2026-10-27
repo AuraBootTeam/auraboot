@@ -1,0 +1,11 @@
+{
+  "source": "af3c6ed89915ff20d8bbe9dc355513857a41c80e",
+  "dirtyFingerprint": "sha256:0bc1cd8af084096cceb344c23d1d425a140e246b979a1e82df79ceaa6e169d1d",
+  "mutation": "CommandResultCachePolicy final return false changed to true",
+  "runtime": "maritime-parent-file-append",
+  "database": "auraboot_72",
+  "expected": "same-key stale cache incorrectly bypasses current result READ; assertThrows must fail",
+  "exitCode": 1,
+  "patchSha256": "2cf62ac0aa9f65f332ae9ed7cf115d2e5d4f0ec4314f50fa716786bb9a816158",
+  "junitSha256": "4a854eb7ed287f63aa6dac4e96dd80c8b77ac1313f8abd44bb066df760a7744b"
+}

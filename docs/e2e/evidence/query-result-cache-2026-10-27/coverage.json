@@ -1,0 +1,60 @@
+{
+  "source": "af3c6ed89915ff20d8bbe9dc355513857a41c80e",
+  "layer": "hermetic/unit",
+  "fullProductionReport": true,
+  "classes": {
+    "com/auraboot/framework/plugin/dto/imports/CommandDefinitionDTO$ExecutionConfig$CacheResultDeserializer": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 28
+      },
+      "BRANCH": {
+        "missed": 0,
+        "covered": 4
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 6
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 6
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 4
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/meta/constant/CommandResultCachePolicy": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 78
+      },
+      "BRANCH": {
+        "missed": 1,
+        "covered": 17
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 14
+      },
+      "COMPLEXITY": {
+        "missed": 1,
+        "covered": 9
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    }
+  },
+  "integrationCoverage": "not_measured"
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:39:36.499Z" hostname="Mac" time="0.183">
+  <properties/>
+  <testcase name="concurrencyFields_parseIntoDeclaredFields_notUnknownFields()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.063"/>
+  <testcase name="resultCachePolicySurvivesTypedImportAndStoredJson()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.012"/>
+  <testcase name="currentStatePolicySurvivesDslImportWithItsStateBoundaries()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.004"/>
+  <testcase name="resultCachePolicyRejectsJacksonScalarCoercion()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.006"/>
+  <testcase name="crudDefaultSurvivesPluginImportWithoutChangingCommandExecutionType()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.003"/>
+  <testcase name="consolidatedExecutionConfig_omitsConcurrencyKeys_whenUnset()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.004"/>
+  <testcase name="formalExecutionSchemaAcceptsOnlyBooleanCachePolicy()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.05"/>
+  <testcase name="consolidatedExecutionConfig_carriesConcurrencyKeys_soRuntimeCanReadThem()" classname="com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest" time="0.003"/>
+</testsuite>

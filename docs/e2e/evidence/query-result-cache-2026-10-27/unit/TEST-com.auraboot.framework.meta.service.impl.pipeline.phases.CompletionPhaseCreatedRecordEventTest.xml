@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:39:37.200Z" hostname="Mac" time="0.047">
+  <properties/>
+  <testcase name="creationCannotTakeRecordIdentityFromClientPayload()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest" time="0.037"/>
+  <testcase name="explicitTargetCannotBeOverriddenByHandlerResult()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest" time="0.002"/>
+  <testcase name="declaredCustomCreatePublishesServerReturnedRecordIdentity()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest" time="0.001"/>
+  <testcase name="readResultIsNotTreatedAsCreatedRecord()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest" time="0.0"/>
+  <testcase name="blankOrNonStringResultsCannotBecomeRecordIdentity()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest" time="0.001"/>
+  <testcase name="standardCreatePublishesFieldMapRecordIdentity()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest" time="0.001"/>
+</testsuite>

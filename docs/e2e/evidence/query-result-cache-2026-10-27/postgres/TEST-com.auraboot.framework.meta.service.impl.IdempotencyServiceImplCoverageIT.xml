@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="IdempotencyServiceImpl Coverage IT — check/record/cleanup" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:41:12.363Z" hostname="Mac" time="0.587">
+  <properties/>
+  <testcase name="two concurrent claims execute once and the loser replays the committed outcome" classname="com.auraboot.framework.meta.service.impl.IdempotencyServiceImplCoverageIT" time="0.457"/>
+  <testcase name="cleanupExpired runs and returns a non-negative count" classname="com.auraboot.framework.meta.service.impl.IdempotencyServiceImplCoverageIT" time="0.013"/>
+  <testcase name="check returns null for blank/unknown; record then check replays the outcome" classname="com.auraboot.framework.meta.service.impl.IdempotencyServiceImplCoverageIT" time="0.013"/>
+  <testcase name="a failed owner rolls back its claim and the same request can retry" classname="com.auraboot.framework.meta.service.impl.IdempotencyServiceImplCoverageIT" time="0.033"/>
+  <testcase name="scoped replay requires the same operation and canonical payload" classname="com.auraboot.framework.meta.service.impl.IdempotencyServiceImplCoverageIT" time="0.02"/>
+</testsuite>

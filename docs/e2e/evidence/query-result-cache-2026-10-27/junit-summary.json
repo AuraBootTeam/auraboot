@@ -1,0 +1,94 @@
+{
+  "unit": {
+    "suites": [
+      {
+        "name": "com.auraboot.framework.meta.constant.CommandResultCachePolicyTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:39:36.684Z"
+      },
+      {
+        "name": "com.auraboot.framework.meta.service.impl.pipeline.CommandIdempotencyIntentTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:39:36.688Z"
+      },
+      {
+        "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:39:36.743Z"
+      },
+      {
+        "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseCreatedRecordEventTest",
+        "tests": "6",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:39:37.200Z"
+      },
+      {
+        "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhaseTransitionEventTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:39:37.248Z"
+      },
+      {
+        "name": "com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest",
+        "tests": "8",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:39:36.499Z"
+      },
+      {
+        "name": "com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest",
+        "tests": "21",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:39:37.258Z"
+      }
+    ],
+    "totals": {
+      "tests": 46,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "postgres": {
+    "suites": [
+      {
+        "name": "IdempotencyServiceImpl Coverage IT \u2014 check/record/cleanup",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:41:12.363Z"
+      },
+      {
+        "name": "com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T01:41:12.967Z"
+      }
+    ],
+    "totals": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  }
+}
