@@ -180,7 +180,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await panel.getByTestId('aurabot-history-trigger').click();
   await panel.getByTestId('aurabot-new-session').click();
   await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
-  const question = `${customer}名下每个项目的预算是多少？重新核对客户记录，按所属客户关联查询。用不超过300字的简洁纯文本列预算合计并给两条仅基于预算的管理建议，预算不是收入；不要推测进度、日期和收入。正文只用业务名称，不要展示数据库字段名、模型编码、查询语句和任何内部标识。金额使用千分位和两位小数。第一行写客户全称，只依据本轮查询结果，不引用历史会话或历史项目数量。`;
+  const question = `${customer}名下每个项目的预算是多少？请生成可以点击“存为报表”并刷新数据的预算分析表，不要只回复文字或静态表格。先重新核对客户记录，按所属客户精确关联查询，再按项目分组对项目预算求和，每个项目一行。分析表之外，用不超过300字的简洁纯文本列预算合计并给两条仅基于预算的管理建议，预算不是收入；不要推测进度、日期和收入。正文只用业务名称，不要展示数据库字段名、模型编码、查询语句和任何内部标识。金额使用千分位和两位小数。第一行写客户全称，只依据本轮查询结果，不引用历史会话或历史项目数量。`;
   const streamPromise = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/ai/aurabot/chat/stream' &&
