@@ -712,5 +712,19 @@
     "zh-CN": "已截断",
     "en-US": "truncated",
     "refType": "ui"
+  },
+  {
+    "key": "aurabot.error.connect_chat",
+    "source": "import",
+    "zh-CN": "无法连接 AI 助手，请检查网络后重新发送。",
+    "en-US": "Unable to connect to the AI assistant. Check your connection and send again.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.error.connect_execute",
+    "source": "import",
+    "zh-CN": "AI 操作未完成，请检查网络后重新发送。",
+    "en-US": "The AI action could not complete. Check your connection and send again.",
+    "refType": "ui"
   }
 ]

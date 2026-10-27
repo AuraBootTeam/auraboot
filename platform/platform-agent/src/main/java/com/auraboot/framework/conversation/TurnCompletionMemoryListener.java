@@ -120,6 +120,12 @@ public class TurnCompletionMemoryListener {
             return;
         }
 
+        // Preserve the visible partial answer/history, but never teach future turns
+        // an answer the provider did not finish.
+        if (Boolean.TRUE.equals(success.meta().get(TurnOutcomeMeta.RESPONSE_TRUNCATED))) {
+            return;
+        }
+
         // 3. Memory rows are user-scoped; system/cron turns have no user owner.
         Long tenantId = ctx.tenantId();
         Long userId = ctx.userId();

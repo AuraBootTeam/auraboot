@@ -74,6 +74,21 @@ class ActiveMemoryServiceSemanticRecallTest {
     }
 
     @Test
+    void rawCitationContentExcludesGeneratedMarkersAndTruncationEllipsis() {
+        ReflectionTestUtils.setField(service, "semanticRecallEnabled", false);
+        var episodic = row("history");
+        episodic.put("memory_type", "turn_summary");
+        episodic.put("shadow_mode", true);
+        episodic.put("memory_content", "Actual body ".repeat(50));
+        when(memoryService.searchScoped(anyLong(), any(), anyString(), anyString(), anyInt()))
+                .thenReturn(List.of(episodic));
+        var snippet = service.preRecall(7L, "u1", "aurabot", "history").get(0);
+        assertThat(snippet.get("source_content")).isEqualTo(episodic.get("memory_content").toString().substring(0, 400));
+        assertThat(snippet).containsEntry("historical", true).containsEntry("shadow_mode", true).containsEntry("truncated", true);
+        assertThat(snippet.get("content").toString()).contains("Historical model response").endsWith("…");
+    }
+
+    @Test
     void semanticSkippedWhenDisabled() {
         ReflectionTestUtils.setField(service, "semanticRecallEnabled", false);
         when(memoryService.searchScoped(anyLong(), any(), anyString(), anyString(), anyInt()))

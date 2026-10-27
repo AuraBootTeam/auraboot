@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 19da7877889dfc0fb73f6b5b131fdf15293b3256143acac8323415f7d8978eb6
+ * Contract SHA-256: 631d615ebcac5d9acf488a473ce883f67e5af1a371a05cd9c8ee587e04b5eb32
  */
 export interface paths {
     "/api/activities": {
@@ -1293,6 +1293,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["promoteNow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/memory/embeddings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["inventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/memory/embeddings/{pid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["inspect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/memory/embeddings/{pid}/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rebuild"];
         delete?: never;
         options?: never;
         head?: never;
@@ -37797,6 +37845,11 @@ export interface components {
             field?: string | null;
             message?: string | null;
         };
+        RebuildRequest: {
+            agentCode?: string;
+            expectedSpace?: string;
+            reason?: string;
+        };
         RebuildResult: {
             errorMessage?: string;
             /** Format: int32 */
@@ -43141,6 +43194,80 @@ export interface operations {
                 "application/json": {
                     [key: string]: unknown;
                 };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    inventory: {
+        parameters: {
+            query: {
+                after?: string;
+                agentCode: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    inspect: {
+        parameters: {
+            query: {
+                agentCode: string;
+            };
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    rebuild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RebuildRequest"];
             };
         };
         responses: {

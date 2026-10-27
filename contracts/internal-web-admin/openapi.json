@@ -42968,6 +42968,20 @@
         },
         "type": "object"
       },
+      "RebuildRequest": {
+        "properties": {
+          "agentCode": {
+            "type": "string"
+          },
+          "expectedSpace": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RebuildResult": {
         "properties": {
           "errorMessage": {
@@ -55504,6 +55518,133 @@
         },
         "tags": [
           "login-channel-manage-controller"
+        ]
+      }
+    },
+    "/api/admin/memory/embeddings": {
+      "get": {
+        "operationId": "inventory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "agentCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "memory-embedding-admin-controller"
+        ]
+      }
+    },
+    "/api/admin/memory/embeddings/{pid}": {
+      "get": {
+        "operationId": "inspect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agentCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "memory-embedding-admin-controller"
+        ]
+      }
+    },
+    "/api/admin/memory/embeddings/{pid}/rebuild": {
+      "post": {
+        "operationId": "rebuild",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RebuildRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "memory-embedding-admin-controller"
         ]
       }
     },

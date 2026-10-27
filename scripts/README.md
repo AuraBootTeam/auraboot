@@ -172,6 +172,8 @@ the original review behavior; pause idle services through their product owner.
 | `run-renderer-release-image-gate.sh` | 1 | 2026-09-14 | Build and verify the immutable renderer release image. |
 | `suspended-tenant-login-ui-golden.sh` | 0 | 2026-07-17 | suspended-tenant-login-ui-golden.sh — E5, at the glass: what a user sees when their org is |
 | `test-acp-runtime.sh` | 0 | 2026-05-09 |  |
+| `application/local-embedding.mjs` | 1 | 2026-10-27 | Manage an owned retained local Qwen embedding service without downloading or deleting model data. |
+| `application/memory-embedding-maintenance.mjs` | 1 | 2026-10-27 | Inspect and rebuild an explicit authenticated memory-vector manifest with a resumable private checkpoint. |
 | `application/application-cli.mjs` | 1 | 2026-09-27 | Validate application artifacts and publish an exact release through register, publication, and stable-channel CAS with a durable receipt. |
 | `application/application-release-control.mjs` | 1 | 2026-09-27 | Publish a registered application release and move stable through replay-safe API operations backed by a durable local receipt. |
 | `application/application-graph-adapters.mjs` | 1 | 2026-09-12 | Resolve typed Web contributions from local source roots or checksum-verified npm tarballs. |

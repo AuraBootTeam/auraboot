@@ -105,6 +105,14 @@ class TurnCompletionMemoryListenerTest {
     }
 
     @Test
+    void truncatedSuccessNeverWritesPartialAnswerToMemory() {
+        listener.onTurnCompleted(new TurnCompletedEvent(
+                newCtx(TriageBucket.CONTEXTUAL_ANSWER, 100L, 42L),
+                new TurnOutcome.Success("Partial answer", Map.of(TurnOutcomeMeta.RESPONSE_TRUNCATED, true))));
+        verifyNoInteractions(memoryService);
+    }
+
+    @Test
     @DisplayName("F7: an answer composed after a TOOL FAILURE is never persisted as memory")
     void toolFailureTurn_skipsMemoryWrite() {
         // Live-reproduced poisoning loop: the model answered with an invented

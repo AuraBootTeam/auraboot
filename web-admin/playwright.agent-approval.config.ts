@@ -6,7 +6,9 @@ import baseConfig from './playwright.config';
 // Paid models and private role fixtures belong to this explicit profile only.
 const fixture = process.env.AGENT_PERMISSION_FIXTURE;
 const evidence = process.env.AGENT_PERMISSION_EVIDENCE;
-const agentApprovalSpecNames = ['permissions'];
+const scope = process.env.AGENT_ACCEPTANCE_SCOPE ?? 'permissions';
+const agentApprovalSpecNames = ['permissions', 'memory'];
+if (!agentApprovalSpecNames.includes(scope)) throw new Error('Unknown agent acceptance scope');
 if (!fixture || !isAbsolute(fixture) || !existsSync(fixture)
     || !evidence || !isAbsolute(evidence)
     || !process.env.PLAYWRIGHT_BASE_URL || !process.env.BACKEND_URL
@@ -16,19 +18,26 @@ if (!fixture || !isAbsolute(fixture) || !existsSync(fixture)
 const inputs = JSON.parse(readFileSync(fixture, 'utf8'));
 if (inputs.baseURL !== process.env.PLAYWRIGHT_BASE_URL
     || inputs.backendURL !== process.env.BACKEND_URL
-    || !inputs.admin?.email || !inputs.admin?.password
-    || !inputs.reader?.email || !inputs.reader?.password
-    || !inputs.modelCode || !inputs.modelName || !inputs.tenantId
-    || !inputs.adminConversationId || !inputs.privateHistoryValue
-    || !inputs.database?.database || !inputs.productIdentity
+    || !inputs.tenantId || !inputs.database?.database || !inputs.productIdentity
     || !/^[a-f0-9]{64}$/.test(inputs.bundleSha256 || '')) {
-  throw new Error('Agent permission UI fixture must bind explicit roles, controlled data and product identity');
+  throw new Error('Agent UI fixture must bind explicit URLs, storage and product identity');
+}
+if (scope === 'permissions' && (!inputs.admin?.email || !inputs.admin?.password
+    || !inputs.reader?.email || !inputs.reader?.password || !inputs.modelCode || !inputs.modelName
+    || !inputs.adminConversationId || !inputs.privateHistoryValue)) {
+  throw new Error('Agent permission fixture requires explicit roles and controlled data');
+}
+if (scope === 'memory' && (!inputs.owner?.email || !inputs.owner?.password
+    || !inputs.other?.email || !inputs.other?.password || !inputs.memory?.pid
+    || !inputs.memory?.actualTitle || !inputs.memory?.value || !inputs.memory?.question
+    || !inputs.memory?.missingQuestion || !inputs.memory?.missingMarker)) {
+  throw new Error('Agent memory fixture requires distinct accounts and actual persisted source data');
 }
 
 export default defineConfig({
   ...baseConfig,
   testDir: './tests/acceptance/agent-approval',
-  testMatch: agentApprovalSpecNames.map(name => '**/' + name + '.spec.ts'),
+  testMatch: agentApprovalSpecNames.filter(name => name === scope).map(name => '**/' + name + '.spec.ts'),
   globalSetup: undefined,
   globalTeardown: undefined,
   outputDir: evidence + '/artifacts',

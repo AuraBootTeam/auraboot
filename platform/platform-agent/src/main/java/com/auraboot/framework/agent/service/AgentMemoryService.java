@@ -7,6 +7,8 @@ import com.auraboot.framework.agent.memory.MemorySecretGuard;
 import com.auraboot.framework.agent.memory.MemoryReadPolicy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,9 @@ import java.util.Objects;
 public class AgentMemoryService {
 
     private final JdbcTemplate jdbcTemplate;
+    private volatile Boolean iterativeScanSupported;
+    // Shared-index tenant/agent filters need a wider candidate set, qualified against an exact scoped oracle.
+    private static final int MIN_SEMANTIC_EF_SEARCH = 1000;
 
     // =========================================================================
     // Create
@@ -507,16 +512,52 @@ public class AgentMemoryService {
         return List.of();
     }
 
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> searchScopedSemanticInSpace(Long tenantId, String userId,
             String agentCode, com.auraboot.framework.rag.service.EmbeddingService.EmbeddedVector query, int limit) {
         Objects.requireNonNull(tenantId, "tenantId");
         if (query == null || query.values().length != 1536 || limit <= 0) return List.of();
         String userKey = MemoryReadPolicy.userKey(tenantId, userId);
-        String sql = "SELECT pid,memory_type,category,memory_title,memory_content,importance,shareable,scope,scope_key,shadow_mode,created_at "
+        boolean iterative = TransactionSynchronizationManager.isActualTransactionActive() && supportsIterativeScan();
+        String previous = iterative ? jdbcTemplate.queryForObject("SELECT current_setting('hnsw.iterative_scan', true)", String.class) : null;
+        String previousEf = iterative ? jdbcTemplate.queryForObject("SELECT current_setting('hnsw.ef_search', true)", String.class) : null;
+        if (iterative) {
+            jdbcTemplate.execute("SET LOCAL hnsw.iterative_scan=strict_order");
+            int efSearch = Math.max(MIN_SEMANTIC_EF_SEARCH, previousEf == null ? 0 : Integer.parseInt(previousEf));
+            jdbcTemplate.execute("SET LOCAL hnsw.ef_search=" + efSearch);
+        }
+        var rows = jdbcTemplate.queryForList(semanticSearchSql(), agentCode, query.space(), tenantId, userKey, toVectorLiteral(query.values()), limit);
+        // Restore the caller's setting even when this method joins an outer transaction.
+        // A failed SQL statement propagates and rolls the transaction back; do not issue SQL in that aborted transaction.
+        if (iterative) {
+            if (previous == null) jdbcTemplate.execute("SET LOCAL hnsw.iterative_scan=DEFAULT");
+            else jdbcTemplate.queryForObject("SELECT set_config('hnsw.iterative_scan', ?, true)", String.class, previous);
+            if (previousEf == null) jdbcTemplate.execute("SET LOCAL hnsw.ef_search=DEFAULT");
+            else jdbcTemplate.queryForObject("SELECT set_config('hnsw.ef_search', ?, true)", String.class, previousEf);
+        }
+        return rows;
+    }
+
+    private boolean supportsIterativeScan() {
+        Boolean supported = iterativeScanSupported;
+        if (supported != null) return supported;
+        synchronized (this) {
+            if (iterativeScanSupported == null) {
+                String version = jdbcTemplate.queryForObject("SELECT MAX(extversion) FROM pg_extension WHERE extname='vector'", String.class);
+                // pgvector before 0.8 has no iterative scanner. Keep its existing query behavior.
+                var parsed = java.util.regex.Pattern.compile("^(\\d+)\\.(\\d+)(?:\\..*)?$").matcher(version == null ? "" : version);
+                iterativeScanSupported = parsed.matches() && (Integer.parseInt(parsed.group(1)) > 0 || Integer.parseInt(parsed.group(2)) >= 8);
+            }
+            return iterativeScanSupported;
+        }
+    }
+
+    /** Shared with the native query-plan qualification; no alternative SQL path in tests. */
+    private static String semanticSearchSql() {
+        return "SELECT pid,memory_type,category,memory_title,memory_content,importance,shareable,scope,scope_key,shadow_mode,created_at "
                 + "FROM ab_agent_memory WHERE memory_agent_id=? AND embedding_space=? AND "
                 + com.auraboot.framework.agent.memory.MemoryVectorPolicy.fresh("") + " AND " + MemoryReadPolicy.VISIBLE
                 + " ORDER BY embedding <=> ?::vector LIMIT ?";
-        return jdbcTemplate.queryForList(sql, agentCode, query.space(), tenantId, userKey, toVectorLiteral(query.values()), limit);
     }
 
     /** Format a float vector as a pgvector literal {@code [v0,v1,...]} for a {@code ?::vector} bind. */
