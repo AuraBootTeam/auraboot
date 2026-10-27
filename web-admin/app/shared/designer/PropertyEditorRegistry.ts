@@ -13,8 +13,15 @@ export class PropertyEditorRegistry {
   private readonly editors = new Map<string, ComponentType<RegisteredPropertyEditorProps>>();
 
   register(key: string, editor: ComponentType<RegisteredPropertyEditorProps>): () => void {
+    if (!key.trim()) {
+      throw new Error(`Conflicting property editor registration: ${key}`);
+    }
+    // Vite HMR re-evaluates importer modules after any web-admin file change while older
+    // instances of this registry survive in the module graph; the re-registration is the SAME
+    // editor component under a fresh module identity, so identical editors overwrite instead
+    // of failing every page behind the dev error overlay.
     const existing = this.editors.get(key);
-    if (!key.trim() || (existing && existing !== editor)) {
+    if (existing && existing !== editor) {
       throw new Error(`Conflicting property editor registration: ${key}`);
     }
     this.editors.set(key, editor);
