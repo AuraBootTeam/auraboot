@@ -43,7 +43,6 @@ test('ZC-03: restored project types and child edit persist after reopening', asy
   await page.reload();
   await expect(page.getByRole('row').filter({ hasText: '接口联调与培训' })).toContainText('陈晨 · 复核');
   await expect(page.getByRole('row').filter({ hasText: '合计' })).toContainText('365,000');
-  await test.info().attach('ZC-03', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
   // Restore via the same UI, preserving the shared demonstration's canonical data.
   const restoredChild = page.getByRole('row').filter({ hasText: '接口联调与培训' });
   await restoredChild.getByRole('button', { name: '编辑', exact: true }).click();
@@ -77,6 +76,7 @@ test('ZC-03: restored project types and child edit persist after reopening', asy
   expect((await deletedChild.json()).code).toBe('0');
   await expect(savedChild).toHaveCount(0);
   await expect(page.getByRole('row').filter({ hasText: '合计' })).toContainText('365,000');
+  await test.info().attach('ZC-03', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 });
 
 test('ZC-04: reference validate cancel create and backfill retain the parent draft', async ({ page }) => {

@@ -81,6 +81,7 @@ test.describe('Model Page Workbench E2E', () => {
       await expect(page.getByTestId('crud-generate-detail')).toBeChecked();
       await expect(page.getByTestId('crud-open-designer')).not.toBeChecked();
       await expect(page.getByTestId('crud-form-presentation')).toHaveCount(0);
+      await test.info().attach('ZC-01', { body: await page.screenshot(), contentType: 'image/png' });
 
       const generateRespPromise = page.waitForResponse(
         (resp) =>
@@ -117,6 +118,7 @@ test.describe('Model Page Workbench E2E', () => {
       await expect(page.getByTestId('dynamic-form')).toBeVisible();
       await page.getByTestId('form-btn-submit').click();
       await expect(page.getByText('请填写MW Field 1', { exact: true })).toBeVisible();
+      await test.info().attach('ZC-02a', { body: await page.screenshot(), contentType: 'image/png' });
       await page.locator(`#${modelData.code}_f1`).fill('默认生成 · 首次保存');
       await page.locator(`#${modelData.code}_f2`).fill('42');
       const createResponse = page.waitForResponse(response =>
@@ -156,7 +158,7 @@ test.describe('Model Page Workbench E2E', () => {
         [`${modelData.code}_f1`]: '默认生成 · 编辑重开',
         [`${modelData.code}_f2`]: 84,
       });
-      await test.info().attach('generated-detail', { body: await page.screenshot(), contentType: 'image/png' });
+      await test.info().attach('ZC-02b', { body: await page.screenshot(), contentType: 'image/png' });
 
       const relatedPagesResp = await page.request.get(`/api/meta/models/${modelPid}/pages`);
       expect(relatedPagesResp.ok()).toBeTruthy();
