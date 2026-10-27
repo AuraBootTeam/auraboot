@@ -13,6 +13,9 @@ import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.entity.payload.FieldUiSchemaBean;
+import com.auraboot.framework.meta.entity.payload.FieldIndexHintBean;
+import com.auraboot.framework.meta.entity.payload.FieldQuerySchemaBean;
+import com.auraboot.framework.meta.entity.payload.FieldRuleSchemaBean;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
@@ -91,6 +94,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     // ==================== 基础CRUD操作 ====================
 
     @Override
+    @Transactional
     public MetaFieldDTO create(MetaFieldCreateRequest request) {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "创建请求不能为空");
@@ -128,6 +132,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setFeature(mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
         entity.setRefTarget(mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
         entity.setUiSchema(mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
+        entity.setIndexHint(mapToBean(request.getIndexHint(), FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(mapToBean(request.getQuerySchema(), FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(mapToBean(request.getRuleSchema(), FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
         entity.setStatus(Boolean.TRUE.equals(request.getAutoPublish()) ? "published"
@@ -254,16 +261,26 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setDataSourceId(request.getDataSourceId());
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
+        entity.setFeature(request.getFeature() == null ? existingEntity.getFeature()
+                : mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
+        entity.setRefTarget(request.getRefTarget() == null ? existingEntity.getRefTarget()
+                : mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
+        entity.setIndexHint(request.getIndexHint() == null ? existingEntity.getIndexHint()
+                : mapToBean(request.getIndexHint(), FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(request.getQuerySchema() == null ? existingEntity.getQuerySchema()
+                : mapToBean(request.getQuerySchema(), FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(request.getRuleSchema() == null ? existingEntity.getRuleSchema()
+                : mapToBean(request.getRuleSchema(), FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setUiSchema(request.getUiSchema() == null ? existingEntity.getUiSchema()
                 : mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
+        entity.setPluginPid(existingEntity.getPluginPid());
         entity.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : StatusConstants.DRAFT);
         entity.setTenantId(MetaContext.getCurrentTenantId());
         entity.setCreatedAt(Instant.now());
         entity.setUpdatedAt(Instant.now());
 
-        if (request.getExtension() != null) {
-            entity.setExtension(extensionConverter.toBean(request.getExtension()));
-        }
+        entity.setExtension(request.getExtension() == null ? existingEntity.getExtension()
+                : extensionConverter.toBean(request.getExtension()));
 
         metaFieldMapper.clearCurrentFlag(existingEntity.getCode());
         metaFieldMapper.insert(entity);
@@ -770,6 +787,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .feature(beanToMap(entity.getFeature()))
                 .refTarget(beanToMap(entity.getRefTarget()))
                 .uiSchema(beanToMap(entity.getUiSchema()))
+                .indexHint(beanToMap(entity.getIndexHint()))
+                .querySchema(beanToMap(entity.getQuerySchema()))
+                .ruleSchema(beanToMap(entity.getRuleSchema()))
                 .extension(extensionConverter.toMap(entity.getExtension())) // ✅ 使用ExtensionConverter将ExtensionBean转换为Map
                 .createdAt(DateUtil.toUtcLocalDateTime(entity.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(entity.getUpdatedAt()))
