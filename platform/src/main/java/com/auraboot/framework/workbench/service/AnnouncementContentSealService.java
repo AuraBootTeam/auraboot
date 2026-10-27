@@ -34,7 +34,7 @@ public class AnnouncementContentSealService {
     private final StorageProvider storage;
     private final CommandMembershipLockAccessor membershipLocks;
     private final IdentityDirectoryAccessor identities;
-    private final com.auraboot.framework.permission.service.UserPermissionService permissions;
+    private final com.auraboot.framework.permission.service.impl.PermissionSnapshotCache permissionSnapshots;
 
     /** Must precede announcement root locks on every official new-seal/release path. */
     @Transactional(propagation=Propagation.MANDATORY)
@@ -77,8 +77,7 @@ public class AnnouncementContentSealService {
         Long tenant=MetaContext.getCurrentTenantId(); requireTenant(tenant);
         // Flush the session before authoritative root/permission reads, including same-TX changes.
         seals.version(tenant,expected.versionPid());
-        permissions.evictUserPermissions(tenant,MetaContext.getCurrentUserId());
-        var root=access.manage(expected.announcementPid(),"publish",true);
+        var root=permissionSnapshots.withFreshReads(() -> access.manage(expected.announcementPid(),"publish",true));
         var version=seals.version(tenant,expected.versionPid());
         Instant now=seals.databaseNow();
         if(version==null || !expected.announcementPid().equals(version.get("announcement_pid"))
@@ -164,7 +163,10 @@ public class AnnouncementContentSealService {
                 if(input==null) throw unavailable();
                 byte[] buffer=new byte[65536]; int read;
                 while((read=input.read(buffer))!=-1) { length=Math.addExact(length,read); if(length>file.getFileSize()) throw unavailable(); digest.update(buffer,0,read); }
-            } catch(IOException failure) { throw new IllegalStateException("Sealed attachment source is unavailable",failure); }
+            } catch(IOException | RuntimeException failure) {
+                // Provider errors may include private keys/endpoints. Preserve the cause only for host diagnostics.
+                throw new IllegalStateException("Sealed attachment source is unavailable",failure);
+            }
             if(length!=file.getFileSize()) throw unavailable();
             String bytes=HexFormat.of().formatHex(digest.digest());
             String locator=hash((storage.type().name()+"\u0000"+file.getFileName()).getBytes(StandardCharsets.UTF_8));

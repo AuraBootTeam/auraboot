@@ -9,7 +9,7 @@ import com.auraboot.framework.plugin.extension.*;
 import com.auraboot.framework.plugin.extension.AnnouncementSealedContentAccessor.*;
 import com.auraboot.framework.workbench.entity.Announcement;
 import com.auraboot.framework.workbench.mapper.*;
-import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.impl.PermissionSnapshotCache;
 import com.auraboot.framework.plugin.extension.approval.ApprovalContract.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
@@ -31,10 +31,11 @@ class AnnouncementContentSealServiceTest {
     final FileMapper rows=mock(FileMapper.class);final StorageProvider storage=mock(StorageProvider.class);
     final CommandMembershipLockAccessor locks=mock(CommandMembershipLockAccessor.class);
     final IdentityDirectoryAccessor identities=mock(IdentityDirectoryAccessor.class);
-    final UserPermissionService permissions=mock(UserPermissionService.class);
+    final PermissionSnapshotCache permissions=mock(PermissionSnapshotCache.class);
     final AnnouncementContentSealService service=new AnnouncementContentSealService(seals,access,approval,submissions,bindings,codec,rows,storage,locks,identities,permissions);
     Map<String,Object> snapshot,stored;String hash;FileEntity file;Map<String,Object> version;Announcement root;
     @BeforeEach void setup() {
+        when(permissions.withFreshReads(any())).thenAnswer(i->((java.util.function.Supplier<?>)i.getArgument(0)).get());
         MetaContext.setContext(1L,2L,"actor","actor");MetaContext.setMemberId(3L);
         TransactionSynchronizationManager.initSynchronization();
         snapshot=Map.of("title"," Title ","content","<p>raw\r\n正文</p>","policy",Map.of(

@@ -185,7 +185,7 @@ public class AnnouncementReleaseService {
             if(frozen==null) throw new IllegalStateException("Release version does not exist");
             String pid=(String)frozen.get("announcement_pid");
             contentSeals.lockActor();
-        Announcement record=access.manage(pid,"publish",true);
+            Announcement record=access.manage(pid,"publish",true);
             Map<String,Object> job=releases.lock(tenant,version);
             if(job==null || !"running".equals(job.get("status")) || ((Number)job.get("fence")).longValue()!=fence
                 || !Boolean.TRUE.equals(job.get("lease_valid"))) return;
