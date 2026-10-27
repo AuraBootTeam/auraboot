@@ -709,6 +709,7 @@ export async function promptInputForm(
   submitLabel?: any,
   runtimeContext: Record<string, unknown> = {},
   feedback: PromptFeedbackContext = {},
+  options: { bindingsResolved?: boolean } = {},
 ): Promise<Record<string, any>> {
   const normalizedFields = fields.map((field) => normalizePromptInputField(field));
   const fieldOptions: Record<
@@ -751,10 +752,12 @@ export async function promptInputForm(
         disabled?: boolean;
       }>;
     } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
-      const endpoint = String(field.dataSource.endpoint).replace(
-        /\$\{([^}]+)\}/g,
-        (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
-      );
+      const endpoint = options.bindingsResolved
+        ? String(field.dataSource.endpoint)
+        : String(field.dataSource.endpoint).replace(
+            /\$\{([^}]+)\}/g,
+            (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
+          );
       const result = await fetchPromptChoices(fetchResult, endpoint, {
         method: 'get',
         ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
@@ -816,7 +819,9 @@ export async function promptInputForm(
   const defaults: Record<string, any> = {};
   for (const field of normalizedFields) {
     if (field.defaultValue !== undefined) {
-      const resolvedDefaultValue = resolveInputDefaultValue(field.defaultValue, runtimeContext);
+      const resolvedDefaultValue = options.bindingsResolved
+        ? field.defaultValue
+        : resolveInputDefaultValue(field.defaultValue, runtimeContext);
       if (field.type === 'multiselect') {
         const raw = resolvedDefaultValue;
         if (Array.isArray(raw)) {

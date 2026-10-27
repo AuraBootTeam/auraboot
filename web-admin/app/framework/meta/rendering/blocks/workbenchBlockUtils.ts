@@ -510,6 +510,8 @@ async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: an
           fetchResult,
           args.inputFieldsSubmitLabel,
           runtime.getContext(),
+          {},
+          { bindingsResolved: true },
         );
       } catch (error) {
         if (error instanceof ActionCancelledError) return;
