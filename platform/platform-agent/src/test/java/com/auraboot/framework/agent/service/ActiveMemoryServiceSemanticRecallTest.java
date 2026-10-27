@@ -74,6 +74,20 @@ class ActiveMemoryServiceSemanticRecallTest {
     }
 
     @Test
+    void recordedTimeIsSeparateFromQuotedSourceAndPreservesAnUnambiguousInstant() {
+        ReflectionTestUtils.setField(service, "semanticRecallEnabled", false);
+        var preference = row("recent");
+        preference.put("created_at", java.sql.Timestamp.from(java.time.Instant.parse("2026-10-27T12:00:00Z")));
+        when(memoryService.searchScoped(anyLong(), any(), anyString(), anyString(), anyInt()))
+                .thenReturn(List.of(preference));
+        var result = service.preRecall(7L, "u1", "aurabot", "report heading").getFirst();
+        assertThat(result.get("recorded_at")).isEqualTo("2026-10-27T12:00:00Z");
+        assertThat(result.get("source_content")).isEqualTo("c-recent");
+        assertThat(result.get("title")).isEqualTo("t-recent");
+        assertThat(result.get("content")).isEqualTo("c-recent");
+    }
+
+    @Test
     void rawCitationContentExcludesGeneratedMarkersAndTruncationEllipsis() {
         ReflectionTestUtils.setField(service, "semanticRecallEnabled", false);
         var episodic = row("history");

@@ -112,9 +112,13 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         assertThat(System.getenv("AURA_EFFECTIVENESS_REPORT")).as("Evidence output path is required").isNotBlank();
         tenantId = getTestTenant().getId();
         // Temporarily isolate prior evidence rows; restore their exact flags even when a live sample fails.
-        for (var row : jdbc.queryForList("SELECT pid,deleted_flag FROM ab_agent_memory WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId)) {
-            retainedMemoryFlags.put(row.get("pid").toString(), row.get("deleted_flag"));
+        if (!lifecycle()) {
+            for (var row : jdbc.queryForList("SELECT pid,deleted_flag FROM ab_agent_memory WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId)) {
+                retainedMemoryFlags.put(row.get("pid").toString(), row.get("deleted_flag"));
+            }
         }
+        // The continuous profile preserves its explicit source-revocation outcome.
+        // It never clears old rows merely to isolate a model sample.
         LiveLlmSeeder.seed(live, tenantId, cloud, jdbc);
         doAnswer(call -> {
             LlmChatRequest request = call.getArgument(0);

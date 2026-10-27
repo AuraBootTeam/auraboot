@@ -276,6 +276,11 @@ public class ActiveMemoryService {
         m.put("pid", row.get("pid"));
         m.put("type", row.get("memory_type"));
         m.put("title", row.get("memory_title"));
+        Object recorded = row.get("created_at");
+        String instant = recorded instanceof java.sql.Timestamp timestamp ? timestamp.toInstant().toString()
+                : recorded instanceof java.time.OffsetDateTime date ? date.toInstant().toString()
+                : recorded instanceof java.time.Instant date ? date.toString() : null;
+        m.put("recorded_at", instant);
         Object content = row.get("memory_content");
         String contentStr = content == null ? null : content.toString();
         // Keep citation text separate from rendering/trust annotations. The legacy
