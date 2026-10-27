@@ -187,7 +187,7 @@ describe('workbenchBlockUtils action runner', () => {
           inputFields: [{ field: 'kind', dictCode: 'media_kind' }],
         },
       }),
-    ).rejects.toThrow('option request failed');
+    ).rejects.toThrow('Unable to load data. Try again.');
     expect(fetchMock).not.toHaveBeenCalled();
     expect(fetchResultMock).toHaveBeenCalledTimes(1);
     expect(fetchResultMock.mock.calls[0][0]).toContain('/api/meta/dict/');
