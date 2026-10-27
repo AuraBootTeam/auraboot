@@ -761,6 +761,16 @@ class AuraBotChatServiceGroundingTest {
     }
 
     @Test
+    void historicalCitationBodyRemainsUnmodifiedWhileTrustIsSeparateMetadata() {
+        var bif = new com.auraboot.framework.agent.dto.BusinessIntentFrame();
+        bif.setPreContext(List.of(Map.of("title", "Personal preference", "content", "INTERNAL_ANNOTATION Actual body",
+                "source_content", "Actual body", "scope", "user", "historical", true, "shadow_mode", true)));
+        String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildBifContextHint", bif);
+        assertThat(prompt).contains("\"content\":\"Actual body\"", "\"historical\":true", "\"provisional\":true");
+        assertThat(prompt).doesNotContain("INTERNAL_ANNOTATION");
+    }
+
+    @Test
     void queryStrategyUsesDeclaredFieldTypesAndStopsAfterAnExactScalarMatch() {
         var tools = new ChatToolResolver.ResolvedTools(List.of(LlmChatRequest.Tool.builder()
                 .name("platform_resolve_reference").description("Resolve declared relationships")

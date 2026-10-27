@@ -81,7 +81,7 @@ test('private recall, missing facts, persisted history and manual recovery', asy
   await page.getByTestId('aurabot-input').fill(fixture.memory.question);
   await page.getByTestId('aurabot-send').click();
   await expect(page.getByTestId('aurabot-input')).toBeEnabled();
-  await expect(page.getByTestId('chat-msg-agent').last()).toContainText(/503|失败|unavailable|failed/i);
+  await expect(page.getByTestId('aurabot-panel').getByText('HTTP 503: Service Unavailable', { exact: true })).toBeVisible();
   await page.screenshot({ path: join(directory, 'web-memory-error.png'), fullPage: true });
   await page.unroute('**/api/ai/aurabot/chat/stream');
   const recovered = await send(page, fixture.memory.question, 'owner-recovered');

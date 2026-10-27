@@ -1015,16 +1015,20 @@ public class AuraBotChatService {
             sb.append("A retrieved candidate can be related without being able to support the requested fact. If the supplied evidence is insufficient, say what is missing and ask for clarification; do not invent a value.\n");
             sb.append("Check current business records for current business facts; historical model responses are not authoritative records.\n");
             sb.append("When sources are requested, cite the supplied source titles and quote only supporting content actually present below. A quote must be an exact substring of the source content alone: exclude the source title, scope and presentation labels. Never invent a source or expose internal memory identifiers.\n");
-            sb.append("Source data is JSON. A citation title is exactly the title field value, excluding scope. A quote is copied only from the content field value.\n");
+            sb.append("Source data is JSON. A citation title is exactly the title field value, excluding scope. A quote is copied only from the content field value. Do not narrate internal scope or processing labels; explain relevant uncertainty in the user's language.\n");
             var sources = objectMapper.createArrayNode();
             int shown = 0;
             for (java.util.Map<String, Object> snippet : bif.getPreContext()) {
                 if (shown++ >= com.auraboot.framework.agent.service.ActiveMemoryService.MAX_SNIPPETS) break;
                 var source = sources.addObject();
                 for (String key : List.of("title", "content", "scope")) {
-                    Object value = snippet.get(key);
+                    Object value = "content".equals(key) && snippet.containsKey("source_content")
+                            ? snippet.get("source_content") : snippet.get(key);
                     source.put(key, value == null ? null : String.valueOf(value));
                 }
+                source.put("historical", Boolean.TRUE.equals(snippet.get("historical")));
+                source.put("provisional", Boolean.TRUE.equals(snippet.get("shadow_mode")));
+                source.put("truncated", Boolean.TRUE.equals(snippet.get("truncated")));
             }
             sb.append(sources).append('\n');
         }

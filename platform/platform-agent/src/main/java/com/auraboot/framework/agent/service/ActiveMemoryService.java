@@ -278,7 +278,14 @@ public class ActiveMemoryService {
         m.put("title", row.get("memory_title"));
         Object content = row.get("memory_content");
         String contentStr = content == null ? null : content.toString();
-        if (contentStr != null && contentStr.length() > 400) {
+        // Keep citation text separate from rendering/trust annotations. The legacy
+        // annotated content remains available to existing memory consumers.
+        boolean truncated = contentStr != null && contentStr.length() > 400;
+        m.put("source_content", truncated ? contentStr.substring(0, 400) : contentStr);
+        m.put("truncated", truncated);
+        m.put("historical", "turn_summary".equals(row.get("memory_type"))
+                || "conversation_turn".equals(row.get("category")));
+        if (truncated) {
             contentStr = contentStr.substring(0, 400) + "…";
         }
         // Shadow-mode annotation (plan §8): tenant memories still in the
