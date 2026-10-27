@@ -182,6 +182,8 @@ test('DR-02: default project list remains readable at desktop viewport widths', 
     });
     expect(progressTextRight).toBeLessThanOrEqual(actionsBox!.x);
     await expect(row.getByRole('button', { name: '查看', exact: true })).toBeVisible();
+    const statusLabel = page.getByTestId('table-header-sort-zcrud_project_status').locator('span').first();
+    await expect.poll(async () => (await statusLabel.boundingBox())?.height ?? Infinity).toBeLessThanOrEqual(20);
     await test.info().attach(`DR-02-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
   }
 });

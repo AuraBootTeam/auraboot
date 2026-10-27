@@ -182,7 +182,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
           <span className={compact ? 'whitespace-normal leading-4 tracking-normal' : 'truncate'}>{label}</span>
           {sortable && (
             <span
-              className={`transition-opacity ${sortInfo ? 'opacity-100' : 'opacity-0 group-hover/th:opacity-40'}`}
+              className={`${compact && !sortInfo ? 'absolute right-5 top-1/2 -translate-y-1/2' : ''} transition-opacity ${sortInfo ? 'opacity-100' : 'opacity-0 group-hover/th:opacity-40'}`}
             >
               <SortIndicator direction={sortInfo?.direction} priority={sortInfo?.priority} />
             </span>
