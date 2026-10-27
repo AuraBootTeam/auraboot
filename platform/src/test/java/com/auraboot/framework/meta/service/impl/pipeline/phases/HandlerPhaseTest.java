@@ -1261,6 +1261,57 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void sealedContentCapabilityReceivesTheOriginalContextAndClosesBothCapabilities() {
+        var factory = mock(com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "sealedContentFactory", factory);
+        var files = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", files);
+        for (boolean fail : List.of(false, true)) {
+            var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
+                    Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+            var scope = mock(com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory.Scope.class);
+            var fileScope = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
+            var accessor = mock(com.auraboot.framework.plugin.extension.AnnouncementSealedContentAccessor.class);
+            when(factory.forCommand(ctx)).thenReturn(scope);
+            when(files.forCommand(ctx)).thenReturn(fileScope);
+            when(scope.accessor()).thenReturn(accessor);
+            when(fileScope.accessor()).thenReturn(mock(FileAccessor.class));
+            var handler = new CommandHandlerExtension() {
+                @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+                @Override public Object execute(CommandContext context) {
+                    assertThat(context.announcementSealedContentAccessor()).isSameAs(accessor);
+                    assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+                    if (fail) throw new IllegalStateException("sealed consumer failed");
+                    return Map.of();
+                }
+            };
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            if (fail) assertThatThrownBy(() -> phase.execute(ctx)).hasMessageContaining("sealed consumer failed");
+            else phase.execute(ctx);
+            verify(factory).forCommand(ctx); verify(scope).close(); verify(fileScope).close();
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        }
+    }
+
+    @Test
+    void sealedContentInitializationFailureClosesTheAlreadyCreatedFileAndQueryScopes() {
+        var factory = mock(com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "sealedContentFactory", factory);
+        var files = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", files);
+        var fileScope = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
+        var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
+                Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE))
+                .thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
+        when(files.forCommand(ctx)).thenReturn(fileScope);
+        when(factory.forCommand(ctx)).thenThrow(new IllegalStateException("sealed initialization failed"));
+        assertThatThrownBy(() -> phase.execute(ctx)).hasMessageContaining("sealed initialization failed");
+        verify(fileScope).close();
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
     void precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability() {
         var source = org.mockito.Mockito.mock(javax.sql.DataSource.class);
         var connection = org.mockito.Mockito.mock(java.sql.Connection.class);
