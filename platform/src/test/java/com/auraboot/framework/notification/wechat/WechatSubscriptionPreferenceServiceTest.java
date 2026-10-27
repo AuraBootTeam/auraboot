@@ -55,6 +55,22 @@ class WechatSubscriptionPreferenceServiceTest {
         verify(recipients).findActiveRecipient(42L, "user-pid"); verify(identities).selectList(any());
         verifyNoInteractions(observations);
     }
+    @Test void catalogAcceptsPlatformGeneratedNumericIdentityPid() {
+        // WechatMiniIdentityService uses IdWorker.getIdStr(), not a fixed-length ULID.
+        identity.setPid("123456789012345678");
+        assertThat(service.catalog().records()).extracting(WechatSubscriptionPreferenceService.Template::kind)
+                .containsExactly("order", "quote");
+        verifyNoInteractions(observations);
+    }
+    @Test void missingIdentityPidCannotReadCatalogOrRecordObservations() {
+        for (String pid : Arrays.asList(null, "", " ")) {
+            identity.setPid(pid);
+            assertThatThrownBy(service::catalog).isInstanceOf(RuntimeException.class);
+            assertThatThrownBy(() -> service.observe(request("request-1", choice("synthetic-quote", "accept"))))
+                    .isInstanceOf(RuntimeException.class);
+        }
+        verifyNoInteractions(observations);
+    }
     @Test void disabledCatalogHasNoTemplatesOrObservationWrites() {
         settings.setEnabled(false); mini.setAppId(null); var disabled = create(); MetaContext.clear();
         assertThat(disabled.catalog().records()).isEmpty();

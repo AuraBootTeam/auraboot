@@ -88,7 +88,7 @@ public class WechatSubscriptionPreferenceService {
         if (matching.size() != 1) throw new RootUnCheckedException(ResponseCode.BadParam);
         AuthIdentity identity = matching.getFirst();
         if (!user.equals(identity.getUserId()) || !"wechat_mini".equals(identity.getProvider())
-                || !appId.equals(identity.getAppId()) || identity.getPid() == null || identity.getPid().length() != 26
+                || !appId.equals(identity.getAppId()) || identity.getPid() == null || identity.getPid().isBlank()
                 || identity.getOpenid() == null || identity.getOpenid().isBlank()) {
             throw new RootUnCheckedException(ResponseCode.BadParam);
         }
