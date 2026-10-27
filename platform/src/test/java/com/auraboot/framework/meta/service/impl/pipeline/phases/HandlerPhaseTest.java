@@ -1314,7 +1314,12 @@ class HandlerPhaseTest {
             var callerScope = outerScope
                     ? com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open() : null;
             try {
-                assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+                if (failure instanceof IllegalStateException) {
+                    assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class)
+                            .hasMessageContaining("sealed initialization failed");
+                } else {
+                    assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+                }
                 verify(fileScope).close();
                 assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isEqualTo(outerScope);
                 if (callerScope != null) callerScope.close();
