@@ -2,6 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-23
+updated: 2026-10-27
 ---
 
 # Notification source bindings
@@ -21,6 +22,14 @@ Properties use kebab case and indexed lists, for example `bindings[0].source.ent
 Polling starts after application readiness. Planning, enqueue and delayed consumption retain host transaction and tenant boundaries; validation and delivery errors stay visible. Replaying an unchanged accepted source is deduplicated by the existing delivery ledger. An outbox receipt means an intent was persisted, not that a phone received a message. Poll failures expose only bounded codes for invalid bindings, envelope conflicts, blocked delivery, transaction conflicts or other processing failures; arbitrary exception text is not copied into diagnostics. A changed or legacy noncanonical configuration must not overwrite an accepted event or manufacture a new key for the same business occurrence; operational test scope transitions retain completed events and use fresh scheduled source occurrences.
 
 Products own schedules, recipient policy, templates, subscription grants and device acceptance. An explicit-account, exact-slot test registration proves only that scope; it does not establish production recipients or authorize WeChat sending. Readiness requires actual Spring property binding and a real-stack happy path; constructing descriptors directly in unit tests is insufficient.
+
+## WeChat field sources
+
+Deployment-owned reservation routes can map template fields to `TITLE`, `CONTENT`, `SOURCE_ID` or `OCCURRED_AT`. `TITLE` and `CONTENT` use the rendered, authorized source plan. `SOURCE_ID` remains an internal source record identifier; it must not be presented as a purchase order or inquiry number. `OCCURRED_AT` uses the plan's immutable source occurrence instant, formatted as `yyyy-MM-dd HH:mm:ss` in `Asia/Shanghai`. It is notification occurrence time, not order creation, shipment, worker execution or provider delivery time. A missing occurrence blocks the reservation before consuming quota. A changed occurrence cannot rewrite an existing reserved field snapshot.
+
+Named template identifiers are case-sensitive. Use bracketed Spring map keys, such as `templates[Owned-Template_A].field-max-lengths[date4]` and `reservations.routes[order].field-sources[date4]=OCCURRED_AT`, to preserve the provider identifier and exact field names. Limits remain explicit per field; field mappings do not truncate values. The deployment must select provider fields whose business meanings match the source facts. A template title alone does not prove compatibility.
+
+`wechat-subscription.preferences.enabled` can expose an explicit self-scoped catalog independently of dispatch. Configuring a catalog, adding a provider template or recording a client preference does not create provider consent, register source bindings, approve recipients or enable sending. Those admission boundaries remain independent and default off.
 
 ## Bounded worker progress
 

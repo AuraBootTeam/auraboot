@@ -23,6 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
@@ -30,6 +32,8 @@ import java.util.*;
 @Service
 @ConditionalOnProperty(prefix = "aura.notification.wechat-subscription.reservations", name = "enabled", havingValue = "true")
 public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscriptionGrantResolver {
+    private static final DateTimeFormatter SOURCE_OCCURRENCE = DateTimeFormatter
+            .ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT).withZone(ZoneId.of("Asia/Shanghai"));
     private final WechatMiniProperties mini;
     private final Map<String, TemplateRoute> routes;
     private record TemplateRoute(String templateId,
@@ -142,6 +146,8 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
         for (var field : route.fields().entrySet()) {
             String value = switch (field.getValue()) {
                 case TITLE -> plan.title(); case CONTENT -> plan.content(); case SOURCE_ID -> plan.sourceId();
+                // Notification occurrence is an immutable source fact, never the worker's current clock.
+                case OCCURRED_AT -> plan.occurredAt() == null ? null : SOURCE_OCCURRENCE.format(plan.occurredAt());
             };
             Integer max = route.limits().get(field.getKey());
             if (blank(value) || max == null || value.codePointCount(0, value.length()) > max) return Optional.empty();

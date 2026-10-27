@@ -82,6 +82,61 @@ class VerifiedWechatSubscriptionGrantResolverTest {
         binder.bind("aura.notification.wechat-subscription",org.springframework.boot.context.properties.bind.Bindable.ofInstance(delivery));
         binder.bind("aura.notification.wechat-subscription.reservations",org.springframework.boot.context.properties.bind.Bindable.ofInstance(policy));
     }
+    void configureOccurrenceField() {
+        policy.setFieldSources(Map.of("date4", WechatSubscriptionReservationProperties.Value.valueOf("OCCURRED_AT"),
+                "thing6", WechatSubscriptionReservationProperties.Value.CONTENT));
+        delivery.setFieldMaxLengths(Map.of("date4", 19, "thing6", 20));
+        resolver = create(List.of(plans));
+    }
+    void occurrence(Instant occurredAt) {
+        plan = new NotificationDeliveryPlanResolver.Plan(42, "source-ref", "recipient", "v1", "quote", "source",
+                occurredAt, "报价提醒", "请及时处理待办事项");
+    }
+    @Test void sourceOccurrenceUsesBeijingTimeRatherThanDispatchClock() {
+        configureOccurrenceField();
+        occurrence(Instant.parse("2026-10-25T23:30:00Z"));
+        var grant = resolver.claim(42, "source-ref").orElseThrow();
+        assertThat(grant.values()).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "date4", "2026-10-26 07:30:00", "thing6", "请及时处理待办事项"));
+        assertThat(resolver.verifyReserved(42, "source-ref", grant.reservationReference())).contains(grant);
+    }
+    @Test void missingSourceOccurrenceCannotConsumeSubscriptionQuota() {
+        configureOccurrenceField(); occurrence(null);
+        assertThat(resolver.claim(42, "source-ref")).isEmpty();
+        verify(reservations, never()).available(anyString(), anyString(), anyString(), any());
+        verify(reservations, never()).append(anyLong(), anyString(), anyString(), anyString(), anyString(), anyString(), any());
+    }
+    @Test void changedSourceOccurrenceCannotRewriteReservedFields() {
+        configureOccurrenceField(); occurrence(Instant.parse("2026-10-25T23:30:00Z"));
+        var grant = resolver.claim(42, "source-ref").orElseThrow();
+        occurrence(Instant.parse("2026-10-25T23:31:00Z"));
+        assertThat(resolver.claim(42, "source-ref")).isEmpty();
+        assertThat(resolver.verifyReserved(42, "source-ref", grant.reservationReference())).isEmpty();
+        verify(reservations, times(1)).available(anyString(), anyString(), anyString(), any());
+    }
+    @Test void occurrenceMappingBindsWithCaseSensitiveNamedTemplateIds() {
+        policy.setSourceTypes(Set.of("quote", "order")); policy.setFieldSources(Map.of());
+        delivery.setTemplateId(null); delivery.setFieldMaxLengths(Map.of());
+        var values = Map.of(
+                "aura.notification.wechat-subscription.templates[Quote-A_B].field-max-lengths[phrase13]", "5",
+                "aura.notification.wechat-subscription.templates[Quote-A_B].field-max-lengths[thing17]", "20",
+                "aura.notification.wechat-subscription.templates[Order-C_D].field-max-lengths[date4]", "19",
+                "aura.notification.wechat-subscription.templates[Order-C_D].field-max-lengths[thing6]", "20",
+                "aura.notification.wechat-subscription.reservations.routes[quote].template-id", "Quote-A_B",
+                "aura.notification.wechat-subscription.reservations.routes[quote].field-sources[phrase13]", "TITLE",
+                "aura.notification.wechat-subscription.reservations.routes[quote].field-sources[thing17]", "CONTENT",
+                "aura.notification.wechat-subscription.reservations.routes[order].template-id", "Order-C_D",
+                "aura.notification.wechat-subscription.reservations.routes[order].field-sources[date4]", "OCCURRED_AT",
+                "aura.notification.wechat-subscription.reservations.routes[order].field-sources[thing6]", "CONTENT");
+        var binder = new org.springframework.boot.context.properties.bind.Binder(
+                new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(values));
+        binder.bind("aura.notification.wechat-subscription", org.springframework.boot.context.properties.bind.Bindable.ofInstance(delivery));
+        binder.bind("aura.notification.wechat-subscription.reservations", org.springframework.boot.context.properties.bind.Bindable.ofInstance(policy));
+        assertThat(delivery.getTemplates()).containsOnlyKeys("Quote-A_B", "Order-C_D");
+        assertThat(policy.getRoutes().get("order").getFieldSources().get("date4"))
+                .isEqualTo(WechatSubscriptionReservationProperties.Value.valueOf("OCCURRED_AT"));
+        assertThatCode(() -> create(List.of(plans))).doesNotThrowAnyException();
+    }
     @Test void distinctSourcesReserveTheirOwnTemplateAndFieldMapping() {
         configureDistinctRoutes();resolver=create(List.of(plans));
         var quote=resolver.claim(42,"source-ref").orElseThrow();

@@ -9,7 +9,7 @@ import java.util.Set;
 @Component
 @ConfigurationProperties(prefix = "aura.notification.wechat-subscription.reservations", ignoreUnknownFields = false)
 public class WechatSubscriptionReservationProperties {
-    public enum Value { TITLE, CONTENT, SOURCE_ID }
+    public enum Value { TITLE, CONTENT, SOURCE_ID, OCCURRED_AT }
     private boolean enabled;
     private Set<String> sourceTypes = Set.of();
     private Map<String, Value> fieldSources = Map.of();
