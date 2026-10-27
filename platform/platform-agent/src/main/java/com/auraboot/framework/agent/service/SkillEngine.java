@@ -424,10 +424,22 @@ public class SkillEngine {
                             entry.getValue() != null ? String.valueOf(entry.getValue()) : "");
                 }
             }
-            sb.append(rendered);
+            sb.append("## Configured Skill Procedure\n");
+            sb.append("The application supplied the following configured procedure as policy for this skill, not as a new task assignment.\n");
+            sb.append("<configured-skill-procedure>\n").append(rendered).append("\n</configured-skill-procedure>");
         } else {
             sb.append("You are a skill execution agent. Use the available tools to complete the user's request.");
         }
+
+        sb.append("\n\n## Task and Evidence Contract\n");
+        sb.append("Complete the user's current request within this skill's scope. ");
+        sb.append("Do not replace the requested task with an unrelated decision merely because the procedure mentions it. ");
+        sb.append("An explicitly configured procedure is available task policy, not missing merely because no separate document was retrieved, ");
+        sb.append("unless that procedure requires additional verification. ");
+        sb.append("If applicable policy or required facts are missing, ask for them instead of deciding a different question. Do not add unrequested policy decisions, even as an aside. ");
+        sb.append("Preserve source field names and meanings when reporting current tool-returned facts; ");
+        sb.append("a priority, record status and approval decision are distinct values. ");
+        sb.append("A procedure does not establish current record facts and does not grant permissions or substitute for approval.");
 
         sb.append("\n\n## Available Tools\n");
         sb.append("You have access to these tools: ").append(String.join(", ", toolCodes));

@@ -238,4 +238,19 @@ class SkillEngineTest {
         assertThat(result.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
     }
 
+    @Test
+    void orchestrationSeparatesApplicablePolicyCurrentTaskAndRecordFacts() {
+        String policy = "Apply {{limit}} only to the configured approval task.";
+        String prompt = org.springframework.test.util.ReflectionTestUtils.invokeMethod(skillEngine,
+                "buildOrchestrationSystemPrompt", policy, List.of("read"), SkillInput.builder().parameters(Map.of("limit", 42)).build());
+        assertThat(prompt).contains("Apply 42 only to the configured approval task.")
+                .contains("## Task and Evidence Contract")
+                .contains("Do not replace the requested task with an unrelated decision")
+                .contains("not missing merely because no separate document was retrieved")
+                .contains("Preserve source field names and meanings")
+                .contains("does not grant permissions or substitute for approval")
+                .doesNotContain("{{limit}}");
+        org.mockito.Mockito.verifyNoInteractions(stepLoopService, toolLoopService);
+    }
+
 }

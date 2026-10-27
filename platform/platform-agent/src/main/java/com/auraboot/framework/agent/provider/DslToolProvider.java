@@ -331,7 +331,7 @@ public class DslToolProvider implements ToolProvider {
         properties.put("pageNum", Map.of("type", "integer", "minimum", 1));
         properties.put("pageSize", Map.of("type", "integer", "minimum", 1, "maximum", 1000));
         properties.put("keyword", Map.of("type", "string"));
-        properties.put("filters", Map.of("type", "array", "items", Map.of("type", "object")));
+        properties.put("filters", com.auraboot.framework.agent.util.DslListFilterSchema.filters());
         return objectSchema(properties, List.of());
     }
 
