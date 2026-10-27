@@ -837,6 +837,10 @@ public class HandlerPhase implements CommandPhase {
                         && status.getStatusCode().is4xxClientError()) {
                     throw status;
                 }
+                if (e instanceof com.auraboot.framework.exception.ConflictException conflict) {
+                    // Host-issued capabilities retain their optimistic concurrency response.
+                    throw conflict;
+                }
                 if (e instanceof AccessDeniedException accessDeniedException) {
                     throw accessDeniedException;
                 }
