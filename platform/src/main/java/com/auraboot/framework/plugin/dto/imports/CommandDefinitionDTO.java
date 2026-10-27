@@ -318,13 +318,23 @@ public class CommandDefinitionDTO {
         private Long timeout;
         private Map<String, Object> retryPolicy;
         private Boolean requireIdempotencyKey;
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = CacheResultDeserializer.class)
         private Boolean cacheResult;
 
-        @com.fasterxml.jackson.annotation.JsonSetter("cacheResult")
-        public void setCacheResult(Object value) {
-            if (!(value instanceof Boolean flag))
-                throw new IllegalArgumentException("cacheResult must be a boolean");
-            cacheResult = flag;
+        public static class CacheResultDeserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Boolean> {
+            @Override
+            public Boolean deserialize(com.fasterxml.jackson.core.JsonParser parser,
+                    com.fasterxml.jackson.databind.DeserializationContext context) throws java.io.IOException {
+                if (parser.currentToken() == com.fasterxml.jackson.core.JsonToken.VALUE_TRUE) return true;
+                if (parser.currentToken() == com.fasterxml.jackson.core.JsonToken.VALUE_FALSE) return false;
+                throw com.fasterxml.jackson.databind.JsonMappingException.from(parser, "cacheResult must be a boolean");
+            }
+
+            @Override
+            public Boolean getNullValue(com.fasterxml.jackson.databind.DeserializationContext context)
+                    throws com.fasterxml.jackson.databind.JsonMappingException {
+                throw com.fasterxml.jackson.databind.JsonMappingException.from(context.getParser(), "cacheResult must be a boolean");
+            }
         }
         private String processKey;
         private Map<String, Object> options;
