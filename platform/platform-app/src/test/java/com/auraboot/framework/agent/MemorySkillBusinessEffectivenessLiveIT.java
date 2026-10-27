@@ -320,7 +320,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         String memoryText = scenario.path("memory").asText();
         memory.createScopedMemory(tenantId, "aurabot", "fact", "test", "ACME-184 other user secret", canary,
                 10, false, "user", "other-" + getTestUser().getId());
-        if (isMemory && enabled) memory.createScopedMemory(tenantId, "aurabot", "turn_summary", "test",
+        if (isMemory && enabled) memory.createScopedMemory(tenantId, "aurabot", scenario.path("memoryType").asText(), "test",
                 "ACME-184 MISSING-404 order reference", memoryText, 9, false, "user", getTestUser().getId().toString());
         String prompt = scenario.path("prompt").asText()
                 + " 请先查询实时记录。末尾独立一行输出 status=<order_status 的原始值，不能用 order_priority；缺记录用 NOT_FOUND>; days_late=<integer or NA>; amount=<integer or NA>。"
