@@ -146,14 +146,7 @@ public class InstalledIntegrationService {
                 if (!Set.of("accepted","completed").contains(original.state()) || original.requestPid() == null) throw denied();
                 return new Acceptance(original.requestPid(), true);
             }
-            if (envelope.payload().containsKey("requestId") && !external.equals(envelope.payload().get("requestId")))
-                throw new IllegalArgumentException("External event id must equal business requestId");
-            if (envelope.payload().containsKey("externalSubject"))
-                throw new IllegalArgumentException("External subject is host-owned");
-            Map<String,Object> payload = new LinkedHashMap<>(envelope.payload());
-            payload.put("requestId", external);
-            payload.put("externalSubject",Map.of("type",envelope.headers().get("externalSubjectType"),
-                    "pid",envelope.headers().get("externalSubjectPid")));
+            Map<String,Object> payload = installedPayload(envelope, external);
             Map<String,Object> data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
             Object record = data.get("recordPid");
             if (!(record instanceof String pid) || !pid.matches("[A-Za-z0-9_-]{1,100}")
@@ -184,6 +177,60 @@ public class InstalledIntegrationService {
             if (receipts.completed(r.tenantId(),installation,source,external,r.requestPid()) != 1) throw denied();
             return null;
         });
+    }
+
+    /** Runs the installed business boundary in the caller transaction without enqueueing work. */
+    @Transactional
+    public Map<String,Object> executeSynchronously(MachinePrincipal principal, String source,
+            IntegrationEventEnvelope envelope) {
+        if (principal == null || envelope == null) throw denied();
+        return inTenant(principal.tenantId(), principal.installationPid(), () -> {
+            String external = envelope.headers().get("externalEventId");
+            Resolved resolved = resolve(principal, source, external, envelope.eventId());
+            verifyEnvelope(resolved, envelope);
+            var receipt = new InstalledIntegrationReceiptMapper.Receipt(principal.tenantId(), principal.installationPid(),
+                    source, external, envelope.eventId(), envelopeHash(envelope), resolved.bindingHash(),
+                    resolved.commandHash(), resolved.artifact(), null, "accepting");
+            if (receipts.claim(receipt) == 0) {
+                var original = receipts.find(receipt.tenantId(), receipt.installationPid(), source, external);
+                verifyReceipt(resolved, envelope, original, true);
+                // Never take over a pending asynchronous request or repeat an unknown write.
+                if (!"completed".equals(original.state()) || !validRequestPid(original.requestPid()))
+                    throw new ExternalEventIngressService.IdempotencyConflictException();
+                return completedResult(resolved, external, original.requestPid());
+            }
+            Map<String,Object> payload = installedPayload(envelope, external);
+            Map<String,Object> accepted = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
+            Object record = accepted.get("recordPid");
+            if (!(record instanceof String pid) || !validRequestPid(pid) || !"accepted".equals(accepted.get("state")))
+                throw new IllegalStateException("Invalid native acceptance result");
+            if (receipts.accepted(receipt.tenantId(), receipt.installationPid(), source, external, pid) != 1) throw denied();
+            try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+                execute(resolved, resolved.registration().processCommand(), Map.of("requestPid", pid), pid, false, envelope);
+            }
+            Map<String,Object> result = completedResult(resolved, external, pid);
+            if (receipts.completed(receipt.tenantId(), receipt.installationPid(), source, external, pid) != 1) throw denied();
+            return result;
+        });
+    }
+
+    private Map<String,Object> completedResult(Resolved resolved, String external, String pid) {
+        Map<String,Object> result = execute(resolved, resolved.registration().resultCommand(), Map.of("requestId", external), null, true);
+        if (!pid.equals(result.get("recordPid")) || !"completed".equals(result.get("state")))
+            throw new IllegalStateException("Installed synchronous business result is not complete");
+        return Collections.unmodifiableMap(new LinkedHashMap<>(result));
+    }
+
+    private Map<String,Object> installedPayload(IntegrationEventEnvelope envelope, String external) {
+        if (envelope.payload().containsKey("requestId") && !Objects.equals(external, envelope.payload().get("requestId")))
+            throw new IllegalArgumentException("External event id must equal business requestId");
+        if (envelope.payload().containsKey("externalSubject"))
+            throw new IllegalArgumentException("External subject is host-owned");
+        Map<String,Object> payload = new LinkedHashMap<>(envelope.payload());
+        payload.put("requestId", external);
+        payload.put("externalSubject", Map.of("type", envelope.headers().get("externalSubjectType"),
+                "pid", envelope.headers().get("externalSubjectPid")));
+        return payload;
     }
 
     @Transactional
