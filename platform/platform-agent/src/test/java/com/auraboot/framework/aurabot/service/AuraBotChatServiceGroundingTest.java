@@ -759,6 +759,19 @@ class AuraBotChatServiceGroundingTest {
         assertThat(prompt).doesNotContain("private-pid-");
     }
 
+    @Test
+    void queryStrategyUsesDeclaredFieldTypesAndStopsAfterAnExactScalarMatch() {
+        var tools = new ChatToolResolver.ResolvedTools(List.of(LlmChatRequest.Tool.builder()
+                .name("platform_resolve_reference").description("Resolve declared relationships")
+                .inputSchema(Map.of("type", "object")).build()), "query", "orders", true);
+        String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildToolHint", tools);
+        assertThat(prompt).contains("declared REFERENCE type", "STRING identifier", "EQ filter",
+                "field name or suffix", "successful exact match", "current business records");
+        String writePrompt = ReflectionTestUtils.invokeMethod(newService(), "buildToolHint",
+                new ChatToolResolver.ResolvedTools(tools.tools(), "update", "orders", false));
+        assertThat(writePrompt).contains("MODIFY data", "Describe what you will do");
+    }
+
     private AuraBotChatService newService() {
         return new AuraBotChatService(
                 llmProviderFactory,

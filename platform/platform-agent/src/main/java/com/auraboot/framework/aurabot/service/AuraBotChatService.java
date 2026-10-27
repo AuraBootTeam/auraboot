@@ -305,7 +305,8 @@ public class AuraBotChatService {
         hint.append("\n\nYou have access to tools. Follow this strategy:\n");
 
         if (resolved.isReadOnly()) {
-            hint.append("- For a named customer or another reference label, call platform_resolve_reference on the declared reference field first. Filter with its returned storedValue. Never substitute legacy text or project-name prefixes for a relationship. If resolution fails, ask for clarification.\n");
+            hint.append("- Choose filters from the declared field type, never from a field name or suffix. Call platform_resolve_reference only for a declared REFERENCE type when resolving a display label, then filter with its returned storedValue. Never substitute legacy text or project-name prefixes for a relationship. If relationship resolution fails, ask for clarification.\n");
+            hint.append("- For a STRING identifier or code, use the declared scalar field with an EQ filter directly; do not resolve it as a relationship. A successful exact match in current business records is sufficient: do not repeat a fuzzy search or reference resolution to reconcile outdated memory. Ask for clarification when the actual result is ambiguous.\n");
             boolean sqlAvailable = LlmChatRuntimeSupport.isToolOffered(resolved.tools(), "platform_execute_sql");
             hint.append("- The user wants to QUERY data. Prefer nq_* (named query) tools — they are pre-built and optimized.\n");
             if (sqlAvailable) {
