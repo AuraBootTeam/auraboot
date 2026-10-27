@@ -962,8 +962,16 @@ cmd_warm() {
     >>"$sd/logs/warm.log" 2>&1 || die "warm: setup execution evidence incomplete"
 
   rm -f "$admin_json"
+  # PW_ROLE_PROJECTS=1 makes auth.setup.ts execute all four logins for real
+  # (admin/operator/fixture-blocks/viewer) instead of structurally skipping the
+  # three role-gated ones — the zero-skip evidence gate below would otherwise
+  # fail with "auth execution evidence incomplete". The precondition is
+  # guaranteed by the warm[setup] step above: 01-multi-role-users provisions
+  # e2e-operator/e2e-viewer and 03-import-test-fixtures imports the e2et_*
+  # roles + fixture pages (that import is enabled by PW_PROFILE=oss here),
+  # mirroring the web-admin/scripts/run-auth-regression.mjs composition.
   ( cd "$fe" && eval "$env_exports" \
-    && PW_PROFILE=oss PW_RESULTS_JSON="$evidence_root/playwright/auth-results.json" \
+    && PW_PROFILE=oss PW_ROLE_PROJECTS=1 PW_RESULTS_JSON="$evidence_root/playwright/auth-results.json" \
        PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/auth-results.json" \
        pnpm exec playwright test --project=auth --no-deps --workers=1 --retries=0 --reporter=line,json \
   ) >>"$sd/logs/warm.log" 2>&1 || die "warm: auth failed; see $sd/logs/warm.log"
