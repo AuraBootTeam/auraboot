@@ -11,6 +11,7 @@ import com.auraboot.framework.file.dto.FileUploadResponseDTO;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.entity.FileRelationEntity;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.file.service.FileDeletionGuard;
 import com.auraboot.framework.file.support.FileNameEncodingSupport;
 import com.auraboot.framework.infrastructure.storage.CdnUrlRewriter;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
@@ -62,6 +63,9 @@ public class FileServiceImpl implements FileService {
 
     @Autowired(required = false)
     private CdnUrlRewriter cdnUrlRewriter;
+
+    @Autowired(required = false)
+    private List<FileDeletionGuard> deletionGuards = List.of();
 
     @Value("${file.download.base-url:}")
     private String baseUrl;
@@ -221,6 +225,10 @@ public class FileServiceImpl implements FileService {
         }
         if (Boolean.TRUE.equals(fileEntity.getRetentionLocked())) {
             throw new BusinessException("File is retention locked and cannot be deleted");
+        }
+
+        for (FileDeletionGuard guard : deletionGuards) {
+            guard.requireDeletable(tenantId, fileEntity.getPid());
         }
 
         int fenced = fileMapper.markDeletedIfUnlocked(
