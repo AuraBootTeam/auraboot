@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.template.generator;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.entity.Model;
@@ -784,7 +785,8 @@ public class DslGeneratorImpl implements DslGenerator {
                             .findFirst()
                             .orElse(null);
 
-                    if (field != null && (field.getFeature() == null || !Boolean.TRUE.equals(field.getFeature().getHidden()))) {
+                    if (field != null && !SystemFieldConstants.isSystemField(field.getCode()) &&
+                            (field.getFeature() == null || !Boolean.TRUE.equals(field.getFeature().getHidden()))) {
                         String dictCode = dictBindings.get(field.getId());
                         formFields.add(buildFormField(model, field, binding, dictCode));
                     }
@@ -826,7 +828,8 @@ public class DslGeneratorImpl implements DslGenerator {
         // Label resolved by frontend: model.{modelCode}.{fieldCode}.label
         String component = fieldTypeMapper.getFormComponent(field);
         formField.put("component", component);
-        boolean readOnly = Boolean.FALSE.equals(binding.getEditable()) ||
+        boolean readOnly = SystemFieldConstants.isSystemField(field.getCode()) ||
+                Boolean.FALSE.equals(binding.getEditable()) ||
                 (field.getFeature() != null && Boolean.TRUE.equals(field.getFeature().getReadonly()));
         if (readOnly) formField.put("readOnly", true);
         if (field.getRefTarget() != null) {
