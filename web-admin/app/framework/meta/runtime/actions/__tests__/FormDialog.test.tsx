@@ -51,7 +51,15 @@ describe('FormDialog choice fields', () => {
 
   it('names a required command textarea by its business label and submits its value', () => {
     const onSubmit = vi.fn();
-    renderDialog({ title: '登记交付跟进', submitLabel: '保存跟进', fields: [{ field: 'tpm_pj_next_action', label: '下一步行动', type: 'textarea', required: true }], defaults: {}, onSubmit });
+    renderDialog({
+      title: '登记交付跟进',
+      submitLabel: '保存跟进',
+      fields: [
+        { field: 'tpm_pj_next_action', label: '下一步行动', type: 'textarea', required: true },
+      ],
+      defaults: {},
+      onSubmit,
+    });
     const input = screen.getByRole('textbox', { name: '下一步行动', exact: true });
     fireEvent.change(input, { target: { value: '林晓于11月8日前完成范围确认。' } });
     fireEvent.click(screen.getByRole('button', { name: '保存跟进', exact: true }));
@@ -550,14 +558,17 @@ describe('FormDialog choice fields', () => {
   });
 });
 
-
 describe('FormDialog calendar and instant fields', () => {
   it('submits a calendar day unchanged and converts a selected local time into an instant', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [
-      { field: 'deliveryDate', label: '交付日期', type: 'date', required: true },
-      { field: 'cutoffAt', label: '报价截止时间', type: 'datetime', required: true },
-    ], defaults: {}, onSubmit });
+    renderDialog({
+      fields: [
+        { field: 'deliveryDate', label: '交付日期', type: 'date', required: true },
+        { field: 'cutoffAt', label: '报价截止时间', type: 'datetime', required: true },
+      ],
+      defaults: {},
+      onSubmit,
+    });
     const delivery = screen.getByLabelText(/交付日期/);
     const cutoff = screen.getByLabelText(/报价截止时间/);
     expect(delivery).toHaveAttribute('type', 'date');
@@ -565,26 +576,36 @@ describe('FormDialog calendar and instant fields', () => {
     fireEvent.change(delivery, { target: { value: '2026-11-01' } });
     fireEvent.change(cutoff, { target: { value: '2026-10-30T15:45' } });
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
-    expect(onSubmit).toHaveBeenCalledWith({ deliveryDate: '2026-11-01',
-      cutoffAt: new Date('2026-10-30T15:45').toISOString() });
+    expect(onSubmit).toHaveBeenCalledWith({
+      deliveryDate: '2026-11-01',
+      cutoffAt: new Date('2026-10-30T15:45').toISOString(),
+    });
   });
 
   it('preserves the original instant when the user leaves its default unchanged', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'cutoffAt', label: '截止时间', type: 'datetime' }],
-      defaults: { cutoffAt: '2026-10-30T07:45:32.123Z' }, onSubmit });
+    renderDialog({
+      fields: [{ field: 'cutoffAt', label: '截止时间', type: 'datetime' }],
+      defaults: { cutoffAt: '2026-10-30T07:45:32.123Z' },
+      onSubmit,
+    });
     const value = (screen.getByLabelText('截止时间') as HTMLInputElement).value;
     const local = new Date('2026-10-30T07:45:32.123Z');
     const pad = (v: number) => String(v).padStart(2, '0');
-    expect(value).toBe(`${local.getFullYear()}-${pad(local.getMonth()+1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`);
+    expect(value).toBe(
+      `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`,
+    );
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).toHaveBeenCalledWith({ cutoffAt: '2026-10-30T07:45:32.123Z' });
   });
 
   it('blocks submission when a required calendar field is cleared', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'deliveryDate', label: '交付日期', type: 'date', required: true }],
-      defaults: { deliveryDate: '2026-11-01' }, onSubmit });
+    renderDialog({
+      fields: [{ field: 'deliveryDate', label: '交付日期', type: 'date', required: true }],
+      defaults: { deliveryDate: '2026-11-01' },
+      onSubmit,
+    });
     fireEvent.change(screen.getByLabelText(/交付日期/), { target: { value: '' } });
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
@@ -592,54 +613,115 @@ describe('FormDialog calendar and instant fields', () => {
   });
 });
 
-
 describe('FormDialog grouped choices', () => {
   const groups = [
-    { value: 'resistors', label: '电阻', options: [{ value: 'supplier-a', label: '供应商甲' }, { value: 'supplier-b', label: '供应商乙' }] },
-    { value: 'capacitors', label: '电容', options: [{ value: 'supplier-a', label: '供应商甲' }, { value: 'supplier-c', label: '停用供应商', disabled: true }] },
+    {
+      value: 'resistors',
+      label: '电阻',
+      options: [
+        { value: 'supplier-a', label: '供应商甲' },
+        { value: 'supplier-b', label: '供应商乙' },
+      ],
+    },
+    {
+      value: 'capacitors',
+      label: '电容',
+      options: [
+        { value: 'supplier-a', label: '供应商甲' },
+        { value: 'supplier-c', label: '停用供应商', disabled: true },
+      ],
+    },
   ];
-  const field = { field: 'categorySuppliers', type: 'grouped-multiselect', label: '各品类供应商', required: true,
-    props: { groupField: 'category', valuesField: 'supplierPids' } };
+  const field = {
+    field: 'categorySuppliers',
+    type: 'grouped-multiselect',
+    label: '各品类供应商',
+    required: true,
+    props: { groupField: 'category', valuesField: 'supplierPids' },
+  };
   it('requires explicit selection in every group and submits independent multi selections', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [field], fieldOptions: { categorySuppliers: groups }, defaults: {}, onSubmit });
+    renderDialog({
+      fields: [field],
+      fieldOptions: { categorySuppliers: groups },
+      defaults: {},
+      onSubmit,
+    });
     const resistors = screen.getByRole('group', { name: '电阻' });
     const capacitors = screen.getByRole('group', { name: '电容' });
-    expect(screen.getAllByRole('checkbox').every((input: HTMLElement) => !(input as HTMLInputElement).checked)).toBe(true);
+    expect(
+      screen
+        .getAllByRole('checkbox')
+        .every((input: HTMLElement) => !(input as HTMLInputElement).checked),
+    ).toBe(true);
     fireEvent.click(screen.getAllByRole('checkbox', { name: '供应商甲' })[0]);
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('checkbox', { name: '供应商乙' }));
     fireEvent.click(screen.getAllByRole('checkbox', { name: '供应商甲' })[1]);
-    expect(resistors).toBeInTheDocument(); expect(capacitors).toBeInTheDocument();
+    expect(resistors).toBeInTheDocument();
+    expect(capacitors).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: '停用供应商' })).toBeDisabled();
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
-    expect(onSubmit).toHaveBeenCalledWith({ categorySuppliers: [
-      { category: 'resistors', supplierPids: ['supplier-a', 'supplier-b'] },
-      { category: 'capacitors', supplierPids: ['supplier-a'] },
-    ] });
+    expect(onSubmit).toHaveBeenCalledWith({
+      categorySuppliers: [
+        { category: 'resistors', supplierPids: ['supplier-a', 'supplier-b'] },
+        { category: 'capacitors', supplierPids: ['supplier-a'] },
+      ],
+    });
   });
-  it.each([
-    [],
-    [{ category: 'resistors', supplierPids: ['supplier-a'] }],
-    [{ category: 'resistors', supplierPids: ['supplier-a', 'supplier-a'] }, { category: 'capacitors', supplierPids: ['supplier-a'] }],
-    [{ category: 'resistors', supplierPids: ['supplier-a'] }, { category: 'capacitors', supplierPids: ['supplier-c'] }],
-    [{ category: 'resistors', supplierPids: ['supplier-a'] }, { category: 'capacitors', supplierPids: ['forged'] }],
-  ].map((value) => ({ value })))('rejects incomplete or invalid submitted defaults', ({ value }) => {
+  it.each(
+    [
+      [],
+      [{ category: 'resistors', supplierPids: ['supplier-a'] }],
+      [
+        { category: 'resistors', supplierPids: ['supplier-a', 'supplier-a'] },
+        { category: 'capacitors', supplierPids: ['supplier-a'] },
+      ],
+      [
+        { category: 'resistors', supplierPids: ['supplier-a'] },
+        { category: 'capacitors', supplierPids: ['supplier-c'] },
+      ],
+      [
+        { category: 'resistors', supplierPids: ['supplier-a'] },
+        { category: 'capacitors', supplierPids: ['forged'] },
+      ],
+    ].map((value) => ({ value })),
+  )('rejects incomplete or invalid submitted defaults', ({ value }) => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [field], fieldOptions: { categorySuppliers: groups }, defaults: { categorySuppliers: value }, onSubmit });
+    renderDialog({
+      fields: [field],
+      fieldOptions: { categorySuppliers: groups },
+      defaults: { categorySuppliers: value },
+      onSubmit,
+    });
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
 
-
 describe('FormDialog grouped default selections', () => {
   it('submits manual changes to a suggested selection without restoring the original default', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: 'Selection', required: true }],
-      fieldOptions: { selection: [{ value: 'materials', label: 'Materials', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] },
-      defaults: { selection: [{ group: 'materials', values: ['a'] }] }, onSubmit });
+    renderDialog({
+      fields: [
+        { field: 'selection', type: 'grouped-multiselect', label: 'Selection', required: true },
+      ],
+      fieldOptions: {
+        selection: [
+          {
+            value: 'materials',
+            label: 'Materials',
+            options: [
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ],
+          },
+        ],
+      },
+      defaults: { selection: [{ group: 'materials', values: ['a'] }] },
+      onSubmit,
+    });
     fireEvent.click(screen.getByRole('checkbox', { name: 'A' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'B' }));
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
@@ -648,9 +730,23 @@ describe('FormDialog grouped default selections', () => {
   it('preserves an explicitly supplied valid selection without adding suppliers', () => {
     const onSubmit = vi.fn();
     const value = [{ group: 'materials', values: ['a'] }];
-    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: 'Selection' }],
-      fieldOptions: { selection: [{ value: 'materials', label: 'Materials', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] },
-      defaults: { selection: value }, onSubmit });
+    renderDialog({
+      fields: [{ field: 'selection', type: 'grouped-multiselect', label: 'Selection' }],
+      fieldOptions: {
+        selection: [
+          {
+            value: 'materials',
+            label: 'Materials',
+            options: [
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ],
+          },
+        ],
+      },
+      defaults: { selection: value },
+      onSubmit,
+    });
     expect(screen.getByRole('checkbox', { name: 'A' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'B' })).not.toBeChecked();
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
@@ -658,15 +754,18 @@ describe('FormDialog grouped default selections', () => {
   });
 });
 
-
 describe('FormDialog named native inputs', () => {
   it('associates business labels with native command input controls', () => {
-    renderDialog({ fields: [
-      { field: 'title', type: 'text', label: '询价标题' },
-      { field: 'notes', type: 'textarea', label: '说明' },
-      { field: 'quantity', type: 'number', label: '数量' },
-      { field: 'category', type: 'select', label: '采购品类' },
-    ], defaults: {}, fieldOptions: { category: [{ value: 'a', label: '电阻' }] } });
+    renderDialog({
+      fields: [
+        { field: 'title', type: 'text', label: '询价标题' },
+        { field: 'notes', type: 'textarea', label: '说明' },
+        { field: 'quantity', type: 'number', label: '数量' },
+        { field: 'category', type: 'select', label: '采购品类' },
+      ],
+      defaults: {},
+      fieldOptions: { category: [{ value: 'a', label: '电阻' }] },
+    });
     expect(screen.getByRole('textbox', { name: '询价标题' })).toHaveAttribute('type', 'text');
     expect(screen.getByRole('textbox', { name: '说明' })).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: '数量' })).toBeInTheDocument();
@@ -674,24 +773,41 @@ describe('FormDialog named native inputs', () => {
   });
 });
 
-
 describe('FormDialog unavailable grouped options', () => {
   it('explains an empty group and prevents its submission', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: '各品类供应商', required: true }],
-      fieldOptions: { selection: [{ value: 'empty', label: '电阻', options: [] }] }, defaults: {}, onSubmit });
+    renderDialog({
+      fields: [
+        { field: 'selection', type: 'grouped-multiselect', label: '各品类供应商', required: true },
+      ],
+      fieldOptions: { selection: [{ value: 'empty', label: '电阻', options: [] }] },
+      defaults: {},
+      onSubmit,
+    });
     expect(screen.getByRole('group', { name: '电阻' })).toHaveTextContent('暂无可选项');
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
 
-
 describe('FormDialog fixed-key string maps', () => {
   it('edits each labeled value without changing keys, coercing numbers or mutating the source', () => {
-    const axes = { color: 'Red', size: 'M' }, onSubmit = vi.fn();
-    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', required: true,
-      props: { keyLabels: { color: 'Colour', size: 'Size' }, maxValueLength: 128 } }], defaults: { axes }, onSubmit });
+    const axes = { color: 'Red', size: 'M' },
+      onSubmit = vi.fn();
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: { keyLabels: { color: 'Colour', size: 'Size' }, maxValueLength: 128 },
+        },
+      ],
+      defaults: { axes },
+      onSubmit,
+    });
     expect(screen.getByRole('group', { name: 'Options' })).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Colour'), { target: { value: 'Wine red' } });
     fireEvent.change(screen.getByLabelText('Size'), { target: { value: '007' } });
@@ -701,22 +817,61 @@ describe('FormDialog fixed-key string maps', () => {
   });
   it('keeps empty values in the dialog and does not submit malformed maps as valid empty options', () => {
     const onSubmit = vi.fn();
-    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', props: { invalidMessage: 'Review options' } }],
-      defaults: { axes: { Colour: 'Red' } }, onSubmit });
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          props: { invalidMessage: 'Review options' },
+        },
+      ],
+      defaults: { axes: { Colour: 'Red' } },
+      onSubmit,
+    });
     fireEvent.change(screen.getByLabelText('Colour'), { target: { value: ' ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
-    expect(screen.getByText('Review options')).toBeTruthy(); expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('Review options')).toBeTruthy();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
   it.each([null, ['Red'], { colour: 7 }])('rejects a non-string-map source: %j', (axes) => {
     const onSubmit = vi.fn();
-    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', props: { invalidMessage: 'Reload options' } }], defaults: { axes }, onSubmit });
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          props: { invalidMessage: 'Reload options' },
+        },
+      ],
+      defaults: { axes },
+      onSubmit,
+    });
     expect(screen.getByRole('alert').textContent).toBe('Reload options');
-    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true })); expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(onSubmit).not.toHaveBeenCalled();
   });
   it('accepts the explicit empty map of a single variant without inventing options', () => {
     const onSubmit = vi.fn();
-    renderDialog({ submitLabel: 'Save options', fields: [{ field: 'axes', label: 'Options', type: 'string-map', required: true, props: { emptyMessage: 'No options needed' } }], defaults: { axes: {} }, onSubmit });
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: { emptyMessage: 'No options needed' },
+        },
+      ],
+      defaults: { axes: {} },
+      onSubmit,
+    });
     expect(screen.getByText('No options needed')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true })); expect(onSubmit).toHaveBeenCalledWith({ axes: {} });
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(onSubmit).toHaveBeenCalledWith({ axes: {} });
   });
 });

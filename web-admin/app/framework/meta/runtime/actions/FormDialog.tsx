@@ -148,9 +148,13 @@ function translatedOrFallback(t: (key: string) => string, key: string, fallback:
 
 /** Fixed-key string maps are edited structurally; malformed values never become an empty map. */
 function isStringMap(value: unknown): value is Record<string, string> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    && [Object.prototype, null].includes(Object.getPrototypeOf(value))
-    && Object.values(value).every((item) => typeof item === 'string');
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
+    Object.values(value).every((item) => typeof item === 'string')
+  );
 }
 
 function isMissing(value: any) {
@@ -248,8 +252,13 @@ export default function FormDialog() {
       }
       if (field.type === 'string-map') {
         const maximum = field.props?.maxValueLength;
-        if (!isStringMap(value) || Object.values(value).some((entry) => !entry.trim()
-            || (Number.isInteger(maximum) && maximum > 0 && entry.length > maximum))) {
+        if (
+          !isStringMap(value) ||
+          Object.values(value).some(
+            (entry) =>
+              !entry.trim() || (Number.isInteger(maximum) && maximum > 0 && entry.length > maximum),
+          )
+        ) {
           const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
           newErrors[field.field] = field.props?.invalidMessage
             ? getLocalizedText(field.props.invalidMessage, locale, t)
@@ -261,16 +270,31 @@ export default function FormDialog() {
         const groupKey = field.props?.groupField || 'group';
         const valuesKey = field.props?.valuesField || 'values';
         const selections = Array.isArray(value) ? value : [];
-        const valid = groups.length > 0 && selections.length === groups.length && groups.every((group) => {
-          const matching = selections.filter((item: any) => item?.[groupKey] === group.value);
-          if (matching.length !== 1 || !Array.isArray(matching[0][valuesKey])) return false;
-          const values = matching[0][valuesKey];
-          return !group.disabled && values.length > 0 && new Set(values).size === values.length && values.every((selected: unknown) =>
-            (group.options || []).some((option) => option.value === selected && !option.disabled));
-        });
+        const valid =
+          groups.length > 0 &&
+          selections.length === groups.length &&
+          groups.every((group) => {
+            const matching = selections.filter((item: any) => item?.[groupKey] === group.value);
+            if (matching.length !== 1 || !Array.isArray(matching[0][valuesKey])) return false;
+            const values = matching[0][valuesKey];
+            return (
+              !group.disabled &&
+              values.length > 0 &&
+              new Set(values).size === values.length &&
+              values.every((selected: unknown) =>
+                (group.options || []).some(
+                  (option) => option.value === selected && !option.disabled,
+                ),
+              )
+            );
+          });
         if (!valid) {
           const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
-          newErrors[field.field] = buildRequiredFieldMessage(label, { dataType: 'select', locale, t });
+          newErrors[field.field] = buildRequiredFieldMessage(label, {
+            dataType: 'select',
+            locale,
+            t,
+          });
         }
       }
       if (field.type === 'bom-upload-review') {
@@ -492,7 +516,17 @@ export default function FormDialog() {
 
               return (
                 <div key={`${field.field}-${sourceIndex}`}>
-                  <label htmlFor={component !== 'memberpicker' && ['date', 'datetime', 'select', 'number', 'textarea', 'text'].includes(fieldType) ? `form-dialog-${field.field}-${sourceIndex}` : undefined} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label
+                    htmlFor={
+                      component !== 'memberpicker' &&
+                      ['date', 'datetime', 'select', 'number', 'textarea', 'text'].includes(
+                        fieldType,
+                      )
+                        ? `form-dialog-${field.field}-${sourceIndex}`
+                        : undefined
+                    }
+                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
                     {label}
                     {field.required && <span className="ml-1 text-red-500">*</span>}
                   </label>
@@ -507,22 +541,60 @@ export default function FormDialog() {
                       placeholder={placeholder || undefined}
                     />
                   ) : fieldType === 'string-map' ? (
-                    <fieldset aria-label={label} data-testid={`form-dialog-field-${field.field}`} className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-600">
+                    <fieldset
+                      aria-label={label}
+                      data-testid={`form-dialog-field-${field.field}`}
+                      className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-600"
+                    >
                       {!isStringMap(formData[field.field]) ? (
-                        <p role="alert" className="text-sm text-red-600">{getLocalizedText(field.props?.invalidMessage, locale, t) || buildRequiredFieldMessage(label, { dataType: 'text', locale, t })}</p>
+                        <p role="alert" className="text-sm text-red-600">
+                          {getLocalizedText(field.props?.invalidMessage, locale, t) ||
+                            buildRequiredFieldMessage(label, { dataType: 'text', locale, t })}
+                        </p>
                       ) : Object.entries(formData[field.field]).length === 0 ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-300">{getLocalizedText(field.props?.emptyMessage, locale, t) || translatedOrFallback(t, 'common.noData', 'No options')}</p>
-                      ) : Object.entries(formData[field.field] as Record<string, string>).map(([key, value], index) => (
-                        <div key={key}>
-                          <label htmlFor={`form-dialog-${field.field}-${sourceIndex}-${index}`} className="mb-1 block text-sm text-gray-700 dark:text-gray-300">{getLocalizedText(field.props?.keyLabels?.[key], locale, t) || key}</label>
-                          <input id={`form-dialog-${field.field}-${sourceIndex}-${index}`} type="text" value={value}
-                            ref={isFirst && index === 0 ? firstInputRef as React.RefObject<HTMLInputElement> : undefined}
-                            maxLength={Number.isInteger(field.props?.maxValueLength) && field.props?.maxValueLength > 0 ? field.props?.maxValueLength : undefined}
-                            placeholder={placeholder} aria-invalid={Boolean(error)}
-                            onChange={(event) => updateField(field.field, { ...formData[field.field], [key]: event.target.value })}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
-                        </div>
-                      ))}
+                        <p className="text-sm text-gray-500 dark:text-gray-300">
+                          {getLocalizedText(field.props?.emptyMessage, locale, t) ||
+                            translatedOrFallback(t, 'common.noData', 'No options')}
+                        </p>
+                      ) : (
+                        Object.entries(formData[field.field] as Record<string, string>).map(
+                          ([key, value], index) => (
+                            <div key={key}>
+                              <label
+                                htmlFor={`form-dialog-${field.field}-${sourceIndex}-${index}`}
+                                className="mb-1 block text-sm text-gray-700 dark:text-gray-300"
+                              >
+                                {getLocalizedText(field.props?.keyLabels?.[key], locale, t) || key}
+                              </label>
+                              <input
+                                id={`form-dialog-${field.field}-${sourceIndex}-${index}`}
+                                type="text"
+                                value={value}
+                                ref={
+                                  isFirst && index === 0
+                                    ? (firstInputRef as React.RefObject<HTMLInputElement>)
+                                    : undefined
+                                }
+                                maxLength={
+                                  Number.isInteger(field.props?.maxValueLength) &&
+                                  field.props?.maxValueLength > 0
+                                    ? field.props?.maxValueLength
+                                    : undefined
+                                }
+                                placeholder={placeholder}
+                                aria-invalid={Boolean(error)}
+                                onChange={(event) =>
+                                  updateField(field.field, {
+                                    ...formData[field.field],
+                                    [key]: event.target.value,
+                                  })
+                                }
+                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                              />
+                            </div>
+                          ),
+                        )
+                      )}
                     </fieldset>
                   ) : fieldType === 'select' ? (
                     <select
@@ -581,30 +653,75 @@ export default function FormDialog() {
                       })}
                     </div>
                   ) : fieldType === 'grouped-multiselect' ? (
-                    <div className={`max-h-80 space-y-3 overflow-y-auto rounded-lg border p-3 ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                    <div
+                      className={`max-h-80 space-y-3 overflow-y-auto rounded-lg border p-3 ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    >
                       {options.map((group) => {
                         const groupKey = field.props?.groupField || 'group';
                         const valuesKey = field.props?.valuesField || 'values';
-                        const selections = Array.isArray(formData[field.field]) ? formData[field.field] : [];
-                        const chosen = selections.find((item: any) => item?.[groupKey] === group.value)?.[valuesKey] || [];
+                        const selections = Array.isArray(formData[field.field])
+                          ? formData[field.field]
+                          : [];
+                        const chosen =
+                          selections.find((item: any) => item?.[groupKey] === group.value)?.[
+                            valuesKey
+                          ] || [];
                         return (
-                          <fieldset key={group.value} className="rounded-md border border-gray-200 p-3 dark:border-gray-600" disabled={group.disabled}>
-                            <legend className="px-1 text-sm font-medium text-gray-900 dark:text-white">{getLocalizedText(group.label, locale, t)}</legend>
-                            {group.description && <p className="mb-2 text-xs text-gray-500 dark:text-gray-300">{getLocalizedText(group.description, locale, t)}</p>}
-                            {(group.options || []).length === 0 && <p className="py-2 text-sm text-gray-500 dark:text-gray-300">{translatedOrFallback(t, 'common.noData', locale.startsWith('zh') ? '暂无可选项' : 'No available options')}</p>}
+                          <fieldset
+                            key={group.value}
+                            className="rounded-md border border-gray-200 p-3 dark:border-gray-600"
+                            disabled={group.disabled}
+                          >
+                            <legend className="px-1 text-sm font-medium text-gray-900 dark:text-white">
+                              {getLocalizedText(group.label, locale, t)}
+                            </legend>
+                            {group.description && (
+                              <p className="mb-2 text-xs text-gray-500 dark:text-gray-300">
+                                {getLocalizedText(group.description, locale, t)}
+                              </p>
+                            )}
+                            {(group.options || []).length === 0 && (
+                              <p className="py-2 text-sm text-gray-500 dark:text-gray-300">
+                                {translatedOrFallback(
+                                  t,
+                                  'common.noData',
+                                  locale.startsWith('zh') ? '暂无可选项' : 'No available options',
+                                )}
+                              </p>
+                            )}
                             {(group.options || []).map((option, optionIndex) => (
-                              <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-gray-900 dark:text-white">
-                                <input type="checkbox" disabled={option.disabled}
-                                  ref={isFirst && group === options[0] && optionIndex === 0 ? firstInputRef as React.RefObject<HTMLInputElement> : undefined}
+                              <label
+                                key={option.value}
+                                className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-gray-900 dark:text-white"
+                              >
+                                <input
+                                  type="checkbox"
+                                  disabled={option.disabled}
+                                  ref={
+                                    isFirst && group === options[0] && optionIndex === 0
+                                      ? (firstInputRef as React.RefObject<HTMLInputElement>)
+                                      : undefined
+                                  }
                                   checked={Array.isArray(chosen) && chosen.includes(option.value)}
                                   onChange={() => {
                                     const current = Array.isArray(chosen) ? chosen : [];
-                                    const next = current.includes(option.value) ? current.filter((item: string) => item !== option.value) : [...current, option.value];
-                                    updateField(field.field, options.map((entry) => ({
-                                      [groupKey]: entry.value,
-                                      [valuesKey]: entry.value === group.value ? next : selections.find((item: any) => item?.[groupKey] === entry.value)?.[valuesKey] || [],
-                                    })));
-                                  }} />
+                                    const next = current.includes(option.value)
+                                      ? current.filter((item: string) => item !== option.value)
+                                      : [...current, option.value];
+                                    updateField(
+                                      field.field,
+                                      options.map((entry) => ({
+                                        [groupKey]: entry.value,
+                                        [valuesKey]:
+                                          entry.value === group.value
+                                            ? next
+                                            : selections.find(
+                                                (item: any) => item?.[groupKey] === entry.value,
+                                              )?.[valuesKey] || [],
+                                      })),
+                                    );
+                                  }}
+                                />
                                 <span>{getLocalizedText(option.label, locale, t)}</span>
                               </label>
                             ))}
@@ -793,15 +910,28 @@ export default function FormDialog() {
                   ) : fieldType === 'date' || fieldType === 'datetime' ? (
                     <input
                       id={`form-dialog-${field.field}-${sourceIndex}`}
-                      ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                      ref={
+                        isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
+                      }
                       data-testid={`form-dialog-field-${field.field}`}
                       type={fieldType === 'date' ? 'date' : 'datetime-local'}
-                      value={fieldType === 'date' ? formData[field.field] ?? '' : localDateTimeValue(formData[field.field])}
-                      onChange={(event) => updateField(field.field, fieldType === 'date'
-                        ? event.target.value : localDateTimeInstant(event.target.value))}
+                      value={
+                        fieldType === 'date'
+                          ? (formData[field.field] ?? '')
+                          : localDateTimeValue(formData[field.field])
+                      }
+                      onChange={(event) =>
+                        updateField(
+                          field.field,
+                          fieldType === 'date'
+                            ? event.target.value
+                            : localDateTimeInstant(event.target.value),
+                        )
+                      }
                       aria-invalid={!!error}
                       className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-700 dark:text-white ${
-                        error ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        error
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                           : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
                       } focus:ring-2 focus:outline-none`}
                     />
