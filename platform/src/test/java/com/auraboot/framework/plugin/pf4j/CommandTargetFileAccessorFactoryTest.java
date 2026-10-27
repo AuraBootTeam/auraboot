@@ -97,6 +97,35 @@ class CommandTargetFileAccessorFactoryTest {
         }return null;});
         verify(files).lockRetention("file-pid");verify(relations).insert(any(FileRelationEntity.class));
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"physicalTx","rollbackOnly","closedConnection","readOnlyConnection","autoCommit","closedScope","thread","actor","tenant","nested","otherCommand"})
+    void createdReceiptCannotOutliveItsOriginalAuthority(String invalidation) throws Exception {
+        when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
+        var row=Map.<String,Object>of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            var delegate=mock(DynamicDataService.class);when(delegate.create(eq("child"),anyMap())).thenReturn(row);
+            assertThat(new DynamicDataAccessorImpl(delegate).tryCreate("child",Map.of("proof","file-pid"))).contains(row);
+            Runnable link=()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof");
+            try {
+                switch(invalidation) {
+                    case "physicalTx" -> when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("replacement-tx");
+                    case "rollbackOnly" -> ((ConnectionHolder)TransactionSynchronizationManager.getResource(source)).setRollbackOnly();
+                    case "closedConnection" -> when(connection.isClosed()).thenReturn(true);
+                    case "readOnlyConnection" -> when(connection.isReadOnly()).thenReturn(true);
+                    case "autoCommit" -> when(connection.getAutoCommit()).thenReturn(true);
+                    case "closedScope" -> scope.close();
+                    case "actor" -> MetaContext.setMemberId(999L);
+                    case "tenant" -> {MetaContext.setContext(2L,42L,"user-pid","user");MetaContext.setMemberId(7L);}
+                    case "nested" -> {MetaContext.runWithAuthorizedCommandCode("order:repair",()->assertThatThrownBy(link::run).isInstanceOf(AccessDeniedException.class));return null;}
+                    case "otherCommand" -> {MetaContext.runWithAuthorizedCommandCode("order:other",()->assertThatThrownBy(link::run).isInstanceOf(AccessDeniedException.class));return null;}
+                    case "thread" -> {try(var pool=Executors.newSingleThreadExecutor()) {assertThat(pool.submit(()->catchThrowable(link::run)).get()).isInstanceOf(AccessDeniedException.class);}return null;}
+                    default -> throw new AssertionError(invalidation);
+                }
+            } catch(Exception error) {throw new AssertionError(error);}
+            assertThatThrownBy(link::run).isInstanceOf(AccessDeniedException.class);
+        }return null;});
+        verify(files,never()).lockRetention(anyString());verify(relations,never()).insert(any(FileRelationEntity.class));
+    }
     @Test void aPlausibleLookupDoesNotAttestCreation() {
         command(()->{try(var scope=factory.forCommand(ctx)) {
             assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
