@@ -401,8 +401,16 @@ export class DataSourceManager {
     };
     this.dataSourceStates.set(id, initialState);
 
-    // 如果配置了 autoFetch，立即获取数据
-    if (configWithDefaults.autoFetch) {
+    // 如果配置了 autoFetch，立即获取数据。
+    // dependOn 只允许门控“重取”，不允许吞掉“首取”：声明了 dependOn 的数据源
+    // （含被上方分页规则强制 autoFetch=false 的分页源）注册时必须发起一次初始
+    // 获取——未赋值的过滤叶子会被 removeBlankFilters/查询序列化丢弃，首取是安
+    // 全的；真正缺父路径的依赖（如未选行的明细源）仍由 fetch() 的
+    // hasMissingDependencyParent 门控延后，不会发出无过滤请求。
+    if (
+      configWithDefaults.autoFetch ||
+      (configWithDefaults.dependOn && configWithDefaults.dependOn.length > 0)
+    ) {
       this.fetch(id);
     }
 
@@ -1031,10 +1039,13 @@ export class DataSourceManager {
    */
   setupDependencyTracking(id: string, dependencies: string[]): (() => void) | null {
     const config = this.dataSources.get(id);
-    if (!config || !config.autoFetch) {
+    if (!config) {
       return null;
     }
 
+    // 事件驱动的依赖订阅对所有声明 dependOn 的数据源生效——包括被分页规则强制
+    // autoFetch=false 的源与注册时依赖未就绪而被延后的源，否则它们在依赖首次被
+    // 写入时不会重取（首取已由 register() 保证，这里保证“重取”）。
     const unsubscribe = this.subscribeDependencies(id, dependencies);
     if (unsubscribe) {
       return unsubscribe;
@@ -1042,6 +1053,11 @@ export class DataSourceManager {
 
     // Fallback: periodic check only when event-driven subscription is unavailable.
     // Pauses when page is hidden to avoid wasting CPU.
+    // 兜底轮询仍只对 autoFetch 源启用，避免为延后源引入无意义的定时器。
+    if (!config.autoFetch) {
+      return null;
+    }
+
     let lastDeps: any = null;
 
     const checkInterval = setInterval(() => {

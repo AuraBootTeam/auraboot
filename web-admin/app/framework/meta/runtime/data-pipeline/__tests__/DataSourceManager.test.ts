@@ -1184,3 +1184,123 @@ describe('DataSourceManager', () => {
     ]);
   });
 });
+
+// Regression for the MES-M10 rework / WMS shipment workbenches: queue data
+// sources declaring `dependOn` on quick-filter state keys (initially undefined)
+// never fired their first request, so the table stayed empty until the user
+// clicked a filter. dependOn must gate re-fetches, not the initial fetch —
+// undefined filter leaves are dropped downstream (removeBlankFilters /
+// normalizeApiParams), so the first load is safe.
+describe('dependOn gates re-fetches, not the initial fetch', () => {
+  beforeEach(() => {
+    mockedFetchResult.mockReset();
+    mockedFetchResult.mockResolvedValue({
+      code: '0',
+      data: { records: [], total: 0, current: 1, pageSize: 50 },
+    } as any);
+  });
+
+  const bindScope = (manager: DataSourceManager, scopeId: string) => {
+    const stateManager = new ScopedStateManager({
+      locale: 'zh-CN',
+      theme: 'light',
+      user: undefined,
+      tenant: undefined,
+      t: (key: string) => key,
+    } as any);
+    stateManager.createScope(scopeId, { state: {} });
+    manager.bindStateManager(stateManager, scopeId);
+    return stateManager;
+  };
+
+  it('fetches once at register for a pagination dependOn source with undefined dependency keys, then refetches when a dependency is set', async () => {
+    const manager = new DataSourceManager(createExpressionContext({ state: {} } as any));
+    const stateManager = bindScope(manager, 'scope-rework');
+
+    manager.register('reworkQueue', {
+      type: 'api',
+      method: 'get',
+      endpoint: '/api/dynamic/mfg_rework_order_pcba_execution_list/list',
+      adaptor: 'table',
+      pagination: true,
+      params: {
+        pageNum: 1,
+        pageSize: 50,
+        sortField: 'mfg_rwo_priority',
+        filters: [
+          { fieldName: 'mfg_rwo_status', operator: 'IN', value: '${state.statusFilter}' },
+          { fieldName: 'mfg_rwo_priority', operator: 'IN', value: '${state.priorityFilter}' },
+        ],
+        keyword: '${state.searchKeyword}',
+      },
+      dependOn: ['state.statusFilter', 'state.priorityFilter', 'state.searchKeyword'],
+    });
+
+    await waitFor(() => expect(mockedFetchResult).toHaveBeenCalledTimes(1));
+    expect(mockedFetchResult.mock.calls[0][0]).toBe(
+      '/api/dynamic/mfg_rework_order_pcba_execution_list/list',
+    );
+    const initialParams = mockedFetchResult.mock.calls[0][1]?.params as Record<string, any>;
+    // Undefined filter leaves are dropped by removeBlankFilters + normalizeApiParams:
+    // the first load goes out with paging controls only, no filter entries.
+    expect(initialParams.pageNum).toBe(1);
+    expect(initialParams.pageSize).toBe(50);
+    expect(initialParams.filters).toBeUndefined();
+    expect(initialParams.keyword).toBeUndefined();
+
+    stateManager.updateState('scope-rework', 'statusFilter', ['open']);
+
+    await waitFor(() => expect(mockedFetchResult).toHaveBeenCalledTimes(2));
+    const refetchParams = mockedFetchResult.mock.calls[1][1]?.params as Record<string, any>;
+    expect(JSON.parse(refetchParams.filters)).toEqual([
+      { fieldName: 'mfg_rwo_status', operator: 'IN', value: ['open'] },
+    ]);
+
+    manager.clear();
+  });
+
+  it('fetches once at register for a plain dependOn source, then refetches once a dependency is set', async () => {
+    const manager = new DataSourceManager(createExpressionContext({ state: {} } as any));
+    const stateManager = bindScope(manager, 'scope-faq');
+
+    manager.register('faqList', {
+      type: 'api',
+      method: 'get',
+      endpoint: '/api/dynamic/faq_candidate_list/list',
+      adaptor: 'table',
+      dependOn: ['state.statusFilter', 'state.searchKeyword'],
+    });
+
+    await waitFor(() => expect(mockedFetchResult).toHaveBeenCalledTimes(1));
+
+    stateManager.updateState('scope-faq', 'statusFilter', 'pending');
+
+    await waitFor(() => expect(mockedFetchResult).toHaveBeenCalledTimes(2));
+
+    manager.clear();
+  });
+
+  it('still defers the initial fetch while a dependency parent object is unresolved', async () => {
+    const manager = new DataSourceManager(createExpressionContext({ state: {} } as any));
+
+    manager.register('selectedRework', {
+      type: 'api',
+      method: 'get',
+      endpoint: '/api/dynamic/mfg_rework_order_pcba_execution_list/list',
+      adaptor: 'table',
+      params: {
+        pageNum: 1,
+        pageSize: 1,
+        filters: [
+          { fieldName: 'mfg_rwo_code', operator: 'EQ', value: '${state.selectedOrder.mfg_rwo_code}' },
+        ],
+      },
+      dependOn: ['state.selectedOrder.mfg_rwo_code'],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(mockedFetchResult).not.toHaveBeenCalled();
+
+    manager.clear();
+  });
+});
