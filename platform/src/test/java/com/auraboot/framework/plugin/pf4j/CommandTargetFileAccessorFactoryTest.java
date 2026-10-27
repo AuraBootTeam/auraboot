@@ -152,7 +152,12 @@ class CommandTargetFileAccessorFactoryTest {
                 case "occupiedSlot" -> when(relations.selectList(any())).thenReturn(List.of(new FileRelationEntity().setFileId("100")));
                 default -> throw new AssertionError(invalidation);
             }
-            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof")).isInstanceOf(AccessDeniedException.class);
+            var failure=catchThrowable(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"));
+            if (invalidation.equals("wrongFieldWriter")) assertThat(failure)
+                    .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class).hasMessageContaining("FIELD_WRITER_DENIED");
+            else if (invalidation.equals("wrongCreateWriter")) assertThat(failure)
+                    .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class).hasMessage("Model mutation requires its exact authorized command");
+            else assertThat(failure).isInstanceOf(AccessDeniedException.class);
         }return null;});
         verify(files,never()).lockRetention(anyString());verify(relations,never()).insert(any(FileRelationEntity.class));
     }
