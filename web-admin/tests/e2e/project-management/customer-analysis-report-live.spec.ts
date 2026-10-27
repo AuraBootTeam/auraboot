@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { customerBudgetFixture } from '../../helpers/customer-budget-fixture';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -49,7 +50,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   const showcaseFixture = process.env.PW_REPORT_SHOWCASE_FIXTURE === '1';
   const customer =
     process.env.PW_REPORT_CUSTOMER_NAME ||
-    (showcaseFixture ? '景川精密制造' : '华辰制造');
+    (showcaseFixture ? customerBudgetFixture.customerName : '华辰制造');
 
   page.setDefaultTimeout(20000);
   await liveShowcaseLogin(page);
@@ -94,11 +95,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
       customers = await list('tpm_customer', 'tpm_cu_name', customer);
     }
     expect(customers).toHaveLength(1);
-    const fixtureProjects = [
-      { name: '供应链协同平台', budget: 128000, code: 'JC-2026-001' },
-      { name: '服务交付二期', budget: 286000, code: 'JC-2026-002' },
-      { name: '供应商对账升级', budget: 132000.5, code: 'JC-2026-003' },
-    ];
+    const fixtureProjects = customerBudgetFixture.projects;
     for (const project of fixtureProjects) {
       const existing = await list('tpm_project', 'tpm_pj_code', project.code);
       if (existing.length === 0)
