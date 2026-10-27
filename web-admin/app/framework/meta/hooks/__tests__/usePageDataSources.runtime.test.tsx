@@ -65,7 +65,7 @@ describe('page-owned named query with a schema runtime', () => {
         }, [manager]);
         return runtime ? readDataSourceRows(runtime, 'projects') : [];
       },
-      { wrapper: ({ children }) => <React.StrictMode>{children}</React.StrictMode> },
+      { wrapper: ({ children }: { children: React.ReactNode }) => <React.StrictMode>{children}</React.StrictMode> },
     );
     await waitFor(() => expect(result.current).toEqual(records));
     unmount();
@@ -92,7 +92,7 @@ describe('page-owned named query with a schema runtime', () => {
       },
     } as any;
     const { result, unmount, rerender } = renderHook(
-      ({ loaded }) => {
+      ({ loaded }: { loaded: boolean }) => {
         const { runtime } = usePageRuntime(loaded ? schema : null, {
           additionalContext: {
             record: {},
@@ -105,7 +105,7 @@ describe('page-owned named query with a schema runtime', () => {
       },
       {
         initialProps: { loaded: false },
-        wrapper: ({ children }) => (
+        wrapper: ({ children }: { children: React.ReactNode }) => (
           <React.StrictMode>
             <MemoryRouter>{children}</MemoryRouter>
           </React.StrictMode>
