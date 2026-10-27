@@ -81,6 +81,22 @@ public class DslGeneratorImpl implements DslGenerator {
         return result;
     }
 
+    private String resolveTitleField(Model model, List<ModelFieldBinding> bindings, List<Field> fields) {
+        Object declared = model.getExtension() == null ? null : model.getExtension().get("titleField");
+        Set<Long> visible = bindings.stream().filter(b -> Boolean.TRUE.equals(b.getVisible()))
+                .map(ModelFieldBinding::getFieldId).collect(Collectors.toSet());
+        return fields.stream().filter(f -> visible.contains(f.getId()))
+                .filter(f -> f.getFeature() == null || !Boolean.TRUE.equals(f.getFeature().getHidden()))
+                .filter(f -> declared instanceof String ? declared.equals(f.getCode())
+                        : f.getExtension() != null && Boolean.TRUE.equals(f.getExtension().get("displayField")))
+                .map(Field::getCode).findFirst().orElse(null);
+    }
+
+    private boolean needsFullWidth(Field field) {
+        return Set.of("smarttextarea", "smartrichtext", "smartrichtexteditor", "smartfileattachment", "smartupload", "smartjsoneditor", "richtext", "textarea", "fileattachment")
+                .contains(fieldTypeMapper.getFormComponent(field).toLowerCase(Locale.ROOT));
+    }
+
     @Override
     public PageSchema generateListPage(
             Model model,
@@ -88,6 +104,8 @@ public class DslGeneratorImpl implements DslGenerator {
             List<Field> fields,
             CrudTemplateConfig config
     ) {
+        bindings = bindings.stream().sorted(Comparator.comparing(ModelFieldBinding::getFieldOrder,
+                Comparator.nullsLast(Comparator.naturalOrder()))).toList();
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
@@ -142,6 +160,8 @@ public class DslGeneratorImpl implements DslGenerator {
             List<Field> fields,
             CrudTemplateConfig config
     ) {
+        bindings = bindings.stream().sorted(Comparator.comparing(ModelFieldBinding::getFieldOrder,
+                Comparator.nullsLast(Comparator.naturalOrder()))).toList();
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
@@ -199,6 +219,8 @@ public class DslGeneratorImpl implements DslGenerator {
             List<Field> fields,
             CrudTemplateConfig config
     ) {
+        bindings = bindings.stream().sorted(Comparator.comparing(ModelFieldBinding::getFieldOrder,
+                Comparator.nullsLast(Comparator.naturalOrder()))).toList();
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
@@ -227,6 +249,12 @@ public class DslGeneratorImpl implements DslGenerator {
                 model.getDisplayName() + "详情",
                 model.getDisplayName() + " Detail"
         ));
+        String titleField = resolveTitleField(model, bindings, fields);
+        if (titleField != null) {
+            var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+            extension.setExtension(Map.of("headerTitleField", titleField));
+            pageSchema.setExtension(extension);
+        }
         pageSchema.setKind("detail");
         pageSchema.setSchemaVersion(com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         pageSchema.setProfile("admin");
@@ -544,19 +572,22 @@ public class DslGeneratorImpl implements DslGenerator {
         // Determine which fields to display
         List<String> displayFields = config.getListColumns();
         if (displayFields == null || displayFields.isEmpty()) {
-            // Display all visible fields
-            for (ModelFieldBinding binding : bindings) {
-                if (Boolean.TRUE.equals(binding.getVisible())) {
-                    Field field = fields.stream()
-                            .filter(f -> f.getId().equals(binding.getFieldId()))
-                            .findFirst()
-                            .orElse(null);
-
-                    if (field != null) {
-                        String dictCode = dictBindings.get(field.getId());
-                        columns.add(buildTableColumn(model, field, dictCode));
-                    }
+            String titleField = resolveTitleField(model, bindings, fields);
+            List<Field> candidates = bindings.stream().filter(b -> Boolean.TRUE.equals(b.getVisible()))
+                    .map(b -> fields.stream().filter(f -> f.getId().equals(b.getFieldId())).findFirst().orElse(null))
+                    .filter(Objects::nonNull)
+                    .filter(f -> f.getFeature() == null || !Boolean.TRUE.equals(f.getFeature().getHidden()))
+                    .sorted(Comparator.comparing(f -> !Objects.equals(f.getCode(), titleField)))
+                    .toList();
+            List<Field> compact = candidates.stream()
+                    .filter(f -> Objects.equals(f.getCode(), titleField) || !needsFullWidth(f)).limit(7).toList();
+            // A text-only model must still have a useful list.
+            for (Field field : compact.isEmpty() ? candidates.stream().limit(7).toList() : compact) {
+                Map<String, Object> column = buildTableColumn(model, field, dictBindings.get(field.getId()));
+                if (Objects.equals(field.getCode(), titleField)) {
+                    column.put("presentation", Map.of("kind", "object"));
                 }
+                columns.add(column);
             }
         } else {
             // Display specified fields only
@@ -736,13 +767,14 @@ public class DslGeneratorImpl implements DslGenerator {
         if (displayFields == null || displayFields.isEmpty()) {
             // Display all editable fields
             for (ModelFieldBinding binding : bindings) {
-                if (Boolean.TRUE.equals(binding.getEditable())) {
+                if (!Boolean.FALSE.equals(binding.getVisible()) &&
+                        (Boolean.TRUE.equals(binding.getEditable()) || Boolean.TRUE.equals(binding.getVisible()))) {
                     Field field = fields.stream()
                             .filter(f -> f.getId().equals(binding.getFieldId()))
                             .findFirst()
                             .orElse(null);
 
-                    if (field != null) {
+                    if (field != null && (field.getFeature() == null || !Boolean.TRUE.equals(field.getFeature().getHidden()))) {
                         String dictCode = dictBindings.get(field.getId());
                         formFields.add(buildFormField(model, field, binding, dictCode));
                     }
@@ -756,13 +788,13 @@ public class DslGeneratorImpl implements DslGenerator {
                         .findFirst()
                         .orElse(null);
 
-                if (field != null) {
+                if (field != null && (field.getFeature() == null || !Boolean.TRUE.equals(field.getFeature().getHidden()))) {
                     ModelFieldBinding binding = bindings.stream()
                             .filter(b -> b.getFieldId().equals(field.getId()))
                             .findFirst()
                             .orElse(null);
 
-                    if (binding != null) {
+                    if (binding != null && !Boolean.FALSE.equals(binding.getVisible())) {
                         String dictCode = dictBindings.get(field.getId());
                         formFields.add(buildFormField(model, field, binding, dictCode));
                     }
@@ -784,9 +816,19 @@ public class DslGeneratorImpl implements DslGenerator {
         // Label resolved by frontend: model.{modelCode}.{fieldCode}.label
         String component = fieldTypeMapper.getFormComponent(field);
         formField.put("component", component);
+        boolean readOnly = Boolean.FALSE.equals(binding.getEditable()) ||
+                (field.getFeature() != null && Boolean.TRUE.equals(field.getFeature().getReadonly()));
+        if (readOnly) formField.put("readOnly", true);
+        if (field.getRefTarget() != null) {
+            formField.put("refTarget", objectMapper.convertValue(field.getRefTarget(), Map.class));
+        }
+        if (field.getUiSchema() != null) {
+            if (field.getUiSchema().getHelpText() != null) formField.put("helpText", field.getUiSchema().getHelpText());
+            if (field.getUiSchema().getPlaceholder() != null) formField.put("placeholder", field.getUiSchema().getPlaceholder());
+        }
 
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("colSpan", Set.of("SmartTextarea", "SmartRichText", "SmartFileAttachment", "SmartUpload", "SmartJsonEditor").contains(component == null ? "" : component) ? 12 : 6);
+        layout.put("colSpan", needsFullWidth(field) ? 12 : 6);
         layout.put("rowSpan", 1);
         formField.put("layout", layout);
 
@@ -813,7 +855,7 @@ public class DslGeneratorImpl implements DslGenerator {
         }
 
         // Add validation rules
-        if (Boolean.TRUE.equals(binding.getRequired())) {
+        if (!readOnly && Boolean.TRUE.equals(binding.getRequired())) {
             List<Map<String, Object>> validation = new ArrayList<>();
             Map<String, Object> requiredRule = new LinkedHashMap<>();
             requiredRule.put("type", "required");
@@ -958,7 +1000,7 @@ public class DslGeneratorImpl implements DslGenerator {
         detailField.put("readOnly", true);
 
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("colSpan", 6);
+        layout.put("colSpan", needsFullWidth(field) ? 12 : 6);
         layout.put("rowSpan", 1);
         detailField.put("layout", layout);
 

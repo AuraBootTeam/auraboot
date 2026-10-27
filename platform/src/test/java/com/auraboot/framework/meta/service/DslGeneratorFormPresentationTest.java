@@ -79,4 +79,59 @@ class DslGeneratorFormPresentationTest {
         group.setFields(List.of("name","name"));
         assertThatThrownBy(() -> generator.generateFormPage(model,List.of(binding(1)),List.of(field(1,"name","string")),config)).hasMessageContaining("Duplicate form group field");
     }
+    @Test void usesTypedSmartControlsForZeroConfigGeneration() {
+        assertThat(mapper.getFormComponent(field(1, "quantity", "INTEGER"))).isEqualTo("SmartNumberInput");
+        assertThat(mapper.getFormComponent(field(2, "payload", "jsonb"))).isEqualTo("SmartJsonEditor");
+        assertThat(mapper.getFormComponent(field(3, "attachment", "file"))).isEqualTo("SmartUpload");
+    }
+    @Test void zeroConfigDetailsUseDeclaredIdentityAndFullWidthContent() throws Exception {
+        model.getExtension().setExtension(java.util.Map.of("titleField", "name"));
+        var one = binding(1); one.setVisible(true);
+        var two = binding(2); two.setVisible(true);
+        var page = generator.generateDetailPage(model, List.of(one, two),
+                List.of(field(1, "name", "string"), field(2, "notes", "text")), new CrudTemplateConfig());
+        assertThat(page.getExtension().get("headerTitleField")).isEqualTo("name");
+        assertThat(page.getExtension().get("presentation")).isNull();
+        var detailFields = json.readTree(page.getBlocks()).get(0).path("fields");
+        assertThat(detailFields.get(1).path("layout").path("colSpan").asInt()).isEqualTo(12);
+    }
+    @Test void generatedReadOnlyFieldsAreNotRequiredInputs() throws Exception {
+        var locked = binding(1); locked.setVisible(true); locked.setEditable(false); locked.setRequired(true);
+        var page = generator.generateFormPage(model, List.of(locked),
+                List.of(field(1, "name", "string")), new CrudTemplateConfig());
+        var value = json.readTree(page.getBlocks()).get(0).path("fields").get(0);
+        assertThat(value.path("readOnly").asBoolean()).isTrue();
+        assertThat(value.path("validation").isMissingNode()).isTrue();
+    }
+    @Test void declaredIdentityMustBeVisibleAndBound() {
+        model.getExtension().setExtension(java.util.Map.of("titleField", "secret"));
+        var one = binding(1); one.setVisible(false);
+        var page = generator.generateDetailPage(model, List.of(one),
+                List.of(field(1, "secret", "string")), new CrudTemplateConfig());
+        assertThat(page.getExtension() == null ? null : page.getExtension().get("headerTitleField")).isNull();
+    }
+
+    @Test void respectsRegisteredModelComponentOverrides() {
+        var notes = field(1, "notes", "string");
+        var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        extension.setExtension(java.util.Map.of("renderComponent", "SmartRichTextEditor")); notes.setExtension(extension);
+        assertThat(mapper.getFormComponent(notes)).isEqualTo("SmartRichTextEditor");
+    }
+    @Test void limitsDefaultColumnsButPreservesExplicitSelectionsAndBindingOrder() throws Exception {
+        var fields = new java.util.ArrayList<Field>();
+        var bindings = new java.util.ArrayList<ModelFieldBinding>();
+        for (int i = 1; i <= 9; i++) {
+            fields.add(field(i, "f" + i, "string"));
+            var binding = binding(i); binding.setVisible(true); binding.setFieldOrder(10 - i); bindings.add(binding);
+        }
+        var page = generator.generateListPage(model, bindings, fields, new CrudTemplateConfig());
+        var columns = json.readTree(page.getBlocks()).findValue("columns");
+        assertThat(columns.size()).isEqualTo(8);
+        assertThat(columns.get(0).path("field").asText()).isEqualTo("f9");
+        var config = new CrudTemplateConfig(); config.setListColumns(fields.stream().map(Field::getCode).toList());
+        columns = json.readTree(generator.generateListPage(model, bindings, fields, config).getBlocks()).findValue("columns");
+        assertThat(columns.size()).isEqualTo(10);
+        assertThat(columns.get(0).path("field").asText()).isEqualTo("f1");
+    }
+
 }

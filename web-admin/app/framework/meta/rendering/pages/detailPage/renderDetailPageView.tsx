@@ -249,20 +249,13 @@ export function renderDetailPageView({
       className={
         workspace
           ? 'min-h-[calc(100vh-56px)] bg-[#F7F7F8] px-6 pt-7 pb-8 lg:px-8'
-          : 'mx-auto w-full px-2 py-3'
+          : 'bg-subtle mx-auto min-h-[calc(100vh-56px)] w-full px-4 py-6 sm:px-6 lg:px-8'
       }
       data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
     >
-      <div
-        className={workspace ? 'min-w-0' : 'rounded-card border-border bg-panel border shadow-sm'}
-      >
+      <div className="min-w-0">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
-        <div
-          className={
-            workspace ? 'print-hide pb-6' : 'print-hide border-border border-b px-4 py-4 sm:px-6'
-          }
-          data-print="hide"
-        >
+        <div className={'print-hide pb-6'} data-print="hide">
           <div className={headerLayout.container}>
             <div className="flex min-w-0 items-start gap-3">
               {schema.extension?.showBack !== false &&
@@ -293,7 +286,7 @@ export function renderDetailPageView({
                   <h2 className="text-text text-2xl leading-tight font-semibold tracking-tight break-words">
                     {headerTitle}
                   </h2>
-                  {workspace && schema.extension?.headerStatusField && (
+                  {schema.extension?.headerStatusField && (
                     <span className="text-accent bg-accent-weak rounded px-2 py-1 text-xs">
                       {(() => {
                         const field = enrichField({
@@ -402,7 +395,11 @@ export function renderDetailPageView({
                               key={button.code}
                               type="button"
                               data-testid={`toolbar-btn-${button.code}`}
-                              disabled={isButtonDisabled(button, evaluateVisibleWhen, actionLoading)}
+                              disabled={isButtonDisabled(
+                                button,
+                                evaluateVisibleWhen,
+                                actionLoading,
+                              )}
                               className={`hover:bg-hover block w-full rounded px-3 py-2 text-left text-xs ${button.danger ? 'text-status-red' : 'text-text-2'}`}
                               onClick={(event) => {
                                 const menu = event.currentTarget.closest('details');
@@ -467,7 +464,7 @@ export function renderDetailPageView({
             )}
           </div>
 
-          {workspace && schema.extension?.objectSummary && (
+          {schema.extension?.objectSummary && (
             <WorkspaceObjectSummary
               items={schema.extension.objectSummary}
               record={recordData || {}}

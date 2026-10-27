@@ -183,7 +183,7 @@ export function renderListPage(model: ListPageModel) {
         aria-busy={!dataReady || loading || viewsLoading || !listQuerySettled}
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
-        {workspace && pageHeader}
+        {pageHeader}
         <div
           className={`rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}
         >

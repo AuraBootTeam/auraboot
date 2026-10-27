@@ -169,7 +169,17 @@ export function renderFormPageView({
   );
   const workspace = schema.extension?.presentation === 'workspace';
   const embedded = Boolean(onCancelOverride || onSubmitOverride);
-  const presentation = resolveFormPresentation(schema.extension, embedded);
+  const presentation = resolveFormPresentation(schema.extension, embedded, {
+    fieldCount: formBlocks.reduce(
+      (count: number, block: any) => count + (block.fields?.length || 0),
+      0,
+    ),
+    hasWideContent:
+      subTableBlocks.length > 0 ||
+      layoutBlocks.length > 0 ||
+      miscFormBlocks.length > 0 ||
+      customBlocks.length > 0,
+  });
   const hasGuidance = presentation.guidance === 'aside' && Boolean(schema.extension?.formGuidance);
   const fixedActions = presentation.actions === 'fixed';
   const backLink = resolveFormBackLink(schema, tableName);
@@ -683,8 +693,9 @@ export function renderFormPageView({
                           </p>
                         )}
                         {[...effectiveButtonBlock.buttons]
-                          .sort((a: any, b: any) =>
-                            workspace ? Number(Boolean(a.primary)) - Number(Boolean(b.primary)) : 0,
+                          .sort(
+                            (a: any, b: any) =>
+                              Number(Boolean(a.primary)) - Number(Boolean(b.primary)),
                           )
                           .map((button: any) => {
                             if (!canRenderFormButton(button, hasPermission)) return null;
