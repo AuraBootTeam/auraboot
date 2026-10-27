@@ -323,6 +323,8 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             config.setConfig(json.writeValueAsString(Map.of("apiKey", "local-ollama-no-auth", "baseUrl", endpoint,
                     "defaultModel", definition.path("model").asText(), "dimensions", 1536, "maxBatchSize", 1,
                     "spaceVersion", "qwen4b-" + definition.path("modelBlobSha256").asText())));
+            var existing = cloud.getEffectiveConfig(tenantId, "embedding", "local_qwen");
+            if (existing != null && tenantId.equals(existing.getTenantId())) config.setPid(existing.getPid());
             cloud.saveConfig(config);
             assertThat(ReflectionTestUtils.getField(recall, "semanticRecallEnabled")).isEqualTo(false);
             jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);

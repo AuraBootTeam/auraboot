@@ -74,6 +74,8 @@ class ManagedMemoryEmbeddingLiveIT extends BaseIntegrationTest {
             request.setConfig(json.writeValueAsString(Map.of("apiKey", "local-ollama-no-auth", "baseUrl", before.get("endpoint"),
                     "defaultModel", "qwen3-embedding:4b", "dimensions", 1536, "maxBatchSize", 1,
                     "spaceVersion", "qwen4b-" + before.get("blobSha256"))));
+            var existing = cloud.getEffectiveConfig(tenant, "embedding", "local_qwen");
+            if (existing != null && tenant.equals(existing.getTenantId())) request.setPid(existing.getPid());
             cloud.saveConfig(request);
             assertThat(cloud.getEnabledProviders(tenant, "embedding").getFirst().getProviderCode()).isEqualTo("local_qwen");
             assertThat(ReflectionTestUtils.getField(active, "semanticRecallEnabled")).isEqualTo(false);
