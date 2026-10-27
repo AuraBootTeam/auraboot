@@ -18,6 +18,7 @@ const DATA_TYPE_ICONS: Record<string, string> = {
   TEXT: 'Tx',
   INTEGER: '#',
   DECIMAL: '#.#',
+  MONEY: '¥',
   BOOLEAN: '?',
   DATE: 'D',
   DATETIME: 'DT',

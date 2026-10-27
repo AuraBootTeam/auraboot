@@ -229,6 +229,7 @@ test('DR-04 to DR-10: designer pointer drag, schema properties, history, save, p
   await expect(page.getByTestId('designer-field-zcrud_project_name')).toBeVisible();
   const initialOrder = await fieldCodes();
   await expect(page.getByTestId('field-library-item-zcrud_project_name')).toBeVisible();
+  await expect(page.getByTestId('field-library-item-zcrud_project_budget')).toContainText('moneyinput');
   await test.info().attach('DR-04-model-field-library', { body: await page.screenshot(), contentType: 'image/png' });
   const from = await page.getByTestId('designer-field-zcrud_project_name').boundingBox();
   const to = await page.getByTestId('designer-field-zcrud_project_code').boundingBox();
@@ -323,7 +324,15 @@ test('DR-04 to DR-10: designer pointer drag, schema properties, history, save, p
   await page.goto(runtimePath);
   await expect(page.locator('#zcrud_project_owner')).toHaveValue('陈晨');
   await test.info().attach('DR-09-live-refined-form', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
-  await page.getByRole('row').filter({ hasText: '合计' }).scrollIntoViewIfNeeded();
+  await page.mouse.move(1000, 550);
+  await page.mouse.wheel(0, 650);
+  const total = page.getByRole('row').filter({ hasText: '合计' });
+  await expect(total).toContainText('365,000');
+  await expect.poll(async () => {
+    const sum = await total.boundingBox();
+    const footer = await page.getByTestId('form-action-footer').boundingBox();
+    return !!sum && !!footer && sum.y + sum.height <= footer.y;
+  }).toBe(true);
   await expect(page.getByRole('row').filter({ hasText: '接口联调与培训' })).toContainText('245,000');
   await test.info().attach('DR-09-live-child-items', { body: await page.screenshot(), contentType: 'image/png' });
   const untouched = await (await page.request.get(`/api/pages/${original.pid}`)).json();
