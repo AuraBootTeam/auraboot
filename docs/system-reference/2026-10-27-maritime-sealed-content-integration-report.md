@@ -1,3 +1,9 @@
+---
+type: system-reference
+status: active
+created: 2026-10-27
+---
+
 # 主线公告内容证明整合验证
 
 统一生产构件源为`0c299e033946e1228e0af700bb1abedaaf4ffe0f`；最终新增命令链测试源为`561cb786081b6b3b5be11cff1d78cede1f6008d5`。两者仅差一个测试文件，生产源码、API和迁移没有改变；本报告提交不改标构件producer。
