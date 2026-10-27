@@ -281,7 +281,7 @@ export function renderDetailPageView({
           ? 'bg-panel min-h-0 w-full min-w-0'
           : workspace
             ? `${workspaceShell?.useThemeTokens ? 'bg-bg' : 'bg-[#F7F7F8]'} min-h-[calc(100vh-56px)] px-6 pt-7 pb-8 lg:px-8`
-            : 'mx-auto w-full px-2 py-3'
+            : 'bg-subtle mx-auto min-h-[calc(100vh-56px)] w-full px-4 py-6 sm:px-6 lg:px-8'
       }
       style={
         presentation
@@ -294,21 +294,11 @@ export function renderDetailPageView({
       }
       data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
     >
-      <div
-        className={
-          presentation || workspace
-            ? 'min-w-0'
-            : 'rounded-card border-border bg-panel border shadow-sm'
-        }
-      >
+      <div className="min-w-0">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
         <div
           className={
-            presentation
-              ? 'print-hide border-border mb-4 border-b pb-4'
-              : workspace
-                ? 'print-hide pb-6'
-                : 'print-hide border-border border-b px-4 py-4 sm:px-6'
+            presentation ? 'print-hide border-border mb-4 border-b pb-4' : 'print-hide pb-6'
           }
           data-print="hide"
         >
@@ -353,7 +343,7 @@ export function renderDetailPageView({
                       {headerTitle}
                     </h2>
                   )}
-                  {workspace && schema.extension?.headerStatusField && (
+                  {schema.extension?.headerStatusField && (
                     <span className="text-accent bg-accent-weak rounded px-2 py-1 text-xs">
                       {(() => {
                         const field = enrichField({
@@ -452,7 +442,7 @@ export function renderDetailPageView({
             )}
           </div>
 
-          {workspace && schema.extension?.objectSummary && (
+          {schema.extension?.objectSummary && (
             <WorkspaceObjectSummary
               items={schema.extension.objectSummary}
               record={recordData || {}}

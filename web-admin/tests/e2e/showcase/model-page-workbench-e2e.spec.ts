@@ -59,7 +59,9 @@ test.describe('Model Page Workbench E2E', () => {
         expect(bindResp.code).toBe('0');
       }
 
-      await page.goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page
+        .goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' })
+        .catch(() => {});
       await openPagesTab(page);
 
       await expect(page.getByRole('heading', { name: '页面工作台' })).toBeVisible({
@@ -74,7 +76,8 @@ test.describe('Model Page Workbench E2E', () => {
       await expect(page.getByTestId('crud-generate-list')).toBeChecked();
       await expect(page.getByTestId('crud-generate-form')).toBeChecked();
       await expect(page.getByTestId('crud-generate-detail')).toBeChecked();
-      await expect(page.getByTestId('crud-open-designer')).toBeChecked();
+      await expect(page.getByTestId('crud-open-designer')).not.toBeChecked();
+      await expect(page.getByTestId('crud-form-presentation')).toHaveCount(0);
 
       const generateRespPromise = page.waitForResponse(
         (resp) =>
@@ -84,22 +87,23 @@ test.describe('Model Page Workbench E2E', () => {
         { timeout: 20_000 },
       );
 
-      const designerNavPromise = page.waitForURL(/\/page-designer\/.+/, { timeout: 20_000 });
-
       await page.getByTestId('crud-generate-submit').click();
 
       const generateResp = await generateRespPromise;
-      await designerNavPromise;
+      const submittedRequest = generateResp.request().postDataJSON();
+      expect(submittedRequest.modelCode).toBe(modelData.code);
+      const submittedConfig = submittedRequest.config;
+      expect(submittedConfig).not.toHaveProperty('formPresentation');
+      expect(submittedConfig).not.toHaveProperty('presentation');
+      expect(submittedConfig).toMatchObject({ createPermissions: false, assignRoles: false });
 
       const generateBody = await generateResp.json();
       expect(generateBody.code).toBe('0');
       expect(generateBody.data?.generatedResources?.pages?.length).toBe(3);
 
-      await expect(
-        page
-          .locator('button:has-text("Save"), button:has-text("保存"), [data-testid="designer-canvas"]')
-          .first(),
-      ).toBeVisible({ timeout: 15_000 });
+      await page.getByTestId('crud-open-page').first().click();
+      await expect(page).toHaveURL(new RegExp(`/p/${modelData.code}$`));
+      await expect(page.getByTestId('dynamic-list')).toBeVisible();
       await expect(page.locator('body')).not.toContainText(/Page not found|Access forbidden|404/i);
 
       const relatedPagesResp = await page.request.get(`/api/meta/models/${modelPid}/pages`);
@@ -108,7 +112,9 @@ test.describe('Model Page Workbench E2E', () => {
       expect(relatedPagesBody.code).toBe('0');
       expect((relatedPagesBody.data ?? []).length).toBeGreaterThanOrEqual(3);
 
-      await page.goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page
+        .goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' })
+        .catch(() => {});
       await openPagesTab(page);
       await expect(page.getByRole('heading', { name: '页面工作台' })).toBeVisible({
         timeout: 10_000,
@@ -128,7 +134,9 @@ test.describe('Model Page Workbench E2E', () => {
       await reopenDesignerPromise;
       await expect(page.locator('body')).not.toContainText(/Page not found|Access forbidden|404/i);
 
-      await page.goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page
+        .goto(`/meta/models/${modelPid}#pages`, { waitUntil: 'domcontentloaded' })
+        .catch(() => {});
       await openPagesTab(page);
       const modelDetailPath = new URL(page.url()).pathname;
       await page.getByTestId('standard-page-detail-preview').click();

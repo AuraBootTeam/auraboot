@@ -34,6 +34,12 @@ public class DslGeneratorImpl implements DslGenerator {
     private final FieldTypeMapper fieldTypeMapper;
     private final MetaFieldDictBindingMapper fieldDictBindingMapper;
 
+    private Object localizedFieldText(String value) {
+        if (value.startsWith("$i18n:") || value.chars().allMatch(c -> c <= 0x7f)) return value;
+        // Field metadata has a single source-language string, not translated copies.
+        return Map.of("zh-CN", value);
+    }
+
     private String buildLocalizedTitleJson(String zhTitle, String enTitle) {
         try {
             return objectMapper.writeValueAsString(Map.of(
@@ -81,6 +87,22 @@ public class DslGeneratorImpl implements DslGenerator {
         return result;
     }
 
+    private String resolveTitleField(Model model, List<ModelFieldBinding> bindings, List<Field> fields) {
+        Object declared = model.getExtension() == null ? null : model.getExtension().get("titleField");
+        Set<Long> visible = bindings.stream().filter(b -> Boolean.TRUE.equals(b.getVisible()))
+                .map(ModelFieldBinding::getFieldId).collect(Collectors.toSet());
+        return fields.stream().filter(f -> visible.contains(f.getId()))
+                .filter(f -> f.getFeature() == null || !Boolean.TRUE.equals(f.getFeature().getHidden()))
+                .filter(f -> declared instanceof String ? declared.equals(f.getCode())
+                        : f.getExtension() != null && Boolean.TRUE.equals(f.getExtension().get("displayField")))
+                .map(Field::getCode).findFirst().orElse(null);
+    }
+
+    private boolean needsFullWidth(Field field) {
+        return Set.of("smarttextarea", "smartrichtext", "smartrichtexteditor", "smartfileattachment", "smartupload", "smartjsoneditor", "richtext", "textarea", "fileattachment")
+                .contains(fieldTypeMapper.getFormComponent(field).toLowerCase(Locale.ROOT));
+    }
+
     @Override
     public PageSchema generateListPage(
             Model model,
@@ -88,6 +110,8 @@ public class DslGeneratorImpl implements DslGenerator {
             List<Field> fields,
             CrudTemplateConfig config
     ) {
+        bindings = bindings.stream().sorted(Comparator.comparing(ModelFieldBinding::getFieldOrder,
+                Comparator.nullsLast(Comparator.naturalOrder()))).toList();
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
@@ -142,6 +166,8 @@ public class DslGeneratorImpl implements DslGenerator {
             List<Field> fields,
             CrudTemplateConfig config
     ) {
+        bindings = bindings.stream().sorted(Comparator.comparing(ModelFieldBinding::getFieldOrder,
+                Comparator.nullsLast(Comparator.naturalOrder()))).toList();
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
@@ -170,16 +196,20 @@ public class DslGeneratorImpl implements DslGenerator {
                 model.getDisplayName() + "表单",
                 model.getDisplayName() + " Form"
         ));
+        Map<String, Object> formExtension = new LinkedHashMap<>();
+        formExtension.put("createTitle", Map.of("zh-CN", "新建" + model.getDisplayName(), "en", "New " + model.getDisplayName()));
+        formExtension.put("editTitle", Map.of("zh-CN", "编辑" + model.getDisplayName(), "en", "Edit " + model.getDisplayName()));
         if (config.getFormPresentation() != null) {
             Integer columns = config.getFormPresentation().getColumns();
             if (columns == null || columns < 1 || columns > 3) {
                 throw new BusinessException("Form columns must be between 1 and 3");
             }
-            var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
-            extension.setExtension(Map.of("formPresentation", objectMapper.convertValue(
-                    config.getFormPresentation(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {})));
-            pageSchema.setExtension(extension);
+            formExtension.put("formPresentation", objectMapper.convertValue(
+                    config.getFormPresentation(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
         }
+        var formExtensionBean = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        formExtensionBean.setExtension(formExtension);
+        pageSchema.setExtension(formExtensionBean);
         pageSchema.setKind("form");
         pageSchema.setSchemaVersion(com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         pageSchema.setProfile("admin");
@@ -199,6 +229,8 @@ public class DslGeneratorImpl implements DslGenerator {
             List<Field> fields,
             CrudTemplateConfig config
     ) {
+        bindings = bindings.stream().sorted(Comparator.comparing(ModelFieldBinding::getFieldOrder,
+                Comparator.nullsLast(Comparator.naturalOrder()))).toList();
         // Load dictionary bindings for fields
         Map<Long, String> dictBindings = loadDictBindings(fields);
 
@@ -227,6 +259,12 @@ public class DslGeneratorImpl implements DslGenerator {
                 model.getDisplayName() + "详情",
                 model.getDisplayName() + " Detail"
         ));
+        String titleField = resolveTitleField(model, bindings, fields);
+        if (titleField != null) {
+            var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+            extension.setExtension(Map.of("headerTitleField", titleField));
+            pageSchema.setExtension(extension);
+        }
         pageSchema.setKind("detail");
         pageSchema.setSchemaVersion(com.auraboot.framework.meta.constant.DslRegistry.PAGE_SCHEMA_CURRENT_VERSION);
         pageSchema.setProfile("admin");
@@ -474,7 +512,7 @@ public class DslGeneratorImpl implements DslGenerator {
         button.put("danger", true);
         // 权限码格式: model.{modelCode}.delete
         button.put("permissionCode", "model." + model.getCode() + ".delete");
-        button.put("enableWhen", "${state.selectedIds.length > 0}");
+        button.put("enableWhen", "${state.selectedCount > 0}");
 
         Map<String, Object> events = new LinkedHashMap<>();
         Map<String, Object> onClick = new LinkedHashMap<>();
@@ -544,19 +582,22 @@ public class DslGeneratorImpl implements DslGenerator {
         // Determine which fields to display
         List<String> displayFields = config.getListColumns();
         if (displayFields == null || displayFields.isEmpty()) {
-            // Display all visible fields
-            for (ModelFieldBinding binding : bindings) {
-                if (Boolean.TRUE.equals(binding.getVisible())) {
-                    Field field = fields.stream()
-                            .filter(f -> f.getId().equals(binding.getFieldId()))
-                            .findFirst()
-                            .orElse(null);
-
-                    if (field != null) {
-                        String dictCode = dictBindings.get(field.getId());
-                        columns.add(buildTableColumn(model, field, dictCode));
-                    }
+            String titleField = resolveTitleField(model, bindings, fields);
+            List<Field> candidates = bindings.stream().filter(b -> Boolean.TRUE.equals(b.getVisible()))
+                    .map(b -> fields.stream().filter(f -> f.getId().equals(b.getFieldId())).findFirst().orElse(null))
+                    .filter(Objects::nonNull)
+                    .filter(f -> f.getFeature() == null || !Boolean.TRUE.equals(f.getFeature().getHidden()))
+                    .sorted(Comparator.comparing(f -> !Objects.equals(f.getCode(), titleField)))
+                    .toList();
+            List<Field> compact = candidates.stream()
+                    .filter(f -> Objects.equals(f.getCode(), titleField) || !needsFullWidth(f)).limit(7).toList();
+            // A text-only model must still have a useful list.
+            for (Field field : compact.isEmpty() ? candidates.stream().limit(7).toList() : compact) {
+                Map<String, Object> column = buildTableColumn(model, field, dictBindings.get(field.getId()));
+                if (Objects.equals(field.getCode(), titleField)) {
+                    column.put("presentation", Map.of("kind", "object"));
                 }
+                columns.add(column);
             }
         } else {
             // Display specified fields only
@@ -736,13 +777,14 @@ public class DslGeneratorImpl implements DslGenerator {
         if (displayFields == null || displayFields.isEmpty()) {
             // Display all editable fields
             for (ModelFieldBinding binding : bindings) {
-                if (Boolean.TRUE.equals(binding.getEditable())) {
+                if (!Boolean.FALSE.equals(binding.getVisible()) &&
+                        (Boolean.TRUE.equals(binding.getEditable()) || Boolean.TRUE.equals(binding.getVisible()))) {
                     Field field = fields.stream()
                             .filter(f -> f.getId().equals(binding.getFieldId()))
                             .findFirst()
                             .orElse(null);
 
-                    if (field != null) {
+                    if (field != null && (field.getFeature() == null || !Boolean.TRUE.equals(field.getFeature().getHidden()))) {
                         String dictCode = dictBindings.get(field.getId());
                         formFields.add(buildFormField(model, field, binding, dictCode));
                     }
@@ -756,13 +798,13 @@ public class DslGeneratorImpl implements DslGenerator {
                         .findFirst()
                         .orElse(null);
 
-                if (field != null) {
+                if (field != null && (field.getFeature() == null || !Boolean.TRUE.equals(field.getFeature().getHidden()))) {
                     ModelFieldBinding binding = bindings.stream()
                             .filter(b -> b.getFieldId().equals(field.getId()))
                             .findFirst()
                             .orElse(null);
 
-                    if (binding != null) {
+                    if (binding != null && !Boolean.FALSE.equals(binding.getVisible())) {
                         String dictCode = dictBindings.get(field.getId());
                         formFields.add(buildFormField(model, field, binding, dictCode));
                     }
@@ -784,9 +826,19 @@ public class DslGeneratorImpl implements DslGenerator {
         // Label resolved by frontend: model.{modelCode}.{fieldCode}.label
         String component = fieldTypeMapper.getFormComponent(field);
         formField.put("component", component);
+        boolean readOnly = Boolean.FALSE.equals(binding.getEditable()) ||
+                (field.getFeature() != null && Boolean.TRUE.equals(field.getFeature().getReadonly()));
+        if (readOnly) formField.put("readOnly", true);
+        if (field.getRefTarget() != null) {
+            formField.put("refTarget", objectMapper.convertValue(field.getRefTarget(), Map.class));
+        }
+        if (field.getUiSchema() != null) {
+            if (field.getUiSchema().getHelpText() != null) formField.put("helpText", localizedFieldText(field.getUiSchema().getHelpText()));
+            if (field.getUiSchema().getPlaceholder() != null) formField.put("placeholder", localizedFieldText(field.getUiSchema().getPlaceholder()));
+        }
 
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("colSpan", Set.of("SmartTextarea", "SmartRichText", "SmartFileAttachment", "SmartUpload", "SmartJsonEditor").contains(component == null ? "" : component) ? 12 : 6);
+        layout.put("colSpan", needsFullWidth(field) ? 12 : 6);
         layout.put("rowSpan", 1);
         formField.put("layout", layout);
 
@@ -813,7 +865,7 @@ public class DslGeneratorImpl implements DslGenerator {
         }
 
         // Add validation rules
-        if (Boolean.TRUE.equals(binding.getRequired())) {
+        if (!readOnly && Boolean.TRUE.equals(binding.getRequired())) {
             List<Map<String, Object>> validation = new ArrayList<>();
             Map<String, Object> requiredRule = new LinkedHashMap<>();
             requiredRule.put("type", "required");
@@ -954,11 +1006,13 @@ public class DslGeneratorImpl implements DslGenerator {
         Map<String, Object> detailField = new LinkedHashMap<>();
         detailField.put("field", field.getCode());
         // Label resolved by frontend: model.{modelCode}.{fieldCode}.label
-        detailField.put("component", "SmartText");
+        // The readonly renderer resolves typed display from authoritative model metadata.
+        // Pinning SmartText here suppresses reference, file, JSON and numeric display components.
+        detailField.put("dataType", field.getDataType());
         detailField.put("readOnly", true);
 
         Map<String, Object> layout = new LinkedHashMap<>();
-        layout.put("colSpan", 6);
+        layout.put("colSpan", needsFullWidth(field) ? 12 : 6);
         layout.put("rowSpan", 1);
         detailField.put("layout", layout);
 
@@ -978,7 +1032,7 @@ public class DslGeneratorImpl implements DslGenerator {
     private Map<String, Object> buildDetailButtons(Model model) {
         Map<String, Object> buttonsBlock = new LinkedHashMap<>();
         buttonsBlock.put("id", "block_" + model.getCode() + "_actions");
-        buttonsBlock.put("blockType", "form-buttons");
+        buttonsBlock.put("blockType", "toolbar");
 
         Map<String, Object> layout = new LinkedHashMap<>();
         layout.put("colSpan", 12);
@@ -1002,18 +1056,6 @@ public class DslGeneratorImpl implements DslGenerator {
         editEvents.put("onClick", editOnClick);
         editBtn.put("events", editEvents);
         buttons.add(editBtn);
-
-        // Back button
-        Map<String, Object> backBtn = new LinkedHashMap<>();
-        backBtn.put("code", "back");
-        backBtn.put("action", "back");
-        // Label resolved by frontend: action.back
-        Map<String, Object> backEvents = new LinkedHashMap<>();
-        Map<String, Object> backOnClick = new LinkedHashMap<>();
-        backOnClick.put("handler", "goBack");
-        backEvents.put("onClick", backOnClick);
-        backBtn.put("events", backEvents);
-        buttons.add(backBtn);
 
         buttonsBlock.put("buttons", buttons);
         return buttonsBlock;

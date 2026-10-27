@@ -172,7 +172,9 @@ export const ListTable = React.memo(function ListTable({
         typeof configuredWidth === 'number' ? configuredWidth : Number(configuredWidth);
       return Number.isFinite(numericWidth) && numericWidth > 0
         ? numericWidth
-        : DEFAULT_COLUMN_WIDTH;
+        : column.presentation?.kind === 'object'
+          ? 280
+          : DEFAULT_COLUMN_WIDTH;
     },
     [columnWidths],
   );

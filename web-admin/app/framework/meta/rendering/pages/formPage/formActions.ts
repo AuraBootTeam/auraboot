@@ -122,10 +122,38 @@ export function isFormAuthoringDenied(
   const primaryActions = activeButtons.filter((button) => button.primary === true);
   return (
     primaryActions.length > 0 &&
-    primaryActions.every(
-      (button) => !hasButtonPermissions(button, hasPermission),
-    )
+    primaryActions.every((button) => !hasButtonPermissions(button, hasPermission))
   );
+}
+
+/** Match dynamic CRUD's server permission at the form boundary, before editable children mount. */
+export function isPureCrudFormAuthoringDenied(
+  schema: {
+    modelCode?: string;
+    commands?: Record<string, unknown>;
+    extension?: Record<string, any>;
+  },
+  buttons: Array<{ action?: unknown; commandCode?: string }>,
+  editing: boolean,
+  externalSubmit: boolean,
+  hasPermission: (code: string) => boolean,
+): boolean {
+  if (
+    externalSubmit ||
+    !schema.modelCode ||
+    Object.values(schema.commands || {}).some(Boolean) ||
+    schema.extension?.submitEndpoint
+  )
+    return false;
+  const writes = buttons.filter((button) =>
+    ['save', 'submit', 'create', 'update'].includes(resolveActionType(button.action).toLowerCase()),
+  );
+  if (
+    !writes.length ||
+    writes.some((button) => button.commandCode || typeof button.action === 'object')
+  )
+    return false;
+  return !hasPermission(`model.${schema.modelCode}.${editing ? 'update' : 'create'}`);
 }
 
 /**
