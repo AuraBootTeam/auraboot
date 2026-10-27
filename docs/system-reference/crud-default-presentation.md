@@ -13,7 +13,7 @@ The standard model page workbench generates usable list, form and detail pages w
 - Model/field metadata supplies types, dictionaries, reference targets, display identity and visibility/editability. Declared model `titleField`, or an existing field `displayField` declaration, identifies the detail record when it is bound and visible.
 - The generator emits structural blocks and business bindings. The default list selects up to seven compact fields in binding order, prioritizing a declared display identity; explicit `listColumns` retain their selection and order. Saved views can add other authorized model fields.
 - Generated forms carry localized create/edit titles. Generated details put their single edit action in the existing header toolbar, avoiding a second runtime footer.
-- The declared object identity receives a readable default column width; explicit column widths and saved view widths still win.
+- The declared object identity receives a readable default column width. Shared tables shrink only unconfigured default columns to type-specific readable floors when space is constrained; headers, data and aggregates share compact padding. Explicit column widths and saved view widths are never compressed. Tables wider than those floors remain horizontally scrollable; no fields are hidden to fit. Existing workspace presentation and wide-screen growth remain compatible.
 - Destructive list actions default to the overflow menu. Existing saved pinning remains authoritative; enable/disable expressions are evaluated against the current selection, including all-matching selection.
 - Shared renderers own page spacing, hierarchy and responsive presentation. Workspace-specific tabs, layout and actions remain compatible; default list headings receive the same visual hierarchy without selecting workspace behavior.
 - Forms with up to four fields and no wide blocks default to a comfortable single column. Larger forms and child-table layouts use the existing wide layout. Explicit width/column properties and legacy workspace behavior take precedence.
@@ -38,3 +38,12 @@ The task implementation plan and acceptance ledger live in the Workspace documen
 ## Repeatable regression
 
 See [the focused browser gate](crud-regression.md) for owned-runtime inputs, fixture provenance, fresh-generation versus restored-case assertions, and evidence limits. `pnpm test:crud` executes the registered journeys; collection alone is not execution.
+
+
+## Designer roundtrip contract
+
+Page Designer edits the generated DSL rather than creating bespoke business React. Field properties remain configuration-driven; widget-specific controls continue through the registry and `PropertyFieldRenderer`. The property adapter recognizes generated `validation` rules and `layout.colSpan`, reflects exact component aliases, and retains reference/create-command bindings and unknown extension keys during serialization. Explicit false overrides must not disappear into shorthand.
+
+Localized titles and placeholders use `LocalizedTextInput`. Non-ASCII text is stored as a locale object even when language controls remain collapsed, satisfying the server i18n validator without user workarounds. ASCII strings and `$i18n:` references remain compatible. Acknowledgement toast bodies do not intercept clicks; their close buttons remain interactive.
+
+The contextual “configure this page” entry opens the ChangeSet authoring surface. The model pages workbench opens Page Designer. These are separate real product entries, not interchangeable test locators. Optional layout fine-tuning should use an independent page when preserving a zero-visual-config reference for comparison.

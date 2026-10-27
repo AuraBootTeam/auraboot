@@ -45,6 +45,7 @@ export default defineConfig({
     // Shared dependency caches can link this package to another checkout.
     // Unit tests must execute the kernel from this exact source tree.
     alias: {
+      '@auraboot/ui': fileURLToPath(new URL('../packages/ui/src', import.meta.url)),
       '@auraboot/runtime-kernel': fileURLToPath(new URL('./packages/runtime-kernel/index.ts', import.meta.url)),
     },
     conditions: ['node'],

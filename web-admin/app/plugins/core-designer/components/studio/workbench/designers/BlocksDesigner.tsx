@@ -42,6 +42,7 @@ import type {
   DslFieldOverride,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { BlockLibrary } from './areas/BlockLibrary';
+import { FieldLibraryPanel } from '../panels/fields/FieldLibraryPanel';
 import { BlockPropertyPanel } from './areas/BlockPropertyPanel';
 import { BlockDragPreview } from './areas/BlockDragPreview';
 import { SortableBlock } from './areas/SortableBlock';
@@ -314,7 +315,8 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
 
       if (targetType === 'fields') {
         const current = block.fields || [];
-        if (!current.includes(fieldCode)) block.fields = [...current, fieldCode];
+        if (current.some(field => parseFieldShorthand(field).field === fieldCode)) return;
+        block.fields = [...current, fieldCode];
       } else {
         const current = block.columns || [];
         const exists = current.some((col) =>
@@ -570,6 +572,14 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
             </div>
 
             <div className="flex-1 overflow-hidden">
+              {leftPanelTab === 'fields' && (
+                <FieldLibraryPanel modelCode={modelCode || schema.modelCode} onAddComponent={component => {
+                  const fieldCode = component.props?.name;
+                  const target = selectedBlock?.blockType === 'form-section' ? selectedBlock
+                    : blocks.find(block => block.blockType === 'form-section');
+                  if (typeof fieldCode === 'string' && target) handleFieldDropToBlock(target.id, fieldCode, 'fields');
+                }} />
+              )}
               {leftPanelTab === 'blocks' && (
                 <BlockLibrary pageKind={schema.kind} readonly={readonly} onAddBlock={addBlock} />
               )}

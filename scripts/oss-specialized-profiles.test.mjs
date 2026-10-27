@@ -92,7 +92,7 @@ test('CRUD profile retains the original workbench journey and real administrator
   assert.deepEqual(report.errors, []);
   const rows = caseIdentities(report);
   assert.equal(rows.filter(row => row.includes('authenticate as admin')).length, 1);
-  assert.equal(rows.filter(row => row.includes('crud-default-case.spec.ts')).length, 4);
+  assert.equal(rows.filter(row => row.includes('crud-default-case.spec.ts')).length, 6);
   const original = collect('playwright.config.ts', { PLAYWRIGHT_BASE_URL: 'http://localhost:5173' },
     ['chromium'], ['--no-deps', 'tests/e2e/showcase/model-page-workbench-e2e.spec.ts']);
   assert.equal(original.status, 0, original.stderr);

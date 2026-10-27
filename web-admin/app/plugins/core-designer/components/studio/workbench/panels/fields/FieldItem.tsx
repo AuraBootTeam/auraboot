@@ -18,6 +18,7 @@ const DATA_TYPE_ICONS: Record<string, string> = {
   TEXT: 'Tx',
   INTEGER: '#',
   DECIMAL: '#.#',
+  MONEY: '¥',
   BOOLEAN: '?',
   DATE: 'D',
   DATETIME: 'DT',
@@ -56,6 +57,7 @@ export const FieldItem: React.FC<FieldItemProps> = ({ field, onDoubleClick }) =>
   return (
     <div
       ref={setNodeRef}
+      data-testid={`field-library-item-${field.code}`}
       {...attributes}
       {...listeners}
       style={style}

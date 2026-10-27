@@ -1,4 +1,4 @@
-import { describe, it, expectTypeOf } from 'vitest';
+import { describe, it, expectTypeOf, expect } from 'vitest';
 import type { PageSchema } from '../types';
 
 // Helper: keys of T that are NOT optional
@@ -54,5 +54,15 @@ describe('PageSchema V2', () => {
     const _floor: PageSchema['layout'] = { type: 'floor' };
     // silence unused-locals
     void _stack; void _grid; void _flex; void _canvas; void _floor;
+  });
+});
+
+
+describe('field override roundtrip', () => {
+  it('retains unknown extension keys and explicit false flags without lossy shorthand', async () => {
+    const { serializeFieldOverride, parseFieldShorthand } = await import('../types');
+    const field = { field: 'amount', required: false, validation: [{ type: 'min', value: 0 }], layout: { colSpan: 12 }, refTarget: { targetEntity: 'account' }, customExtension: { enabled: true } };
+    expect(parseFieldShorthand(serializeFieldOverride(field))).toEqual(field);
+    expect(parseFieldShorthand(serializeFieldOverride({ field: 'name', required: false }))).toEqual({ field: 'name', required: false });
   });
 });

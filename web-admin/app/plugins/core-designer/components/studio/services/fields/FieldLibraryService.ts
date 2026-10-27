@@ -56,7 +56,8 @@ export class FieldLibraryService {
    */
   async getModelFields(modelPid: string): Promise<MetaFieldDTO[]> {
     const result = await get<MetaFieldDTO[]>(`/api/meta/models/${modelPid}/fields`);
-    return result?.data ?? [];
+    // Model bindings use lowercase canonical types; the field palette map uses uppercase keys.
+    return (result?.data ?? []).map(field => ({ ...field, dataType: String(field.dataType ?? 'STRING').toUpperCase() }));
   }
 
   /**

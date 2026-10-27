@@ -159,7 +159,7 @@ export default defineConfig({
   ].filter((plugin): plugin is Plugin => Boolean(plugin)),
   resolve: {
     dedupe: ['react', 'react-dom', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
-    alias: [{ find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }, ...dndSingletonAliases],
+    alias: [{ find: /^@auraboot\/ui(?=\/|$)/, replacement: normalizePath(path.resolve(coreWebAdminRoot, '../packages/ui/src')) }, { find: /^zrender(?=\/|$)/, replacement: normalizePath(zrenderRoot) }, ...dndSingletonAliases],
   },
   server: {
     host: process.env.VITE_HOST || '0.0.0.0',
