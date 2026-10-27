@@ -21,6 +21,7 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 - Scheduled command delegation: [deployment bindings and execution boundaries](./system-reference/scheduled-command-bindings.md).
 - Notification source delivery: [deployment descriptors and configuration boundaries](./system-reference/notification-source-bindings.md).
 - Command consistency: [explicit transaction isolation admission](./system-reference/command-transaction-isolation.md).
+- Plugin command errors: [structured rejections and localization boundaries](./system-reference/plugin-command-rejections.md).
 
 - Architecture overview: start at [ARCHITECTURE.md](../ARCHITECTURE.md) (repo root), then dive into `system-reference/` for operational detail.
 - Internal process documents (session handovers, plans, retrospectives) are intentionally **not tracked in this public repository** — `scripts/check-oss-no-internal-docs.sh` enforces this; they live in the team's private documentation repos.
