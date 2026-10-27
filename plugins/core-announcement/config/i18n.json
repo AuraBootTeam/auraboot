@@ -182,14 +182,14 @@
     "refType": "action"
   },
   {
-    "key": "announcement.submit_approval.confirm.title",
+    "key": "message.announcement.submit_approval.confirm.title",
     "zh-CN": "提交公告审批",
     "en-US": "Submit announcement approval",
     "source": "import",
     "refType": "message"
   },
   {
-    "key": "announcement.submit_approval.confirm.content",
+    "key": "message.announcement.submit_approval.confirm.content",
     "zh-CN": "提交后将冻结正文、附件和通知设置；审批通过后按发布安排执行。确定提交吗？",
     "en-US": "Content, attachments and notification settings will be frozen. Approval will authorize the configured release. Submit now?",
     "source": "import",

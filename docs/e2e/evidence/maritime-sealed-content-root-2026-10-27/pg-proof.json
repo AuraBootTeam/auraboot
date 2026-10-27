@@ -1,0 +1,31 @@
+{
+  "producer": "0c299e033946e1228e0af700bb1abedaaf4ffe0f",
+  "database": "auraboot_26",
+  "suite": "com.auraboot.framework.workbench.AnnouncementSealedContentIT",
+  "tests": 10,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "time": "2.507",
+  "rawXml": "${WORKSPACE_ROOT}/.workspace/evidence/maritime-parallel-core/sealed-content-root/pg-0c299e033.xml",
+  "rawXmlSha256": "a50e3a8b869fa506ba8b8efe74f07f8f88b036c0417c522ed3975d9f65d814da",
+  "controlledApprovalFixture": true,
+  "actualBpmApproval": false,
+  "fullCommandExecutorChain": false,
+  "runtimePrimaryPublisherRevocation": false,
+  "publishedModelConsumer": false,
+  "flywayApplied": 1,
+  "flywayValidated": 157,
+  "cases": [
+    "aConcurrentRootWriterCannotPassTheProofRootLockBeforeCommit()",
+    "sameTransactionWithdrawalAtCommitRollsBackCallerMutation()",
+    "oldMissingSealCannotBeBackfilledByLookupOrLaterTransaction()",
+    "anActiveOwnerWithoutPublishCannotBorrowContentAuthority()",
+    "publisherPermissionRevocationCannotReuseAProofAtCommit()",
+    "sealEvidenceCannotBeUpdatedOrDeleted()",
+    "uncommittedFreshGrantIsNeverPublishedToAnotherThreadOrRollbackCache()",
+    "publisherNotARecipientGetsExactContentAndOfficialBindingFixtureInSamePhysicalTransaction()",
+    "sourceByteChangeAfterProofIsRejectedAtCommit()",
+    "sameLocatorByteReplacementIsNotAProviderGenerationAndIsRejected()"
+  ]
+}

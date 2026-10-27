@@ -1,0 +1,18 @@
+{
+  "candidate": "${ANCHORAGE_SOURCE_ROOT}/.tools/admitted-platform-sealed-0c299e0",
+  "catalogSha256": "c0422e78104044ca2b8bb9ae9a7d02a6f1973ebfae2d052619de975fdeca2316",
+  "producer": "0c299e033946e1228e0af700bb1abedaaf4ffe0f",
+  "changedEntries": [
+    "com.auraboot:runtime",
+    "com.auraboot:platform-plugin-api",
+    "core"
+  ],
+  "unchangedEntries": 18,
+  "embeddedApiEqualsStandalone": true,
+  "richGettersPreserved": true,
+  "compiledHostClassBytesVerified": 3,
+  "migrationAddedOnly": "V20261027100000__announcement_sealed_content.sql",
+  "rootProductLockChanged": false,
+  "nativeProductAcceptance": false,
+  "materialization": "official prepare; ephemeral hardlinked producer input removed after independent artifact copies"
+}

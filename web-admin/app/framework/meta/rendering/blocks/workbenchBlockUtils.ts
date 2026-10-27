@@ -1,6 +1,7 @@
+import { createPromptSubmissionFeedback } from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
+import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { downloadWithAuth } from '~/framework/meta/utils/commandDownload';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -66,6 +67,11 @@ export function useRuntimeStateSubscription(runtime: SchemaRuntime | null): void
   useEffect(() => {
     if (!runtime) return undefined;
 
+    if (runtime.subscribeContext) {
+      const unsubscribe = runtime.subscribeContext(() => forceUpdate((version) => version + 1));
+      forceUpdate((version) => version + 1);
+      return unsubscribe;
+    }
     const stateManager = runtime.getStateManager?.();
     const scopeId = runtime.getScopeId?.();
     const store = stateManager?.getStore?.(scopeId);
@@ -299,6 +305,7 @@ async function pollWorkbenchAsyncTask(
   taskCode: string,
   reloadIds: string | string[] | undefined,
   args: any,
+  onTerminal?: (status: string, task: AsyncTaskStatus) => void,
 ): Promise<any> {
   const terminalStatuses = new Set(['completed', 'failed', 'cancelled']);
   const intervalMs = resolvePollIntervalMs(args);
@@ -317,12 +324,18 @@ async function pollWorkbenchAsyncTask(
       // B-002 (DR-20260715-B-002): prefer localized context.detail over the generic
       // message/desc envelope — the third command path (workbench) must extract the
       // reason the same way useActionHandler / FormPageContent do (OSS #1212).
-      throw new Error(resolveCommandErrorMessage(result, taskCode, runtime.getContext().t));
+      throw commandExecutionError(
+        result,
+        taskCode,
+        runtime.getContext().t,
+        runtime.getContext().locale,
+      );
     }
 
     const task: AsyncTaskStatus = result?.data ?? {};
     const status = String(task.status || '').toLowerCase();
     const isTerminal = terminalStatuses.has(status);
+    if (isTerminal) onTerminal?.(status, task);
     const now = Date.now();
     const shouldReload =
       lastReloadAt === 0 ||
@@ -390,7 +403,13 @@ function openDownloadUrl(url: string): void {
  * add its `if (config.action === '<verb>')` branch below — the parser reads the
  * branch conditions, so the catalog updates itself.
  */
-const KNOWN_WORKBENCH_ACTIONS = ['state.set', 'dataSource.reload', 'navigate', 'command.execute'];
+const KNOWN_WORKBENCH_ACTIONS = [
+  'state.set',
+  'form.reset',
+  'dataSource.reload',
+  'navigate',
+  'command.execute',
+];
 
 export async function executeSimpleWorkbenchAction(
   runtime: SchemaRuntime,
@@ -426,6 +445,19 @@ export async function executeSimpleWorkbenchAction(
     return;
   }
 
+  if (config.action === 'form.reset') {
+    const stateManager = runtime.getStateManager?.();
+    const scopeId = runtime.getScopeId?.();
+    if (!stateManager || !scopeId || !stateManager.getScope(scopeId)) {
+      throw new Error('[workbench] form.reset requires an active scoped form');
+    }
+    // Resolve explicit targets before clearing the current form's input values.
+    const args = resolveRuntimeValue(runtime, config.args);
+    stateManager.resetForm(scopeId);
+    await reloadDataSources(runtime, resolveReloadIds(args));
+    return;
+  }
+
   if (config.action === 'dataSource.reload') {
     const args = resolveRuntimeValue(runtime, config.args);
     await reloadDataSources(runtime, resolveReloadIds(args));
@@ -455,6 +487,11 @@ export async function executeSimpleWorkbenchAction(
     // THIS path (not ActionRegistry), so the platform inputFields feature must be wired here
     // too — otherwise a detail-page action with inputFields silently skips the form and fails
     // (the cr_account "导入凭据" gate-gap, caught by the credential golden).
+    // Existing DMS reload may resolve after retaining an error/cache; no strict read capability here.
+    const submissionFeedback = createPromptSubmissionFeedback({
+      t: runtime.getContext().t,
+      locale: runtime.getContext().locale,
+    });
     let collectedInputs: Record<string, any> = {};
     if (Array.isArray(args.inputFields) && args.inputFields.length > 0) {
       const { promptInputForm } = await import('~/framework/meta/runtime/actions/ActionRegistry');
@@ -465,91 +502,130 @@ export async function executeSimpleWorkbenchAction(
           fetchResult,
           args.inputFieldsSubmitLabel,
           runtime.getContext(),
+          { t: runtime.getContext().t, locale: runtime.getContext().locale },
+          args.inputFieldsPresentation,
+          undefined,
+          submissionFeedback,
         );
       } catch {
+        submissionFeedback.dispose();
         return; // user cancelled the form — abort without executing the command
       }
     }
 
-    const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;
-    const operationType = args.operationType ? String(args.operationType).toUpperCase() : undefined;
-    const versionInput = args.expectedVersion;
-    const expectedVersion =
-      versionInput === undefined
-        ? undefined
-        : typeof versionInput === 'number' ||
-            (typeof versionInput === 'string' && versionInput.trim() !== '')
-          ? Number(versionInput)
-          : Number.NaN;
-    if (
-      expectedVersion !== undefined &&
-      (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0)
-    ) {
-      throw new Error('[workbench] command.execute expectedVersion must be a non-negative integer');
-    }
-    const params: Record<string, any> = {
-      expectedVersion,
-      targetRecordPid,
-      operationType,
-      payload: { ...(args.payload || {}), ...collectedInputs },
-    };
-    if (targetRecordPid) {
-      params.targetRecordPid = targetRecordPid;
-    }
-    // Strict CAS contract (#1752): existing-target mutations must carry the
-    // expectedVersion observed by the caller. Workbench drawers confirm rows
-    // resolved from list data, so when the caller passed no version we send the
-    // command once; a CAS_VERSION_REQUIRED conflict names the target model, and
-    // we complete the version handshake with its current row_version.
-    Object.keys(params).forEach((key) => {
-      if (params[key] === undefined) delete params[key];
-    });
-
-    const sendCommand = () =>
-      fetchResult(`/api/meta/commands/execute/${command}`, {
-        method: 'post',
-        params,
+    try {
+      const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;
+      const operationType = args.operationType
+        ? String(args.operationType).toUpperCase()
+        : undefined;
+      const versionInput = args.expectedVersion;
+      const expectedVersion =
+        versionInput === undefined
+          ? undefined
+          : typeof versionInput === 'number' ||
+              (typeof versionInput === 'string' && versionInput.trim() !== '')
+            ? Number(versionInput)
+            : Number.NaN;
+      if (
+        expectedVersion !== undefined &&
+        (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0)
+      ) {
+        throw new Error(
+          '[workbench] command.execute expectedVersion must be a non-negative integer',
+        );
+      }
+      const params: Record<string, any> = {
+        expectedVersion,
+        targetRecordPid,
+        operationType,
+        payload: { ...(args.payload || {}), ...collectedInputs },
+      };
+      if (targetRecordPid) {
+        params.targetRecordPid = targetRecordPid;
+      }
+      // Strict CAS contract (#1752): existing-target mutations must carry the
+      // expectedVersion observed by the caller. Workbench drawers confirm rows
+      // resolved from list data, so when the caller passed no version we send the
+      // command once; a CAS_VERSION_REQUIRED conflict names the target model, and
+      // we complete the version handshake with its current row_version.
+      Object.keys(params).forEach((key) => {
+        if (params[key] === undefined) delete params[key];
       });
-    let result = await sendCommand();
-    if (
-      !isSuccessResult(result) &&
-      (result as any)?.context?.errorCode === 'CAS_VERSION_REQUIRED' &&
-      targetRecordPid
-    ) {
-      const conflictModel = (result as any)?.context?.modelCode || String(command).split(':')[0];
-      const recordResult = await fetchResult(
-        `/api/dynamic/${encodeURIComponent(conflictModel)}/${encodeURIComponent(targetRecordPid)}`,
-        { method: 'get' },
-      );
-      if (isSuccessResult(recordResult)) {
-        const record = (recordResult as any)?.data?.data ?? (recordResult as any)?.data;
-        const version = Number(record?.row_version ?? record?.rowVersion);
-        if (Number.isFinite(version)) {
-          params.expectedVersion = version;
-          result = await sendCommand();
+
+      const sendCommand = () =>
+        fetchResult(`/api/meta/commands/execute/${command}`, {
+          method: 'post',
+          params,
+        });
+      let result = await sendCommand();
+      if (
+        !isSuccessResult(result) &&
+        (result as any)?.context?.errorCode === 'CAS_VERSION_REQUIRED' &&
+        targetRecordPid
+      ) {
+        const conflictModel = (result as any)?.context?.modelCode || String(command).split(':')[0];
+        const recordResult = await fetchResult(
+          `/api/dynamic/${encodeURIComponent(conflictModel)}/${encodeURIComponent(targetRecordPid)}`,
+          { method: 'get' },
+        );
+        if (isSuccessResult(recordResult)) {
+          const record = (recordResult as any)?.data?.data ?? (recordResult as any)?.data;
+          const version = Number(record?.row_version ?? record?.rowVersion);
+          if (Number.isFinite(version)) {
+            params.expectedVersion = version;
+            result = await sendCommand();
+          }
         }
       }
-    }
-    try {
       if (!isSuccessResult(result)) {
         // B-002 (DR-20260715-B-002): a business-rejected command puts the real,
         // localized reason in context.detail; message/desc are the generic envelope.
         // Use the shared extractor so the workbench toast shows the reason (not
         // "Business error"), matching useActionHandler / FormPageContent (OSS #1212).
-        throw new Error(resolveCommandErrorMessage(result, command, runtime.getContext().t));
+        throw commandExecutionError(
+          result,
+          command,
+          runtime.getContext().t,
+          runtime.getContext().locale,
+        );
       }
 
       const reloadIds = resolveReloadIds(args.reload);
       const dispatch = unwrapCommandData(result);
       const asyncDispatched = isAsyncDispatch(dispatch);
       if (isAsyncDispatch(dispatch)) {
-        result = await pollWorkbenchAsyncTask(runtime, dispatch.taskCode, reloadIds, args);
+        result = await pollWorkbenchAsyncTask(
+          runtime,
+          dispatch.taskCode,
+          reloadIds,
+          args,
+          (status, task) => {
+            const outcome = unwrapCommandData(task.resultData ?? {});
+            if (status === 'completed' && !isBusinessRejected(outcome))
+              submissionFeedback.completeResult(outcome, true);
+            else
+              submissionFeedback.fail(
+                new Error(
+                  status === 'completed'
+                    ? String(outcome.message || outcome.reason || 'Command rejected')
+                    : task.errorMessage ||
+                        task.message ||
+                        (status === 'cancelled' ? 'Task cancelled' : 'Async task failed'),
+                ),
+              );
+          },
+        );
       }
 
+      const resultData = unwrapCommandData(result);
+      if (isBusinessRejected(resultData))
+        submissionFeedback.fail(
+          new Error(String(resultData.message || resultData.reason || 'Command rejected')),
+        );
+      else submissionFeedback.completeResult(resultData, true);
       if (!asyncDispatched) {
         await reloadDataSources(runtime, reloadIds);
       }
-      const resultData = unwrapCommandData(result);
       const { downloadBase64CommandArtifact } =
         await import('~/framework/meta/runtime/actions/ActionRegistry');
       downloadBase64CommandArtifact(resultData);
@@ -580,6 +656,7 @@ export async function executeSimpleWorkbenchAction(
       }
       return resultData;
     } catch (error) {
+      submissionFeedback.fail(error);
       const reloadOnErrorIds = resolveReloadIds(args.reloadOnError);
       if (
         typeof reloadOnErrorIds === 'string' ||
@@ -599,6 +676,8 @@ export async function executeSimpleWorkbenchAction(
         error instanceof Error ? error.message : `${command} failed`,
       );
       throw error;
+    } finally {
+      submissionFeedback.finalize();
     }
   }
 }

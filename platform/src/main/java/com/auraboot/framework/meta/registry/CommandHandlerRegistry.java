@@ -27,6 +27,11 @@ public class CommandHandlerRegistry {
         return entries.containsKey(code);
     }
 
+    /** Remove only metadata still owned by the original registering bridge. */
+    public boolean unregisterIfSame(HandlerMeta expected) {
+        return entries.remove(expected.code(), expected);
+    }
+
     public Collection<HandlerMeta> getAll() {
         return entries.values();
     }

@@ -89,6 +89,13 @@ public class ExecutionConfigValidator implements PluginValidator {
                                     + " execution contract"));
             }
 
+            try {
+                com.auraboot.framework.meta.constant.CommandResultCachePolicy.enabled(execConfig);
+            } catch (IllegalArgumentException invalid) {
+                messages.add(error("S-EXEC-RESULT-CACHE", category(),
+                        path + ".executionConfig.cacheResult", invalid.getMessage()));
+            }
+
             // Validate type
             Object type = execConfig.get("type");
             if (type != null && !VALID_EXEC_TYPES.contains(type.toString())) {

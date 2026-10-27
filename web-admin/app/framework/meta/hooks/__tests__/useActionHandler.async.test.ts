@@ -43,150 +43,283 @@ function makeRuntime(overrides: Record<string, unknown> = {}): SchemaRuntime {
 }
 
 describe('useActionHandler - offboarding action propagation', () => {
-  it.each(['suspend', 'deactivate', 'remove'])('uses the same %s action for impact and recipient lookup', async action => {
-    fetchResultMock.mockReset();
-    fetchResultMock.mockResolvedValue({ code: '0', data: { transferRequired: true, ownedResourceCount: 1 } });
-    const input = vi.spyOn(actionRegistry, 'promptInputForm').mockRejectedValue(new Error('cancelled'));
-    try {
-      const { result } = renderHook(() => useActionHandler({
-        runtime: makeRuntime(),
-        navigate: vi.fn() as any,
-        tableName: 'tenant_member',
-        locale: 'en-US',
-        t: key => key,
-      }));
-      await act(async () => {
-        await result.current.handleAction({
-          code: 'member-offboarding',
-          action: { type: 'command', command: 'admin:suspend_member', offboardingAction: action },
-        } as unknown as ButtonConfig, { pid: 'MEMBER-1' });
+  it.each(['suspend', 'deactivate', 'remove'])(
+    'uses the same %s action for impact and recipient lookup',
+    async (action) => {
+      fetchResultMock.mockReset();
+      fetchResultMock.mockResolvedValue({
+        code: '0',
+        data: { transferRequired: true, ownedResourceCount: 1 },
       });
-      expect(fetchResultMock).toHaveBeenCalledWith(
-        '/api/tenant/members/MEMBER-1/offboarding-impact',
-        expect.objectContaining({ method: 'get', params: { action } }),
-      );
-      expect(input).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({
-          field: 'targetMemberPid',
-          dataSource: expect.objectContaining({
-            endpoint: `/api/tenant/members/\${record.pid}/offboarding-candidates?action=${action}`,
+      const input = vi
+        .spyOn(actionRegistry, 'promptInputForm')
+        .mockRejectedValue(new Error('cancelled'));
+      try {
+        const { result } = renderHook(() =>
+          useActionHandler({
+            runtime: makeRuntime(),
+            navigate: vi.fn() as any,
+            tableName: 'tenant_member',
+            locale: 'en-US',
+            t: (key) => key,
           }),
-        })]),
-        expect.anything(), expect.anything(), undefined, expect.anything(), expect.objectContaining({ locale: 'en-US' }),
-      );
-      expect(fetchResultMock).toHaveBeenCalledTimes(1);
-    } finally {
-      input.mockRestore();
-    }
-  });
+        );
+        await act(async () => {
+          await result.current.handleAction(
+            {
+              code: 'member-offboarding',
+              action: {
+                type: 'command',
+                command: 'admin:suspend_member',
+                offboardingAction: action,
+              },
+            } as unknown as ButtonConfig,
+            { pid: 'MEMBER-1' },
+          );
+        });
+        expect(fetchResultMock).toHaveBeenCalledWith(
+          '/api/tenant/members/MEMBER-1/offboarding-impact',
+          expect.objectContaining({ method: 'get', params: { action } }),
+        );
+        expect(input).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({
+              field: 'targetMemberPid',
+              dataSource: expect.objectContaining({
+                endpoint: `/api/tenant/members/\${record.pid}/offboarding-candidates?action=${action}`,
+              }),
+            }),
+          ]),
+          expect.anything(),
+          expect.anything(),
+          undefined,
+          expect.anything(),
+          expect.objectContaining({ locale: 'en-US' }),
+          undefined,
+          expect.any(AbortSignal),
+          expect.objectContaining({
+            completeResult: expect.any(Function),
+            fail: expect.any(Function),
+          }),
+        );
+        expect(fetchResultMock).toHaveBeenCalledTimes(1);
+      } finally {
+        input.mockRestore();
+      }
+    },
+  );
 });
 
 describe('useActionHandler - explicit command payload', () => {
-  beforeEach(() => { fetchResultMock.mockReset(); });
+  beforeEach(() => {
+    fetchResultMock.mockReset();
+  });
 
   it.each([{}, { includeRecordPayload: true }, { includeRecordPayload: false }])(
-    'separates configured payload from ambient records: %j', async option => {
+    'separates configured payload from ambient records: %j',
+    async (option) => {
       fetchResultMock.mockResolvedValue({ code: '0', data: {} });
-      const record = { pid: 'receipt-1', row_version: 7, status: 'draft', price: 'forbidden ambient value' };
-      const { result } = renderHook(() => useActionHandler({
-        runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'receipt',
-        locale: 'en-US', t: ((key: string) => key) as any,
-      }));
+      const record = {
+        pid: 'receipt-1',
+        row_version: 7,
+        status: 'draft',
+        price: 'forbidden ambient value',
+      };
+      const { result } = renderHook(() =>
+        useActionHandler({
+          runtime: makeRuntime(),
+          navigate: vi.fn() as any,
+          tableName: 'receipt',
+          locale: 'en-US',
+          t: ((key: string) => key) as any,
+        }),
+      );
       await act(async () => {
-        await result.current.handleAction({ code: 'add_line', action: {
-          type: 'command', command: 'receipt:add_line', operationType: 'update',
-          payload: { quantity: '0.1' }, ...option,
-        } } as ButtonConfig, record);
+        await result.current.handleAction(
+          {
+            code: 'add_line',
+            action: {
+              type: 'command',
+              command: 'receipt:add_line',
+              operationType: 'update',
+              payload: { quantity: '0.1' },
+              ...option,
+            },
+          } as ButtonConfig,
+          record,
+        );
       });
       expect(result.current.error).toBeNull();
       expect(fetchResultMock).toHaveBeenCalledOnce();
       expect(fetchResultMock.mock.calls[0][1].params).toEqual({
-        targetRecordPid: 'receipt-1', operationType: 'UPDATE', expectedVersion: 7,
-        payload: option.includeRecordPayload === false ? { quantity: '0.1' } : { ...record, quantity: '0.1' },
+        targetRecordPid: 'receipt-1',
+        operationType: 'UPDATE',
+        expectedVersion: 7,
+        payload:
+          option.includeRecordPayload === false
+            ? { quantity: '0.1' }
+            : { ...record, quantity: '0.1' },
       });
-    });
+    },
+  );
 
-  it.each(['false', 0, null])('rejects malformed includeRecordPayload before dispatch: %j', async includeRecordPayload => {
-    const { result } = renderHook(() => useActionHandler({
-      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'receipt',
-      locale: 'en-US', t: ((key: string) => key) as any,
-    }));
-    await act(async () => {
-      await result.current.handleAction({ code: 'add_line', action: {
-        type: 'command', command: 'receipt:add_line', operationType: 'update',
-        includeRecordPayload,
-      } } as unknown as ButtonConfig, { pid: 'receipt-1', row_version: 7 });
-    });
-    expect(fetchResultMock).not.toHaveBeenCalled();
-    expect(result.current.error).toBeTruthy();
-  });
+  it.each(['false', 0, null])(
+    'rejects malformed includeRecordPayload before dispatch: %j',
+    async (includeRecordPayload) => {
+      const { result } = renderHook(() =>
+        useActionHandler({
+          runtime: makeRuntime(),
+          navigate: vi.fn() as any,
+          tableName: 'receipt',
+          locale: 'en-US',
+          t: ((key: string) => key) as any,
+        }),
+      );
+      await act(async () => {
+        await result.current.handleAction(
+          {
+            code: 'add_line',
+            action: {
+              type: 'command',
+              command: 'receipt:add_line',
+              operationType: 'update',
+              includeRecordPayload,
+            },
+          } as unknown as ButtonConfig,
+          { pid: 'receipt-1', row_version: 7 },
+        );
+      });
+      expect(fetchResultMock).not.toHaveBeenCalled();
+      expect(result.current.error).toBeTruthy();
+    },
+  );
 
   it('merges prompted fields into an isolated payload while preserving record expressions and CAS', async () => {
-    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { pid: 'receipt-1', row_version: 8, status: 'draft' } });
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: { pid: 'receipt-1', row_version: 8, status: 'draft' },
+    });
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: {} });
-    const prompt = vi.spyOn(actionRegistry, 'promptInputForm').mockResolvedValue({ orderLinePid: 'line-1', quantity: '0.1' });
+    const prompt = vi
+      .spyOn(actionRegistry, 'promptInputForm')
+      .mockResolvedValue({ orderLinePid: 'line-1', quantity: '0.1' });
     const errors: Error[] = [];
     try {
-      const { result } = renderHook(() => useActionHandler({
-        runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'receipt',
-        locale: 'en-US', t: ((key: string) => key) as any, onError: error => errors.push(error),
-      }));
+      const { result } = renderHook(() =>
+        useActionHandler({
+          runtime: makeRuntime(),
+          navigate: vi.fn() as any,
+          tableName: 'receipt',
+          locale: 'en-US',
+          t: ((key: string) => key) as any,
+          onError: (error) => errors.push(error),
+        }),
+      );
       await act(async () => {
-        await result.current.handleAction({ code: 'add_line', action: {
-          type: 'command', command: 'receipt:add_line', operationType: 'update', includeRecordPayload: false,
-          payload: {}, inputFields: [{ field: 'quantity', type: 'text' }],
-        } } as unknown as ButtonConfig, { pid: 'receipt-1', row_version: 7, status: 'draft' });
+        await result.current.handleAction(
+          {
+            code: 'add_line',
+            action: {
+              type: 'command',
+              command: 'receipt:add_line',
+              operationType: 'update',
+              includeRecordPayload: false,
+              payload: {},
+              inputFields: [{ field: 'quantity', type: 'text' }],
+            },
+          } as unknown as ButtonConfig,
+          { pid: 'receipt-1', row_version: 7, status: 'draft' },
+        );
       });
       expect(errors).toEqual([]);
       expect(result.current.error).toBeNull();
       expect(fetchResultMock.mock.calls[1][1].params).toEqual({
-        targetRecordPid: 'receipt-1', operationType: 'UPDATE', expectedVersion: 8,
+        targetRecordPid: 'receipt-1',
+        operationType: 'UPDATE',
+        expectedVersion: 8,
         payload: { orderLinePid: 'line-1', quantity: '0.1' },
       });
-      expect(prompt.mock.calls[0][4]).toMatchObject({ record: { pid: 'receipt-1', row_version: 8 } });
-    } finally { prompt.mockRestore(); }
+      expect(prompt.mock.calls[0][4]).toMatchObject({
+        record: { pid: 'receipt-1', row_version: 8 },
+      });
+    } finally {
+      prompt.mockRestore();
+    }
   });
 });
 
 describe('useActionHandler - handlerParams.async polling', () => {
-  beforeEach(() => { fetchResultMock.mockReset(); confirmMock.mockReset(); });
+  beforeEach(() => {
+    fetchResultMock.mockReset();
+    confirmMock.mockReset();
+  });
 
   it.each([
     [{}, 'default'],
     [{ confirmVariant: 'default' }, 'default'],
     [{ danger: true }, 'danger'],
     [{ variant: 'danger' }, 'danger'],
-  ] as const)('uses the declared confirmation intent and cancels before dispatch: %j', async (intent, expectedVariant) => {
-    confirmMock.mockResolvedValue(false);
-    const { result } = renderHook(() => useActionHandler({
-      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'inv_arrival_notice',
-      locale: 'zh-CN', t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any,
-    }));
-    await act(async () => {
-      await result.current.handleAction({
-        code: 'convert_to_inbound', confirm: 'Generate a draft receipt?', ...intent,
-        action: { type: 'command', command: 'inv:convert_notice_to_inbound' },
-      } as unknown as ButtonConfig, { pid: 'notice-1' });
-    });
-    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ variant: expectedVariant }));
-    expect(fetchResultMock).not.toHaveBeenCalled();
-    expect(result.current.loading).toBe(false);
-  });
+  ] as const)(
+    'uses the declared confirmation intent and cancels before dispatch: %j',
+    async (intent, expectedVariant) => {
+      confirmMock.mockResolvedValue(false);
+      const { result } = renderHook(() =>
+        useActionHandler({
+          runtime: makeRuntime(),
+          navigate: vi.fn() as any,
+          tableName: 'inv_arrival_notice',
+          locale: 'zh-CN',
+          t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any,
+        }),
+      );
+      await act(async () => {
+        await result.current.handleAction(
+          {
+            code: 'convert_to_inbound',
+            confirm: 'Generate a draft receipt?',
+            ...intent,
+            action: { type: 'command', command: 'inv:convert_notice_to_inbound' },
+          } as unknown as ButtonConfig,
+          { pid: 'notice-1' },
+        );
+      });
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: expectedVariant }),
+      );
+      expect(fetchResultMock).not.toHaveBeenCalled();
+      expect(result.current.loading).toBe(false);
+    },
+  );
 
   it('normalizes rejected HTTP command errors before displaying detail feedback', async () => {
-    fetchResultMock.mockRejectedValue(new Error(
-      'Plugin handler execution failed: Insufficient stock for product [01SECRET-PID] at the line location: required 5.00, available 2.00'));
+    fetchResultMock.mockRejectedValue(
+      new Error(
+        'Plugin handler execution failed: Insufficient stock for product [01SECRET-PID] at the line location: required 5.00, available 2.00',
+      ),
+    );
     const showToast = vi.fn();
-    const { result } = renderHook(() => useActionHandler({
-      runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'inv_outbound',
-      locale: 'zh-CN', t: ((key: string) => key) as any, showToast,
-    }));
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'inv_outbound',
+        locale: 'zh-CN',
+        t: ((key: string) => key) as any,
+        showToast,
+      }),
+    );
     await act(async () => {
-      await result.current.handleAction({ code: 'confirm_other_out',
-        action: { type: 'command', command: 'inv:confirm_other_out' },
-      } as unknown as ButtonConfig, { pid: 'issue-1', row_version: 1 });
+      await result.current.handleAction(
+        {
+          code: 'confirm_other_out',
+          action: { type: 'command', command: 'inv:confirm_other_out' },
+        } as unknown as ButtonConfig,
+        { pid: 'issue-1', row_version: 1 },
+      );
     });
-    expect(result.current.error).toBe('所选库位库存不足：需要 5.00，可用 2.00。请调整数量或选择其他库位。');
+    expect(result.current.error).toBe(
+      '所选库位库存不足：需要 5.00，可用 2.00。请调整数量或选择其他库位。',
+    );
     expect(showToast).toHaveBeenCalledWith(result.current.error, 'error');
     expect(result.current.loading).toBe(false);
   });
@@ -425,6 +558,12 @@ describe('useActionHandler - handlerParams.async polling', () => {
     const listener = vi.fn((event: Event) => {
       const detail = (event as CustomEvent).detail;
       defaults = detail.defaults;
+      expect(detail.title).toBe('Adjust · quote-1');
+      expect(
+        detail.presentation.summary.items.map((item: { value: string }) => item.value),
+      ).toEqual(['quote-1', '3']);
+      oldRecord.row_version = 9;
+      oldRecord.count = 99;
       // A concurrent writer after the dialog opens must still cause a conflict;
       // never fetch a newer version at submit or replay the command automatically.
       detail.onSubmit({ count: 5 });
@@ -447,6 +586,12 @@ describe('useActionHandler - handlerParams.async polling', () => {
           action: {
             type: 'command',
             command: 'qo_quote_common:recompute_quantities',
+            inputFieldsTitle: 'Adjust · ${record.pid}',
+            inputFieldsPresentation: {
+              width: 600,
+              showClose: true,
+              summary: { columns: 2, fields: [{ field: 'pid' }, { field: 'count' }] },
+            },
             inputFields: [
               { field: 'count', type: 'number', label: 'Count', defaultValue: '${form.count}' },
             ],
@@ -1010,17 +1155,23 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
   it('resolves a static card route without requiring a record PID', async () => {
     const navigate = vi.fn();
-    const { result } = renderHook(() => useActionHandler({
-      runtime: makeRuntime({ record: { pid: 'PARENT-1' } }),
-      navigate: navigate as any,
-      tableName: 'settings',
-      locale: 'en-US',
-      t: key => key,
-    }));
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime({ record: { pid: 'PARENT-1' } }),
+        navigate: navigate as any,
+        tableName: 'settings',
+        locale: 'en-US',
+        t: (key) => key,
+      }),
+    );
     await act(async () => {
-      await result.current.handleAction({
-        code: 'open', action: { type: 'navigate', to: '{target}' },
-      } as unknown as ButtonConfig, { title: 'Providers', target: '/aurabot/providers' });
+      await result.current.handleAction(
+        {
+          code: 'open',
+          action: { type: 'navigate', to: '{target}' },
+        } as unknown as ButtonConfig,
+        { title: 'Providers', target: '/aurabot/providers' },
+      );
     });
     expect(navigate).toHaveBeenCalledWith('/aurabot/providers');
   });
@@ -1857,7 +2008,6 @@ describe('useActionHandler - handlerParams.async polling', () => {
   });
 });
 
-
 describe('useActionHandler - explicit confirmation style', () => {
   it.each([
     [{}, 'default'],
@@ -1867,84 +2017,181 @@ describe('useActionHandler - explicit confirmation style', () => {
     [{ variant: 'danger' }, 'danger'],
     [{ danger: true, confirmVariant: 'default' }, 'default'],
     [{ variant: 'default', confirmVariant: 'danger' }, 'danger'],
-  ] as const)('uses %j confirmation intent and preserves cancellation', async (intent, expected) => {
-    fetchResultMock.mockReset();
-    const confirm = vi.spyOn(confirmations, 'confirmDialog').mockResolvedValue(false);
-    try {
-      const { result } = renderHook(() => useActionHandler({
-        runtime: makeRuntime(), navigate: vi.fn() as any, tableName: 'tenant_member',
-        locale: 'en-US', t: key => key,
-      }));
-      await act(async () => {
-        await result.current.handleAction({
-          code: 'restore', confirm: 'Restore this member?', ...intent,
-          action: { type: 'command', command: 'admin:restore_member' },
-        } as unknown as ButtonConfig, { pid: 'MEMBER-1' });
-      });
-      expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ variant: expected }));
-      expect(fetchResultMock).not.toHaveBeenCalled();
-    } finally {
-      confirm.mockRestore();
-    }
-  });
+  ] as const)(
+    'uses %j confirmation intent and preserves cancellation',
+    async (intent, expected) => {
+      fetchResultMock.mockReset();
+      const confirm = vi.spyOn(confirmations, 'confirmDialog').mockResolvedValue(false);
+      try {
+        const { result } = renderHook(() =>
+          useActionHandler({
+            runtime: makeRuntime(),
+            navigate: vi.fn() as any,
+            tableName: 'tenant_member',
+            locale: 'en-US',
+            t: (key) => key,
+          }),
+        );
+        await act(async () => {
+          await result.current.handleAction(
+            {
+              code: 'restore',
+              confirm: 'Restore this member?',
+              ...intent,
+              action: { type: 'command', command: 'admin:restore_member' },
+            } as unknown as ButtonConfig,
+            { pid: 'MEMBER-1' },
+          );
+        });
+        expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ variant: expected }));
+        expect(fetchResultMock).not.toHaveBeenCalled();
+      } finally {
+        confirm.mockRestore();
+      }
+    },
+  );
 });
 
-
 describe('useActionHandler invalid confirmation configuration', () => {
-  it.each(['invalid', 'DEFAULT'])('rejects invalid style %s before confirmation or dispatch', async confirmVariant => {
-    fetchResultMock.mockReset();confirmMock.mockReset();confirmMock.mockResolvedValue(false);
-    const showToast = vi.fn();
-    const { result } = renderHook(() => useActionHandler({ runtime: makeRuntime(), navigate: vi.fn() as any,
-      tableName: 'tenant_member', locale: 'en-US', t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any, showToast }));
-    await act(async () => { await result.current.handleAction({ code: 'restore', confirm: 'Restore this member?', confirmVariant,
-      action: { type: 'command', command: 'admin:restore_member' },
-    } as unknown as ButtonConfig, { pid: 'MEMBER-1' }); });
-    expect(result.current.error).toBe('Operation failed');
-    expect(showToast).toHaveBeenCalledWith('Operation failed', 'error');
-    expect(confirmMock).not.toHaveBeenCalled();expect(fetchResultMock).not.toHaveBeenCalled();
-    expect(result.current.loading).toBe(false);
-  });
+  it.each(['invalid', 'DEFAULT'])(
+    'rejects invalid style %s before confirmation or dispatch',
+    async (confirmVariant) => {
+      fetchResultMock.mockReset();
+      confirmMock.mockReset();
+      confirmMock.mockResolvedValue(false);
+      const showToast = vi.fn();
+      const { result } = renderHook(() =>
+        useActionHandler({
+          runtime: makeRuntime(),
+          navigate: vi.fn() as any,
+          tableName: 'tenant_member',
+          locale: 'en-US',
+          t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any,
+          showToast,
+        }),
+      );
+      await act(async () => {
+        await result.current.handleAction(
+          {
+            code: 'restore',
+            confirm: 'Restore this member?',
+            confirmVariant,
+            action: { type: 'command', command: 'admin:restore_member' },
+          } as unknown as ButtonConfig,
+          { pid: 'MEMBER-1' },
+        );
+      });
+      expect(result.current.error).toBe('Operation failed');
+      expect(showToast).toHaveBeenCalledWith('Operation failed', 'error');
+      expect(confirmMock).not.toHaveBeenCalled();
+      expect(fetchResultMock).not.toHaveBeenCalled();
+      expect(result.current.loading).toBe(false);
+    },
+  );
 });
 
 describe('useActionHandler dynamic choices fail before submission', () => {
-  const field = { field: 'selection', type: 'select', required: true,
-    dataSource: { type: 'api', endpoint: '/api/example/choices' } };
-  it.each(['command', 'state_transition'])('reports a rejected choice read for %s without executing the command', async type => {
-    fetchResultMock.mockReset();
-    if (type === 'command') fetchResultMock.mockResolvedValueOnce({ code: '0', data: { pid: 'example-1', row_version: 1 } });
-    fetchResultMock.mockResolvedValue({ code: '35000', httpStatus: 400,
-      context: { exception: 'BusinessException', detail: 'Review the classification before continuing.' }, data: null });
-    const showToast = vi.fn();
-    const { result } = renderHook(() => useActionHandler({ runtime: makeRuntime(), navigate: vi.fn() as any,
-      tableName: 'example', locale: 'en-US', t: key => key, showToast }));
-    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
-    window.addEventListener('dialog:form', dialog);
-    try {
-      await act(async () => { await result.current.handleAction({ code: 'example-update',
-        action: { type, command: 'example:update', inputFields: [field] },
-      } as unknown as ButtonConfig, { pid: 'example-1', row_version: 1 }); });
-      expect(result.current.error).toBe('Review the classification before continuing.');
-      expect(showToast).toHaveBeenCalledWith('Review the classification before continuing.', 'error');
-      expect(dialog).not.toHaveBeenCalled();expect(fetchResultMock).toHaveBeenCalledTimes(type === 'command' ? 2 : 1);
-      expect(fetchResultMock.mock.calls.at(-1)?.[0]).toBe('/api/example/choices');
-      expect(result.current.loading).toBe(false);
-    } finally { window.removeEventListener('dialog:form', dialog); }
-  });
-  it.each(['command', 'state_transition'])('keeps actual dialog cancellation silent for %s', async type => {
-    fetchResultMock.mockReset();
-    if (type === 'command') fetchResultMock.mockResolvedValueOnce({ code: '0', data: { pid: 'example-1', row_version: 1 } });
-    fetchResultMock.mockResolvedValue({ code: '0', data: [] });
-    const showToast = vi.fn();
-    const { result } = renderHook(() => useActionHandler({ runtime: makeRuntime(), navigate: vi.fn() as any,
-      tableName: 'example', locale: 'en-US', t: key => key, showToast }));
-    const cancel = (event: Event) => (event as CustomEvent).detail.onCancel();
-    window.addEventListener('dialog:form', cancel);
-    try {
-      await act(async () => { await result.current.handleAction({ code: 'example-update',
-        action: { type, command: 'example:update', inputFields: [field] },
-      } as unknown as ButtonConfig, { pid: 'example-1', row_version: 1 }); });
-      expect(result.current.error).toBeNull();expect(showToast).not.toHaveBeenCalled();
-      expect(fetchResultMock).toHaveBeenCalledTimes(type === 'command' ? 2 : 1);expect(result.current.loading).toBe(false);
-    } finally { window.removeEventListener('dialog:form', cancel); }
-  });
+  const field = {
+    field: 'selection',
+    type: 'select',
+    required: true,
+    dataSource: { type: 'api', endpoint: '/api/example/choices' },
+  };
+  it.each(['command', 'state_transition'])(
+    'reports a rejected choice read for %s without executing the command',
+    async (type) => {
+      fetchResultMock.mockReset();
+      if (type === 'command')
+        fetchResultMock.mockResolvedValueOnce({
+          code: '0',
+          data: { pid: 'example-1', row_version: 1 },
+        });
+      fetchResultMock.mockResolvedValue({
+        code: '35000',
+        httpStatus: 400,
+        context: {
+          exception: 'BusinessException',
+          detail: 'Review the classification before continuing.',
+        },
+        data: null,
+      });
+      const showToast = vi.fn();
+      const { result } = renderHook(() =>
+        useActionHandler({
+          runtime: makeRuntime(),
+          navigate: vi.fn() as any,
+          tableName: 'example',
+          locale: 'en-US',
+          t: (key) => key,
+          showToast,
+        }),
+      );
+      const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+      window.addEventListener('dialog:form', dialog);
+      try {
+        await act(async () => {
+          await result.current.handleAction(
+            {
+              code: 'example-update',
+              action: { type, command: 'example:update', inputFields: [field] },
+            } as unknown as ButtonConfig,
+            { pid: 'example-1', row_version: 1 },
+          );
+        });
+        expect(result.current.error).toBe('Review the classification before continuing.');
+        expect(showToast).toHaveBeenCalledWith(
+          'Review the classification before continuing.',
+          'error',
+        );
+        expect(dialog).not.toHaveBeenCalled();
+        expect(fetchResultMock).toHaveBeenCalledTimes(type === 'command' ? 2 : 1);
+        expect(fetchResultMock.mock.calls.at(-1)?.[0]).toBe('/api/example/choices');
+        expect(result.current.loading).toBe(false);
+      } finally {
+        window.removeEventListener('dialog:form', dialog);
+      }
+    },
+  );
+  it.each(['command', 'state_transition'])(
+    'keeps actual dialog cancellation silent for %s',
+    async (type) => {
+      fetchResultMock.mockReset();
+      if (type === 'command')
+        fetchResultMock.mockResolvedValueOnce({
+          code: '0',
+          data: { pid: 'example-1', row_version: 1 },
+        });
+      fetchResultMock.mockResolvedValue({ code: '0', data: [] });
+      const showToast = vi.fn();
+      const { result } = renderHook(() =>
+        useActionHandler({
+          runtime: makeRuntime(),
+          navigate: vi.fn() as any,
+          tableName: 'example',
+          locale: 'en-US',
+          t: (key) => key,
+          showToast,
+        }),
+      );
+      const cancel = (event: Event) => (event as CustomEvent).detail.onCancel();
+      window.addEventListener('dialog:form', cancel);
+      try {
+        await act(async () => {
+          await result.current.handleAction(
+            {
+              code: 'example-update',
+              action: { type, command: 'example:update', inputFields: [field] },
+            } as unknown as ButtonConfig,
+            { pid: 'example-1', row_version: 1 },
+          );
+        });
+        expect(result.current.error).toBeNull();
+        expect(showToast).not.toHaveBeenCalled();
+        expect(fetchResultMock).toHaveBeenCalledTimes(type === 'command' ? 2 : 1);
+        expect(result.current.loading).toBe(false);
+      } finally {
+        window.removeEventListener('dialog:form', cancel);
+      }
+    },
+  );
 });

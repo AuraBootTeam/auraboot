@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
+import com.auraboot.framework.meta.constant.CommandResultCachePolicy;
 import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandIdempotencyIntent;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
@@ -31,11 +32,13 @@ public class IdempotencyPhase implements CommandPhase {
 
     @Override
     public boolean shouldSkip(CommandPipelineContext ctx) {
-        return !StringUtils.hasText(ctx.getRequest().getClientRequestId());
+        return !CommandResultCachePolicy.enabled(ctx.getExecConfig())
+                || !StringUtils.hasText(ctx.getRequest().getClientRequestId());
     }
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        if (shouldSkip(ctx)) return;
         Map<String, Object> intent = CommandIdempotencyIntent.snapshot(ctx);
         ctx.setIdempotencyIntent(intent);
         Map<String, Object> cachedResult = idempotencyService.claimScopedIdempotency(

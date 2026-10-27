@@ -84,6 +84,7 @@ describe('Actual Detail→canonical BlockRenderer→FormButtons selected-row tra
     });
     const evaluator = new ExpressionEvaluator();
     const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.bindStateManager(state, 'detail');
     owned.manager = manager;
     manager.register('shipmentDraftRows', {
       type: 'api',

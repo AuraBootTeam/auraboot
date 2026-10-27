@@ -1,3 +1,4 @@
+import { findListFilterTabsBlock } from './listSchemaPolicy';
 import { internalRequest } from '~/shared/services/http-client/internal-api';
 import { dictionaryData } from '~/shared/services/dict-adapter';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -353,7 +354,7 @@ export function useListMetadata(
   // Get current tab filter as QueryCondition (if tabs block exists)
   const getTabFilter = useCallback((): ListQueryFilterCondition | null => {
     if (!schema?.blocks) return null;
-    const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
+    const tabsBlock = findListFilterTabsBlock(schema.blocks);
     if (!tabsBlock?.tabs) return null;
     const currentTab = (tabsBlock.tabs as any[]).find((tab: any) => tab.key === activeTab);
     if (!currentTab?.filter) return null;

@@ -275,6 +275,7 @@ public class CommandDefinitionDTO {
             if (executionConfig.timeout != null) config.put("timeout", executionConfig.timeout);
             if (executionConfig.retryPolicy != null) config.put("retryPolicy", executionConfig.retryPolicy);
             if (executionConfig.requireIdempotencyKey != null) config.put("requireIdempotencyKey", executionConfig.requireIdempotencyKey);
+            if (executionConfig.cacheResult != null) config.put("cacheResult", executionConfig.cacheResult);
             if (executionConfig.processKey != null) config.put("processKey", executionConfig.processKey);
             if (executionConfig.options != null) config.put("options", executionConfig.options);
         }
@@ -317,6 +318,29 @@ public class CommandDefinitionDTO {
         private Long timeout;
         private Map<String, Object> retryPolicy;
         private Boolean requireIdempotencyKey;
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = CacheResultDeserializer.class)
+        private Boolean cacheResult;
+
+        public static class CacheResultDeserializer extends com.fasterxml.jackson.databind.JsonDeserializer<Boolean> {
+            @Override
+            public Boolean deserialize(com.fasterxml.jackson.core.JsonParser parser,
+                    com.fasterxml.jackson.databind.DeserializationContext context) throws java.io.IOException {
+                if (parser.currentToken() == com.fasterxml.jackson.core.JsonToken.VALUE_TRUE) return true;
+                if (parser.currentToken() == com.fasterxml.jackson.core.JsonToken.VALUE_FALSE) return false;
+                throw com.fasterxml.jackson.databind.JsonMappingException.from(parser, "cacheResult must be a boolean");
+            }
+
+            @Override
+            public Boolean getAbsentValue(com.fasterxml.jackson.databind.DeserializationContext context) {
+                return null;
+            }
+
+            @Override
+            public Boolean getNullValue(com.fasterxml.jackson.databind.DeserializationContext context)
+                    throws com.fasterxml.jackson.databind.JsonMappingException {
+                throw com.fasterxml.jackson.databind.JsonMappingException.from(context.getParser(), "cacheResult must be a boolean");
+            }
+        }
         private String processKey;
         private Map<String, Object> options;
     }

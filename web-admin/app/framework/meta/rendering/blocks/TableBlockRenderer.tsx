@@ -1,3 +1,4 @@
+import { resolveRowActionModel } from './rowActionModel';
 import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { Pagination } from '~/ui/Pagination';
 import { readServerTablePage, ServerTablePageError, type ServerTablePage } from './serverTablePage';
@@ -174,8 +175,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
   const { token, hasPermission } = useAuth();
-  const schema = runtime.getSchema();
-  const tableName = (schema as any).modelCode || schema.id || '';
+  const tableName = resolveRowActionModel(block, runtime);
 
   const { handleAction: dispatchAction } = useActionHandler({
     runtime,
@@ -308,36 +308,68 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
   const paging = block.table?.pagination;
   const serverPaging = paging?.mode === 'server';
-  const pagingAttempt = useRef<{ pageNum: number; pageSize: number } | null>(null);
-  const parentPid = getLegacyCompatibleRecordPid((context as any).record);
-  useEffect(() => { pagingAttempt.current = null; }, [runtime, dataSourceId, parentPid]);
+  const pagingAttempt = useRef<{ pageNum: number; pageSize: number; parentPid: string | undefined } | null>(null);
+  const parentPid = getLegacyCompatibleRecordPid((context as any).record) || (context as any).$page?.recordPid;
+  useEffect(() => {
+    pagingAttempt.current = null;
+  }, [runtime, dataSourceId, parentPid]);
   let serverPage: ServerTablePage | undefined;
   let pagingInvalid = false;
   if (serverPaging && dataSourceId) {
     const page = dataSourceManager.getData(dataSourceId);
     if (page !== undefined && page !== null) {
-      try { serverPage = readServerTablePage(page, paging?.pageField); }
-      catch (failure) { if (!(failure instanceof ServerTablePageError)) throw failure; pagingInvalid = true; }
+      try {
+        serverPage = readServerTablePage(page, paging?.pageField);
+        const localAttempt = pagingAttempt.current;
+        const attempt = dataSourceState?.requestedPage ??
+          (localAttempt?.parentPid === parentPid ? localAttempt : undefined);
+        if (attempt && !dataSourceState?.loading && !dataSourceState?.error &&
+          (serverPage.current !== attempt.pageNum || serverPage.pageSize !== attempt.pageSize)) {
+          pagingInvalid = true;
+        }
+      } catch (failure) {
+        if (!(failure instanceof ServerTablePageError)) throw failure;
+        pagingInvalid = true;
+      }
     }
   }
   const runPageRequest = (params: { pageNum: number; pageSize: number }, force = false) => {
     if (!dataSourceId) return;
-    pagingAttempt.current = params;
+    pagingAttempt.current = { ...params, parentPid };
     // The subscribed data source preserves its error and last accepted rows; this UI boundary retains diagnostics.
-    void dataSourceManager.fetch(dataSourceId, params, { force }).catch(failure => console.error('Table page request failed', failure));
+    void dataSourceManager
+      .fetch(dataSourceId, params, { force })
+      .catch((failure) => console.error('Table page request failed', failure));
   };
   const retryDataSource = () => {
     if (!dataSourceId) return;
-    if (serverPaging && pagingAttempt.current) runPageRequest(pagingAttempt.current, true);
-    else void dataSourceManager.reload(dataSourceId);
+    if (serverPaging && dataSourceState?.requestedPage) {
+      runPageRequest(dataSourceState.requestedPage, true);
+    } else if (serverPaging && pagingAttempt.current?.parentPid === parentPid && pagingAttempt.current) {
+      runPageRequest({ pageNum: pagingAttempt.current.pageNum, pageSize: pagingAttempt.current.pageSize }, true);
+    } else void dataSourceManager.reload(dataSourceId);
   };
   const acceptedPage = serverPage;
   const pagination = acceptedPage ? (
-    <fieldset disabled={Boolean(dataSourceState?.loading)} aria-busy={Boolean(dataSourceState?.loading)} className="m-0 min-w-0 border-0 p-0" data-testid="table-server-pagination">
-      <Pagination alwaysVisible compact current={acceptedPage.current} pageSize={acceptedPage.pageSize} total={acceptedPage.total} t={t}
-        pageSizeOptions={paging?.pageSizeOptions} showPageSizeSelector={paging?.showSizeChanger !== false} showQuickJumper={paging?.showQuickJumper}
-        onChange={pageNum => runPageRequest({ pageNum, pageSize: acceptedPage.pageSize })}
-        onPageSizeChange={pageSize => runPageRequest({ pageNum: 1, pageSize })} />
+    <fieldset
+      disabled={Boolean(dataSourceState?.loading)}
+      aria-busy={Boolean(dataSourceState?.loading)}
+      className="m-0 min-w-0 border-0 p-0"
+      data-testid="table-server-pagination"
+    >
+      <Pagination
+        alwaysVisible
+        compact
+        current={acceptedPage.current}
+        pageSize={acceptedPage.pageSize}
+        total={acceptedPage.total}
+        t={t}
+        pageSizeOptions={paging?.pageSizeOptions}
+        showPageSizeSelector={paging?.showSizeChanger !== false}
+        showQuickJumper={paging?.showQuickJumper}
+        onChange={(pageNum) => runPageRequest({ pageNum, pageSize: acceptedPage.pageSize })}
+        onPageSizeChange={(pageSize) => runPageRequest({ pageNum: 1, pageSize })}
+      />
     </fieldset>
   ) : null;
   const dataSourceError = dataSourceState?.error as any;
@@ -709,8 +741,13 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       return String(enrichedDisplayValue);
     }
 
-    if (column.emptyText !== undefined && (value === null || value === undefined || value === ''
-      || (Array.isArray(value) && value.length === 0))) {
+    if (
+      column.emptyText !== undefined &&
+      (value === null ||
+        value === undefined ||
+        value === '' ||
+        (Array.isArray(value) && value.length === 0))
+    ) {
       return <span className="text-text-3">{getLocalizedText(column.emptyText, locale, t)}</span>;
     }
 
@@ -773,7 +810,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
         if (item && typeof item.label === 'string' && item.label.trim()) {
-          const tone = resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined);
+          const tone = resolveStatusTone(
+            typeof item.extension?.color === 'string' ? item.extension.color : undefined,
+          );
           if (column.renderType === 'status-pill') {
             return renderStatusPill(tone, item.label);
           }
@@ -839,7 +878,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       case 'date':
       case 'datetime':
         return cellRendererRegistry.render(column.valueType, {
-          value, record: row, column: { ...column, timezone, dateTimeFormats } as any, locale, t,
+          value,
+          record: row,
+          column: { ...column, timezone, dateTimeFormats } as any,
+          locale,
+          t,
         } as any);
 
       case 'currency':
@@ -1291,7 +1334,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     setLocalSelectedRowKey(getRowIdentity(row));
   };
 
-  if (serverPaging && !dataSourceId) throw new Error('Server table pagination requires an explicit data source');
+  if (serverPaging && !dataSourceId)
+    throw new Error('Server table pagination requires an explicit data source');
 
   if (dataSourceState?.loading && rawData.length === 0) {
     return (
@@ -1310,10 +1354,18 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   if (pagingInvalid) {
     const key = 'table.pagination.invalid_response';
-    return <div role="alert" data-testid="table-page-contract-error" className="border-border bg-panel text-text rounded-control border p-4">
-      {t(key) !== key ? t(key) : 'Page information is unavailable. Refresh to try again.'}
-      <button type="button" className="ml-3 underline" onClick={retryDataSource}>{stateTitle('retry', t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry')}</button>
-    </div>;
+    return (
+      <div
+        role="alert"
+        data-testid="table-page-contract-error"
+        className="border-border bg-panel text-text rounded-control border p-4"
+      >
+        {t(key) !== key ? t(key) : 'Page information is unavailable. Refresh to try again.'}
+        <button type="button" className="ml-3 underline" onClick={retryDataSource}>
+          {stateTitle('retry', t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry')}
+        </button>
+      </div>
+    );
   }
 
   if (dataSourceError && (accessDenied || rawData.length === 0)) {
@@ -1354,7 +1406,14 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       className="border-warning/30 bg-warning/5 text-text mb-2 rounded-lg border px-4 py-2 text-sm"
     >
       {stateTitle('stale', 'Showing preserved data because refresh failed. Retry before acting.')}
-      <button type="button" data-testid="table-stale-retry" className="ml-3 underline" onClick={retryDataSource}>{stateTitle('retry', t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry')}</button>
+      <button
+        type="button"
+        data-testid="table-stale-retry"
+        className="ml-3 underline"
+        onClick={retryDataSource}
+      >
+        {stateTitle('retry', t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry')}
+      </button>
     </div>
   ) : null;
 
@@ -1497,6 +1556,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                   <tr
                     key={rowIdentity}
                     data-testid={`table-row-${rowIdentity}`}
+                    data-record-pid={getLegacyCompatibleRecordPid(row)}
                     onClick={() => handleRowClick(row, index)}
                     className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${rowClassName(row)} ${
                       selectionConfig?.bind ? 'cursor-pointer' : ''

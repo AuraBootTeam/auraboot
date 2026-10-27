@@ -14,6 +14,25 @@ class ExecutionConfigValidatorTest {
     private final ExecutionConfigValidator validator = new ExecutionConfigValidator();
 
     @Test
+    void resultCachePolicyIsValidatedOnConsolidatedExecutionMetadata() {
+        var cmd = command("query");
+        var config = new CommandDefinitionDTO.ExecutionConfig();
+        config.setCacheResult(false);
+        cmd.setExecutionConfig(config);
+        assertEquals(List.of(), validate(List.of(cmd)));
+        config.setRequireIdempotencyKey(true);
+        assertEquals("S-EXEC-RESULT-CACHE", validate(List.of(cmd)).get(0).getCode());
+        config.setRequireIdempotencyKey(false);
+        cmd.setType("update");
+        assertEquals("commands[0].executionConfig.cacheResult", validate(List.of(cmd)).get(0).getPath());
+        config.setCacheResult(true);
+        assertEquals(List.of(), validate(List.of(cmd)));
+        cmd.setType("query"); config.setCacheResult(false);
+        cmd.setHandlerParams(Map.of("targetRecordAction", "update"));
+        assertTrue(validate(List.of(cmd)).get(0).isError());
+    }
+
+    @Test
     void missingCommandsNullEntriesAndNoConfigurationAreAccepted() {
         assertEquals("semantic", validator.category());
         assertEquals(List.of(), validate(null));

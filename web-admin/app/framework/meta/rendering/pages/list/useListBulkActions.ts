@@ -1,3 +1,9 @@
+import {
+  commandBusinessRejectionError,
+  createPromptSubmissionFeedback,
+  hasAsyncCommandReceipt,
+} from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
+import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
 import React, { useCallback } from 'react';
 import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
@@ -26,6 +32,12 @@ import {
   type SelectionState,
 } from './selectionModel';
 
+interface BulkPromptOutcome {
+  successCount: number;
+  failures: BulkActionFailure[];
+  firstError?: unknown;
+  acceptedReceipt?: unknown;
+}
 interface ListBulkActionsInput {
   setImportOpen: React.Dispatch<React.SetStateAction<boolean>>;
   loadData: (params?: ListLoadDataParams) => Promise<void>;
@@ -118,11 +130,14 @@ export function useListBulkActions({
       ids: string[],
       payload: Record<string, unknown>,
       operationType: 'UPDATE' | 'DELETE' = 'UPDATE',
+      onOutcome?: (outcome: BulkPromptOutcome) => void,
     ) => {
       const label = resolveButtonLabel(button);
       const isZhLocale = locale.toLowerCase().startsWith('zh');
       let successCount = 0;
       const failures: BulkActionFailure[] = [];
+      let firstError: unknown = undefined,
+        acceptedReceipt: unknown = undefined;
       const recordLabelById = new Map(
         data.map((record) => {
           const id = getPublicRecordKey(record) || '';
@@ -144,16 +159,23 @@ export function useListBulkActions({
             },
             token: token || undefined,
           });
-          if (ResultHelper.isSuccess(result)) {
+          if (ResultHelper.isSuccess(result) && !commandBusinessRejectionError(result)) {
             successCount += 1;
+            if (hasAsyncCommandReceipt(result.data)) acceptedReceipt ??= result.data;
           } else {
+            firstError ??=
+              commandBusinessRejectionError(result) ??
+              commandExecutionError(result, command, t, locale);
             failures.push({
               recordPid: id,
               recordLabel: recordLabelById.get(id) || id,
-              reason: resolveCommandErrorMessage(result, command, t),
+              reason:
+                commandBusinessRejectionError(result)?.message ??
+                resolveCommandErrorMessage(result, command, t),
             });
           }
         } catch (error) {
+          firstError ??= error;
           failures.push({
             recordPid: id,
             recordLabel: recordLabelById.get(id) || id,
@@ -162,12 +184,24 @@ export function useListBulkActions({
         }
       }
 
+      const outcome = { successCount, failures, firstError, acceptedReceipt };
+      onOutcome?.(outcome);
       if (successCount > 0) {
         setSelectionState(selectionClearSelection);
         await loadData({ page: 0, size: pagination.pageSize, filters });
       }
 
-      if (failures.length === 0) {
+      if (
+        acceptedReceipt &&
+        (button.action as any)?.inputFieldsPresentation?.waitForResult === true
+      ) {
+        showToast(
+          isZhLocale
+            ? `已受理 ${successCount} 条请求，拒绝 ${failures.length} 条；请刷新核对最终结果。`
+            : `${successCount} requests accepted; ${failures.length} rejected. Refresh to review final results.`,
+          failures.length > 0 ? 'warning' : 'info',
+        );
+      } else if (failures.length === 0) {
         showToast(
           translateOrFallback(
             t,
@@ -193,6 +227,7 @@ export function useListBulkActions({
         );
         setBulkActionResult({ actionLabel: label, successCount, failures });
       }
+      return outcome;
     },
     [data, filters, loadData, locale, pagination.pageSize, resolveButtonLabel, showToast, t, token],
   );
@@ -252,107 +287,156 @@ export function useListBulkActions({
         if (!confirmed) return;
       }
 
-      let commandPayload: Record<string, unknown> = {};
-      const inputFields = Array.isArray((actionDef as any)?.inputFields)
-        ? (actionDef as any).inputFields
-        : [];
-      if (inputFields.length > 0) {
-        try {
-          commandPayload = await promptInputForm(
-            inputFields,
-            (actionDef as any)?.inputFieldsTitle,
-            fetchResult,
-            (actionDef as any)?.inputFieldsSubmitLabel,
-            {
-              selectedCount: ids.length,
-              selectedIds: ids,
-              modelCode,
+      const submissionFeedback = createPromptSubmissionFeedback({ t, locale });
+      try {
+        let commandPayload: Record<string, unknown> = {};
+        const inputFields = Array.isArray((actionDef as any)?.inputFields)
+          ? (actionDef as any).inputFields
+          : [];
+        if (inputFields.length > 0) {
+          try {
+            commandPayload = await promptInputForm(
+              inputFields,
+              (actionDef as any)?.inputFieldsTitle,
+              fetchResult,
+              (actionDef as any)?.inputFieldsSubmitLabel,
+              {
+                selectedCount: ids.length,
+                selectedIds: ids,
+                modelCode,
+              },
+              { t, locale },
+              (actionDef as any)?.inputFieldsPresentation,
+              undefined,
+              submissionFeedback,
+            );
+          } catch {
+            return;
+          }
+        }
+
+        if (actionType === 'bulk_state_transition' || actionType === 'bulk_record_command') {
+          await executeTargetedBulkCommand(
+            button,
+            ids,
+            commandPayload,
+            (actionDef as any)?.operationType || 'UPDATE',
+            (outcome) => {
+              if (outcome.failures.length > 0) {
+                const prefix =
+                  outcome.successCount > 0
+                    ? locale.toLowerCase().startsWith('zh')
+                      ? `已有 ${outcome.successCount} 条请求被接受；`
+                      : `${outcome.successCount} requests accepted; `
+                    : '';
+                submissionFeedback.fail(
+                  outcome.firstError ?? new Error(outcome.failures[0].reason),
+                  prefix + outcome.failures[0].reason,
+                );
+              } else submissionFeedback.completeResult(outcome.acceptedReceipt);
             },
           );
-        } catch {
           return;
         }
-      }
 
-      if (actionType === 'bulk_state_transition' || actionType === 'bulk_record_command') {
-        await executeTargetedBulkCommand(
-          button,
-          ids,
-          commandPayload,
-          (actionDef as any)?.operationType || 'UPDATE',
-        );
-        return;
-      }
+        const label = resolveButtonLabel(button);
+        const isZhLocale = locale.toLowerCase().startsWith('zh');
+        let successCount = 0;
+        const failures: BulkActionFailure[] = [];
+        let acceptedReceipt: unknown = undefined;
 
-      const label = resolveButtonLabel(button);
-      const isZhLocale = locale.toLowerCase().startsWith('zh');
-      let successCount = 0;
-      const failures: BulkActionFailure[] = [];
-
-      if (actionType === 'bulk_command') {
-        const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
-          method: 'post',
-          params: {
-            payload: {
-              recordPids: ids,
-              selectedIds: ids,
-              modelCode,
+        if (actionType === 'bulk_command') {
+          const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+            method: 'post',
+            params: {
+              payload: {
+                recordPids: ids,
+                selectedIds: ids,
+                modelCode,
+              },
             },
-          },
-          token: token || undefined,
-        });
-        if (ResultHelper.isSuccess(result)) {
-          successCount = ids.length;
-        } else {
-          failures.push({
-            recordPid: command,
-            recordLabel: command,
-            reason: resolveCommandErrorMessage(result, command, t),
+            token: token || undefined,
           });
+          if (ResultHelper.isSuccess(result) && !commandBusinessRejectionError(result)) {
+            successCount = ids.length;
+            if (hasAsyncCommandReceipt(result.data)) acceptedReceipt = result.data;
+            submissionFeedback.completeResult(result);
+          } else {
+            submissionFeedback.fail(
+              commandBusinessRejectionError(result) ??
+                commandExecutionError(result, command, t, locale),
+            );
+            failures.push({
+              recordPid: command,
+              recordLabel: command,
+              reason:
+                commandBusinessRejectionError(result)?.message ??
+                resolveCommandErrorMessage(result, command, t),
+            });
+          }
+        } else {
+          submissionFeedback.fail(
+            new Error(`Unsupported bulk action type: ${actionType || 'unknown'}`),
+          );
+          showToast(
+            translateOrFallback(
+              t,
+              'list.bulkAction.unsupported',
+              `Unsupported bulk action type: ${actionType || 'unknown'}`,
+            ),
+            'error',
+          );
+          return;
         }
-      } else {
-        showToast(
-          translateOrFallback(
-            t,
-            'list.bulkAction.unsupported',
-            `Unsupported bulk action type: ${actionType || 'unknown'}`,
-          ),
-          'error',
-        );
-        return;
-      }
 
-      if (successCount > 0) {
-        setSelectionState(selectionClearSelection);
-        await loadData({ page: 0, size: pagination.pageSize, filters });
-      }
+        if (successCount > 0) {
+          setSelectionState(selectionClearSelection);
+          await loadData({ page: 0, size: pagination.pageSize, filters });
+        }
 
-      if (failures.length === 0) {
-        showToast(
-          translateOrFallback(
-            t,
-            'list.bulkAction.success',
+        if (
+          acceptedReceipt &&
+          failures.length === 0 &&
+          (actionDef as any)?.inputFieldsPresentation?.waitForResult === true
+        ) {
+          showToast(
             isZhLocale
-              ? `${label}已完成，成功 ${successCount} 条`
-              : `${label} completed for ${successCount} records`,
-          ),
-          'success',
-        );
-      } else if (successCount > 0) {
-        showToast(
-          translateOrFallback(
-            t,
-            'list.bulkAction.partial',
-            isZhLocale
-              ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
-              : `${label} completed for ${successCount} records; ${failures.length} failed`,
-          ),
-          'warning',
-        );
-        setBulkActionResult({ actionLabel: label, successCount, failures });
-      } else {
-        showToast(failures[0]?.reason || `${label} failed`, 'error');
-        setBulkActionResult({ actionLabel: label, successCount, failures });
+              ? '命令已受理，请刷新核对执行结果。'
+              : 'Commands accepted. Refresh to review their final results.',
+            'info',
+          );
+        } else if (failures.length === 0) {
+          showToast(
+            translateOrFallback(
+              t,
+              'list.bulkAction.success',
+              isZhLocale
+                ? `${label}已完成，成功 ${successCount} 条`
+                : `${label} completed for ${successCount} records`,
+            ),
+            'success',
+          );
+        } else if (successCount > 0) {
+          showToast(
+            translateOrFallback(
+              t,
+              'list.bulkAction.partial',
+              isZhLocale
+                ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
+                : `${label} completed for ${successCount} records; ${failures.length} failed`,
+            ),
+            'warning',
+          );
+          setBulkActionResult({ actionLabel: label, successCount, failures });
+        } else {
+          showToast(failures[0]?.reason || `${label} failed`, 'error');
+          setBulkActionResult({ actionLabel: label, successCount, failures });
+        }
+      } catch (error) {
+        submissionFeedback.fail(error);
+        throw error;
+      } finally {
+        submissionFeedback.finalize();
       }
     },
     [

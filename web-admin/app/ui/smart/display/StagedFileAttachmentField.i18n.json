@@ -1,0 +1,35 @@
+{
+  "add": { "zh-CN": "选择附件", "en-US": "Choose attachments" },
+  "pending": { "zh-CN": "上传中…", "en-US": "Uploading…" },
+  "uploaded": { "zh-CN": "已上传，待随表单保存", "en-US": "Uploaded; awaiting form submission" },
+  "failed": {
+    "zh-CN": "上传失败，文件仍保留",
+    "en-US": "Upload failed; the selection is retained"
+  },
+  "tooLarge": {
+    "zh-CN": "超出单文件大小限制，请移除或另选文件",
+    "en-US": "File exceeds the size limit; remove or replace it"
+  },
+  "wrongType": {
+    "zh-CN": "不支持此文件类型，请移除或另选文件",
+    "en-US": "Unsupported file type; remove or replace it"
+  },
+  "tooMany": {
+    "zh-CN": "附件数量超限，本次选择未上传，请移除多余文件后重试",
+    "en-US": "Too many files; this selection was not uploaded. Remove excess files and retry"
+  },
+  "retry": { "zh-CN": "重试上传", "en-US": "Retry upload" },
+  "remove": { "zh-CN": "移除", "en-US": "Remove" },
+  "resolve": {
+    "zh-CN": "请逐项重试或移除失败文件后再提交。已成功的文件会保留。",
+    "en-US": "Retry or remove each failed file before submitting. Successful files are retained."
+  },
+  "staging": {
+    "zh-CN": "上传不会保存本条业务记录；提交表单时才建立业务关联。",
+    "en-US": "Uploading does not save this record. Business references are created only when the form is submitted."
+  },
+  "invalid": {
+    "zh-CN": "附件配置或初始值无效，请联系管理员。",
+    "en-US": "The attachment configuration or initial value is invalid. Contact an administrator."
+  }
+}

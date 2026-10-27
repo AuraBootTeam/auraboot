@@ -1,3 +1,4 @@
+import { findListFilterTabsBlock } from './listSchemaPolicy';
 import React, { useEffect, useMemo, useState } from 'react';
 import { type ViewFilterConfig } from '~/framework/smart/types/savedView';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -50,7 +51,7 @@ export function useListWorkspaceTabs({
   schemaExtension,
 }: ListWorkspaceTabsInput) {
   const listTabsBlock = useMemo(() => {
-    const found = allBlocks.find((block: any) => block.blockType === 'tabs');
+    const found = findListFilterTabsBlock(allBlocks);
     return found;
   }, [allBlocks]);
 

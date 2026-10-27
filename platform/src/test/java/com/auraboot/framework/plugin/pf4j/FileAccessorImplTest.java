@@ -85,6 +85,17 @@ class FileAccessorImplTest {
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void legacyLinkChecksTheFieldBeforeLookupOrItsAlreadyLinkedShortCircuit() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("FIELD_WRITER_DENIED"))
+                .when(fileService).assertFileRelationMutationAllowed("order","parent","photos");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->new FileAccessorImpl(fileService,storageProvider,42L)
+                .linkExisting("uploaded","order","parent","photos")).hasMessageContaining("FIELD_WRITER_DENIED");
+        verify(fileService,org.mockito.Mockito.never()).getFileById(org.mockito.ArgumentMatchers.anyString());
+        verify(fileService,org.mockito.Mockito.never()).createFileRelation(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoInteractions(storageProvider);
+    }
+
     @Mock
     private FileService fileService;
 

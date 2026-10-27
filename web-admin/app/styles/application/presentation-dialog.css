@@ -1,0 +1,54 @@
+/* Shared opt-in presentation dialogs; legacy dialogs do not receive these classes. */
+.aura-dialog-presentation {
+  box-sizing: border-box;
+  padding: var(--dialog-padding, 30px);
+}
+.aura-dialog-presentation__backdrop {
+  background: var(--dialog-backdrop, #0e293a68);
+  backdrop-filter: blur(var(--dialog-backdrop-blur, 3px));
+}
+.aura-dialog-presentation__panel {
+  width: var(--dialog-width, 600px);
+  max-width: 100%;
+  max-height: var(--dialog-max-height, 90vh);
+  margin: 0;
+  border-radius: var(--dialog-radius, 14px);
+  background: var(--color-panel, #fff);
+  box-shadow: var(--dialog-shadow, 0 20px 100px #0b253d33);
+}
+.aura-dialog-presentation__header {
+  padding: var(--dialog-header-padding, 20px 24px);
+  border-color: var(--color-border, #e3e9ed);
+}
+.aura-dialog-presentation__header > :is(h2, h3) {
+  font-size: var(--dialog-title-size, 17px);
+  color: var(--color-text, #17343d);
+}
+.aura-dialog-presentation__body {
+  padding: var(--dialog-body-padding, 22px 24px);
+}
+.aura-dialog-presentation__footer {
+  align-items: center;
+  gap: var(--dialog-footer-gap, 9px);
+  padding: var(--dialog-footer-padding, 16px 24px);
+  border-color: var(--color-border, #e3e9ed);
+}
+@media (max-width: 700px) {
+  .aura-dialog-presentation {
+    padding: var(--dialog-mobile-padding, 10px);
+  }
+  .aura-dialog-presentation__panel {
+    max-height: var(--dialog-mobile-max-height, 94vh);
+    border-radius: var(--dialog-mobile-radius, 10px);
+  }
+  .aura-dialog-presentation__header {
+    padding: var(--dialog-mobile-header-padding, 16px);
+  }
+  .aura-dialog-presentation__body {
+    padding: var(--dialog-mobile-body-padding, 16px);
+  }
+  .aura-dialog-presentation__footer {
+    padding: var(--dialog-mobile-footer-padding, 13px 16px);
+    flex-wrap: wrap;
+  }
+}

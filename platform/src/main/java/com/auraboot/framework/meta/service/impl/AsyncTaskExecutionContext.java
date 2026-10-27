@@ -6,6 +6,8 @@ public final class AsyncTaskExecutionContext {
     public record Snapshot(Long taskId,String taskCode,Long tenantId,Long createdBy,String token) {}
     private static final ThreadLocal<Snapshot> CURRENT=new ThreadLocal<>();
 
+    public static boolean isActive() { return CURRENT.get() != null; }
+
     public static Snapshot require() {
         Snapshot snapshot=CURRENT.get();
         if(snapshot==null) throw new IllegalStateException("No claimed asynchronous execution context");

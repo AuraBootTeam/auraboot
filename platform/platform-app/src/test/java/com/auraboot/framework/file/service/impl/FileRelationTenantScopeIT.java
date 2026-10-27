@@ -43,7 +43,32 @@ class FileRelationTenantScopeIT {
     private static final long TENANT_B = 991_930_011L;
     private static final long USER_B = 991_930_012L;
 
-    private static final String ENTITY_TYPE = "quote_export_it";
+    private String ENTITY_TYPE;
+    private String sharedRecord, anotherRecord, entityRecord, legacyRecord;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService models;
+    @Autowired private com.auraboot.framework.meta.service.SchemaManagementService schema;
+    @Autowired private com.auraboot.framework.meta.service.DynamicDataService data;
+
+    @org.junit.jupiter.api.BeforeAll
+    void initializeRealBusinessTarget() {
+        MetaContext.setContext(TENANT_A, USER_A, "owner", "owner");
+        ENTITY_TYPE = "file_rel_" + Long.toString(System.currentTimeMillis(),36);
+        models.saveDefinition(com.auraboot.framework.meta.dto.ModelDefinition.builder().code(ENTITY_TYPE)
+                .tableName("mt_"+ENTITY_TYPE).status("published").modelType("entity")
+                .fields(List.of(com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code(FIELD_NAME).columnName(FIELD_NAME).dataType("file").build())).build());
+        assertThat(schema.createTableByModel(ENTITY_TYPE).isSuccess()).isTrue();
+        sharedRecord = newParent(); anotherRecord = newParent(); entityRecord = newParent(); legacyRecord = newParent();
+        MetaContext.clear();
+    }
+
+    private String newParent() {
+        return MetaContext.runWithCommandPermitScope("ALL",()->data.create(ENTITY_TYPE, java.util.Map.of(FIELD_NAME,"[]")).get("pid").toString());
+    }
+
+    private boolean replace(FileRelationRequestDTO request, Long user) {
+        return MetaContext.runWithCommandPermitScope("ALL",()->fileService.createFileRelation(request,user));
+    }
     private static final String FIELD_NAME = "bom_workbook";
 
     @Autowired private FileService fileService;
@@ -86,32 +111,32 @@ class FileRelationTenantScopeIT {
         FileRelationRequestDTO request = new FileRelationRequestDTO();
         request.setFileIds(new String[]{filePid});
         request.setEntityType(ENTITY_TYPE);
-        request.setEntityId("shared-record");
+        request.setEntityId(sharedRecord);
         request.setFieldName(FIELD_NAME);
         MetaContext.setContext(TENANT_A, USER_A, "owner", "owner");
-        assertThat(fileService.createFileRelation(request, USER_A)).isTrue();
+        assertThat(replace(request, USER_A)).isTrue();
 
         long editor = USER_A + 1;
         MetaContext.setContext(TENANT_A, editor, "editor", "editor");
-        assertThat(fileService.createFileRelation(request, editor)).isTrue();
+        assertThat(replace(request, editor)).isTrue();
         assertThat(fileRelationMapper.findFileIdsByEntityAndField(
-                ENTITY_TYPE, "shared-record", FIELD_NAME)).containsExactly(fileId);
+                ENTITY_TYPE, sharedRecord, FIELD_NAME)).containsExactly(fileId);
 
-        request.setEntityId("another-record");
-        assertThatThrownBy(() -> fileService.createFileRelation(request, editor))
+        request.setEntityId(anotherRecord);
+        assertThatThrownBy(() -> replace(request, editor))
                 .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
-        request.setEntityId("shared-record");
+        request.setEntityId(sharedRecord);
         request.setFieldName("another_field");
-        assertThatThrownBy(() -> fileService.createFileRelation(request, editor))
+        assertThatThrownBy(() -> replace(request, editor))
                 .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
         assertThat(fileRelationMapper.findFileIdsByEntityAndField(
-                ENTITY_TYPE, "shared-record", FIELD_NAME)).containsExactly(fileId);
+                ENTITY_TYPE, sharedRecord, FIELD_NAME)).containsExactly(fileId);
 
         MetaContext.setContext(TENANT_B, USER_B, "other-tenant", "other-tenant");
         request.setFieldName(FIELD_NAME);
-        assertThatThrownBy(() -> fileService.createFileRelation(request, USER_B))
-                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
-        assertThat(fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "shared-record")).isEmpty();
+        assertThatThrownBy(() -> replace(request, USER_B))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, sharedRecord)).isEmpty();
     }
 
     @Test
@@ -122,9 +147,9 @@ class FileRelationTenantScopeIT {
             FileRelationRequestDTO request = new FileRelationRequestDTO();
             request.setFileIds(new String[]{filePid});
             request.setEntityType(ENTITY_TYPE);
-            request.setEntityId("entity-a-1");
+            request.setEntityId(entityRecord);
             request.setFieldName(FIELD_NAME);
-            assertThat(fileService.createFileRelation(request, USER_A)).isTrue();
+            assertThat(replace(request, USER_A)).isTrue();
 
             Boolean flaggedDeleted = jdbcTemplate.queryForObject(
                     "SELECT deleted_flag FROM ab_file_relation WHERE file_id = ?",
@@ -139,7 +164,7 @@ class FileRelationTenantScopeIT {
             assertThat(ownerView).hasSize(1);
             assertThat(ownerView.get(0).getTenantId()).isEqualTo(TENANT_A);
 
-            List<Long> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-a-1");
+            List<Long> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, entityRecord);
             assertThat(ownerIds).containsExactly(fileId);
         } finally {
             MetaContext.clear();
@@ -148,8 +173,8 @@ class FileRelationTenantScopeIT {
         MetaContext.setContext(TENANT_B, USER_B, "relscope-b", "relscope-b");
         try {
             assertThat(fileService.getFileRelations(filePid)).isEmpty();
-            assertThat(fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-a-1")).isEmpty();
-            assertThat(fileRelationMapper.findFileIdsByEntityAndField(ENTITY_TYPE, "entity-a-1", FIELD_NAME))
+            assertThat(fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, entityRecord)).isEmpty();
+            assertThat(fileRelationMapper.findFileIdsByEntityAndField(ENTITY_TYPE, entityRecord, FIELD_NAME))
                     .isEmpty();
         } finally {
             MetaContext.clear();
@@ -164,11 +189,11 @@ class FileRelationTenantScopeIT {
                         + "field_name, relation_type, sort_order, deleted_flag) "
                         + "VALUES (?, ?, ?, ?, ?, ?, 'ATTACHMENT', 0, false)",
                 "relscope-legacy-" + fileId, String.valueOf(fileId), TENANT_A,
-                ENTITY_TYPE, "entity-legacy-1", FIELD_NAME);
+                ENTITY_TYPE, legacyRecord, FIELD_NAME);
 
         MetaContext.setContext(TENANT_A, USER_A, "relscope-a", "relscope-a");
         try {
-            List<Long> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-legacy-1");
+            List<Long> ownerIds = fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, legacyRecord);
             assertThat(ownerIds).containsExactly(fileId);
         } finally {
             MetaContext.clear();
@@ -176,7 +201,7 @@ class FileRelationTenantScopeIT {
 
         MetaContext.setContext(TENANT_B, USER_B, "relscope-b", "relscope-b");
         try {
-            assertThat(fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, "entity-legacy-1")).isEmpty();
+            assertThat(fileRelationMapper.findFileIdsByEntity(ENTITY_TYPE, legacyRecord)).isEmpty();
         } finally {
             MetaContext.clear();
         }

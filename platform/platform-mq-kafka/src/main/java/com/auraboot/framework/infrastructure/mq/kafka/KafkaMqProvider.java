@@ -60,13 +60,59 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
     private final KafkaProducer<String, String> producer;
     private final DeadLetterQueueHandler deadLetterQueueHandler;
     private final Map<String, ConsumerEntry> consumers = new ConcurrentHashMap<>();
-    private boolean destroyed;
+    private final java.util.concurrent.locks.ReentrantLock closeLock = new java.util.concurrent.locks.ReentrantLock();
+    private final ThreadLocal<Boolean> producerCallback = new ThreadLocal<>();
+    private volatile boolean destroyed;
+    private volatile RuntimeException closeFailure;
+    private volatile Thread producerCloser;
+    private final CompletableFuture<Void> producerClosed = new CompletableFuture<>();
+
+    /** Failure never means the SDK's resources have terminated; supervisors retain this observation. */
+    public record CloseStatus(boolean requested, int liveConsumers, long producerCloserThreadId,
+                              boolean producerCloserAlive, boolean producerCleanupSucceeded, boolean successful) {}
+
+    public CloseStatus closeStatus() {
+        Thread closer = producerCloser;
+        int live = (int) consumers.values().stream().filter(entry -> entry.thread().isAlive()).count();
+        boolean producerSucceeded = producerClosed.isDone() && !producerClosed.isCompletedExceptionally();
+        return new CloseStatus(destroyed, live, closer == null ? 0 : closer.threadId(),
+                closer != null && closer.isAlive(), producerSucceeded,
+                destroyed && closeFailure == null && producerSucceeded && live == 0 && closer != null && !closer.isAlive());
+    }
+
+    /** Trusted, bounded producer budgets; no arbitrary producer configuration is exposed. */
+    public record ProducerTimeouts(Duration maxBlockTimeout, Duration requestTimeout, Duration deliveryTimeout) {
+        public ProducerTimeouts {
+            long block = boundedMillis(maxBlockTimeout), request = boundedMillis(requestTimeout);
+            long delivery = boundedMillis(deliveryTimeout);
+            if (delivery < request || block + delivery > 60_000)
+                throw new IllegalArgumentException("Delivery must cover request timeout within a 60-second total budget");
+        }
+
+        /** Split the total admission/delivery budget; delivery includes request time, with zero linger. */
+        public static ProducerTimeouts within(Duration operationTimeout) {
+            long total = boundedMillis(operationTimeout);
+            if (total < 2) throw new IllegalArgumentException("The producer operation budget must be at least two milliseconds");
+            long block = total / 2;
+            return new ProducerTimeouts(Duration.ofMillis(block), Duration.ofMillis(total - block),
+                    Duration.ofMillis(total - block));
+        }
+    }
 
     public KafkaMqProvider(MqProperties properties) {
+        this(properties, createProducer(properties.getKafka().getBootstrapServers()));
+    }
+
+    /** Explicit bounded construction for supervised callers; ordinary host configuration stays compatible. */
+    public KafkaMqProvider(MqProperties properties, ProducerTimeouts timeouts) {
+        this(properties, createProducer(properties.getKafka().getBootstrapServers(), Objects.requireNonNull(timeouts)));
+    }
+
+    private KafkaMqProvider(MqProperties properties, KafkaProducer<String, String> producer) {
         MqProperties.Kafka kafkaConfig = properties.getKafka();
         this.bootstrapServers = kafkaConfig.getBootstrapServers();
         this.defaultConsumerGroup = kafkaConfig.getConsumerGroup();
-        this.producer = createProducer(bootstrapServers);
+        this.producer = producer;
         MqProperties.Kafka.DeadLetter dl = kafkaConfig.getDeadLetter();
         this.deadLetterQueueHandler = new DeadLetterQueueHandler(
                 this.producer, dl.getTopicSuffix(), dl.getMaxAttempts(), dl.isEnabled());
@@ -127,13 +173,16 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         CompletableFuture<RecordMetadata> result = new CompletableFuture<>();
         try {
             producer.send(record, (metadata, error) -> {
-                if (error != null) {
-                    result.completeExceptionally(error);
-                } else if (metadata == null) {
-                    result.completeExceptionally(new IllegalStateException("Kafka acknowledgement has no metadata"));
-                } else {
-                    result.complete(metadata);
-                }
+                producerCallback.set(true);
+                try {
+                    if (error != null) {
+                        result.completeExceptionally(error);
+                    } else if (metadata == null) {
+                        result.completeExceptionally(new IllegalStateException("Kafka acknowledgement has no metadata"));
+                    } else {
+                        result.complete(metadata);
+                    }
+                } finally { producerCallback.remove(); }
             });
         } catch (RuntimeException error) {
             result.completeExceptionally(error);
@@ -275,42 +324,139 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
     }
 
     @Override
-    public synchronized void destroy() {
-        if (destroyed) {
-            return;
-        }
-        destroyed = true;
-        log.info("KafkaMqProvider shutting down: closing producer and {} consumer(s)", consumers.size());
+    public void destroy() { close(Duration.ofSeconds(5)); }
 
-        // Signal all consumers to stop
-        for (Map.Entry<String, ConsumerEntry> entry : consumers.entrySet()) {
-            entry.getValue().running().set(false);
-            Consumer<String, String> consumer = entry.getValue().consumer();
-            if (consumer != null) {
-                consumer.wakeup();
-            }
-        }
-
-        // Wait for consumer threads to finish
-        for (Map.Entry<String, ConsumerEntry> entry : consumers.entrySet()) {
-            try {
-                entry.getValue().thread().join(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("Interrupted while waiting for consumer thread: {}", entry.getKey());
-            }
-        }
-
-        consumers.clear();
-
-        // Close producer
+    /**
+     * Stop owned subscriptions and the producer under one cleanup deadline. Failure, interruption
+     * or a surviving consumer is observable; an earlier failed close never becomes a normal return.
+     */
+    public void close(Duration timeout) {
+        boundedMillis(timeout);
+        if (Boolean.TRUE.equals(producerCallback.get()))
+            throw new IllegalStateException("A producer callback cannot await its own Kafka close; use the supervising thread");
+        long deadline = System.nanoTime() + timeout.toNanos();
+        boolean interrupted = Thread.interrupted();
         try {
-            producer.close(Duration.ofSeconds(5));
-        } catch (Exception e) {
-            log.warn("Error closing Kafka producer", e);
+            boolean acquired;
+            try {
+                acquired = closeLock.tryLock(Math.max(0, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS);
+            } catch (InterruptedException error) {
+                interrupted = true;
+                throw new IllegalStateException("Waiting for Kafka close was interrupted", error);
+            }
+            if (!acquired) throw new IllegalStateException("Another Kafka close exceeded this caller's deadline");
+            try { closeOwned(deadline, interrupted); }
+            finally { closeLock.unlock(); }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
+    }
 
+    private void closeOwned(long deadline, boolean interrupted) {
+        List<ConsumerEntry> owned;
+        synchronized (this) {
+            if (destroyed) {
+                if (closeFailure != null) throw new IllegalStateException("An earlier Kafka close failed", closeFailure);
+                if (interrupted) throw new IllegalStateException("Kafka close was interrupted", new InterruptedException());
+                return;
+            }
+            destroyed = true;
+            closeFailure = new IllegalStateException("Kafka close has not completed");
+            owned = List.copyOf(consumers.values());
+        }
+        RuntimeException failure = interrupted
+                ? new IllegalStateException("Kafka close was interrupted", new InterruptedException("Caller was interrupted")) : null;
+        try {
+            for (var entry : owned) {
+                entry.running().set(false);
+                try { if (entry.consumer() != null) entry.consumer().wakeup(); }
+                catch (RuntimeException error) { failure = combineCloseFailure(failure, error); }
+            }
+            for (var entry : owned) {
+                Thread thread = entry.thread();
+                long remaining = Math.max(0, deadline - System.nanoTime());
+                if (thread != Thread.currentThread() && remaining > 0) {
+                    try { thread.join(remaining / 1_000_000, (int)(remaining % 1_000_000)); }
+                    catch (InterruptedException error) {
+                        interrupted = true;
+                        failure = combineCloseFailure(failure, new IllegalStateException("Kafka consumer stop was interrupted", error));
+                    }
+                }
+                if (thread.isAlive()) {
+                    failure = combineCloseFailure(failure, new IllegalStateException("Kafka consumer survived its close deadline"));
+                } else {
+                    if (!entry.stopped.isDone()) {
+                        failure = combineCloseFailure(failure, new IllegalStateException("Kafka consumer has no terminal lifecycle result"));
+                    } else {
+                        try { entry.stopped.join(); }
+                        catch (java.util.concurrent.CompletionException error) { failure = combineCloseFailure(failure, error); }
+                    }
+                }
+            }
+            var producerFailure = closeProducer(deadline);
+            if (producerFailure != null) failure = combineCloseFailure(failure, producerFailure);
+            if (Thread.currentThread().isInterrupted()) {
+                interrupted = true;
+                failure = combineCloseFailure(failure,
+                        new IllegalStateException("Kafka producer close was interrupted", new InterruptedException()));
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+        if (failure != null) {
+            closeFailure = failure;
+            throw failure;
+        }
+        closeFailure = null;
         log.info("KafkaMqProvider shutdown complete");
+    }
+
+    /** Kafka's force-close contains an unbounded internal join. Never run it on the supervising caller. */
+    private RuntimeException closeProducer(long deadline) {
+        Duration sdkBudget = Duration.ofNanos(Math.max(0, deadline - System.nanoTime()));
+        var closer = new Thread(() -> {
+            try { producer.close(sdkBudget); producerClosed.complete(null); }
+            catch (Throwable error) {
+                // This owned thread must publish Errors as failed cleanup, never disappear as success.
+                producerClosed.completeExceptionally(error);
+            }
+        }, "auraboot-kafka-producer-close-" + UUID.randomUUID());
+        closer.setDaemon(true);
+        producerCloser = closer;
+        closer.start();
+        long remaining = Math.max(0, deadline - System.nanoTime());
+        try {
+            if (remaining > 0) closer.join(remaining / 1_000_000, (int)(remaining % 1_000_000));
+        } catch (InterruptedException error) {
+            closer.interrupt(); Thread.currentThread().interrupt();
+            return new IllegalStateException("Awaiting the owned Kafka producer closer was interrupted", error);
+        }
+        if (closer.isAlive()) {
+            closer.interrupt();
+            return new IllegalStateException("Owned Kafka producer cleanup exceeded its deadline; inspect closeStatus and retain process ownership",
+                    new java.util.concurrent.TimeoutException("Kafka SDK cleanup has not terminated"));
+        }
+        if (!producerClosed.isDone()) return new IllegalStateException("Kafka producer closer has no terminal result");
+        try { producerClosed.join(); return null; }
+        catch (java.util.concurrent.CompletionException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof org.apache.kafka.common.errors.InterruptException) Thread.currentThread().interrupt();
+            return cause instanceof RuntimeException runtime ? runtime
+                    : new IllegalStateException("Kafka producer cleanup failed", cause);
+        }
+    }
+
+    private static RuntimeException combineCloseFailure(RuntimeException previous, RuntimeException next) {
+        if (previous == null) return next;
+        if (previous != next) previous.addSuppressed(next);
+        return previous;
+    }
+
+    private static long boundedMillis(Duration value) {
+        if (value == null || value.isNegative() || value.isZero() || value.compareTo(Duration.ofSeconds(60)) > 0
+                || value.getNano() % 1_000_000 != 0)
+            throw new IllegalArgumentException("A positive integral-millisecond duration of at most 60 seconds is required");
+        return value.toMillis();
     }
 
     /**
@@ -332,6 +478,10 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
      * Factory method for creating the Kafka producer. Package-private for test override.
      */
     static KafkaProducer<String, String> createProducer(String bootstrapServers) {
+        return createProducer(bootstrapServers, null);
+    }
+
+    private static KafkaProducer<String, String> createProducer(String bootstrapServers, ProducerTimeouts timeouts) {
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -339,6 +489,12 @@ public class KafkaMqProvider implements MqProvider, DisposableBean {
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
+        if (timeouts != null) {
+            props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, timeouts.maxBlockTimeout().toMillis());
+            props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, Math.toIntExact(timeouts.requestTimeout().toMillis()));
+            props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, Math.toIntExact(timeouts.deliveryTimeout().toMillis()));
+            props.put(ProducerConfig.LINGER_MS_CONFIG, 0);
+        }
         return new KafkaProducer<>(props);
     }
 
