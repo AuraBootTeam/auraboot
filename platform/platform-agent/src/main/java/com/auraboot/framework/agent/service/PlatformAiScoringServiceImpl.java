@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
+
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.PlatformAiScoreRequest;
@@ -263,7 +265,8 @@ public class PlatformAiScoringServiceImpl implements PlatformAiScoringService {
                 ))
                 .build();
 
-        LlmChatResponse response = provider.chat(llmRequest, config.getApiKey(), config.getBaseUrl());
+        LlmChatResponse response = LlmResponseGuard.requireCompleteContent(
+                provider.chat(llmRequest, config.getApiKey(), config.getBaseUrl()), "business score batch");
 
         // Extract text from response
         String responseText = "";

@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
+
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
@@ -97,7 +99,8 @@ public class LlmToolSelectionService {
                 .responseFormat("json_object")
                 .build();
 
-        LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
+        LlmChatResponse response = LlmResponseGuard.requireCompleteContent(
+                provider.chat(request, config.getApiKey(), config.getBaseUrl()), "tool selection");
         String text = extractTextContent(response);
         if (text == null || text.isBlank()) {
             throw new IllegalStateException("LLM returned empty response for tool selection");

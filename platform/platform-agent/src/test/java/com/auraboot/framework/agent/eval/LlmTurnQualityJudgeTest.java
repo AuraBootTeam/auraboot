@@ -44,6 +44,10 @@ class LlmTurnQualityJudgeTest {
     }
 
     private void providerReplies(String text) throws Exception {
+        providerReplies(text, null);
+    }
+
+    private void providerReplies(String text, String stopReason) throws Exception {
         LlmProviderFactory.ProviderConfig cfg = new LlmProviderFactory.ProviderConfig();
         cfg.setProviderCode("provider-under-test");
         cfg.setDefaultModel("model-under-test");
@@ -56,9 +60,20 @@ class LlmTurnQualityJudgeTest {
         block.setType("text");
         block.setText(text);
         LlmChatResponse response = new LlmChatResponse();
+        response.setStopReason(stopReason);
         response.setContent(List.of(block));
         lenient().when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
                 .thenReturn(response);
+    }
+
+    @Test
+    void truncatedVerdictCannotCountAsJudgedOrHealthy() throws Exception {
+        providerReplies("{\"score\":0.9,\"healthy\":true,\"reason\":\"grounded\"}", "max_tokens");
+        var verdict = judge.judge(turnWithNarrative());
+        assertThat(verdict.judged()).isFalse();
+        assertThat(verdict.healthy()).isFalse();
+        assertThat(verdict.reason()).contains("Incomplete response");
+        org.mockito.Mockito.verify(provider).chat(any(), anyString(), anyString());
     }
 
     private static AgentTurnQualityJudge.TurnSignals turnWithNarrative() {
