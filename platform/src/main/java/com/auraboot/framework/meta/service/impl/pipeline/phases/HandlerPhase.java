@@ -118,6 +118,8 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory sealedContentFactory;
+    @Autowired
+    private com.auraboot.framework.plugin.pf4j.AnnouncementSubjectAcknowledgementAccessorFactory subjectAcknowledgements;
 
     @Autowired(required = false)
     private AsyncTaskServiceImpl asyncTaskService;
@@ -652,7 +654,8 @@ public class HandlerPhase implements CommandPhase {
         try (DynamicDataQueryScope queryScope = DynamicDataQueryScope.open()) {
             var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext);
             try (fileScope;
-                 var sealedContentScope = sealedContentFactory == null ? null : sealedContentFactory.forCommand(pipelineContext)) {
+                 var sealedContentScope = sealedContentFactory == null ? null : sealedContentFactory.forCommand(pipelineContext);
+                 var subjectScope = subjectAcknowledgements == null ? null : subjectAcknowledgements.forCommand(pipelineContext)) {
                 String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
                 Map<String, Object> pluginSettings = new HashMap<>();
                 pluginSettings.putAll(resolveHandlerParams(execConfig));
@@ -769,6 +772,12 @@ public class HandlerPhase implements CommandPhase {
                 if (announcementAcknowledgementAccessor != null) {
                     pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY,
                             announcementAcknowledgementAccessor);
+                }
+                if (handler instanceof com.auraboot.framework.plugin.extension.CommandSubjectAcknowledgementSource && subjectAcknowledgements == null) {
+                    throw new AccessDeniedException("Original subject acknowledgement factory is unavailable");
+                }
+                if (subjectScope != null) {
+                    pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementSubjectAcknowledgementAccessor.SETTINGS_KEY, subjectScope.accessor());
                 }
                 if (sealedContentScope != null) {
                     pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementSealedContentAccessor.SETTINGS_KEY,
