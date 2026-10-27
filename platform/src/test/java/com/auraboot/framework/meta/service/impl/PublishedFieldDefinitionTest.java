@@ -27,9 +27,10 @@ class PublishedFieldDefinitionTest {
     private final MetaFieldMapper mapper = mock(MetaFieldMapper.class);
     private final MetaModelFieldBindingMapper bindings = mock(MetaModelFieldBindingMapper.class);
     private final ModelFieldBindingService bindingService = mock(ModelFieldBindingService.class);
+    private final MetaFieldValidator validator = mock(MetaFieldValidator.class);
     private final MetaFieldServiceImpl service = new MetaFieldServiceImpl(mapper, mock(DictService.class),
             mock(ApplicationEventPublisher.class), mock(TransactionTemplate.class), new ExtensionConverter(),
-            mock(MetaFieldValidator.class), mock(MetaFieldDictBindingMapper.class), bindings,
+            validator, mock(MetaFieldDictBindingMapper.class), bindings,
             bindingService, new ObjectMapper());
 
     @BeforeEach void tenant() { MetaContext.setContext(101L, 1L, "test", "tester"); }
@@ -82,6 +83,39 @@ class PublishedFieldDefinitionTest {
         rule.setType("custom"); rule.setValue("untranslated"); rules.setValidationRules(List.of(rule)); entity.setRuleSchema(rules);
         when(mapper.findByCodeAndVersion("capacity", 2)).thenReturn(entity);
         assertThrows(UnsupportedOperationException.class, () -> service.resolvePublishedDefinition("capacity", 2));
+        verifyNoInteractions(bindings, bindingService);
+    }
+
+    @Test void nativeCreatePersistsDeclaredRulesAndExposesThemForFailClosedResolution() {
+        var request = new com.auraboot.framework.meta.dto.MetaFieldCreateRequest();
+        request.setCode("capacity"); request.setDataType("decimal"); request.setAutoPublish(true);
+        request.setRuleSchema(Map.of("validationRules", List.of(Map.of("type", "custom", "value", "declared"))));
+        when(validator.validateCreateRequest(request)).thenReturn(new com.auraboot.framework.meta.dto.MetaFieldValidationResult());
+        when(mapper.getNextVersion("capacity")).thenReturn(1);
+        var result = service.create(request);
+        var inserted = org.mockito.ArgumentCaptor.forClass(Field.class); verify(mapper).insert(inserted.capture());
+        assertNotNull(inserted.getValue().getRuleSchema(), "Declared rules cannot disappear before publication");
+        assertNotNull(result.getRuleSchema(), "Definition reads must disclose declared rules");
+        when(mapper.findByCodeAndVersion("capacity", 1)).thenReturn(inserted.getValue());
+        assertThrows(UnsupportedOperationException.class, () -> service.resolvePublishedDefinition("capacity", 1));
+        verifyNoInteractions(bindings, bindingService);
+    }
+
+    @Test void nativeVersionUpdateRetainsOmittedDefinitionsWithoutChangingPublishedMeaning() {
+        var existing = field(); var rules = new FieldRuleSchemaBean();
+        rules.setExtensions(Map.of("declared", true)); existing.setRuleSchema(rules);
+        when(mapper.selectByPidWithContext(existing.getPid(), 101L)).thenReturn(existing);
+        when(mapper.getNextVersion("capacity")).thenReturn(3);
+        var request = new com.auraboot.framework.meta.dto.MetaFieldUpdateRequest(); request.setDataType("decimal");
+        request.setUiSchema(Map.of("widget", "decimal"));
+        when(validator.validateUpdateRequest(null, request)).thenReturn(new com.auraboot.framework.meta.dto.MetaFieldValidationResult());
+        service.update(existing.getPid(), request);
+        var inserted = org.mockito.ArgumentCaptor.forClass(Field.class); verify(mapper).insert(inserted.capture());
+        var next = inserted.getValue(); assertEquals(3, next.getVersion()); assertEquals("draft", next.getStatus());
+        assertNotNull(next.getFeature(), "Omitted required/search settings must survive versioning");
+        assertTrue(next.getFeature().getRequired()); assertNotNull(next.getExtension());
+        assertNotNull(next.getRuleSchema()); assertTrue(existing.getFeature().getRequired());
+        assertEquals(2, existing.getVersion()); assertEquals("published", existing.getStatus());
         verifyNoInteractions(bindings, bindingService);
     }
 }
