@@ -53,7 +53,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const [resultReceipt, setResultReceipt] = useState<{ config: any; data: any } | null>(null);
   useRuntimeStateSubscription(runtime);
-  useDataSourceSubscription(runtime, block.dataSource);
+  useDataSourceSubscription(runtime, typeof block.dataSource === 'string' ? block.dataSource : undefined);
 
   const visibleActions = actions.filter((actionConfig: any) => {
     if (actionConfig?.permissionCode && !hasPermission(actionConfig.permissionCode)) return false;
