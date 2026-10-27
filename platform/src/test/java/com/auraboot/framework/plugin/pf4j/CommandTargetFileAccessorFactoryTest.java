@@ -80,6 +80,38 @@ class CommandTargetFileAccessorFactoryTest {
         ctx.setTargetRecordReadable(true);
         ctx.setPermitPlan(new CommandPermitPlan(CommandPermitPlan.Decision.PERMIT,null,null,null,CommandPermitPlan.ScopeGrade.TARGET,2L));
     }
+    @Test void onlyAttestedSingletonCreationCanCompleteAnImmutableSingleFileField() {
+        field = FieldDefinition.builder().code("proof").columnName("proof").dataType("file").immutable(true)
+                .allowedWriterCommands(List.of("order:repair")).build();
+        model = ModelDefinition.builder().code("child").status("published").tableName("mt_child").immutable(true)
+                .fields(List.of(field)).extension(Map.of("commandWriters",Map.of("create",List.of("order:repair"),
+                        "update",List.of("other:update"),"delete",List.of("other:delete")))).build();
+        when(models.getModelDefinition("child")).thenReturn(Optional.of(model));
+        var row=Map.<String,Object>of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+        when(data.getById("child","new-child")).thenReturn(row);
+        when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            // A lookup cannot attest CREATE, even when actor, PID and version look plausible.
+            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
+                    .isInstanceOf(AccessDeniedException.class);
+        }return null;});
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            var delegate=mock(DynamicDataService.class);when(delegate.create(eq("child"),anyMap())).thenReturn(row);
+            new DynamicDataAccessorImpl(delegate).create("child",Map.of("proof","file-pid"));
+            scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof");
+        }return null;});
+        verify(files).lockRetention("file-pid");verify(relations).insert(any(FileRelationEntity.class));
+    }
+    @Test void creationOnlyNoTargetScopeStillCannotAppendToAParent() {
+        ctx.setTargetRecordReadable(null);ctx.getRequest().setTargetRecordId(null);
+        MetaContext.runWithCommandPermitPlan("ALL",null,"order",null,()->MetaContext.runWithAuthorizedCommandCode("order:repair",()->{
+            try(var scope=factory.forCommand(ctx)) {
+                assertThat(scope).isNotNull();
+                assertThatThrownBy(()->scope.accessor().appendAndRetainExistingToTarget("file-pid","photos"))
+                        .isInstanceOf(AccessDeniedException.class);
+            }
+        }));
+    }
     @AfterEach void cleanup() {
         TransactionSynchronizationManager.unbindResourceIfPossible(source);
         TransactionSynchronizationManager.clear(); MetaContext.clear();

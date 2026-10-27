@@ -119,6 +119,16 @@ public interface FileAccessor {
     }
 
     /**
+     * Complete a single-file association for an exact record successfully created through this
+     * command's DataAccessor in the same physical transaction. The scalar file field must already
+     * contain this PID. This never replaces a relation or grants UPDATE access to an immutable row.
+     * Older/unscoped hosts fail closed. Bulk create and historical/non-owner evidence are not implied.
+     */
+    default void linkAndRetainExistingToCreatedRecord(String filePid, String modelCode, String recordPid, String fieldCode) {
+        throw new UnsupportedOperationException("Command-created record attachment linking is not supported");
+    }
+
+    /**
      * Append an owned finalized upload to the original human command's root record and retain
      * its bytes, atomically in the caller's physical Core transaction. Existing relations remain.
      * The host validates the published multi-file field and its exact command writer. The caller

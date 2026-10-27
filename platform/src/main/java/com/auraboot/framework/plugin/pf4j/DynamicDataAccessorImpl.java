@@ -166,15 +166,18 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     @Override
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: create({}, {} fields)", modelCode, data != null ? data.size() : 0);
-        return withCommandAuthority(() -> dynamicDataService.create(modelCode, mutableCopy(data)));
+        Map<String,Object> created = withCommandAuthority(() -> dynamicDataService.create(modelCode, mutableCopy(data)));
+        CommandTargetFileAccessorFactory.recordCreated(modelCode, created);
+        return created;
     }
 
     @Override
     public Optional<Map<String, Object>> tryCreate(String modelCode, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: tryCreate({}, {} fields)", modelCode, data != null ? data.size() : 0);
         try {
-            return Optional.of(withCommandAuthority(
-                    () -> dynamicDataService.create(modelCode, mutableCopy(data))));
+            Map<String,Object> created = withCommandAuthority(() -> dynamicDataService.create(modelCode, mutableCopy(data)));
+            CommandTargetFileAccessorFactory.recordCreated(modelCode, created);
+            return Optional.of(created);
         } catch (RuntimeException error) {
             if (!IdempotentCreateSupport.isUniqueViolation(error)) throw error;
             log.debug("Plugin DataAccessor: tryCreate hit unique violation for model={}", modelCode);
