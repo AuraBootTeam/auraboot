@@ -16,8 +16,8 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes shared presentation types in the 55-definition contract', () => {
-    expect(Object.keys(defs).length).toBe(55);
+  it('includes shared presentation types in the 60-definition contract', () => {
+    expect(Object.keys(defs).length).toBe(60);
     expect(defs).toHaveProperty('CardImageViewport');
   });
 
@@ -402,6 +402,37 @@ describe('DSL Generated Schema', () => {
   it('BlockConfig should require id and blockType', () => {
     expect(defs.BlockConfig.required).toContain('id');
     expect(defs.BlockConfig.required).toContain('blockType');
+  });
+
+  it('validates authoritative source bindings while preserving legacy block props', () => {
+    const validate = new Ajv({ strict: false }).compile({ ...defs.BlockConfig, definitions: defs });
+    const base = { id: 'reading', blockType: 'stat-card' };
+    const binding = {
+      mode: 'authoritative',
+      identity: [{ responsePath: 'source', contextPath: 'state.source' }],
+      valuePath: 'value',
+      states: [
+        {
+          path: 'quality',
+          label: 'Quality',
+          values: { MISSING: { label: 'Missing', hideValue: true } },
+        },
+      ],
+    };
+    expect(validate({ ...base, props: { sourceState: binding } })).toBe(true);
+    expect(validate({ ...base, props: { sourceState: { ...binding, mode: 'fallback' } } })).toBe(
+      false,
+    );
+    expect(
+      validate({
+        ...base,
+        props: { sourceState: { ...binding, identity: [{ responsePath: 1 }] } },
+      }),
+    ).toBe(false);
+    expect(validate({ ...base, props: { sourceState: { ...binding, inlineValue: 99 } } })).toBe(
+      false,
+    );
+    expect(validate({ ...base, props: { legacyLayout: 'compact' } })).toBe(true);
   });
 
   it('BlockConfig.subTable should reference SubTableConfig', () => {

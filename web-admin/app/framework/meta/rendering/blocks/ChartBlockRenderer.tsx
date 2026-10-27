@@ -12,6 +12,7 @@
  */
 
 import React, { Suspense, useMemo, useSyncExternalStore } from 'react';
+import { AuthoritativeSourceBlock } from './AuthoritativeSourceBlock';
 import { useDetailSourceRefreshVersion } from '../pages/detail/DetailSourceRefreshContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
@@ -110,7 +111,7 @@ export function resolveStateParams(
   return out;
 }
 
-export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
+const LegacyChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
   const { locale } = useI18n();
   const sourceRefreshVersion = useDetailSourceRefreshVersion();
   const props = (block as any).props || {};
@@ -234,5 +235,12 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
     </Suspense>
   );
 };
+
+export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = (props) =>
+  Object.prototype.hasOwnProperty.call(props.block.props ?? {}, 'sourceState') ? (
+    <AuthoritativeSourceBlock {...props} kind="chart" />
+  ) : (
+    <LegacyChartBlockRenderer {...props} />
+  );
 
 export default ChartBlockRenderer;

@@ -1,4 +1,11 @@
 import type { CardRowSelection } from '../runtime/expression/row-selection';
+import type { AuthoritativeSourceConfig } from './source-state';
+export type {
+  AuthoritativeSourceConfig,
+  SourceStateField,
+  SourceStateIndicator,
+  SourceStateTone,
+} from './source-state';
 import type { RowProjection } from '../runtime/expression/row-projection';
 import type { WorkspaceCellPresentation } from '../runtime/renderers/WorkspaceCells';
 /**
@@ -107,6 +114,7 @@ export interface BlockConfig {
   /** Existing block visibility and named-source permission gate. */
   permissionCode?: string;
   className?: string;
+  props?: Record<string, any> & { sourceState?: AuthoritativeSourceConfig };
   imageField?: string;
   imageViewports?: Record<string, CardImageViewport>;
 

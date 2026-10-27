@@ -1,0 +1,33 @@
+{
+  "pending": { "zh-CN": "请先选择数据范围或来源", "en-US": "Select a scope and source first" },
+  "unconfigured": { "zh-CN": "数据源尚未配置", "en-US": "The data source is not configured" },
+  "loading": { "zh-CN": "正在读取数据…", "en-US": "Reading data…" },
+  "empty": {
+    "zh-CN": "所选范围暂无可显示的数据",
+    "en-US": "No data is available in the selected range"
+  },
+  "configuration": {
+    "zh-CN": "数据源配置无法识别，请联系管理员",
+    "en-US": "The source configuration is invalid. Contact an administrator"
+  },
+  "denied": {
+    "zh-CN": "无权读取当前数据",
+    "en-US": "You do not have permission to read this data"
+  },
+  "unavailable": {
+    "zh-CN": "数据读取失败，请重试",
+    "en-US": "The source could not be read. Try again"
+  },
+  "not-fresh": {
+    "zh-CN": "尚未取得本次读取的新数据，请稍后重试",
+    "en-US": "No fresh result was obtained. Try again later"
+  },
+  "invalid": {
+    "zh-CN": "返回数据与当前选择不一致或格式无法识别",
+    "en-US": "The result does not match the selection or has an invalid format"
+  },
+  "retry": { "zh-CN": "重新读取", "en-US": "Read again" },
+  "readAt": { "zh-CN": "本次读取时间", "en-US": "Result read at" },
+  "points": { "zh-CN": "已返回点数", "en-US": "Returned points" },
+  "gaps": { "zh-CN": "未绘制数值的点数", "en-US": "Points without a plotted value" }
+}
