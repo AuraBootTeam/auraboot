@@ -328,8 +328,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                     new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_ref", "订单编号", "string", null, null, false),
                     new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_status", "状态", "string", null, List.of("OPEN", "CLOSED"), false),
                     new com.auraboot.framework.agent.dto.FormFillRequest.Field("days_late", "逾期天数", "integer", null, null, false),
-                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_amount", "金额", "integer", null, null, false),
-                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_priority", "受保护优先级", "string", null, null, true))));
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_amount", "金额", "integer", null, null, false))));
             var sink = new Probe();
             long started = System.nanoTime();
             var outcome = turns.runTurn(new TurnRequest(tenantId, getTestUser().getId(), getTestTenantMember().getId(),
