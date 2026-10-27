@@ -53,6 +53,22 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
 }
 
 describe('workbenchBlockUtils action runner', () => {
+  it('does not interpret a resolved business value again when opening an input form', async () => {
+    const runtime=makeRuntime() as any;
+    runtime.getContext().state.selectedLine.altText='\$\{state.secret}';
+    runtime.getContext().state.secret='must-not-replace-business-text';
+    let observed: any;
+    window.addEventListener('dialog:form', ((event: CustomEvent) => {
+      observed=event.detail.defaults;
+      event.detail.onSubmit(event.detail.defaults);
+    }) as EventListener, { once: true });
+    await executeSimpleWorkbenchAction(runtime, { action: 'command.execute', args: {
+      command: 'catalog:edit_media', inputFields: [{ field: 'altText', type: 'text', defaultValue: '\$\{state.selectedLine.altText}' }],
+    } });
+    expect(observed).toEqual({altText: '\$\{state.secret}'});
+    expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/catalog:edit_media', expect.objectContaining({params: expect.objectContaining({payload: {altText: '\$\{state.secret}'}})}));
+  });
+
   beforeEach(() => {
     fetchResultMock.mockReset();
     fetchResultMock.mockResolvedValue({ code: '0', data: {} });
