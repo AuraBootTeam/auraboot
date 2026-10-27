@@ -260,8 +260,11 @@ export const ListTable = React.memo(function ListTable({
     const extraWidth = Math.max(0, containerWidth - baseTableWidth);
     if (extraWidth <= 0 || orderedDataColumns.length === 0) return baseWidths;
 
-    const fillColumns = orderedDataColumns.filter(isAutoFillColumn);
-    const targets = fillColumns.length > 0 ? fillColumns : orderedDataColumns;
+    // Personal widths are explicit user choices, not defaults to stretch.
+    const flexibleColumns = orderedDataColumns.filter(column => !Object.hasOwn(columnWidths, column.field));
+    if (flexibleColumns.length === 0) return baseWidths;
+    const fillColumns = flexibleColumns.filter(isAutoFillColumn);
+    const targets = fillColumns.length > 0 ? fillColumns : flexibleColumns;
     const targetBaseWidth = targets.reduce((sum, column) => sum + baseWidths[column.field], 0);
     const equalShare = extraWidth / targets.length;
 
