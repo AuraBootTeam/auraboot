@@ -124,6 +124,9 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     @DisplayName("native file arrays create, update and read through PostgreSQL JSONB")
     void native_file_arrays_persist_without_untyped_jdbc_parameters() {
         MetaContext.runWithCommandPermitScope("ALL", () -> {
+            assertThat(jdbcTemplate.queryForObject("SELECT data_type FROM information_schema.columns "
+                    + "WHERE table_schema='public' AND table_name=? AND column_name=?", String.class,
+                    "mt_" + modelCode, attachmentField)).isEqualTo("jsonb");
             Map<String, Object> created = dynamicDataService.create(modelCode, Map.of(
                     nameField, "Delivery attachments", attachmentField,
                     List.of(Map.of("fileId", "file-first", "name", "scope.pdf"))));
@@ -401,6 +404,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         ExtensionBean ext = new ExtensionBean();
         Map<String, Object> extMap = new HashMap<>();
         extMap.put("displayName", code.toUpperCase());
+        if (code.equals(attachmentField)) extMap.put("multiple", true);
         if (primaryKey) extMap.put("primaryKey", true);
         ext.setExtension(extMap);
         f.setExtension(ext);

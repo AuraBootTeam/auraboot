@@ -13,6 +13,13 @@ import java.util.*;
  */
 public class JsonbFieldHelper {
 
+    /** Multiple native attachments are structured JSON; scalar file identifiers remain strings. */
+    public static boolean isMultipleFile(FieldDefinition field) {
+        return field != null && "file".equalsIgnoreCase(field.getDataType())
+                && field.getExtraProps() != null
+                && Boolean.TRUE.equals(field.getExtraProps().get("multiple"));
+    }
+
     /**
      * Merge JSONB virtual field values into their host JSONB columns.
      * Called during INSERT/UPDATE to convert frontend field-level data into column-level data.
@@ -169,7 +176,7 @@ public class JsonbFieldHelper {
         Set<String> hostColumns = new LinkedHashSet<>();
         for (FieldDefinition field : model.getFields()) {
             String dt = field.getDataType();
-            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt) || "file".equalsIgnoreCase(dt)) && !field.isJsonbVirtual()) {
+            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt) || isMultipleFile(field)) && !field.isJsonbVirtual()) {
                 hostColumns.add(field.getColumnName());
             }
         }
@@ -239,7 +246,7 @@ public class JsonbFieldHelper {
         List<String[]> keys = new ArrayList<>();
         for (FieldDefinition field : model.getFields()) {
             String dt = field.getDataType();
-            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt) || "file".equalsIgnoreCase(dt)) && !field.isJsonbVirtual()) {
+            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt) || isMultipleFile(field)) && !field.isJsonbVirtual()) {
                 keys.add(new String[]{field.getColumnName(), field.getCode()});
             }
         }

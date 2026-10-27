@@ -15,6 +15,14 @@ class PostgresDdlDialectTest {
     private final PostgresDdlDialect dialect = new PostgresDdlDialect();
 
     @Test
+    void storesMultipleAttachmentsAsJsonbWithoutChangingScalarFileIdentifiers() {
+        assertEquals("jsonb", dialect.mapDataType(FieldDefinition.builder().code("delivery_files")
+                .dataType("file").extraProps(java.util.Map.of("multiple", true)).build()));
+        assertEquals("VARCHAR(255)", dialect.mapDataType(FieldDefinition.builder().code("source_file")
+                .dataType("file").extraProps(java.util.Map.of("multiple", false)).build()));
+    }
+
+    @Test
     void preservesImageUrlsDuringLegacyPluginSchemaPublication() {
         assertEquals("VARCHAR(2048)", dialect.mapDataType(FieldDefinition.builder()
                 .code("class_image").dataType("IMAGE").maxLength(2048).build()));

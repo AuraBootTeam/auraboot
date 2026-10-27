@@ -18,16 +18,20 @@ class JsonbFieldHelperTest {
     void nativeFileColumnsUseJsonbBindingAndReadShape() {
         ModelDefinition model = ModelDefinition.builder().code("delivery").tableName("mt_delivery")
                 .fields(List.of(FieldDefinition.builder().code("attachments").columnName("files")
-                        .dataType("FILE").build(), FieldDefinition.builder().code("title")
+                        .dataType("FILE").extraProps(Map.of("multiple", true)).build(),
+                        FieldDefinition.builder().code("source_file").columnName("source_file").dataType("file").build(),
+                        FieldDefinition.builder().code("title")
                         .columnName("title").dataType("string").build())).build();
         assertEquals(java.util.Set.of("files"), JsonbFieldHelper.getJsonbHostColumns(model));
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("files", List.of(Map.of("fileId", "owned-file", "name", "scope.pdf")));
         record.put("title", "Delivery");
+        record.put("source_file", "01M40R49GX8JJAH5KGNKGP5FJX");
         JsonbFieldHelper.normalizeJsonReadValues(model, record);
         assertInstanceOf(String.class, record.get("files"));
         assertTrue(record.get("files").toString().contains("owned-file"));
         assertEquals("Delivery", record.get("title"));
+        assertEquals("01M40R49GX8JJAH5KGNKGP5FJX", record.get("source_file"));
     }
 
     @Test

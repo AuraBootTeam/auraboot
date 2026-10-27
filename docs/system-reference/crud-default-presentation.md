@@ -47,3 +47,9 @@ Page Designer edits the generated DSL rather than creating bespoke business Reac
 Localized titles and placeholders use `LocalizedTextInput`. Non-ASCII text is stored as a locale object even when language controls remain collapsed, satisfying the server i18n validator without user workarounds. ASCII strings and `$i18n:` references remain compatible. Acknowledgement toast bodies do not intercept clicks; their close buttons remain interactive.
 
 The contextual “configure this page” entry opens the ChangeSet authoring surface. The model pages workbench opens Page Designer. These are separate real product entries, not interchangeable test locators. Optional layout fine-tuning should use an independent page when preserving a zero-visual-config reference for comparison.
+
+## Native attachment storage
+
+A scalar `file` field stores a file identifier in its existing string column. A native `file` field with explicit `extension.multiple: true` stores the attachment collection in PostgreSQL JSONB. DDL generation, structured write binding and JSON-string read normalization use the same multiple-file predicate. Display component selection does not change the storage contract: selecting `fileattachment` on a generic JSON field does not grant file-relation mutation authority.
+
+Project and acceptance template attachment fields declare native multiple files. An existing model with a mismatched physical column requires the normal explicit schema comparison and publication workflow; startup does not alter a user table. File upload, business update, relation authorization and permitted download remain separate checks. A storage integration test with an internal command permit does not prove browser or user permission behavior.
