@@ -27,6 +27,7 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 - Notification source delivery: [deployment descriptors and configuration boundaries](./system-reference/notification-source-bindings.md).
 - Module-owned command validation: [live module registration and import metadata](./system-reference/application-module-command-lifecycle.md).
 - Command consistency: [explicit transaction isolation admission](./system-reference/command-transaction-isolation.md).
+- Original command files: [target-bound append and combined verification](./system-reference/2026-10-27-maritime-combined-files-testing-gate-acceptance-report.md).
 
 - Architecture overview: start at [ARCHITECTURE.md](../ARCHITECTURE.md) (repo root), then dive into `system-reference/` for operational detail.
 - Internal process documents (session handovers, plans, retrospectives) are intentionally **not tracked in this public repository** — `scripts/check-oss-no-internal-docs.sh` enforces this; they live in the team's private documentation repos.

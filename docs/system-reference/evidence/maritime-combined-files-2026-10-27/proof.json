@@ -1,0 +1,135 @@
+{
+  "producer": "b297c242798bd177e602eb09e483a5ad849f2cc9",
+  "runtime": "maritime-parallel-core",
+  "database": "auraboot_26",
+  "sourceDigest": "24f5888687f98e702056011c143048599a4aa2f7a14b30b6f134ee03c3262c08",
+  "artifacts": {
+    "runtime": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-app/build/libs/AuraBoot-1.0.0-boot.jar",
+      "sha256": "859fa0071f28b61398d32dbd489f32ea502763a153ed65a9c2e915ff4603374c"
+    },
+    "api": {
+      "path": "/Users/ghj/work/auraboot/.workspace/worktrees/maritime-parallel-integration/auraboot/platform/platform-plugin-api/build/libs/platform-plugin-api-1.0.0.jar",
+      "sha256": "9ca35017426267e434ecc3c1e1fd63b57e4fdabb0407d61bf2fe6a88658db75f"
+    }
+  },
+  "suites": {
+    "unit": {
+      "rows": [
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest",
+          "tests": "19",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.application.tenant.MetaContextCommandOriginTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactoryTest",
+          "tests": "21",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.file.service.impl.FileServiceImplTest",
+          "tests": "52",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.CommandMembershipLockAccessorImplTest",
+          "tests": "21",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest",
+          "tests": "45",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.FileAccessorImplTest",
+          "tests": "17",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.workbench.service.AnnouncementAcknowledgementAccessorImplTest",
+          "tests": "27",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest",
+          "tests": "4",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "Only an AUTHORIZED verdict opens the command's authority",
+          "tests": "6",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ],
+      "totals": {
+        "tests": 215,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "postgres": {
+      "rows": [
+        {
+          "name": "File relation tenant scoping IT",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "File retention/delete race IT",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT",
+          "tests": "12",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ],
+      "totals": {
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "limits": [
+    "No product admission",
+    "No mixed-role public HTTP upload",
+    "No maintenance browser journey",
+    "Component mutation evidence belongs to M producer0642; not rerun against combined producer"
+  ]
+}
