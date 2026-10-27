@@ -180,7 +180,10 @@ class AnnouncementSealedContentIT {
                         jdbc.queryForMap("SELECT pid FROM ab_announcement WHERE tenant_id=? AND pid=? FOR UPDATE",tenant.getId(),root);
                     });
                     return false;
-                } catch(org.springframework.dao.CannotAcquireLockException blocked){return true;}
+                } catch(org.springframework.dao.DataAccessException blocked) {
+                    if(blocked.getMostSpecificCause() instanceof java.sql.SQLException sql && "55P03".equals(sql.getSQLState())) return true;
+                    throw blocked;
+                }
             }));
         });
         assertNotNull(new TransactionTemplate(transactions).execute(status->roots.lock(tenant.getId(),root)));
