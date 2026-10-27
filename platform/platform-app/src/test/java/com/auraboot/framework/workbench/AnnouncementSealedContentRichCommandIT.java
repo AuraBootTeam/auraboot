@@ -381,16 +381,17 @@ class AnnouncementSealedContentRichCommandIT {
             assertTrue(files.lockRetention(filePid));
             content.captureFrozenVersion(tenant.getId(), announcement, version, snapshotHash, codec.encode(snapshot));
             String submission = UniqueIdGenerator.generate(), result = UniqueIdGenerator.generate(), definition = UniqueIdGenerator.generate();
+            String instancePid = "fixture-" + version;
             var binding = new SubmittedApproval(submission, "fixture-operation", new BusinessRef("announcement", announcement, version),
                     "snapshot", snapshotHash, "announcement.v1", new DefinitionRef(definition, 1, "a".repeat(64)),
                     StrictPolicy.required(), actor.getPid(), "制度 Native title ", Instant.now());
             assertEquals(1, approvals.insert(tenant.getId(), submission, announcement, version, actor.getId(), membership.getPid(),
                     actor.getPid(), "controlled-test-fixture", "Fixture definition", codec.encode(binding), codec.hash(binding)));
-            var terminal = new TerminalResult(submission, binding.businessRef(), snapshotHash, "fixture-instance", binding.definition(),
+            var terminal = new TerminalResult(submission, binding.businessRef(), snapshotHash, instancePid, binding.definition(),
                     "approved", result, 1, Instant.now(), "CONTROLLED_TEST_FIXTURE");
-            jdbc.update("UPDATE ab_announcement_approval_submission SET state='approved',sync_state='completed',instance_pid='fixture-instance',"
+            jdbc.update("UPDATE ab_announcement_approval_submission SET state='approved',sync_state='completed',instance_pid=?,"
                     + "provider_revision=1,terminal_result_pid=?,terminal_result=CAST(? AS jsonb) WHERE tenant_id=? AND pid=?",
-                    result, codec.encode(terminal), tenant.getId(), submission);
+                    instancePid, result, codec.encode(terminal), tenant.getId(), submission);
             jdbc.update("INSERT INTO ab_announcement_version_control(tenant_id,version_pid,approval_state,publication_state,"
                     + "authorization_basis,current_submission_pid,published_at) VALUES(?,?,'approved','published','approved',?,clock_timestamp())",
                     tenant.getId(), version, submission);
