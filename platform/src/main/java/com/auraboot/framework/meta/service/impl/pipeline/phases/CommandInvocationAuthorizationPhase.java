@@ -30,6 +30,7 @@ public class CommandInvocationAuthorizationPhase implements CommandPhase {
     }
 
     @Override public void execute(CommandPipelineContext context) {
+        context.setHandlerInvocationAuthorization(null);
         var params = (Map<?, ?>) context.getExecConfig().get("handlerParams");
         if (!"handler".equals(params.get("invocationAuthorization")) || !MetaContext.exists()
                 || context.getTenantId() == null || !Objects.equals(context.getTenantId(), MetaContext.getCurrentTenantId())
@@ -50,6 +51,10 @@ public class CommandInvocationAuthorizationPhase implements CommandPhase {
                     scope == null ? null : scope.accessor());
             if (!authorizer.authorizeInvocation(invocation)) throw denied();
         } finally { if (scope != null) scope.close(); }
+        context.setHandlerInvocationAuthorization(new CommandPipelineContext.HandlerInvocationAuthorization(
+                context.getCommandCode(), context.getCommand() == null ? null : context.getCommand().getModelCode(),
+                request == null ? null : request.getTargetRecordId(),
+                params.get("targetRecordAction") instanceof String action ? action : null));
     }
 
     private static AccessDeniedException denied() {
