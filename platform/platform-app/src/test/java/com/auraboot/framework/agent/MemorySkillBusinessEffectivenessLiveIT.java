@@ -288,7 +288,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
 
     private static boolean expanded() {
         String profile = System.getenv("AURA_EFFECTIVENESS_PROFILE");
-        if (profile != null && !profile.equals("expanded-v1") && !profile.equals("recall-answer-v1") && !profile.equals("lifecycle-v1")) throw new IllegalArgumentException("Unknown evaluation profile");
+        if (profile != null && !profile.equals("expanded-v1") && !profile.equals("recall-answer-v1") && !profile.equals("lifecycle-v1") && !profile.equals("form-consumer-v1")) throw new IllegalArgumentException("Unknown evaluation profile");
         return "expanded-v1".equals(profile);
     }
 
