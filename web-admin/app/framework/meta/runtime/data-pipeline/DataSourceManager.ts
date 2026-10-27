@@ -283,7 +283,8 @@ export class DataSourceManager {
    * 绑定 ScopedStateManager,用于依赖追踪和上下文刷新
    */
   bindStateManager(stateManager: ScopedStateManager, scopeId: string) {
-    if (this.stateManager && !this.isBoundTo(stateManager, scopeId)) {
+    const scopeChanged = Boolean(this.stateManager && !this.isBoundTo(stateManager, scopeId));
+    if (scopeChanged) {
       this.dataSourceStates.forEach((state, id) => {
         this.fetchVersions.set(id, (this.fetchVersions.get(id) ?? 0) + 1);
         this.dataSourceStates.set(id, { ...state, data: null, error: null, loading: false });
@@ -322,6 +323,14 @@ export class DataSourceManager {
       this.cleanupDependency(id);
       this.registerDependencies(id, config);
     });
+    // Rebinding invalidates requests owned by the previous scope. Page hooks
+    // can retain registration across a runtime reconnect, so start the new
+    // owner's declared reads after its context and dependencies are bound.
+    if (scopeChanged) {
+      this.dataSources.forEach((config, id) => {
+        if (config.autoFetch && !config.pagination) void this.fetch(id);
+      });
+    }
   }
 
   isBoundTo(stateManager: ScopedStateManager, scopeId: string): boolean {

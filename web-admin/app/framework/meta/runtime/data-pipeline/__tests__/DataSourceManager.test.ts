@@ -17,6 +17,37 @@ vi.mock('~/shared/services/http-client', () => ({
 const mockedFetchResult = vi.mocked(fetchResult);
 
 describe('DataSourceManager', () => {
+  it('reloads automatic reads in the new scope and discards the previous scope response', async () => {
+    const pending: Array<(result: any) => void> = [];
+    mockedFetchResult.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    const manager = new DataSourceManager(createExpressionContext({}));
+    const oldScope = new ScopedStateManager({} as any);
+    oldScope.createScope('old', { state: { project: 'old-project' } });
+    manager.bindStateManager(oldScope, 'old');
+    manager.register('projects', {
+      type: 'namedQuery',
+      queryCode: 'delivery',
+      format: 'records',
+      adaptor: 'table',
+      params: { project: '${state.project}' },
+    });
+    manager.register('manual', { type: 'namedQuery', queryCode: 'manual', autoFetch: false });
+    manager.register('paged', { type: 'namedQuery', queryCode: 'paged', pagination: true });
+    const nextScope = new ScopedStateManager({} as any);
+    nextScope.createScope('next', { state: { project: 'next-project' } });
+    manager.bindStateManager(nextScope, 'next');
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+    expect(mockedFetchResult.mock.calls[1][1]?.params).toMatchObject({ project: 'next-project' });
+    pending[1]({ code: '0', data: { records: [{ pid: 'new' }], total: 1 } });
+    await waitFor(() => expect(manager.getData('projects')?.records).toEqual([{ pid: 'new' }]));
+    pending[0]({ code: '0', data: { records: [{ pid: 'old' }], total: 1 } });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(manager.getData('projects')?.records).toEqual([{ pid: 'new' }]);
+    expect(manager.getData('manual')).toBeNull();
+    expect(manager.getData('paged')).toBeNull();
+    manager.clear();
+  });
   it('preserves real paging metadata through the native statistics configuration and manager defaults', async () => {
     const pages = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../../../plugins/core-announcement/config/pages.json'), 'utf8'));
     const page = canonicalizePageSchemaDto(pages.find((candidate: any) => candidate.pageKey === 'announcement_statistics_detail'));
