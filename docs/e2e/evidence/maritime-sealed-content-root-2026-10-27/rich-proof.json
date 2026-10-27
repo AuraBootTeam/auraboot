@@ -1,0 +1,40 @@
+{
+  "testProducer": "561cb786081b6b3b5be11cff1d78cede1f6008d5",
+  "productionSourceEquivalentTo": "0c299e033946e1228e0af700bb1abedaaf4ffe0f",
+  "productionArtifactRebuilt": false,
+  "runtime": "maritime-parallel-core",
+  "database": "auraboot_26",
+  "scope": "service/real-stack/it; real PF4J, registry, CommandExecutor and transaction-bound typed getter",
+  "tests": 3,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "junitSeconds": "6.112",
+  "cases": [
+    "committedPublisherAssociationRevocationStillRunsProbeButRefusesContent()",
+    "sameTransactionPublisherAssignmentRevocationRejectsCommitAndRollsBackCaller()",
+    "nativePublisherProofCommitsThroughTheRealRichHost()"
+  ],
+  "rawXmlSha256": "50793f3a5ba40dab14bb58e350befd226f488e834332f34c5dcd9d0837d698cd",
+  "rawXml": "/Users/ghj/work/auraboot/.workspace/evidence/maritime-parallel-core/sealed-content-root/rich-green-561cb786.xml",
+  "runtimePrimaryPermissionSource": "bound release role permission catalog plus current exact member-role association; no fallback role_permission publish grant",
+  "officialRoleRemovalUsed": true,
+  "controlledApprovalFixture": true,
+  "actualBpmApproval": false,
+  "httpOrBrowserExecuted": false,
+  "productionConsumerMapping": false,
+  "retainedFailures": [
+    {
+      "producer": "6ad2e6b92d4830ffd541ebf29682fb9fa8e48c6b",
+      "tests": 1,
+      "failures": 1,
+      "reason": "Generic fixture incorrectly expected fixed privileged-owner discovery attestation; cases not reached."
+    },
+    {
+      "producer": "68fc4608806b0b33c8cec445a306f03e05ef50a5",
+      "tests": 3,
+      "failures": 2,
+      "reason": "Two setup transactions reused provider instance within the shared fixture tenant; SQL uniqueness retained and exact-version fixture identity corrected."
+    }
+  ]
+}

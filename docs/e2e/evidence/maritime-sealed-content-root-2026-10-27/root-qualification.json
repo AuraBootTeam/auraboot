@@ -1,0 +1,73 @@
+{
+  "sourceProducer": "c4dc37ddcb7dd5c50c1889c63d59677562b0ad25",
+  "hostTestsExecuted": 87,
+  "apiVectorsReusedFromPrecedingRun": 4,
+  "suites": [
+    {
+      "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest",
+      "tests": 50,
+      "timestamp": "2026-10-27T03:09:50.433Z",
+      "sha256": "40da6c06638e3d4fda11499ad445f52675bd132f9907a30777f5e5b81e2c87c0",
+      "apiTaskReusedUnchangedResult": false
+    },
+    {
+      "name": "com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest",
+      "tests": 8,
+      "timestamp": "2026-10-27T03:09:52.751Z",
+      "sha256": "368417382a086167ebdfcefb9bc2a22a1c088b42fed55c747be505092e27a404",
+      "apiTaskReusedUnchangedResult": false
+    },
+    {
+      "name": "com.auraboot.framework.permission.service.impl.PermissionSnapshotCacheTest",
+      "tests": 20,
+      "timestamp": "2026-10-27T03:09:52.507Z",
+      "sha256": "5423bb70211eec446012fc5ccb76d318b9b4700985f02da036a6aea4f90a7bd6",
+      "apiTaskReusedUnchangedResult": false
+    },
+    {
+      "name": "com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest",
+      "tests": 7,
+      "timestamp": "2026-10-27T03:09:52.939Z",
+      "sha256": "5ebafac96b2359e7a89dd330944da78ca070dedb0698e8d2d9875a5277f6be08",
+      "apiTaskReusedUnchangedResult": false
+    },
+    {
+      "name": "com.auraboot.framework.workbench.service.AnnouncementSealWriterLockOrderTest",
+      "tests": 2,
+      "timestamp": "2026-10-27T03:09:52.996Z",
+      "sha256": "d74cc7c0d3574557b7546571d442048ee875342a1ca9ed787fded069e35ff0bc",
+      "apiTaskReusedUnchangedResult": false
+    },
+    {
+      "name": "com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest",
+      "tests": 4,
+      "timestamp": "2026-10-27T03:08:37.170Z",
+      "sha256": "48ca76754ececec9d1e7ae2aedb05c1f80b00846a5f778a20022bcb674109452",
+      "apiTaskReusedUnchangedResult": true
+    }
+  ],
+  "hermeticOnly": true,
+  "postgresCapabilityTestsExecuted": false,
+  "nativeCommandExecutorChainExecuted": false,
+  "runtimePrimaryPublisherRevocationExecuted": false,
+  "freshSchemaMigrationCount": 157,
+  "snapshotAddedLines": 66,
+  "snapshotSha256": "4f161d3882631a1c7e293670a57e7d6369ff0edb96e5c6e4f8960a8de72d0ca9",
+  "previousFailures": [
+    {
+      "producer": "e84ad7955",
+      "classification": "test-compilation",
+      "cause": "Missing static Mockito.mock import; no tests executed."
+    },
+    {
+      "producer": "01c4010b2",
+      "classification": "test-oracle",
+      "cause": "Expected generic internal error identity rather than existing translated BusinessException; 2 failed."
+    },
+    {
+      "producer": "adc55e82c",
+      "classification": "product-defect",
+      "cause": "Typed host ConflictException translated to BadParam in PF4J path; 2 failed. Corrected in c4dc37ddc."
+    }
+  ]
+}
