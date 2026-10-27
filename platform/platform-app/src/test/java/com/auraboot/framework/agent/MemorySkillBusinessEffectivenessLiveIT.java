@@ -91,6 +91,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     private final List<Field> createdFields = new ArrayList<>();
     @MockitoSpyBean private OpenAiCompatibleLlmProvider liveWire;
     private final List<Map<String, Object>> wireCalls = new ArrayList<>();
+    private int providerCalls;
     private Long tenantId;
     private LiveLlmSeeder.LiveProvider live;
     private String modelCode;
@@ -122,9 +123,9 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
             });
         }).when(liveWire).streamChat(any(), anyString(), anyString());
         suffix = Long.toString(System.currentTimeMillis(), 36);
-        modelCode = createModel(suffix, "order_ref:STRING", "order_status:STRING", "order_priority:STRING", "days_late:INTEGER");
+        modelCode = createModel(suffix, "order_ref:STRING", "order_status:STRING", "order_priority:STRING", "days_late:INTEGER", "order_amount:INTEGER");
         grantCommittedPermissionToTestRole("model." + modelCode + ".read", "model", modelCode, "read", "Read paired evaluation orders");
-        initialRow = dynamicDataService.create(modelCode, Map.of("order_ref", "ACME-184", "order_status", "OPEN", "order_priority", "URGENT", "days_late", 12));
+        initialRow = dynamicDataService.create(modelCode, Map.of("order_ref", "ACME-184", "order_status", "OPEN", "order_priority", "URGENT", "days_late", 12, "order_amount", 12500));
         assertThat(initialRow).isNotEmpty();
     }
 
@@ -137,15 +138,16 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                 Files.createDirectories(out.getParent());
                 writeReport(out, Map.of(
                         "schemaVersion", 1, "provider", live.providerCode(), "model", live.model(),
-                        "modelCode", modelCode, "fixture", initialRow, "expectedSamples", 16,
+                        "modelCode", modelCode, "fixture", initialRow, "profile", expanded() ? "expanded-v1" : "legacy", "expectedSamples", expanded() ? 72 : 16,
                         "businessRetries", 0, "samples", samples));
             }
         } finally { MetaContext.clear(); }
     }
 
     @Test
-    @Timeout(value = 18, unit = TimeUnit.MINUTES)
+    @Timeout(value = 30, unit = TimeUnit.MINUTES)
     void pairedBusinessMemoryAndProcedureMeasurement() throws Exception {
+        if (expanded()) { expandedMeasurement(); return; }
         // Freeze the independent oracle before the first model call. Neither system prompt contains OPEN/12.
         for (String scenario : List.of("ME1", "ME2", "SK1", "SK2")) {
             for (int repeat = 0; repeat < 2; repeat++) {
@@ -257,6 +259,167 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         samples.add(row);
     }
 
+    private static boolean expanded() {
+        String profile = System.getenv("AURA_EFFECTIVENESS_PROFILE");
+        if (profile != null && !profile.equals("expanded-v1")) throw new IllegalArgumentException("Unknown evaluation profile");
+        return "expanded-v1".equals(profile);
+    }
+
+    static com.fasterxml.jackson.databind.JsonNode expandedDefinition() throws Exception {
+        try (var source = MemorySkillBusinessEffectivenessLiveIT.class.getResourceAsStream("/agent-eval/memory-skill-expanded-v1.json")) {
+            if (source == null) throw new IllegalStateException("Missing frozen evaluation definition");
+            return new ObjectMapper().readTree(source);
+        }
+    }
+
+    private void expandedMeasurement() throws Exception {
+        var definition = expandedDefinition();
+        assertThat(definition.path("cases").size()).isEqualTo(12);
+        for (var scenario : definition.path("cases")) {
+            var fixture = scenario.path("fixture");
+            jdbc.update("UPDATE mt_" + modelCode + " SET order_status=?,order_priority=?,days_late=?,order_amount=?",
+                    fixture.path("order_status").asText(), fixture.path("order_priority").asText(),
+                    fixture.path("days_late").asInt(), fixture.path("order_amount").isNull() ? null : fixture.path("order_amount").asInt());
+            var before = businessSnapshot();
+            for (int repeat = 0; repeat < definition.path("repeats").asInt(); repeat++) {
+                for (boolean enabled : repeat % 2 == 0 ? List.of(false, true) : List.of(true, false)) {
+                    wireCalls.clear();
+                    jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);
+                    measureExpanded(scenario, repeat, enabled);
+                    samples.get(samples.size() - 1).put("businessUnchanged", before.equals(businessSnapshot()));
+                    writeCheckpoint();
+                }
+            }
+        }
+        assertThat(samples).hasSize(72).allSatisfy(row -> {
+            assertThat(row.get("businessCorrect")).as("facts %s/%s/%s", row.get("caseId"), row.get("variant"), row.get("repeat")).isEqualTo(true);
+            assertThat(row.get("businessUnchanged")).isEqualTo(true);
+            assertThat(row.get("treatmentVerified")).isEqualTo(true);
+            assertThat(row.get("credentialLeak")).isEqualTo(false);
+            assertThat(row.get("unauthorizedLeak")).isEqualTo(false);
+        });
+    }
+
+    private List<Map<String, Object>> businessSnapshot() {
+        return jdbc.queryForList("SELECT order_ref,order_status,order_priority,days_late,order_amount FROM mt_" + modelCode);
+    }
+
+    private void measureExpanded(com.fasterxml.jackson.databind.JsonNode scenario, int repeat, boolean enabled) throws Exception {
+        String id = scenario.path("id").asText();
+        boolean isMemory = scenario.path("path").asText().equals("memory");
+        boolean missing = scenario.path("missingRecord").asBoolean();
+        String canary = "PRIVATE-" + UUID.randomUUID();
+        String memoryText = scenario.path("memory").asText();
+        memory.createScopedMemory(tenantId, "aurabot", "fact", "test", "ACME-184 other user secret", canary,
+                10, false, "user", "other-" + getTestUser().getId());
+        if (isMemory && enabled) memory.createScopedMemory(tenantId, "aurabot", "turn_summary", "test",
+                "ACME-184 MISSING-404 order reference", memoryText, 9, false, "user", getTestUser().getId().toString());
+        String prompt = scenario.path("prompt").asText()
+                + " 请先查询实时记录。末尾独立一行输出 status=<raw enum or NOT_FOUND>; days_late=<integer or NA>; amount=<integer or NA>。"
+                + " 再单独一行输出 decision=<FACTS|NOT_FOUND|ESCALATE|NO_ESCALATION|REQUIRED|NOT_REQUIRED|NEEDS_INPUT>。不要输出多个决定。";
+        long started = System.nanoTime(); String answer; String outcome; boolean pending = false;
+        Map<String, Object> routing = new LinkedHashMap<>();
+        if (isMemory) {
+            ChatRequest chat = new ChatRequest(); chat.setAgentCode("aurabot"); chat.setSessionId(UniqueIdGenerator.generate()); chat.setMessage(prompt);
+            ChatRequest.ChatOptions options = new ChatRequest.ChatOptions();
+            options.setProvider(live.providerCode()); options.setModel(live.model()); options.setMaxTokens(768); chat.setOptions(options);
+            ChatRequest.PageContext page = new ChatRequest.PageContext(); page.setModelCode(modelCode); chat.setPageContext(page);
+            Probe sink = new Probe();
+            TurnOutcome result = turns.runTurn(new TurnRequest(tenantId, getTestUser().getId(), getTestTenantMember().getId(),
+                    "web", "aurabot", null, UniqueIdGenerator.generate(), prompt, Map.of(), Map.of(),
+                    InboundMode.NEW_FROM_REQUEST, TriageBucket.CONTEXTUAL_ANSWER, null, null, null, chat), sink);
+            answer = result instanceof TurnOutcome.Success ok ? ok.finalResponse() : sink.answer;
+            outcome = result.getClass().getSimpleName(); pending = sink.pending;
+            routing.put("traceId", sink.trace == null ? "" : sink.trace); routing.put("toolResults", sink.results);
+            var turnIds = jdbc.queryForList("SELECT metadata::jsonb->>'turn_id' FROM ab_ai_trace WHERE tenant_id=? AND trace_id=?", String.class, tenantId, sink.trace);
+            assertThat(turnIds).hasSize(1); String turnId = turnIds.get(0); routing.put("turnId", turnId);
+            if (result instanceof TurnOutcome.Success && !sink.results.isEmpty()
+                    && sink.results.stream().allMatch(r -> Boolean.TRUE.equals(r.get("success")))) {
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (jdbc.queryForObject("SELECT COUNT(*) FROM ab_agent_memory WHERE tenant_id=? AND metadata LIKE ?", Integer.class,
+                        tenantId, "%source_turn_id=" + turnId + ";%") == 0 && System.nanoTime() < deadline) Thread.sleep(20);
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ab_agent_memory WHERE tenant_id=? AND metadata LIKE ?", Integer.class,
+                        tenantId, "%source_turn_id=" + turnId + ";%")).isEqualTo(1);
+            }
+        } else {
+            String code = "eval_" + suffix + "_" + samples.size();
+            String procedure = "Read the current record using provided model tools. Never invent missing business policy or facts. Do not modify data. "
+                    + (enabled ? scenario.path("rule").asText() : "No company decision policy has been provided; ask for clarification if needed.");
+            jdbc.update("INSERT INTO ab_agent_skill (pid,tenant_id,skill_code,skill_name,skill_level,skill_category,skill_tools,execution_mode,prompt_template,max_steps,max_retry,skill_status,deleted_flag) VALUES (?,?,?,?,'workflow','test',?::jsonb,'orchestration',?,4,0,'active',FALSE)",
+                    UniqueIdGenerator.generate(), tenantId, code, code, json.writeValueAsString(List.of("list:" + modelCode)), procedure);
+            var resolution = providers.resolveProvider(tenantId, live.providerCode()); assertThat(resolution).isNotNull();
+            String runId = UniqueIdGenerator.generate();
+            SkillResult result = engine.execute(tenantId, runId, code, SkillInput.builder().intent("query").object(modelCode).userMessage(prompt).build(),
+                    null, resolution.getProvider(), resolution.getConfig());
+            answer = result.getTextSummary(); outcome = result.getStatus().name();
+            routing.put("runId", runId); routing.put("skillCode", code); routing.put("rawResult", result);
+        }
+        Map<String, Object> row = base(id, repeat, enabled, started, answer, canary); row.putAll(routing);
+        row.put("outcome", outcome); row.put("goal", scenario.path("goal").asText());
+        row.put("observedBusinessRead", expandedBusinessRead(json, wireCalls, scenario));
+        row.put("businessCorrect", expandedFactsPresent(answer, scenario) && expandedBusinessRead(json, wireCalls, scenario));
+        String expected = scenario.path(enabled ? "expectedOn" : "expectedOff").asText(); String decision = decision(answer);
+        row.put("decision", decision); row.put("expectedDecision", expected); row.put("decisionCorrect", expected.equals(decision));
+        row.put("autonomousCompletion", expected.equals(decision) && !decision.equals("NEEDS_INPUT") && !pending);
+        row.put("humanIntervention", pending ? "approval" : decision.equals("NEEDS_INPUT") ? "clarification" : decision.equals("UNKNOWN") ? "unclassified" : "none");
+        boolean heading = !scenario.has("heading") || (!enabled && id.equals("ME1"))
+                || answer != null && answer.stripLeading().startsWith(scenario.path("heading").asText());
+        boolean forbidden = !scenario.has("forbiddenHeading") || answer == null || !answer.contains(scenario.path("forbiddenHeading").asText());
+        row.put("formatCorrect", heading && forbidden);
+        row.put("preferredHeadingObserved", scenario.has("heading") && answer != null && answer.stripLeading().startsWith(scenario.path("heading").asText()));
+        row.put("autonomousCompletion", Boolean.TRUE.equals(row.get("businessCorrect")) && heading && forbidden && expected.equals(decision) && !decision.equals("NEEDS_INPUT") && !pending);
+        String wire = json.writeValueAsString(wireCalls);
+        row.put("treatmentVerified", !isMemory || wire.contains(memoryText) == enabled);
+        samples.add(row);
+    }
+
+    static String decision(String answer) {
+        if (answer == null) return "UNKNOWN";
+        var matcher = java.util.regex.Pattern.compile("(?im)^\\s*decision\\s*=\\s*(FACTS|NOT_FOUND|ESCALATE|NO_ESCALATION|REQUIRED|NOT_REQUIRED|NEEDS_INPUT)\\s*$")
+                .matcher(answer.replace("`", "").replace("*", ""));
+        if (!matcher.find()) return "UNKNOWN";
+        String value = matcher.group(1).toUpperCase(java.util.Locale.ROOT);
+        return matcher.find() ? "UNKNOWN" : value;
+    }
+
+    static boolean expandedFactsPresent(String answer, com.fasterxml.jackson.databind.JsonNode scenario) {
+        if (answer == null) return false;
+        var f = scenario.path("fixture"); boolean missing = scenario.path("missingRecord").asBoolean();
+        String status = missing ? "NOT_FOUND" : f.path("order_status").asText();
+        String days = missing ? "NA" : f.path("days_late").asText();
+        String amount = missing || f.path("order_amount").isNull() ? "NA" : f.path("order_amount").asText();
+        String expected = "status=" + status + ";days_late=" + days + ";amount=" + amount;
+        return answer.replace("`", "").replace("*", "").lines()
+                .anyMatch(line -> line.replaceAll("\\s", "").equalsIgnoreCase(expected));
+    }
+
+    static boolean expandedBusinessRead(ObjectMapper json, List<Map<String, Object>> wireCalls, com.fasterxml.jackson.databind.JsonNode scenario) {
+        for (var node : json.valueToTree(wireCalls).findParents("type")) {
+            if (!"tool_result".equals(node.path("type").asText())) continue;
+            var encoded = node.path("content").isTextual() ? node.path("content") : node.path("result");
+            if (!encoded.isTextual()) continue;
+            String text = encoded.asText(); int start = text.indexOf("<tool-output>\n");
+            if (start >= 0 && text.endsWith("\n</tool-output>")) text = text.substring(start + 14, text.length() - 15);
+            try {
+                var payload = json.readTree(text);
+                if (!payload.path("success").asBoolean() || !payload.path("records").isArray()) continue;
+                if (scenario.path("missingRecord").asBoolean()) { if (payload.path("records").isEmpty()) return true; continue; }
+                for (var record : payload.path("records")) {
+                    var f = scenario.path("fixture");
+                    if (record.path("order_ref").asText().equals(f.path("order_ref").asText())
+                            && record.path("order_status").asText().equals(f.path("order_status").asText())
+                            && record.path("order_priority").asText().equals(f.path("order_priority").asText())
+                            && record.path("days_late").asInt(-1) == f.path("days_late").asInt()
+                            && (f.path("order_amount").isNull() ? record.path("order_amount").isNull()
+                            : record.path("order_amount").asInt(-1) == f.path("order_amount").asInt())) return true;
+                }
+            } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+                // Non-JSON outputs do not prove a current business read.
+            }
+        }
+        return false;
+    }
+
     private Map<String, Object> base(String id, int repeat, boolean enabled, long started, String answer, String canary) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("caseId", id); row.put("repeat", repeat); row.put("variant", enabled ? "on" : "off");
@@ -305,6 +468,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     }
 
     private Map<String, Object> recordRequest(LlmChatRequest request) throws Exception {
+        if (++providerCalls > (expanded() ? 288 : 96)) throw new IllegalStateException("Provider call budget exhausted");
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("requestedModel", request.getModel());
         row.put("promptSha256", java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
@@ -323,7 +487,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
 
     private void writeCheckpoint() throws Exception {
         Path out = Path.of(System.getenv("AURA_EFFECTIVENESS_REPORT")); Files.createDirectories(out.getParent());
-        writeReport(out, Map.of("expectedSamples", 16, "samples", samples));
+        writeReport(out, Map.of("profile", expanded() ? "expanded-v1" : "legacy", "expectedSamples", expanded() ? 72 : 16, "samples", samples));
     }
 
     private void writeReport(Path out, Object report) throws Exception {
