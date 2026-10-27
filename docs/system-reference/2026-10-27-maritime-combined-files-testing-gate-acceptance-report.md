@@ -53,3 +53,10 @@ did_not_run: product HTTP/browser and independent combined mutations
 remaining_blockers: consumer admission and real journey verification
 allowed_claim: scoped backend evidence only
 ```
+
+
+## Attachment initialization failure cleanup
+
+Independent review exposed a query-scope lifetime defect in the first integration: file capability initialization preceded the cleanup block. Two new regression cases executed against that implementation both failed on a leaked active query scope. The repair now closes nested resources in reverse order, including when file initialization fails, while preserving an existing caller query scope and the original exception classification. An intermediate resource layout wrapped initialization errors through the handler translator and failed the same two regression cases; that failed round is retained rather than relabeled.
+
+Fixed producer `0298a79200960ed6625bd8a18ee5c3e34f10cd46` ran the full same targeted hermetic set plus both new regressions: 217 executed, 217 passed, 0 failures/errors/skips. It also rebuilt the boot artifact; the API bytes remain identical to the b297 candidate. See the [cleanup proof](./evidence/maritime-combined-files-2026-10-27/scope-cleanup-proof.json). The prior 16 PostgreSQL cases remain explicitly bound to b297: this follow-up did not change the file factory, guards or mapper implementation, and those cases were not rerun. Current cleanup evidence is hermetic, not a new PostgreSQL or consumer acceptance claim. The independently observed old-implementation leak is the falsifiability witness for this cleanup property only. Product admission remains pending.
