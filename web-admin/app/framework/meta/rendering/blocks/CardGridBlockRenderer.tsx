@@ -1,3 +1,4 @@
+import { resolveRowActionModel } from './rowActionModel';
 /**
  * CardGridBlockRenderer - Generic responsive card-grid block.
  *
@@ -131,8 +132,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     token: token || undefined,
   });
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
-  const schema = runtime.getSchema();
-  const tableName = (schema as any).modelCode || (schema as any).id || '';
+  const tableName = resolveRowActionModel(block, runtime);
   const dataSourceManager = runtime.getDataSourceManager();
 
   const showToast = useCallback(

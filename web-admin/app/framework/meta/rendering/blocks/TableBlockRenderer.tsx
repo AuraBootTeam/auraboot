@@ -1,3 +1,4 @@
+import { resolveRowActionModel } from './rowActionModel';
 import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { Pagination } from '~/ui/Pagination';
 import { readServerTablePage, ServerTablePageError, type ServerTablePage } from './serverTablePage';
@@ -174,8 +175,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
   const { token, hasPermission } = useAuth();
-  const schema = runtime.getSchema();
-  const tableName = (schema as any).modelCode || schema.id || '';
+  const tableName = resolveRowActionModel(block, runtime);
 
   const { handleAction: dispatchAction } = useActionHandler({
     runtime,

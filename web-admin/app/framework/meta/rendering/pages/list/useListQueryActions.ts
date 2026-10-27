@@ -1,3 +1,4 @@
+import { findListFilterTabsBlock } from './listSchemaPolicy';
 import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import React, { useCallback, useEffect, useMemo } from 'react';
@@ -295,7 +296,7 @@ export function useListQueryActions(
       // Compute tab filter directly (don't rely on getTabFilter since activeTab is stale in closure)
       let tabCondition: ListQueryFilterCondition | null = null;
       if (schema?.blocks) {
-        const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
+        const tabsBlock = findListFilterTabsBlock(schema.blocks);
         const tabDef = (tabsBlock?.tabs as any[])?.find((t: any) => t.key === tabKey);
         if (tabDef?.filter) {
           tabCondition = tabFilterToQueryCondition(tabDef.filter, user?.pid);
