@@ -1191,6 +1191,120 @@ describe('DataSourceManager', () => {
 // clicked a filter. dependOn must gate re-fetches, not the initial fetch —
 // undefined filter leaves are dropped downstream (removeBlankFilters /
 // normalizeApiParams), so the first load is safe.
+// Regression for the MES-M10 rework workbench (goal14): when the page runtime
+// is recreated over the shared DataSourceManager (StrictMode remount / runtime
+// rebuild), bindStateManager bumps fetchVersions and drops in-flight responses.
+// Both initial-fetch responses then failed the stale check and NOTHING
+// re-triggered them — the queue table rendered its empty state even though the
+// API responses (carrying projection columns like mfg_rwo_route_code_snapshot)
+// had arrived. The rebind must re-issue initial loads under the new binding.
+describe('rebind re-issues invalidated initial fetches', () => {
+  const reworkRow = {
+    pid: '01M5ZDP20GDNJDDFVM75YYGG3W',
+    mfg_rwo_code: 'RW-20261027-41CB1F3E1A',
+    mfg_rwo_finished_sn: 'AMOS-W2-FIN-QUALIFIED',
+    mfg_rwo_status: 'open',
+    mfg_rwo_priority: 'high',
+    mfg_rwo_route_code_snapshot: 'AMOS-W2-RWR-G14B',
+    mfg_rwo_operation_id_display: 'AOI 复判',
+  };
+
+  const registerReworkQueue = (manager: DataSourceManager) => {
+    manager.register('reworkQueue', {
+      type: 'api',
+      method: 'get',
+      endpoint: '/api/dynamic/mfg_rework_order_pcba_execution_list/list',
+      adaptor: 'table',
+      params: {
+        pageNum: 1,
+        pageSize: 50,
+        sortField: 'mfg_rwo_priority',
+        filters: [
+          { fieldName: 'mfg_rwo_status', operator: 'IN', value: '${state.statusFilter}' },
+          { fieldName: 'mfg_rwo_priority', operator: 'IN', value: '${state.priorityFilter}' },
+        ],
+        keyword: '${state.searchKeyword}',
+        sortOrder: 'desc',
+      },
+      dependOn: ['state.statusFilter', 'state.priorityFilter', 'state.searchKeyword'],
+    });
+  };
+
+  const createStateManager = () => {
+    const stateManager = new ScopedStateManager({
+      locale: 'zh-CN',
+      theme: 'light',
+      user: undefined,
+      tenant: undefined,
+      t: (key: string) => key,
+    } as any);
+    stateManager.createScope('scope-wb', { state: {} });
+    return stateManager;
+  };
+
+  beforeEach(() => {
+    mockedFetchResult.mockReset();
+    mockedFetchResult.mockResolvedValue({
+      code: '0',
+      data: { records: [reworkRow], total: 1, current: 1, pageSize: 50 },
+    } as any);
+  });
+
+  it('re-issues initial fetches after a rebind so the new scope receives its rows', async () => {
+    const manager = new DataSourceManager(createExpressionContext({ state: {} } as any));
+    registerReworkQueue(manager);
+    manager.bindStateManager(createStateManager(), 'scope-wb'); // first bind
+    manager.bindStateManager(createStateManager(), 'scope-wb'); // runtime recreated → rebind
+
+    await waitFor(() => expect(manager.getState('reworkQueue')?.lastFetch).not.toBeNull());
+    expect(manager.getData('reworkQueue')).toEqual({
+      records: [reworkRow],
+      total: 1,
+      current: 1,
+      pageSize: 50,
+    });
+    manager.clear();
+  });
+
+  it('still discards in-flight responses captured before the rebind', async () => {
+    let releaseOldScopeResponse: (value: any) => void = () => {};
+    mockedFetchResult.mockImplementationOnce(
+      () => new Promise((resolve) => { releaseOldScopeResponse = resolve; }),
+    );
+    const newRow = { ...reworkRow, pid: 'new-scope-pid', mfg_rwo_code: 'RW-NEW-SCOPE' };
+    mockedFetchResult.mockResolvedValue({
+      code: '0',
+      data: { records: [newRow], total: 1, current: 1, pageSize: 50 },
+    } as any);
+
+    const manager = new DataSourceManager(createExpressionContext({ state: {} } as any));
+    registerReworkQueue(manager); // fetch #1 hangs on the gated promise
+    manager.bindStateManager(createStateManager(), 'scope-wb');
+    manager.bindStateManager(createStateManager(), 'scope-wb'); // rebind → refetch resolves
+
+    await waitFor(() => expect(manager.getData('reworkQueue')).toEqual({
+      records: [newRow],
+      total: 1,
+      current: 1,
+      pageSize: 50,
+    }));
+
+    // The old-scope response lands late; it must not overwrite the new scope.
+    releaseOldScopeResponse({
+      code: '0',
+      data: { records: [{ ...reworkRow, pid: 'old-scope-pid' }], total: 9, current: 1, pageSize: 50 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(manager.getData('reworkQueue')).toEqual({
+      records: [newRow],
+      total: 1,
+      current: 1,
+      pageSize: 50,
+    });
+    manager.clear();
+  });
+});
+
 describe('dependOn gates re-fetches, not the initial fetch', () => {
   beforeEach(() => {
     mockedFetchResult.mockReset();

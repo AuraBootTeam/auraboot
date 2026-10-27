@@ -283,7 +283,15 @@ export class DataSourceManager {
    * 绑定 ScopedStateManager,用于依赖追踪和上下文刷新
    */
   bindStateManager(stateManager: ScopedStateManager, scopeId: string) {
-    if (this.stateManager && !this.isBoundTo(stateManager, scopeId)) {
+    // A rebind (runtime recreated over the shared manager) invalidates every
+    // in-flight response via the version bump below. Without re-issuing the
+    // initial loads those responses are silently dropped and NOTHING re-triggers
+    // them: the new scope would render empty until a user action writes state
+    // (workbench queue tables stayed blank on first paint). Re-fetch under the
+    // new binding — old-scope responses stay discarded (isolation preserved),
+    // new-scope responses carry the bumped version and are accepted.
+    const rebinding = Boolean(this.stateManager && !this.isBoundTo(stateManager, scopeId));
+    if (rebinding) {
       this.dataSourceStates.forEach((state, id) => {
         this.fetchVersions.set(id, (this.fetchVersions.get(id) ?? 0) + 1);
         this.dataSourceStates.set(id, { ...state, data: null, error: null, loading: false });
@@ -322,6 +330,14 @@ export class DataSourceManager {
       this.cleanupDependency(id);
       this.registerDependencies(id, config);
     });
+
+    if (rebinding) {
+      this.dataSources.forEach((config, id) => {
+        if (config.autoFetch || (config.dependOn && config.dependOn.length > 0)) {
+          this.fetch(id);
+        }
+      });
+    }
   }
 
   isBoundTo(stateManager: ScopedStateManager, scopeId: string): boolean {
