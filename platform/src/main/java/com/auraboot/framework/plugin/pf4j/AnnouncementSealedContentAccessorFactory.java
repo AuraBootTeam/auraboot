@@ -91,7 +91,8 @@ public class AnnouncementSealedContentAccessorFactory {
         Actor actor=current();
         String model=context.getCommand().getModelCode(),command=context.getCommand().getCode();
         String target=MetaContext.getCommandPermitTargetFor(model);
-        if(actor.tenant()==null || actor.user()==null || actor.member()==null || actor.userPid()==null
+        if(actor.tenant()==null || actor.tenant()<1 || actor.user()==null || actor.user()<1
+                || actor.member()==null || actor.member()<1 || actor.userPid()==null
                 || actor.userPid().isBlank() || !Objects.equals(actor.tenant(),context.getTenantId())
                 || !Objects.equals(actor.user(),context.getUserId()) || target==null || target.isBlank()
                 || !target.equals(context.getRequest().getTargetRecordId())

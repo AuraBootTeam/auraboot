@@ -55,17 +55,21 @@ public class AnnouncementContentSealService {
         if(seals.seal(tenant,version)!=null) throw unavailable();
         var snapshot=codec.object(snapshotJson);
         if(!snapshotHash.equals(codec.hash(snapshot))) throw unavailable();
-        var document=document(snapshot,observeAttachments(snapshot));
+        var document=document(snapshot,observeAttachments(tenant,snapshot));
         var encoded=AnnouncementDocumentCanonicalizer.encode(document);
         if(seals.insert(tenant,root,version,snapshotHash,encoded.canonicalJson(),encoded.documentDigest(),sealIdentity(tenant,root,version,snapshotHash,encoded.documentDigest()))!=1)
             throw new IllegalStateException("Official content seal was not persisted");
+        verifyBeforeCommit(tenant,version,snapshotHash,snapshot);
     }
 
     /** Publication checks new evidence when present; legacy versions remain readable but never gain a seal. */
     @Transactional(propagation=Propagation.MANDATORY)
     public void verifyForRelease(Long tenant,String version,String snapshotHash,Map<String,Object> snapshot) {
         requireTenant(tenant);
-        if(seals.seal(tenant,version)!=null) verifySeal(tenant,version,snapshotHash,snapshot);
+        if(seals.seal(tenant,version)!=null) {
+            verifySeal(tenant,version,snapshotHash,snapshot);
+            verifyBeforeCommit(tenant,version,snapshotHash,snapshot);
+        }
     }
 
     @Transactional(propagation=Propagation.MANDATORY)
@@ -93,8 +97,12 @@ public class AnnouncementContentSealService {
         var row=submissions.read(tenant,submission);
         if(row==null || row.get("terminal_result_pid")==null) throw unavailable();
         var binding=bindings.read(row);
+        if(!expected.announcementPid().equals(binding.businessRef().recordPid())
+                || !"announcement.v1".equals(binding.snapshotSchema())) throw unavailable();
         var snapshot=codec.object((String)version.get("snapshot"));
-        if(!expected.expectedSnapshotHash().equals(codec.hash(snapshot))) throw unavailable();
+        if(!expected.expectedSnapshotHash().equals(codec.hash(snapshot))
+                || !Objects.equals(expiry,snapshot.get("expiresAt")==null ? null : Instant.parse(snapshot.get("expiresAt").toString())))
+            throw unavailable();
         var document=verifySeal(tenant,expected.versionPid(),expected.expectedSnapshotHash(),snapshot);
         var encoded=AnnouncementDocumentCanonicalizer.encode(document);
         var definition=binding.definition();
@@ -103,12 +111,19 @@ public class AnnouncementContentSealService {
                 definition.version(),definition.hash()),(String)seals.seal(tenant,expected.versionPid()).get("seal_identity"),memberPid,now,expiry);
     }
 
+    private void verifyBeforeCommit(Long tenant,String version,String hash,Map<String,Object> snapshot) {
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void beforeCommit(boolean readOnly) { verifySeal(tenant,version,hash,snapshot); }
+                });
+    }
+
     private Document verifySeal(Long tenant,String version,String hash,Map<String,Object> snapshot) {
         var seal=seals.seal(tenant,version);
         if(seal==null || !hash.equals(seal.get("snapshot_hash"))
                 || !AnnouncementDocumentCanonicalizer.SCHEMA.equals(seal.get("projection_schema"))
                 || !"SEAL_OBSERVED_CONTENT".equals(seal.get("source_identity_kind"))) throw unavailable();
-        var current=document(snapshot,observeAttachments(snapshot));
+        var current=document(snapshot,observeAttachments(tenant,snapshot));
         var encoded=AnnouncementDocumentCanonicalizer.encode(current);
         if(!encoded.canonicalJson().equals(seal.get("canonical_projection"))
                 || !encoded.documentDigest().equals(seal.get("document_digest"))
@@ -122,7 +137,7 @@ public class AnnouncementContentSealService {
         return new Document(title,content,attachments);
     }
 
-    private List<Attachment> observeAttachments(Map<String,Object> snapshot) {
+    private List<Attachment> observeAttachments(Long tenant,Map<String,Object> snapshot) {
         if(!(snapshot.get("policy") instanceof Map<?,?> policy)
                 || !(policy.get("attachmentPids") instanceof List<?> pids)
                 || !(policy.get("attachmentMetadata") instanceof List<?> metadata) || pids.size()!=metadata.size()) throw unavailable();
@@ -137,7 +152,7 @@ public class AnnouncementContentSealService {
             var matches=metadata.stream().filter(v->v instanceof Map<?,?> m && pid.equals(m.get("fileId"))).toList();
             if(matches.size()!=1) throw unavailable();
             var declared=(Map<?,?>)matches.getFirst();
-            var file=fileRows.selectActiveByPidForUpdate(MetaContext.getCurrentTenantId(),pid);
+            var file=fileRows.selectActiveByPidForUpdate(tenant,pid);
             if(file==null || !pid.equals(file.getPid()) || Boolean.TRUE.equals(file.getDeletedFlag())
                     || !"success".equals(file.getStatus()) || !Boolean.TRUE.equals(file.getRetentionLocked())
                     || file.getStorageType()!=storage.type() || file.getFileName()==null || file.getFileName().isBlank()
@@ -148,7 +163,7 @@ public class AnnouncementContentSealService {
             try(var input=storage.download(file.getFileName())) {
                 if(input==null) throw unavailable();
                 byte[] buffer=new byte[65536]; int read;
-                while((read=input.read(buffer))!=-1) { length=Math.addExact(length,read); digest.update(buffer,0,read); }
+                while((read=input.read(buffer))!=-1) { length=Math.addExact(length,read); if(length>file.getFileSize()) throw unavailable(); digest.update(buffer,0,read); }
             } catch(IOException failure) { throw new IllegalStateException("Sealed attachment source is unavailable",failure); }
             if(length!=file.getFileSize()) throw unavailable();
             String bytes=HexFormat.of().formatHex(digest.digest());
