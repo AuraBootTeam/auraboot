@@ -12,13 +12,22 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -135,17 +144,38 @@ class MemoryEmbeddingScaleLiveIT extends BaseIntegrationTest {
                     long started = System.nanoTime();
                     var actual = memories.searchScopedSemanticInSpace(tenant, user, agent, vector, 5).stream().map(row -> row.get("pid").toString()).toList();
                     double elapsed = (System.nanoTime() - started) / 1_000_000d;
-                    assertThat(actual).doesNotContainAnyElementsOf(forbidden); assertThat(actual).allMatch(valid::contains);
+                    assertThat(actual).noneMatch(forbidden::contains); assertThat(actual).allMatch(valid::contains);
                     double recall = actual.stream().filter(exact::contains).count() / 5d;
-                    measurements.add(Map.of("query", query.path("id").asText(), "exact", exact, "actual", actual, "recallAt5", recall, "elapsedMs", elapsed));
+                    String productionSql = ReflectionTestUtils.invokeMethod(memories, "semanticSearchSql");
+                    var ann = new TransactionTemplate(transactions).execute(status -> {
+                        jdbc.execute("SET LOCAL enable_seqscan=off"); jdbc.execute("SET LOCAL enable_bitmapscan=off"); jdbc.execute("SET LOCAL enable_sort=off");
+                        jdbc.execute("SET LOCAL hnsw.iterative_scan=off"); jdbc.execute("SET LOCAL hnsw.ef_search=40");
+                        String plan = jdbc.queryForObject("EXPLAIN (FORMAT JSON) " + productionSql, String.class, agent, space, tenant, user, literal, 5);
+                        long annStarted = System.nanoTime();
+                        var hits = memories.searchScopedSemanticInSpace(tenant, user, agent, vector, 5).stream().map(row -> row.get("pid").toString()).toList();
+                        double annElapsedMs = (System.nanoTime() - annStarted) / 1_000_000d;
+                        assertThat(jdbc.queryForObject("SELECT current_setting('hnsw.iterative_scan')", String.class)).as("joined transaction setting restored").isEqualTo("off");
+                        assertThat(jdbc.queryForObject("SELECT current_setting('hnsw.ef_search')", String.class)).as("joined transaction budget restored").isEqualTo("40");
+                        return Map.<String,Object>of("elapsedMs", annElapsedMs, "plan", plan, "hnsw", plan.contains("idx_agent_memory_embedding"), "hits", hits,
+                                "recallAt5", hits.stream().filter(exact::contains).count() / 5d);
+                    });
+                    @SuppressWarnings("unchecked") List<String> annHits = (List<String>) ann.get("hits");
+                    assertThat(annHits).noneMatch(forbidden::contains); assertThat(annHits).allMatch(valid::contains);
+                    measurements.add(Map.of("query", query.path("id").asText(), "exact", exact, "actual", actual, "recallAt5", recall, "elapsedMs", elapsed, "forcedAnn", ann));
                 }
                 double average = measurements.stream().mapToDouble(row -> ((Number)row.get("recallAt5")).doubleValue()).average().orElseThrow();
-                rounds.add(Map.of("corpusRows", size, "visibleRows", valid.size(), "excludedRows", forbidden.size(), "indexedGlobalRows",
+                double annAverage = measurements.stream().mapToDouble(row -> ((Number)((Map<?,?>)row.get("forcedAnn")).get("recallAt5")).doubleValue()).average().orElseThrow();
+                long hnswPlans = measurements.stream().filter(row -> Boolean.TRUE.equals(((Map<?,?>)row.get("forcedAnn")).get("hnsw"))).count();
+                rounds.add(Map.of("averageAnnExactTop5Recall", annAverage, "hnswPlans", hnswPlans, "corpusRows", size, "visibleRows", valid.size(), "excludedRows", forbidden.size(), "indexedGlobalRows",
                         jdbc.queryForObject("SELECT COUNT(*) FROM ab_agent_memory WHERE embedding IS NOT NULL", Integer.class), "averageExactTop5Recall", average, "queries", measurements));
                 report.put("createdRealVectors", created); report.put("reusedVerifiedVectors", reused);
                 Files.createDirectories(output.getParent()); Files.writeString(output, json.writerWithDefaultPrettyPrinter().writeValueAsString(report));
             }
-            assertThat(rounds).allSatisfy(round -> assertThat(((Number)round.get("averageExactTop5Recall")).doubleValue()).isGreaterThanOrEqualTo(.95));
+            assertThat(rounds).allSatisfy(round -> {
+                assertThat(((Number)round.get("averageExactTop5Recall")).doubleValue()).isGreaterThanOrEqualTo(.95);
+                assertThat(((Number)round.get("averageAnnExactTop5Recall")).doubleValue()).isGreaterThanOrEqualTo(.95);
+                assertThat(((Number)round.get("hnswPlans")).intValue()).isEqualTo(24);
+            });
             report.put("status", "pass");
         } finally {
             if (allow == null) System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS"); else System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", allow);
