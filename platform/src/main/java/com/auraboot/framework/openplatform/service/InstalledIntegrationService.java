@@ -183,6 +183,14 @@ public class InstalledIntegrationService {
     @Transactional
     public Map<String,Object> executeSynchronously(MachinePrincipal principal, String source,
             IntegrationEventEnvelope envelope) {
+        return executeSynchronouslyWithReceipt(principal, source, envelope).data();
+    }
+
+    public record SynchronousResult(Map<String,Object> data, boolean replay) { }
+
+    @Transactional
+    public SynchronousResult executeSynchronouslyWithReceipt(MachinePrincipal principal, String source,
+            IntegrationEventEnvelope envelope) {
         if (principal == null || envelope == null) throw denied();
         return inTenant(principal.tenantId(), principal.installationPid(), () -> {
             String external = envelope.headers().get("externalEventId");
@@ -197,7 +205,7 @@ public class InstalledIntegrationService {
                 // Never take over a pending asynchronous request or repeat an unknown write.
                 if (!"completed".equals(original.state()) || !validRequestPid(original.requestPid()))
                     throw new ExternalEventIngressService.IdempotencyConflictException();
-                return completedResult(resolved, external, original.requestPid());
+                return new SynchronousResult(completedResult(resolved, external, original.requestPid()), true);
             }
             Map<String,Object> payload = installedPayload(envelope, external);
             Map<String,Object> accepted = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
@@ -210,7 +218,7 @@ public class InstalledIntegrationService {
             }
             Map<String,Object> result = completedResult(resolved, external, pid);
             if (receipts.completed(receipt.tenantId(), receipt.installationPid(), source, external, pid) != 1) throw denied();
-            return result;
+            return new SynchronousResult(result, false);
         });
     }
 

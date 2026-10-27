@@ -14,6 +14,7 @@ public class OpenApiEndpointValidator {
     private final OpenApiQueryPublicationService queries;
     private final OpenApiProtocolHash hashes;
     private final List<OpenApiCapabilityContributor> contributors;
+    private final OpenApiSynchronousIntegrationService integrations;
     public record Description(OpenApiEndpointRegistry.Candidate candidate, String bindingCode, String fingerprint, int minTimeoutMs) { }
     public Description describe(Long tenant, String candidateCode, String bindingCode) {
         var candidate = registry.require(candidateCode);
@@ -28,6 +29,8 @@ public class OpenApiEndpointValidator {
             var action = actions.active(tenant, bindingCode).orElseThrow(() -> new IllegalArgumentException("Published business action required"));
             if (!candidate.actionSourceKind().equals(action.sourceKind())) throw new IllegalArgumentException("Controller adaptation does not match this business implementation kind");
             binding = Map.of("action", action, "resource", resource(tenant, action.resourceCode())); budget = action.timeoutMs();
+        } else if (kind == OpenApiEndpointKind.INTEGRATION) {
+            binding = integrations.description(bindingCode); budget = integrations.timeout(bindingCode);
         } else {
             var query = queries.active(tenant, bindingCode).orElseThrow(() -> new IllegalArgumentException("Published named query required"));
             var sourceResources = new TreeMap<String, Object>();
@@ -55,6 +58,8 @@ public class OpenApiEndpointValidator {
             var action = actions.active(tenant, contract.bindingCode()).orElseThrow();
             base = OpenApiContractArtifacts.action(action, resource(tenant, action.resourceCode()));
             original = "/api/open/v1/actions/" + action.code() + ":execute";
+        } else if (kind == OpenApiEndpointKind.INTEGRATION) {
+            base = integrations.document(contract.bindingCode(), contract.path()); original = contract.path();
         } else {
             var query = queries.active(tenant, contract.bindingCode()).orElseThrow(); base = OpenApiContractArtifacts.query(query);
             original = "/api/open/v1/queries/" + query.code() + ":execute";
@@ -67,6 +72,8 @@ public class OpenApiEndpointValidator {
             var action = actions.active(tenant, contract.bindingCode()).orElseThrow(); requiredScopes.add(action.scopes().get("execute"));
             var operationKind = "command".equals(action.sourceKind()) ? OpenApiResourceContract.Operation.UPDATE : OpenApiResourceContract.Operation.LIST;
             requiredScopes.add(resource(tenant, action.resourceCode()).scopes().get(operationKind));
+        } else if (kind == OpenApiEndpointKind.INTEGRATION) {
+            requiredScopes.add(integrations.scope(contract.bindingCode()));
         } else {
             var query = queries.active(tenant, contract.bindingCode()).orElseThrow(); requiredScopes.add(query.scopes().get("execute"));
             query.sourceResources().values().forEach(code -> requiredScopes.add(resource(tenant, code).scopes().get(OpenApiResourceContract.Operation.LIST)));
@@ -105,6 +112,9 @@ public class OpenApiEndpointValidator {
         } else if (contract.kind() == OpenApiEndpointKind.ACTION) {
             var action = actions.active(tenant, contract.bindingCode()).orElseThrow();
             base = OpenApiContractArtifacts.actionTypes(action, resource(tenant, action.resourceCode())); request = "ActionRequest"; result = "ActionResult";
+        } else if (contract.kind() == OpenApiEndpointKind.INTEGRATION) {
+            // Exact JSON schemas are distributed in the OpenAPI artifact; do not invent structural types.
+            base = ""; request = "{ input: Record<string, unknown> }"; result = "Record<string, unknown>";
         } else {
             var query = queries.active(tenant, contract.bindingCode()).orElseThrow();
             base = OpenApiContractArtifacts.queryTypes(query);

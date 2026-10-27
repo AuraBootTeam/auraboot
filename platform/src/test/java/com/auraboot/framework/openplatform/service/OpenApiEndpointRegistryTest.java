@@ -23,7 +23,8 @@ class OpenApiEndpointRegistryTest {
     }
     @Test void actualRoutesAreInventoriedButOnlyDeveloperAdaptedMethodsAreExecutable() throws Exception {
         route("/api/devices/{recordPid}","read"); route("/api/admin/secret","unadapted"); route("/health","unadapted"); route("/api/open/v1/endpoints/{code}","unadapted");
-        var catalog = registry.candidates(null); assertThat(catalog).hasSize(2);
+        var catalog = registry.candidates(null); assertThat(catalog).hasSize(3);
+        assertThat(registry.require(OpenApiSynchronousIntegrationService.CANDIDATE).adapterCode()).isEqualTo("integration.execute");
         assertThat(catalog.getFirst().available()).isTrue(); assertThat(catalog.getFirst().internalPath()).isEqualTo("/api/devices/{recordPid}");
         assertThat(catalog.getFirst().fingerprint()).matches("[a-f0-9]{64}"); assertThat(catalog.getFirst().targetRequired()).isTrue();
         assertThat(catalog.getLast().available()).isFalse(); assertThat(catalog.getLast().reason()).isEqualTo("machine_adapter_required");
