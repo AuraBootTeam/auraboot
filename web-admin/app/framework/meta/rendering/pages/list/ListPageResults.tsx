@@ -39,6 +39,7 @@ export function renderListPageResults(
     | 'quickFilterChips'
     | 'activeQuickFilter'
     | 'currentView'
+    | 'viewsLoading'
     | 'handleActivateChip'
     | 'handleSaveActivePreset'
     | 'activeSorts'
@@ -150,6 +151,7 @@ export function renderListPageResults(
     quickFilterChips,
     activeQuickFilter,
     currentView,
+    viewsLoading,
     handleActivateChip,
     handleSaveActivePreset,
     activeSorts,
@@ -319,6 +321,7 @@ export function renderListPageResults(
               rowHeight={effectiveViewConfig?.rowHeight}
               onRowHeightChange={handleRowHeightChange}
               onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
+              columnSettingsLoading={viewsLoading}
               onAnalysisOpen={
                 schemaExtension.hideViewAnalysis || namedQueryCode || isApiDatasourcePage
                   ? undefined
