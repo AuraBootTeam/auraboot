@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" tests="23" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:28.215Z" hostname="Mac" time="0.49">
+  <properties/>
+  <testcase name="injectsProgressReporterThatForwardsToTaskCallback()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.166"/>
+  <testcase name="resumable_handler_cannot_silently_run_without_checkpoint_transactions()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.001"/>
+  <testcase name="failsOnMissingHandlerCode()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.0"/>
+  <testcase name="[1] locale=zh-CN" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.031"/>
+  <testcase name="[2] locale=en-US" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.002"/>
+  <testcase name="recovery_restores_persisted_tenant_and_clears_scheduler_thread_identity()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.003"/>
+  <testcase name="removed_membership_cannot_execute_recovered_task()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.001"/>
+  <testcase name="installsScopedSecretBridgeDuringAuthenticatedAsyncExecution()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.025"/>
+  <testcase name="injectsAuthenticatedUserAsServerOwnedPluginSetting()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.063"/>
+  <testcase name="runsHandlerInsideDynamicDataQueryScopeAndClosesIt()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.002"/>
+  <testcase name="resumable_handler_receives_real_checkpoint_transaction_bridge()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.046"/>
+  <testcase name="failed_async_handler_writes_failure_audit()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.027"/>
+  <testcase name="persistedPermitPlanWithoutCommandCodeDoesNotTrustHandlerIdentity()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.002"/>
+  <testcase name="commandCodeWithoutPersistedPermitPlanDoesNotBecomeWriterAuthority()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.002"/>
+  <testcase name="[1] capability=ai" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.003"/>
+  <testcase name="[2] capability=knowledge" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.003"/>
+  <testcase name="failsWhenHandlerThrows()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.002"/>
+  <testcase name="restoresExactCommandWriterIdentityOnlyFromPersistedPermitPlan()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.001"/>
+  <testcase name="runsResolvedHandlerAndReturnsResultData()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.001"/>
+  <testcase name="taskTypeIsCommandHandler()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.0"/>
+  <testcase name="failsWhenHandlerNotRegistered()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.001"/>
+  <testcase name="async_handler_receives_follow_up_bridge_and_writes_execution_audit()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.056"/>
+  <testcase name="marksTypedTransientInfrastructureFailureRetryable()" classname="com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest" time="0.002"/>
+</testsuite>

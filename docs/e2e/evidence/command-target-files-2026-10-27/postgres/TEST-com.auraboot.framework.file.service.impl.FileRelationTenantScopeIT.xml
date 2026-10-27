@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="File relation tenant scoping IT" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:15:02.697Z" hostname="Mac" time="0.086">
+  <properties/>
+  <testcase name="relation insert fills tenant_id and tenant-scoped reads isolate per tenant" classname="com.auraboot.framework.file.service.impl.FileRelationTenantScopeIT" time="0.033"/>
+  <testcase name="backfilled legacy relation row (tenant set, no interceptor insert) reads per tenant" classname="com.auraboot.framework.file.service.impl.FileRelationTenantScopeIT" time="0.012"/>
+  <testcase name="another editor retains the same attachment but cannot copy it across records or fields" classname="com.auraboot.framework.file.service.impl.FileRelationTenantScopeIT" time="0.035"/>
+</testsuite>

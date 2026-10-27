@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.file.service.impl.FileServiceImplTest" tests="52" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:27.821Z" hostname="Mac" time="0.382">
+  <properties/>
+  <testcase name="getFilesByUserId_delegatesToMapper()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.212"/>
+  <testcase name="uploadFile_validManufacturingArchive_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.02"/>
+  <testcase name="uploadFile_executableDisguisedAsImage_rejectedByContent()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.006"/>
+  <testcase name="appendFileRelation_preservesPriorAttachmentsAndStoresExactCurrentTenantRelation()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.004"/>
+  <testcase name="uploadFile_mojibakeOriginalFilename_persistsRecoveredUtf8Name()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="createFileRelation_rejectsForeignFileBeforeRemovingExistingRelations()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="uploadFile_blockedExtension_throwsBusinessException()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.003"/>
+  <testcase name="getFileById_pidMiss_fallsBackToGeneratedSvgFileNameWhenExtensionWasStripped()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="uploadFile_gerberGerWithOctetStream_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="uploadFile_xRarMimeType_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="uploadFile_validImage_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="deleteFile_notFound_throwsBusinessException()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="uploadFile_windowsZipMimeType_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="uploadFile_rarContentUntrustedExtensionAndOctetStream_acceptedByContent()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="getFileRelations_resolvesPublicPidToInternalRelationKey()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFilesByEntityAndField_emptyIds_returnsEmpty()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="uploadFile_pngContentMislabeledOctetStream_acceptedByContent()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="getFileDownloadUrl_cdnConfigured_takesPriority()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFileDownloadUrl_cloud_presignedUnsupported_fallsBackToCloudPath()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFileById_pidMiss_fallsBackToGeneratedStorageFileName()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="getFileById_nonNumericPidMiss_doesNotQueryNumericIdColumn()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFileDownloadUrl_localStorage_returnsApiPath()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFilesByEntity_emptyIds_returnsEmpty()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="lockRetention_alreadyLocked_isIdempotent()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="appendFileRelation_rejectsMissingSessionAndForgedActorBeforeAnyLookup()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="uploadFiles_iteratesAndReturnsList()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFileRelations_missingFileDoesNotProbeRelations()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFilesByEntity_withIds_queriesMapper()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.004"/>
+  <testcase name="getFileDownloadUrl_cloud_usesPresignedUrl()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="uploadFile_trustedExtensionNullContentType_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="createFileRelation_retainsAnotherOwnersFileOnlyAtItsExistingTarget()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.003"/>
+  <testcase name="uploadFile_disallowedMimeType_throwsBusinessException()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.003"/>
+  <testcase name="uploadFile_obeysConfiguredMultipartLimitIncludingExactBoundary()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.003"/>
+  <testcase name="uploadFile_blockedExtensionWithTrustedMime_stillThrows()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="findByPid_delegatesToMapper()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="deleteFile_storageDeleteThrows_swallowedAndContinues()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.003"/>
+  <testcase name="uploadFile_trustedExtensionUnknownMime_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="getFileDownloadUrl_notFound_returnsNull()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.0"/>
+  <testcase name="removeFileRelation_callsDeleteWithWrapper()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="deleteFile_notOwner_throwsBusinessException()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="uploadFile_octetStreamCamFile_persistsAndReturnsResponse()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="appendFileRelation_refusesAnUnpersistedRelation()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="createFileRelation_removesPriorAndInserts()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="deleteFile_retentionLocked_rejectsBeforePhysicalOrMetadataDeletion()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="relationWriterDenialPrecedesReplacementRemovalAndLegacyAppend()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFileById_pidHit_returnsEntity()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="getFileById_pidMiss_fallsBackToSelectById()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="deleteFile_acceptsUploadResponsePid()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="lockRetention_requiresPublicActivePidAndPersistsMonotonically()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.0"/>
+  <testcase name="deleteFile_owner_softDeletesAndCallsStorage()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.001"/>
+  <testcase name="appendFileRelation_rejectsForeignOwnerUnfinalizedDeletedAndInternalFileIdentities()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+  <testcase name="uploadFile_emptyFile_throwsBusinessException()" classname="com.auraboot.framework.file.service.impl.FileServiceImplTest" time="0.002"/>
+</testsuite>

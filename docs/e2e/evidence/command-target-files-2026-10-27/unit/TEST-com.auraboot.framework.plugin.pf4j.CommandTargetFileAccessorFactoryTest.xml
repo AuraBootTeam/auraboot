@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:29.258Z" hostname="Mac" time="0.042">
+  <properties/>
+  <testcase name="rejectsForeignOwnerUnfinalizedDeletedAndNonPublicFileBeforeRetention()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.004"/>
+  <testcase name="keepsPriorFilesAndAppendsAfterHighestSortOrder()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.002"/>
+  <testcase name="nestedCommandsCannotInstallAnotherTargetCapability()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="fieldCapacityFailureDoesNotRetainOrInsert()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="exactRepeatRetainsButNeverReplacesOrDuplicates()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="closesAtHandlerReturnAndDeniesTargetCommandActorAndTransactionReplacement()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.002"/>
+  <testcase name="claimedAsyncTaskCannotInstallTheCapabilityWithRestoredHumanIdentity()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.002"/>
+  <testcase name="absentHumanAuthorityDryRunOrNoWritableTransactionDoesNotInstall()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="crossThreadCannotUseAnOtherwiseActiveCapability()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.002"/>
+  <testcase name="deniesParentWithoutVisibilityBeforeLockingFile()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="rejectsUnknownSingleVirtualAndWrongWriterFieldsBeforeAnyFileLock()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.002"/>
+  <testcase name="legacyConstructorDoesNotGrantTargetCapability()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.0"/>
+  <testcase name="nestedCommandBeforeOuterCapabilityInstallationCannotAcquireOne()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.0"/>
+  <testcase name="appendsExactRelationAfterParentLockAndRetentionWithoutCopying()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="requiresSuccessfulRetentionBeforeInserting()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="distinctFileLocksMustFollowAscendingPublicPidOrder()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+  <testcase name="staleParentVersionFailsBeforeAnyFileLock()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.0"/>
+  <testcase name="impersonationCannotBorrowTheEffectiveUsersUploadOwnership()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.002"/>
+  <testcase name="rejectsUnpublishedAndChildModelBeforeAnyFileLock()" classname="com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest" time="0.001"/>
+</testsuite>

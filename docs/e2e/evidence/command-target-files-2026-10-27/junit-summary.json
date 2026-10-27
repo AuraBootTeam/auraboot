@@ -1,0 +1,1069 @@
+{
+  "sourceSha": "0642b5fc6041030e0750c233912694b00bd01642",
+  "runtime": "maritime-parent-file-append",
+  "postgresDatabase": "auraboot_72",
+  "postgresVersion": "17.6",
+  "flywayAppliedMigrations": 157,
+  "unit": {
+    "executed": 196,
+    "passed": 196,
+    "failed": 0,
+    "skipped": 0
+  },
+  "postgres": {
+    "executed": 16,
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0
+  },
+  "browser": {
+    "executed": 0,
+    "did_not_run": true
+  },
+  "httpMixedRole": {
+    "executed": 0,
+    "did_not_run": true
+  },
+  "suites": [
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.application.tenant.MetaContextCommandOriginTest",
+      "tests": 3,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.application.tenant.MetaContextCommandOriginTest.xml",
+      "sha256": "86c6f980a7253f9448e87304e4d0e8d81ad2278122a5a683aeba3ea16cb4ce33",
+      "cases": [
+        {
+          "name": "clearRemovesRootProvenance()",
+          "verdict": "pass"
+        },
+        {
+          "name": "identitySnapshotDoesNotPropagateRootAuthorityEvenOnCallerRuns()",
+          "verdict": "pass"
+        },
+        {
+          "name": "onlyTheOuterAuthorizedCommandFrameIsRootAndFailuresRestoreIt()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "Command permit execution context",
+      "tests": 7,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.application.tenant.MetaContextCommandPermitTest.xml",
+      "sha256": "359b5000244ee4e3fd885865cb2db17d8d73d839cad39b0da1343cdb01993199",
+      "cases": [
+        {
+          "name": "independentSourceReadWithoutOuterPermitDoesNotCreateOne()",
+          "verdict": "pass"
+        },
+        {
+          "name": "independentSourceFailureAndNestedPermitRestoreExactOuterPlan()",
+          "verdict": "pass"
+        },
+        {
+          "name": "legacy explicit scope remains global because it has no target model",
+          "verdict": "pass"
+        },
+        {
+          "name": "publishes scope and server-captured version, then closes both",
+          "verdict": "pass"
+        },
+        {
+          "name": "advancing the target version affects only the matching target",
+          "verdict": "pass"
+        },
+        {
+          "name": "nested explicit ALL work restores the outer SELF plan and version",
+          "verdict": "pass"
+        },
+        {
+          "name": "independentSourceReadRestoresOuterPlanAndIdentity()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "FileUploadController /create metadata alias guard",
+      "tests": 1,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.file.controller.FileUploadControllerCreateAuthzTest.xml",
+      "sha256": "7e7fc91d7f40f77c235d7ef4f5dd01a9f97da3e816aee7d706cea9b5e586269e",
+      "cases": [
+        {
+          "name": "registering any client-supplied storage key is rejected",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.file.controller.FileUploadControllerTest",
+      "tests": 12,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.file.controller.FileUploadControllerTest.xml",
+      "sha256": "1dc3f12dd470f4430e7256ad4dec777fc19f303424e9bdcb058f8388b2dac025",
+      "cases": [
+        {
+          "name": "downloadFile_pdf_returnsInlineDispositionForBrowserPreview()",
+          "verdict": "pass"
+        },
+        {
+          "name": "endpoints_declare_separate_leastPrivilegeFileCapabilities()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFile_ownerReceivesMetadataWithoutServerStoragePath()",
+          "verdict": "pass"
+        },
+        {
+          "name": "downloadFile_legacyMojibakeChineseName_recoversUtf8Filename()",
+          "verdict": "pass"
+        },
+        {
+          "name": "downloadFile_linkedRecordIsReauthorizedOnEveryRequest()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFile_unrelatedUploaderCannotReadUnlinkedFileByPid()",
+          "verdict": "pass"
+        },
+        {
+          "name": "downloadFile_absentFromTenantDoesNotReadStorage()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFile_absentFromTenantReturnsSafeNotFoundWithoutReadingStorage()",
+          "verdict": "pass"
+        },
+        {
+          "name": "downloadFile_chineseName_usesUtf8FilenameStar()",
+          "verdict": "pass"
+        },
+        {
+          "name": "downloadFile_linkedRecordDenialStopsBeforeReadingBytes()",
+          "verdict": "pass"
+        },
+        {
+          "name": "downloadFile_svgImage_returnsInlineSvgResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "createRelation_authorizesTheTargetRecordBeforeWriting()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest",
+      "tests": 4,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest.xml",
+      "sha256": "3d82c4a2f5e74bdeaa2fa202fe25bff236842ed1b93ddd17b1810dd93cb3f215",
+      "cases": [
+        {
+          "name": "broadParentUpdateDoesNotGrantAFieldWriterIncludingPhysicalAliases()",
+          "verdict": "pass"
+        },
+        {
+          "name": "modelWriterPolicyAppliesEvenToOpaqueLegacySlots()",
+          "verdict": "pass"
+        },
+        {
+          "name": "exactWriterAllowsMutableFileButCannotOverrideFieldOrModelImmutability()",
+          "verdict": "pass"
+        },
+        {
+          "name": "ordinaryLegacyFileAndOpaqueExportSlotsRetainTheirExistingMutableSemantics()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.file.service.impl.FileServiceImplTest",
+      "tests": 52,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.file.service.impl.FileServiceImplTest.xml",
+      "sha256": "f88f3c7e2ae0729797a4e5cc4c4f08e806266a05e04513fb3b573ef71e786bcf",
+      "cases": [
+        {
+          "name": "getFilesByUserId_delegatesToMapper()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_validManufacturingArchive_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_executableDisguisedAsImage_rejectedByContent()",
+          "verdict": "pass"
+        },
+        {
+          "name": "appendFileRelation_preservesPriorAttachmentsAndStoresExactCurrentTenantRelation()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_mojibakeOriginalFilename_persistsRecoveredUtf8Name()",
+          "verdict": "pass"
+        },
+        {
+          "name": "createFileRelation_rejectsForeignFileBeforeRemovingExistingRelations()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_blockedExtension_throwsBusinessException()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileById_pidMiss_fallsBackToGeneratedSvgFileNameWhenExtensionWasStripped()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_gerberGerWithOctetStream_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_xRarMimeType_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_validImage_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deleteFile_notFound_throwsBusinessException()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_windowsZipMimeType_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_rarContentUntrustedExtensionAndOctetStream_acceptedByContent()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileRelations_resolvesPublicPidToInternalRelationKey()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFilesByEntityAndField_emptyIds_returnsEmpty()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_pngContentMislabeledOctetStream_acceptedByContent()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileDownloadUrl_cdnConfigured_takesPriority()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileDownloadUrl_cloud_presignedUnsupported_fallsBackToCloudPath()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileById_pidMiss_fallsBackToGeneratedStorageFileName()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileById_nonNumericPidMiss_doesNotQueryNumericIdColumn()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileDownloadUrl_localStorage_returnsApiPath()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFilesByEntity_emptyIds_returnsEmpty()",
+          "verdict": "pass"
+        },
+        {
+          "name": "lockRetention_alreadyLocked_isIdempotent()",
+          "verdict": "pass"
+        },
+        {
+          "name": "appendFileRelation_rejectsMissingSessionAndForgedActorBeforeAnyLookup()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFiles_iteratesAndReturnsList()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileRelations_missingFileDoesNotProbeRelations()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFilesByEntity_withIds_queriesMapper()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileDownloadUrl_cloud_usesPresignedUrl()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_trustedExtensionNullContentType_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "createFileRelation_retainsAnotherOwnersFileOnlyAtItsExistingTarget()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_disallowedMimeType_throwsBusinessException()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_obeysConfiguredMultipartLimitIncludingExactBoundary()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_blockedExtensionWithTrustedMime_stillThrows()",
+          "verdict": "pass"
+        },
+        {
+          "name": "findByPid_delegatesToMapper()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deleteFile_storageDeleteThrows_swallowedAndContinues()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_trustedExtensionUnknownMime_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileDownloadUrl_notFound_returnsNull()",
+          "verdict": "pass"
+        },
+        {
+          "name": "removeFileRelation_callsDeleteWithWrapper()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deleteFile_notOwner_throwsBusinessException()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_octetStreamCamFile_persistsAndReturnsResponse()",
+          "verdict": "pass"
+        },
+        {
+          "name": "appendFileRelation_refusesAnUnpersistedRelation()",
+          "verdict": "pass"
+        },
+        {
+          "name": "createFileRelation_removesPriorAndInserts()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deleteFile_retentionLocked_rejectsBeforePhysicalOrMetadataDeletion()",
+          "verdict": "pass"
+        },
+        {
+          "name": "relationWriterDenialPrecedesReplacementRemovalAndLegacyAppend()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileById_pidHit_returnsEntity()",
+          "verdict": "pass"
+        },
+        {
+          "name": "getFileById_pidMiss_fallsBackToSelectById()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deleteFile_acceptsUploadResponsePid()",
+          "verdict": "pass"
+        },
+        {
+          "name": "lockRetention_requiresPublicActivePidAndPersistsMonotonically()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deleteFile_owner_softDeletesAndCallsStorage()",
+          "verdict": "pass"
+        },
+        {
+          "name": "appendFileRelation_rejectsForeignOwnerUnfinalizedDeletedAndInternalFileIdentities()",
+          "verdict": "pass"
+        },
+        {
+          "name": "uploadFile_emptyFile_throwsBusinessException()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContextTest",
+      "tests": 1,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContextTest.xml",
+      "sha256": "63be939b05d497c65472884de5e4c989e89c4bca9e406c680aa3491275a8b2e1",
+      "cases": [
+        {
+          "name": "claimedIdentityRestoresNestedScopesAndCannotLeakAfterFailure()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest",
+      "tests": 23,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutorTest.xml",
+      "sha256": "0afb1c985fd70e4dfcfffbd448cfcb5dbbe06c78869fd3d2b551396f130680df",
+      "cases": [
+        {
+          "name": "injectsProgressReporterThatForwardsToTaskCallback()",
+          "verdict": "pass"
+        },
+        {
+          "name": "resumable_handler_cannot_silently_run_without_checkpoint_transactions()",
+          "verdict": "pass"
+        },
+        {
+          "name": "failsOnMissingHandlerCode()",
+          "verdict": "pass"
+        },
+        {
+          "name": "[1] locale=zh-CN",
+          "verdict": "pass"
+        },
+        {
+          "name": "[2] locale=en-US",
+          "verdict": "pass"
+        },
+        {
+          "name": "recovery_restores_persisted_tenant_and_clears_scheduler_thread_identity()",
+          "verdict": "pass"
+        },
+        {
+          "name": "removed_membership_cannot_execute_recovered_task()",
+          "verdict": "pass"
+        },
+        {
+          "name": "installsScopedSecretBridgeDuringAuthenticatedAsyncExecution()",
+          "verdict": "pass"
+        },
+        {
+          "name": "injectsAuthenticatedUserAsServerOwnedPluginSetting()",
+          "verdict": "pass"
+        },
+        {
+          "name": "runsHandlerInsideDynamicDataQueryScopeAndClosesIt()",
+          "verdict": "pass"
+        },
+        {
+          "name": "resumable_handler_receives_real_checkpoint_transaction_bridge()",
+          "verdict": "pass"
+        },
+        {
+          "name": "failed_async_handler_writes_failure_audit()",
+          "verdict": "pass"
+        },
+        {
+          "name": "persistedPermitPlanWithoutCommandCodeDoesNotTrustHandlerIdentity()",
+          "verdict": "pass"
+        },
+        {
+          "name": "commandCodeWithoutPersistedPermitPlanDoesNotBecomeWriterAuthority()",
+          "verdict": "pass"
+        },
+        {
+          "name": "[1] capability=ai",
+          "verdict": "pass"
+        },
+        {
+          "name": "[2] capability=knowledge",
+          "verdict": "pass"
+        },
+        {
+          "name": "failsWhenHandlerThrows()",
+          "verdict": "pass"
+        },
+        {
+          "name": "restoresExactCommandWriterIdentityOnlyFromPersistedPermitPlan()",
+          "verdict": "pass"
+        },
+        {
+          "name": "runsResolvedHandlerAndReturnsResultData()",
+          "verdict": "pass"
+        },
+        {
+          "name": "taskTypeIsCommandHandler()",
+          "verdict": "pass"
+        },
+        {
+          "name": "failsWhenHandlerNotRegistered()",
+          "verdict": "pass"
+        },
+        {
+          "name": "async_handler_receives_follow_up_bridge_and_writes_execution_audit()",
+          "verdict": "pass"
+        },
+        {
+          "name": "marksTypedTransientInfrastructureFailureRetryable()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "Only an AUTHORIZED verdict opens the command's authority",
+      "tests": 6,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseCommandAuthorityTest.xml",
+      "sha256": "a298d48159be834f762e39bfcec8618492bb1e91aeb06614836548c22ed99182",
+      "cases": [
+        {
+          "name": "a command with no user in context opens no scope",
+          "verdict": "pass"
+        },
+        {
+          "name": "an AUTHORIZED verdict opens a scope carrying the granting permission",
+          "verdict": "pass"
+        },
+        {
+          "name": "a non-permitting plan opens no scope even with an AUTHORIZED phase verdict",
+          "verdict": "pass"
+        },
+        {
+          "name": "the scope closes when the handler stage returns",
+          "verdict": "pass"
+        },
+        {
+          "name": "a missing verdict opens no scope",
+          "verdict": "pass"
+        },
+        {
+          "name": "a command that declared nothing opens no scope",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest",
+      "tests": 45,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest.xml",
+      "sha256": "00a76080fdb5578f5af632e018943620bc5c4c1a6ddb1fa694cb0cbddedf5ea2",
+      "cases": [
+        {
+          "name": "execute_installsRelatedUpdatesOnlyForAnAuthorizedReadableRoot()",
+          "verdict": "pass"
+        },
+        {
+          "name": "handlerOwnedResultsAreResponseOnly()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_installsRelatedDeleteOnlyWithTargetAuthorizationAndProjection()",
+          "verdict": "pass"
+        },
+        {
+          "name": "[1] variant=sync-ai",
+          "verdict": "pass"
+        },
+        {
+          "name": "[2] variant=async-ai",
+          "verdict": "pass"
+        },
+        {
+          "name": "[3] variant=sync-knowledge",
+          "verdict": "pass"
+        },
+        {
+          "name": "[4] variant=async-knowledge",
+          "verdict": "pass"
+        },
+        {
+          "name": "persistHandlerResults_usesJsonbAwareUpdateWhenResultIncludesJsonbColumn()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_mapsTransportNeutralSecurityDenialWithoutDiagnosticLeakage()",
+          "verdict": "pass"
+        },
+        {
+          "name": "dryRunNeverInvokesAnUnmarkedNativeHandler()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_preservesLocalizedPluginBusinessErrorKeyAndCause()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_doesNotExposeAServerFilledVersionWhenTheCallerOmittedThePrecondition()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_doesNotInstallRelatedUpdatesWithoutReadableAuthorizedTarget()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_usesConfiguredPluginHandlerAndPassesHandlerParamsAsSettings()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_doesNotTreatDiagnosticTextAsTypedBusinessRejection()",
+          "verdict": "pass"
+        },
+        {
+          "name": "persistHandlerResults_neverCopiesReturnedIdentityOntoTargetRecord()",
+          "verdict": "pass"
+        },
+        {
+          "name": "precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_failClosedWhenDeclaredHandlerMissingFromRegistry()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_preservesWrappedPersistenceFailureForSanitizedTransportHandling()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_silentSkipRetainedForPurelyDeclarativeCommands()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_mapsTypedBusinessRuleBlockWithoutMessageClassification()",
+          "verdict": "pass"
+        },
+        {
+          "name": "nativeOwnershipAndConcurrencyDenialsKeepTheirHttpSemantics()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_runsInlineUnderDryRunEvenWhenAsyncDeclared()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_preservesBusinessErrorWithoutLeakingHandlerBeanName()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_installsCurrencyReaderOnlyFromServerMetadataAndDelegatesBoundRead()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_fallsBackToCommandCodeWhenNoConfiguredPluginHandler()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_mapsPluginVersionConflictToHttpConflictSemantic()",
+          "verdict": "pass"
+        },
+        {
+          "name": "persistHandlerResults_usesScopedSqlGuardsWhenUserContextExists()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_missingCurrencyModuleRejectsBeforeCallingThePlugin()",
+          "verdict": "pass"
+        },
+        {
+          "name": "declaredNativeHandlerIdentityResolvesWithoutDependingOnBeanName()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_preservesTypedDomainClientRejections()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_chainedSecondaryFailure_propagatesAndAbortsTheCommand()",
+          "verdict": "pass"
+        },
+        {
+          "name": "aSecondaryRequirementRejectsBeforeThePrimaryHandlerRuns()",
+          "verdict": "pass"
+        },
+        {
+          "name": "persistHandlerResults_rejectsStaleServerVersionWithoutReconsultingDataScope()",
+          "verdict": "pass"
+        },
+        {
+          "name": "targetFileCapabilityReceivesTrustedPipelineContextAndClosesOnSuccessAndFailure()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_preservesPluginAccessDeniedSemantic()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_keepsPersistenceFailureOnTheSanitizedPublicBoundary()",
+          "verdict": "pass"
+        },
+        {
+          "name": "handlerReturnedFieldsRetainParentAndRecordSqlProtection()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_installsTenantSecretOnlyForExplicitServerScope()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_exposesTenantProjectionReaderOnlyForExplicitBooleanOptIn()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_dispatchesAsyncWhenHandlerParamsAsyncTrue()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_rejectsRelatedUpdateAsyncBeforeSubmittingAnUnscopedTask()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_runsChainedSecondaryAfterPrimary_sharingTheSameContext()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_runsPluginHandlersInsideDynamicDataQueryScopeAndClosesIt()",
+          "verdict": "pass"
+        },
+        {
+          "name": "execute_preservesWrappedSerializationFailureWithoutBusinessErrorLeakage()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest",
+      "tests": 19,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml",
+      "sha256": "39bb491654c7cf59fc4cb628b06e1d86522ed263676c24656e0140577d569b0c",
+      "cases": [
+        {
+          "name": "rejectsForeignOwnerUnfinalizedDeletedAndNonPublicFileBeforeRetention()",
+          "verdict": "pass"
+        },
+        {
+          "name": "keepsPriorFilesAndAppendsAfterHighestSortOrder()",
+          "verdict": "pass"
+        },
+        {
+          "name": "nestedCommandsCannotInstallAnotherTargetCapability()",
+          "verdict": "pass"
+        },
+        {
+          "name": "fieldCapacityFailureDoesNotRetainOrInsert()",
+          "verdict": "pass"
+        },
+        {
+          "name": "exactRepeatRetainsButNeverReplacesOrDuplicates()",
+          "verdict": "pass"
+        },
+        {
+          "name": "closesAtHandlerReturnAndDeniesTargetCommandActorAndTransactionReplacement()",
+          "verdict": "pass"
+        },
+        {
+          "name": "claimedAsyncTaskCannotInstallTheCapabilityWithRestoredHumanIdentity()",
+          "verdict": "pass"
+        },
+        {
+          "name": "absentHumanAuthorityDryRunOrNoWritableTransactionDoesNotInstall()",
+          "verdict": "pass"
+        },
+        {
+          "name": "crossThreadCannotUseAnOtherwiseActiveCapability()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deniesParentWithoutVisibilityBeforeLockingFile()",
+          "verdict": "pass"
+        },
+        {
+          "name": "rejectsUnknownSingleVirtualAndWrongWriterFieldsBeforeAnyFileLock()",
+          "verdict": "pass"
+        },
+        {
+          "name": "legacyConstructorDoesNotGrantTargetCapability()",
+          "verdict": "pass"
+        },
+        {
+          "name": "nestedCommandBeforeOuterCapabilityInstallationCannotAcquireOne()",
+          "verdict": "pass"
+        },
+        {
+          "name": "appendsExactRelationAfterParentLockAndRetentionWithoutCopying()",
+          "verdict": "pass"
+        },
+        {
+          "name": "requiresSuccessfulRetentionBeforeInserting()",
+          "verdict": "pass"
+        },
+        {
+          "name": "distinctFileLocksMustFollowAscendingPublicPidOrder()",
+          "verdict": "pass"
+        },
+        {
+          "name": "staleParentVersionFailsBeforeAnyFileLock()",
+          "verdict": "pass"
+        },
+        {
+          "name": "impersonationCannotBorrowTheEffectiveUsersUploadOwnership()",
+          "verdict": "pass"
+        },
+        {
+          "name": "rejectsUnpublishedAndChildModelBeforeAnyFileLock()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.plugin.pf4j.FileAccessorImplTest",
+      "tests": 17,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.plugin.pf4j.FileAccessorImplTest.xml",
+      "sha256": "753bf7de9a32e6d853e6b22797b0f8ff11d310dc9786827c16a81187860ef16a",
+      "cases": [
+        {
+          "name": "linkExisting_is_idempotent_for_an_already_linked_upload()",
+          "verdict": "pass"
+        },
+        {
+          "name": "legacyLinkChecksTheFieldBeforeLookupOrItsAlreadyLinkedShortCircuit()",
+          "verdict": "pass"
+        },
+        {
+          "name": "open_reads_file_bytes_from_platform_storage_by_file_id()",
+          "verdict": "pass"
+        },
+        {
+          "name": "open_rejects_storageAliasesAndUnfinalizedMetadata()",
+          "verdict": "pass"
+        },
+        {
+          "name": "describe_rejects_storage_keys_and_internal_aliases()",
+          "verdict": "pass"
+        },
+        {
+          "name": "saveAndLink_failsClosedWhenTheHostCannotPersistTheRelation()",
+          "verdict": "pass"
+        },
+        {
+          "name": "saveAndAppendLink_neverUsesTheReplacingRelationOperation()",
+          "verdict": "pass"
+        },
+        {
+          "name": "retain_applies_monotonic_host_retention_to_the_exact_public_pid()",
+          "verdict": "pass"
+        },
+        {
+          "name": "save_uploads_generated_bytes_and_returns_platform_file_id()",
+          "verdict": "pass"
+        },
+        {
+          "name": "isLinkedTo_requires_the_exact_public_pid_in_the_business_field_relation()",
+          "verdict": "pass"
+        },
+        {
+          "name": "saveAndAppendLink_failsClosedWhenAppendIsUnavailable()",
+          "verdict": "pass"
+        },
+        {
+          "name": "linkExisting_fails_when_the_public_file_is_not_visible()",
+          "verdict": "pass"
+        },
+        {
+          "name": "describe_returns_storage_opaque_metadata_for_a_public_file_pid()",
+          "verdict": "pass"
+        },
+        {
+          "name": "linkExisting_rejects_another_owner_before_replacing_any_relation()",
+          "verdict": "pass"
+        },
+        {
+          "name": "saveAndLink_registersTheGeneratedFileAgainstTheExactBusinessField()",
+          "verdict": "pass"
+        },
+        {
+          "name": "save_recoversMojibakeOriginalNameBeforeUpload()",
+          "verdict": "pass"
+        },
+        {
+          "name": "linkExisting_persists_uploaded_file_relation_without_copying_bytes()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "unit",
+      "suite": "com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest",
+      "tests": 6,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "unit/TEST-com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest.xml",
+      "sha256": "d39f58fbb022beede13e0d641d5db9e0b0f48c2c894e28bc9fde7ff3f7fa00ae",
+      "cases": [
+        {
+          "name": "draftPublishRemainsTheAuthorityForItsOwnGuard()",
+          "verdict": "pass"
+        },
+        {
+          "name": "failedSchemaCannotProduceSuccessfulImportOrRunHooks()",
+          "verdict": "pass"
+        },
+        {
+          "name": "hookRejectionEscapesAndDoesNotRegisterPermissions()",
+          "verdict": "pass"
+        },
+        {
+          "name": "publishedImportDispatchesExactGuardAfterSchemaBeforePermissions()",
+          "verdict": "pass"
+        },
+        {
+          "name": "disabledAutoPublishDoesNotTouchSchemaOrHooks()",
+          "verdict": "pass"
+        },
+        {
+          "name": "missingSchemaResultFailsClosed()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "postgres",
+      "suite": "com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT",
+      "tests": 12,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml",
+      "sha256": "ffce39dc6efdfbfe72ed2e8d39339de955aafd6955f39ba30e0af7463b4a8234",
+      "cases": [
+        {
+          "name": "appendPreservesExistingRelationsAndRepeatIsIdempotent()",
+          "verdict": "pass"
+        },
+        {
+          "name": "outerFailureRollsBackRetentionRelationsProjectionAndEvidence()",
+          "verdict": "pass"
+        },
+        {
+          "name": "appendAndDeleteHaveOneWinnerAndTheLoserLeavesNoPartialEffects()",
+          "verdict": "pass"
+        },
+        {
+          "name": "legacyRelationEntrypointsCannotReplaceOrRemoveACommandOwnedFileField()",
+          "verdict": "pass"
+        },
+        {
+          "name": "aCaughtAppendFailureStillPreventsPartialCommit()",
+          "verdict": "pass"
+        },
+        {
+          "name": "ordinaryLegacyFileFieldStillReplacesItsRelations()",
+          "verdict": "pass"
+        },
+        {
+          "name": "foreignTenantOwnerAndUnfinalizedUploadsLeaveNoWrites()",
+          "verdict": "pass"
+        },
+        {
+          "name": "anExactCommandWriterStillCannotMutateAnImmutableFileFieldThroughLegacyApi()",
+          "verdict": "pass"
+        },
+        {
+          "name": "requiresNewCannotReuseOriginalCapabilityOrCommitPartialParent()",
+          "verdict": "pass"
+        },
+        {
+          "name": "officialMultipartUploadIsAnOwnedUnboundStageUntilTheOriginalCommandAppendsIt()",
+          "verdict": "pass"
+        },
+        {
+          "name": "concurrentIdenticalAppendsCommitExactlyOneRelation()",
+          "verdict": "pass"
+        },
+        {
+          "name": "deleteFirstRejectsAppendAndRollsBackParent()",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "postgres",
+      "suite": "File relation tenant scoping IT",
+      "tests": 3,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "postgres/TEST-com.auraboot.framework.file.service.impl.FileRelationTenantScopeIT.xml",
+      "sha256": "9a4ebbbdbc880638fe796b94f57b4fa38b3f347c23ae7d693b189b847d42114e",
+      "cases": [
+        {
+          "name": "relation insert fills tenant_id and tenant-scoped reads isolate per tenant",
+          "verdict": "pass"
+        },
+        {
+          "name": "backfilled legacy relation row (tenant set, no interceptor insert) reads per tenant",
+          "verdict": "pass"
+        },
+        {
+          "name": "another editor retains the same attachment but cannot copy it across records or fields",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "kind": "postgres",
+      "suite": "File retention/delete race IT",
+      "tests": 1,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": "postgres/TEST-com.auraboot.framework.file.service.impl.FileRetentionDeletionRaceIT.xml",
+      "sha256": "23449fce34c353905d09c40ea31bfdf7b614cfadf509e005f3827eb5645a8edb",
+      "cases": [
+        {
+          "name": "retain and delete can never both win for the same finalized bytes",
+          "verdict": "pass"
+        }
+      ]
+    }
+  ]
+}

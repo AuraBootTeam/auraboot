@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-27T00:11:01.504Z" hostname="Mac" time="0.223">
+  <properties/>
+  <testcase name="legacyRelationEntrypointsCannotReplaceOrRemoveACommandOwnedFileField()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.223">
+    <failure message="java.lang.AssertionError: &#10;Expecting code to raise a throwable." type="java.lang.AssertionError">java.lang.AssertionError: 
+Expecting code to raise a throwable.
+	at com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.lambda$legacyRelationEntrypointsCannotReplaceOrRemoveACommandOwnedFileField$33(CommandTargetFileAppendIT.java:198)
+	at com.auraboot.framework.application.tenant.MetaContext.lambda$runWithCommandPermitScope$11(MetaContext.java:671)
+	at com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan(MetaContext.java:651)
+	at com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope(MetaContext.java:630)
+	at com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope(MetaContext.java:670)
+	at com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.legacyRelationEntrypointsCannotReplaceOrRemoveACommandOwnedFileField(CommandTargetFileAppendIT.java:197)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+</failure>
+  </testcase>
+</testsuite>

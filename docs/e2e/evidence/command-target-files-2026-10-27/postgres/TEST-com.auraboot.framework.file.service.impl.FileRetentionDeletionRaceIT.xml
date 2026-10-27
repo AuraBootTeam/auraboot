@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="File retention/delete race IT" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:15:02.792Z" hostname="Mac" time="0.03">
+  <properties/>
+  <testcase name="retain and delete can never both win for the same finalized bytes" classname="com.auraboot.framework.file.service.impl.FileRetentionDeletionRaceIT" time="0.03"/>
+</testsuite>

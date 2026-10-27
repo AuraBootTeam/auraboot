@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" tests="45" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:28.719Z" hostname="Mac" time="0.537">
+  <properties/>
+  <testcase name="execute_installsRelatedUpdatesOnlyForAnAuthorizedReadableRoot()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.158"/>
+  <testcase name="handlerOwnedResultsAreResponseOnly()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="execute_installsRelatedDeleteOnlyWithTargetAuthorizationAndProjection()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="[1] variant=sync-ai" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="[2] variant=async-ai" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.001"/>
+  <testcase name="[3] variant=sync-knowledge" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="[4] variant=async-knowledge" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.001"/>
+  <testcase name="persistHandlerResults_usesJsonbAwareUpdateWhenResultIncludesJsonbColumn()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="execute_mapsTransportNeutralSecurityDenialWithoutDiagnosticLeakage()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="dryRunNeverInvokesAnUnmarkedNativeHandler()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="execute_preservesLocalizedPluginBusinessErrorKeyAndCause()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.01"/>
+  <testcase name="execute_doesNotExposeAServerFilledVersionWhenTheCallerOmittedThePrecondition()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_doesNotInstallRelatedUpdatesWithoutReadableAuthorizedTarget()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_usesConfiguredPluginHandlerAndPassesHandlerParamsAsSettings()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.001"/>
+  <testcase name="execute_doesNotTreatDiagnosticTextAsTypedBusinessRejection()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="persistHandlerResults_neverCopiesReturnedIdentityOntoTargetRecord()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.105"/>
+  <testcase name="execute_failClosedWhenDeclaredHandlerMissingFromRegistry()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_preservesWrappedPersistenceFailureForSanitizedTransportHandling()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="execute_silentSkipRetainedForPurelyDeclarativeCommands()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.001"/>
+  <testcase name="execute_mapsTypedBusinessRuleBlockWithoutMessageClassification()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="nativeOwnershipAndConcurrencyDenialsKeepTheirHttpSemantics()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.021"/>
+  <testcase name="execute_runsInlineUnderDryRunEvenWhenAsyncDeclared()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.001"/>
+  <testcase name="execute_preservesBusinessErrorWithoutLeakingHandlerBeanName()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_installsCurrencyReaderOnlyFromServerMetadataAndDelegatesBoundRead()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.022"/>
+  <testcase name="execute_fallsBackToCommandCodeWhenNoConfiguredPluginHandler()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_mapsPluginVersionConflictToHttpConflictSemantic()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="persistHandlerResults_usesScopedSqlGuardsWhenUserContextExists()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.009"/>
+  <testcase name="execute_missingCurrencyModuleRejectsBeforeCallingThePlugin()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.003"/>
+  <testcase name="declaredNativeHandlerIdentityResolvesWithoutDependingOnBeanName()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_preservesTypedDomainClientRejections()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.004"/>
+  <testcase name="execute_chainedSecondaryFailure_propagatesAndAbortsTheCommand()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="aSecondaryRequirementRejectsBeforeThePrimaryHandlerRuns()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="persistHandlerResults_rejectsStaleServerVersionWithoutReconsultingDataScope()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="targetFileCapabilityReceivesTrustedPipelineContextAndClosesOnSuccessAndFailure()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.066"/>
+  <testcase name="execute_preservesPluginAccessDeniedSemantic()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.004"/>
+  <testcase name="execute_keepsPersistenceFailureOnTheSanitizedPublicBoundary()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.007"/>
+  <testcase name="handlerReturnedFieldsRetainParentAndRecordSqlProtection()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.004"/>
+  <testcase name="execute_installsTenantSecretOnlyForExplicitServerScope()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_exposesTenantProjectionReaderOnlyForExplicitBooleanOptIn()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.001"/>
+  <testcase name="execute_dispatchesAsyncWhenHandlerParamsAsyncTrue()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.008"/>
+  <testcase name="execute_rejectsRelatedUpdateAsyncBeforeSubmittingAnUnscopedTask()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_runsChainedSecondaryAfterPrimary_sharingTheSameContext()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+  <testcase name="execute_runsPluginHandlersInsideDynamicDataQueryScopeAndClosesIt()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.001"/>
+  <testcase name="execute_preservesWrappedSerializationFailureWithoutBusinessErrorLeakage()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="0.002"/>
+</testsuite>

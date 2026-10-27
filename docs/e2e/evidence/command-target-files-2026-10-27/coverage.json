@@ -1,0 +1,52 @@
+{
+  "sourceSha": "0642b5fc6041030e0750c233912694b00bd01642",
+  "measurement": "hermetic unit JaCoCo lines; real-stack coverage_not_measured",
+  "groups": [
+    {
+      "prefix": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory",
+      "coveredLines": 112,
+      "totalLines": 115,
+      "percent": 97.39,
+      "classes": [
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory$Actor",
+          "covered": 1,
+          "missed": 0
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory$1",
+          "covered": 1,
+          "missed": 0
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory$2",
+          "covered": 15,
+          "missed": 0
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory",
+          "covered": 87,
+          "missed": 3
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory$Scope",
+          "covered": 8,
+          "missed": 0
+        }
+      ]
+    },
+    {
+      "prefix": "com/auraboot/framework/file/service/impl/FileRelationMutationGuard",
+      "coveredLines": 37,
+      "totalLines": 38,
+      "percent": 97.37,
+      "classes": [
+        {
+          "class": "com/auraboot/framework/file/service/impl/FileRelationMutationGuard",
+          "covered": 37,
+          "missed": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:29.468Z" hostname="Mac" time="0.013">
+  <properties/>
+  <testcase name="draftPublishRemainsTheAuthorityForItsOwnGuard()" classname="com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest" time="0.004"/>
+  <testcase name="failedSchemaCannotProduceSuccessfulImportOrRunHooks()" classname="com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest" time="0.001"/>
+  <testcase name="hookRejectionEscapesAndDoesNotRegisterPermissions()" classname="com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest" time="0.001"/>
+  <testcase name="publishedImportDispatchesExactGuardAfterSchemaBeforePermissions()" classname="com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest" time="0.001"/>
+  <testcase name="disabledAutoPublishDoesNotTouchSchemaOrHooks()" classname="com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest" time="0.0"/>
+  <testcase name="missingSchemaResultFailsClosed()" classname="com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest" time="0.0"/>
+</testsuite>

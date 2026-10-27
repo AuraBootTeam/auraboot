@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-26T23:47:28.790Z" hostname="Mac" time="2.668">
+  <properties/>
+  <testcase name="precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability()" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest" time="2.668">
+    <failure message="org.opentest4j.AssertionFailedError: &#10;expected: null&#10; but was: com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory$Scope@53ba9105" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: 
+expected: null
+ but was: com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory$Scope@53ba9105
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest$23.lambda$execute$0(HandlerPhaseTest.java:1266)
+	at app//com.auraboot.framework.application.tenant.MetaContext.lambda$runWithAuthorizedCommandCode$8(MetaContext.java:567)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode(MetaContext.java:552)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode(MetaContext.java:566)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest$23.lambda$execute$1(HandlerPhaseTest.java:1265)
+	at app//com.auraboot.framework.application.tenant.MetaContext.lambda$runWithCommandPermitPlan$10(MetaContext.java:664)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan(MetaContext.java:651)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan(MetaContext.java:663)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest$23.execute(HandlerPhaseTest.java:1264)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhase.executeHandlerPhase(HandlerPhase.java:209)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhase.lambda$execute$0(HandlerPhase.java:151)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhase.withCommandAuthority(HandlerPhase.java:543)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhase.lambda$execute$1(HandlerPhase.java:151)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithCommandAggregate(MetaContext.java:602)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhase.withCommandAggregate(HandlerPhase.java:537)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhase.execute(HandlerPhase.java:150)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest.lambda$precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability$31(HandlerPhaseTest.java:1279)
+	at app//com.auraboot.framework.application.tenant.MetaContext.lambda$runWithAuthorizedCommandCode$8(MetaContext.java:567)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode(MetaContext.java:552)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode(MetaContext.java:566)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest.lambda$precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability$32(HandlerPhaseTest.java:1279)
+	at app//com.auraboot.framework.application.tenant.MetaContext.lambda$runWithCommandPermitPlan$10(MetaContext.java:664)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan(MetaContext.java:651)
+	at app//com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan(MetaContext.java:663)
+	at app//com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest.precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability(HandlerPhaseTest.java:1278)
+	at java.base@21.0.8/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+</failure>
+  </testcase>
+</testsuite>

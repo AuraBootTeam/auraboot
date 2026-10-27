@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContextTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:28.205Z" hostname="Mac" time="0.006">
+  <properties/>
+  <testcase name="claimedIdentityRestoresNestedScopesAndCannotLeakAfterFailure()" classname="com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContextTest" time="0.006"/>
+</testsuite>

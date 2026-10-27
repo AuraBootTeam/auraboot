@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.application.tenant.MetaContextCommandOriginTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:26.215Z" hostname="Mac" time="0.107">
+  <properties/>
+  <testcase name="clearRemovesRootProvenance()" classname="com.auraboot.framework.application.tenant.MetaContextCommandOriginTest" time="0.057"/>
+  <testcase name="identitySnapshotDoesNotPropagateRootAuthorityEvenOnCallerRuns()" classname="com.auraboot.framework.application.tenant.MetaContextCommandOriginTest" time="0.004"/>
+  <testcase name="onlyTheOuterAuthorizedCommandFrameIsRootAndFailuresRestoreIt()" classname="com.auraboot.framework.application.tenant.MetaContextCommandOriginTest" time="0.001"/>
+</testsuite>

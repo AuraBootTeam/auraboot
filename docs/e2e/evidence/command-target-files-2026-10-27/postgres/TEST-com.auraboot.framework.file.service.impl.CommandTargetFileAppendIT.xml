@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:15:01.722Z" hostname="Mac" time="0.873">
+  <properties/>
+  <testcase name="appendPreservesExistingRelationsAndRepeatIsIdempotent()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.22"/>
+  <testcase name="outerFailureRollsBackRetentionRelationsProjectionAndEvidence()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.048"/>
+  <testcase name="appendAndDeleteHaveOneWinnerAndTheLoserLeavesNoPartialEffects()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.168"/>
+  <testcase name="legacyRelationEntrypointsCannotReplaceOrRemoveACommandOwnedFileField()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.08"/>
+  <testcase name="aCaughtAppendFailureStillPreventsPartialCommit()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.034"/>
+  <testcase name="ordinaryLegacyFileFieldStillReplacesItsRelations()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.06"/>
+  <testcase name="foreignTenantOwnerAndUnfinalizedUploadsLeaveNoWrites()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.056"/>
+  <testcase name="anExactCommandWriterStillCannotMutateAnImmutableFileFieldThroughLegacyApi()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.025"/>
+  <testcase name="requiresNewCannotReuseOriginalCapabilityOrCommitPartialParent()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.02"/>
+  <testcase name="officialMultipartUploadIsAnOwnedUnboundStageUntilTheOriginalCommandAppendsIt()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.039"/>
+  <testcase name="concurrentIdenticalAppendsCommitExactlyOneRelation()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.047"/>
+  <testcase name="deleteFirstRejectsAppendAndRollsBackParent()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.022"/>
+</testsuite>

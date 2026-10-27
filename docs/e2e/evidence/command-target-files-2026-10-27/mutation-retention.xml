@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-26T23:41:13.841Z" hostname="Mac" time="0.486">
+  <properties/>
+  <testcase name="appendPreservesExistingRelationsAndRepeatIsIdempotent()" classname="com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT" time="0.486">
+    <failure message="org.opentest4j.AssertionFailedError: &#10;Expecting value to be true but was false" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: 
+Expecting value to be true but was false
+	at app//com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.appendPreservesExistingRelationsAndRepeatIsIdempotent(CommandTargetFileAppendIT.java:119)
+	at java.base@21.0.8/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.8/java.util.ArrayList.forEach(ArrayList.java:1596)
+</failure>
+  </testcase>
+</testsuite>

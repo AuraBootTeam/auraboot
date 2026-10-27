@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Only an AUTHORIZED verdict opens the command's authority" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:28.707Z" hostname="Mac" time="0.01">
+  <properties/>
+  <testcase name="a command with no user in context opens no scope" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseCommandAuthorityTest" time="0.005"/>
+  <testcase name="an AUTHORIZED verdict opens a scope carrying the granting permission" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseCommandAuthorityTest" time="0.0"/>
+  <testcase name="a non-permitting plan opens no scope even with an AUTHORIZED phase verdict" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseCommandAuthorityTest" time="0.0"/>
+  <testcase name="the scope closes when the handler stage returns" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseCommandAuthorityTest" time="0.0"/>
+  <testcase name="a missing verdict opens no scope" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseCommandAuthorityTest" time="0.0"/>
+  <testcase name="a command that declared nothing opens no scope" classname="com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseCommandAuthorityTest" time="0.0"/>
+</testsuite>

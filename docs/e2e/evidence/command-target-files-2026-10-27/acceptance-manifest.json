@@ -1,0 +1,341 @@
+{
+  "run": {
+    "id": "command-target-files-2026-10-27",
+    "target": "Owned Core command-target file capability and legacy write closure",
+    "sot": "docs/system-reference/command-transaction-isolation.md#original-command-target-attachments",
+    "runtime": "maritime-parent-file-append",
+    "commit": "0642b5fc6041030e0750c233912694b00bd01642"
+  },
+  "groups": [
+    {
+      "id": "core",
+      "title": "Owned Core backend slice",
+      "rows": [
+        {
+          "id": "F01",
+          "action": "Typed API and conservative legacy constructors",
+          "assertion": "Both official interfaces have the same typed void default; the old constructor has no new target write capability.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml",
+            "producer-receipt.json"
+          ],
+          "testCases": [
+            "legacyConstructorDoesNotGrantTargetCapability"
+          ]
+        },
+        {
+          "id": "F02",
+          "action": "Original human command frame",
+          "assertion": "Nested commands cannot acquire target capabilities before or after the outer plugin capability is installed.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest.xml",
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ],
+          "testCases": [
+            "nestedCommandBeforeOuterCapabilityInstallationCannotAcquireOne",
+            "precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability"
+          ]
+        },
+        {
+          "id": "F03",
+          "action": "Actor, target, thread and transaction lifetime",
+          "assertion": "Changed member, command, target, thread, handler lifetime and replaced physical resource all fail closed.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ],
+          "testCases": [
+            "closesAtHandlerReturnAndDeniesTargetCommandActorAndTransactionReplacement",
+            "crossThreadCannotUseAnOtherwiseActiveCapability"
+          ]
+        },
+        {
+          "id": "F04",
+          "action": "Async and snapshot isolation",
+          "assertion": "Claimed tasks, impersonation and propagated identity cannot acquire original synchronous write authority.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.application.tenant.MetaContextCommandOriginTest.xml",
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ],
+          "testCases": [
+            "claimedAsyncTaskCannotInstallTheCapabilityWithRestoredHumanIdentity",
+            "identitySnapshotDoesNotPropagateRootAuthorityEvenOnCallerRuns",
+            "impersonationCannotBorrowTheEffectiveUsersUploadOwnership"
+          ]
+        },
+        {
+          "id": "F05",
+          "action": "Published root multi-file fields",
+          "assertion": "Unknown, single-file, virtual, child and unpublished metadata are rejected; the exact command field writer remains required.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ],
+          "testCases": [
+            "rejectsUnknownSingleVirtualAndWrongWriterFieldsBeforeAnyFileLock",
+            "rejectsUnpublishedAndChildModelBeforeAnyFileLock"
+          ]
+        },
+        {
+          "id": "F06",
+          "action": "Parent authorization and version before files",
+          "assertion": "The scoped parent is locked/read and its current version checked before any file row lock.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ],
+          "testCases": [
+            "appendsExactRelationAfterParentLockAndRetentionWithoutCopying",
+            "staleParentVersionFailsBeforeAnyFileLock",
+            "deniesParentWithoutVisibilityBeforeLockingFile"
+          ]
+        },
+        {
+          "id": "F07",
+          "action": "Current upload ownership and finalized state",
+          "assertion": "Cross-tenant, foreign-owner, pending, deleted and nonpublic upload identities cannot create retained relations.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml",
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ],
+          "testCases": [
+            "foreignTenantOwnerAndUnfinalizedUploadsLeaveNoWrites",
+            "rejectsForeignOwnerUnfinalizedDeletedAndNonPublicFileBeforeRetention"
+          ]
+        },
+        {
+          "id": "F08",
+          "action": "Stable file ordering and capacity",
+          "assertion": "Distinct file locks use ascending public PID order and a full field cannot retain or insert another file.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactoryTest.xml"
+          ],
+          "testCases": [
+            "distinctFileLocksMustFollowAscendingPublicPidOrder",
+            "fieldCapacityFailureDoesNotRetainOrInsert"
+          ]
+        },
+        {
+          "id": "F09",
+          "action": "Append, retain and VARCHAR projection",
+          "assertion": "Repeated exact links remain singular, existing relations remain, retention is monotonic, and the caller JSON string projection persists in VARCHAR.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml"
+          ],
+          "testCases": [
+            "appendPreservesExistingRelationsAndRepeatIsIdempotent"
+          ]
+        },
+        {
+          "id": "F10",
+          "action": "Atomic rollback even after caught failure",
+          "assertion": "Retention, relation, parent projection and evidence all roll back, including a caught append rejection.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml"
+          ],
+          "testCases": [
+            "outerFailureRollsBackRetentionRelationsProjectionAndEvidence",
+            "aCaughtAppendFailureStillPreventsPartialCommit"
+          ]
+        },
+        {
+          "id": "F11",
+          "action": "Independent transaction misuse",
+          "assertion": "REQUIRES_NEW cannot use the original capability or commit a partially changed parent.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml"
+          ],
+          "testCases": [
+            "requiresNewCannotReuseOriginalCapabilityOrCommitPartialParent"
+          ]
+        },
+        {
+          "id": "F12",
+          "action": "Concurrent idempotency and deletion arbitration",
+          "assertion": "Duplicate concurrent append commits one relation; append/delete have one winner; deterministic delete-first and retain-first outcomes are covered.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml"
+          ],
+          "testCases": [
+            "concurrentIdenticalAppendsCommitExactlyOneRelation",
+            "appendAndDeleteHaveOneWinnerAndTheLoserLeavesNoPartialEffects",
+            "deleteFirstRejectsAppendAndRollsBackParent"
+          ]
+        },
+        {
+          "id": "F13",
+          "action": "Protected legacy relation entrypoints",
+          "assertion": "A broad parent UPDATE permit cannot replace, empty-array remove, append, or use either legacy linkExisting branch on a command-owned file field; all prior facts remain.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml",
+            "mutations.json",
+            "legacy-bypass-db-witness.json"
+          ],
+          "testCases": [
+            "legacyRelationEntrypointsCannotReplaceOrRemoveACommandOwnedFileField"
+          ]
+        },
+        {
+          "id": "F14",
+          "action": "Ordinary legacy semantics and immutability",
+          "assertion": "Ordinary file fields still replace; exact writers cannot override field/model immutability; physical aliases obey the actual field policy.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml",
+            "unit/TEST-com.auraboot.framework.file.service.impl.FileRelationMutationGuardTest.xml"
+          ],
+          "testCases": [
+            "ordinaryLegacyFileFieldStillReplacesItsRelations",
+            "anExactCommandWriterStillCannotMutateAnImmutableFileFieldThroughLegacyApi",
+            "broadParentUpdateDoesNotGrantAFieldWriterIncludingPhysicalAliases",
+            "modelWriterPolicyAppliesEvenToOpaqueLegacySlots"
+          ]
+        },
+        {
+          "id": "F15",
+          "action": "Official unbound staging upload",
+          "assertion": "Multipart upload creates an owned finalized unbound file; only the original command later appends and retains it.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.file.service.impl.CommandTargetFileAppendIT.xml"
+          ],
+          "testCases": [
+            "officialMultipartUploadIsAnOwnedUnboundStageUntilTheOriginalCommandAppendsIt"
+          ]
+        },
+        {
+          "id": "F16",
+          "action": "Published model reimport dependency",
+          "assertion": "The existing reimport hook still dispatches the exact guard after schema sync and before permission registration.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.service.impl.PluginImportPublishedModelGuardTest.xml"
+          ],
+          "testCases": [
+            "publishedImportDispatchesExactGuardAfterSchemaBeforePermissions"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "consumer",
+      "title": "Consumer composition; not executed in this Core task",
+      "rows": [
+        {
+          "id": "C01",
+          "action": "Mixed-role HTTP permission interceptor plus real business command integration",
+          "assertion": "Integrating product must exercise the relation-manage plus parent-UPDATE identity over HTTP and the real work-order command. Service/PG tests do not claim this HTTP layer.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "http",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        },
+        {
+          "id": "C02",
+          "action": "Browser staged upload and complete maintenance submission",
+          "assertion": "Integrating product must capture the native upload wire and original repair command transaction, with user-visible terminal state.",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        }
+      ]
+    }
+  ]
+}

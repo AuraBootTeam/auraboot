@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Command permit execution context" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T00:14:26.324Z" hostname="Mac" time="0.015">
+  <properties/>
+  <testcase name="independentSourceReadWithoutOuterPermitDoesNotCreateOne()" classname="com.auraboot.framework.application.tenant.MetaContextCommandPermitTest" time="0.001"/>
+  <testcase name="independentSourceFailureAndNestedPermitRestoreExactOuterPlan()" classname="com.auraboot.framework.application.tenant.MetaContextCommandPermitTest" time="0.003"/>
+  <testcase name="legacy explicit scope remains global because it has no target model" classname="com.auraboot.framework.application.tenant.MetaContextCommandPermitTest" time="0.001"/>
+  <testcase name="publishes scope and server-captured version, then closes both" classname="com.auraboot.framework.application.tenant.MetaContextCommandPermitTest" time="0.0"/>
+  <testcase name="advancing the target version affects only the matching target" classname="com.auraboot.framework.application.tenant.MetaContextCommandPermitTest" time="0.001"/>
+  <testcase name="nested explicit ALL work restores the outer SELF plan and version" classname="com.auraboot.framework.application.tenant.MetaContextCommandPermitTest" time="0.001"/>
+  <testcase name="independentSourceReadRestoresOuterPlanAndIdentity()" classname="com.auraboot.framework.application.tenant.MetaContextCommandPermitTest" time="0.001"/>
+</testsuite>

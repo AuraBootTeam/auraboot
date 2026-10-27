@@ -1,0 +1,69 @@
+{
+  "sourceSha": "0642b5fc6041030e0750c233912694b00bd01642",
+  "producerRef": "refs/heads/codex/maritime-parent-file-append",
+  "sourceSetDigest": "8ca86c5bc4c01dfe3a3bf227614f14f3fd57e6eb1c33ee2ea59578b212dbab81",
+  "runtime": "maritime-parent-file-append",
+  "publications": [
+    {
+      "coordinate": {
+        "group": "com.auraboot",
+        "artifact": "auraboot-core",
+        "version": "1.0.1-rc.3"
+      },
+      "file": "com/auraboot/auraboot-core/1.0.1-rc.3/auraboot-core-1.0.1-rc.3.jar",
+      "sha256": "7beae33db78ec1cb17d0d8edccf2f265bf1c5703d119c841324bc48fb1c8f0c7",
+      "apiSignatureVerified": true
+    },
+    {
+      "coordinate": {
+        "group": "com.auraboot",
+        "artifact": "platform-plugin-api",
+        "version": "1.0.1-rc.3"
+      },
+      "file": "com/auraboot/platform-plugin-api/1.0.1-rc.3/platform-plugin-api-1.0.1-rc.3.jar",
+      "sha256": "a9c5cd12925bb3ac246014b0cde746e27fcff3c5a20cbb8c41b9a5020e329ffc",
+      "apiSignatureVerified": true
+    }
+  ],
+  "criticalClasses": [
+    {
+      "class": "com/auraboot/framework/plugin/pf4j/CommandTargetFileAccessorFactory.class",
+      "sha256": "bf138379327b25a84722f615a1f7a2bf64ae000942223eabd5da569374c21306",
+      "matchesCompiledTestRuntimeClass": true
+    },
+    {
+      "class": "com/auraboot/framework/file/service/impl/FileRelationMutationGuard.class",
+      "sha256": "c6aecd89f8a1c8f090a059cb5b2aeb289620f8269b83612fd87dc9c5ba88c84a",
+      "matchesCompiledTestRuntimeClass": true
+    },
+    {
+      "class": "com/auraboot/framework/file/service/impl/FileServiceImpl.class",
+      "sha256": "b220113283753876e09e7e174946a13dbfcae7ee9578d1c4debad51f5e22f89f",
+      "matchesCompiledTestRuntimeClass": true
+    },
+    {
+      "class": "com/auraboot/framework/plugin/pf4j/FileAccessorImpl.class",
+      "sha256": "89337ab64930883abba4a04695aef144359c9f46b3b26458c5a7e2de11f74712",
+      "matchesCompiledTestRuntimeClass": true
+    },
+    {
+      "class": "com/auraboot/framework/application/tenant/MetaContext.class",
+      "sha256": "ef68042b26dcdf237c12ac233f229293f91bf7c4e12fb2a5fa5ac75bae9d7bb6",
+      "matchesCompiledTestRuntimeClass": true
+    },
+    {
+      "class": "com/auraboot/framework/meta/service/impl/AsyncTaskExecutionContext.class",
+      "sha256": "8de39ae30e1f101708be82a36c885127dc64f63269f015158a3233126637796c",
+      "matchesCompiledTestRuntimeClass": true
+    },
+    {
+      "class": "com/auraboot/framework/meta/service/impl/pipeline/phases/HandlerPhase.class",
+      "sha256": "bc4557fe6eb6ad7fc86c55fef91c7604a85b634dd6f41df8c064bd77f6ee9a13",
+      "matchesCompiledTestRuntimeClass": true
+    }
+  ],
+  "componentCandidateOnly": true,
+  "consumerCompositionRequires": "Integrate into the existing richer Core/API source line before producing the full consumer candidate.",
+  "remotePublication": "did_not_run",
+  "productionDeployment": "did_not_run"
+}

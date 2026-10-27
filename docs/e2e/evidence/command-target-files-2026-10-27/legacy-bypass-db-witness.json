@@ -1,0 +1,27 @@
+{
+  "sourceSha": "e06be88ed726157a25d21bd5e321405c20afeb82",
+  "mutation": "FileRelationMutationGuard.authorize body omitted",
+  "model": {
+    "code": "file_append_mvpxjnm6",
+    "table": "mt_file_append_mvpxjnm6"
+  },
+  "snapshot": {
+    "parentPid": "01M5XB4D2S5PX7W8E9879MJP4T",
+    "parentPhotos": "[\"FILE-APPEND-1793059842963\"]",
+    "evidence": "after",
+    "rowVersion": 3,
+    "activeRelations": [
+      {
+        "filePid": "FILE-APPEND-1793059842964",
+        "retentionLocked": false
+      }
+    ]
+  },
+  "projectedPids": [
+    "FILE-APPEND-1793059842963"
+  ],
+  "linkedPids": [
+    "FILE-APPEND-1793059842964"
+  ],
+  "mismatchObserved": true
+}

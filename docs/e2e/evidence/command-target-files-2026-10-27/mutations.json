@@ -1,0 +1,32 @@
+{
+  "restoredSourceSha": "0642b5fc6041030e0750c233912694b00bd01642",
+  "experiments": [
+    {
+      "id": "retention",
+      "sourceShaBeforeMutation": "10ad5610971ac2832cdc9083b8455b939c5d2de9",
+      "dirtyControlledMutation": true,
+      "executed": 1,
+      "failedAsExpected": 1,
+      "evidence": "mutation-retention.xml",
+      "failure": "org.opentest4j.AssertionFailedError: \nExpecting value to be true but was false"
+    },
+    {
+      "id": "nested-origin",
+      "sourceShaBeforeMutation": "a710e6a0c47c9a9128cf3895530b41a06823ae12",
+      "dirtyControlledMutation": true,
+      "executed": 1,
+      "failedAsExpected": 1,
+      "evidence": "mutation-nested-origin.xml",
+      "failure": "org.opentest4j.AssertionFailedError: \nexpected: null\n but was: com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory$Scope@53ba9105"
+    },
+    {
+      "id": "legacy-relation",
+      "sourceShaBeforeMutation": "e06be88ed726157a25d21bd5e321405c20afeb82",
+      "dirtyControlledMutation": true,
+      "executed": 1,
+      "failedAsExpected": 1,
+      "evidence": "mutation-legacy-relation.xml",
+      "failure": "java.lang.AssertionError: \nExpecting code to raise a throwable."
+    }
+  ]
+}

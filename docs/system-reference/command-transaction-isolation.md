@@ -30,3 +30,52 @@ The host supplies immutable current root/related records and the intended change
 ## Client command payload isolation
 
 DSL command actions may declare `includeRecordPayload: false`. The shared action hook then sends only explicitly configured `payload` fields and values collected by `inputFields`; the ambient record remains available to expressions, target resolution and optimistic-version checks, but its fields are not copied into the request payload. This also applies after the pre-dialog fresh-record read. Omission or `true` retains legacy record merging; any other supplied value fails before a command request. This client option does not change server input validation, permissions or command CAS semantics.
+
+## Original command target attachments
+
+`CommandContext.fileAccessor().appendAndRetainExistingToTarget(filePid, fieldCode)` appends an
+existing owned finalized upload to the original authorized human command's root record. The typed
+API accepts only a public file PID and a real published physical multi-file field code. It accepts
+neither a target model/PID nor a storage path, external URL, byte copy or child relation. Older hosts
+and the ordinary `FileAccessorImpl` constructor fail closed with `UnsupportedOperationException`.
+
+The capability is installed by the host handler phase from its trusted pipeline context. It binds
+the tenant, internal user ID, member ID, user PID, exact authorized command, original target, thread,
+handler lifetime, Core connection holder, JDBC connection and transaction synchronization. It rejects
+impersonation, claimed asynchronous tasks, nested authorized command frames, identity/target changes,
+read-only transactions and `REQUIRES_NEW`. Original command provenance is server thread state and
+is excluded from identity snapshots; saturated executor `CallerRunsPolicy` does not inherit it.
+
+The caller first performs its parent CAS, complete attachment projection and domain evidence writes
+in the same physical transaction. The host locks and rechecks the scoped parent, current command
+version and model/record/field mutation invariants before locking a file. Distinct new upload PIDs
+must be passed in ascending string order; repeated already-locked PIDs are permitted. Under the
+file lock the host verifies current-tenant visibility, the actual internal user as owner, finalized
+upload and active state, applies the official monotonic retention fence, and appends one exact
+tenant/model/record/field/file relation. Existing relations remain. Exact repeats are idempotent;
+field capacity is enforced under the parent lock. The method does not update the business field.
+
+An append failure on the original thread marks the original Core transaction rollback-only, even
+if plugin code catches it. Parent projection, evidence, retention and relation cannot partially
+commit. Retention and deletion use the existing file-row arbitration: deletion first rejects append;
+committed retention rejects subsequent deletion. Physical object deletion remains after-commit.
+
+Legacy relationship replacement, removal and append use the same model/record and actual-file-field
+writer/immutability invariants. The guard locks and authorizes the parent before relation writes;
+physical column aliases resolve to the actual field policy. Old `linkExisting` checks authorization
+before its already-linked short circuit. Generated save-and-link methods authorize before uploading.
+An empty replacement array cannot remove a command-owned field's relations without its exact writer.
+Ordinary mutable legacy file fields retain replacement semantics. Existing opaque export slots remain
+subject to model/record authorization and invariants; they do not override an actual file field's
+policy. No new generic relation permission is granted by the target-bound capability.
+
+The existing multipart upload is the staging path: `/api/file/upload` accepts the file without a
+business target and persists an owned, finalized, unbound file. `FileAttachmentField` sends only the
+`file` multipart member and passes its returned public PID to the command form. The domain command
+then consumes the staged upload through the target-bound capability. No alternate upload API or
+pre-command relation exemption is needed. Image/PDF semantics remain in the consuming domain.
+
+The existing download authorizer requires read access to every active relation target. Consumers
+must avoid unrelated child relations merely to make an attachment appear; the capability itself
+links only its original root target. Backend qualification and explicitly unexecuted consumer
+layers are recorded in the [file capability verification report](./2026-10-27-command-target-files-testing-gate-acceptance-report.md).
