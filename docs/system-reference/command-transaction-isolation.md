@@ -107,3 +107,22 @@ The existing download authorizer requires read access to every active relation t
 must avoid unrelated child relations merely to make an attachment appear; the capability itself
 links only its original root target. Backend qualification and explicitly unexecuted consumer
 layers are recorded in the [file capability verification report](./2026-10-27-maritime-combined-files-testing-gate-acceptance-report.md).
+
+
+## Query result reuse
+
+A published query command can explicitly declare `executionConfig.cacheResult: false`:
+
+```json
+{
+  "code": "example:current_records",
+  "type": "query",
+  "executionConfig": { "cacheResult": false }
+}
+```
+
+`query` is the existing registered command type. The declaration is trusted command metadata, never a request or payload option. It disables both the command idempotency claim/replay lookup and completion's stored result. A supplied `clientRequestId` therefore does not return an older result: the handler and its current result-record READ checks run again. Existing stored outcomes are ignored, not deleted. An absent setting or explicit `true` preserves the existing scoped idempotency contract, including actor/intent conflict checks for writes.
+
+Only a boolean is valid; explicit null, strings and numbers are rejected. `false` requires `type: "query"`, cannot coexist with `requireIdempotencyKey: true`, and cannot declare a non-read `handlerParams.targetRecordAction`. Import validation and both runtime phases enforce the same policy. Plugin DTO consolidation preserves the boolean in the stored execution configuration. Mutation commands must retain their idempotency contract; their authors must not relabel them as queries to disable result reuse.
+
+This is a result-reuse policy, not a database read-only transaction mode. It grants no command capability, result-record READ, target UPDATE, file access or broader scope, and does not disable existing invocation authorization, audit, effects or invariant handling. A handler remains responsible for checking every returned record through the established READ authority; the declaration cannot make an unsafe query handler safe. Public HTTP/browser and consumer-specific wiring require their own qualification.

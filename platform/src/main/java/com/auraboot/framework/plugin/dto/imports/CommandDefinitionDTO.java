@@ -275,6 +275,7 @@ public class CommandDefinitionDTO {
             if (executionConfig.timeout != null) config.put("timeout", executionConfig.timeout);
             if (executionConfig.retryPolicy != null) config.put("retryPolicy", executionConfig.retryPolicy);
             if (executionConfig.requireIdempotencyKey != null) config.put("requireIdempotencyKey", executionConfig.requireIdempotencyKey);
+            if (executionConfig.cacheResult != null) config.put("cacheResult", executionConfig.cacheResult);
             if (executionConfig.processKey != null) config.put("processKey", executionConfig.processKey);
             if (executionConfig.options != null) config.put("options", executionConfig.options);
         }
@@ -317,6 +318,14 @@ public class CommandDefinitionDTO {
         private Long timeout;
         private Map<String, Object> retryPolicy;
         private Boolean requireIdempotencyKey;
+        private Boolean cacheResult;
+
+        @com.fasterxml.jackson.annotation.JsonSetter("cacheResult")
+        public void setCacheResult(Object value) {
+            if (!(value instanceof Boolean flag))
+                throw new IllegalArgumentException("cacheResult must be a boolean");
+            cacheResult = flag;
+        }
         private String processKey;
         private Map<String, Object> options;
     }
