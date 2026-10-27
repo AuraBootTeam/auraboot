@@ -16,8 +16,8 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes shared presentation types in the 60-definition contract', () => {
-    expect(Object.keys(defs).length).toBe(60);
+  it('includes shared presentation types in the 61-definition contract', () => {
+    expect(Object.keys(defs).length).toBe(61);
     expect(defs).toHaveProperty('CardImageViewport');
   });
 
@@ -299,6 +299,30 @@ describe('DSL Generated Schema', () => {
           },
         ],
       }),
+    ).toBe(true);
+  });
+
+  it('publishes strict uploaded-files configuration without changing legacy file hints', () => {
+    const validate = new Ajv({ strict: false }).compile({
+      ...defs.CommandInputFieldConfig,
+      definitions: defs,
+    });
+    const field = {
+      field: 'filePids',
+      type: 'uploaded-files',
+      uploadedFiles: { maxCount: 10, accept: 'image/*,.pdf', maxBytes: 10485760 },
+    };
+    expect(validate(field)).toBe(true);
+    for (const uploadedFiles of [
+      { maxCount: 11, accept: '.pdf' },
+      { maxCount: 0, accept: '.pdf' },
+      { maxCount: 1.5, accept: '.pdf' },
+      { maxCount: 1 },
+      { maxCount: 1, accept: '.pdf', link: true },
+    ])
+      expect(validate({ ...field, uploadedFiles })).toBe(false);
+    expect(
+      validate({ field: 'csvText', type: 'file', fileValueMode: 'text', accept: '.csv' }),
     ).toBe(true);
   });
 

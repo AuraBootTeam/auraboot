@@ -423,6 +423,20 @@ export interface ColumnConfig {
   tagConfig?: Record<string, unknown>;
 }
 
+export interface UploadedFilesInputConfig {
+  /** @minimum 1
+   * @maximum 10
+   * @multipleOf 1
+   */
+  maxCount: number;
+  /** File chooser/type hint; server byte validation remains authoritative. */
+  accept: string;
+  /** @minimum 1
+   * @multipleOf 1
+   */
+  maxBytes?: number;
+}
+
 export interface CommandInputFieldConfig {
   field: string;
   label?: string | LocalizedText;
@@ -431,6 +445,8 @@ export interface CommandInputFieldConfig {
   helpText?: string | LocalizedText;
   placeholder?: string | LocalizedText;
   type?: string;
+  /** Configuration for type: uploaded-files; its submitted value is public file PID[]. */
+  uploadedFiles?: UploadedFilesInputConfig;
   /** Static dictionary used to populate select/segmented choice fields. */
   dictCode?: string;
   required?: boolean;

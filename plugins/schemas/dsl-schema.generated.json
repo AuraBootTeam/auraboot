@@ -2034,6 +2034,10 @@
         "type": {
           "type": "string"
         },
+        "uploadedFiles": {
+          "$ref": "#/definitions/UploadedFilesInputConfig",
+          "description": "Configuration for type: uploaded-files; its submitted value is public file PID[]."
+        },
         "dictCode": {
           "type": "string",
           "description": "Static dictionary used to populate select/segmented choice fields."
@@ -2046,6 +2050,31 @@
         "field"
       ],
       "additionalProperties": {}
+    },
+    "UploadedFilesInputConfig": {
+      "type": "object",
+      "properties": {
+        "maxCount": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "multipleOf": 1
+        },
+        "accept": {
+          "type": "string",
+          "description": "File chooser/type hint; server byte validation remains authoritative."
+        },
+        "maxBytes": {
+          "type": "number",
+          "minimum": 1,
+          "multipleOf": 1
+        }
+      },
+      "required": [
+        "maxCount",
+        "accept"
+      ],
+      "additionalProperties": false
     },
     "CommandInputPresentation": {
       "type": "object",

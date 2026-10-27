@@ -10,8 +10,9 @@ import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-rende
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import FILE_ATTACHMENT_TEXT from './FileAttachmentField.i18n.json';
+import { StagedFileAttachmentField } from './StagedFileAttachmentField';
 
-interface FileItem {
+export interface FileItem {
   name: string;
   fileId?: string;
   url: string;
@@ -19,7 +20,13 @@ interface FileItem {
   type?: string;
 }
 
-interface FileAttachmentFieldProps {
+export interface FileUploadState {
+  pendingCount: number;
+  failedCount: number;
+  blocked: boolean;
+}
+
+export interface FileAttachmentFieldProps {
   name?: string;
   value?: string | FileItem[];
   disabled?: boolean;
@@ -30,6 +37,9 @@ interface FileAttachmentFieldProps {
   maxCount?: number;
   limitsEndpoint?: string;
   onChange?: (value: FileItem[]) => void;
+  /** Opt-in prompt staging; no business relation or stored-file management. */
+  uploadMode?: 'staged-pids';
+  onUploadStateChange?: (state: FileUploadState) => void;
   context?: any;
 }
 
@@ -59,7 +69,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function FileAttachmentField({
+function LegacyFileAttachmentField({
   value,
   disabled = false,
   readOnly = false,
@@ -225,6 +235,12 @@ export function FileAttachmentField({
       </button>
     </div>
   );
+}
+
+export function FileAttachmentField(props: FileAttachmentFieldProps) {
+  return props.uploadMode === 'staged-pids'
+    ? <StagedFileAttachmentField {...props} />
+    : <LegacyFileAttachmentField {...props} />;
 }
 
 export default FileAttachmentField;
