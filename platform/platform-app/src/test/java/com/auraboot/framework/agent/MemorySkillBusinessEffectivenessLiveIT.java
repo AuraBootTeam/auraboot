@@ -171,6 +171,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     @Test
     @Timeout(value = 30, unit = TimeUnit.MINUTES)
     void pairedBusinessMemoryAndProcedureMeasurement() throws Exception {
+        if (formConsumer()) { formConsumerMeasurement(); return; }
         if (lifecycle()) { lifecycleMeasurement(); return; }
         if (recallAnswers()) { recallAnswerMeasurement(); return; }
         if (expanded()) { expandedMeasurement(); return; }
@@ -296,10 +297,76 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     }
 
     private static String effectivenessProfile() {
-        return lifecycle() ? "lifecycle-v1" : recallAnswers() ? "recall-answer-v1" : expanded() ? "expanded-v1" : "legacy";
+        return formConsumer() ? "form-consumer-v1" : lifecycle() ? "lifecycle-v1" : recallAnswers() ? "recall-answer-v1" : expanded() ? "expanded-v1" : "legacy";
     }
 
-    private static int expectedSampleCount() { return lifecycle() ? 8 : recallAnswers() ? 96 : expanded() ? 72 : 16; }
+    private static int expectedSampleCount() { return formConsumer() ? 3 : lifecycle() ? 8 : recallAnswers() ? 96 : expanded() ? 72 : 16; }
+
+    private static boolean formConsumer() {
+        return "form-consumer-v1".equals(System.getenv("AURA_EFFECTIVENESS_PROFILE"));
+    }
+
+    private void formConsumerMeasurement() throws Exception {
+        com.fasterxml.jackson.databind.JsonNode definition;
+        try (var input = getClass().getResourceAsStream("/agent-eval/form-consumer-v1.json")) {
+            assertThat(input).isNotNull(); definition = json.readTree(input);
+        }
+        assertThat(definition.path("cases").size()).isEqualTo(3);
+        // Install the exact production upgrade playbook, not an acceptance-only prompt.
+        jdbc.execute(Files.readString(Path.of("../scripts/seed-form-fill-skill.sql")));
+        var before = jdbc.queryForList("SELECT * FROM mt_" + modelCode + " ORDER BY pid");
+        for (var scenario : definition.path("cases")) {
+            wireCalls.clear();
+            String prompt = scenario.path("message").asText();
+            var chat = new ChatRequest();
+            chat.setAgentCode("aurabot"); chat.setSessionId(UniqueIdGenerator.generate()); chat.setMessage(prompt);
+            var options = new ChatRequest.ChatOptions();
+            options.setProvider(live.providerCode()); options.setModel(live.model()); options.setMaxTokens(1536);
+            chat.setOptions(options);
+            chat.setFormFill(new com.auraboot.framework.agent.dto.FormFillRequest(
+                    "business-draft-" + suffix, modelCode, "2026-10-27", "Asia/Shanghai", List.of(
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_ref", "订单编号", "string", null, null, false),
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_status", "状态", "string", null, List.of("OPEN", "CLOSED"), false),
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("days_late", "逾期天数", "integer", null, null, false),
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_amount", "金额", "integer", null, null, false),
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_priority", "受保护优先级", "string", null, null, true))));
+            var sink = new Probe();
+            long started = System.nanoTime();
+            var outcome = turns.runTurn(new TurnRequest(tenantId, getTestUser().getId(), getTestTenantMember().getId(),
+                    "web", "aurabot", null, UniqueIdGenerator.generate(), prompt, Map.of(), Map.of(),
+                    InboundMode.NEW_FROM_REQUEST, TriageBucket.CONTEXTUAL_ANSWER, null, null, null, chat), sink);
+            var row = new LinkedHashMap<String, Object>();
+            row.put("caseId", scenario.path("id").asText()); row.put("message", prompt);
+            row.put("conversationId", chat.getSessionId()); row.put("traceId", sink.trace);
+            row.put("success", outcome instanceof TurnOutcome.Success); row.put("pending", sink.pending);
+            row.put("reply", sink.answer); row.put("tools", List.copyOf(sink.tools));
+            row.put("toolResults", List.copyOf(sink.results)); row.put("wireCalls", List.copyOf(wireCalls));
+            row.put("elapsedMillis", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            var after = jdbc.queryForList("SELECT * FROM mt_" + modelCode + " ORDER BY pid");
+            row.put("businessBefore", before); row.put("businessAfter", after);
+            row.put("businessUnchanged", before.equals(after)); samples.add(row); writeCheckpoint();
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            assertThat(sink.pending).isFalse(); assertThat(sink.tools).hasSize(1); assertThat(sink.results).hasSize(1);
+            assertThat(sink.tools.get(0).get("name")).isIn("platform.fill_form", "platform_fill_form");
+            var result = json.valueToTree(sink.results.get(0)).path("result");
+            assertThat(result.path("success").asBoolean()).isTrue();
+            assertThat(result.path("action").asText()).isEqualTo("form_fill");
+            assertThat(result.path("fields")).isEqualTo(scenario.path("fields"));
+            scenario.path("fields").fieldNames().forEachRemaining(field -> {
+                var review = result.path("reviews").path(field);
+                assertThat(review.path("status").asText()).isEqualTo("supported");
+                assertThat(review.path("quote").asText()).isNotBlank();
+                assertThat(prompt).contains(review.path("quote").asText());
+            });
+            if (scenario.has("ambiguous")) {
+                var review = result.path("reviews").path(scenario.path("ambiguous").asText());
+                assertThat(review.path("status").asText()).isEqualTo("ambiguous");
+                assertThat(review.path("reason").asText()).isEqualTo("multiple_values");
+            }
+            assertThat(after).isEqualTo(before);
+            assertThat(wireCalls).isNotEmpty();
+        }
+    }
 
     private static boolean lifecycle() {
         return "lifecycle-v1".equals(System.getenv("AURA_EFFECTIVENESS_PROFILE"));
