@@ -91,14 +91,9 @@ async function stopOwned(state, aura) {
   aura(['runtime', 'process', 'unregister', state.runtime, 'embedding']);
   sameProcess(snapshot(state.process.pid), state.process);
   process.kill(state.process.pid, 'SIGTERM');
-  for (const child of descendants) if (alive(child.pid)) {
-    let current;
-    try { current = snapshot(child.pid); }
-    catch (error) { if (!alive(child.pid)) continue; throw error; }
-    sameProcess(current, child);
-    try { process.kill(child.pid, 'SIGTERM'); }
-    catch (error) { if (error.code !== 'ESRCH') throw error; }
-  }
+  // Ollama shuts down its own runners. Do not interrogate or signal a runner
+  // halfway through that exit: its cwd can disappear before kill(0) does.
+  // Observe the exact pre-stop descendant set; survivors fail closed below.
   for (let n = 0; n < 100 && [state.process, ...descendants].some(p => alive(p.pid)); n++) await sleep(100);
   assert([state.process, ...descendants].every(p => !alive(p.pid)), 'Owned provider did not stop; preserve record for inspection');
 }
