@@ -23,7 +23,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Same-transaction actual create with scalar PID gets exactly one retained relation and unchanged row version; exact repeat idempotent.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Targetless creation command</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">No root target can complete only its exact new child; parent append remains denied.</td>
@@ -31,7 +31,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> No root target can complete only its exact new child; parent append remains denied.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Creation provenance</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Prior-transaction record with same actor/file/projection and nested-command creation are refused.</td>
@@ -39,7 +39,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Prior-transaction record with same actor/file/projection and nested-command creation are refused.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Atomic SQL result</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Domain failure rolls back new record, relation and retention together; legacy UPDATE path remains denied.</td>
@@ -47,7 +47,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Domain failure rolls back new record, relation and retention together; legacy UPDATE path remains denied.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Owner and exact file</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Nonowner finalized upload and mismatched scalar PID are denied without retaining.</td>
@@ -55,7 +55,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Nonowner finalized upload and mismatched scalar PID are denied without retaining.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Scope and physical transaction</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Different PG identity, rollback-only, closed/read-only/autocommit connection, scope close, thread, actor, tenant and nested command are denied.</td>
@@ -63,7 +63,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Different PG identity, rollback-only, closed/read-only/autocommit connection, scope close, thread, actor, tenant and nested command are denied.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Formal file and writer policy</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">String/multiple/virtual fields, wrong CREATE/field writer, changed projection/version and occupied single slot are denied before retention.</td>
@@ -71,7 +71,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> String/multiple/virtual fields, wrong CREATE/field writer, changed projection/version and occupied single slot are denied before retention.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Parent append regression</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Existing target append, locking, retention/deletion arbitration and concurrency selections execute successfully.</td>
@@ -79,7 +79,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Existing target append, locking, retention/deletion arbitration and concurrency selections execute successfully.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Falsification and native identity</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Lookup-as-creation mutation makes actual old-record test red; source restored, final suites pass; primary JARs and six class bytes verified.</td>
@@ -87,7 +87,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Lookup-as-creation mutation makes actual old-record test red; source restored, final suites pass; primary JARs and six class bytes verified.</div>
-    
+
   </td></tr></tbody></table></details>
     <details open><summary>consumer Unexecuted consumer integration</summary>
     <table><thead><tr><th></th><th>行动点</th><th>四轴</th><th>成色/证据</th><th>断言</th></tr></thead>
@@ -98,7 +98,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Integrate the exact delta into Root rich Core/API; preserve Root [] deny-all semantics; build one combined artifact and issue the existing file scope.</div>
-    
+
   </td></tr><tr class="dot-⬜">
     <td>⬜</td><td>A actual public command and download journeys</td><td class="layer">api/real-stack/http [recorded]</td>
     <td><span class="badge b-none">–</span></td><td class="assert">Run verify/reverify/grant/import prepare and browser/download behavior with original authenticated principals on A owned runtime.</td>
@@ -106,7 +106,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Run verify/reverify/grant/import prepare and browser/download behavior with original authenticated principals on A owned runtime.</div>
-    
+
   </td></tr><tr class="dot-⬜">
     <td>⬜</td><td>Separate historical and generated export paths</td><td class="layer">api/real-stack/http [recorded]</td>
     <td><span class="badge b-none">–</span></td><td class="assert">Nonowner historical relation reuse and empty-slot generated export require their independently owned paths; this SPI grants neither generic UPDATE nor arbitrary linking.</td>
@@ -114,5 +114,5 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Nonowner historical relation reuse and empty-slot generated export require their independently owned paths; this SPI grants neither generic UPDATE nor arbitrary linking.</div>
-    
+
   </td></tr></tbody></table></details></body></html>
