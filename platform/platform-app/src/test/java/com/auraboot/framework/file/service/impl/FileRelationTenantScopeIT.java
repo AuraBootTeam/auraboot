@@ -63,7 +63,7 @@ class FileRelationTenantScopeIT {
     }
 
     private String newParent() {
-        return MetaContext.runWithCommandPermitScope("ALL",()->data.create(ENTITY_TYPE, java.util.Map.of()).get("pid").toString());
+        return MetaContext.runWithCommandPermitScope("ALL",()->data.create(ENTITY_TYPE, java.util.Map.of(FIELD_NAME,"[]")).get("pid").toString());
     }
 
     private boolean replace(FileRelationRequestDTO request, Long user) {

@@ -224,7 +224,7 @@ class CommandTargetFileAppendIT {
         var request=new com.auraboot.framework.file.dto.FileRelationRequestDTO();
         request.setEntityType(model); request.setEntityId(parent); request.setFieldName("frozen_photos"); request.setFileIds(new String[]{file});
         assertThatThrownBy(()->command(parent,a->files.createFileRelation(request,USER))).isInstanceOf(AccessDeniedException.class);
-        assertThat(files.getFilesByEntityAndField(model,parent,"frozen_photos")).isEmpty();
+        actor(); assertThat(files.getFilesByEntityAndField(model,parent,"frozen_photos")).isEmpty();
         assertThat(retained(file)).isFalse(); assertThat(evidence(parent)).isEqualTo("before");
     }
     @Test void officialMultipartUploadIsAnOwnedUnboundStageUntilTheOriginalCommandAppendsIt() throws Exception {
