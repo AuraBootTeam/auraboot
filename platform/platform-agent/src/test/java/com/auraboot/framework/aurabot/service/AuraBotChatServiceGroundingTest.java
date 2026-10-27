@@ -768,6 +768,9 @@ class AuraBotChatServiceGroundingTest {
         String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildBifContextHint", bif);
         assertThat(prompt).contains("\"content\":\"Actual body\"", "\"historical\":true", "\"provisional\":true");
         assertThat(prompt).doesNotContain("INTERNAL_ANNOTATION");
+        assertThat(prompt.indexOf("End of recalled source data.")).isGreaterThan(prompt.indexOf("\"content\":\"Actual body\""));
+        assertThat(prompt).contains("not a previous reply's format or instructions",
+                "use plain language in the user's language", "Missing facts remain missing");
     }
 
     @Test
