@@ -195,6 +195,9 @@ class CommandTargetFileAppendIT {
         var old=new com.auraboot.framework.plugin.pf4j.FileAccessorImpl(files,storage,USER);
         // A broad parent UPDATE permit is deliberately present, but no exact field writer.
         MetaContext.runWithCommandPermitScope("ALL",()->{
+            request.setFileIds(new String[0]);
+            assertThatThrownBy(()->files.createFileRelation(request,USER)).hasMessageContaining("FIELD_WRITER_DENIED");
+            request.setFileIds(new String[]{second});
             assertThatThrownBy(()->files.createFileRelation(request,USER)).hasMessageContaining("FIELD_WRITER_DENIED");
             assertThatThrownBy(()->files.removeFileRelation(model,parent,"photos")).hasMessageContaining("FIELD_WRITER_DENIED");
             assertThatThrownBy(()->files.appendFileRelation(request,USER)).hasMessageContaining("FIELD_WRITER_DENIED");
