@@ -756,7 +756,7 @@ class AuraBotChatServiceGroundingTest {
         String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildBifContextHint", bif);
         assertThat(prompt).contains("Source content 8", "untrusted context", "support the requested fact",
                 "source titles", "current business records", "exact substring of the source content alone",
-                "\"title\":\"Policy 8\"", "\"content\":\"Source content 8\"", "\"scope\":\"user\"");
+                "\"title\":\"Policy 8\"", "\"content\":\"Source content 8\"", "\"scope\":\"user\"", "unless the user explicitly asks about storage mechanics");
         assertThat(prompt).doesNotContain("private-pid-", "[user] Policy");
     }
 
@@ -777,7 +777,8 @@ class AuraBotChatServiceGroundingTest {
                 .inputSchema(Map.of("type", "object")).build()), "query", "orders", true);
         String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildToolHint", tools);
         assertThat(prompt).contains("declared REFERENCE type", "STRING identifier", "EQ filter",
-                "field name or suffix", "successful exact match", "current business records");
+                "field name or suffix", "successful exact match", "current business records",
+                "current request's output contract", "line boundaries exactly", "empty-query results");
         String writePrompt = ReflectionTestUtils.invokeMethod(newService(), "buildToolHint",
                 new ChatToolResolver.ResolvedTools(tools.tools(), "update", "orders", false));
         assertThat(writePrompt).contains("MODIFY data", "Describe what you will do");

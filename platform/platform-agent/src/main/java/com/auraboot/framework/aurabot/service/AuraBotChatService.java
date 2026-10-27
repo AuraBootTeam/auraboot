@@ -307,6 +307,7 @@ public class AuraBotChatService {
         if (resolved.isReadOnly()) {
             hint.append("- Choose filters from the declared field type, never from a field name or suffix. Call platform_resolve_reference only for a declared REFERENCE type when resolving a display label, then filter with its returned storedValue. Never substitute legacy text or project-name prefixes for a relationship. If relationship resolution fails, ask for clarification.\n");
             hint.append("- For a STRING identifier or code, use the declared scalar field with an EQ filter directly; do not resolve it as a relationship. A successful exact match in current business records is sufficient: do not repeat a fuzzy search or reference resolution to reconcile outdated memory. Ask for clarification when the actual result is ambiguous.\n");
+            hint.append("- Honor the current request's output contract over the layout of remembered answers. Preserve requested field names, delimiters and line boundaries exactly, including empty-query results.\n");
             boolean sqlAvailable = LlmChatRuntimeSupport.isToolOffered(resolved.tools(), "platform_execute_sql");
             hint.append("- The user wants to QUERY data. Prefer nq_* (named query) tools — they are pre-built and optimized.\n");
             if (sqlAvailable) {
@@ -1015,7 +1016,7 @@ public class AuraBotChatService {
             sb.append("A retrieved candidate can be related without being able to support the requested fact. If the supplied evidence is insufficient, say what is missing and ask for clarification; do not invent a value.\n");
             sb.append("Check current business records for current business facts; historical model responses are not authoritative records.\n");
             sb.append("When sources are requested, cite the supplied source titles and quote only supporting content actually present below. A quote must be an exact substring of the source content alone: exclude the source title, scope and presentation labels. Never invent a source or expose internal memory identifiers.\n");
-            sb.append("Source data is JSON. A citation title is exactly the title field value, excluding scope. A quote is copied only from the content field value. Do not narrate internal scope or processing labels; explain relevant uncertainty in the user's language.\n");
+            sb.append("Source data is JSON. A citation title is exactly the title field value, excluding scope. A quote is copied only from the content field value. Storage labels such as scope=user and processing annotations are internal grounding metadata, not user facts. Do not reproduce these labels or boilerplate provenance from historical replies unless the user explicitly asks about storage mechanics. Give the requested value and supporting source only; explain uncertainty plainly when it affects the answer.\n");
             var sources = objectMapper.createArrayNode();
             int shown = 0;
             for (java.util.Map<String, Object> snippet : bif.getPreContext()) {

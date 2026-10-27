@@ -62,6 +62,7 @@ test('private recall, missing facts, persisted history and manual recovery', asy
   await login(page, fixture.owner);
   const answer = await send(page, fixture.memory.question, 'owner-recall', true);
   await expect(answer).toContainText(fixture.memory.value);
+  await expect(answer).not.toContainText(/scope\s*=|Historical model response|memory_agent_id/);
   await expect(answer).toContainText(fixture.memory.actualTitle);
   await page.screenshot({ path: join(directory, 'web-memory-supported.png'), fullPage: true });
   const before = (await database.query('SELECT count(*)::int AS n FROM ab_gen_ai_usage WHERE tenant_id=$1', [fixture.tenantId])).rows[0].n;
@@ -75,6 +76,7 @@ test('private recall, missing facts, persisted history and manual recovery', asy
   await fresh(page);
   const missing = await send(page, fixture.memory.missingQuestion, 'owner-missing');
   await expect(missing).toContainText(fixture.memory.missingMarker);
+  await expect(missing).not.toContainText(/scope\s*=|Historical model response|memory_agent_id/);
   await page.screenshot({ path: join(directory, 'web-memory-missing.png'), fullPage: true });
   // Only the negative phase substitutes one transport failure; all answers use real upstreams.
   await page.route('**/api/ai/aurabot/chat/stream', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Controlled acceptance transport unavailable"}' }));
@@ -86,6 +88,7 @@ test('private recall, missing facts, persisted history and manual recovery', asy
   await page.unroute('**/api/ai/aurabot/chat/stream');
   const recovered = await send(page, fixture.memory.question, 'owner-recovered');
   await expect(recovered).toContainText(fixture.memory.value);
+  await expect(recovered).not.toContainText(/scope\s*=|Historical model response|memory_agent_id/);
   await page.screenshot({ path: join(directory, 'web-memory-recovery.png'), fullPage: true });
   facts.push({ id: 'R5.web.owner', historyModelRequests: after - before, transportFaultOnly: true });
 });
