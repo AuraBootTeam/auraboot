@@ -221,7 +221,9 @@ test('SC10 dashboard template → real donut/title edit → save/publish → rel
   ).not.toBeChecked();
   const filters = panel.getByTestId('designer-filter-builder');
   await expect(filters).toContainText('未设置筛选条件');
-  await expect(panel.getByRole('option', { name: /交付验收状态分布/ })).toBeAttached();
+  const distributionQuery = panel.locator('option[value="tdo_acceptance_distribution"]');
+  await expect(distributionQuery).toBeAttached();
+  await expect(distributionQuery).toHaveText('交付验收状态分布 (tdo_acceptance_distribution)');
   await page.mouse.move(280, 85);
   await shot(page, 'SC10-dashboard-before');
   let unfinishedQueries = 0;
