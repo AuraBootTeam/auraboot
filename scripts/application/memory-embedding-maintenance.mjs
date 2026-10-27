@@ -18,7 +18,7 @@ export function validateManifest(value) {
   return { baseUrl: url.origin, tenantId: value.tenantId, agentCode: value.agentCode, expectedSpace: value.expectedSpace, reason: value.reason, pids: value.pids };
 }
 
-export async function run(manifest, checkpointPath, { token, resume = false, maxItems = 100, request = fetch } = {}) {
+export async function run(manifest, checkpointPath, { token, resume = false, maxItems = 100, request = fetch, signal } = {}) {
   const target = validateManifest(manifest), digest = hash(target);
   if (!token || !Number.isInteger(maxItems) || maxItems < 1 || maxItems > 100) throw Error('token and max-items 1..100 required');
   const lockPath = `${checkpointPath}.lock`;
@@ -42,7 +42,7 @@ export async function run(manifest, checkpointPath, { token, resume = false, max
     const api = async (path, body) => {
       const response = await request(`${target.baseUrl}/api/admin/memory/embeddings${path}`, {
         method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(180_000),
+        ...(body ? { body: JSON.stringify(body) } : {}), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(180_000)]) : AbortSignal.timeout(180_000),
         redirect: 'error',
       });
       const result = await response.json();
@@ -88,11 +88,21 @@ export async function main(args) {
     options[key] = key === '--resume' ? true : args[++i];
   }
   if (!options['--manifest'] || !options['--checkpoint'] || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(options['--token-env'] ?? '')) throw Error('--manifest, --checkpoint and --token-env required');
-  const result = await run(JSON.parse(readFileSync(resolve(options['--manifest']), 'utf8')), resolve(options['--checkpoint']), {
-    token: process.env[options['--token-env']], resume: options['--resume'], maxItems: Number(options['--max-items'] ?? 100),
-  });
-  process.stdout.write(JSON.stringify(result) + '\n');
-  return result.status === 'complete' ? 0 : 3;
+  const controller = new AbortController();
+  const cancel = () => controller.abort(Error('maintenance interrupted; inspect checkpoint before resuming'));
+  process.on('SIGINT', cancel);
+  process.on('SIGTERM', cancel);
+  try {
+    const result = await run(JSON.parse(readFileSync(resolve(options['--manifest']), 'utf8')), resolve(options['--checkpoint']), {
+      token: process.env[options['--token-env']], resume: options['--resume'], maxItems: Number(options['--max-items'] ?? 100),
+      signal: controller.signal,
+    });
+    process.stdout.write(JSON.stringify(result) + '\n');
+    return result.status === 'complete' ? 0 : 3;
+  } finally {
+    process.off('SIGINT', cancel);
+    process.off('SIGTERM', cancel);
+  }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main(process.argv.slice(2)).then(code => { process.exitCode = code; }).catch(error => { process.stderr.write(error.message + '\n'); process.exitCode = 1; });

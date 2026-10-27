@@ -362,7 +362,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                     var recalled = recall.preRecall(tenantId, user, "aurabot", prompt);
                     ChatRequest chat = new ChatRequest(); chat.setAgentCode("aurabot");
                     chat.setSessionId(UniqueIdGenerator.generate()); chat.setMessage(prompt);
-                    var options = new ChatRequest.ChatOptions(); options.setProvider(live.providerCode()); options.setModel(live.model()); options.setMaxTokens(768); chat.setOptions(options);
+                    var options = new ChatRequest.ChatOptions(); options.setProvider(live.providerCode()); options.setModel(live.model()); options.setMaxTokens(4096); chat.setOptions(options);
                     Probe sink = new Probe(); long started = System.nanoTime();
                     TurnOutcome outcome = turns.runTurn(new TurnRequest(tenantId, getTestUser().getId(), getTestTenantMember().getId(),
                             "web", "aurabot", null, UniqueIdGenerator.generate(), prompt, Map.of(), Map.of(), InboundMode.NEW_FROM_REQUEST,
@@ -382,6 +382,8 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                     assertThat(sink.pending).as("Read-only memory questions must not initiate an approval").isFalse();
                     assertThat(row.get("businessUnchanged")).isEqualTo(true);
                     var success = (TurnOutcome.Success) outcome;
+                    assertThat(success.meta()).as("The answer-quality sample must finish within the product token budget")
+                            .doesNotContainEntry(TurnOutcomeMeta.RESPONSE_TRUNCATED, Boolean.TRUE);
                     if (!Boolean.TRUE.equals(success.meta().get(TurnOutcomeMeta.TOOL_FAILURE))) {
                         var ids = jdbc.queryForList("SELECT metadata::jsonb->>'turn_id' FROM ab_ai_trace WHERE tenant_id=? AND trace_id=?", String.class, tenantId, sink.trace);
                         assertThat(ids).hasSize(1); String turnId = ids.getFirst();
@@ -625,7 +627,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     }
 
     private Map<String, Object> recordRequest(LlmChatRequest request) throws Exception {
-        if ((expanded() || recallAnswers()) && request.getMaxTokens() > 768) throw new IllegalStateException("Per-request token budget exceeded");
+        if ((expanded() || recallAnswers()) && request.getMaxTokens() > (recallAnswers() ? 4096 : 768)) throw new IllegalStateException("Per-request token budget exceeded");
         if (++providerCalls > ((expanded() || recallAnswers()) ? 288 : 96)) throw new IllegalStateException("Provider call budget exhausted");
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("requestedModel", request.getModel());

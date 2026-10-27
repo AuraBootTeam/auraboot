@@ -278,7 +278,7 @@ public class ChatTurnRuntime {
             sink.onTextChunk(text);
         }
         sink.onDone(text, traceId);
-        return new TurnOutcome.Success(text, Map.of());
+        return new TurnOutcome.Success(text, completionMeta(response));
     }
 
     public TurnOutcome completeFinalResponse(LlmChatResponse response,
@@ -423,7 +423,12 @@ public class ChatTurnRuntime {
             sink.onTextChunk(finalText);
         }
         sink.onDone(finalText, traceId);
-        return new TurnOutcome.Success(finalText, Map.of());
+        return new TurnOutcome.Success(finalText, completionMeta(aggregate));
+    }
+
+    private static Map<String, Object> completionMeta(LlmChatResponse response) {
+        return response != null && "max_tokens".equals(response.getStopReason())
+                ? Map.of(TurnOutcomeMeta.RESPONSE_TRUNCATED, Boolean.TRUE) : Map.of();
     }
 
     public TurnOutcome runToolLoop(ChatToolLoopSpec spec, ChatToolLoopCallbacks callbacks) {
