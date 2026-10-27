@@ -44,3 +44,16 @@ test('portable delivery report reads governed sources and contains no embedded r
  const columns=report.dsl.body.flatMap(block=>block.columns||[]).map(column=>column.field);
  for(const field of ['owner_name','delivery_stage','delivery_date','budget','risk_summary','next_action','tpm_cu_contact'])assert.ok(columns.includes(field));
 });
+
+test('project and acceptance attachment fields use the native file contract required by relation authorization',()=>{
+ for(const [file,code] of [['tpm_project.json','tpm_pj_files'],['tpm_acceptance.json','tpm_ac_files']]) {
+  const field=read('config/fields/'+file).find(row=>row.code===code);
+  assert.ok(field);assert.equal(field.dataType,'file');
+  assert.equal(field.extension.renderComponent,'fileattachment');
+  assert.equal(field.extension.multiple,true);
+ }
+ for(const file of ['config/pages/tpm_project_form.json','config/pages/tpm_acceptance_form.json']) {
+  const page=read(file);assert.equal(page.extension.linkFileAttachments,true);
+  assert.equal(page.extension.attachmentFields.length,1);
+ }
+});

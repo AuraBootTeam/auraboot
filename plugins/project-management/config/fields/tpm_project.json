@@ -195,7 +195,7 @@
     "code": "tpm_pj_files",
     "displayName:zh-CN": "合同与附件",
     "displayName:en": "Contracts and files",
-    "dataType": "jsonb",
+    "dataType": "file",
     "extension": {
       "multiple": true,
       "maxCount": 5,
