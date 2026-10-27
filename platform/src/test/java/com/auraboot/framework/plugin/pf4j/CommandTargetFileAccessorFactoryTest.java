@@ -144,7 +144,7 @@ class CommandTargetFileAccessorFactoryTest {
             switch(invalidation) {
                 case "stringField" -> field.setDataType("string");
                 case "multiple" -> field.setExtraProps(Map.of("multiple",true));
-                case "virtual" -> field.setVirtual(true);
+                case "virtual" -> field.setVirtualType("computed_readonly");
                 case "wrongFieldWriter" -> field.setAllowedWriterCommands(List.of("other:write"));
                 case "wrongCreateWriter" -> model.setExtension(Map.of("commandWriters",Map.of("create",List.of("other:create"),"update",List.of("other:update"),"delete",List.of("other:delete"))));
                 case "changedProjection" -> row.put("proof","different-file");
