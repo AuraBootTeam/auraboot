@@ -10,6 +10,11 @@ const evidence = process.env.AURA_EVIDENCE_DIR;
 if (!evidence) throw Error('Bind the owned evidence round');
 async function start(page: Page) {
   await navigateToMenuByClick(page, ['客户交付案例', '开始体验']);
+  // A sidebar click starts an SPA transition: DOMContentLoaded still belongs
+  // to the previous document. Verify navigation and schema mounting before
+  // asserting the business content, including after a cold restore.
+  await expect(page).toHaveURL((url) => url.pathname === '/p/c/scd_start');
+  await expect(page.getByTestId('dynamic-page-list')).toBeVisible();
   await expect(page.getByRole('main')).toContainText('把一次客户交付完整跑通');
   await expect(page.getByRole('row').filter({ hasText: '华辰制造 · 供应链协同平台' })).toHaveCount(
     1,
