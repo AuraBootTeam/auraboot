@@ -1,0 +1,2 @@
+# Preserve byte-exact native JUnit exception text, including its heading spaces.
+docs/e2e/evidence/command-target-files-2026-10-27/mutation-*.xml whitespace=-blank-at-eol

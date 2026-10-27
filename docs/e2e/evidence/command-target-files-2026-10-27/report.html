@@ -23,7 +23,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Both official interfaces have the same typed void default; the old constructor has no new target write capability.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Original human command frame</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Nested commands cannot acquire target capabilities before or after the outer plugin capability is installed.</td>
@@ -31,7 +31,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Nested commands cannot acquire target capabilities before or after the outer plugin capability is installed.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Actor, target, thread and transaction lifetime</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Changed member, command, target, thread, handler lifetime and replaced physical resource all fail closed.</td>
@@ -39,7 +39,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Changed member, command, target, thread, handler lifetime and replaced physical resource all fail closed.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Async and snapshot isolation</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Claimed tasks, impersonation and propagated identity cannot acquire original synchronous write authority.</td>
@@ -47,7 +47,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Claimed tasks, impersonation and propagated identity cannot acquire original synchronous write authority.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Published root multi-file fields</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Unknown, single-file, virtual, child and unpublished metadata are rejected; the exact command field writer remains required.</td>
@@ -55,7 +55,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Unknown, single-file, virtual, child and unpublished metadata are rejected; the exact command field writer remains required.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Parent authorization and version before files</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">The scoped parent is locked/read and its current version checked before any file row lock.</td>
@@ -63,7 +63,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> The scoped parent is locked/read and its current version checked before any file row lock.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Current upload ownership and finalized state</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Cross-tenant, foreign-owner, pending, deleted and nonpublic upload identities cannot create retained relations.</td>
@@ -71,7 +71,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Cross-tenant, foreign-owner, pending, deleted and nonpublic upload identities cannot create retained relations.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Stable file ordering and capacity</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Distinct file locks use ascending public PID order and a full field cannot retain or insert another file.</td>
@@ -79,7 +79,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Distinct file locks use ascending public PID order and a full field cannot retain or insert another file.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Append, retain and VARCHAR projection</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Repeated exact links remain singular, existing relations remain, retention is monotonic, and the caller JSON string projection persists in VARCHAR.</td>
@@ -87,7 +87,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Repeated exact links remain singular, existing relations remain, retention is monotonic, and the caller JSON string projection persists in VARCHAR.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Atomic rollback even after caught failure</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Retention, relation, parent projection and evidence all roll back, including a caught append rejection.</td>
@@ -95,7 +95,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Retention, relation, parent projection and evidence all roll back, including a caught append rejection.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Independent transaction misuse</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">REQUIRES_NEW cannot use the original capability or commit a partially changed parent.</td>
@@ -103,7 +103,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> REQUIRES_NEW cannot use the original capability or commit a partially changed parent.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Concurrent idempotency and deletion arbitration</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Duplicate concurrent append commits one relation; append/delete have one winner; deterministic delete-first and retain-first outcomes are covered.</td>
@@ -111,7 +111,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Duplicate concurrent append commits one relation; append/delete have one winner; deterministic delete-first and retain-first outcomes are covered.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Protected legacy relation entrypoints</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">A broad parent UPDATE permit cannot replace, empty-array remove, append, or use either legacy linkExisting branch on a command-owned file field; all prior facts remain.</td>
@@ -119,7 +119,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> A broad parent UPDATE permit cannot replace, empty-array remove, append, or use either legacy linkExisting branch on a command-owned file field; all prior facts remain.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Ordinary legacy semantics and immutability</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Ordinary file fields still replace; exact writers cannot override field/model immutability; physical aliases obey the actual field policy.</td>
@@ -127,7 +127,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Ordinary file fields still replace; exact writers cannot override field/model immutability; physical aliases obey the actual field policy.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Official unbound staging upload</td><td class="layer">service/real-stack/it [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">Multipart upload creates an owned finalized unbound file; only the original command later appends and retains it.</td>
@@ -135,7 +135,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Multipart upload creates an owned finalized unbound file; only the original command later appends and retains it.</div>
-    
+
   </td></tr><tr class="dot-🟢">
     <td>🟢</td><td>Published model reimport dependency</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
     <td><span class="badge b-solid">▪spec</span></td><td class="assert">The existing reimport hook still dispatches the exact guard after schema sync and before permission registration.</td>
@@ -143,7 +143,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> The existing reimport hook still dispatches the exact guard after schema sync and before permission registration.</div>
-    
+
   </td></tr></tbody></table></details>
     <details open><summary>consumer Consumer composition; not executed in this Core task</summary>
     <table><thead><tr><th></th><th>行动点</th><th>四轴</th><th>成色/证据</th><th>断言</th></tr></thead>
@@ -154,7 +154,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Integrating product must exercise the relation-manage plus parent-UPDATE identity over HTTP and the real work-order command. Service/PG tests do not claim this HTTP layer.</div>
-    
+
   </td></tr><tr class="dot-⬜">
     <td>⬜</td><td>Browser staged upload and complete maintenance submission</td><td class="layer">journey/real-stack/browser [recorded]</td>
     <td><span class="badge b-none">–</span></td><td class="assert">Integrating product must capture the native upload wire and original repair command transaction, with user-visible terminal state.</td>
@@ -162,5 +162,5 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid 
   <tr class="detail"><td></td><td colspan="4">
     <div class="shots"></div>
     <div class="note"><b>断言:</b> Integrating product must capture the native upload wire and original repair command transaction, with user-visible terminal state.</div>
-    
+
   </td></tr></tbody></table></details></body></html>
