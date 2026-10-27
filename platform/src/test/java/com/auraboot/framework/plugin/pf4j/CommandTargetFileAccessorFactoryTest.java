@@ -80,6 +80,104 @@ class CommandTargetFileAccessorFactoryTest {
         ctx.setTargetRecordReadable(true);
         ctx.setPermitPlan(new CommandPermitPlan(CommandPermitPlan.Decision.PERMIT,null,null,null,CommandPermitPlan.ScopeGrade.TARGET,2L));
     }
+    @Test void onlyAttestedSingletonCreationCanCompleteAnImmutableSingleFileField() {
+        field = FieldDefinition.builder().code("proof").columnName("proof").dataType("file").immutable(true)
+                .allowedWriterCommands(List.of("order:repair")).build();
+        model = ModelDefinition.builder().code("child").status("published").tableName("mt_child").immutable(true)
+                .fields(List.of(field)).extension(Map.of("commandWriters",Map.of("create",List.of("order:repair"),
+                        "update",List.of("other:update"),"delete",List.of("other:delete")))).build();
+        when(models.getModelDefinition("child")).thenReturn(Optional.of(model));
+        var row=Map.<String,Object>of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+        when(data.getById("child","new-child")).thenReturn(row);
+        when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            var delegate=mock(DynamicDataService.class);when(delegate.create(eq("child"),anyMap())).thenReturn(row);
+            new DynamicDataAccessorImpl(delegate).create("child",Map.of("proof","file-pid"));
+            scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof");
+        }return null;});
+        verify(files).lockRetention("file-pid");verify(relations).insert(any(FileRelationEntity.class));
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"physicalTx","rollbackOnly","closedConnection","readOnlyConnection","autoCommit","closedScope","thread","actor","tenant","nested","otherCommand"})
+    void createdReceiptCannotOutliveItsOriginalAuthority(String invalidation) throws Exception {
+        when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
+        var row=Map.<String,Object>of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            var delegate=mock(DynamicDataService.class);when(delegate.create(eq("child"),anyMap())).thenReturn(row);
+            assertThat(new DynamicDataAccessorImpl(delegate).tryCreate("child",Map.of("proof","file-pid"))).contains(row);
+            Runnable link=()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof");
+            try {
+                switch(invalidation) {
+                    case "physicalTx" -> when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("replacement-tx");
+                    case "rollbackOnly" -> ((ConnectionHolder)TransactionSynchronizationManager.getResource(source)).setRollbackOnly();
+                    case "closedConnection" -> when(connection.isClosed()).thenReturn(true);
+                    case "readOnlyConnection" -> when(connection.isReadOnly()).thenReturn(true);
+                    case "autoCommit" -> when(connection.getAutoCommit()).thenReturn(true);
+                    case "closedScope" -> scope.close();
+                    case "actor" -> MetaContext.setMemberId(999L);
+                    case "tenant" -> {MetaContext.setContext(2L,42L,"user-pid","user");MetaContext.setMemberId(7L);}
+                    case "nested" -> {MetaContext.runWithAuthorizedCommandCode("order:repair",()->assertThatThrownBy(link::run).isInstanceOf(AccessDeniedException.class));return null;}
+                    case "otherCommand" -> {MetaContext.runWithAuthorizedCommandCode("order:other",()->assertThatThrownBy(link::run).isInstanceOf(AccessDeniedException.class));return null;}
+                    case "thread" -> {try(var pool=Executors.newSingleThreadExecutor()) {assertThat(pool.submit(()->catchThrowable(link::run)).get()).isInstanceOf(AccessDeniedException.class);}return null;}
+                    default -> throw new AssertionError(invalidation);
+                }
+            } catch(Exception error) {throw new AssertionError(error);}
+            assertThatThrownBy(link::run).isInstanceOf(AccessDeniedException.class);
+        }return null;});
+        verify(files,never()).lockRetention(anyString());verify(relations,never()).insert(any(FileRelationEntity.class));
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"stringField","multiple","virtual","wrongFieldWriter","wrongCreateWriter","changedProjection","changedVersion","occupiedSlot"})
+    void creationDoesNotBypassFieldWriterProjectionOrSingleSlotPolicy(String invalidation) {
+        field=FieldDefinition.builder().code("proof").columnName("proof").dataType("file").immutable(true)
+                .allowedWriterCommands(List.of("order:repair")).build();
+        model=ModelDefinition.builder().code("child").status("published").tableName("mt_child").immutable(true)
+                .fields(List.of(field)).extension(Map.of("commandWriters",Map.of("create",List.of("order:repair"),
+                        "update",List.of("other:update"),"delete",List.of("other:delete")))).build();
+        when(models.getModelDefinition("child")).thenReturn(Optional.of(model));
+        var row=new HashMap<String,Object>(Map.of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid"));
+        when(data.getById("child","new-child")).thenReturn(row);
+        when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            var delegate=mock(DynamicDataService.class);when(delegate.create(eq("child"),anyMap())).thenReturn(row);
+            new DynamicDataAccessorImpl(delegate).create("child",Map.of("proof","file-pid"));
+            switch(invalidation) {
+                case "stringField" -> field.setDataType("string");
+                case "multiple" -> field.setExtraProps(Map.of("multiple",true));
+                case "virtual" -> field.setVirtualType("computed_readonly");
+                case "wrongFieldWriter" -> field.setAllowedWriterCommands(List.of("other:write"));
+                case "wrongCreateWriter" -> model.setExtension(Map.of("commandWriters",Map.of("create",List.of("other:create"),"update",List.of("other:update"),"delete",List.of("other:delete"))));
+                case "changedProjection" -> row.put("proof","different-file");
+                case "changedVersion" -> row.put("row_version",2L);
+                case "occupiedSlot" -> when(relations.selectList(any())).thenReturn(List.of(new FileRelationEntity().setFileId("100")));
+                default -> throw new AssertionError(invalidation);
+            }
+            var failure=catchThrowable(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"));
+            if (invalidation.equals("wrongFieldWriter")) assertThat(failure)
+                    .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class).hasMessageContaining("FIELD_WRITER_DENIED");
+            else if (invalidation.equals("wrongCreateWriter")) assertThat(failure)
+                    .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class).hasMessage("Model mutation requires its exact authorized command");
+            else assertThat(failure).isInstanceOf(AccessDeniedException.class);
+        }return null;});
+        verify(files,never()).lockRetention(anyString());verify(relations,never()).insert(any(FileRelationEntity.class));
+    }
+    @Test void aPlausibleLookupDoesNotAttestCreation() {
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
+                    .isInstanceOf(AccessDeniedException.class);
+        }return null;});
+        verify(files,never()).lockRetention(anyString());
+    }
+    @Test void creationOnlyNoTargetScopeStillCannotAppendToAParent() {
+        ctx.setTargetRecordReadable(null);ctx.getRequest().setTargetRecordId(null);
+        MetaContext.runWithCommandPermitPlan("ALL",null,"order",null,()->MetaContext.runWithAuthorizedCommandCode("order:repair",()->{
+            try(var scope=factory.forCommand(ctx)) {
+                assertThat(scope).isNotNull();
+                assertThatThrownBy(()->scope.accessor().appendAndRetainExistingToTarget("file-pid","photos"))
+                        .isInstanceOf(AccessDeniedException.class);
+            }
+        }));
+    }
     @AfterEach void cleanup() {
         TransactionSynchronizationManager.unbindResourceIfPossible(source);
         TransactionSynchronizationManager.clear(); MetaContext.clear();
