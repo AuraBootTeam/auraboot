@@ -37,6 +37,8 @@ class MemoryEmbeddingRecallQualityLiveIT extends BaseIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper json;
     private Process server;
+    private Path modelManifest;
+    private String manifestDigest;
     private String oldAllowlist;
     private boolean allowlistChanged;
     private Long tenant;
@@ -60,6 +62,12 @@ class MemoryEmbeddingRecallQualityLiveIT extends BaseIntegrationTest {
         }
         Path cache = Path.of(Objects.requireNonNull(System.getenv("AURA_EMBEDDING_MODEL_CACHE"))).toRealPath();
         String digest = definition.path("modelBlobSha256").asText();
+        modelManifest=cache.resolve("manifests/registry.ollama.ai/library/qwen3-embedding/4b");
+        byte[] manifestBytes=Files.readAllBytes(modelManifest);
+        manifestDigest=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(manifestBytes));
+        assertThat(manifestDigest).isEqualTo(definition.path("modelManifestSha256").asText());
+        assertThat(json.readTree(manifestBytes).path("layers").findValuesAsText("digest")).contains("sha256:"+digest);
+        report.put("modelManifestSha256",manifestDigest);
         Path blob = cache.resolve("blobs/sha256-" + digest);
         assertThat(Files.isRegularFile(blob)).as("Existing real weights required; no download fallback").isTrue();
         MessageDigest sha = MessageDigest.getInstance("SHA-256");
@@ -82,6 +90,7 @@ class MemoryEmbeddingRecallQualityLiveIT extends BaseIntegrationTest {
         builder.environment().put("OLLAMA_TMPDIR", temp.toString());
         builder.environment().put("OLLAMA_MAX_LOADED_MODELS", "1");
         builder.environment().put("OLLAMA_NUM_PARALLEL", "1");
+        builder.environment().put("OLLAMA_NOPRUNE", "true");
         builder.redirectErrorStream(true).redirectOutput(output.getParent().resolve("provider.log").toFile());
         server = builder.start(); report.put("ownedProviderPid", server.pid());
         String endpoint = "http://127.0.0.1:" + port;
@@ -90,7 +99,12 @@ class MemoryEmbeddingRecallQualityLiveIT extends BaseIntegrationTest {
             assertThat(server.isAlive()).as("Owned provider must remain alive").isTrue();
             try {
                 var tags = json.readTree(HTTP.send(HttpRequest.newBuilder(URI.create(endpoint + "/api/tags")).timeout(Duration.ofSeconds(2)).GET().build(), HttpResponse.BodyHandlers.ofString()).body());
-                if (tags.path("models").findValuesAsText("name").contains(definition.path("model").asText())) break;
+                boolean found=false;
+                for (var model : tags.path("models")) if (model.path("name").asText().equals(definition.path("model").asText())) {
+                    assertThat(model.path("digest").asText()).isEqualTo(manifestDigest);
+                    report.put("resolvedModelDigest",model.path("digest").asText()); found=true;
+                }
+                if (found) break;
             } catch (java.io.IOException unavailable) {
                 if (System.nanoTime() > deadline) throw unavailable;
             }
@@ -107,7 +121,12 @@ class MemoryEmbeddingRecallQualityLiveIT extends BaseIntegrationTest {
         request.setConfig(json.writeValueAsString(Map.of("apiKey", "local-ollama-no-auth", "baseUrl", endpoint,
                 "defaultModel", definition.path("model").asText(), "dimensions", 1536, "maxBatchSize", 1,
                 "spaceVersion", "qwen4b-" + digest)));
-        request.setEnabled(true); request.setPriority(0); cloud.saveConfig(request);
+        request.setEnabled(true); request.setPriority(-200); cloud.saveConfig(request);
+        assertThat(cloud.getEnabledProviders(tenant,"embedding").getFirst().getProviderCode()).isEqualTo(provider);
+        String resolvedSpace=embedding.currentSpace(tenant,provider,1536);
+        assertThat(resolvedSpace).isNotNull();
+        assertThat(embedding.currentSpace(tenant,null,1536)).isEqualTo(resolvedSpace);
+        report.put("resolvedProvider",provider); report.put("resolvedSpace",resolvedSpace);
         report.put("actualDatabase", jdbc.queryForObject("SELECT current_database()", String.class));
         report.put("agentCode", agent); report.put("tenantId", tenant);
         assertThat(ReflectionTestUtils.getField(active, "semanticRecallEnabled")).as("Default remains off").isEqualTo(false);
@@ -133,6 +152,11 @@ class MemoryEmbeddingRecallQualityLiveIT extends BaseIntegrationTest {
                 }
                 report.put("ownedProviderStopped", !server.isAlive());
             }
+            if (modelManifest!=null && manifestDigest!=null) {
+                String after=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(modelManifest)));
+                report.put("modelManifestUnchanged",after.equals(manifestDigest));
+                assertThat(after).isEqualTo(manifestDigest);
+            }
             if (output != null) Files.writeString(output, json.writerWithDefaultPrettyPrinter().writeValueAsString(report));
         }
     }
@@ -153,7 +177,7 @@ class MemoryEmbeddingRecallQualityLiveIT extends BaseIntegrationTest {
             switch (variant) {
                 case "private" -> jdbc.update("UPDATE ab_agent_memory SET scope_key=? WHERE pid=?", "other-user", pid);
                 case "foreign" -> jdbc.update("UPDATE ab_agent_memory SET tenant_id=? WHERE pid=?", tenant + 1000, pid);
-                case "expired" -> jdbc.update("UPDATE ab_agent_memory SET expires_at=NOW()-INTERVAL '1 day' WHERE pid=?", pid);
+                case "expired" -> jdbc.update("UPDATE ab_agent_memory SET valid_until=NOW()-INTERVAL '1 day' WHERE pid=?", pid);
                 case "deleted" -> jdbc.update("UPDATE ab_agent_memory SET deleted_flag=TRUE WHERE pid=?", pid);
                 case "wrong-space" -> jdbc.update("UPDATE ab_agent_memory SET embedding_space=? WHERE pid=?", "f".repeat(64), pid);
                 case "stale" -> jdbc.update("UPDATE ab_agent_memory SET memory_content=memory_content||' edited' WHERE pid=?", pid);

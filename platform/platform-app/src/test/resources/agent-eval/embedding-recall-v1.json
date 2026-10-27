@@ -390,5 +390,6 @@
     "mrrAt5": 0.7
   },
   "negativeDiagnosticSimilarityThreshold": 0.7,
-  "notes": "Frozen relevance labels; no-match similarity threshold is diagnostic only, not an implemented production abstention policy."
+  "notes": "Frozen relevance labels; no-match similarity threshold is diagnostic only, not an implemented production abstention policy.",
+  "modelManifestSha256": "df5bd2e3c74cd8d069d21dc038f1b359fcdc9458fce1c99bd43c9eb1518ff907"
 }
