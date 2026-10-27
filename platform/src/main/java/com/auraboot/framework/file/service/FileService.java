@@ -56,6 +56,11 @@ public interface FileService {
      */
     boolean createFileRelation(FileRelationRequestDTO request, Long userId);
 
+    /** Authorize the exact legacy relation target before a caller can short-circuit or upload. */
+    default void assertFileRelationMutationAllowed(String entityType, String entityId, String fieldName) {
+        throw new UnsupportedOperationException("File relation mutation authorization is unavailable");
+    }
+
     /** Add owned files to a business field while preserving its existing relations. */
     boolean appendFileRelation(FileRelationRequestDTO request, Long userId);
     
