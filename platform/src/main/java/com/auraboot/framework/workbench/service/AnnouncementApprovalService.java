@@ -28,6 +28,7 @@ public class AnnouncementApprovalService {
     private final AnnouncementLifecycleMapper records;
     private final AnnouncementReleaseMapper releases;
     private final AnnouncementPreparationService preparation;
+    private final AnnouncementContentSealService contentSeals;
     private final AnnouncementPolicyService policies;
     private final AnnouncementAudienceService audiences;
     private final AnnouncementTenantPolicyService tenantPolicies;
@@ -47,6 +48,7 @@ public class AnnouncementApprovalService {
 
     @Transactional
     public Map<String,Object> execute(String command,String pid,Map<String,Object> payload,String operation,Integer expected) {
+        if(SUBMIT.equals(command)) contentSeals.lockActor();
         var record=access.manage(pid,action(command),true);
         if(SUBMIT.equals(command)) access.actor("publish");
         if(!Set.of(SUBMIT,WITHDRAW,RECONCILE).contains(command)) throw new IllegalArgumentException("Unsupported announcement approval command");
@@ -111,6 +113,7 @@ public class AnnouncementApprovalService {
             "announcement:"+version,prepared.snapshotHash(),"announcement.v1",definitionRef,StrictPolicy.required(),
             MetaContext.getCurrentUserPid(),record.getTitle(),prepared.acceptedAt());
         if(releases.freeze(tenant,record.getPid(),version,record.getEditorRevision(),prepared.snapshotHash(),prepared.snapshot(),actor)!=1) conflict();
+        contentSeals.captureFrozenVersion(tenant,record.getPid(),version,prepared.snapshotHash(),prepared.snapshot());
         preparation.persistEstimate(tenant,version,prepared);
         if(submissions.insert(tenant,submission,record.getPid(),version,actor,(String)prepared.member().get("member_pid"),binding.applicantUserPid(),
                 workflows.providerId(ApprovalContract.START),(String)label,codec.encode(binding),codec.hash(binding))!=1

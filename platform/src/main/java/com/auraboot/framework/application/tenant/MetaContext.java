@@ -45,6 +45,7 @@ public class MetaContext {
     public static void clearPlatformPluginUpgrade() { PLUGIN_UPGRADE_PERMIT.remove(); }
     /** Exact command code whose permit plan authorized the current mutation stages. */
     private static final ThreadLocal<String> AUTHORIZED_COMMAND_CODE = new ThreadLocal<>();
+    private static final ThreadLocal<Integer> AUTHORIZED_COMMAND_DEPTH = new ThreadLocal<>();
     /** Aggregate root (master document) the current command was authorized against. */
     private static final ThreadLocal<String> COMMAND_AGGREGATE = new ThreadLocal<>();
     /**
@@ -139,6 +140,7 @@ public class MetaContext {
         EXTERNAL_COMMAND_PERMISSION.remove();
         PLUGIN_UPGRADE_PERMIT.remove();
         AUTHORIZED_COMMAND_CODE.remove();
+        AUTHORIZED_COMMAND_DEPTH.remove();
         COMMAND_AGGREGATE.remove();
         COMMAND_PERMIT.remove();
     }
@@ -204,7 +206,7 @@ public class MetaContext {
     public static void runWithSnapshot(Snapshot snapshot, Runnable task) {
         ThreadLocal<?>[] locals = { HOLDER, MEMBER_ID, ENV_ID, SESSION_CONTEXT, OTEL_TRACE_ID,
                 ENV_FILTER_BYPASSED, TENANT_FILTER_BYPASSED, LOCK_GUARD_BYPASSED,
-                COMMAND_AUTHORITY, EXTERNAL_COMMAND_PERMISSION, AUTHORIZED_COMMAND_CODE,
+                COMMAND_AUTHORITY, EXTERNAL_COMMAND_PERMISSION, AUTHORIZED_COMMAND_CODE, AUTHORIZED_COMMAND_DEPTH,
                 COMMAND_AGGREGATE, COMMAND_PERMIT };
         Object[] previous = new Object[locals.length];
         for (int i = 0; i < locals.length; i++) {
@@ -543,12 +545,21 @@ public class MetaContext {
                     "An authorized command writer scope requires a published command permit plan");
         }
         String prior = AUTHORIZED_COMMAND_CODE.get();
+        Integer priorDepth = AUTHORIZED_COMMAND_DEPTH.get();
+        AUTHORIZED_COMMAND_DEPTH.set(priorDepth == null ? 1 : priorDepth + 1);
         AUTHORIZED_COMMAND_CODE.set(commandCode);
         try {
             return action.get();
         } finally {
             AUTHORIZED_COMMAND_CODE.set(prior);
+            if (priorDepth == null) AUTHORIZED_COMMAND_DEPTH.remove();
+            else AUTHORIZED_COMMAND_DEPTH.set(priorDepth);
         }
+    }
+
+    /** Root invocation only; neither nested command frames nor propagated identity inherit it. */
+    public static boolean isRootAuthorizedCommand() {
+        return Integer.valueOf(1).equals(AUTHORIZED_COMMAND_DEPTH.get()) && getAuthorizedCommandCode() != null;
     }
 
     public static void runWithAuthorizedCommandCode(String commandCode, Runnable action) {

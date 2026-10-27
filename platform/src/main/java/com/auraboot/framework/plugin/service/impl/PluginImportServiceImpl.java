@@ -1214,11 +1214,15 @@ public class PluginImportServiceImpl implements PluginImportService {
                                 .syncMode(SchemaSyncOptions.SyncMode.SAFE)
                                 .createIndexes(true)
                                 .build());
-                if (syncResult.isSuccess()) {
-                    log.info("Schema sync for {}: {}", logSafe(modelCode), logSafe(syncResult.getMessage()));
-                } else {
-                    log.warn("Schema sync failed for {}: {}", logSafe(modelCode), logSafe(syncResult.getErrorMessage()));
+                if (syncResult == null || !syncResult.isSuccess()) {
+                    throw new PluginException("Failed to synchronize published model " + modelCode + ": "
+                            + (syncResult == null ? "missing schema result" : syncResult.getErrorMessage()));
                 }
+                log.info("Schema sync for {}: {}", logSafe(modelCode), logSafe(syncResult.getMessage()));
+                // Published imports do not traverse MetaModelService.publish. Apply the same
+                // transaction-bound guards after their physical schema is synchronized.
+                applicationEventPublisher.publishEvent(
+                        new com.auraboot.framework.meta.event.ModelTablePublishedEvent(this, modelCode));
 
                 // Ensure hierarchical permissions exist (idempotent — skips if already created)
                 autoPermissionAssignmentService.registerPermissions(modelCode, pluginNamespace, tenantId);

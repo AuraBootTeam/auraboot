@@ -257,7 +257,9 @@ public class CommandTargetScopePhase implements CommandPhase {
                 && ctx.getAuthorizationVerdict().isAuthorized()
                 && ctx.getAuthorizationVerdict().permissionCode() != null
                 && ctx.getAuthorizationVerdict().permissionCode().startsWith("record-share:")) {
-            return true;
+            String requiredAction = targetRecordAction(ctx);
+            // The prior grant may name an aggregate root, but its action cannot be upgraded.
+            return requiredAction == null || ctx.getAuthorizationVerdict().permissionCode().endsWith(":" + requiredAction);
         }
 
         Long memberId = resolveMemberId(ctx);
@@ -304,16 +306,12 @@ public class CommandTargetScopePhase implements CommandPhase {
         if (!result.granted()) return false;
         String action = targetRecordAction(ctx);
         if (action == null || "read".equals(action)) return true;
-        // RBAC already authorizes this business command. Preserve ordinary row scope, but do
-        // not let a read-only ReBAC exception authorize a write on someone else's record.
-        var scope = applicationContext.getBean(
-                com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class)
-                .evaluate(memberId, modelCode, "read", record);
-        if (scope == null || scope.verdict() !=
-                com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY) return true;
-        return applicationContext.getBean(com.auraboot.framework.permission.service.RecordShareService.class)
-                .isSharedByPid(ctx.getTenantId(), modelCode, recordId, memberId,
-                        MetaContext.getCurrentUserPid(), action);
+        if (!MetaContext.exists()) return false;
+        // The command capability is already authorized. Apply the declared action's row
+        // restriction, not generic model-operation RBAC or the unrelated read scope.
+        return com.auraboot.framework.plugin.pf4j.CommandRecordActionScopePolicy.permits(
+                applicationContext, ctx.getTenantId(), memberId, MetaContext.getCurrentUserPid(),
+                modelCode, recordId, action, record);
     }
 
     private Long resolveRecordVersion(Map<String, Object> record) {

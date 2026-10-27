@@ -12,6 +12,10 @@
 // Re-export all serializable types from types.ts
 export type {
   LocalizedText,
+  BusinessActivityDataSource,
+  BusinessActivityRecordMapping,
+  BusinessActivityDetailField,
+  BusinessActivitySnapshotField,
   LayoutConfig,
   BlockLayoutConfig,
   DataSourceConfig,
@@ -45,6 +49,10 @@ export type {
 import type {
   CardImageViewport,
   LocalizedText,
+  BusinessActivityDataSource,
+  BusinessActivityRecordMapping,
+  BusinessActivityDetailField,
+  BusinessActivitySnapshotField,
   LayoutConfig,
   BlockLayoutConfig,
   FieldConfig,
@@ -63,6 +71,15 @@ import type {
   ThemeConfig,
   PageDataSourceConfig,
 } from './types';
+import type { PageExtensionConfig as RuntimePageExtensionConfig } from './types';
+
+/** Serializable open extension boundary; retain the runtime's legacy any compatibility. */
+export interface PageExtensionConfig {
+  [key: string]: unknown;
+  workspaceShell?: RuntimePageExtensionConfig['workspaceShell'];
+  detailHeaderLayout?: RuntimePageExtensionConfig['detailHeaderLayout'];
+  detailBodyOrder?: RuntimePageExtensionConfig['detailBodyOrder'];
+}
 
 // ---------------------------------------------------------------------------
 // StrictBlockConfig — all properties from BlockConfig, NO index signature
@@ -74,6 +91,8 @@ export interface StrictBlockConfig {
   title?: string | LocalizedText;
   layout?: BlockLayoutConfig;
   visibleWhen?: string;
+  /** Existing block visibility and named-source permission gate. */
+  permissionCode?: string;
   className?: string;
   imageField?: string;
   imageViewports?: Record<string, CardImageViewport>;
@@ -87,6 +106,15 @@ export interface StrictBlockConfig {
   columns?: number | ColumnConfig[];
   rowActions?: ButtonConfig[];
   dataSource?: string | DataSourceConfig;
+  /** Business-only history reads an existing named source and never requests audit activities. */
+  businessOnly?: boolean;
+  businessDataSource?: string | BusinessActivityDataSource;
+  businessRecordMapping?: BusinessActivityRecordMapping;
+  businessStateDictCode?: string;
+  businessDetailFields?: BusinessActivityDetailField[];
+  businessSnapshotFields?: BusinessActivitySnapshotField[];
+  compact?: boolean;
+  previewLimit?: number;
 
   // List tabs
   tabs?: ListTabConfig[] | DetailTabConfig[];
@@ -129,7 +157,6 @@ export interface StrictBlockConfig {
   detailUrl?: string;
   addCommandCode?: string;
 }
-
 
 // ---------------------------------------------------------------------------
 // Inlined Linkage types (from ~/studio/workbench/panels/linkage/types)
@@ -281,5 +308,5 @@ export interface DslSchema {
   defaultFilters?: Array<Record<string, unknown>>;
 
   /** Open extension point for custom properties */
-  extension?: Record<string, unknown>;
+  extension?: PageExtensionConfig;
 }

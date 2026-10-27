@@ -30,6 +30,7 @@ public class AnnouncementReleaseService {
     private final AnnouncementReminderMapper reminders;
     private final AnnouncementCodec codec;
     private final AnnouncementPreparationService preparation;
+    private final AnnouncementContentSealService contentSeals;
     private final AnnouncementTenantPolicyService tenantPolicies;
     private final AnnouncementApprovalProofService approvalProof;
     private final ReliableIntegrationAccessor outbox;
@@ -40,6 +41,7 @@ public class AnnouncementReleaseService {
 
     @Transactional
     public Map<String,Object> execute(String command,String pid,Map<String,Object> input,String operation,Integer expected) {
+        contentSeals.lockActor();
         Announcement record=access.manage(pid,"publish",true);
         Long tenant=MetaContext.getCurrentTenantId(),actor=MetaContext.getCurrentUserId();
         if(operation==null || operation.isBlank() || operation.length()>100) invalid("operation_required");
@@ -78,6 +80,7 @@ public class AnnouncementReleaseService {
         String zone=prepared.timezone(),authorization=prepared.authorizationHash();Instant planned=prepared.plannedAt();
         String state=policy.scheduledAt()==null ? "unpublished" : "scheduled";
         if(releases.freeze(tenant,record.getPid(),version,record.getEditorRevision(),prepared.snapshotHash(),prepared.snapshot(),actor)!=1) conflict();
+        contentSeals.captureFrozenVersion(tenant,record.getPid(),version,prepared.snapshotHash(),prepared.snapshot());
         preparation.persistEstimate(tenant,version,prepared);
         if(releases.control(tenant,version,release,state,planned,record.getExpiresAt())!=1
             || releases.queue(tenant,release,record.getPid(),version,actor,(String)member.get("member_pid"),authorization,planned,planned.plus(Duration.ofMinutes(tenantPolicies.current().lateWindowMinutes())),zone)!=1
@@ -181,6 +184,7 @@ public class AnnouncementReleaseService {
             Map<String,Object> frozen=releases.version(tenant,version);
             if(frozen==null) throw new IllegalStateException("Release version does not exist");
             String pid=(String)frozen.get("announcement_pid");
+            contentSeals.lockActor();
             Announcement record=access.manage(pid,"publish",true);
             Map<String,Object> job=releases.lock(tenant,version);
             if(job==null || !"running".equals(job.get("status")) || ((Number)job.get("fence")).longValue()!=fence
@@ -207,6 +211,7 @@ public class AnnouncementReleaseService {
             if(!job.get("actor_member_pid").equals(member.get("member_pid")) || !job.get("authorization_hash").equals(authorization(recipients,member))) invalid("authorization_changed");
             if(recipients.recipients().isEmpty()) invalid("audience_empty");
             policies.verifyAttachments(policy,pid,true);
+            contentSeals.verifyForRelease(tenant,version,(String)frozen.get("snapshot_hash"),snapshot);
             Instant expiry=snapshot.get("expiresAt")==null ? null : Instant.parse(snapshot.get("expiresAt").toString());
             Instant due=Boolean.TRUE.equals(policy.acknowledgementRequired()) ? now.plus(Duration.ofDays(policy.acknowledgementDays())) : null;
             if(expiry!=null && (!now.isBefore(expiry) || (due!=null && due.isAfter(expiry)))) invalid("expiry_invalid");

@@ -172,10 +172,18 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
                 || ctx.getAuthorizationVerdict() == null
                 || !ctx.getAuthorizationVerdict().isAuthorized()) return false;
         Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
-        if (!(params instanceof java.util.Map<?, ?> values)
-                || !"handler".equals(values.get("targetRecordAuthorization"))) return false;
+        if (!(params instanceof java.util.Map<?, ?> values)) return false;
         Object action = values.get("targetRecordAction");
-        return "update".equals(action) || "delete".equals(action);
+        if (!"update".equals(action) && !"delete".equals(action)) return false;
+        if ("handler".equals(values.get("targetRecordAuthorization"))) return true;
+        // A declaration alone is not a completed callback. Bind its host-only witness to
+        // the exact current root/action; generic READ SQL must not replace this decision.
+        var invocation = ctx.getHandlerInvocationAuthorization();
+        return "handler".equals(values.get("invocationAuthorization")) && invocation != null
+                && java.util.Objects.equals(invocation.commandCode(), ctx.getCommandCode())
+                && java.util.Objects.equals(invocation.modelCode(), ctx.getCommand().getModelCode())
+                && java.util.Objects.equals(invocation.targetRecordId(), ctx.getRequest().getTargetRecordId())
+                && java.util.Objects.equals(invocation.action(), action);
     }
 
     /**

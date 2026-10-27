@@ -1,3 +1,8 @@
+import {
+  useDetailPresentation,
+  useDetailPresentationTitle,
+} from './detail/DetailPresentationContext';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useState, useMemo, useEffect } from 'react';
 import { type PageContentProps } from '@auraboot/runtime-kernel';
 import { fetchResult } from '~/shared/services/http-client';
@@ -65,6 +70,7 @@ export {
 export { DataPathTable } from './detailPage/DataPathTable';
 
 function DetailPageContentInner(props: PageContentProps) {
+  const presentation = useDetailPresentation();
   const {
     timezone,
     schema,
@@ -145,6 +151,15 @@ function DetailPageContentInner(props: PageContentProps) {
     reloadRecord,
     tableName,
   });
+  const titleField = String(schema?.extension?.headerTitleField || '').trim();
+  const titleValue = titleField ? recordData?.[titleField] : undefined;
+  useDetailPresentationTitle(
+    recordLoading || recordError || recordAccessDenied || recordNotFound
+      ? null
+      : titleValue !== undefined && titleValue !== null && titleValue !== ''
+        ? String(titleValue)
+        : getLocalizedText(schema.title, locale, t),
+  );
   const {
     allBlocks,
     showDefaultEditAction,
@@ -208,6 +223,7 @@ function DetailPageContentInner(props: PageContentProps) {
     onReceipt: setRecordData,
   });
   const view = renderDetailPageView({
+    presentation,
     recordLoading,
     recordError,
     schema,
@@ -262,14 +278,22 @@ function DetailPageContentInner(props: PageContentProps) {
     showDefaultEditAction,
     shareDialogOpen,
   });
-  return <>
-    {receipt.error && <div role="alert" className="mx-6 my-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
-      <span>{receipt.error}</span>
-      <button type="button" onClick={receipt.retry} className="ms-3 underline">{t('common.retry')}</button>
-    </div>}
-    {view}
-  </>;
-
+  return (
+    <>
+      {receipt.error && (
+        <div
+          role="alert"
+          className="mx-6 my-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"
+        >
+          <span>{receipt.error}</span>
+          <button type="button" onClick={receipt.retry} className="ms-3 underline">
+            {t('common.retry')}
+          </button>
+        </div>
+      )}
+      {view}
+    </>
+  );
 }
 
 export function DetailPageContent(props: PageContentProps) {

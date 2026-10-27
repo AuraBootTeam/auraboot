@@ -1,0 +1,28 @@
+{
+  "code": "0",
+  "message": "OK",
+  "data": {
+    "records": [
+      {
+        "anc_alert_ref": "01M5W7NMNWGPTCT4WGMRP4TX7E",
+        "anc_action_name": "收到监测事件",
+        "anc_to": "new",
+        "anc_operator": "合成验证·观测接入员",
+        "created_at": "2026-10-26T13:51:17.749+00:00",
+        "pid": "01M5W7NMQNVKKWC2081KC08MNR",
+        "anc_action_at": "2026-10-26T13:51:17.740+00:00",
+        "updated_at": "2026-10-26T13:51:17.749+00:00",
+        "row_version": 1,
+        "anc_alert_title": "合成验证·东堤01号 · 合成验证·东侧警戒区",
+        "anc_action_note": "依据已提交观测生成，等待人工核查；尚不能视为确认异常。"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 100,
+    "totalPages": 1,
+    "nextCursor": null
+  },
+  "context": null,
+  "timestamp": 1793045683346
+}

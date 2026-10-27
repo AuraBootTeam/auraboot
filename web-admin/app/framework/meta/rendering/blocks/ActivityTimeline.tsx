@@ -11,6 +11,23 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import {
+  BusinessActivityTimeline,
+  type BusinessActivityRuntime,
+  type BusinessActivityDictionaryReader,
+} from './BusinessActivityTimeline';
+import type {
+  BusinessActivityDataSource,
+  BusinessActivityRecordMapping,
+  BusinessActivityDetailField,
+  BusinessActivitySnapshotField,
+} from '~/framework/meta/schemas/types';
+export type {
+  BusinessActivityDataSource,
+  BusinessActivityRecordMapping,
+  BusinessActivityDetailField,
+  BusinessActivitySnapshotField,
+} from '~/framework/meta/schemas/types';
 
 dayjs.extend(relativeTime);
 
@@ -36,28 +53,6 @@ interface ActivityRecord {
   source?: 'audit' | 'business';
 }
 
-export interface BusinessActivityDataSource {
-  endpoint?: string;
-  url?: string;
-  method?: 'get' | 'post';
-  queryCode?: string;
-  params?: Record<string, unknown>;
-}
-
-export interface BusinessActivityRecordMapping {
-  pid?: string;
-  occurredAt?: string;
-  status?: string;
-  priority?: string;
-  role?: string;
-  objectModel?: string;
-  objectRecord?: string;
-  activityType?: string;
-  subject?: string;
-  content?: string;
-  actorName?: string;
-}
-
 export interface ActivityTimelineProps {
   modelCode: string;
   recordPid: string;
@@ -65,7 +60,14 @@ export interface ActivityTimelineProps {
   locale?: string;
   t?: (key: string) => string;
   /** Optional product business-activity query merged with the platform audit log. */
-  businessDataSource?: BusinessActivityDataSource;
+  businessDataSource?: BusinessActivityDataSource | string;
+  businessOnly?: boolean;
+  runtime?: BusinessActivityRuntime;
+  businessStateDictCode?: string;
+  businessDetailFields?: readonly BusinessActivityDetailField[];
+  businessSnapshotFields?: readonly BusinessActivitySnapshotField[];
+  getDictItems?: BusinessActivityDictionaryReader;
+  timezone?: string;
   businessRecordMapping?: BusinessActivityRecordMapping;
   compact?: boolean;
   previewLimit?: number;
@@ -90,7 +92,57 @@ const ACTIVITY_TYPE_CONFIG: Record<string, [React.ReactNode, string, string, str
   SYSTEM: [<SystemIcon key="sys" />, 'System', 'System', 'bg-status-gray'],
 };
 
-export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
+/** Keep the original legacy object intact after validating its public read contract. */
+export function resolveBusinessActivityDataSource(
+  source: unknown,
+): BusinessActivityDataSource | string | undefined {
+  if (typeof source === 'string') return source;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return undefined;
+  const candidate = source as Record<string, unknown>;
+  if (
+    ['endpoint', 'url', 'queryCode'].some(
+      (key) => candidate[key] !== undefined && typeof candidate[key] !== 'string',
+    ) ||
+    (candidate.method !== undefined && candidate.method !== 'get' && candidate.method !== 'post') ||
+    (candidate.params !== undefined &&
+      (!candidate.params ||
+        typeof candidate.params !== 'object' ||
+        Array.isArray(candidate.params)))
+  )
+    return undefined;
+  return source as BusinessActivityDataSource;
+}
+
+type LegacyActivityTimelineProps = Omit<ActivityTimelineProps, 'businessDataSource'> & {
+  businessDataSource?: BusinessActivityDataSource;
+};
+
+export const ActivityTimeline: React.FC<ActivityTimelineProps> = (props) => {
+  if (props.businessOnly || typeof props.businessDataSource === 'string') {
+    return (
+      <BusinessActivityTimeline
+        enabled={props.businessOnly === true}
+        modelCode={props.modelCode}
+        recordPid={props.recordPid}
+        source={typeof props.businessDataSource === 'string' ? props.businessDataSource : undefined}
+        runtime={props.runtime}
+        mapping={props.businessRecordMapping}
+        stateDictCode={props.businessStateDictCode}
+        detailFields={props.businessDetailFields}
+        snapshotFields={props.businessSnapshotFields}
+        getDictItems={props.getDictItems}
+        timezone={props.timezone}
+        compact={props.compact}
+        previewLimit={props.previewLimit}
+        locale={props.locale}
+        t={props.t}
+      />
+    );
+  }
+  return <LegacyActivityTimeline {...props} businessDataSource={props.businessDataSource} />;
+};
+
+const LegacyActivityTimeline: React.FC<LegacyActivityTimelineProps> = ({
   modelCode,
   recordPid,
   token,
@@ -145,7 +197,8 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
       const businessRows =
         businessOutcome?.ok && ResultHelper.isSuccess(businessOutcome.value)
           ? extractBusinessRecords(businessOutcome.value.data).map((row, index) =>
-              normalizeBusinessActivity(row, index, businessRecordMapping))
+              normalizeBusinessActivity(row, index, businessRecordMapping),
+            )
           : [];
       const merged = [...auditRows, ...businessRows].sort(
         (left, right) => dayjs(right.occurredAt).valueOf() - dayjs(left.occurredAt).valueOf(),
@@ -153,8 +206,10 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
       setActivities(merged);
 
       if (
-        !auditOutcome.ok || (auditOutcome.ok && !ResultHelper.isSuccess(auditOutcome.value)) ||
-        (businessOutcome != null && (!businessOutcome.ok || !ResultHelper.isSuccess(businessOutcome.value)))
+        !auditOutcome.ok ||
+        (auditOutcome.ok && !ResultHelper.isSuccess(auditOutcome.value)) ||
+        (businessOutcome != null &&
+          (!businessOutcome.ok || !ResultHelper.isSuccess(businessOutcome.value)))
       ) {
         const denied =
           (!auditOutcome.ok && auditOutcome.error?.status === 403) ||
@@ -193,7 +248,9 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     () => activities.filter((activity) => matchesTimelineFilter(activity, activeFilter)),
     [activeFilter, activities],
   );
-  const groups = groupByDate(previewLimit ? filteredActivities.slice(0, previewLimit) : filteredActivities);
+  const groups = groupByDate(
+    previewLimit ? filteredActivities.slice(0, previewLimit) : filteredActivities,
+  );
 
   if (loading) {
     return (
@@ -235,38 +292,40 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
   return (
     <div data-testid="activity-timeline">
-      {!compact && <div className="border-border mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h3 className="text-text text-base font-semibold">
-            {locale === 'zh-CN' ? '客户互动时间线' : 'Customer activity timeline'}
-          </h3>
-          <p className="text-text-3 mt-1 text-xs">
-            {locale === 'zh-CN'
-              ? '业务跟进、待办任务与系统变更按时间合并展示'
-              : 'Business interactions, tasks, and system changes in one chronological view'}
-          </p>
+      {!compact && (
+        <div className="border-border mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-text text-base font-semibold">
+              {locale === 'zh-CN' ? '客户互动时间线' : 'Customer activity timeline'}
+            </h3>
+            <p className="text-text-3 mt-1 text-xs">
+              {locale === 'zh-CN'
+                ? '业务跟进、待办任务与系统变更按时间合并展示'
+                : 'Business interactions, tasks, and system changes in one chronological view'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Timeline filters">
+            {filterOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                role="tab"
+                aria-selected={activeFilter === option.key}
+                data-testid={`activity-timeline-filter-${option.key}`}
+                onClick={() => setActiveFilter(option.key)}
+                className={`rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeFilter === option.key
+                    ? 'bg-accent text-white'
+                    : 'bg-subtle text-text-2 hover:bg-hover'
+                }`}
+              >
+                {locale === 'zh-CN' ? option.zh : option.en}
+                <span className="ml-1 opacity-75">{option.count}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Timeline filters">
-          {filterOptions.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              role="tab"
-              aria-selected={activeFilter === option.key}
-              data-testid={`activity-timeline-filter-${option.key}`}
-              onClick={() => setActiveFilter(option.key)}
-              className={`rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeFilter === option.key
-                  ? 'bg-accent text-white'
-                  : 'bg-subtle text-text-2 hover:bg-hover'
-              }`}
-            >
-              {locale === 'zh-CN' ? option.zh : option.en}
-              <span className="ml-1 opacity-75">{option.count}</span>
-            </button>
-          ))}
-        </div>
-      </div>}
+      )}
 
       {filteredActivities.length === 0 ? (
         <div className="text-text-3 rounded-card bg-subtle py-10 text-center text-sm">
@@ -294,7 +353,9 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                     const actorType = normalizeActorType(activity.actorType);
                     const actorLabel = resolveActorLabel(activity, locale);
                     const sanitizedSubject = sanitizeVisibleText(activity.subject);
-                    const subject = compact ? sanitizedSubject?.replace(/^(Created|Updated)\s+/, '') : sanitizedSubject;
+                    const subject = compact
+                      ? sanitizedSubject?.replace(/^(Created|Updated)\s+/, '')
+                      : sanitizedSubject;
                     const content = sanitizeVisibleText(activity.content);
                     const config =
                       ACTIVITY_TYPE_CONFIG[activityType] || ACTIVITY_TYPE_CONFIG.SYSTEM;
@@ -312,12 +373,20 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                           className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`}
                         />
 
-                        <div className={compact ? "border-border border-b pb-3" : "rounded-card bg-panel border-border border px-4 py-3 shadow-sm"}>
+                        <div
+                          className={
+                            compact
+                              ? 'border-border border-b pb-3'
+                              : 'rounded-card bg-panel border-border border px-4 py-3 shadow-sm'
+                          }
+                        >
                           {/* Header: icon + type badge + actor + time */}
                           <div className="flex items-center gap-2 text-sm">
                             <span className="text-text-3 flex-shrink-0">{icon}</span>
                             <ActivityTypeBadge type={activityType} locale={locale} />
-                            {!compact && <span className="text-text-2 font-medium">{actorLabel}</span>}
+                            {!compact && (
+                              <span className="text-text-2 font-medium">{actorLabel}</span>
+                            )}
                             {actorType === 'agent' && (
                               <span className="bg-status-blue-bg text-status-blue rounded px-1.5 py-0.5 text-[10px] font-medium">
                                 AI
@@ -334,7 +403,9 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
                           {/* Content */}
                           {content && (
-                            <p className={`text-text-2 mt-1 text-xs whitespace-pre-wrap ${compact ? 'line-clamp-2' : ''}`}>
+                            <p
+                              className={`text-text-2 mt-1 text-xs whitespace-pre-wrap ${compact ? 'line-clamp-2' : ''}`}
+                            >
                               {content}
                             </p>
                           )}

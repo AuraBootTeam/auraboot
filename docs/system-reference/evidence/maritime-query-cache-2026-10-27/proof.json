@@ -1,0 +1,136 @@
+{
+  "producer": "778e91aa60765b34a3e40ba5c0dc3c72d9f1b382",
+  "sourceDigest": "bb0b77e3d018017991991b461f09e534804cc879acf0df6ab5395776f1c5aa22",
+  "runtime": "maritime-parallel-core",
+  "database": "auraboot_26",
+  "layers": {
+    "unit": {
+      "suites": [
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactoryTest",
+          "tests": "21",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.validation.ExecutionConfigValidatorTest",
+          "tests": "21",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.constant.CommandResultCachePolicyTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTOTest",
+          "tests": "8",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandInvocationAuthorizationPhaseTest",
+          "tests": "8",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ],
+      "totals": {
+        "tests": 64,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "postgres-query": {
+      "suites": [
+        {
+          "name": "com.auraboot.framework.meta.service.impl.QueryResultCacheRevocationIT",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ],
+      "totals": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "postgres-idempotency": {
+      "suites": [
+        {
+          "name": "IdempotencyServiceImpl Coverage IT \u2014 check/record/cleanup",
+          "tests": "5",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ],
+      "totals": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "independentMutation": "M af3 component evidence only; not rerun by Root",
+  "consumerNative": "did_not_run for this runtime candidate",
+  "catalog": {
+    "catalog": "${ANCHORAGE_SOURCE_ROOT}/.tools/admitted-platform-filequery-778e91a/artifact-catalog.json",
+    "catalogSha256": "41b33e56527440d57b70b2f3afae132eacefc82b2a3caa1d47e274b643070734",
+    "runtimeProducer": "778e91aa60765b34a3e40ba5c0dc3c72d9f1b382",
+    "apiProducer": "b297c242798bd177e602eb09e483a5ad849f2cc9",
+    "changedFromRootCurrentCatalog": [
+      "com.auraboot:runtime",
+      "com.auraboot:platform-plugin-api"
+    ],
+    "unchangedEntries": 19,
+    "entries": 21,
+    "embeddedApiVerified": true,
+    "scope": "component candidate; Root product lock remains unchanged; consumer native verification mandatory"
+  },
+  "artifacts": {
+    "com.auraboot:runtime": {
+      "type": "runtime",
+      "id": "com.auraboot:runtime",
+      "version": "1.0.0",
+      "uri": "artifact:AuraBoot-1.0.0-boot.jar",
+      "digest": "sha256:b43cc5de285fc58b93d0f0b96261119dd2c44343916a5b34670939d0c2f7cec9",
+      "localPath": "runtime/AuraBoot-1.0.0-boot.jar",
+      "source": {
+        "repository": "git@github.com:AuraBootTeam/auraboot.git",
+        "commit": "778e91aa60765b34a3e40ba5c0dc3c72d9f1b382"
+      }
+    },
+    "com.auraboot:platform-plugin-api": {
+      "type": "maven",
+      "id": "com.auraboot:platform-plugin-api",
+      "version": "1.0.0",
+      "uri": "artifact:platform-plugin-api-1.0.0.jar",
+      "digest": "sha256:9ca35017426267e434ecc3c1e1fd63b57e4fdabb0407d61bf2fe6a88658db75f",
+      "localPath": "maven/platform-plugin-api-1.0.0.jar",
+      "source": {
+        "repository": "git@github.com:AuraBootTeam/auraboot.git",
+        "commit": "b297c242798bd177e602eb09e483a5ad849f2cc9"
+      }
+    }
+  }
+}

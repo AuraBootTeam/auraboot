@@ -6,7 +6,10 @@ import { ContributedSubTableViewer as SubTableViewer } from '~/framework/extensi
 import { EmbeddedListBlockRenderer } from '~/framework/meta/rendering/blocks/EmbeddedListBlockRenderer';
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';
 import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHistoryViewer';
-import { ActivityTimeline } from '~/framework/meta/rendering/blocks/ActivityTimeline';
+import {
+  ActivityTimeline,
+  resolveBusinessActivityDataSource,
+} from '~/framework/meta/rendering/blocks/ActivityTimeline';
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
 import { LazyContributedComponent } from '~/framework/extensions/contributed-components';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -356,14 +359,23 @@ export function DetailBlockRenderer({
           token={token}
           locale={locale}
           t={t}
-          businessDataSource={
-            (block as any).businessDataSource ??
-            (block as any).dataSource ??
-            (block as any).subTable?.dataSource
-          }
-          compact={(block as any).extension?.density === 'compact'}
-          previewLimit={(block as any).extension?.previewLimit}
-          businessRecordMapping={(block as any).businessRecordMapping}
+          businessDataSource={resolveBusinessActivityDataSource(
+            block.businessDataSource ??
+              block.dataSource ??
+              (block.subTable && 'dataSource' in block.subTable
+                ? block.subTable.dataSource
+                : undefined),
+          )}
+          businessOnly={block.businessOnly}
+          runtime={runtime}
+          getDictItems={getDictItems}
+          timezone={timezone}
+          businessStateDictCode={block.businessStateDictCode}
+          businessDetailFields={block.businessDetailFields}
+          businessSnapshotFields={block.businessSnapshotFields}
+          compact={block.compact ?? (block as any).extension?.density === 'compact'}
+          previewLimit={block.previewLimit ?? (block as any).extension?.previewLimit}
+          businessRecordMapping={block.businessRecordMapping}
         />
       </section>
     );

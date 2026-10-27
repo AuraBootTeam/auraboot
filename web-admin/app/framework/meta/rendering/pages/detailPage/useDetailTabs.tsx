@@ -1,3 +1,4 @@
+import { useDetailPresentation } from '../detail/DetailPresentationContext';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { resolveTextFallback } from './detailFieldDisplay';
 import {
@@ -27,6 +28,7 @@ export function useDetailTabs({
   routerNavigate,
   t,
 }: UseDetailTabsArgs) {
+  const presentation = useDetailPresentation();
   // A detail page may expose multiple phase-specific tab groups. Compose every
   // visible group instead of silently dropping all but the first one.
   const allTabs = resolveVisibleDetailTabsFromBlocks(allBlocks, evaluateVisibleWhen, hasPermission);
@@ -57,18 +59,19 @@ export function useDetailTabs({
   );
 
   useEffect(() => {
-    if (tabs.length === 0) return;
+    if (presentation || tabs.length === 0) return;
     const matchedIndex = resolveTabIndexFromHash(location.hash);
     if (matchedIndex >= 0) {
       setActiveTab(matchedIndex);
       return;
     }
     setActiveTab((current) => (current < tabs.length ? current : 0));
-  }, [location.hash, resolveTabIndexFromHash, tabs.length]);
+  }, [location.hash, resolveTabIndexFromHash, tabs.length, presentation]);
 
   const handleTabChange = useCallback(
     (index: number) => {
       setActiveTab(index);
+      if (presentation) return;
       const nextTabKey = tabHashKeys[index];
       if (!nextTabKey) return;
       const nextHash = `#${encodeURIComponent(nextTabKey)}`;
@@ -82,7 +85,7 @@ export function useDetailTabs({
         { preventScrollReset: true },
       );
     },
-    [location.hash, location.pathname, location.search, routerNavigate, tabHashKeys],
+    [location.hash, location.pathname, location.search, routerNavigate, tabHashKeys, presentation],
   );
   const activeDetailTab = resolveActiveDetailTab(tabs, activeTab);
   const actionFailedTitle = resolveTextFallback(t, 'common.actionFailed', 'Action failed');

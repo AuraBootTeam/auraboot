@@ -1,5 +1,6 @@
 import type { CardRowSelection } from '../runtime/expression/row-selection';
 import type { RowProjection } from '../runtime/expression/row-projection';
+import type { WorkspaceCellPresentation } from '../runtime/renderers/WorkspaceCells';
 /**
  * 统一 DSL Schema 类型定义
  * 基于 final.v1.0 DSL 结构
@@ -17,10 +18,37 @@ export interface LocalizedText {
   [locale: string]: string | undefined; // 支持动态 locale
 }
 
+/** Optional shared workspace shell. Omission preserves the existing shell. */
+export interface WorkspaceShellConfig {
+  useThemeTokens?: boolean;
+  headerHeight?: number;
+  /** Optional height at the declared mobile sidebar breakpoint. */
+  mobileHeaderHeight?: number;
+  sidebar?: {
+    expandedWidth?: number;
+    compactWidth?: number;
+    compactBreakpoint?: number;
+    collapsedWidth?: number;
+    mobileBreakpoint?: number;
+    brandHeight?: number;
+  };
+}
+
+/** Open page extensions with typed shared presentation options. */
+export interface PageExtensionConfig {
+  [key: string]: any;
+  workspaceShell?: WorkspaceShellConfig;
+  detailHeaderLayout?: LayoutConfig;
+  detailBodyOrder?: 'schema';
+}
+
 // Layout 配置
 export interface LayoutConfig {
   type?: 'grid' | 'stack'; // Layout mode: 'grid' (12-col) or 'stack' (vertical). Default: 'stack'
   cols?: number; // Grid column count (default 12, only for type='grid')
+  /** Optional compact grid; existing grids are unchanged when omitted. */
+  compactCols?: number;
+  compactBreakpoint?: number;
   columnTemplate?: string; // Optional CSS grid-template-columns override
   gridTemplateColumns?: string; // Alias for columnTemplate
   colGap?: number; // Column gap in px (default 16)
@@ -35,6 +63,40 @@ export interface CardImageViewport {
   viewBox: [number, number, number, number];
 }
 
+/** Optional legacy business activity query; named sources use the owning runtime DMS. */
+export interface BusinessActivityDataSource {
+  endpoint?: string;
+  url?: string;
+  method?: 'get' | 'post';
+  queryCode?: string;
+  params?: Record<string, unknown>;
+}
+
+export interface BusinessActivityRecordMapping {
+  pid?: string;
+  occurredAt?: string;
+  status?: string;
+  priority?: string;
+  role?: string;
+  objectModel?: string;
+  objectRecord?: string;
+  activityType?: string;
+  subject?: string;
+  content?: string;
+  actorName?: string;
+  fromState?: string;
+  toState?: string;
+}
+
+/** An actual nullable field of each business history row, displayed read-only when present. */
+export interface BusinessActivityDetailField {
+  field: string;
+  label: string | LocalizedText;
+  dictCode?: string;
+}
+
+export interface BusinessActivitySnapshotField extends BusinessActivityDetailField {}
+
 // Block 配置 (新 DSL)
 export interface BlockConfig {
   id: string;
@@ -42,6 +104,8 @@ export interface BlockConfig {
   title?: string | LocalizedText;
   layout?: BlockLayoutConfig;
   visibleWhen?: string;
+  /** Existing block visibility and named-source permission gate. */
+  permissionCode?: string;
   className?: string;
   imageField?: string;
   imageViewports?: Record<string, CardImageViewport>;
@@ -61,6 +125,15 @@ export interface BlockConfig {
   columns?: number | ColumnConfig[];
   rowActions?: ButtonConfig[];
   dataSource?: string | DataSourceConfig;
+  /** Business-only history reads an existing named source and never requests audit activities. */
+  businessOnly?: boolean;
+  businessDataSource?: string | BusinessActivityDataSource;
+  businessRecordMapping?: BusinessActivityRecordMapping;
+  businessStateDictCode?: string;
+  businessDetailFields?: BusinessActivityDetailField[];
+  businessSnapshotFields?: BusinessActivitySnapshotField[];
+  compact?: boolean;
+  previewLimit?: number;
 
   // List tabs
   tabs?: ListTabConfig[] | DetailTabConfig[];
@@ -239,7 +312,7 @@ export interface ColumnConfig {
   /** Localized placeholder for explicitly empty values, including empty arrays. */
   emptyText?: string | LocalizedText;
   /** Structured, reusable business cell presentation. */
-  presentation?: import('../runtime/renderers/WorkspaceCells').WorkspaceCellPresentation;
+  presentation?: WorkspaceCellPresentation;
   field: string;
   label?: string | LocalizedText; // optional: resolved by i18n Resolver from model displayName
   /** Runtime personalization may reorder but never hide this baseline field. */
@@ -356,10 +429,25 @@ export interface CommandInputFieldConfig {
   [key: string]: unknown;
 }
 
+export interface CommandInputPresentation {
+  /** Keep this command input draft until the native executor reports its result. */
+  waitForResult?: boolean;
+  /** Maximum pixel width, clamped to the viewport by the shared dialog. */
+  width?: number;
+  showClose?: boolean;
+  /** Omission preserves backdrop cancellation for existing prompts. */
+  closeOnBackdrop?: boolean;
+  summary?: {
+    columns?: 1 | 2;
+    fields: Array<{ field: string; label?: string | LocalizedText; dictCode?: string }>;
+  };
+}
+
 export interface CommandInputFormConfig {
   inputFields?: CommandInputFieldConfig[];
   inputFieldsTitle?: string | LocalizedText;
   inputFieldsSubmitLabel?: string | LocalizedText;
+  inputFieldsPresentation?: CommandInputPresentation;
 }
 
 /** Existing-record command options shared by toolbar and sub-table actions. */
@@ -395,7 +483,13 @@ export type ActionDef =
       input: FieldConfig;
       operationType?: 'UPDATE' | 'DELETE';
     }
-  | { type: 'navigate'; to: string; command?: string; hardReload?: boolean }
+  | {
+      type: 'navigate';
+      to: string;
+      command?: string;
+      hardReload?: boolean;
+      presentation?: { mode: 'modal'; width?: number };
+    }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
   | { type: 'flow'; handler: string }
@@ -506,7 +600,7 @@ export interface PaginationConfig {
   /** Explicit opt-in for paged API data sources on a table block. */
   mode?: 'server';
   /** Use the declared response field; request parameters remain pageNum/pageSize. */
-  pageField?: 'pageNum' | 'current';
+  pageField?: 'pageNum' | 'current' | 'page';
   pageSize?: number;
   pageSizeOptions?: number[];
   showTotal?: boolean;
@@ -835,7 +929,7 @@ export interface UnifiedSchema {
   options?: Record<string, unknown>;
 
   // Page-level extension properties (e.g., showShare, showReport for detail pages)
-  extension?: Record<string, any>;
+  extension?: PageExtensionConfig;
 
   /**
    * Optional override for the edit-mode record-prefill fetch. When set, the form

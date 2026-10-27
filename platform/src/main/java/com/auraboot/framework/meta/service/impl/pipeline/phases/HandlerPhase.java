@@ -114,6 +114,12 @@ public class HandlerPhase implements CommandPhase {
     private FileService fileService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory commandTargetFiles;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory sealedContentFactory;
+
+    @Autowired(required = false)
     private AsyncTaskServiceImpl asyncTaskService;
 
     @Autowired
@@ -128,11 +134,17 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private RecordShareAccessor recordShareAccessor;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor announcementAcknowledgementAccessor;
+
     /** Lazy so the phase → executor → (lazy) pipeline edge never cycles at startup. */
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
     private com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
 
+    @Autowired private com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor commandMembershipLockAccessor;
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory recordScopeFactory;
     @Autowired private IdentityDirectoryAccessorImpl identityDirectoryAccessor;
     @Autowired private RoleMapper roleMapper;
     @Autowired private UserRoleService userRoleService;
@@ -150,7 +162,7 @@ public class HandlerPhase implements CommandPhase {
                         ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(),
                         Boolean.TRUE.equals(ctx.getTargetRecordReadable())
                             && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
-                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized())));
+                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized(), ctx)));
         ctx.setHandlerResults(handlerResults);
         if (!ctx.isHandlerOwnedMutation()) {
             persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
@@ -166,7 +178,8 @@ public class HandlerPhase implements CommandPhase {
                                                      Map<String, Object> fieldMapResults,
                                                      Long tenantId, Long userId,
                                                      CommandExecuteRequest request,
-                                                     Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
+                                                     Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized,
+                                                     CommandPipelineContext pipelineContext) {
         Map<String, Object> handlerResults = new HashMap<>();
         boolean dryRun = request.isDryRun();
 
@@ -221,7 +234,7 @@ public class HandlerPhase implements CommandPhase {
 
         // 2. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
-                fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized);
+                fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized, pipelineContext);
 
         // 3. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
@@ -551,7 +564,8 @@ public class HandlerPhase implements CommandPhase {
                                               CommandExecuteRequest request,
                                               Map<String, Object> fieldMapResults,
                                               Map<String, Object> handlerResults,
-                                              Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized) {
+                                              Map<String, Object> execConfig, boolean relatedUpdateBoundaryAuthorized,
+                                              CommandPipelineContext pipelineContext) {
         if (extensionRegistry == null) {
             return;
         }
@@ -635,220 +649,240 @@ public class HandlerPhase implements CommandPhase {
                 handlerCode, commandCode,
                 handler != null ? handler.getClass().getName() : "<none>", secondaryHandlers.size());
 
-        DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
-        try {
-            String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
-            Map<String, Object> pluginSettings = new HashMap<>();
-            pluginSettings.putAll(resolveHandlerParams(execConfig));
-            pluginSettings.put("__commandCode", commandCode);
-            pluginSettings.put("__handlerCode", handlerCode);
-            // Authenticated actor identity is a server-owned setting, never a client payload
-            // value. Hybrid handlers use it for independent confirmation/audit invariants.
-            // Keep the established String shape expected by existing plugin handlers.
-            if (userId != null) {
-                pluginSettings.put("__currentUser", userId.toString());
-            }
-            if (MetaContext.exists() && StringUtils.hasText(MetaContext.getCurrentUserPid())) {
-                pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
-                        MetaContext.getCurrentUserPid().trim());
-            }
-            if (StringUtils.hasText(request.getClientRequestId())) {
-                pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
-                        request.getClientRequestId().trim());
-            }
-            String effectiveRecordId = resolveEffectiveRecordId(request, fieldMapResults);
-            Long expectedVersion = MetaContext.getCommandExpectedVersion(modelCode, effectiveRecordId);
-            if (request.getExpectedVersion() != null && expectedVersion != null) {
-                pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY, expectedVersion);
-            }
-            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.install(
-                    commandCode, tenantId, pluginSettings);
-            com.auraboot.framework.plugin.pf4j.DocumentCurrencyAccessorImpl.install(
-                    pluginSettings, tenantId, currencyConversionService);
-            com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
-                    pluginSettings, tenantId, cloudConfigService, objectMapper);
-            com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
-                    pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
-            pluginSettings.put("__dataAccessor",
-                    com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                        ? new com.auraboot.framework.openplatform.service.InstalledMachineDataAccessor(dynamicDataService)
-                        : new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
-            if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
-                // Q03-04: nested follow-up commands dispatch through the real
-                // pipeline (validated, invariant-checked, evented, audited)
-                // instead of handlers `new`-ing other handlers directly.
-                pluginSettings.put(CommandHandlerExtension.COMMAND_DISPATCHER_ACCESSOR_KEY,
-                        new com.auraboot.framework.plugin.pf4j.CommandDispatcherAccessorImpl(commandExecutor));
-            }
-            if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
-                pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
-                        new TenantProjectionAccessorImpl(tenantId,
-                                new BackgroundDataAccessorImpl(dynamicDataService)));
-            }
-            if (Boolean.TRUE.equals(pluginSettings.get(
-                    com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))) {
-                if (handler == null || !"handler".equals(pluginSettings.get("targetRecordAuthorization"))
-                        || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
-                            instanceof TenantProjectionAccessor projection)) {
-                    throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
+        try (DynamicDataQueryScope queryScope = DynamicDataQueryScope.open()) {
+            var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext);
+            try (fileScope;
+                 var sealedContentScope = sealedContentFactory == null ? null : sealedContentFactory.forCommand(pipelineContext)) {
+                String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
+                Map<String, Object> pluginSettings = new HashMap<>();
+                pluginSettings.putAll(resolveHandlerParams(execConfig));
+                pluginSettings.put("__commandCode", commandCode);
+                pluginSettings.put("__handlerCode", handlerCode);
+                // Authenticated actor identity is a server-owned setting, never a client payload
+                // value. Hybrid handlers use it for independent confirmation/audit invariants.
+                // Keep the established String shape expected by existing plugin handlers.
+                if (userId != null) {
+                    pluginSettings.put("__currentUser", userId.toString());
                 }
-                pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
-                        new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
-                                tenantId,commandCode,modelCode,effectiveRecordId,
-                                MetaContext.getCurrentUserPid(),handler,projection));
-            }
-            if (Boolean.TRUE.equals(pluginSettings.get(
-                    com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
-                if (handler == null || !relatedUpdateBoundaryAuthorized
-                        || !StringUtils.hasText(effectiveRecordId)
-                        || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                        || Boolean.TRUE.equals(pluginSettings.get(
-                            com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))
-                        || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
-                            instanceof TenantProjectionAccessor projection)) {
-                    throw new AccessDeniedException("Related update requires an authorized readable target and projection");
+                if (MetaContext.exists() && StringUtils.hasText(MetaContext.getCurrentUserPid())) {
+                    pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
+                            MetaContext.getCurrentUserPid().trim());
                 }
-                pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
-                        new com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor(dynamicDataService,
-                                tenantId,commandCode,modelCode,effectiveRecordId,
-                                MetaContext.getCurrentUserPid(),handler,projection));
-            }
-            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
-                    pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);
-            pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
-                    new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
-                            roleMapper, userRoleService, tenantMemberService, userService));
-            pluginSettings.put(CommandHandlerExtension.IDENTITY_DIRECTORY_ACCESSOR_KEY, identityDirectoryAccessor);
-            if (biTemporalService != null) {
-                pluginSettings.put("__biTemporalAccessor",
-                        new BiTemporalAccessorImpl(biTemporalService, objectMapper));
-            }
-            if (aiProviderAccessorFactory != null) {
-                pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
-                        aiProviderAccessorFactory.create(tenantId));
-            }
-            if (fileService != null && storageProvider != null) {
-                pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
-                        new FileAccessorImpl(fileService, storageProvider, userId));
-            }
-            if (asyncTaskService != null && objectMapper != null) {
-                pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
-                        new AsyncTaskAccessorImpl(asyncTaskService, objectMapper, tenantId, userId));
-            }
-            if (platformTransactionManager != null) {
-                pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
-                        new IndependentTransactionAccessorImpl(
-                                platformTransactionManager, dynamicDataService));
-            }
-            if (recordShareAccessor != null) {
-                pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
-            }
-            com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.finishSettings(pluginSettings);
-            CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
-                    .tenantId(tenantId)
-                    .namespace(namespace)
-                    .commandType(handlerCode)
-                    .modelCode(modelCode)
-                    .recordId(effectiveRecordId)
-                    .payload(payload)
-                    .settings(pluginSettings)
-                    .dryRun(request.isDryRun())
-                    .build();
+                if (StringUtils.hasText(request.getClientRequestId())) {
+                    pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
+                            request.getClientRequestId().trim());
+                }
+                String effectiveRecordId = resolveEffectiveRecordId(request, fieldMapResults);
+                Long expectedVersion = MetaContext.getCommandExpectedVersion(modelCode, effectiveRecordId);
+                if (request.getExpectedVersion() != null && expectedVersion != null) {
+                    pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY, expectedVersion);
+                }
+                com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.install(
+                        commandCode, tenantId, pluginSettings);
+                com.auraboot.framework.plugin.pf4j.DocumentCurrencyAccessorImpl.install(
+                        pluginSettings, tenantId, currencyConversionService);
+                com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
+                        pluginSettings, tenantId, cloudConfigService, objectMapper);
+                com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
+                        pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
+                pluginSettings.put("__dataAccessor",
+                        com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                            ? new com.auraboot.framework.openplatform.service.InstalledMachineDataAccessor(dynamicDataService)
+                            : new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
+                if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
+                    // Q03-04: nested follow-up commands dispatch through the real
+                    // pipeline (validated, invariant-checked, evented, audited)
+                    // instead of handlers `new`-ing other handlers directly.
+                    pluginSettings.put(CommandHandlerExtension.COMMAND_DISPATCHER_ACCESSOR_KEY,
+                            new com.auraboot.framework.plugin.pf4j.CommandDispatcherAccessorImpl(commandExecutor));
+                }
+                if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
+                    pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
+                            new TenantProjectionAccessorImpl(tenantId,
+                                    new BackgroundDataAccessorImpl(dynamicDataService)));
+                }
+                if (Boolean.TRUE.equals(pluginSettings.get(
+                        com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))) {
+                    if (handler == null || !"handler".equals(pluginSettings.get("targetRecordAuthorization"))
+                            || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                                instanceof TenantProjectionAccessor projection)) {
+                        throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
+                    }
+                    pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                            new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
+                                    tenantId,commandCode,modelCode,effectiveRecordId,
+                                    MetaContext.getCurrentUserPid(),handler,projection));
+                }
+                if (Boolean.TRUE.equals(pluginSettings.get(
+                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
+                    if (handler == null || !relatedUpdateBoundaryAuthorized
+                            || !StringUtils.hasText(effectiveRecordId)
+                            || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                            || Boolean.TRUE.equals(pluginSettings.get(
+                                com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))
+                            || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
+                                instanceof TenantProjectionAccessor projection)) {
+                        throw new AccessDeniedException("Related update requires an authorized readable target and projection");
+                    }
+                    pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                            new com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor(dynamicDataService,
+                                    tenantId,commandCode,modelCode,effectiveRecordId,
+                                    MetaContext.getCurrentUserPid(),handler,projection));
+                }
+                com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
+                        pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);
+                pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
+                        new TenantRoleAssignmentAccessorImpl(tenantId, userId, identityDirectoryAccessor,
+                                roleMapper, userRoleService, tenantMemberService, userService));
+                pluginSettings.put(CommandHandlerExtension.IDENTITY_DIRECTORY_ACCESSOR_KEY, identityDirectoryAccessor);
+                if (biTemporalService != null) {
+                    pluginSettings.put("__biTemporalAccessor",
+                            new BiTemporalAccessorImpl(biTemporalService, objectMapper));
+                }
+                if (aiProviderAccessorFactory != null) {
+                    pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
+                            aiProviderAccessorFactory.create(tenantId));
+                }
+                if (fileService != null && storageProvider != null) {
+                    pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
+                            fileScope == null ? new FileAccessorImpl(fileService, storageProvider, userId) : fileScope.accessor());
+                }
+                if (asyncTaskService != null && objectMapper != null) {
+                    pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
+                            new AsyncTaskAccessorImpl(asyncTaskService, objectMapper, tenantId, userId));
+                }
+                if (platformTransactionManager != null) {
+                    pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
+                            new IndependentTransactionAccessorImpl(
+                                    platformTransactionManager, dynamicDataService));
+                }
+                if (recordShareAccessor != null) {
+                    pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
+                }
+                pluginSettings.put(com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor.SETTINGS_KEY,
+                        commandMembershipLockAccessor);
+                if (recordScopeFactory != null) {
+                    var scopes = recordScopeFactory.forCommand(pipelineContext);
+                    if (scopes != null) pluginSettings.put(
+                            com.auraboot.framework.plugin.extension.RecordActionScopeAccessor.SETTINGS_KEY, scopes);
+                }
+                if (announcementAcknowledgementAccessor != null) {
+                    pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY,
+                            announcementAcknowledgementAccessor);
+                }
+                if (sealedContentScope != null) {
+                    pluginSettings.put(com.auraboot.framework.plugin.extension.AnnouncementSealedContentAccessor.SETTINGS_KEY,
+                            sealedContentScope.accessor());
+                }
+                com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.finishSettings(pluginSettings);
+                CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
+                        .tenantId(tenantId)
+                        .namespace(namespace)
+                        .commandType(handlerCode)
+                        .modelCode(modelCode)
+                        .recordId(effectiveRecordId)
+                        .payload(payload)
+                        .settings(pluginSettings)
+                        .dryRun(request.isDryRun())
+                        .build();
 
-            // Primary handler (if any). Gated per-handler on supportsDryRun() (PR-56): a primary
-            // that is not dry-run-safe is skipped under dry-run because external side effects
-            // escape the JDBC rollback envelope.
-            if (handler != null) {
-                if (request.isDryRun() && !handler.supportsDryRun()) {
-                    log.info("Dry-run: skipping primary handler {} for command {} (supportsDryRun()=false)",
-                            handler.getClass().getName(), handlerCode);
-                } else {
-                    Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
-                            : inventoryReceiptProvenance.route(handler, pluginContext);
-                    if (result instanceof Map) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> resultMap = (Map<String, Object>) result;
-                        handlerResults.putAll(resultMap);
-                        log.info("Plugin handler returned {} entries", resultMap.size());
-                    } else if (result != null) {
-                        handlerResults.put("pluginResult", result);
+                // Primary handler (if any). Gated per-handler on supportsDryRun() (PR-56): a primary
+                // that is not dry-run-safe is skipped under dry-run because external side effects
+                // escape the JDBC rollback envelope.
+                if (handler != null) {
+                    if (request.isDryRun() && !handler.supportsDryRun()) {
+                        log.info("Dry-run: skipping primary handler {} for command {} (supportsDryRun()=false)",
+                                handler.getClass().getName(), handlerCode);
+                    } else {
+                        Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
+                                : inventoryReceiptProvenance.route(handler, pluginContext);
+                        if (result instanceof Map) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> resultMap = (Map<String, Object>) result;
+                            handlerResults.putAll(resultMap);
+                            log.info("Plugin handler returned {} entries", resultMap.size());
+                        } else if (result != null) {
+                            handlerResults.put("pluginResult", result);
+                        }
                     }
                 }
-            }
 
-            // Chained secondaries run after the primary, in priority order, sharing the same
-            // context (and DataAccessor) and the same command transaction. A secondary that
-            // throws propagates out and rolls back the whole command (intended atomicity). Their
-            // result keys are merged without clobbering the primary's (putIfAbsent).
-            for (CommandHandlerExtension secondary : secondaryHandlers) {
-                if (request.isDryRun() && !secondary.supportsDryRun()) {
-                    log.info("Dry-run: skipping secondary handler {} for command {} (supportsDryRun()=false)",
+                // Chained secondaries run after the primary, in priority order, sharing the same
+                // context (and DataAccessor) and the same command transaction. A secondary that
+                // throws propagates out and rolls back the whole command (intended atomicity). Their
+                // result keys are merged without clobbering the primary's (putIfAbsent).
+                for (CommandHandlerExtension secondary : secondaryHandlers) {
+                    if (request.isDryRun() && !secondary.supportsDryRun()) {
+                        log.info("Dry-run: skipping secondary handler {} for command {} (supportsDryRun()=false)",
+                                secondary.getClass().getName(), handlerCode);
+                        continue;
+                    }
+                    log.info("Executing chained secondary handler {} for command {}",
                             secondary.getClass().getName(), handlerCode);
-                    continue;
+                    Object secResult = inventoryReceiptProvenance == null ? secondary.execute(pluginContext)
+                            : inventoryReceiptProvenance.route(secondary, pluginContext);
+                    if (secResult instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> secMap = (Map<String, Object>) secResult;
+                        secMap.forEach(handlerResults::putIfAbsent);
+                        log.info("Secondary handler {} returned {} entries",
+                                secondary.getClass().getSimpleName(), secMap.size());
+                    }
                 }
-                log.info("Executing chained secondary handler {} for command {}",
-                        secondary.getClass().getName(), handlerCode);
-                Object secResult = inventoryReceiptProvenance == null ? secondary.execute(pluginContext)
-                        : inventoryReceiptProvenance.route(secondary, pluginContext);
-                if (secResult instanceof Map) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> secMap = (Map<String, Object>) secResult;
-                    secMap.forEach(handlerResults::putIfAbsent);
-                    log.info("Secondary handler {} returned {} entries",
-                            secondary.getClass().getSimpleName(), secMap.size());
-                }
-            }
 
-        } catch (Exception e) {
-            log.error("Plugin command handler execution failed for {} (command={}): {}",
-                    handlerCode, commandCode, e.getMessage(), e);
-            if (e instanceof org.springframework.web.server.ResponseStatusException status
-                    && status.getStatusCode().is4xxClientError()) {
-                throw status;
-            }
-            if (e instanceof AccessDeniedException accessDeniedException) {
-                throw accessDeniedException;
-            }
-            if (e instanceof SecurityException) {
-                // The transport-neutral plugin SPI may reject ownership without Spring dependencies.
-                // Keep the authorization status and cause, never expose its internal record diagnostics.
-                throw new AccessDeniedException("Access denied", e);
-            }
-            if (e instanceof DataAccessorException dataAccess
-                    && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
-                throw new AccessDeniedException("Plugin source data access denied", dataAccess);
-            }
-            // Preserve the typed persistence boundary: the global response handler
-            // sanitizes database diagnostics in every profile, including dev.
-            // Meta services can wrap mapper failures. Inspect typed causes rather
-            // than diagnostic text, preserving rollback/conflict transport semantics.
-            java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-            for (Throwable cause = e; cause != null && seen.add(cause); cause = cause.getCause()) {
-                if (cause instanceof org.springframework.dao.DataAccessException persistenceFailure) {
-                    throw persistenceFailure;
+            } catch (Exception e) {
+                log.error("Plugin command handler execution failed for {} (command={}): {}",
+                        handlerCode, commandCode, e.getMessage(), e);
+                if (e instanceof org.springframework.web.server.ResponseStatusException status
+                        && status.getStatusCode().is4xxClientError()) {
+                    throw status;
                 }
+                if (e instanceof com.auraboot.framework.exception.ConflictException conflict) {
+                    // Host-issued capabilities retain their optimistic concurrency response.
+                    throw conflict;
+                }
+                if (e instanceof AccessDeniedException accessDeniedException) {
+                    throw accessDeniedException;
+                }
+                if (e instanceof SecurityException) {
+                    // The transport-neutral plugin SPI may reject ownership without Spring dependencies.
+                    // Keep the authorization status and cause, never expose its internal record diagnostics.
+                    throw new AccessDeniedException("Access denied", e);
+                }
+                if (e instanceof DataAccessorException dataAccess
+                        && dataAccess.code() == DataAccessErrorCode.PERMISSION_DENIED) {
+                    throw new AccessDeniedException("Plugin source data access denied", dataAccess);
+                }
+                // Preserve the typed persistence boundary: the global response handler
+                // sanitizes database diagnostics in every profile, including dev.
+                // Meta services can wrap mapper failures. Inspect typed causes rather
+                // than diagnostic text, preserving rollback/conflict transport semantics.
+                java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+                for (Throwable cause = e; cause != null && seen.add(cause); cause = cause.getCause()) {
+                    if (cause instanceof org.springframework.dao.DataAccessException persistenceFailure) {
+                        throw persistenceFailure;
+                    }
+                }
+                if (e instanceof com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Unavailable unavailable) {
+                    throw new BusinessException(ResponseCode.BadParam,
+                            "$i18n:currency.error.document_snapshot_unavailable", unavailable);
+                }
+                // Plugin handlers use stable, transport-neutral error keys because
+                // the plugin API must not depend on host web exceptions. Preserve
+                // the optimistic-concurrency semantic at the host boundary so DSL
+                // clients receive HTTP 409 and can offer reload/retry recovery.
+                if (e.getMessage() != null && e.getMessage().contains("iot.error.version_conflict")) {
+                    throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
+                }
+                // Classification is a public SPI contract, independent of diagnostic text or locale.
+                if (e instanceof PluginCommandRejectionException rejection) {
+                    ResponseCode responseCode = switch (rejection.code()) {
+                        case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
+                    };
+                    throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection, rejection.messageArgs());
+                }
+                throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
             }
-            if (e instanceof com.auraboot.framework.plugin.extension.DocumentCurrencyAccessor.Unavailable unavailable) {
-                throw new BusinessException(ResponseCode.BadParam,
-                        "$i18n:currency.error.document_snapshot_unavailable", unavailable);
-            }
-            // Plugin handlers use stable, transport-neutral error keys because
-            // the plugin API must not depend on host web exceptions. Preserve
-            // the optimistic-concurrency semantic at the host boundary so DSL
-            // clients receive HTTP 409 and can offer reload/retry recovery.
-            if (e.getMessage() != null && e.getMessage().contains("iot.error.version_conflict")) {
-                throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
-            }
-            // Classification is a public SPI contract, independent of diagnostic text or locale.
-            if (e instanceof PluginCommandRejectionException rejection) {
-                ResponseCode responseCode = switch (rejection.code()) {
-                    case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
-                };
-                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection, rejection.messageArgs());
-            }
-            throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
-        } finally {
-            queryScope.close();
         }
     }
 

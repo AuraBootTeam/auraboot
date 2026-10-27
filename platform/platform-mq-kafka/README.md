@@ -26,6 +26,39 @@ Broker acknowledgement is not confirmation of downstream persistence or domain
 processing. Outbox publishers may mark transport delivery only after confirmed
 completion, preserving their existing lease, retry and identity rules.
 
+### Explicit producer budgets and observed cleanup
+
+Supervised callers can construct a dedicated provider with
+`new KafkaMqProvider(properties, KafkaMqProvider.ProducerTimeouts.within(operationTimeout))`.
+The total budget must be two to sixty thousand integral milliseconds. It is split
+between synchronous `max.block.ms` admission and delivery; request timeout is no
+larger than delivery, and linger is explicitly zero. The typed constructor keeps
+`acks=all`, idempotence and the default keyed partitioner. It exposes no arbitrary
+producer property map. The original one-argument constructor retains its ordinary
+host settings; use the explicit constructor when admission must be bounded.
+
+`close(Duration)` stops owned subscriptions and attempts producer cleanup under
+one caller deadline, including concurrent-close lock admission. Positive integral
+millisecond durations up to sixty seconds are accepted. Failures retain their
+causes and suppressed cleanup failures; interruption is restored. A completion
+callback cannot await its own producer shutdown and must defer to its supervisor.
+`destroy()` delegates to this strict path with a five-second budget.
+
+Kafka's SDK close may contain an unbounded internal force-close join. The provider
+therefore owns a named daemon producer-closer thread, awaits it only for the
+remaining caller budget, and interrupts/reports failure on expiry. It retains that
+thread and terminal result: `closeStatus()` exposes whether cleanup was requested,
+the number of live owned consumers, producer closer thread ID/liveness, SDK cleanup
+success, and overall successful closure. A thrown close is **not** proof that SDK
+or network resources have terminated. Supervisors must keep process ownership and
+handle non-cooperative cleanup explicitly; they must not reuse a failed provider
+or report it as stopped. Later SDK completion does not turn a missed deadline into
+a successful close, and subsequent close calls retain the earlier failure.
+
+These are scheduling/SDK bounds, not hard real-time guarantees, upstream durable
+acknowledgements, or evidence of downstream business completion. Component tests
+and product-specific real-broker/owned-process qualification remain separate.
+
 ## Durable receipt consumption
 
 ```java
@@ -76,7 +109,8 @@ Hermetic tests (no network or broker):
 
 ```sh
 ./gradlew :platform-mq-kafka:test --tests '*KafkaMqProviderTest' \
-  --tests '*KafkaMqReliabilityTest' --tests '*DeadLetterQueueHandlerTest'
+  --tests '*KafkaMqReliabilityTest' --tests '*DeadLetterQueueHandlerTest' \
+  --tests '*KafkaMqProviderBoundsTest'
 ```
 
 Host-first seam tests, in an owned, registered runtime:

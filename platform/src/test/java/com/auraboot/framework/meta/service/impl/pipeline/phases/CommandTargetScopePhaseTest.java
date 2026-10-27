@@ -338,7 +338,7 @@ class CommandTargetScopePhaseTest {
         var shares = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RecordShareService.class);
         when(applicationContext.getBean(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class)).thenReturn(scope);
         when(applicationContext.getBean(com.auraboot.framework.permission.service.RecordShareService.class)).thenReturn(shares);
-        when(scope.evaluate(eq(99L), eq("qo_quote_common"), eq("read"), any())).thenReturn(
+        when(scope.evaluate(eq(99L), eq("qo_quote_common"), eq("update"), any())).thenReturn(
                 new com.auraboot.framework.permission.engine.model.EvaluationStep("DataScope",
                         com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY, "Not owner"));
         var ctx = context("qo_quote_common", "REC-1");
@@ -359,6 +359,59 @@ class CommandTargetScopePhaseTest {
         ctx.setExecConfig(Map.of("handlerParams", Map.of("targetRecordAction", "read")));
         phase.execute(ctx);
         assertThat(ctx.getTargetRecordReadable()).isTrue();
+    }
+
+    @Test void declaredWriteScopeIsCheckedBeforeIdempotentReplayEvenWhenReadScopeIsAll() {
+        MetaContext.setContext(1L,42L,"caller-pid","Caller");
+        givenRecordIsReadable(true);
+        var scope=org.mockito.Mockito.mock(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class);
+        when(applicationContext.getBean(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class)).thenReturn(scope);
+        when(applicationContext.getBean(com.auraboot.framework.permission.service.RecordShareService.class))
+                .thenReturn(org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RecordShareService.class));
+        when(scope.evaluate(eq(99L),eq("qo_quote_common"),eq("read"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("DataScope",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"Scope all"));
+        when(scope.evaluate(eq(99L),eq("qo_quote_common"),eq("update"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("DataScope",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY,"Update scope none"));
+        var ctx=context("qo_quote_common","REC-1");
+        ctx.setExecConfig(Map.of("handlerParams",Map.of("targetRecordAction","update")));
+        ctx.getRequest().setClientRequestId("previously-successful-key");
+        var pipeline=new CommandPipeline(List.of(phase()),List.of(new IdempotencyPhase(idempotencyService)));
+        assertThatThrownBy(() -> {
+            if(pipeline.executePreGuardPhases(ctx)==null) pipeline.executeGuardedPhases(ctx);
+        }).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(idempotencyService);
+    }
+
+    @Test void unavailableWriteScopeCannotBecomeAnAllowDecision() {
+        MetaContext.setContext(1L,42L,"scope-user","Scope user");
+        givenRecordIsReadable(true);
+        when(applicationContext.getBean(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class))
+                .thenReturn(org.mockito.Mockito.mock(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class));
+        var ctx=context("qo_quote_common","REC-1");
+        ctx.setExecConfig(Map.of("handlerParams",Map.of("targetRecordAction","update")));
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test void readShareAuthorizationCannotAuthorizeAnExplicitUpdateTarget() {
+        givenRecordIsReadable(true);
+        var ctx=context("qo_quote_common","REC-1");
+        ctx.setExecConfig(Map.of("handlerParams",Map.of("targetRecordAction","update")));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized(
+                "record-share:qo_quote_common:read"));
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(permissionFacade);
+    }
+
+    @Test void updateShareAuthorizationCannotAuthorizeAnExplicitDeleteTarget() {
+        givenRecordIsReadable(true);
+        var ctx=context("qo_quote_common","REC-1");
+        ctx.setExecConfig(Map.of("handlerParams",Map.of("targetRecordAction","delete")));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized(
+                "record-share:qo_quote_common:update"));
+        assertThatThrownBy(() -> phase().execute(ctx)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(permissionFacade);
     }
 
     @org.junit.jupiter.api.AfterEach

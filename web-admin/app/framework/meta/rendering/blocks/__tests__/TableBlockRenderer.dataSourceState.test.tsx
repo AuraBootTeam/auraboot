@@ -85,6 +85,7 @@ describe('TableBlockRenderer data-source states', () => {
     );
     expect(screen.getByTestId('table-stale-state')).toHaveTextContent('Connection lost');
     expect(screen.getByText('Batch A')).toBeInTheDocument();
+    expect(screen.getByTestId('table-row-1')).toHaveAttribute('data-record-pid', '1');
   });
 
   it('keeps preserved rows in place without an inline status during background refresh', () => {
