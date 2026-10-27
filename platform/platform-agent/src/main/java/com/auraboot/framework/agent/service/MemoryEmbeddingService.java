@@ -42,12 +42,9 @@ import java.util.Map;
  *       at INSERT time.</li>
  * </ul>
  *
- * <p>TODO(post-phase-1): Today we call {@link EmbeddingService#embed} which
- * uses the CloudConfig "embedding" provider type. If no embedding provider
- * is configured, no fallback to a text-generation provider is attempted —
- * the extractor logs WARN and skips. A dedicated embedding fallback (e.g.
- * local MiniLM) may be worth adding before Phase 7 tuning so tenants
- * without paid embedding keys still get proposals.
+ * <p>Embedding profiles remain explicit CloudConfig entries. The selected default
+ * model is local Qwen3-Embedding:4b; missing configuration does not trigger a
+ * text-generation fallback or an automatic model download.
  */
 @Slf4j
 @Service
@@ -75,40 +72,79 @@ public class MemoryEmbeddingService {
      * @return true if a new vector was written, false otherwise.
      */
     public boolean computeAndStore(String memoryPid) {
-        Map<String, Object> row = loadVectorRow(memoryPid);
-        if (row == null) return false;
+        return "rebuilt".equals(computeAndStoreRow(memoryPid, loadVectorRow(memoryPid), null, null));
+    }
+
+    /** Operator-only adapter: prepare outside a transaction; the caller atomically archives the exact CAS snapshot. */
+    String rebuildScoped(String memoryPid, Long tenantId, String agentCode, String expectedSpace,
+                         java.util.function.Function<PreparedRebuild, String> commit) {
+        java.util.Objects.requireNonNull(tenantId, "tenantId");
+        java.util.Objects.requireNonNull(agentCode, "agentCode");
+        java.util.Objects.requireNonNull(expectedSpace, "expectedSpace");
+        java.util.Objects.requireNonNull(commit, "commit");
+        Map<String, Object> row;
+        try {
+            row = jdbcTemplate.queryForMap(vectorRowSelect()
+                    + " WHERE pid=? AND tenant_id=? AND memory_agent_id=? AND "
+                    + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE, memoryPid, tenantId, agentCode);
+        } catch (EmptyResultDataAccessException absent) { return "not_found_or_inactive"; }
+        return computeAndStoreRow(memoryPid, row, expectedSpace, commit);
+    }
+
+    private String computeAndStoreRow(String memoryPid, Map<String, Object> row, String expectedSpace,
+                                      java.util.function.Function<PreparedRebuild, String> commit) {
+        if (row == null) return "not_found_or_inactive";
         Long tenantId = ((Number) row.get("tenant_id")).longValue();
         String content = (String) row.get("memory_content");
-        if (content == null || content.isBlank()) return false;
+        if (content == null || content.isBlank()) return "empty_content";
         String hash = com.auraboot.framework.agent.memory.MemoryVectorPolicy.sha256(content);
         String currentSpace = embeddingService.currentSpace(tenantId, null, EXPECTED_DIM);
-        if (currentSpace == null) return false;
+        if (currentSpace == null) return "provider_unconfigured";
+        if (expectedSpace != null && !expectedSpace.equals(currentSpace)) return "space_changed";
         if (row.get("embedding_text") != null && currentSpace.equals(row.get("embedding_space"))
-                && hash.equals(row.get("embedding_content_hash"))) return false;
+                && hash.equals(row.get("embedding_content_hash"))) return "already_current";
         String normalised = normaliseForEmbedding(content);
-        if (normalised.isEmpty()) return false;
+        if (normalised.isEmpty()) return "empty_content";
         var embedded = embeddingService.embedWithIdentity(tenantId, normalised, null);
         if (embedded == null || embedded.values().length != EXPECTED_DIM) {
             recordDimMismatch(tenantId, "auto", embedded == null ? 0 : embedded.values().length);
-            return false;
+            return "invalid_embedding";
         }
-        return jdbcTemplate.update(
+        if (expectedSpace != null && (!expectedSpace.equals(embedded.space())
+                || !expectedSpace.equals(embeddingService.currentSpace(tenantId, null, EXPECTED_DIM)))) return "space_changed";
+        PreparedRebuild prepared = new PreparedRebuild(memoryPid,
+                java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(row)),
+                toVectorLiteral(embedded.values()), embedded.space(), hash);
+        return commit == null ? storePrepared(prepared) : commit.apply(prepared);
+    }
+
+    record PreparedRebuild(String pid, Map<String, Object> before, String vector, String space, String contentHash) {}
+
+    /** No network access here; the operator composes this CAS with a mandatory joined audit transaction. */
+    String storePrepared(PreparedRebuild prepared) {
+        Map<String, Object> row = prepared.before();
+        int written = jdbcTemplate.update(
                 "UPDATE ab_agent_memory SET embedding=?::vector, embedding_space=?, embedding_content_hash=?, embedding_generated_at=NOW() "
                         + "WHERE pid=? AND tenant_id=? AND memory_content IS NOT DISTINCT FROM ? "
                         + "AND embedding::text IS NOT DISTINCT FROM ? AND embedding_space IS NOT DISTINCT FROM ? "
-                        + "AND embedding_content_hash IS NOT DISTINCT FROM ? AND " + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE,
-                toVectorLiteral(embedded.values()), embedded.space(), hash, memoryPid, tenantId, content,
-                row.get("embedding_text"), row.get("embedding_space"), row.get("embedding_content_hash")) == 1;
+                        + "AND embedding_content_hash IS NOT DISTINCT FROM ? AND memory_agent_id IS NOT DISTINCT FROM ? "
+                        + "AND embedding_generated_at IS NOT DISTINCT FROM ?::timestamptz AND "
+                        + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE,
+                prepared.vector(), prepared.space(), prepared.contentHash(), prepared.pid(), row.get("tenant_id"), row.get("memory_content"),
+                row.get("embedding_text"), row.get("embedding_space"), row.get("embedding_content_hash"), row.get("memory_agent_id"), row.get("embedding_generated_at"));
+        return written == 1 ? "rebuilt" : "conflict";
+    }
+
+    private static String vectorRowSelect() {
+        return "SELECT tenant_id,memory_agent_id,memory_content,embedding::text AS embedding_text,embedding_space,embedding_content_hash,embedding_generated_at::text AS embedding_generated_at FROM ab_agent_memory";
     }
 
     private Map<String, Object> loadVectorRow(String memoryPid) {
         if (memoryPid == null || memoryPid.isBlank()) return null;
         try {
-            return jdbcTemplate.queryForMap("SELECT tenant_id,memory_content,embedding::text AS embedding_text,embedding_space,embedding_content_hash "
-                    + "FROM ab_agent_memory WHERE pid=? AND " + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE, memoryPid);
-        } catch (EmptyResultDataAccessException absent) {
-            return null;
-        }
+            return jdbcTemplate.queryForMap(vectorRowSelect() + " WHERE pid=? AND "
+                    + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE, memoryPid);
+        } catch (EmptyResultDataAccessException absent) { return null; }
     }
 
     /** Existing vectors are never silently rebuilt on a read; explicit computeAndStore is required. */
