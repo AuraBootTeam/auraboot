@@ -83,12 +83,15 @@ test('private recall, missing facts, persisted history and manual recovery', asy
   await page.getByTestId('aurabot-input').fill(fixture.memory.question);
   await page.getByTestId('aurabot-send').click();
   await expect(page.getByTestId('aurabot-input')).toBeEnabled();
-  await expect(page.getByTestId('aurabot-panel').getByText('HTTP 503: Service Unavailable', { exact: true })).toBeVisible();
+  const error = page.getByTestId('aurabot-panel').getByText('无法连接 AI 助手，请检查网络后重新发送。', { exact: true });
+  await expect(error).toBeVisible();
+  await error.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(directory, 'web-memory-error.png'), fullPage: true });
   await page.unroute('**/api/ai/aurabot/chat/stream');
   const recovered = await send(page, fixture.memory.question, 'owner-recovered');
   await expect(recovered).toContainText(fixture.memory.value);
   await expect(recovered).not.toContainText(/scope\s*=|Historical model response|memory_agent_id/);
+  await recovered.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(directory, 'web-memory-recovery.png'), fullPage: true });
   facts.push({ id: 'R5.web.owner', historyModelRequests: after - before, transportFaultOnly: true });
 });
