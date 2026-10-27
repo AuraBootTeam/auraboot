@@ -2,7 +2,6 @@ import { createPromptSubmissionFeedback } from '~/framework/meta/runtime/actions
 import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { downloadWithAuth } from '~/framework/meta/utils/commandDownload';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -68,6 +67,11 @@ export function useRuntimeStateSubscription(runtime: SchemaRuntime | null): void
   useEffect(() => {
     if (!runtime) return undefined;
 
+    if (runtime.subscribeContext) {
+      const unsubscribe = runtime.subscribeContext(() => forceUpdate((version) => version + 1));
+      forceUpdate((version) => version + 1);
+      return unsubscribe;
+    }
     const stateManager = runtime.getStateManager?.();
     const scopeId = runtime.getScopeId?.();
     const store = stateManager?.getStore?.(scopeId);

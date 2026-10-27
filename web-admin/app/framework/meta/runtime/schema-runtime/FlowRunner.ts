@@ -71,7 +71,10 @@ export class FlowRunner {
   }
 
   private withFreshState(context: ExpressionContext): ExpressionContext {
-    const fresh = this.deps.stateManager.getContext(this.deps.scopeId);
+    const scoped = this.deps.stateManager.getContext(this.deps.scopeId);
+    const fresh = this.deps.dataSourceManager.getRuntimeContext?.(
+      scoped, this.deps.stateManager, this.deps.scopeId,
+    ) ?? scoped;
     return {
       ...context,
       ...fresh,

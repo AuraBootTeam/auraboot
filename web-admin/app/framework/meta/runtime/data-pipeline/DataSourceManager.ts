@@ -187,6 +187,7 @@ export class DataSourceManager {
   private dataSources = new Map<string, DataSourceConfig>();
   private dataSourceStates = new Map<string, DataSourceState>();
   private subscriptions = new Map<string, Set<(state: DataSourceState) => void>>();
+  private contextSubscribers = new Set<() => void>();
   private baseContext: ExpressionContext;
   private contextGetter?: () => ExpressionContext;
   private stateManager?: ScopedStateManager;
@@ -197,7 +198,7 @@ export class DataSourceManager {
   private inFlightFetches = new Map<string, Promise<any>>();
   private lastFetchStartedAt = new Map<string, number>();
   private rateLimitBackoffUntil = new Map<string, number>();
-  private paginationParentScopes = new Map<string, string>();
+  private apiReadScopes = new Map<string, string>();
   /** DataSource ID → modelCode mapping for real-time data sync */
   private dataSourceModelCodes = new Map<string, string>();
 
@@ -219,7 +220,7 @@ export class DataSourceManager {
     return data ? [data] : [];
   }
 
-  private buildDataSourceContext(): {
+  private buildDataSourceContext(context?: ExpressionContext): {
     data: Record<string, any>;
     dataSource: Record<string, any>;
     dataSources: Record<string, any>;
@@ -228,19 +229,37 @@ export class DataSourceManager {
     const raw: Record<string, any> = {};
 
     this.dataSourceStates.forEach((state, id) => {
-      raw[id] = state.data;
-      data[id] = this.readRows(state.data)[0];
+      raw[id] = state.error ? null : state.data;
+      data[id] = this.readRows(raw[id])[0];
     });
 
-    return {
-      data,
-      dataSource: raw,
-      dataSources: raw,
-    };
+    if (context) {
+      const candidate = { ...context, data: { ...(context as any).data, ...data },
+        dataSource: { ...(context as any).dataSource, ...raw },
+        dataSources: { ...(context as any).dataSources, ...raw } } as ExpressionContext;
+      // Mask a changed read scope immediately, even before its dependency fetch starts.
+      // Repeat only while invalidating, so dependents cannot retain an upstream record.
+      let changed: boolean;
+      do {
+        changed = false;
+        this.dataSources.forEach((config, id) => {
+          if (config.type !== 'api' || !this.apiReadScopes.has(id) || raw[id] == null) return;
+          const request = this.buildApiRequest(config, undefined, candidate);
+          if (this.apiReadScopes.get(id) !== this.buildApiReadScope(config, request)) {
+            raw[id] = null; data[id] = undefined;
+            (candidate as any).data[id] = undefined;
+            (candidate as any).dataSource[id] = null;
+            (candidate as any).dataSources[id] = null;
+            changed = true;
+          }
+        });
+      } while (changed);
+    }
+    return { data, dataSource: raw, dataSources: raw };
   }
 
   private withDataSourceContext(context: ExpressionContext): ExpressionContext {
-    const dataSourceContext = this.buildDataSourceContext();
+    const dataSourceContext = this.buildDataSourceContext(context);
     const ctx = {
       ...context,
       data: {
@@ -264,6 +283,15 @@ export class DataSourceManager {
    * 绑定 ScopedStateManager,用于依赖追踪和上下文刷新
    */
   bindStateManager(stateManager: ScopedStateManager, scopeId: string) {
+    if (this.stateManager && !this.isBoundTo(stateManager, scopeId)) {
+      this.dataSourceStates.forEach((state, id) => {
+        this.fetchVersions.set(id, (this.fetchVersions.get(id) ?? 0) + 1);
+        this.dataSourceStates.set(id, { ...state, data: null, error: null, loading: false });
+      });
+      this.apiReadScopes.clear();
+      this.inFlightFetches.clear();
+      this.lastFetchStartedAt.clear();
+    }
     this.stateManager = stateManager;
     this.scopeId = scopeId;
     this.contextGetter = () => {
@@ -279,7 +307,7 @@ export class DataSourceManager {
           ...((this.baseContext as any).form || {}),
           ...(scopedContext.form || {}),
         },
-        record: (scopedContext as any).record ?? (this.baseContext as any).record,
+        record: Object.hasOwn(scopedContext, 'record') ? (scopedContext as any).record : (this.baseContext as any).record,
         row: scopedContext.row ?? (this.baseContext as any).row,
         $page: {
           ...((this.baseContext as any).$page || {}),
@@ -294,6 +322,21 @@ export class DataSourceManager {
       this.cleanupDependency(id);
       this.registerDependencies(id, config);
     });
+  }
+
+  isBoundTo(stateManager: ScopedStateManager, scopeId: string): boolean {
+    return this.stateManager === stateManager && this.scopeId === scopeId;
+  }
+
+  /** The same named-source aliases used by fetch parameters, scoped to their runtime owner. */
+  getRuntimeContext(context: ExpressionContext, stateManager: ScopedStateManager, scopeId: string): ExpressionContext {
+    if (!this.isBoundTo(stateManager, scopeId)) throw new Error('Data source context belongs to another runtime scope');
+    return this.withDataSourceContext(context);
+  }
+
+  subscribeContext(listener: () => void): () => void {
+    this.contextSubscribers.add(listener);
+    return () => { this.contextSubscribers.delete(listener); };
   }
 
   private getContext(): ExpressionContext {
@@ -311,7 +354,7 @@ export class DataSourceManager {
     if ((!config.type || config.type === 'api') && config.body !== undefined)
       throw new Error('Data source body is unsupported; use explicit params');
     this.cleanupDependency(id);
-    this.paginationParentScopes.delete(id);
+    this.apiReadScopes.delete(id);
 
     // 智能提取参数: 如果 config 中没有 params,从 ID 中提取
     // 例如: ds_storeTypes → { datasourceId: 'ds_storeTypes' }
@@ -479,7 +522,7 @@ export class DataSourceManager {
     const newState = {
       ...state,
       loading: false,
-      error: null,
+      error: state.error,
     };
 
     this.dataSourceStates.set(id, newState);
@@ -575,9 +618,9 @@ export class DataSourceManager {
     const apiRequest = config.type === 'api' ? this.buildApiRequest(config, extraParams) : undefined;
     const fetchKey = this.buildFetchKey(id, config, extraParams, apiRequest);
     // Never display or reuse a previous parent's rows while reading a new command target.
-    if (config.paginationRequest && apiRequest) {
-      const parent = stableStringify({ endpoint: apiRequest.endpoint, targetRecordPid: apiRequest.params.targetRecordPid });
-      const previous = this.paginationParentScopes.get(id);
+    if (apiRequest) {
+      const parent = this.buildApiReadScope(config, apiRequest);
+      const previous = this.apiReadScopes.get(id);
       if (previous !== undefined && previous !== parent) {
         this.setData(id, null);
         this.fetchVersions.set(id, (this.fetchVersions.get(id) ?? 0) + 1);
@@ -589,7 +632,7 @@ export class DataSourceManager {
           if (key.startsWith(`${id}::`)) this.lastFetchStartedAt.delete(key);
         }
       }
-      this.paginationParentScopes.set(id, parent);
+      this.apiReadScopes.set(id, parent);
     }
     const force = options?.force === true;
     const inFlightFetch = force ? undefined : this.inFlightFetches.get(fetchKey);
@@ -684,18 +727,36 @@ export class DataSourceManager {
   /**
    * 获取 API 数据源
    */
-  private buildApiRequest(config: DataSourceConfig, extraParams?: Record<string, any>) {
+  private buildApiReadScope(config: DataSourceConfig, request: { endpoint: string; params: Record<string, any>; scopeParams?: Record<string, any> }): string {
+    const params = { ...(request.scopeParams ?? request.params) };
+    const paths = config.paginationRequest
+      ? [config.paginationRequest.pageNumPath, config.paginationRequest.pageSizePath]
+      : [['pageNum'], ['pageSize']];
+    for (const path of paths) {
+      let target = params;
+      for (const key of path.slice(0, -1)) {
+        target[key] = { ...target[key] };
+        target = target[key];
+      }
+      delete target[path[path.length - 1]];
+    }
+    return stableStringify({ endpoint: request.endpoint, params });
+  }
+
+  private buildApiRequest(config: DataSourceConfig, extraParams?: Record<string, any>, context?: ExpressionContext) {
     if (!config.endpoint) throw new Error('API endpoint is required');
-    const params = buildPaginationRequestParams(
-      this.evaluateConfiguredParams(config.params), extraParams, config.paginationRequest,
-    );
-    const endpoint = expressionEvaluator.evaluateTemplate(config.endpoint, this.getContext());
+    const configuredParams = this.evaluateConfiguredParams(config.params, context);
+    const params = buildPaginationRequestParams(configuredParams, extraParams, config.paginationRequest);
+    // Caller query extras belong to this read intent; only changed runtime bindings invalidate it.
+    const scopeParams = { ...(configuredParams && typeof configuredParams === 'object' && !Array.isArray(configuredParams) ? configuredParams : {}),
+      ...(Object.hasOwn(params, 'targetRecordPid') ? { targetRecordPid: params.targetRecordPid } : {}) };
+    const endpoint = expressionEvaluator.evaluateTemplate(config.endpoint, context ?? this.getContext());
     const readPath = (path: string[]) => path.reduce<any>((value, key) => value[key], params);
     const requestedPage = config.paginationRequest ? {
       pageNum: readPath(config.paginationRequest.pageNumPath),
       pageSize: readPath(config.paginationRequest.pageSizePath),
     } : undefined;
-    return { endpoint, params: normalizeApiParams(endpoint, params), requestedPage };
+    return { endpoint, params: normalizeApiParams(endpoint, params), requestedPage, scopeParams };
   }
 
   private async fetchApiDataSource(
@@ -745,16 +806,16 @@ export class DataSourceManager {
     return this.adaptData(result.data, config);
   }
 
-  private evaluateConfiguredParams(paramsConfig: DataSourceConfig['params']): any {
+  private evaluateConfiguredParams(paramsConfig: DataSourceConfig['params'], context?: ExpressionContext): any {
     if (typeof paramsConfig === 'string') {
-      const bindResult = bind(paramsConfig, this.getContext());
+      const bindResult = bind(paramsConfig, context ?? this.getContext());
       // 如果是绑定结果（包含 path 属性），使用 value；否则使用整个结果
       return bindResult && typeof bindResult === 'object' && 'path' in bindResult
         ? bindResult.value
         : bindResult;
     }
     if (paramsConfig && typeof paramsConfig === 'object' && !Array.isArray(paramsConfig)) {
-      return expressionEvaluator.evaluateObject(paramsConfig, this.getContext());
+      return expressionEvaluator.evaluateObject(paramsConfig, context ?? this.getContext());
     }
     return paramsConfig;
   }
@@ -951,6 +1012,7 @@ export class DataSourceManager {
    * 通知订阅者
    */
   private notifySubscribers(id: string, state: DataSourceState): void {
+    this.contextSubscribers.forEach((listener) => listener());
     const subscribers = this.subscriptions.get(id);
     if (!subscribers) return;
 
@@ -1004,9 +1066,10 @@ export class DataSourceManager {
    * 清理数据源
    */
   unregister(id: string): void {
-    this.paginationParentScopes.delete(id);
+    this.apiReadScopes.delete(id);
     this.dataSources.delete(id);
     this.dataSourceStates.delete(id);
+    this.contextSubscribers.forEach((listener) => listener());
     this.subscriptions.delete(id);
     this.cleanupFetchBookkeeping(id);
     this.dataSourceModelCodes.delete(id);
@@ -1036,9 +1099,11 @@ export class DataSourceManager {
   }
 
   clear(): void {
-    this.paginationParentScopes.clear();
+    this.apiReadScopes.clear();
     this.dataSources.clear();
     this.dataSourceStates.clear();
+    this.contextSubscribers.forEach((listener) => listener());
+    this.contextSubscribers.clear();
     this.subscriptions.clear();
     this.fetchVersions.clear();
     this.inFlightFetches.clear();
