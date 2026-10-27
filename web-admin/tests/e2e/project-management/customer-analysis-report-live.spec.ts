@@ -49,7 +49,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   const showcaseFixture = process.env.PW_REPORT_SHOWCASE_FIXTURE === '1';
   const customer =
     process.env.PW_REPORT_CUSTOMER_NAME ||
-    (showcaseFixture ? '华辰制造（经营分析案例）' : '华辰制造');
+    (showcaseFixture ? '景川精密制造' : '华辰制造');
 
   page.setDefaultTimeout(20000);
   await liveShowcaseLogin(page);
@@ -95,9 +95,9 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
     }
     expect(customers).toHaveLength(1);
     const fixtureProjects = [
-      { name: '供应链协同平台', budget: 128000, code: 'REPORT-SUPPLY' },
-      { name: '服务交付二期', budget: 286000, code: 'REPORT-SERVICE' },
-      { name: '供应商对账升级', budget: 132000.5, code: 'REPORT-RECONCILE' },
+      { name: '供应链协同平台', budget: 128000, code: 'JC-2026-001' },
+      { name: '服务交付二期', budget: 286000, code: 'JC-2026-002' },
+      { name: '供应商对账升级', budget: 132000.5, code: 'JC-2026-003' },
     ];
     for (const project of fixtureProjects) {
       const existing = await list('tpm_project', 'tpm_pj_code', project.code);
