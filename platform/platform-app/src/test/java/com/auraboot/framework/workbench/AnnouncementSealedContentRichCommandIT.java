@@ -183,7 +183,13 @@ class AnnouncementSealedContentRichCommandIT {
         assertEquals(PluginState.STARTED, plugins.startPlugin(PLUGIN));
         var discovered = extensions.getCommandHandler(HANDLER).orElseThrow();
         assertEquals(IMPLEMENTATION, discovered.getClass().getName());
-        assertTrue(plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class, discovered));
+        var wrapper = plugins.getPlugin(PLUGIN);
+        assertNotNull(wrapper);
+        assertEquals(PluginState.STARTED, wrapper.getPluginState());
+        assertSame(wrapper.getPluginClassLoader(), discovered.getClass().getClassLoader());
+        assertSame(discovered, extensions.getCommandHandler(HANDLER).orElseThrow());
+        // This generic fixture is not one of the fixed inventory/procurement privileged owners.
+        assertFalse(plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class, discovered));
         var artifact = plugins.observeLoadedArtifact(discovered.getClass()).orElseThrow();
         assertEquals(PLUGIN, artifact.pluginId());
         assertEquals(probeJar.toAbsolutePath().normalize(), artifact.path());
