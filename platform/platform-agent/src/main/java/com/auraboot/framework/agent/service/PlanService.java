@@ -68,7 +68,7 @@ public class PlanService {
                 .build();
 
         try {
-            LlmChatResponse planResp = LlmResponseGuard.requireContent(
+            LlmChatResponse planResp = LlmResponseGuard.requireCompleteContent(
                     provider.chat(planReq, config.getApiKey(), config.getBaseUrl()),
                     "plan generation");
             String content = planResp.getContent().stream()

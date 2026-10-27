@@ -41,6 +41,46 @@ class ChatTurnRuntimeTest {
 
     private final ChatTurnRuntime runtime = new ChatTurnRuntime();
 
+    @ParameterizedTest
+    @CsvSource({"max_tokens,true", "tool_use,true", "end_turn,true", "max_tokens,false"})
+    void truncatedToolCallsNeverReachExecutionButPartialChatRemainsVisible(String stopReason, boolean tool)
+            throws Exception {
+        LlmProvider provider = mock(LlmProvider.class);
+        RecordingSink sink = new RecordingSink();
+        var reply = tool ? toolUseResponse() : response("partial answer");
+        reply.setStopReason(stopReason);
+        if (tool) reply.getContent().get(0).setName("nq:crm_customer_stats");
+        when(provider.chat(any(), eq("sk-test"), eq("https://llm.test")))
+                .thenReturn(reply).thenReturn(response("complete answer"));
+        var messages = new ArrayList<LlmChatRequest.Message>();
+        messages.add(LlmChatRequest.Message.text("user", "Look up A-1"));
+        var definition = ToolDefinition.builder().toolCode("nq:crm_customer_stats").toolType("dsl_query")
+                .riskLevel("L0").build();
+        var callbacks = new PolicyCallbacks(null);
+        var outcome = runtime.runToolLoop(new ChatTurnRuntime.ChatToolLoopSpec(
+                new TurnContext("turn-truncation", 1L, 2L, null, null, "aurabot",
+                        null, null, null, null, java.util.Set.of(), null, null, Instant.now()),
+                "aurabot", provider, "test", "sk-test", "https://llm.test", "truncation test",
+                "test-model", "system", 256, messages,
+                List.of(LlmChatRequest.Tool.builder().name("nq:crm_customer_stats").inputSchema(Map.of("type", "object")).build()),
+                List.of(definition), null, null, "session-truncation", sink, false, false, 2, null,
+                "trace-truncation", null), callbacks);
+        boolean truncatedTool = tool && "max_tokens".equals(stopReason);
+        assertThat(callbacks.executeCalls).isEqualTo(tool && !truncatedTool ? 1 : 0);
+        assertThat(callbacks.confirmationPendings).isEmpty();
+        if (truncatedTool) {
+            assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+            assertThat(sink.donePayloads).isEmpty();
+            assertThat(sink.toolResults).isEmpty();
+            assertThat(messages).hasSize(1);
+        } else {
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            assertThat(sink.donePayloads).containsExactly(tool ? "complete answer" : "partial answer");
+        }
+        verify(provider, times(tool && !truncatedTool ? 2 : 1))
+                .chat(any(), eq("sk-test"), eq("https://llm.test"));
+    }
+
     @Test
     @DisplayName("callProvider rejects empty provider responses before callers read tokens or content")
     void callProvider_emptyResponse_throwsSharedGuardFailure() throws Exception {

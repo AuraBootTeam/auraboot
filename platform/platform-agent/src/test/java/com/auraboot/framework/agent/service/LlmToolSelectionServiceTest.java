@@ -62,15 +62,28 @@ class LlmToolSelectionServiceTest {
     }
 
     private void stubProvider(String replyText) throws Exception {
+        stubProvider(replyText, null);
+    }
+
+    private void stubProvider(String replyText, String stopReason) throws Exception {
         LlmProviderFactory.ProviderConfig config = LlmProviderFactory.ProviderConfig.builder()
                 .providerCode("provider-under-test").apiKey("k").defaultModel("model-under-test").build();
         when(llmProviderFactory.resolveConfig(anyLong(), eq(null))).thenReturn(config);
         when(llmProviderFactory.getProvider(anyString())).thenReturn(provider);
         when(provider.chat(any(LlmChatRequest.class), anyString(), any()))
                 .thenReturn(LlmChatResponse.builder()
+                        .stopReason(stopReason)
                         .content(List.of(LlmChatResponse.ContentBlock.builder()
                                 .type("text").text(replyText).build()))
                         .build());
+    }
+
+    @Test
+    void truncatedObjectCannotCountAsToolSelectionEvidence() throws Exception {
+        stubProvider("{\"tools\":[\"nq_order_list\"]}", "max_tokens");
+        assertThatThrownBy(() -> service.selectTools(1L, "list orders", catalog, 5))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Incomplete response");
+        org.mockito.Mockito.verify(provider).chat(any(), anyString(), any());
     }
 
     @Test

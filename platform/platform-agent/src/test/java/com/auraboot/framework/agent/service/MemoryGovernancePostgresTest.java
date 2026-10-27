@@ -95,6 +95,60 @@ class MemoryGovernancePostgresTest {
     }
 
     @Test
+    void futureEffectiveFactsStayOutOfEveryPromptReaderAndAccessReinforcement() {
+        String futureUser = add(TENANT_A, "user", "alice", "user", "future-user");
+        String futureTeam = add(TENANT_A, "tenant", null, "agent", "future-team");
+        String futureGlobal = add(TENANT_B, "global", null, "agent", "future-global");
+        String current = add(TENANT_A, "user", "alice", "user", "current-fact");
+        jdbc.update("UPDATE ab_agent_memory SET valid_from=NOW()+INTERVAL '1 day' WHERE pid IN (?,?,?)",
+                futureUser, futureTeam, futureGlobal);
+        jdbc.update("UPDATE ab_agent_memory SET valid_from=NOW()-INTERVAL '1 hour' WHERE pid=?", current);
+        assertThat(titles(memories.searchScoped(TENANT_A, "alice", agent, "", 20)))
+                .containsExactly("current-fact");
+        assertThat(titles(memories.loadScopedByImportance(TENANT_A, "alice", agent, 20)))
+                .containsExactly("current-fact");
+        assertThat(titles(memories.loadScopedByImportanceL2Only(TENANT_A, "alice", agent, 20)))
+                .containsExactly("current-fact");
+        assertThat(titles(memories.loadForPrompt(TENANT_A, "alice", agent, null, 20)))
+                .containsExactly("current-fact");
+        assertThat(new ActiveMemoryService(memories).preRecall(TENANT_A, "alice", agent, "future"))
+                .extracting(row -> row.get("pid")).containsExactly(current);
+        memories.trackAccess(TENANT_A, "alice", futureUser);
+        assertThat(jdbc.queryForObject("SELECT access_count FROM ab_agent_memory WHERE pid=?", Integer.class, futureUser))
+                .isZero();
+        float[] vector = new float[1536]; vector[0] = 1;
+        String literal = "[1," + "0,".repeat(1534) + "0]";
+        jdbc.update("UPDATE ab_agent_memory SET embedding=?::vector, embedding_space=?, "
+                        + "embedding_content_hash=encode(sha256(convert_to(memory_content,'UTF8')),'hex') WHERE memory_agent_id=?",
+                literal, "b".repeat(64), agent);
+        assertThat(memories.searchScopedSemanticInSpace(TENANT_A, "alice", agent,
+                new com.auraboot.framework.rag.service.EmbeddingService.EmbeddedVector(vector, "b".repeat(64)), 20))
+                .extracting(row -> row.get("pid")).containsExactly(current);
+        assertThat(jdbc.queryForList("SELECT pid FROM ab_agent_memory WHERE memory_agent_id=? AND "
+                + com.auraboot.framework.agent.memory.MemoryVectorPolicy.fresh(""), String.class, agent))
+                .containsExactly(current);
+    }
+
+    @Test
+    void effectiveWindowIncludesStartAndExcludesEndAtTheSameDatabaseInstant() {
+        transaction.executeWithoutResult(status -> {
+            String legacy = add(TENANT_A, "user", "alice", "user", "legacy-live");
+            String starting = add(TENANT_A, "user", "alice", "user", "starting-now");
+            String ending = add(TENANT_A, "user", "alice", "user", "ending-now");
+            jdbc.update("UPDATE ab_agent_memory SET valid_from=NOW(),valid_until=NOW()+INTERVAL '1 hour' WHERE pid=?", starting);
+            jdbc.update("UPDATE ab_agent_memory SET valid_until=NOW() WHERE pid=?", ending);
+            assertThat(titles(memories.searchScoped(TENANT_A, "alice", agent, "", 20)))
+                    .containsExactlyInAnyOrder("legacy-live", "starting-now");
+            assertThat(memories.loadForPrompt(TENANT_A, "alice", agent, null, 20))
+                    .extracting(row -> row.get("pid")).containsExactlyInAnyOrder(legacy, starting);
+            memories.trackAccess(TENANT_A, "alice", starting);
+            memories.trackAccess(TENANT_A, "alice", ending);
+            assertThat(jdbc.queryForObject("SELECT access_count FROM ab_agent_memory WHERE pid=?", Integer.class, starting)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT access_count FROM ab_agent_memory WHERE pid=?", Integer.class, ending)).isZero();
+        });
+    }
+
+    @Test
     void accessReinforcementTouchesOnlyTheSelectedVisibleLiveRow() {
         String selected = add(TENANT_A, "user", "alice", "user", "selected");
         String unselected = add(TENANT_A, "user", "alice", "user", "unselected");

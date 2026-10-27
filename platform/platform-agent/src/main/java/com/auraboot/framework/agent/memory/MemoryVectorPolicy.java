@@ -24,6 +24,8 @@ public final class MemoryVectorPolicy {
         String p = alias.isEmpty() ? "" : alias + ".";
         return p + "embedding IS NOT NULL AND " + p + "embedding_space IS NOT NULL AND "
                 + p + "embedding_content_hash = encode(sha256(convert_to(" + p + "memory_content, 'UTF8')), 'hex') AND ("
-                + p + "deleted_flag IS NULL OR " + p + "deleted_flag=FALSE) AND (" + p + "valid_until IS NULL OR " + p + "valid_until>NOW())";
+                + p + "deleted_flag IS NULL OR " + p + "deleted_flag=FALSE) AND ("
+                + p + "valid_from IS NULL OR " + p + "valid_from<=NOW()) AND ("
+                + p + "valid_until IS NULL OR " + p + "valid_until>NOW())";
     }
 }

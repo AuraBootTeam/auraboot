@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.eval;
 
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
+
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
@@ -81,7 +83,8 @@ public class LlmTurnQualityJudge implements AgentTurnQualityJudge {
                     .responseFormat("json_object")
                     .build();
 
-            LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
+            LlmChatResponse response = LlmResponseGuard.requireCompleteContent(
+                    provider.chat(request, config.getApiKey(), config.getBaseUrl()), "turn quality judgment");
             return parseVerdict(s, extractText(response));
         } catch (Exception e) {
             // Deliberately broad: any provider/parse failure must degrade to "not judged",

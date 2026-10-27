@@ -879,6 +879,7 @@ class DataPermissionEngineIntegrationTest {
         request.setBatchSize(1);
         List<String> prompts = new ArrayList<>();
         var providerJson = new java.util.concurrent.atomic.AtomicReference<String>();
+        var providerStopReason = new java.util.concurrent.atomic.AtomicReference<String>("end_turn");
         var revokeAtProvider = new java.util.concurrent.atomic.AtomicBoolean(false);
         org.mockito.Mockito.when(provider.chat(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
@@ -890,6 +891,7 @@ class DataPermissionEngineIntegrationTest {
                         assertFalse(scoringPermissions.canAction(actorMember.getId(), modelCode, "update"));
                     }
                     return com.auraboot.framework.agent.dto.LlmChatResponse.builder()
+                            .stopReason(providerStopReason.get())
                             .content(List.of(com.auraboot.framework.agent.dto.LlmChatResponse.ContentBlock.builder()
                                     .type("text").text(providerJson.get()).build()))
                             .inputTokens(17).outputTokens(9).build();
@@ -994,6 +996,25 @@ class DataPermissionEngineIntegrationTest {
             assertFalse(scoringPermissions.canAction(actorMember.getId(), modelCode, "update"));
             assertEquals(Set.of(localRole.getId()), userRoleService.findByMemberIdAndTenantId(actorMember.getId(), tenantId)
                     .stream().map(UserRole::getRoleId).collect(java.util.stream.Collectors.toSet()));
+            // A parseable prefix of a truncated provider reply must not mutate either row.
+            // Restore the actor's original permission so a denial cannot falsely prove this boundary.
+            revokeAtProvider.set(false);
+            assertTrue(roleService.assignPermissions(localRole.getId(), grants));
+            assertTrue(scoringPermissions.canAction(actorMember.getId(), modelCode, "update"));
+            providerStopReason.set("max_tokens");
+            providerJson.set(objectMapper.writeValueAsString(List.of(Map.of("id", ownPid, "score", 96))));
+            var incomplete = service.score(request, tenantId);
+            assertEquals(0, incomplete.getScoredCount());
+            assertEquals(1, incomplete.getFailedCount());
+            assertEquals(Map.of(), incomplete.getScores());
+            assertEquals(providerCalls + 2, prompts.size());
+            assertScoringStored(tableName, scoreField, ownPid, otherPid, 87, 22);
+            // A later complete request recovers through the same real write and row-scope guards.
+            providerStopReason.set("end_turn");
+            providerJson.set(objectMapper.writeValueAsString(List.of(Map.of("id", ownPid, "score", 93))));
+            assertEquals(Map.of(ownPid, 93), service.score(request, tenantId).getScores());
+            assertEquals(providerCalls + 3, prompts.size());
+            assertScoringStored(tableName, scoreField, ownPid, otherPid, 93, 22);
         } finally {
             applyScopeActor(localUser, localTenantMember);
         }

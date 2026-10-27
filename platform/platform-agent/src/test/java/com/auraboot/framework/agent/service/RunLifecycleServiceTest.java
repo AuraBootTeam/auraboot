@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.provider.LlmProvider;
+import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -75,6 +77,51 @@ class RunLifecycleServiceTest {
         assertThat(extracted).isFalse();
         verify(providerFactory, never()).getProvider(anyString());
         verifyNoInteractions(provider);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"max_tokens", "end_turn"})
+    void incompleteExtractionDoesNotWriteStructuredMemory(String stopReason) throws Exception {
+        var result = extractionFixture(stopReason);
+        boolean extracted = service.extractMemoriesViaLlm(
+                7L, "run-1", "aurabot", "Summarize", result, "deepseek", "test-model");
+        assertThat(extracted).isEqualTo("end_turn".equals(stopReason));
+        if ("end_turn".equals(stopReason)) {
+            ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
+            verify(dynamicDataMapper).insert(eq("ab_agent_memory"), data.capture());
+            assertThat(data.getValue()).containsEntry("memory_content", "Extracted fact");
+        } else {
+            verifyNoInteractions(dynamicDataMapper);
+        }
+        verify(provider).chat(any(), eq("test-key"), eq("https://example.invalid"));
+    }
+
+    @Test
+    void incompleteExtractionUsesExistingSummaryFallbackOnce() throws Exception {
+        var result = extractionFixture("max_tokens");
+        service.saveRunMemory(7L, "run-1", "task-1", result, "aurabot", "Summarize",
+                "deepseek", "test-model");
+        ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).insert(eq("ab_agent_memory"), data.capture());
+        assertThat(data.getValue()).containsEntry("memory_content", "Verified run result")
+                .containsEntry("importance", 3);
+        verify(memoryService).deduplicateMemories(7L, "aurabot");
+        verify(provider).chat(any(), eq("test-key"), eq("https://example.invalid"));
+    }
+
+    private AgentRunService.AgentLoopResult extractionFixture(String stopReason) throws Exception {
+        when(providerFactory.resolveConfig(7L, "deepseek"))
+                .thenReturn(LlmProviderFactory.ProviderConfig.builder().providerCode("deepseek")
+                        .apiKey("test-key").baseUrl("https://example.invalid").build());
+        when(providerFactory.getProvider("deepseek")).thenReturn(provider);
+        when(provider.chat(any(), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(LlmChatResponse.builder().stopReason(stopReason).content(List.of(
+                        LlmChatResponse.ContentBlock.builder().type("text")
+                                .text("[{\"type\":\"FACT\",\"content\":\"Extracted fact\",\"importance\":5}]")
+                                .build())).build());
+        var result = new AgentRunService.AgentLoopResult();
+        result.lastResponse = "Verified run result";
+        return result;
     }
 
     @ParameterizedTest

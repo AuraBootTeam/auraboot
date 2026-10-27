@@ -112,9 +112,13 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         assertThat(System.getenv("AURA_EFFECTIVENESS_REPORT")).as("Evidence output path is required").isNotBlank();
         tenantId = getTestTenant().getId();
         // Temporarily isolate prior evidence rows; restore their exact flags even when a live sample fails.
-        for (var row : jdbc.queryForList("SELECT pid,deleted_flag FROM ab_agent_memory WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId)) {
-            retainedMemoryFlags.put(row.get("pid").toString(), row.get("deleted_flag"));
+        if (!lifecycle()) {
+            for (var row : jdbc.queryForList("SELECT pid,deleted_flag FROM ab_agent_memory WHERE tenant_id=? AND memory_agent_id='aurabot'", tenantId)) {
+                retainedMemoryFlags.put(row.get("pid").toString(), row.get("deleted_flag"));
+            }
         }
+        // The continuous profile preserves its explicit source-revocation outcome.
+        // It never clears old rows merely to isolate a model sample.
         LiveLlmSeeder.seed(live, tenantId, cloud, jdbc);
         doAnswer(call -> {
             LlmChatRequest request = call.getArgument(0);
@@ -167,6 +171,8 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     @Test
     @Timeout(value = 30, unit = TimeUnit.MINUTES)
     void pairedBusinessMemoryAndProcedureMeasurement() throws Exception {
+        if (formConsumer()) { formConsumerMeasurement(); return; }
+        if (lifecycle()) { lifecycleMeasurement(); return; }
         if (recallAnswers()) { recallAnswerMeasurement(); return; }
         if (expanded()) { expandedMeasurement(); return; }
         // Freeze the independent oracle before the first model call. Neither system prompt contains OPEN/12.
@@ -282,7 +288,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
 
     private static boolean expanded() {
         String profile = System.getenv("AURA_EFFECTIVENESS_PROFILE");
-        if (profile != null && !profile.equals("expanded-v1") && !profile.equals("recall-answer-v1")) throw new IllegalArgumentException("Unknown evaluation profile");
+        if (profile != null && !profile.equals("expanded-v1") && !profile.equals("recall-answer-v1") && !profile.equals("lifecycle-v1") && !profile.equals("form-consumer-v1")) throw new IllegalArgumentException("Unknown evaluation profile");
         return "expanded-v1".equals(profile);
     }
 
@@ -291,10 +297,185 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     }
 
     private static String effectivenessProfile() {
-        return recallAnswers() ? "recall-answer-v1" : expanded() ? "expanded-v1" : "legacy";
+        return formConsumer() ? "form-consumer-v1" : lifecycle() ? "lifecycle-v1" : recallAnswers() ? "recall-answer-v1" : expanded() ? "expanded-v1" : "legacy";
     }
 
-    private static int expectedSampleCount() { return recallAnswers() ? 96 : expanded() ? 72 : 16; }
+    private static int expectedSampleCount() { return formConsumer() ? 3 : lifecycle() ? 8 : recallAnswers() ? 96 : expanded() ? 72 : 16; }
+
+    private static boolean formConsumer() {
+        return "form-consumer-v1".equals(System.getenv("AURA_EFFECTIVENESS_PROFILE"));
+    }
+
+    private void formConsumerMeasurement() throws Exception {
+        com.fasterxml.jackson.databind.JsonNode definition;
+        try (var input = getClass().getResourceAsStream("/agent-eval/form-consumer-v1.json")) {
+            assertThat(input).isNotNull(); definition = json.readTree(input);
+        }
+        assertThat(definition.path("cases").size()).isEqualTo(3);
+        // Install the exact production upgrade playbook, not an acceptance-only prompt.
+        jdbc.execute(Files.readString(Path.of("../scripts/seed-form-fill-skill.sql")));
+        var before = jdbc.queryForList("SELECT * FROM mt_" + modelCode + " ORDER BY pid");
+        for (var scenario : definition.path("cases")) {
+            wireCalls.clear();
+            String prompt = scenario.path("message").asText();
+            var chat = new ChatRequest();
+            chat.setAgentCode("aurabot"); chat.setSessionId(UniqueIdGenerator.generate()); chat.setMessage(prompt);
+            var options = new ChatRequest.ChatOptions();
+            options.setProvider(live.providerCode()); options.setModel(live.model()); options.setMaxTokens(1536);
+            chat.setOptions(options);
+            chat.setFormFill(new com.auraboot.framework.agent.dto.FormFillRequest(
+                    "business-draft-" + suffix, modelCode, "2026-10-27", "Asia/Shanghai", List.of(
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_ref", "订单编号", "string", null, null, false),
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_status", "状态", "string", null, List.of("OPEN", "CLOSED"), false),
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("days_late", "逾期天数", "integer", null, null, false),
+                    new com.auraboot.framework.agent.dto.FormFillRequest.Field("order_amount", "金额", "integer", null, null, false))));
+            var sink = new Probe();
+            long started = System.nanoTime();
+            var outcome = turns.runTurn(new TurnRequest(tenantId, getTestUser().getId(), getTestTenantMember().getId(),
+                    "web", "aurabot", null, UniqueIdGenerator.generate(), prompt, Map.of(), Map.of(),
+                    InboundMode.NEW_FROM_REQUEST, TriageBucket.CONTEXTUAL_ANSWER, null, null, null, chat), sink);
+            var row = new LinkedHashMap<String, Object>();
+            row.put("caseId", scenario.path("id").asText()); row.put("message", prompt);
+            row.put("conversationId", chat.getSessionId()); row.put("traceId", sink.trace);
+            row.put("success", outcome instanceof TurnOutcome.Success); row.put("pending", sink.pending);
+            row.put("reply", sink.answer); row.put("tools", List.copyOf(sink.tools));
+            row.put("toolResults", List.copyOf(sink.results)); row.put("wireCalls", List.copyOf(wireCalls));
+            row.put("elapsedMillis", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            var after = jdbc.queryForList("SELECT * FROM mt_" + modelCode + " ORDER BY pid");
+            row.put("businessBefore", before); row.put("businessAfter", after);
+            row.put("businessUnchanged", before.equals(after)); samples.add(row); writeCheckpoint();
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            assertThat(sink.pending).isFalse(); assertThat(sink.tools).hasSize(1); assertThat(sink.results).hasSize(1);
+            assertThat(sink.tools.get(0).get("name")).isIn("platform.fill_form", "platform_fill_form");
+            var result = json.valueToTree(sink.results.get(0)).path("result");
+            assertThat(result.path("success").asBoolean()).isTrue();
+            assertThat(result.path("action").asText()).isEqualTo("form_fill");
+            assertThat(result.path("fields")).isEqualTo(scenario.path("fields"));
+            scenario.path("fields").fieldNames().forEachRemaining(field -> {
+                var review = result.path("reviews").path(field);
+                assertThat(review.path("status").asText()).isEqualTo("supported");
+                assertThat(review.path("quote").asText()).isNotBlank();
+                assertThat(prompt).contains(review.path("quote").asText());
+            });
+            if (scenario.has("ambiguous")) {
+                var review = result.path("reviews").path(scenario.path("ambiguous").asText());
+                assertThat(review.path("status").asText()).isEqualTo("ambiguous");
+                assertThat(review.path("reason").asText()).isEqualTo("multiple_values");
+            }
+            assertThat(after).isEqualTo(before);
+            assertThat(wireCalls).isNotEmpty();
+        }
+    }
+
+    private static boolean lifecycle() {
+        return "lifecycle-v1".equals(System.getenv("AURA_EFFECTIVENESS_PROFILE"));
+    }
+
+    private void lifecycleMeasurement() throws Exception {
+        com.fasterxml.jackson.databind.JsonNode definition;
+        try (var input = getClass().getResourceAsStream("/agent-eval/memory-lifecycle-v1.json")) {
+            assertThat(input).isNotNull(); definition = json.readTree(input);
+        }
+        assertThat(definition.path("cases").size()).isEqualTo(8);
+        String user = getTestUser().getId().toString();
+        String foreign = "FOREIGN-LIFE-" + UUID.randomUUID();
+        String inactive = "INACTIVE-LIFE-" + UUID.randomUUID();
+        String otherPid = memory.createScopedMemory(tenantId, "aurabot", "fact", "user", "ACME-184 private reward code", foreign,
+                10, false, "user", "other-" + user);
+        memory.createScopedMemory(tenantId + 1, "aurabot", "fact", "user", "ACME-184 other tenant reward code", foreign,
+                10, false, "user", user);
+        assertThat(recall.preRecall(tenantId, "other-" + user, "aurabot", "ACME-184"))
+                .extracting(row -> row.get("pid")).contains(otherPid);
+        List<String> originalSources = new ArrayList<>();
+        for (var scenario : definition.path("cases")) {
+            String id = scenario.path("id").asText();
+            if (scenario.path("updateBusiness").asBoolean()) {
+                dynamicDataService.update(modelCode, String.valueOf(initialRow.get("pid")),
+                        Map.of("order_status", "CLOSED", "days_late", 0));
+                assertThat(businessSnapshot()).allSatisfy(row -> {
+                    assertThat(row.get("order_status")).isEqualTo("CLOSED");
+                    assertThat(((Number) row.get("days_late")).intValue()).isZero();
+                });
+            }
+            if (scenario.path("inactiveSources").asBoolean()) {
+                for (String state : List.of("future", "expired", "deleted")) {
+                    String pid = memory.createScopedMemory(tenantId, "aurabot", "fact", "user", "ACME-184 reward code " + state,
+                            inactive, 10, false, "user", user);
+                    if (state.equals("future")) jdbc.update("UPDATE ab_agent_memory SET valid_from=NOW()+INTERVAL '1 day' WHERE pid=?", pid);
+                    else if (state.equals("expired")) jdbc.update("UPDATE ab_agent_memory SET valid_until=NOW()-INTERVAL '1 day' WHERE pid=?", pid);
+                    else assertThat(memory.deleteMemory(tenantId, pid)).isTrue();
+                }
+            }
+            List<String> revoked = new ArrayList<>();
+            if (scenario.path("revokeOwnedSources").asBoolean()) {
+                revoked.addAll(jdbc.queryForList("SELECT pid FROM ab_agent_memory WHERE tenant_id=? AND memory_agent_id='aurabot' "
+                        + "AND scope='user' AND scope_key=? AND deleted_flag=FALSE", String.class, tenantId, user));
+                assertThat(revoked).containsAll(originalSources);
+                for (String pid : revoked) assertThat(memory.deleteMemory(tenantId, pid)).isTrue();
+                assertThat(recall.preRecall(tenantId, user, "aurabot", "ACME-184")).isEmpty();
+                assertThat(recall.preRecall(tenantId, "other-" + user, "aurabot", "ACME-184"))
+                        .extracting(row -> row.get("pid")).contains(otherPid);
+            }
+            var before = businessSnapshot();
+            wireCalls.clear(); long started = System.nanoTime();
+            String prompt = lifecycleText(scenario.path("prompt").asText())
+                    + " 先查询实时记录。最后独立一行输出 status=<order_status原始值>; days_late=<整数>。";
+            String conversation = UniqueIdGenerator.generate();
+            ChatRequest chat = new ChatRequest(); chat.setAgentCode("aurabot"); chat.setSessionId(conversation); chat.setMessage(prompt);
+            ChatRequest.ChatOptions options = new ChatRequest.ChatOptions(); options.setProvider(live.providerCode());
+            options.setModel(live.model()); options.setMaxTokens(4096); chat.setOptions(options);
+            ChatRequest.PageContext page = new ChatRequest.PageContext(); page.setModelCode(modelCode); chat.setPageContext(page);
+            Probe sink = new Probe();
+            TurnOutcome outcome = turns.runTurn(new TurnRequest(tenantId, getTestUser().getId(), getTestTenantMember().getId(),
+                    "web", "aurabot", null, conversation, prompt, Map.of(), Map.of(), InboundMode.NEW_FROM_REQUEST,
+                    TriageBucket.CONTEXTUAL_ANSWER, null, null, null, chat), sink);
+            String answer = outcome instanceof TurnOutcome.Success success ? success.finalResponse() : sink.answer;
+            Map<String, Object> sample = new LinkedHashMap<>();
+            sample.put("caseId", id); sample.put("conversationId", conversation); sample.put("prompt", prompt);
+            sample.put("answer", answer); sample.put("outcome", outcome.getClass().getSimpleName());
+            sample.put("wireCalls", new ArrayList<>(wireCalls)); sample.put("toolResults", sink.results);
+            sample.put("latencyMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            sample.put("revokedSourcePids", revoked); sample.put("traceId", sink.trace == null ? "" : sink.trace);
+            String wire = json.writeValueAsString(wireCalls);
+            String plain = answer == null ? "" : answer.replace("*", "").replace("`", "");
+            sample.put("businessCorrect", plain.matches("(?s).*status\\s*=\\s*" + scenario.path("status").asText()
+                    + "\\s*;\\s*days_late\\s*=\\s*" + scenario.path("daysLate").asInt() + "(?:\\s|$).*"));
+            sample.put("headingCorrect", plain.stripLeading().replaceFirst("^#{1,6}\\s+", "")
+                    .startsWith(lifecycleText(scenario.path("heading").asText())));
+            sample.put("observedBusinessRead", observedBusinessRead(json, wireCalls, scenario.path("status").asText(), scenario.path("daysLate").asInt()));
+            sample.put("businessUnchanged", before.equals(businessSnapshot()));
+            sample.put("foreignLeak", wire.contains(foreign) || plain.contains(foreign));
+            sample.put("inactiveLeak", wire.contains(inactive) || plain.contains(inactive));
+            samples.add(sample); writeCheckpoint();
+            assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+            var success = (TurnOutcome.Success) outcome;
+            assertThat(success.meta()).doesNotContainEntry(TurnOutcomeMeta.RESPONSE_TRUNCATED, true)
+                    .doesNotContainEntry(TurnOutcomeMeta.TOOL_FAILURE, true);
+            assertThat(sample.get("businessCorrect")).as("Current facts " + id).isEqualTo(true);
+            assertThat(sample.get("headingCorrect")).as("Preference lifecycle " + id).isEqualTo(true);
+            assertThat(sample.get("observedBusinessRead")).isEqualTo(true);
+            assertThat(sample.get("businessUnchanged")).isEqualTo(true);
+            assertThat(sample.get("foreignLeak")).isEqualTo(false); assertThat(sample.get("inactiveLeak")).isEqualTo(false);
+            var turnIds = jdbc.queryForList("SELECT metadata::jsonb->>'turn_id' FROM ab_ai_trace WHERE tenant_id=? AND trace_id=?",
+                    String.class, tenantId, sink.trace); assertThat(turnIds).hasSize(1);
+            String turnId = turnIds.getFirst();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            List<String> written;
+            do {
+                written = jdbc.queryForList("SELECT pid FROM ab_agent_memory WHERE tenant_id=? AND metadata LIKE ?",
+                        String.class, tenantId, "%source_turn_id=" + turnId + ";%");
+                if (written.isEmpty()) Thread.sleep(25);
+            } while (written.isEmpty() && System.nanoTime() < deadline);
+            assertThat(written).hasSize(1); originalSources.add(written.getFirst());
+            sample.put("turnId", turnId); sample.put("writtenMemoryPid", written.getFirst()); writeCheckpoint();
+        }
+        assertThat(samples).hasSize(8);
+    }
+
+    private String lifecycleText(String value) {
+        return value.replace("【星河周会】", "【星河周会/A" + suffix + "】")
+                .replace("【星河复盘】", "【星河复盘/A" + suffix + "】");
+    }
 
     private void recallAnswerMeasurement() throws Exception {
         com.fasterxml.jackson.databind.JsonNode definition;
@@ -595,6 +776,10 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     }
 
     static boolean observedBusinessRead(ObjectMapper json, List<Map<String, Object>> wireCalls) {
+        return observedBusinessRead(json, wireCalls, "OPEN", 12);
+    }
+
+    static boolean observedBusinessRead(ObjectMapper json, List<Map<String, Object>> wireCalls, String status, int daysLate) {
         for (var node : json.valueToTree(wireCalls).findParents("type")) {
             if (!"tool_result".equals(node.path("type").asText())) continue;
             var encoded = node.path("content").isTextual() ? node.path("content") : node.path("result");
@@ -609,8 +794,8 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                 if (!payload.path("success").asBoolean(false)) continue;
                 for (var record : payload.path("records")) {
                     if ("ACME-184".equals(record.path("order_ref").asText())
-                            && "OPEN".equals(record.path("order_status").asText())
-                            && record.path("days_late").asInt(-1) == 12) return true;
+                            && status.equals(record.path("order_status").asText())
+                            && record.path("days_late").asInt(-1) == daysLate) return true;
                 }
             } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
                 // Non-JSON tool results cannot prove the business read.
@@ -654,6 +839,12 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         if (recallAnswers()) {
             Map<String, Object> enriched = new LinkedHashMap<>(json.convertValue(report, Map.class));
             enriched.put("recallEvidence", recallEvidence); report = enriched;
+        }
+        if (lifecycle()) {
+            Map<String, Object> enriched = new LinkedHashMap<>(json.convertValue(report, Map.class));
+            enriched.put("modelCode", modelCode);
+            enriched.put("journeyMarker", "A" + suffix);
+            report = enriched;
         }
         String serialized = json.writerWithDefaultPrettyPrinter().writeValueAsString(report);
         String keyName = System.getenv("AURA_LIVE_LLM_API_KEY_ENV");
