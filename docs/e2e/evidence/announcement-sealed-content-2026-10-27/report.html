@@ -1,0 +1,150 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>Exact official sealed-content publisher proof component · 验收证据索引</title><style>
+body{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:2rem;color:#1a1a1a}
+.hdr{border-bottom:2px solid #ddd;padding-bottom:.5rem;margin-bottom:1rem}
+.sum{font-size:1.1rem;margin:.5rem 0}.reds{background:#fff3f3;border:1px solid #f5c2c2;padding:.5rem 1rem;border-radius:6px;margin:1rem 0}.reds.ok{background:#f2fbf2;border-color:#bfe6bf}
+table{border-collapse:collapse;width:100%;margin:.5rem 0}th,td{border:1px solid #e5e5e5;padding:.35rem .5rem;text-align:left;vertical-align:top}
+.detail{background:#fafafa;font-size:.9rem}.shots img{max-width:360px;border:1px solid #ccc;margin:.25rem}
+.badge{font-family:monospace}.b-solid{color:#1a7f37}.b-dashed{color:#9a6700}.b-hollow{color:#8a8a8a}.b-metric{color:#0a5}.red{color:#c00;font-weight:bold}
+.layer{font-family:monospace;font-size:.85rem;color:#555}.ev{font-family:monospace;font-size:.85rem;color:#555}
+</style></head><body>
+<div class="hdr"><h1>Exact official sealed-content publisher proof component · 验收证据索引</h1>
+<div>runtime maritime-parent-file-append · commit 4ec7b97131e7a52408be436e41b9fe2439e3726c · 2026-10-27 02:44 · 修复回路 0 轮</div>
+<div>SoT: docs/system-reference/announcement-management.md#sealed-content-proofs-for-original-business-commands</div></div>
+<div class="sum">🟢 12 🟡 0 🔴 0 ⬜ 4 / 16 行动点</div>
+<div class="sum">强度: spec-assert 12 · vision 0 · exit 0 · metric 0</div>
+<div class="reds"><h3>未清零(置顶,永不折叠)</h3><ul><li>⬜ Root rich host issuance and single combined API — 未测 (verdict=untested)</li><li>⬜ Full official BPM publication journey — 未测 (verdict=untested)</li><li>⬜ P immutable publication mapping — 未测 (verdict=untested)</li><li>⬜ Consumer browser and external-system qualification — 未测 (verdict=untested)</li></ul></div>
+    <details open><summary>component Owned source component and bounded backend evidence</summary>
+    <table><thead><tr><th></th><th>行动点</th><th>四轴</th><th>成色/证据</th><th>断言</th></tr></thead>
+    <tbody><tr class="dot-🟢">
+    <td>🟢</td><td>One shared canonical document algorithm</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">API encoding preserves exact raw Unicode/title/CRLF/HTML, rejects lossy scalars, sorts unique ASCII PIDs and emits fixed decimal integers.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> API encoding preserves exact raw Unicode/title/CRLF/HTML, rejects lossy scalars, sorts unique ASCII PIDs and emits fixed decimal integers.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Document digest and full snapshot hash are independent</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Literal A/B snapshots with different authorization/audience-estimate facts have distinct full snapshot hashes but the same document digest.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Literal A/B snapshots with different authorization/audience-estimate facts have distinct full snapshot hashes but the same document digest.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Official fresh-version seal association and immutability</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">New-version same-TX seal insert succeeds; later backfill, UPDATE and DELETE are rejected by PostgreSQL.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> New-version same-TX seal insert succeeds; later backfill, UPDATE and DELETE are rejected by PostgreSQL.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Official writer identity-before-root entry order</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Real submit and exemption entry methods call shared identity locking before the first root lock; release verifies existing seals without backfill.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Real submit and exemption entry methods call shared identity locking before the first root lock; release verifies existing seals without backfill.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Publisher proof independent from recipient eligibility</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Enabled publisher owner with no recipient row obtains exact content and controlled approved binding; owner without publish is denied.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Enabled publisher owner with no recipient row obtains exact content and controlled approved binding; owner without publish is denied.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Real observed source identity and missing history</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Actual local bytes, exact size/name/MIME and retention are bound; same-locator changed bytes and old missing seal cannot be certified.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Actual local bytes, exact size/name/MIME and retention are bound; same-locator changed bytes and old missing seal cannot be certified.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Original command physical transaction and lifetime</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Nested commands, escaped accessors, async use, actor/holder changes and growing lock sets are denied; handler close precedes valid commit revalidation.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Nested commands, escaped accessors, async use, actor/holder changes and growing lock sets are denied; handler close precedes valid commit revalidation.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Commit-time official state and byte checks</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Withdrawal or actual byte replacement after successful proof causes commit refusal; withdrawn SQL mutation rolls back.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Withdrawal or actual byte replacement after successful proof causes commit refusal; withdrawn SQL mutation rolls back.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Fresh permission reads without cache pollution</td><td class="layer">contract/hermetic/unit [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">All existing component cache loaders are reused without reading/writing shared caches; nested exceptions restore state, worker/other-tenant cached reads remain normal.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> All existing component cache loaders are reused without reading/writing shared caches; nested exceptions restore state, worker/other-tenant cached reads remain normal.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Real uncommitted grant isolation and rollback</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Same-TX publish grant revocation is denied; uncommitted new grant is visible only in fresh scope, not another thread; rollback preserves normal cached results.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Same-TX publish grant revocation is denied; uncommitted new grant is visible only in fresh scope, not another thread; rollback preserves normal cached results.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Concurrent root writer waits for transaction lifetime</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Concurrent FOR UPDATE fails with exact PostgreSQL SQLSTATE55P03 while proof holds root, then succeeds after commit.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Concurrent FOR UPDATE fails with exact PostgreSQL SQLSTATE55P03 while proof holds root, then succeeds after commit.</div>
+
+  </td></tr><tr class="dot-🟢">
+    <td>🟢</td><td>Falsification and original native publications</td><td class="layer">service/real-stack/it [blocking-commit]</td>
+    <td><span class="badge b-solid">▪spec</span></td><td class="assert">Removing commit revalidation makes actual withdrawal assertion red; restored source passes. Exact primary JARs match inventory and five tested class bytes.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Removing commit revalidation makes actual withdrawal assertion red; restored source passes. Exact primary JARs match inventory and five tested class bytes.</div>
+
+  </td></tr></tbody></table></details>
+    <details open><summary>consumer Explicit unexecuted integration and qualification</summary>
+    <table><thead><tr><th></th><th>行动点</th><th>四轴</th><th>成色/证据</th><th>断言</th></tr></thead>
+    <tbody><tr class="dot-⬜">
+    <td>⬜</td><td>Root rich host issuance and single combined API</td><td class="layer">service/real-stack/it [recorded]</td>
+    <td><span class="badge b-none">–</span></td><td class="assert">Integrate source delta and issue Scope from Root-owned HandlerPhase with the richer API.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Integrate source delta and issue Scope from Root-owned HandlerPhase with the richer API.</div>
+
+  </td></tr><tr class="dot-⬜">
+    <td>⬜</td><td>Full official BPM publication journey</td><td class="layer">api/real-stack/http [recorded]</td>
+    <td><span class="badge b-none">–</span></td><td class="assert">Run actual submit/prepare/freeze, real BPM approval and release worker; controlled terminal fixtures do not qualify this row.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Run actual submit/prepare/freeze, real BPM approval and release worker; controlled terminal fixtures do not qualify this row.</div>
+
+  </td></tr><tr class="dot-⬜">
+    <td>⬜</td><td>P immutable publication mapping</td><td class="layer">api/real-stack/http [recorded]</td>
+    <td><span class="badge b-none">–</span></td><td class="assert">Actual publisher command persists mapping from host proof and later recipient consent uses the independent digest/ack authorities.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Actual publisher command persists mapping from host proof and later recipient consent uses the independent digest/ack authorities.</div>
+
+  </td></tr><tr class="dot-⬜">
+    <td>⬜</td><td>Consumer browser and external-system qualification</td><td class="layer">journey/real-stack/browser [recorded]</td>
+    <td><span class="badge b-none">–</span></td><td class="assert">Actual UI flow, external object-version atomicity and global IAM revocation linearizability are not inferred from this component.</td>
+  </tr>
+  <tr class="detail"><td></td><td colspan="4">
+    <div class="shots"></div>
+    <div class="note"><b>断言:</b> Actual UI flow, external object-version atomicity and global IAM revocation linearizability are not inferred from this component.</div>
+
+  </td></tr></tbody></table></details></body></html>

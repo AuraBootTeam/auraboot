@@ -1,0 +1,16 @@
+diff --git a/platform/src/main/java/com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory.java b/platform/src/main/java/com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory.java
+index 1c3529ca2..65e58c098 100644
+--- a/platform/src/main/java/com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory.java
++++ b/platform/src/main/java/com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory.java
+@@ -51,10 +51,7 @@ public class AnnouncementSealedContentAccessorFactory {
+                     proof=verified;
+                     TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                         @Override public void beforeCommit(boolean readOnly) {
+-                            // The command frame normally ended already. Its immutable proof remains bound to this TX.
+-                            transaction();
+-                            var current=content.requirePublished(proof.exactVersion(),content.lockActor());
+-                            sameProof(proof,current);
++                            // Controlled mutation: omit business commit revalidation.
+                         }
+                     });
+                 } else sameProof(proof,verified);

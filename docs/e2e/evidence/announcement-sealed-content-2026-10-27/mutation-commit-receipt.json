@@ -1,0 +1,9 @@
+{
+  "producer": "34ee2635cb01bad40946f22f10d001c121b47c3d",
+  "dirtyFingerprint": "sha256:804e298f0d35085d5254f58cca2c178193755f5dcc2eaf737a8d94ead29d5ca2",
+  "mutation": "omit sealed-content factory beforeCommit revalidation",
+  "tests": 1,
+  "failures": 1,
+  "exitCode": 1,
+  "junitSha256": "2fbd61b16dae2f5209640a3fa7192d580b8748546e713d9f9c0a4cf8953a688f"
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:41.774Z" hostname="Mac" time="0.024">
+  <properties/>
+  <testcase name="daylightSavingGapMovesToFirstValidInstantOfTheDay()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.004"/>
+  <testcase name="partialOrAllDayQuietWindowsCannotCreateAnUnrunnablePolicy()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.001"/>
+  <testcase name="deadlineAndExpiryEqualityStopAutomaticRemindersEvenAfterAnEarlierSlot()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.001"/>
+  <testcase name="daylightSavingFoldAlwaysUsesEarlierOccurrenceForTheDailyUniqueKey()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.0"/>
+  <testcase name="firstSlotIncludesExactlyTwentyFourHoursAndRejectsOneSecondEarlier()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.0"/>
+  <testcase name="neverRunsBeforeTodaysSlot()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.0"/>
+  <testcase name="overnightQuietHoursAllowMorningEndButNeverCarryAnEveningSlotIntoTomorrow()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.0"/>
+  <testcase name="frozenTenantZoneDeterminesCalendarDay()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.0"/>
+  <testcase name="laterSameDayScanUsesTodaysSlotRatherThanAccumulatingMissedDates()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.0"/>
+  <testcase name="quietHoursMoveToSameDayEndAndEndBoundaryIsAllowed()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest" time="0.0"/>
+</testsuite>

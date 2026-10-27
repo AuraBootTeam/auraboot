@@ -1,0 +1,105 @@
+{
+  "unitProducer": "6c3947f759b4e8888205b5a9b1da4480c89288fc",
+  "postgresAndCandidateProducer": "4ec7b97131e7a52408be436e41b9fe2439e3726c",
+  "base": "b8fdc3ca586f2ed5fb6f515250b856451b64f8b7",
+  "runtime": "maritime-parent-file-append",
+  "database": "auraboot_72",
+  "slot": 72,
+  "schemaMigrations": 158,
+  "newMigration": "V20261027100000__announcement_sealed_content.sql",
+  "migrationSha256": "d32c6a291025bd23b93c441f0f7261211cea826c06b72d149e8b710e8b6f7d50",
+  "generatedSchemaSnapshotSha256": "a96ee93b61fe53ed5644a72c7fdb7d46fd74445704011eb7f3011fa40cf9af16",
+  "schemaGenerator": "scripts/db/generate-schema-snapshot.sh --edition oss; fresh generator-owned DB; cleaned after output",
+  "publications": "native-candidate-receipt.json",
+  "dependencies": [
+    {
+      "path": "platform/platform-plugin-api/src/main/java/com/auraboot/framework/plugin/extension/CommandMembershipLockAccessor.java",
+      "source": "4575ba72211e697c668662ae816faf1c086d4113",
+      "sha256": "f7956d8047a593f66f5723ac632b79b493ed388a511093c12a59d08a05cf1dbc",
+      "byteExact": true
+    },
+    {
+      "path": "platform/src/main/java/com/auraboot/framework/plugin/extension/CommandMembershipLockAccessor.java",
+      "source": "4575ba72211e697c668662ae816faf1c086d4113",
+      "sha256": "f7956d8047a593f66f5723ac632b79b493ed388a511093c12a59d08a05cf1dbc",
+      "byteExact": true
+    },
+    {
+      "path": "platform/src/main/java/com/auraboot/framework/plugin/mapper/CommandMembershipLockMapper.java",
+      "source": "4575ba72211e697c668662ae816faf1c086d4113",
+      "sha256": "7b08eae321d2b4dc2d81c1593e7a284b956f45cb4c261897e536b7f9fca13499",
+      "byteExact": true
+    },
+    {
+      "path": "platform/src/main/java/com/auraboot/framework/plugin/pf4j/CommandMembershipLockAccessorImpl.java",
+      "source": "4575ba72211e697c668662ae816faf1c086d4113",
+      "sha256": "9bec5f1eef1a7af60d9811bdd0f607769ee5514b3d62632bdbf17b4dc4998646",
+      "byteExact": true
+    }
+  ],
+  "approvalEvidence": "Controlled persisted official contract/terminal fixtures validated by actual AnnouncementApprovalProofService; no actual BPM engine approval or production admission claimed",
+  "componentCandidateOnly": true,
+  "handlerPhaseEdited": false,
+  "permitPlanEdited": false,
+  "sourceJavaUnchangedBetweenUnitAndFinalProducer": true,
+  "commands": {
+    "unit": ":test --tests *Announcement*Test --tests *PermissionSnapshotCacheTest :jacocoUnitFullReport; :platform-plugin-api:test --tests *AnnouncementDocumentCanonicalizerTest :platform-plugin-api:jacocoTestReport",
+    "postgres": ":platform-app:test --rerun --tests *AnnouncementSealedContentIT --no-build-cache",
+    "candidate": "-Paura.library.release=true -Paura.library.roots=:,:platform-plugin-api -Paura.library.output=<fresh-owned-evidence> prepareLibraryCandidate"
+  },
+  "logExitCodes": {
+    "unit-final.log": 0,
+    "postgres-final-executed.log": 0,
+    "migrate.log": 0,
+    "schema-generation.log": 0,
+    "native-candidate.log": 0,
+    "mutation-commit.log": 1
+  },
+  "notExecuted": [
+    "Root rich single-API composition/HandlerPhase issuance",
+    "full official submit/actual-BPM/release-worker journey",
+    "P immutable publication mapping",
+    "public HTTP/browser journey",
+    "external storage atomic versioning",
+    "global linearizable IAM revocation"
+  ],
+  "evidenceSha256": {
+    "mutation-commit.xml": "2fbd61b16dae2f5209640a3fa7192d580b8748546e713d9f9c0a4cf8953a688f",
+    "junit-summary.json": "2d831f306d3f68a552aa717bd768b99db86096c5f7c8fa8dd60566d2ffcec848",
+    "native-candidate-receipt.json": "7cccd381153d340d66d5f4f1146912b08b9c2e0690c75928bcabf4f2529f5127",
+    "mutation-cached-grant.xml": "f3b43a876b7502fccf124ffffcf4efe2c8d6b89612686813bc6dc3ce5d5243d9",
+    "mutation-commit-receipt.json": "e4101854fa48a6aaf8ac185fe2ab2a59f225c8782edde46322a7047b7da73c31",
+    "vectors.json": "fcd8d10d3233e77ccb713507810de211e53e7ef5d32cd1ad9f65c4fd9754c441",
+    "omit-commit-mutation.patch": "98c3e7ac35fee5c448f37d1a0837f4341de73742bdf95b25a4a5b58da571ddad",
+    "coverage.json": "933eb0c4a1d6ac2ebad1d6f198071af896cfd8511cc01e4e1f8d327a5789bce7",
+    "cached-grant-receipt.json": "c03444163025655804f20b9b74e27b2de709e98ce5c6b26e6e74475e4b9fa266",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementMetricsTest.xml": "e82ff6c62cd35b9139d877c372defd856eca1fa1436a868b07aba590aac9b38e",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest.xml": "9e3d29d0abe0e9726942108803f09144884477ad4b67ebe2070f6af220ea34aa",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest.xml": "0b1822676a7cd2e799574d21f68f04ecb5c72168d64223b84ac35ccaad35862b",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementStatisticsCsvTest.xml": "ca87d453fb535599888cad9fd039caf8b71dbaff81c7c1ef1c938c14851d155f",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementContentProjectionVectorsTest.xml": "0ae8b02e7c006c3a0c789d4bccae636671c6c70d4bc6a8c31cfdfcf0131a4fcd",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest.xml": "a4ee62e55474acdd4c8c80149e2b5a9284c842a0afdfca4930dc2fa0da7a1c2f",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest.xml": "60a7d31afd253e19eaba99136b35518a616b6da4ada1a64ac1edfffc51e2b9bf",
+    "unit/TEST-com.auraboot.framework.workbench.service.impl.AnnouncementServiceImplTest.xml": "9cba1b28c525f3438f73fe12e811d36271bd06e5b27df64189e98f769f6419a9",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest.xml": "e92988d4342b4abcd1c9d0db9cff07da5bcbb10f236d283cf5756868d4dc6338",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementOperationsTest.xml": "03ff7226dc3e6f8d5900cdf93b70eeaa76d946b76dd026d3d9414c186db6ee58",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest.xml": "ea458f603bf95c79d9777ab7b2ec27b3c5141a4dd074aa88369ac6979ec76e68",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementStatisticsTest.xml": "7edec44ed88798c94292d219bcebab69ba40e0588af27c7ebdcef66c64493c96",
+    "unit/TEST-com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest.xml": "7323380b3ed716f319e763d6997f19aa15f0f4255551b9af74963c59adf45efe",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest.xml": "42dc45865c208ed9763ffcc5beeeb2cdfe1f6912da87be9309cb356d7617ce57",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest.xml": "fe71536f359d9451a74c44f1a85edb7fb7618891a76dd8826b05f8a75da017e0",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest.xml": "0c01d2a9ec4371b0fdba04e06cf1fcd759b4050d4f985dba5217c5b5b1c5f60d",
+    "unit/TEST-com.auraboot.framework.permission.service.impl.PermissionSnapshotCacheTest.xml": "6ed9086dae96a7b9768f62f1a9dad89311474c3b179d502f153158ffa742d1ca",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest.xml": "9f132152b10203eb72d96dbeb4ae95ed6d01fc25b26621141d12a2eafa338b3c",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest.xml": "5ed3c4ca9f1d665f8b8c16a75f2bed51a725ab306c5cdf6febe003a75d8e0720",
+    "unit/TEST-com.auraboot.framework.workbench.controller.AnnouncementControllerAuthzTest.xml": "a64657a32be98cdf1605e73b0a9522fd3ece7c5e6da96c7f4068229e838f1814",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementSealWriterLockOrderTest.xml": "a2897c7f01dab745e1fcb9fd43779ce1895298220eebb6d016c5ae6e8c9fc316",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest.xml": "8d020f52ea5c0a0676b349cdec7a5da1c6d231a1a36b1a03f643824b37e47974",
+    "unit/TEST-com.auraboot.framework.im.service.impl.ImConversationServiceImplAnnouncementParseTest.xml": "a3df712861ca5604ff30a913fd3af5f93a8b07462aea3c7e4fb3d307d3a766ca",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementCodecTest.xml": "0000ee52308300e551a09daf72f7f505e596db86ef95ff6e004a081f562da252",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementActorContextTest.xml": "51e7098a8a6ff960e973d9cc04e7f640679a7710fcf3d1db20774ec0ab7e730f",
+    "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementReleaseFailureTest.xml": "104bc2177201f462513cdbd94c5df35b92ada07cfc55b0c370eb9511b271c011",
+    "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml": "8658f08a9c386efb1c09ef95bee224927463ba2a0110b6864eb8da0a3569ba9a",
+    "api/TEST-com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest.xml": "af5df3645c972e2217c13ed157748e24646f00a85a255f03e63e75c4bb225533"
+  }
+}

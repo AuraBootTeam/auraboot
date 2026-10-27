@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:41.736Z" hostname="Mac" time="0.033">
+  <properties/>
+  <testcase name="bothModesShareIntentionWindowAndBoundaryIsInclusive()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.007"/>
+  <testcase name="invalidOrDuplicateIdentityFailsInsteadOfInflatingQuota()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.002"/>
+  <testcase name="noAcknowledgementPolicyDoesNotInventPendingWork()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.0"/>
+  <testcase name="completionBeforeConsumptionSkipsAcceptedIntention()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.001"/>
+  <testcase name="outstandingCoalescesUnreadAndUnacknowledgedIntoOneRecipient()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.002"/>
+  <testcase name="deadlineStopsAutomaticButAllowsManualUntilExpiry()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.001"/>
+  <testcase name="legacyAndWithdrawnVersionsNeverBecomeUnreadCandidates()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.001"/>
+  <testcase name="readingDoesNotCompleteAcknowledgement()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.0"/>
+  <testcase name="throttledAndInactiveCandidatesDoNotConsumePositiveBatchCount()" classname="com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest" time="0.001"/>
+</testsuite>

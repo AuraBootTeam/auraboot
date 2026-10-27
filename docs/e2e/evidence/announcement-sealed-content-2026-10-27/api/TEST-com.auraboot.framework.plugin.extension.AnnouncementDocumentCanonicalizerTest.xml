@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:09:07.408Z" hostname="Mac" time="0.203">
+  <properties/>
+  <testcase name="attachmentsAreAsciiSortedDistinctAndContentBound()" classname="com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest" time="0.015"/>
+  <testcase name="sharedLiteralVectorPreservesRawUnicodeAndCrLf()" classname="com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest" time="0.184"/>
+  <testcase name="rawTextAndTitleChangesAreSignificant()" classname="com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest" time="0.001"/>
+  <testcase name="strictScalarsAndEscapingRejectLossyInput()" classname="com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:38.817Z" hostname="Mac" time="0.369">
+  <properties/>
+  <testcase name="escapedCapabilityAndNestedFrameCannotMintProofs()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.322"/>
+  <testcase name="capabilityIsIssuedOnlyInTheAuthorizedOriginalPhysicalTransaction()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.015"/>
+  <testcase name="asynchronousUseDoesNotInheritTheOriginalCapability()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.004"/>
+  <testcase name="aNestedCommandBeforeIssuanceHasNoCapability()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.003"/>
+  <testcase name="oneCommandCannotGrowItsAnnouncementLockSet()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.002"/>
+  <testcase name="dryRunReadOnlyAndDeniedTargetsNeverReceiveCapabilities()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.002"/>
+  <testcase name="commitRevalidationRejectsChangedOfficialFactsAfterHandlerExit()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.004"/>
+  <testcase name="actorAndPhysicalHolderChangesAreDenied()" classname="com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest" time="0.002"/>
+</testsuite>

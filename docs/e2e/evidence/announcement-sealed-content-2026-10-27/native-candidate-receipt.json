@@ -1,0 +1,57 @@
+{
+  "sourceSha": "4ec7b97131e7a52408be436e41b9fe2439e3726c",
+  "producerRef": "refs/heads/codex/maritime-parent-file-append",
+  "componentCandidateOnly": true,
+  "remotePublication": "did_not_run",
+  "releaseQualification": false,
+  "inventorySha256": "49887992d706866226747aa05cd7ba04216cbacd52632c65648d0cb1f18cb814",
+  "publications": [
+    {
+      "coordinate": {
+        "group": "com.auraboot",
+        "artifact": "auraboot-core",
+        "version": "1.0.1-rc.3"
+      },
+      "file": "com/auraboot/auraboot-core/1.0.1-rc.3/auraboot-core-1.0.1-rc.3.jar",
+      "sha256": "3c81a902e90925c87cd0051480b2dfda2158ea79668756eb9ff71cf6affb283f",
+      "criticalClasses": [
+        {
+          "class": "com/auraboot/framework/workbench/service/AnnouncementContentSealService.class",
+          "sha256": "e891884bf1431f8f102072bce90844de7d9021635bde731feaac06803e6d8dfc",
+          "matchesTestCompilation": true
+        },
+        {
+          "class": "com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory.class",
+          "sha256": "89a6643fb16c672684d40b6c9356977bf58c6a98cfbcfb0c7e01a63b84bb1497",
+          "matchesTestCompilation": true
+        },
+        {
+          "class": "com/auraboot/framework/permission/service/impl/PermissionSnapshotCache.class",
+          "sha256": "c42bee18f32a3bb3b33f7c446a57b984452b20d5a7a6d7d5b390426506ad5852",
+          "matchesTestCompilation": true
+        }
+      ]
+    },
+    {
+      "coordinate": {
+        "group": "com.auraboot",
+        "artifact": "platform-plugin-api",
+        "version": "1.0.1-rc.3"
+      },
+      "file": "com/auraboot/platform-plugin-api/1.0.1-rc.3/platform-plugin-api-1.0.1-rc.3.jar",
+      "sha256": "66eda7cbd4431b824049d0878d0baff90234fa6aa0fad9ab0e7c6937c678afc0",
+      "criticalClasses": [
+        {
+          "class": "com/auraboot/framework/plugin/extension/AnnouncementDocumentCanonicalizer.class",
+          "sha256": "bac8975cb9f05daf66e800368ab6225db3389639a581cfdd7a4978e2c9fbed11",
+          "matchesTestCompilation": true
+        },
+        {
+          "class": "com/auraboot/framework/plugin/extension/AnnouncementSealedContentAccessor.class",
+          "sha256": "a894713d96e402692b77c5b73f8d12a51c97d6b2accd4c832a38d85b870b2ce6",
+          "matchesTestCompilation": true
+        }
+      ]
+    }
+  ]
+}

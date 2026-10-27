@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:41.416Z" hostname="Mac" time="0.079">
+  <properties/>
+  <testcase name="normalizedCommandTimeRemainsIsoAcrossStoredPolicyRoundTrip()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.016"/>
+  <testcase name="foreignTenantAttachmentIsRejectedBeforeItsMetadataIsRead()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.001"/>
+  <testcase name="protectedPolicyFieldsAndCoercedValuesAreRejected()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.002"/>
+  <testcase name="newWorkflowOverridesAreRejectedWhileFrozenLegacyPoliciesRemainReadable()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.002"/>
+  <testcase name="finalizedButUnownedAndUnlinkedFileIsRejected()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.004"/>
+  <testcase name="unchangedNativeFileJsonIsNormalizedWithoutTrustingPresentation()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.006"/>
+  <testcase name="ownedFinalFileIsRetainedOnlyForSubmission()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.001"/>
+  <testcase name="importantDefaultIsIndependentFromAnExplicitOptOut()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.003"/>
+  <testcase name="legacyDraftRequiresAnExplicitSwitchToTheTenantDefault()" classname="com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest" time="0.005"/>
+</testsuite>

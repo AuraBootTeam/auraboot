@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:39.462Z" hostname="Mac" time="0.353">
+  <properties/>
+  <testcase name="changedProviderCannotResumeAnOldSubmission()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest" time="0.251"/>
+  <testcase name="staleRevisionCannotRequeueAnotherCurrentState()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest" time="0.05"/>
+  <testcase name="anAdministratorCannotSupplyAnApprovalResult()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest" time="0.006"/>
+  <testcase name="recoveryQueuesTheExistingSubmissionWithoutCallingOrDecidingTheProvider()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest" time="0.034"/>
+  <testcase name="terminalSubmissionCannotBeReopened()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest" time="0.003"/>
+</testsuite>

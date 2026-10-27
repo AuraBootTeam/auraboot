@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:40.679Z" hostname="Mac" time="0.195">
+  <properties/>
+  <testcase name="pinningCannotSmuggleContentOrPolicyChanges()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.003"/>
+  <testcase name="deleteDraftRequiresItsIndependentActionAndNoHistory()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.004"/>
+  <testcase name="disabledIdentityCannotRetrieveAnOldOperation()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.001"/>
+  <testcase name="revisionUsesTheFrozenContentWithoutRepublishing()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.004"/>
+  <testcase name="staleEditorCannotOverwrite()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.005"/>
+  <testcase name="forbiddenStateInputNeverClaimsOrWrites()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.001"/>
+  <testcase name="tenantWideAudiencePermissionDoesNotGrantAnotherAuthorsRecord()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.001"/>
+  <testcase name="missingVersionAndNonDraftEditsAreRejected()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.007"/>
+  <testcase name="revokedActionAndMissingMembershipAreDenied()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.006"/>
+  <testcase name="ownershipAndPermissionAreIndependent()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.003"/>
+  <testcase name="withdrawClearsTheActiveVersionAndAdvancesBothControls()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.005"/>
+  <testcase name="missingOperationIdentityNeverClaimsOrWrites()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.005"/>
+  <testcase name="deletedTargetRemainsBoundToItsOwnerForReplayAuthorization()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.003"/>
+  <testcase name="incompleteCreateProducesDraftAndAtomicEvidence()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.003"/>
+  <testcase name="savePreservesTypedEditableInputsAndAdvancesRevision()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.003"/>
+  <testcase name="invalidDraftValuesCannotReachPersistence()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.003"/>
+  <testcase name="publicationCannotCreateVersionOrDelivery()" classname="com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest" time="0.001"/>
+</testsuite>

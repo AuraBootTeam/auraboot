@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.AnnouncementSealedContentIT" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:33:44.280Z" hostname="Mac" time="4.493">
+  <properties/>
+  <testcase name="aConcurrentRootWriterCannotPassTheProofRootLockBeforeCommit()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="1.901"/>
+  <testcase name="sameTransactionWithdrawalAtCommitRollsBackCallerMutation()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.416"/>
+  <testcase name="oldMissingSealCannotBeBackfilledByLookupOrLaterTransaction()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.39"/>
+  <testcase name="anActiveOwnerWithoutPublishCannotBorrowContentAuthority()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.195"/>
+  <testcase name="publisherPermissionRevocationCannotReuseAProofAtCommit()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.198"/>
+  <testcase name="sealEvidenceCannotBeUpdatedOrDeleted()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.155"/>
+  <testcase name="uncommittedFreshGrantIsNeverPublishedToAnotherThreadOrRollbackCache()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.327"/>
+  <testcase name="publisherNotARecipientGetsExactContentAndOfficialBindingFixtureInSamePhysicalTransaction()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.358"/>
+  <testcase name="sourceByteChangeAfterProofIsRejectedAtCommit()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.267"/>
+  <testcase name="sameLocatorByteReplacementIsNotAProviderGenerationAndIsRejected()" classname="com.auraboot.framework.workbench.AnnouncementSealedContentIT" time="0.193"/>
+</testsuite>

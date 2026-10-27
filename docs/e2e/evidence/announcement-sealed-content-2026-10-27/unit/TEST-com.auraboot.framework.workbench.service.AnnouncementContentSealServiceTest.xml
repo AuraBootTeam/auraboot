@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:40.489Z" hostname="Mac" time="0.077">
+  <properties/>
+  <testcase name="sameTransactionExpiryAndMalformedMetadataFailClosed()" classname="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" time="0.016"/>
+  <testcase name="releaseRechecksOnlyAnExistingSealAndNeverBackfillsLegacyVersions()" classname="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" time="0.009"/>
+  <testcase name="changedBytesAndMissingRetentionFailAtReadAndCommit()" classname="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" time="0.009"/>
+  <testcase name="actorLocksReuseTheOfficialExactMembershipService()" classname="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" time="0.004"/>
+  <testcase name="unavailablePublicationAndApprovalStatesCannotBeUpgradedByASeal()" classname="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" time="0.006"/>
+  <testcase name="historicalMissingSealIsNeverCreatedByProofLookup()" classname="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" time="0.004"/>
+  <testcase name="officialCaptureAndPublisherProofBindActualBytesWithoutExposingLocator()" classname="com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest" time="0.005"/>
+</testsuite>

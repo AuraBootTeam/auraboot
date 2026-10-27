@@ -1,0 +1,8 @@
+{
+  "producer": "eadfc515b868e9948ccc17ee727b09b666cbda44",
+  "tests": 6,
+  "failures": 1,
+  "failure": "publisherPermissionRevocationCannotReuseAProofAtCommit: expected RuntimeException but none thrown",
+  "cause": "user snapshot eviction does not invalidate cached role permission grants",
+  "junitSha256": "f3b43a876b7502fccf124ffffcf4efe2c8d6b89612686813bc6dc3ce5d5243d9"
+}

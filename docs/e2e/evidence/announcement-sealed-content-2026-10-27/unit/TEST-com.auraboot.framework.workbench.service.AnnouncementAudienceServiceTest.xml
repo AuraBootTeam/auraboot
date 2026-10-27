@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:39.963Z" hostname="Mac" time="0.121">
+  <properties/>
+  <testcase name="partialDepartmentAndForgedAllNeverSilentlyClip()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.003"/>
+  <testcase name="outsidePersonAndMissingConfigurationFailClosed()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.003"/>
+  <testcase name="allIncludesMembersWithoutEmployeeAndDeduplicatesMatches()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.03"/>
+  <testcase name="invalidActorCannotPreviewAnotherTenantsDirectory()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.002"/>
+  <testcase name="optionPagingRejectsUnboundedRequestsBeforeReadingTheDirectory()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.001"/>
+  <testcase name="statisticsAuthorityDoesNotImplicitlyRequirePublicationPermission()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.001"/>
+  <testcase name="staleOrMissingMembershipCannotUseAnotherMembershipScope()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.003"/>
+  <testcase name="freezesAllEmployeeDepartmentsTeamsAndOnlyMatchedRoleLabelsWithoutExposingPrivateJson()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.023"/>
+  <testcase name="pagedChoicesSearchAndHydrateOnlyTheCurrentlyAuthorizedDirectory()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.007"/>
+  <testcase name="aConfiguredAllScopeWithoutTenantWideGrantFailsClosed()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.002"/>
+  <testcase name="departmentExpandsChildrenAndRetainsMatchedRules()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.003"/>
+  <testcase name="rolesAreExplicitlyLimitedToManagementScope()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.004"/>
+  <testcase name="theSharedCapacityBoundsUniqueRecipientsBeforeAnyPublicationCanBePrepared()" classname="com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest" time="0.012"/>
+</testsuite>

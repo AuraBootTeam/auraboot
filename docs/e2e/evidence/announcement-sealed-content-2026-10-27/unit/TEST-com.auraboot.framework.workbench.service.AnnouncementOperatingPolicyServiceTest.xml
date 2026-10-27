@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:41.098Z" hostname="Mac" time="0.101">
+  <properties/>
+  <testcase name="experienceChangesAdvanceOnlyEditRevisionAndNormalizeDatabaseTimes()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.008"/>
+  <testcase name="missingPolicyUsesExplicitDefaultsAndAppendsAudit()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.007"/>
+  <testcase name="unknownFieldsOrInvalidWindowsCannotMutatePolicy()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.007"/>
+  <testcase name="selectingAFlowRequiresCurrentQualifiedProviderReadiness()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.011"/>
+  <testcase name="unavailableCurrentFlowUsesAHumanLabelWithoutPretendingItIsReady()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.002"/>
+  <testcase name="concurrentInitialInsertDoesNotClaimSuccessOrAppendAudit()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.003"/>
+  <testcase name="administratorsCanExplicitlyClearTheDefaultFlowAndQuietWindow()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.009"/>
+  <testcase name="tighteningApprovalAdvancesSecurityGeneration()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.003"/>
+  <testcase name="staleRevisionCannotWriteOrAudit()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.006"/>
+  <testcase name="explicitOperationReplayReturnsOriginalWireResultWithoutAnotherUpdate()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.009"/>
+  <testcase name="replayCannotRevealPolicyAfterMembershipIsRecreated()" classname="com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest" time="0.002"/>
+</testsuite>

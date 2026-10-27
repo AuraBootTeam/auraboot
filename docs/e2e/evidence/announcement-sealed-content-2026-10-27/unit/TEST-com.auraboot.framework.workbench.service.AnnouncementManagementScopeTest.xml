@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:40.877Z" hostname="Mac" time="0.01">
+  <properties/>
+  <testcase name="tenantWideAndSelfScopesDoNotInventOrganizationFacts()" classname="com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest" time="0.0"/>
+  <testcase name="teamAuthorityMatchesFrozenTeamAndDefensivelyCopiesItsInputs()" classname="com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest" time="0.001"/>
+  <testcase name="unknownHistoricalClassificationNeverGrantsDepartmentOrTeamAccess()" classname="com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest" time="0.0"/>
+  <testcase name="unknownSchemaCannotBroadenHistoricalScope()" classname="com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest" time="0.0"/>
+  <testcase name="historicalScopeUsesFrozenClassificationInsteadOfCurrentRecipientMembership()" classname="com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest" time="0.002"/>
+</testsuite>

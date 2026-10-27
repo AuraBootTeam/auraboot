@@ -1,0 +1,245 @@
+{
+  "run": {
+    "id": "announcement-sealed-content-2026-10-27",
+    "target": "Exact official sealed-content publisher proof component",
+    "sot": "docs/system-reference/announcement-management.md#sealed-content-proofs-for-original-business-commands",
+    "runtime": "maritime-parent-file-append",
+    "commit": "4ec7b97131e7a52408be436e41b9fe2439e3726c"
+  },
+  "groups": [
+    {
+      "id": "component",
+      "title": "Owned source component and bounded backend evidence",
+      "rows": [
+        {
+          "id": "S01",
+          "action": "One shared canonical document algorithm",
+          "assertion": "API encoding preserves exact raw Unicode/title/CRLF/HTML, rejects lossy scalars, sorts unique ASCII PIDs and emits fixed decimal integers.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "api/TEST-com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest.xml",
+            "vectors.json"
+          ]
+        },
+        {
+          "id": "S02",
+          "action": "Document digest and full snapshot hash are independent",
+          "assertion": "Literal A/B snapshots with different authorization/audience-estimate facts have distinct full snapshot hashes but the same document digest.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementContentProjectionVectorsTest.xml",
+            "vectors.json"
+          ]
+        },
+        {
+          "id": "S03",
+          "action": "Official fresh-version seal association and immutability",
+          "assertion": "New-version same-TX seal insert succeeds; later backfill, UPDATE and DELETE are rejected by PostgreSQL.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml"
+          ]
+        },
+        {
+          "id": "S04",
+          "action": "Official writer identity-before-root entry order",
+          "assertion": "Real submit and exemption entry methods call shared identity locking before the first root lock; release verifies existing seals without backfill.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementSealWriterLockOrderTest.xml",
+            "unit/TEST-com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest.xml"
+          ]
+        },
+        {
+          "id": "S05",
+          "action": "Publisher proof independent from recipient eligibility",
+          "assertion": "Enabled publisher owner with no recipient row obtains exact content and controlled approved binding; owner without publish is denied.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml"
+          ]
+        },
+        {
+          "id": "S06",
+          "action": "Real observed source identity and missing history",
+          "assertion": "Actual local bytes, exact size/name/MIME and retention are bound; same-locator changed bytes and old missing seal cannot be certified.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml"
+          ]
+        },
+        {
+          "id": "S07",
+          "action": "Original command physical transaction and lifetime",
+          "assertion": "Nested commands, escaped accessors, async use, actor/holder changes and growing lock sets are denied; handler close precedes valid commit revalidation.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest.xml"
+          ]
+        },
+        {
+          "id": "S08",
+          "action": "Commit-time official state and byte checks",
+          "assertion": "Withdrawal or actual byte replacement after successful proof causes commit refusal; withdrawn SQL mutation rolls back.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml"
+          ]
+        },
+        {
+          "id": "S09",
+          "action": "Fresh permission reads without cache pollution",
+          "assertion": "All existing component cache loaders are reused without reading/writing shared caches; nested exceptions restore state, worker/other-tenant cached reads remain normal.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "unit/TEST-com.auraboot.framework.permission.service.impl.PermissionSnapshotCacheTest.xml"
+          ]
+        },
+        {
+          "id": "S10",
+          "action": "Real uncommitted grant isolation and rollback",
+          "assertion": "Same-TX publish grant revocation is denied; uncommitted new grant is visible only in fresh scope, not another thread; rollback preserves normal cached results.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml",
+            "cached-grant-receipt.json"
+          ]
+        },
+        {
+          "id": "S11",
+          "action": "Concurrent root writer waits for transaction lifetime",
+          "assertion": "Concurrent FOR UPDATE fails with exact PostgreSQL SQLSTATE55P03 while proof holds root, then succeeds after commit.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml"
+          ]
+        },
+        {
+          "id": "S12",
+          "action": "Falsification and original native publications",
+          "assertion": "Removing commit revalidation makes actual withdrawal assertion red; restored source passes. Exact primary JARs match inventory and five tested class bytes.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "blocking-commit",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "evidence": [
+            "postgres/TEST-com.auraboot.framework.workbench.AnnouncementSealedContentIT.xml",
+            "mutation-commit-receipt.json",
+            "native-candidate-receipt.json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "consumer",
+      "title": "Explicit unexecuted integration and qualification",
+      "rows": [
+        {
+          "id": "S13",
+          "action": "Root rich host issuance and single combined API",
+          "assertion": "Integrate source delta and issue Scope from Root-owned HandlerPhase with the richer API.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "driver": "it",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        },
+        {
+          "id": "S14",
+          "action": "Full official BPM publication journey",
+          "assertion": "Run actual submit/prepare/freeze, real BPM approval and release worker; controlled terminal fixtures do not qualify this row.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "http",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        },
+        {
+          "id": "S15",
+          "action": "P immutable publication mapping",
+          "assertion": "Actual publisher command persists mapping from host proof and later recipient consent uses the independent digest/ack authorities.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "driver": "http",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        },
+        {
+          "id": "S16",
+          "action": "Consumer browser and external-system qualification",
+          "assertion": "Actual UI flow, external object-version atomicity and global IAM revocation linearizability are not inferred from this component.",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "verdict": "untested",
+          "verdict_by": null,
+          "evidence": []
+        }
+      ]
+    }
+  ]
+}

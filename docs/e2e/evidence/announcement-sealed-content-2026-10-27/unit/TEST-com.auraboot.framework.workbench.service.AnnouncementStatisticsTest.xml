@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:42.007Z" hostname="Mac" time="0.034">
+  <properties/>
+  <testcase name="scopeUsesFrozenClassificationAndOnlyPermittedLabelsEnterThePublicView()" classname="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" time="0.009"/>
+  <testcase name="exactDeadlineIsNotLateAndInactiveVersionsCannotBeReminded()" classname="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" time="0.001"/>
+  <testcase name="legacyMigrationCohortDoesNotInventHistoricalSendingOrUnreadFacts()" classname="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" time="0.001"/>
+  <testcase name="detailFiltersDoNotRewriteTheHistoricalDenominator()" classname="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" time="0.001"/>
+  <testcase name="inactiveMembersRemainInHistoricalDenominatorsAndLateCompletionIsNotOverdue()" classname="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" time="0.001"/>
+  <testcase name="emptyDenominatorsDoNotReturnAnInventedPercentage()" classname="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" time="0.0"/>
+  <testcase name="aTeamIdentifierCannotGrantDepartmentLabelsEvenWhenTheirPublicIdsCoincide()" classname="com.auraboot.framework.workbench.service.AnnouncementStatisticsTest" time="0.0"/>
+</testsuite>

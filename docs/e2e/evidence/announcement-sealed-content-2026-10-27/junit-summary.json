@@ -1,0 +1,259 @@
+{
+  "unit": {
+    "producer": "6c3947f759b4e8888205b5a9b1da4480c89288fc",
+    "suites": [
+      {
+        "name": "com.auraboot.framework.im.service.impl.ImConversationServiceImplAnnouncementParseTest",
+        "tests": "6",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:35.472Z"
+      },
+      {
+        "name": "com.auraboot.framework.permission.service.impl.PermissionSnapshotCacheTest",
+        "tests": "20",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:36.337Z"
+      },
+      {
+        "name": "com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactoryTest",
+        "tests": "8",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:38.817Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.controller.AnnouncementControllerAuthzTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:39.189Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementActorContextTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:39.261Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:39.286Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementApprovalReconciliationTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:39.462Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementAudienceServiceTest",
+        "tests": "13",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:39.963Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:40.112Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementCodecTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:40.217Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementContentProjectionVectorsTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:40.224Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementContentSealServiceTest",
+        "tests": "7",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:40.489Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementLifecycleServiceTest",
+        "tests": "17",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:40.679Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementManagementScopeTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:40.877Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementMetricsTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:40.894Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementOperatingPolicyServiceTest",
+        "tests": "11",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.098Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementOperationsTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.336Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementPolicyServiceTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.416Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest",
+        "tests": "13",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.526Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementReleaseFailureTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.725Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementReminderEligibilityTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.736Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementReminderScheduleTest",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.774Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementSealWriterLockOrderTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.803Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementStatisticsCsvTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:41.961Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.AnnouncementStatisticsTest",
+        "tests": "7",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:42.007Z"
+      },
+      {
+        "name": "com.auraboot.framework.workbench.service.impl.AnnouncementServiceImplTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:28:42.083Z"
+      }
+    ],
+    "totals": {
+      "tests": 179,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "api": {
+    "producer": "6c3947f759b4e8888205b5a9b1da4480c89288fc",
+    "suites": [
+      {
+        "name": "com.auraboot.framework.plugin.extension.AnnouncementDocumentCanonicalizerTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:09:07.408Z"
+      }
+    ],
+    "totals": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "postgres": {
+    "producer": "4ec7b97131e7a52408be436e41b9fe2439e3726c",
+    "suites": [
+      {
+        "name": "com.auraboot.framework.workbench.AnnouncementSealedContentIT",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "timestamp": "2026-10-27T02:33:44.280Z"
+      }
+    ],
+    "totals": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  }
+}

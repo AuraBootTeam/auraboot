@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:39.286Z" hostname="Mac" time="0.172">
+  <properties/>
+  <testcase name="aPublicSubmissionIdCannotBeReboundToAnotherBusinessOwner()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest" time="0.127"/>
+  <testcase name="versionSnapshotDefinitionInstanceAndRevisionAreAllIndependentFences()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest" time="0.019"/>
+  <testcase name="withdrawalBeforeEngineStartHasAnExplicitNullableInstanceContract()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest" time="0.001"/>
+  <testcase name="exactFrozenBindingAndExplicitResultAreAccepted()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest" time="0.012"/>
+  <testcase name="incidentalEngineCompletionIsNotAnApprovalTerminal()" classname="com.auraboot.framework.workbench.service.AnnouncementApprovalBindingsTest" time="0.001"/>
+</testsuite>

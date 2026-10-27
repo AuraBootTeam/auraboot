@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:40.112Z" hostname="Mac" time="0.102">
+  <properties/>
+  <testcase name="modeOptionsKeepPermissionFailuresVisibleWithoutCallingTheProvider()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.003"/>
+  <testcase name="installingBpmWithoutATenantDefaultDoesNotAdvertiseApprovalAsReady()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.063"/>
+  <testcase name="absentProviderDoesNotFallBackToAnApproval()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.001"/>
+  <testcase name="aProviderCannotSubstituteAnotherDefinition()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.007"/>
+  <testcase name="forcedApprovalCannotAdvertiseAnExemptionDespiteItsGrant()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.001"/>
+  <testcase name="aReadyNeutralPayloadReturnsOnlyTheBoundDefaultDefinition()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.002"/>
+  <testcase name="missingDefaultDefinitionDoesNotQueryAnArbitraryWorkflow()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.001"/>
+  <testcase name="currentUploadLimitsAndUnavailableChannelsAreExplicitWithoutAProviderCall()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.001"/>
+  <testcase name="publisherDefaultOptionsNeverExposeCatalogChoicesOrTheProviderProof()" classname="com.auraboot.framework.workbench.service.AnnouncementCapabilityServiceTest" time="0.003"/>
+</testsuite>

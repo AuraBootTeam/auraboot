@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementReleaseFailureTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:41.725Z" hostname="Mac" time="0.006">
+  <properties/>
+  <testcase name="unknownPersistedDiagnosticsNeverBecomePublicMessages()" classname="com.auraboot.framework.workbench.service.AnnouncementReleaseFailureTest" time="0.001"/>
+  <testcase name="knownConditionsRemainActionableWithoutPublishingInternalErrorText()" classname="com.auraboot.framework.workbench.service.AnnouncementReleaseFailureTest" time="0.003"/>
+</testsuite>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.controller.AnnouncementControllerAuthzTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:39.189Z" hostname="Mac" time="0.012">
+  <properties/>
+  <testcase name="everyMutationRequiresAnnouncementManage()" classname="com.auraboot.framework.workbench.controller.AnnouncementControllerAuthzTest" time="0.01"/>
+  <testcase name="readEndpointsStayOpen()" classname="com.auraboot.framework.workbench.controller.AnnouncementControllerAuthzTest" time="0.0"/>
+</testsuite>

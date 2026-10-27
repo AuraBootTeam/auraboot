@@ -1,0 +1,317 @@
+{
+  "producer": "6c3947f759b4e8888205b5a9b1da4480c89288fc",
+  "layer": "hermetic/unit",
+  "classes": {
+    "com/auraboot/framework/permission/service/impl/PermissionSnapshotCache#withFreshReads": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 36
+      },
+      "BRANCH": {
+        "missed": 0,
+        "covered": 4
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 6
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 3
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/workbench/service/AnnouncementContentSealService": {
+      "INSTRUCTION": {
+        "missed": 52,
+        "covered": 779
+      },
+      "BRANCH": {
+        "missed": 53,
+        "covered": 83
+      },
+      "LINE": {
+        "missed": 5,
+        "covered": 111
+      },
+      "COMPLEXITY": {
+        "missed": 53,
+        "covered": 31
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 16
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/workbench/service/AnnouncementContentSealService$1": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 31
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 2
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 2
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 2
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory$Scope": {
+      "INSTRUCTION": {
+        "missed": 5,
+        "covered": 175
+      },
+      "BRANCH": {
+        "missed": 16,
+        "covered": 28
+      },
+      "LINE": {
+        "missed": 1,
+        "covered": 31
+      },
+      "COMPLEXITY": {
+        "missed": 16,
+        "covered": 12
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 6
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory": {
+      "INSTRUCTION": {
+        "missed": 15,
+        "covered": 255
+      },
+      "BRANCH": {
+        "missed": 42,
+        "covered": 52
+      },
+      "LINE": {
+        "missed": 1,
+        "covered": 39
+      },
+      "COMPLEXITY": {
+        "missed": 42,
+        "covered": 13
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 8
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory$Scope$2": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 30
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 5
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 2
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 2
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory$Scope$1": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 3
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 1
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 1
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/pf4j/AnnouncementSealedContentAccessorFactory$Actor": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 15
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 1
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 1
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/extension/AnnouncementDocumentCanonicalizer$Document": {
+      "INSTRUCTION": {
+        "missed": 2,
+        "covered": 55
+      },
+      "BRANCH": {
+        "missed": 3,
+        "covered": 5
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 12
+      },
+      "COMPLEXITY": {
+        "missed": 3,
+        "covered": 2
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/extension/AnnouncementDocumentCanonicalizer$Attachment": {
+      "INSTRUCTION": {
+        "missed": 2,
+        "covered": 41
+      },
+      "BRANCH": {
+        "missed": 2,
+        "covered": 2
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 7
+      },
+      "COMPLEXITY": {
+        "missed": 2,
+        "covered": 1
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/extension/AnnouncementDocumentCanonicalizer$SourceIdentityKind": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 9
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 1
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 1
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/extension/AnnouncementDocumentCanonicalizer$Encoded": {
+      "INSTRUCTION": {
+        "missed": 0,
+        "covered": 12
+      },
+      "LINE": {
+        "missed": 0,
+        "covered": 1
+      },
+      "COMPLEXITY": {
+        "missed": 0,
+        "covered": 1
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 1
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    },
+    "com/auraboot/framework/plugin/extension/AnnouncementDocumentCanonicalizer": {
+      "INSTRUCTION": {
+        "missed": 12,
+        "covered": 254
+      },
+      "BRANCH": {
+        "missed": 4,
+        "covered": 28
+      },
+      "LINE": {
+        "missed": 1,
+        "covered": 42
+      },
+      "COMPLEXITY": {
+        "missed": 4,
+        "covered": 19
+      },
+      "METHOD": {
+        "missed": 0,
+        "covered": 7
+      },
+      "CLASS": {
+        "missed": 0,
+        "covered": 1
+      }
+    }
+  },
+  "integrationCoverage": "not_measured"
+}

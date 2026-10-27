@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementSealWriterLockOrderTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:41.803Z" hostname="Mac" time="0.154">
+  <properties/>
+  <testcase name="officialExemptionLocksIdentityBeforeAnnouncementRoot()" classname="com.auraboot.framework.workbench.service.AnnouncementSealWriterLockOrderTest" time="0.086"/>
+  <testcase name="officialApprovalSubmitLocksIdentityBeforeAnnouncementRoot()" classname="com.auraboot.framework.workbench.service.AnnouncementSealWriterLockOrderTest" time="0.063"/>
+</testsuite>

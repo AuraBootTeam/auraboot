@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-27T02:28:41.526Z" hostname="Mac" time="0.195">
+  <properties/>
+  <testcase name="[1] body=Plain policy" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.121"/>
+  <testcase name="[2] body=&lt;p&gt;&lt;strong&gt;Rich policy&lt;/strong&gt;&lt;/p&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.003"/>
+  <testcase name="[3] body=&lt;img src='/policy.png'&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.001"/>
+  <testcase name="[4] body=&lt;img src='https://example.com/policy.png'&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.001"/>
+  <testcase name="[1] body=null" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.001"/>
+  <testcase name="[2] body=" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.001"/>
+  <testcase name="[3] body= " classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.001"/>
+  <testcase name="[4] body=&lt;p&gt;&lt;br&gt;&lt;/p&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.002"/>
+  <testcase name="[5] body=&lt;p&gt;&amp;nbsp;&amp;#8203;&lt;/p&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.002"/>
+  <testcase name="[6] body=&lt;!-- only a comment --&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.001"/>
+  <testcase name="[7] body=&lt;script&gt;alert(1)&lt;/script&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.002"/>
+  <testcase name="[8] body=&lt;style&gt;body{color:red}&lt;/style&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.001"/>
+  <testcase name="[9] body=&lt;img src='javascript:alert(1)'&gt;" classname="com.auraboot.framework.workbench.service.AnnouncementPreparationContentTest" time="0.013"/>
+</testsuite>
