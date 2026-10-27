@@ -16,8 +16,8 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes shared presentation types in the 61-definition contract', () => {
-    expect(Object.keys(defs).length).toBe(61);
+  it('includes shared presentation types in the 62-definition contract', () => {
+    expect(Object.keys(defs).length).toBe(62);
     expect(defs).toHaveProperty('CardImageViewport');
   });
 
@@ -174,6 +174,19 @@ describe('DSL Generated Schema', () => {
         inputFieldsPresentation: { waitForResult: 'true' },
       }),
     ).toBe(false);
+  });
+
+
+  it('publishes explicit nested paging paths and rejects malformed declarations', () => {
+    const validate = new Ajv({ strict:false }).compile({ ...defs.DataSourceConfig, definitions:defs });
+    const source = { type:'api',method:'post',paginationRequest:{pageNumPath:['payload','pageNum'],pageSizePath:['payload','pageSize']} };
+    expect(validate(source)).toBe(true);
+    for (const paginationRequest of [
+      {pageNumPath:[],pageSizePath:['size']},
+      {pageNumPath:['page'],pageSizePath:'size'},
+      {pageNumPath:['page'],pageSizePath:['size'],unknown:true},
+      {pageNumPath:Array(9).fill('deep'),pageSizePath:['size']},
+    ]) expect(validate({...source,paginationRequest})).toBe(false);
   });
 
   it('publishes the real page key in server pagination without changing the response', () => {

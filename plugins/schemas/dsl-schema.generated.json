@@ -1246,6 +1246,10 @@
         "pagination": {
           "type": "boolean"
         },
+        "paginationRequest": {
+          "$ref": "#/definitions/PaginationRequestConfig",
+          "description": "Explicit placement of runtime pageNum/pageSize, without changing other request inputs."
+        },
         "adaptor": {
           "type": "string",
           "description": "Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata."
@@ -1302,6 +1306,33 @@
           ]
         }
       },
+      "additionalProperties": false
+    },
+    "PaginationRequestConfig": {
+      "type": "object",
+      "properties": {
+        "pageNumPath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Nonempty object-key paths; unsafe, overlapping and identity paths are rejected.",
+          "maxItems": 8
+        },
+        "pageSizePath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "pageNumPath",
+        "pageSizePath"
+      ],
       "additionalProperties": false
     },
     "RowProjection": {

@@ -176,6 +176,16 @@ export interface BlockLayoutConfig {
 }
 
 // DataSource 配置
+export interface PaginationRequestConfig {
+  /**
+   * Nonempty object-key paths; unsafe, overlapping and identity paths are rejected.
+   * @maxItems 8
+   */
+  pageNumPath: [string, ...string[]];
+  /** @maxItems 8 */
+  pageSizePath: [string, ...string[]];
+}
+
 export interface DataSourceConfig {
   id?: string;
   type?: 'api' | 'static' | 'namedQuery'; // 'namedQuery' delegates to nq:{queryCode} format
@@ -187,6 +197,8 @@ export interface DataSourceConfig {
   body?: string | Record<string, any>;
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
+  /** Explicit placement of runtime pageNum/pageSize, without changing other request inputs. */
+  paginationRequest?: PaginationRequestConfig;
   /** Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata. */
   adaptor?: string;
   /** Explicit path inside completed command data; no fallback. */

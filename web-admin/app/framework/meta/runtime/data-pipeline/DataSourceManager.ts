@@ -1,3 +1,4 @@
+import { buildPaginationRequestParams, validatePaginationRequest } from '../../schemas/paginationRequest';
 /**
  * DataSource Manager - 数据源管理器
  * 支持 API、字典、静态数据源，以及依赖追踪和自动刷新
@@ -20,6 +21,8 @@ export interface DataSourceState {
   loading: boolean;
   error: Error | null;
   lastFetch: number | null;
+  /** Effective requested page for opt-in mapped sources, including explicit refreshes. */
+  requestedPage?: { pageNum: number; pageSize: number };
 }
 
 const DYNAMIC_LIST_CONTROL_PARAMS = new Set([
@@ -194,6 +197,7 @@ export class DataSourceManager {
   private inFlightFetches = new Map<string, Promise<any>>();
   private lastFetchStartedAt = new Map<string, number>();
   private rateLimitBackoffUntil = new Map<string, number>();
+  private paginationParentScopes = new Map<string, string>();
   /** DataSource ID → modelCode mapping for real-time data sync */
   private dataSourceModelCodes = new Map<string, string>();
 
@@ -300,7 +304,14 @@ export class DataSourceManager {
    * 注册数据源
    */
   register(id: string, config: DataSourceConfig): void {
+    if (config.paginationRequest !== undefined) {
+      validatePaginationRequest(config.paginationRequest);
+      if (config.type && config.type !== 'api') throw new Error('paginationRequest requires an API source');
+    }
+    if ((!config.type || config.type === 'api') && config.body !== undefined)
+      throw new Error('Data source body is unsupported; use explicit params');
     this.cleanupDependency(id);
+    this.paginationParentScopes.delete(id);
 
     // 智能提取参数: 如果 config 中没有 params,从 ID 中提取
     // 例如: ds_storeTypes → { datasourceId: 'ds_storeTypes' }
@@ -480,16 +491,14 @@ export class DataSourceManager {
     id: string,
     config: DataSourceConfig,
     extraParams?: Record<string, any>,
+    apiRequest?: { endpoint: string; params: Record<string, any> },
   ): string {
-    const configuredParams = this.evaluateConfiguredParams(config.params);
-    const mergedParams = {
-      ...(configuredParams && typeof configuredParams === 'object' ? configuredParams : {}),
-      ...(extraParams || {}),
-    };
-    const endpoint =
+    const configuredParams = apiRequest ? undefined : this.evaluateConfiguredParams(config.params);
+    const mergedParams = apiRequest?.params ?? buildPaginationRequestParams(configuredParams, extraParams, config.paginationRequest);
+    const endpoint = apiRequest?.endpoint ?? (
       config.endpoint && typeof config.endpoint === 'string'
         ? expressionEvaluator.evaluateTemplate(config.endpoint, this.getContext())
-        : undefined;
+        : undefined);
 
     return `${id}::${stableStringify({
       type: config.type,
@@ -563,7 +572,25 @@ export class DataSourceManager {
       return null;
     }
 
-    const fetchKey = this.buildFetchKey(id, config, extraParams);
+    const apiRequest = config.type === 'api' ? this.buildApiRequest(config, extraParams) : undefined;
+    const fetchKey = this.buildFetchKey(id, config, extraParams, apiRequest);
+    // Never display or reuse a previous parent's rows while reading a new command target.
+    if (config.paginationRequest && apiRequest) {
+      const parent = stableStringify({ endpoint: apiRequest.endpoint, targetRecordPid: apiRequest.params.targetRecordPid });
+      const previous = this.paginationParentScopes.get(id);
+      if (previous !== undefined && previous !== parent) {
+        this.setData(id, null);
+        this.fetchVersions.set(id, (this.fetchVersions.get(id) ?? 0) + 1);
+        // Retain backend backoff, but do not let a previous parent/page's soft cache return other rows.
+        for (const key of this.inFlightFetches.keys()) {
+          if (key.startsWith(`${id}::`)) this.inFlightFetches.delete(key);
+        }
+        for (const key of this.lastFetchStartedAt.keys()) {
+          if (key.startsWith(`${id}::`)) this.lastFetchStartedAt.delete(key);
+        }
+      }
+      this.paginationParentScopes.set(id, parent);
+    }
     const force = options?.force === true;
     const inFlightFetch = force ? undefined : this.inFlightFetches.get(fetchKey);
     if (inFlightFetch) {
@@ -592,6 +619,10 @@ export class DataSourceManager {
     const version = (this.fetchVersions.get(id) ?? 0) + 1;
     this.fetchVersions.set(id, version);
     this.lastFetchStartedAt.set(fetchKey, Date.now());
+    const state = this.dataSourceStates.get(id);
+    if (state && apiRequest?.requestedPage) {
+      this.dataSourceStates.set(id, { ...state, requestedPage: apiRequest.requestedPage });
+    }
 
     const request = (async () => {
       this.setLoading(id, true);
@@ -601,7 +632,7 @@ export class DataSourceManager {
 
         switch (config.type) {
           case 'api':
-            data = await this.fetchApiDataSource(config, extraParams);
+            data = await this.fetchApiDataSource(config, apiRequest!);
             break;
           case 'namedQuery':
             data = await this.fetchNamedQueryDataSource(config, extraParams);
@@ -653,32 +684,25 @@ export class DataSourceManager {
   /**
    * 获取 API 数据源
    */
+  private buildApiRequest(config: DataSourceConfig, extraParams?: Record<string, any>) {
+    if (!config.endpoint) throw new Error('API endpoint is required');
+    const params = buildPaginationRequestParams(
+      this.evaluateConfiguredParams(config.params), extraParams, config.paginationRequest,
+    );
+    const endpoint = expressionEvaluator.evaluateTemplate(config.endpoint, this.getContext());
+    const readPath = (path: string[]) => path.reduce<any>((value, key) => value[key], params);
+    const requestedPage = config.paginationRequest ? {
+      pageNum: readPath(config.paginationRequest.pageNumPath),
+      pageSize: readPath(config.paginationRequest.pageSizePath),
+    } : undefined;
+    return { endpoint, params: normalizeApiParams(endpoint, params), requestedPage };
+  }
+
   private async fetchApiDataSource(
     config: DataSourceConfig,
-    extraParams?: Record<string, any>,
+    request: { endpoint: string; params: Record<string, any> },
   ): Promise<any> {
-    if (!config.endpoint) {
-      throw new Error('API endpoint is required');
-    }
-
-    const params = this.evaluateConfiguredParams(config.params);
-
-    // 合并额外参数
-    const mergedParams = {
-      ...(params && typeof params === 'object' ? params : {}),
-      ...extraParams,
-    };
-
-    const endpoint = expressionEvaluator.evaluateTemplate(config.endpoint, this.getContext());
-    const requestParams = normalizeApiParams(endpoint, mergedParams);
-
-    // 发起请求
-    const result = await fetchResult(endpoint, {
-      method: config.method,
-      params: requestParams,
-    });
-
-    // 适配数据
+    const result = await fetchResult(request.endpoint, { method: config.method, params: request.params });
     return this.adaptData(unwrapApiResult(result), config);
   }
 
@@ -980,6 +1004,7 @@ export class DataSourceManager {
    * 清理数据源
    */
   unregister(id: string): void {
+    this.paginationParentScopes.delete(id);
     this.dataSources.delete(id);
     this.dataSourceStates.delete(id);
     this.subscriptions.delete(id);
@@ -1011,6 +1036,7 @@ export class DataSourceManager {
   }
 
   clear(): void {
+    this.paginationParentScopes.clear();
     this.dataSources.clear();
     this.dataSourceStates.clear();
     this.subscriptions.clear();
