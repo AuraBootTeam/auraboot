@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { renderHook, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePageDataSources } from '../usePageDataSources';
 import { SchemaRuntime } from '../../runtime/schema-runtime';
 import { createExpressionContext } from '../../runtime/expression/context';
@@ -28,6 +28,7 @@ vi.mock('~/framework/extensions/use-contribution', () => ({
 }));
 
 describe('page-owned named query with a schema runtime', () => {
+  beforeEach(() => fetchResult.mockReset());
   it('renders completed query rows after StrictMode reconnects the runtime scope', async () => {
     const records = Array.from({ length: 8 }, (_, index) => ({ pid: `project-${index}` }));
     fetchResult.mockResolvedValue({
@@ -159,6 +160,7 @@ describe('page-owned named query with a schema runtime', () => {
       </React.StrictMode>,
     );
     await waitFor(() => expect(screen.getByText('Delivery project')).toBeVisible());
+    expect(fetchResult).toHaveBeenCalledExactlyOnceWith('/api/datasource/list', { method: 'get', params: { datasourceId: 'nq:delivery_brief', valueField: 'value', labelField: 'label', format: 'records' } });
     view.unmount();
   });
 });

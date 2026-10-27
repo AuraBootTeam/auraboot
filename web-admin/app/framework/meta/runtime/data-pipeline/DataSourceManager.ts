@@ -328,9 +328,18 @@ export class DataSourceManager {
     // owner's declared reads after its context and dependencies are bound.
     if (scopeChanged) {
       this.dataSources.forEach((config, id) => {
-        if (config.autoFetch && !config.pagination) void this.fetch(id);
+        if (config.autoFetch && !config.pagination) this.scheduleAutoFetch(id, config);
       });
     }
+  }
+
+  private scheduleAutoFetch(id: string, config: DataSourceConfig): void {
+    // Mount effects can register, dispose and reconnect before this turn ends.
+    // Read only from the surviving registration and its final bound context;
+    // simultaneous requests then share the existing in-flight read.
+    queueMicrotask(() => {
+      if (this.dataSources.get(id) === config) void this.fetch(id);
+    });
   }
 
   isBoundTo(stateManager: ScopedStateManager, scopeId: string): boolean {
@@ -412,7 +421,7 @@ export class DataSourceManager {
 
     // 如果配置了 autoFetch，立即获取数据
     if (configWithDefaults.autoFetch) {
-      this.fetch(id);
+      this.scheduleAutoFetch(id, configWithDefaults);
     }
 
     this.registerDependencies(id, configWithDefaults);

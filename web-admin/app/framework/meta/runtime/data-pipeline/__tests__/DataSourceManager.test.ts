@@ -31,11 +31,13 @@ describe('DataSourceManager', () => {
       adaptor: 'table',
       params: { project: '${state.project}' },
     });
+    await Promise.resolve();
     manager.register('manual', { type: 'namedQuery', queryCode: 'manual', autoFetch: false });
     manager.register('paged', { type: 'namedQuery', queryCode: 'paged', pagination: true });
     const nextScope = new ScopedStateManager({} as any);
     nextScope.createScope('next', { state: { project: 'next-project' } });
     manager.bindStateManager(nextScope, 'next');
+    await Promise.resolve();
     expect(mockedFetchResult).toHaveBeenCalledTimes(2);
     expect(mockedFetchResult.mock.calls[1][1]?.params).toMatchObject({ project: 'next-project' });
     pending[1]({ code: '0', data: { records: [{ pid: 'new' }], total: 1 } });
