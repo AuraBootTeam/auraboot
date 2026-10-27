@@ -126,6 +126,36 @@ class CommandTargetFileAccessorFactoryTest {
         }return null;});
         verify(files,never()).lockRetention(anyString());verify(relations,never()).insert(any(FileRelationEntity.class));
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"stringField","multiple","virtual","wrongFieldWriter","wrongCreateWriter","changedProjection","changedVersion","occupiedSlot"})
+    void creationDoesNotBypassFieldWriterProjectionOrSingleSlotPolicy(String invalidation) {
+        field=FieldDefinition.builder().code("proof").columnName("proof").dataType("file").immutable(true)
+                .allowedWriterCommands(List.of("order:repair")).build();
+        model=ModelDefinition.builder().code("child").status("published").tableName("mt_child").immutable(true)
+                .fields(List.of(field)).extension(Map.of("commandWriters",Map.of("create",List.of("order:repair"),
+                        "update",List.of("other:update"),"delete",List.of("other:delete")))).build();
+        when(models.getModelDefinition("child")).thenReturn(Optional.of(model));
+        var row=new HashMap<String,Object>(Map.of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid"));
+        when(data.getById("child","new-child")).thenReturn(row);
+        when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
+        command(()->{try(var scope=factory.forCommand(ctx)) {
+            var delegate=mock(DynamicDataService.class);when(delegate.create(eq("child"),anyMap())).thenReturn(row);
+            new DynamicDataAccessorImpl(delegate).create("child",Map.of("proof","file-pid"));
+            switch(invalidation) {
+                case "stringField" -> field.setDataType("string");
+                case "multiple" -> field.setExtraProps(Map.of("multiple",true));
+                case "virtual" -> field.setVirtual(true);
+                case "wrongFieldWriter" -> field.setAllowedWriterCommands(List.of("other:write"));
+                case "wrongCreateWriter" -> model.setExtension(Map.of("commandWriters",Map.of("create",List.of("other:create"),"update",List.of("other:update"),"delete",List.of("other:delete"))));
+                case "changedProjection" -> row.put("proof","different-file");
+                case "changedVersion" -> row.put("row_version",2L);
+                case "occupiedSlot" -> when(relations.selectList(any())).thenReturn(List.of(new FileRelationEntity().setFileId("100")));
+                default -> throw new AssertionError(invalidation);
+            }
+            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof")).isInstanceOf(AccessDeniedException.class);
+        }return null;});
+        verify(files,never()).lockRetention(anyString());verify(relations,never()).insert(any(FileRelationEntity.class));
+    }
     @Test void aPlausibleLookupDoesNotAttestCreation() {
         command(()->{try(var scope=factory.forCommand(ctx)) {
             assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
