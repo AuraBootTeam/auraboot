@@ -48,6 +48,12 @@ Localized titles and placeholders use `LocalizedTextInput`. Non-ASCII text is st
 
 The contextual “configure this page” entry opens the ChangeSet authoring surface. The model pages workbench opens Page Designer. These are separate real product entries, not interchangeable test locators. Optional layout fine-tuning should use an independent page when preserving a zero-visual-config reference for comparison.
 
+## Personal list presentation
+
+`hideSavedViews` hides the view switcher, not persisted personal settings. Model-backed lists still load the authorized effective view when `dashboard.saved_view.read` is available. External-data pages that skip list data and pages without a schema do not load those views.
+
+Explicit personal column widths remain exact during viewport fill. Only columns without a personal width absorb spare space; when every column has a personal width, the table may leave unused horizontal space. Default layouts keep their responsive fill behavior. Saving, refreshing, leaving and reopening must preserve both the configuration and the rendered width without changing business records.
+
 ## Native attachment storage
 
 A scalar `file` field stores a file identifier in its existing string column. A native `file` field with explicit `extension.multiple: true` stores the attachment collection in PostgreSQL JSONB. DDL generation, structured write binding and JSON-string read normalization use the same multiple-file predicate. Display component selection does not change the storage contract: selecting `fileattachment` on a generic JSON field does not grant file-relation mutation authority.
