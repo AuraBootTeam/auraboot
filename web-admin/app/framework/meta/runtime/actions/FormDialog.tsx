@@ -517,7 +517,7 @@ export default function FormDialog() {
                           <label htmlFor={`form-dialog-${field.field}-${sourceIndex}-${index}`} className="mb-1 block text-sm text-gray-700 dark:text-gray-300">{getLocalizedText(field.props?.keyLabels?.[key], locale, t) || key}</label>
                           <input id={`form-dialog-${field.field}-${sourceIndex}-${index}`} type="text" value={value}
                             ref={isFirst && index === 0 ? firstInputRef as React.RefObject<HTMLInputElement> : undefined}
-                            maxLength={Number.isInteger(field.props?.maxValueLength) && field.props.maxValueLength > 0 ? field.props.maxValueLength : undefined}
+                            maxLength={Number.isInteger(field.props?.maxValueLength) && field.props?.maxValueLength > 0 ? field.props?.maxValueLength : undefined}
                             placeholder={placeholder} aria-invalid={Boolean(error)}
                             onChange={(event) => updateField(field.field, { ...formData[field.field], [key]: event.target.value })}
                             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
