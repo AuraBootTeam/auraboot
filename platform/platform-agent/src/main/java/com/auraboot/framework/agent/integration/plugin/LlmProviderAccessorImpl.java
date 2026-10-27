@@ -4,9 +4,12 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.extension.AiProviderAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -63,6 +66,10 @@ public class LlmProviderAccessorImpl implements AiProviderAccessor {
                     .build();
             LlmChatResponse response = provider.chat(llmRequest, config.getApiKey(), config.getBaseUrl());
             String text = extractText(response);
+            if ("json_object".equals(llmRequest.getResponseFormat())) {
+                LlmResponseGuard.requireCompleteContent(response, "plugin structured response");
+                validateJsonObject(text);
+            }
             return new ChatResponse(
                     effectiveProviderCode,
                     modelName,
@@ -73,6 +80,19 @@ public class LlmProviderAccessorImpl implements AiProviderAccessor {
                     response == null ? "{}" : objectMapper.writeValueAsString(response)
             );
         });
+    }
+
+    private void validateJsonObject(String text) {
+        try {
+            var value = objectMapper.reader()
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(text);
+            if (value == null || !value.isObject()) {
+                throw new IllegalStateException("LLM structured response must be a JSON object");
+            }
+        } catch (JsonProcessingException ex) {
+            // Provider output may contain private business data; do not include it in diagnostics.
+            throw new IllegalStateException("LLM structured response is not a valid JSON object");
+        }
     }
 
     private ChatResponse withTenantContext(CheckedSupplier<ChatResponse> action) throws Exception {
