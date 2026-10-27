@@ -1,0 +1,115 @@
+{
+  "producer": "c1866af4c63539fbeba26451d3adf3c477763ce6",
+  "sourceDigest": "2065738e36fd6354fd8767b08de17bf86beb17042c669662cdf99a657c64aabc",
+  "runtime": "maritime-parallel-core",
+  "cases": {
+    "before": {
+      "suites": [
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.InvocationTargetPermitPlanTest",
+          "tests": "10",
+          "failures": "2",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ],
+      "totals": {
+        "tests": 10,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "after": {
+      "suites": [
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandResultCachePhasesTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactoryTest",
+          "tests": "21",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.HandlerPhaseTest",
+          "tests": "47",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetScopePhaseTest",
+          "tests": "35",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.InvocationTargetPermitPlanTest",
+          "tests": "10",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.CommandInvocationAuthorizationPhaseTest",
+          "tests": "8",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "com.auraboot.framework.meta.service.impl.pipeline.phases.PermitPlanAssemblyPhaseTest",
+          "tests": "21",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ],
+      "totals": {
+        "tests": 145,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "catalog": {
+    "catalog": "${ANCHORAGE_SOURCE_ROOT}/.tools/admitted-platform-target-c1866af/artifact-catalog.json",
+    "catalogSha256": "06133f5257d3d4291194304126200188927610c343d9cb63bfba63242e3878f4",
+    "runtimeProducer": "c1866af4c63539fbeba26451d3adf3c477763ce6",
+    "apiProducer": "b297c242798bd177e602eb09e483a5ad849f2cc9",
+    "changedFromPriorFileQueryCatalog": [
+      "com.auraboot:runtime"
+    ],
+    "unchangedEntries": 20,
+    "entries": 21,
+    "componentTests": {
+      "executed": 145,
+      "failed": 0,
+      "skipped": 0
+    },
+    "oldPlanTests": {
+      "executed": 10,
+      "failed": 2,
+      "reason": "TARGET expected but SELF after genuine invocation callback"
+    },
+    "consumerNative": "pending D RWG07 and restrictive-role/regression execution",
+    "noAllScopePromotion": true
+  },
+  "productNative": "pending D exact shared-read/update-all role requalification",
+  "invariants": [
+    "no ALL promotion",
+    "no new permission grant",
+    "same target READ/function checks remain",
+    "exact host invocation witness required",
+    "sibling model/target/action cannot borrow witness",
+    "failed recheck clears previous witness"
+  ]
+}

@@ -51,7 +51,7 @@ class SkillEngineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void execute_dslCommand_dispatches_to_commandExecutor() {
+    void unavailableCommandIsRejectedBeforeExecution() {
         // Dispatch reaches CommandExecutor — the command may fail at domain level
         // (e.g., model not found) but the dispatch routing itself works.
         SkillInput input = new SkillInput();
@@ -64,20 +64,14 @@ class SkillEngineIntegrationTest extends BaseIntegrationTest {
 
         SkillResult result = skillEngine.execute(tenantId, "test-run", "dsl.command", input, null, null, null);
 
-        // Verify dispatch reached the handler (not a dispatch-level error)
-        assertThat(result).isNotNull();
         assertThat(result.getSkillCode()).isEqualTo("dsl.command");
-        assertThat(result.getToolCallCount()).isEqualTo(1);
-        // The error (if any) should come from CommandExecutor, not from dispatch logic
-        if (result.getStatus() == SkillResult.Status.FAILED) {
-            assertThat(result.getErrorMessage())
-                    .describedAs("Error should come from command execution, not dispatch")
-                    .contains("Error executing command");
-        }
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.FAILED);
+        assertThat(result.getToolCallCount()).isZero();
+        assertThat(result.getErrorMessage()).contains("Tool is unavailable or not permitted");
     }
 
     @Test
-    void execute_dslQuery_list_dispatches_to_dynamicDataService() {
+    void unavailableModelIsRejectedBeforeExecution() {
         // Dispatch reaches DynamicDataService.list() — may fail if model not registered
         // in the test tenant, but that proves routing worked.
         SkillInput input = new SkillInput();
@@ -87,18 +81,10 @@ class SkillEngineIntegrationTest extends BaseIntegrationTest {
 
         SkillResult result = skillEngine.execute(tenantId, "test-run", "dsl.query", input, null, null, null);
 
-        assertThat(result).isNotNull();
         assertThat(result.getSkillCode()).isEqualTo("dsl.query");
-        // If the model exists in test tenant, we get SUCCESS with records
-        // If not, the error comes from DynamicDataService (not from dispatch)
-        if (result.getStatus() == SkillResult.Status.SUCCESS) {
-            assertThat(result.getOutputType()).isEqualTo("structured_result");
-            assertThat(result.getData()).containsKey("records");
-        } else {
-            assertThat(result.getErrorMessage())
-                    .describedAs("Error should come from data service, not dispatch")
-                    .containsAnyOf("Model not found", "not found", "error");
-        }
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.FAILED);
+        assertThat(result.getToolCallCount()).isZero();
+        assertThat(result.getErrorMessage()).contains("Tool is unavailable or not permitted");
     }
 
     @Test

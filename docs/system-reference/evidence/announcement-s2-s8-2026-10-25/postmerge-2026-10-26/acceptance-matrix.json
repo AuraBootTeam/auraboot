@@ -2489,23 +2489,23 @@
       "status": "captured",
       "existingJointMatrix": "same sourceDerivedActions/supplementalActions assertion; current design §16/§18.28",
       "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
-      "path": "reminders-preview.png",
+      "path": "capture-error/reminders-preview.png",
       "sha256": "4b658564d5ce183e8909a1d1b2af40fd6c1c1042dfee04dd5d70feb758167bf8",
       "locale": "zh-CN",
       "screenshotDimensions": {
         "width": 1440,
         "height": 1000
       },
-      "visualVerdict": "accepted-with-note",
+      "visualVerdict": "invalid-capture-superseded",
       "reviewer": "agent-vision",
       "reviewedAt": "2026-10-26T01:40:07.317045+00:00",
-      "observation": "实际可催办人数 1、当前限流 0、预览与有效时间以及确认/重新预览可读。摘要与计数表之间留白较大，记录为非阻断版式意见 R-UI-01，不在本次验证中重设计。",
+      "observation": "后续证实该图在说明和催办信息的懒加载尚未完成时抓取，不能裁决就绪态；原字节已隔离，替代图见 ../fix-preview-stop-2026-10-26/manifest.md。",
       "issues": [
         "R-UI-01"
       ],
       "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
       "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
-      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "evidenceTrustVerdict": "Source identity remains valid, but the named ready state was not fully captured; excluded from ready-scene acceptance.",
       "reviewDimensions": {
         "informationHierarchy": {
           "verdict": "pass",
@@ -2528,8 +2528,8 @@
           "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
         },
         "stateQuality": {
-          "verdict": "pass",
-          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+          "verdict": "capture-error",
+          "observation": "Named ready scene was captured before lazy business content completed."
         },
         "responsiveAccessibility": {
           "verdict": "pass-for-captured-viewport",
@@ -2540,8 +2540,8 @@
           "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
         },
         "evidenceIntegrity": {
-          "verdict": "pass",
-          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+          "verdict": "invalid-for-ready-scene",
+          "observation": "Original bytes retained in capture-error; acceptance corrected with a current guarded replacement."
         }
       },
       "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-ready.png",
@@ -2558,7 +2558,12 @@
         "locale": "zh-CN",
         "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
         "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
-      }
+      },
+      "initialVisualVerdict": "accepted-with-note",
+      "initialObservation": "实际可催办人数 1、当前限流 0、预览与有效时间以及确认/重新预览可读。摘要与计数表之间留白较大，记录为非阻断版式意见 R-UI-01，不在本次验证中重设计。",
+      "excludedFromAcceptance": true,
+      "reclassifiedAt": "2026-10-26T07:25:15.885432+00:00",
+      "replacement": "../fix-preview-stop-2026-10-26/manifest.md"
     },
     {
       "id": "reminders:resume-original",
@@ -2655,11 +2660,13 @@
   "issues": [
     {
       "id": "R-UI-01",
-      "severity": "non-blocking visual density",
+      "severity": "capture-error",
       "scope": "reminders:preview",
       "observation": "Large vertical whitespace between summary and count row.",
-      "disposition": "Accepted with note for this merge-and-verify scope; no task action is blocked; no unsolicited redesign performed.",
-      "owner": "announcement UI/platform page layout"
+      "disposition": "Original ready-state verdict withdrawn; exact bytes quarantined and replaced by guarded captures in the follow-up.",
+      "owner": "announcement UI/platform page layout",
+      "status": "resolved-as-capture-error",
+      "resolution": "../fix-preview-stop-2026-10-26/manifest.md"
     }
   ],
   "excludedBpmRun": {
@@ -2689,5 +2696,7 @@
       ]
     }
   ],
-  "captureEnvironmentLimits": "Screenshots record the local Chromium/macOS render, not physical mobile or screen-reader acceptance. No cross-platform pixel diff was performed."
+  "captureEnvironmentLimits": "Screenshots record the local Chromium/macOS render, not physical mobile or screen-reader acceptance. No cross-platform pixel diff was performed.",
+  "acceptedOriginalsAfterCorrection": 31,
+  "invalidReadyCaptures": 1
 }

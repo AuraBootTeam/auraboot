@@ -25,14 +25,16 @@ public final class ModelMutationGuard {
             throw new MetaServiceException("Invalid model commandWriters policy");
         }
         for (Object value : policy.values()) {
-            if (!(value instanceof java.util.List<?> codes) || codes.isEmpty()
+            // An explicit empty list denies every command for this operation.
+            if (!(value instanceof java.util.List<?> codes)
                     || codes.stream().anyMatch(code -> !(code instanceof String text) || text.isBlank())) {
                 throw new MetaServiceException("Invalid model commandWriters policy");
             }
         }
         java.util.List<?> allowed = (java.util.List<?>) policy.get(operation);
+        String commandCode = MetaContext.getAuthorizedCommandCode();
         if (allowed == null || !MetaContext.hasCommandPermitScope()
-                || !allowed.contains(MetaContext.getAuthorizedCommandCode())) {
+                || commandCode == null || !allowed.contains(commandCode)) {
             throw new MetaServiceException("Model mutation requires its exact authorized command");
         }
     }

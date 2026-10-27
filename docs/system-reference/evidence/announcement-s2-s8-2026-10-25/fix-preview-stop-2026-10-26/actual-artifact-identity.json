@@ -1,0 +1,15 @@
+{
+  "verified": true,
+  "backendPid": 15192,
+  "artifactRoot": ".workspace/evidence/announcement-management/fix-preview-stop-2026-10-26/bpm-composition-a61fd2478",
+  "source": {
+    "repository": "git@github.com:AuraBootTeam/aura-bpm.git",
+    "commit": "a61fd24781160b6bb0bf686156f06bfab541af83"
+  },
+  "platformSource": {
+    "repository": "git@github.com:AuraBootTeam/auraboot.git",
+    "commit": "2214c7294b2e84083f82483b8657be82282cfe7f"
+  },
+  "lockIdentity": "sha256:efb97764daaa9011464d5975e859ee5b164b05c76ff83f663d3e0ac84621af81",
+  "publicProjection": "Machine-specific root removed; exact Java path and package identity were checked in the owned private evidence round."
+}

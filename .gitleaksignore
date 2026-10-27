@@ -1,0 +1,6 @@
+# Exact historical false positives: public Git source commits and SHA256 artifact digests.
+# No credential values or path-wide exclusions; new commits remain scanned.
+77101e8711bba9d7f2510045a31ecb9552c1081e:docs/system-reference/evidence/invocation-target-plan-2026-10-27/proof.json:generic-api-key:87
+e28be55a5823dcc49a27f7d657c3fe54e51c8a9b:docs/system-reference/evidence/maritime-query-cache-2026-10-27/proof.json:generic-api-key:100
+3470faa491d2505ab82665d42f9e4479b21bbf66:docs/retro/2026-10/module-import-bridge-evidence.json:generic-api-key:7
+78de9c15ae431afcb026fdf8925d90ea5518cba3:docs/retro/2026-10/empty-command-writer-evidence.json:generic-api-key:7

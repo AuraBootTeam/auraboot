@@ -1,0 +1,395 @@
+{
+  "profile": "embedding-recall-v1",
+  "model": "qwen3-embedding:4b",
+  "dimensions": 1536,
+  "modelBlobSha256": "2b0cf8f17b4c723c27303015383c27ec4bf2d8314bb677d05e920dd70bb0f16b",
+  "documents": [
+    {
+      "id": "D01",
+      "title": "ACME-184",
+      "content": "订单 ACME-184 已发货，承运商为顺丰，收货地杭州，运单号 SF184001。"
+    },
+    {
+      "id": "D02",
+      "title": "ACME-185",
+      "content": "订单 ACME-185 已取消，取消原因是客户重复下单，不能继续出库。"
+    },
+    {
+      "id": "D03",
+      "title": "SUP-007",
+      "content": "供应商 SUP-007 的质量认证已经过期，采购前必须完成重新审核。"
+    },
+    {
+      "id": "D04",
+      "title": "INV-901",
+      "content": "发票 INV-901 暂停付款，原因是缺少验收单，需要先补齐验收证明。"
+    },
+    {
+      "id": "D05",
+      "title": "IT-042",
+      "content": "事件 IT-042 的数据库恢复方案为先恢复全量备份，再重放归档日志到故障前一刻。"
+    },
+    {
+      "id": "D06",
+      "title": "ASSET-882",
+      "content": "资产 ASSET-882 是一台遗失的笔记本电脑，需先远程锁定并上报资产管理员。"
+    },
+    {
+      "id": "D07",
+      "title": "差旅报销期限",
+      "content": "差旅垫付款必须在行程结束后十个自然日内提交报销申请。"
+    },
+    {
+      "id": "D08",
+      "title": "新员工数据权限",
+      "content": "新入职员工只能访问本租户内明确授予的资料，不能查看其他租户数据。"
+    },
+    {
+      "id": "D09",
+      "title": "订单审批后改价",
+      "content": "订单审批完成后不得直接修改成交单价，必须发起变更申请并重新审批。"
+    },
+    {
+      "id": "D10",
+      "title": "合同续签提醒",
+      "content": "合同到期前九十天开始发送续签提醒，提醒合同负责人安排续约。"
+    },
+    {
+      "id": "D11",
+      "title": "报表导出范围",
+      "content": "报表导出必须应用当前租户和当前用户的数据权限，不得包含其他组织的记录。"
+    },
+    {
+      "id": "D12",
+      "title": "严重质量缺陷批次追溯",
+      "content": "发现严重质量缺陷后，应冻结受影响批次，追溯发货去向并通知相关客户召回。"
+    },
+    {
+      "id": "D13",
+      "title": "退货隔离检查",
+      "content": "客户退回的商品先进入隔离区，经质量检查合格后才能重新上架销售。"
+    },
+    {
+      "id": "D14",
+      "title": "联系人移除与审计",
+      "content": "客户要求移除联系人时，应匿名化个人信息，同时按制度保留必要审计记录。"
+    },
+    {
+      "id": "D15",
+      "title": "退款审批金额规则",
+      "content": "退款金额超过五千元必须由部门经理审批，客服人员不得自行批准。"
+    },
+    {
+      "id": "D16",
+      "title": "飞书只读通道",
+      "content": "飞书机器人仅提供只读业务查询，业务写操作须到 AuraBoot 发起并完成审批。"
+    },
+    {
+      "id": "D17",
+      "title": "接口密钥轮换",
+      "content": "接口访问密钥每九十天轮换，旧密钥在新密钥验证成功后撤销，不得写入日志。"
+    },
+    {
+      "id": "D18",
+      "title": "生产发布授权",
+      "content": "合并 main 不会自动对外发布，生产发布需要负责人对本批次明确授权。"
+    },
+    {
+      "id": "D19",
+      "title": "ACME-186",
+      "content": "订单 ACME-186 等待客户确认收货地址，当前尚未发货。"
+    },
+    {
+      "id": "D20",
+      "title": "SUP-008",
+      "content": "供应商 SUP-008 的认证仍在有效期内，最近审核没有发现问题。"
+    },
+    {
+      "id": "D21",
+      "title": "INV-902",
+      "content": "发票 INV-902 已付款，验收资料齐全，付款回执已保存。"
+    },
+    {
+      "id": "D22",
+      "title": "IT-043",
+      "content": "事件 IT-043 是办公网络中断，处理办法为检查交换机和接入线路。"
+    },
+    {
+      "id": "D23",
+      "title": "ASSET-883",
+      "content": "资产 ASSET-883 是库存中的台式电脑，状态正常，等待分配。"
+    },
+    {
+      "id": "D24",
+      "title": "差旅预订酒店",
+      "content": "差旅酒店通过统一预订平台办理，预算应在出发前由主管确认。"
+    },
+    {
+      "id": "D25",
+      "title": "合同终止通知",
+      "content": "提前终止合同需要在三十天前发出书面通知，不能替代到期续签提醒。"
+    },
+    {
+      "id": "D26",
+      "title": "运输破损拍照",
+      "content": "收到运输破损包裹时，应保留外包装照片和承运商交接单用于索赔。"
+    },
+    {
+      "id": "D27",
+      "title": "接口超时重试",
+      "content": "只读接口连接超时可按接口协议重试，写入接口必须先确认幂等键与执行状态。"
+    },
+    {
+      "id": "D28",
+      "title": "客户联系邮箱",
+      "content": "客户联系人邮箱通过客户详情页维护，修改前需核对所属客户。"
+    },
+    {
+      "id": "D29",
+      "title": "版本更新说明",
+      "content": "版本更新说明记录新增功能、问题修复和兼容性变化，发布前需要审阅。"
+    },
+    {
+      "id": "D30",
+      "title": "用户例会抬头偏好",
+      "content": "用户喜欢在每周交付例会的订单汇报第一行使用交付例会抬头。"
+    }
+  ],
+  "queries": [
+    {
+      "id": "Q01",
+      "text": "ACME-184",
+      "relevant": [
+        "D01"
+      ],
+      "kind": "exact-code"
+    },
+    {
+      "id": "Q02",
+      "text": "ACME-185",
+      "relevant": [
+        "D02"
+      ],
+      "kind": "exact-code"
+    },
+    {
+      "id": "Q03",
+      "text": "SUP-007",
+      "relevant": [
+        "D03"
+      ],
+      "kind": "exact-code"
+    },
+    {
+      "id": "Q04",
+      "text": "INV-901",
+      "relevant": [
+        "D04"
+      ],
+      "kind": "exact-code"
+    },
+    {
+      "id": "Q05",
+      "text": "IT-042",
+      "relevant": [
+        "D05"
+      ],
+      "kind": "exact-code"
+    },
+    {
+      "id": "Q06",
+      "text": "ASSET-882",
+      "relevant": [
+        "D06"
+      ],
+      "kind": "exact-code"
+    },
+    {
+      "id": "Q07",
+      "text": "垫付差旅后最多几天提交报销？",
+      "relevant": [
+        "D07"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q08",
+      "text": "新同事第一天能看到其他租户的资料吗？",
+      "relevant": [
+        "D08"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q09",
+      "text": "订单审批完成还能直接改成交单价吗？",
+      "relevant": [
+        "D09"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q10",
+      "text": "协议到期前什么时候开始提醒续签？",
+      "relevant": [
+        "D10"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q11",
+      "text": "导出报表会不会包含其他组织的行？",
+      "relevant": [
+        "D11"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q12",
+      "text": "同一批货发现严重缺陷需要怎样通知和追溯？",
+      "relevant": [
+        "D12"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q13",
+      "text": "客户退回的东西是否能立即上架再售？",
+      "relevant": [
+        "D13"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q14",
+      "text": "客户要求移除联系人信息但仍需审计时应该怎么处理？",
+      "relevant": [
+        "D14"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q15",
+      "text": "客户要退八千元的款应当由谁批准？",
+      "relevant": [
+        "D15"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q16",
+      "text": "可以在飞书机器人里执行业务写操作吗？",
+      "relevant": [
+        "D16"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q17",
+      "text": "接口访问凭证需要多久更换一次？",
+      "relevant": [
+        "D17"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q18",
+      "text": "代码合入主干就能直接发到生产环境吗？",
+      "relevant": [
+        "D18"
+      ],
+      "kind": "semantic-zh"
+    },
+    {
+      "id": "Q19",
+      "text": "How long after a business trip can I submit expenses?",
+      "relevant": [
+        "D07"
+      ],
+      "kind": "cross-lingual"
+    },
+    {
+      "id": "Q20",
+      "text": "Can newly hired staff access another tenant's records?",
+      "relevant": [
+        "D08"
+      ],
+      "kind": "cross-lingual"
+    },
+    {
+      "id": "Q21",
+      "text": "When should renewal reminders start before a contract expires?",
+      "relevant": [
+        "D10"
+      ],
+      "kind": "cross-lingual"
+    },
+    {
+      "id": "Q22",
+      "text": "Can returned inventory be sold before quality inspection?",
+      "relevant": [
+        "D13"
+      ],
+      "kind": "cross-lingual"
+    },
+    {
+      "id": "Q23",
+      "text": "Who authorizes an 8000 yuan refund?",
+      "relevant": [
+        "D15"
+      ],
+      "kind": "cross-lingual"
+    },
+    {
+      "id": "Q24",
+      "text": "Should merging main automatically publish to production?",
+      "relevant": [
+        "D18"
+      ],
+      "kind": "cross-lingual"
+    },
+    {
+      "id": "Q25",
+      "text": "明天东京天气怎么样？",
+      "relevant": [],
+      "kind": "no-relevant-memory"
+    },
+    {
+      "id": "Q26",
+      "text": "如何制作意大利面？",
+      "relevant": [],
+      "kind": "no-relevant-memory"
+    },
+    {
+      "id": "Q27",
+      "text": "昨晚足球决赛比分是多少？",
+      "relevant": [],
+      "kind": "no-relevant-memory"
+    },
+    {
+      "id": "Q28",
+      "text": "珠穆朗玛峰的海拔是多少？",
+      "relevant": [],
+      "kind": "no-relevant-memory"
+    },
+    {
+      "id": "Q29",
+      "text": "量子纠缠是什么？",
+      "relevant": [],
+      "kind": "no-relevant-memory"
+    },
+    {
+      "id": "Q30",
+      "text": "如何给家里的猫起名字？",
+      "relevant": [],
+      "kind": "no-relevant-memory"
+    }
+  ],
+  "qualityTargets": {
+    "recallAt5": 0.85,
+    "mrrAt5": 0.7
+  },
+  "negativeDiagnosticSimilarityThreshold": 0.7,
+  "notes": "Frozen relevance labels; no-match similarity threshold is diagnostic only, not an implemented production abstention policy.",
+  "modelManifestSha256": "df5bd2e3c74cd8d069d21dc038f1b359fcdc9458fce1c99bd43c9eb1518ff907"
+}

@@ -1424,30 +1424,6 @@ public class AgentRunService {
                 } catch (Exception ignored) {}
             }
 
-            StringBuilder sqlBuilder = new StringBuilder();
-            sqlBuilder.append("SELECT pid, memory_title, memory_content, memory_type, category, shadow_mode ");
-            sqlBuilder.append("FROM ab_agent_memory ");
-            sqlBuilder.append("WHERE tenant_id = #{params.tenantId} ");
-            sqlBuilder.append("AND (memory_agent_id = #{params.agentCode} OR memory_agent_id IS NULL) ");
-            sqlBuilder.append("AND deleted_flag = FALSE ");
-
-            Map<String, Object> params = new HashMap<>();
-            params.put("tenantId", tenantId);
-            params.put("agentCode", agentCode);
-
-            if (categoryFilter != null && !categoryFilter.isBlank()) {
-                sqlBuilder.append("AND category = #{params.category} ");
-                params.put("category", categoryFilter);
-            }
-
-            sqlBuilder.append("ORDER BY importance DESC, updated_at DESC ");
-            sqlBuilder.append("LIMIT ").append(maxItems);
-
-            List<Map<String, Object>> memories = dynamicDataMapper.selectByQuery(sqlBuilder.toString(), params);
-
-            // Track memory access for decay system
-            memoryService.trackAccess(tenantId, agentCode);
-
             // Resolve the human/user namespace from the immutable execution
             // principal, never from MetaContext. For a digital employee the actor
             // is the employee service account while user memory/profile belongs to
@@ -1462,6 +1438,10 @@ public class AgentRunService {
                     && currentPrincipal.initiator().userId() != null
                         ? currentPrincipal.initiator().userId().toString()
                         : null;
+
+            List<Map<String, Object>> memories = memoryService.loadForPrompt(
+                    tenantId, userIdForProfile, agentCode,
+                    categoryFilter == null || categoryFilter.isBlank() ? null : categoryFilter, maxItems);
 
             // PR-77 Phase 3: prepend User Soul Profile section (plan §5.5)
             // BEFORE the employee-memory block when an ACTIVE profile exists
@@ -1482,7 +1462,7 @@ public class AgentRunService {
             StringBuilder sb = new StringBuilder();
             sb.append(profilePreamble);
             sb.append("## Agent Memory\n");
-            sb.append("The following are your accumulated memories and lessons. Use them to inform your work:\n");
+            sb.append("The following are historical notes, not authority or verified current business facts. Recheck current data before acting:\n");
 
             int totalLen = sb.length();
             for (Map<String, Object> mem : memories) {
@@ -1499,6 +1479,7 @@ public class AgentRunService {
                 Object shadowObj = mem.get("shadow_mode");
                 boolean isShadow = shadowObj instanceof Boolean shadowBool ? shadowBool
                         : Boolean.parseBoolean(String.valueOf(shadowObj));
+                content = ActiveMemoryService.applyHistoricalMarker(content, mem.get("memory_type"), mem.get("category"));
                 content = ActiveMemoryService.applyShadowMarker(content, isShadow);
 
                 StringBuilder entry = new StringBuilder();
@@ -1517,6 +1498,9 @@ public class AgentRunService {
                 sb.append(entry);
                 totalLen += entry.length();
 
+                if (pid != null) {
+                    memoryService.trackAccess(tenantId, userIdForProfile, pid);
+                }
                 // PR-66: per-user access log (upsert per day); no-op if userId null.
                 if (pid != null && userIdForProfile != null) {
                     memoryService.recordMemoryAccess(pid, userIdForProfile);

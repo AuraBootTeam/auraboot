@@ -8,6 +8,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ModelDefinitionDTOTest {
 
     @Test
+    void explicitEmptyWriterListsSurviveImportAndSerialization() throws Exception {
+        String json = """
+                {"code":"audit_record","extension":{"commandWriters":{
+                  "create":["audit:create"],"update":[],"delete":[]}}}
+                """;
+        ModelDefinitionDTO model = objectMapper.readValue(json, ModelDefinitionDTO.class);
+        var serialized = objectMapper.readTree(objectMapper.writeValueAsString(model));
+        assertThat(serialized.path("extension").path("commandWriters"))
+                .isEqualTo(objectMapper.readTree(json).path("extension").path("commandWriters"));
+        assertThat(model.getUnknownFields()).isNull();
+    }
+
+    @Test
     void commandDeletionPolicySurvivesTheExistingExtensionContract() throws Exception {
         ModelDefinitionDTO model = objectMapper.readValue(
                 "{\"code\":\"oi_disclosure_package\",\"extension\":{\"commandOnlyDelete\":true}}",

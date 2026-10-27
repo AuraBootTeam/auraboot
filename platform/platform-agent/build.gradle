@@ -84,3 +84,17 @@ publishing {
         outgoing.capability("com.auraboot:auraboot-agent-test-fixtures:${project.version}")
     }
 }
+
+// Explicit real-PostgreSQL qualification; never silently skipped in an opted-in run.
+tasks.named('test', Test) {
+    useJUnitPlatform { excludeTags 'agent-memory-postgres' }
+}
+tasks.register('memoryGovernanceIntegrationTest', Test) {
+    description = 'Qualify memory isolation and compaction against the owned migrated PostgreSQL runtime.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'agent-memory-postgres' }
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+    shouldRunAfter tasks.named('test')
+}

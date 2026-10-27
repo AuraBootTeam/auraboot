@@ -124,10 +124,11 @@ public class UserSoulProfileStalenessDetector {
                 continue;
             }
 
+            EmbeddingService.EmbeddedVector profileVector;
             double[] profileEmbedding;
             try {
-                float[] v = embeddingService.embed(tenantId, profileText, null);
-                profileEmbedding = v == null ? null : toDoubles(v);
+                profileVector = embeddingService.embedWithIdentity(tenantId, profileText, null);
+                profileEmbedding = profileVector == null ? null : toDoubles(profileVector.values());
             } catch (RuntimeException e) {
                 // Allowed catch: embedding provider outage must not abort the
                 // detector tick. Skip this profile; a subsequent run retries.
@@ -154,8 +155,9 @@ public class UserSoulProfileStalenessDetector {
             int divergent = 0;
             for (Map<String, Object> mem : recent) {
                 String memPid = (String) mem.get("pid");
-                double[] memEmbedding = memoryEmbeddingService.resolveEmbedding(memPid);
-                if (memEmbedding == null || memEmbedding.length != profileEmbedding.length) {
+                var memoryVector = memoryEmbeddingService.resolveVersionedEmbedding(memPid);
+                double[] memEmbedding = memoryVector == null ? null : toDoubles(memoryVector.values());
+                if (memEmbedding == null || !profileVector.space().equals(memoryVector.space()) || memEmbedding.length != profileEmbedding.length) {
                     continue;
                 }
                 double cos = cosineSimilarity(profileEmbedding, memEmbedding);
