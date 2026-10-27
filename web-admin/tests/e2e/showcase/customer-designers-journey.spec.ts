@@ -232,7 +232,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(createdRecordResponse.ok()).toBe(true);
   expect(createdRecordResponse.request().postDataJSON()).toMatchObject({
     [customerField]: customerName,
-    [amountField]: '42000',
+    [amountField]: 42000,
   });
   const recordBody = await createdRecordResponse.json();
   expect(String(recordBody.code)).toBe('0');
@@ -263,7 +263,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('form-btn-submit').click();
   const updatedRecordResponse = await updateRecord;
   expect(updatedRecordResponse.ok()).toBe(true);
-  expect(updatedRecordResponse.request().postDataJSON()).toMatchObject({ [amountField]: '68000' });
+  expect(updatedRecordResponse.request().postDataJSON()).toMatchObject({ [amountField]: 68000 });
   const updatedRecordBody = await updatedRecordResponse.json();
   expect(String(updatedRecordBody.code)).toBe('0');
   expect(updatedRecordBody.data).toMatchObject({ [customerField]: customerName, [amountField]: 68000 });
