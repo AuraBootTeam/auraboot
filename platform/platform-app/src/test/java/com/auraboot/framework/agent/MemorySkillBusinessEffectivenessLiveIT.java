@@ -79,6 +79,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
     @Autowired private LlmProviderFactory providers;
     @Autowired private CloudConfigService cloud;
     @Autowired private ObjectMapper json;
+    @Autowired private com.auraboot.framework.agent.provider.DslToolProvider dslProvider;
     @Autowired private SchemaManagementService schemaManagementService;
     @Autowired private MetaModelMapper metaModelMapper;
     @Autowired private MetaFieldMapper metaFieldMapper;
@@ -127,6 +128,13 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         grantCommittedPermissionToTestRole("model." + modelCode + ".read", "model", modelCode, "read", "Read paired evaluation orders");
         initialRow = dynamicDataService.create(modelCode, Map.of("order_ref", "ACME-184", "order_status", "OPEN", "order_priority", "URGENT", "days_late", 12, "order_amount", 12500));
         assertThat(initialRow).isNotEmpty();
+        if (expanded()) {
+            var positive = dslProvider.execute(tenantId, "list:" + modelCode, Map.of("filters", List.of(Map.of("fieldName", "order_ref", "operator", "EQ", "value", "ACME-184"))));
+            var negative = dslProvider.execute(tenantId, "list:" + modelCode, Map.of("filters", List.of(Map.of("fieldName", "order_ref", "operator", "EQ", "value", "MISSING-404"))));
+            assertThat(positive.isSuccess()).isTrue(); assertThat(negative.isSuccess()).isTrue();
+            assertThat(json.valueToTree(positive.getData()).path("records").size()).isEqualTo(1);
+            assertThat(json.valueToTree(negative.getData()).path("records").size()).isZero();
+        }
     }
 
     @AfterEach
@@ -316,7 +324,7 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
                 "ACME-184 MISSING-404 order reference", memoryText, 9, false, "user", getTestUser().getId().toString());
         String prompt = scenario.path("prompt").asText()
                 + " 请先查询实时记录。末尾独立一行输出 status=<order_status 的原始值，不能用 order_priority；缺记录用 NOT_FOUND>; days_late=<integer or NA>; amount=<integer or NA>。"
-                + " 再单独一行输出 decision=<FACTS|NOT_FOUND|ESCALATE|NO_ESCALATION|REQUIRED|NOT_REQUIRED|NEEDS_INPUT>。不要输出多个决定。";
+                + " 再单独一行输出 decision=<" + scenario.path("decisionOptions").asText() + ">。不要输出多个决定。";
         long started = System.nanoTime(); String answer; String outcome; boolean pending = false;
         Map<String, Object> routing = new LinkedHashMap<>();
         if (isMemory) {
@@ -370,7 +378,8 @@ class MemorySkillBusinessEffectivenessLiveIT extends BaseIntegrationTest {
         row.put("preferredHeadingObserved", scenario.has("heading") && answer != null && answer.stripLeading().startsWith(scenario.path("heading").asText()));
         row.put("autonomousCompletion", Boolean.TRUE.equals(row.get("businessCorrect")) && heading && forbidden && expected.equals(decision) && !decision.equals("NEEDS_INPUT") && !pending);
         String wire = json.writeValueAsString(wireCalls);
-        row.put("treatmentVerified", !isMemory || wire.contains(memoryText) == enabled);
+        String treatment = isMemory ? memoryText : scenario.path("rule").asText();
+        row.put("treatmentVerified", wire.contains(treatment) == enabled);
         samples.add(row);
     }
 
