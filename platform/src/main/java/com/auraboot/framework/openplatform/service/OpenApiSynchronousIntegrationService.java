@@ -78,15 +78,29 @@ public class OpenApiSynchronousIntegrationService {
     }
     public Map<String,Object> document(String code, String path) {
         var d = resolve(code).definition();
+        var input = new LinkedHashMap<>(d.inputSchema());
+        var result = new LinkedHashMap<>(d.resultSchema());
+        var components = new LinkedHashMap<String,Object>();
+        for (var schema : List.of(input, result)) {
+            Object embedded = schema.remove("components");
+            if (embedded == null) continue;
+            if (!(embedded instanceof Map<?,?> map)) throw new IllegalStateException("Invalid integration schema components");
+            for (var entry : map.entrySet()) {
+                if (!(entry.getKey() instanceof String key)) throw new IllegalStateException("Invalid integration component key");
+                Object previous = components.putIfAbsent(key, entry.getValue());
+                if (previous != null && !previous.equals(entry.getValue())) throw new IllegalStateException("Conflicting integration components");
+            }
+        }
+        components.put("securitySchemes", Map.of("integrationToken", Map.of("type", "http", "scheme", "bearer")));
         return Map.of("openapi", "3.1.0", "paths", Map.of(path, Map.of("post", Map.of(
                 "parameters", List.of(Map.of("in", "header", "name", "Idempotency-Key", "required", true,
                         "schema", Map.of("type", "string", "pattern", "^[A-Za-z0-9._:-]{8,128}$"))),
                 "requestBody", Map.of("required", true, "content", Map.of("application/json", Map.of("schema",
                         Map.of("type", "object", "required", List.of("input"), "additionalProperties", false,
-                                "properties", Map.of("input", d.inputSchema()))))),
+                                "properties", Map.of("input", input))))),
                 "responses", Map.of("200", Map.of("description", "Committed business result", "content",
-                        Map.of("application/json", Map.of("schema", d.resultSchema()))))))),
-                "components", Map.of("securitySchemes", Map.of("integrationToken", Map.of("type", "http", "scheme", "bearer"))));
+                        Map.of("application/json", Map.of("schema", result))))))),
+                "components", components);
     }
     private static SecurityException denied() { return new SecurityException("Synchronous integration provider denied"); }
 }

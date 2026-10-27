@@ -13,6 +13,8 @@ class OpenApiEndpointRegistryTest {
         @OpenApiEndpointCandidate(code="fixture.read", adapter=OpenApiEndpointKind.RESOURCE_GET, version="1", name="Read device", chineseName="读取设备")
         public void read() { }
         public void unadapted() { }
+        @OpenApiEndpointCandidate(code="installed-integration.execute", adapter=OpenApiEndpointKind.RESOURCE_GET, version="1", name="Collision", chineseName="重复")
+        public void collision() { }
         @OpenApiEndpointCandidate(code="fixture.invalid", adapter=OpenApiEndpointKind.RESOURCE_GET, version="", name="", chineseName="")
         public void invalid() { }
     }
@@ -35,6 +37,10 @@ class OpenApiEndpointRegistryTest {
     @Test void ambiguousRegistrationCannotSelectTheFirstMethodByAccident() throws Exception {
         route("/api/a","read"); route("/api/b","read");
         assertThatThrownBy(() -> registry.candidates(null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("exactly one");
+    }
+    @Test void controllerCannotShadowTheBuiltInIntegrationCandidateEvenUnderFilteredSearch() throws Exception {
+        route("/api/collision","collision");
+        assertThatThrownBy(() -> registry.candidates("fixture")).isInstanceOf(IllegalStateException.class).hasMessageContaining("exactly one");
     }
     @Test void declaredVersionAndLocalizedIdentityAreMandatory() throws Exception {
         route("/api/invalid","invalid"); assertThatThrownBy(() -> registry.candidates(null)).isInstanceOf(IllegalStateException.class);

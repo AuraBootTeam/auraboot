@@ -69,4 +69,26 @@ class OpenApiSynchronousIntegrationServiceTest {
         when(extension.project(eq(code),eq("request-123"),anyMap())).thenReturn(Map.of("requestId","request-123","status","accepted"));
         assertThrows(IllegalArgumentException.class,()->service.execute(principal,code,"publication","request-123",input));
     }
+    @Test void exportedDocumentResolvesEveryLocalReferenceAtTheDocumentRoot() {
+        var schemas=Map.<String,Object>of("Order",schema,"Result",Map.of("type","object","required",List.of("status"),"properties",Map.of("status",Map.of("const","completed"))));
+        var components=Map.of("schemas",schemas);
+        when(extension.definitions()).thenReturn(List.of(new SynchronousIntegrationEndpointExtension.Definition(code,"Create order",source,event,1,30000,
+                Map.of("$ref","#/components/schemas/Order","components",components),
+                Map.of("$ref","#/components/schemas/Result","components",components))));
+        var root=new ObjectMapper().valueToTree(service.document(code,"/orders"));
+        assertTrue(root.at("/components/schemas/Order").isObject());
+        assertEquals("http",root.at("/components/securitySchemes/integrationToken/type").asText());
+        var pending=new ArrayDeque<com.fasterxml.jackson.databind.JsonNode>();pending.add(root);int references=0;
+        while(!pending.isEmpty()) {
+            var node=pending.remove();
+            if(node.has("$ref")) {
+                String ref=node.get("$ref").asText();assertTrue(ref.startsWith("#/"));
+                assertFalse(root.at(ref.substring(1)).isMissingNode(),ref);references++;
+                assertFalse(node.has("components"),"Nested schemas must not embed document components");
+            }
+            if(node.isContainerNode())node.elements().forEachRemaining(pending::add);
+        }
+        assertEquals(2,references);
+    }
+
 }

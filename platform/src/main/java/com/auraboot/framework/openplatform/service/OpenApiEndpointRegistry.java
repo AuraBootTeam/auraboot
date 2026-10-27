@@ -22,6 +22,7 @@ public class OpenApiEndpointRegistry {
         if (search != null && search.length() > 200) throw new IllegalArgumentException("Candidate search exceeds budget");
         String query = search == null ? "" : search.toLowerCase(Locale.ROOT);
         List<Candidate> result = new ArrayList<>(); Set<String> codes = new HashSet<>();
+        codes.add(OpenApiSynchronousIntegrationService.CANDIDATE);
         if (query.isBlank() || OpenApiSynchronousIntegrationService.CANDIDATE.contains(query)) {
             result.add(new Candidate(OpenApiSynchronousIntegrationService.CANDIDATE, "Installed synchronous integration",
                     Map.of("zh-CN", "已安装集成同步调用", "en-US", "Installed synchronous integration"),
