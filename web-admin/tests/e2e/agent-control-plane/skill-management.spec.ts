@@ -43,7 +43,7 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   );
   const fixtureBody = await fixture.json();
   expect(fixtureBody.code).toBe('0');
-  const agentPid = fixtureBody.data.data.pid;
+  const agentPid = fixtureBody.data.data.recordPid;
   expect(agentPid).toBeTruthy();
   await page.goto('/home');
   await page.getByText('AI 中心', { exact: true }).first().click();
@@ -75,7 +75,7 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   await editor.getByRole('button', { name: '保存技能', exact: true }).click();
   const savedBody = await (await saved).json();
   expect(savedBody.code, JSON.stringify(savedBody)).toBe('0');
-  const skillPid = savedBody.data.data.pid;
+  const skillPid = savedBody.data.data.recordPid;
   expect(skillPid).toBeTruthy();
   await expect(page).toHaveURL(new RegExp(`/p/agent_skill/edit/${skillPid}$`));
   await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue('技能管理业务验收');

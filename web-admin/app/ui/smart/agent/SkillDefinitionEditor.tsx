@@ -247,7 +247,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
         saved?.pid,
       );
       const pid =
-        saved?.pid ?? String((response.data as Record<string, unknown> | undefined)?.pid ?? '');
+        saved?.pid ?? String((response.data as Record<string, unknown> | undefined)?.recordPid ?? '');
       if (!pid)
         throw new Error(
           label(
