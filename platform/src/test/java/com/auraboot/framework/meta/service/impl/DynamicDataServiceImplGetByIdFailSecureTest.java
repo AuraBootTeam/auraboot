@@ -171,6 +171,36 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         return member;
     }
 
+    @Test
+    void dependencyReadsKeepAuthorizationAndMaskingButDoNotExpandDisplayBackLinks() {
+        wireHappyPathDbStubs();wireRuleCenterPermissionAllows();
+        when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE),anyMap(),eq(USER_ID))).thenAnswer(call -> call.getArgument(1));
+        when(fieldPermissionService.getFieldPermissions(USER_ID,MODEL_CODE)).thenReturn(com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(java.util.Set.of("pid","name","related")));
+        ModelDefinition model=metadataService.getModelDefinition(MODEL_CODE).orElseThrow();
+        FieldDefinition ref=FieldDefinition.builder().code("related").columnName("related").dataType("reference").build();
+        ref.setExtraProps(Map.of("refTarget",Map.of("targetEntity","fixture_policy","valueField","pid","displayField","name")));
+        model.setFields(List.of(model.getFields().getFirst(),ref));
+        when(dynamicDataMapper.selectByQuery(anyString(),anyMap())).thenAnswer(call -> List.of(new java.util.LinkedHashMap<>(Map.of("pid",RECORD_ID,"name","secret-value","related","policy-1"))));
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap())).thenReturn(true);
+        var dependencyModels=mock(MetaModelService.class);var dependencyData=mock(DynamicDataService.class);
+        var dependencyPermissions=mock(PermissionFacade.class);
+        when(dependencyModels.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(RequiredReadReferencesTest.model(10)));
+        when(dependencyPermissions.canAction(USER_ID,"fixture_member","read")).thenReturn(true);
+        var guard=new RequiredRecordReadGuard(dependencyModels,dependencyData,dependencyPermissions,queryBuilderService,dynamicDataMapper,dataDomainService);
+        when(dependencyData.getById(eq("fixture_member"),anyString())).thenAnswer(call -> service.getById(MODEL_CODE,RECORD_ID));
+        guard.require("fixture_bundle",Map.of("pid",RequiredReadReferencesTest.id(9),"tenant_id",TENANT_ID,"members",List.of(RequiredReadReferencesTest.id(1))));
+        verify(permissionFacade,never()).canAction(USER_ID,"fixture_policy","read");
+        verify(permissionFacade).canOperate(eq(USER_ID),eq(MODEL_CODE),eq("read"),anyMap());
+        verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap());
+        verify(dataPermissionEngine).getFieldMaskRules(TENANT_ID,MODEL_CODE,USER_ID);
+        service.getById(MODEL_CODE,RECORD_ID);
+        verify(permissionFacade).canAction(USER_ID,"fixture_policy","read");
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap())).thenReturn(false);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> guard.require("fixture_bundle",Map.of("pid",RequiredReadReferencesTest.id(9),"tenant_id",TENANT_ID,"members",List.of(RequiredReadReferencesTest.id(1)))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.assertj.core.api.Assertions.assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
+    }
+
     // =====================================================================
     // Test (a): row-ACL check throws → getById must NOT return the record
     // =====================================================================

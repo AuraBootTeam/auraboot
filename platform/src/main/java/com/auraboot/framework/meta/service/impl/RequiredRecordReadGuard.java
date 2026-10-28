@@ -31,6 +31,19 @@ public class RequiredRecordReadGuard {
     private final DynamicDataMapper rows;
     private final DataDomainService domains;
     private final ThreadLocal<Traversal> current = new ThreadLocal<>();
+    private static final ThreadLocal<Integer> REFERENCE_READ_DEPTH = new ThreadLocal<>();
+    /** Dependency authorization needs canonical rows, not recursively derived display labels. */
+    static boolean isResolvingReference() { return REFERENCE_READ_DEPTH.get() != null; }
+    private Map<String,Object> readReference(RequiredReadReferences.Reference reference) {
+        Integer previous = REFERENCE_READ_DEPTH.get();
+        REFERENCE_READ_DEPTH.set(previous == null ? 1 : previous + 1);
+        try {
+            return MetaContext.runWithoutCommandPermit(() -> data.getById(reference.model(),reference.pid()));
+        } finally {
+            if (previous == null) REFERENCE_READ_DEPTH.remove();
+            else REFERENCE_READ_DEPTH.set(previous);
+        }
+    }
     private record Actor(Long tenant, Long user, Long member) { }
     private static final class Traversal {
         final Actor actor; final Set<RequiredReadReferences.Reference> path = new HashSet<>(); int reads;
@@ -60,7 +73,7 @@ public class RequiredRecordReadGuard {
                     if(++traversal.reads>RequiredReadReferences.MAX_REFERENCES) throw new MetaServiceException("Required-read reference budget exceeded");
                     if(!permissions.canAction(actor.member(),reference.model(),"read")) throw denied();
                     // Remove only the outer row permit. Identity and the exact writer/version plan are restored by Core.
-                    var loaded=MetaContext.runWithoutCommandPermit(()->data.getById(reference.model(),reference.pid()));
+                    var loaded=readReference(reference);
                     if(loaded==null) throw denied();
                 }
             } finally { traversal.path.remove(key); }

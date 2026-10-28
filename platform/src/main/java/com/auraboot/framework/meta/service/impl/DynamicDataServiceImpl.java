@@ -852,7 +852,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
 
-        if (!commandPermitInForce) {
+        if (!commandPermitInForce && !RequiredRecordReadGuard.isResolvingReference()) {
+            // Authorization dependencies retain every gate above, without presentation-only back-links.
             // Resolve reference display names (same as list) so the detail page shows names, not pids.
             // Internal command reads intentionally retain the canonical stored shape.
             List<Map<String, Object>> single = new java.util.ArrayList<>(1);

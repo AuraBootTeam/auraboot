@@ -48,6 +48,23 @@ class RequiredRecordReadGuardTest {
         });
         verify(data).getById("fixture_member",id(1));verify(data).getById("fixture_member",id(2));
     }
+    @Test void dependencyPresentationScopeRestoresAfterNestedSuccessAndFailure() {
+        allow();assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
+        when(data.getById("fixture_member",id(1))).thenAnswer(call->{
+            assertThat(RequiredRecordReadGuard.isResolvingReference()).isTrue();
+            guard.require("fixture_bundle",root(10,id(2)));
+            assertThat(RequiredRecordReadGuard.isResolvingReference()).isTrue();
+            return Map.of("pid",id(1));
+        });
+        when(data.getById("fixture_member",id(2))).thenAnswer(call->{
+            assertThat(RequiredRecordReadGuard.isResolvingReference()).isTrue();return Map.of("pid",id(2));
+        });
+        guard.require("fixture_bundle",root(9,id(1)));
+        assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
+        doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(2));
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+        assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
+    }
     @Test void revocationIsRecheckedAndFailuresRestoreOuterPermit() {
         allow();guard.require("fixture_bundle",root(9,id(1),id(2)));
         when(data.getById("fixture_member",id(2))).thenThrow(new AccessDeniedException("revoked"));
