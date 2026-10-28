@@ -19,6 +19,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useSmartText } from '~/utils/i18n';
 import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';
+import { hasCanonicalListResult, toolQueryPresentation } from './toolQueryPresentation';
 import { ConfirmCard } from './ConfirmCard';
 import { SkillPreviewCard } from '../components-shell/SkillPreviewCard';
 import { ModelSuggestionCard } from './ModelSuggestionCard';
@@ -126,9 +127,10 @@ interface MessageBubbleProps {
   onConfirm?: (toolId: string) => void;
   onCancel?: (toolId: string) => void;
   isLoading?: boolean;
+  canonicalListResult?: boolean;
 }
 
-function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbleProps) {
+function MessageBubble({ message, onConfirm, onCancel, isLoading, canonicalListResult }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
   const { t, locale } = useI18n();
   const displayContent = !isUser && message.content === 'Approved tool executed.'
@@ -194,12 +196,13 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
 
   // Tool result — any result with records array gets a chart card; others get collapsible table
   if (message.type === 'tool_result') {
+    if (canonicalListResult) return null;
     // Analytics is rendered by its canonical result_contract event.
     if (message.toolName === 'aurabot:chat-bi' || message.toolName === 'aurabot_chat-bi') return null;
     // toolResult shape varies: { records, ... } or { success, data: { records, ... }, durationMs }
     const resultData = message.toolResult?.data || message.toolResult;
     if (resultData?.records && Array.isArray(resultData.records) && resultData.records.length > 0) {
-      return <ChatBiResultCard result={resultData as any} />;
+      return <ChatBiResultCard result={toolQueryPresentation(resultData, message.toolName)} />;
     }
     const isModelSuggest =
       message.toolName === 'builtin__model_suggest' && message.toolResult?.modelCode;
@@ -775,8 +778,9 @@ export function AuraBotChat() {
       <div className="flex-1 overflow-y-auto">
         {hasMessages ? (
           <div className="px-4 py-4">
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <MessageBubble
+                canonicalListResult={hasCanonicalListResult(message.toolName, messages[index + 1])}
                 key={message.id}
                 message={message}
                 onConfirm={confirmTool}
