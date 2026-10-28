@@ -42,6 +42,7 @@ public class UserPermissionServiceImpl implements UserPermissionService {
 
     @Override
     public Set<String> getCurrentEffectiveRoleCodes() {
+        if(!MetaContext.exists())return Set.of();
         Long tenant=MetaContext.getCurrentTenantId(),user=MetaContext.getCurrentUserId(),member=MetaContext.getCurrentMemberId();
         if(tenant==null || tenant<=0 || user==null || member==null) return Set.of();
         var ids=new LinkedHashSet<>(permissionSnapshotCache.getUserRoleIds(tenant,user,member));
