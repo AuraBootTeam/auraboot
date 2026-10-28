@@ -184,7 +184,7 @@ test('explicit form, governance and process profiles collect their bounded real-
       baseURL: 'http://localhost:5173', backendURL: 'http://localhost:6443', tenantId: '1',
       admin: { email: 'owner@example.invalid', password: 'fixture-only', userId: '11' },
       reader: { email: 'reader@example.invalid', password: 'fixture-only', userId: '12' },
-      writer: { memberPid: 'owned-member' }, codes: { pendingCrash: 'owned_pending' },
+      writer: { memberPid: 'owned-member' }, codes: { pendingCrash: 'owned_pending', checkpointCrash: 'owned_checkpoint' },
       approvalPolicyPid: 'owned-policy',
       readerRolePid: 'read-role', writerInitialRolePids: ['writer-role', 'read-role'],
       adminBearer: 'collection-only', readerBearer: 'collection-only', foreignBearer: 'collection-only',
@@ -196,7 +196,7 @@ test('explicit form, governance and process profiles collect their bounded real-
     const environment = { PLAYWRIGHT_BASE_URL: 'http://localhost:5173', BACKEND_URL: 'http://localhost:6443',
       BE_PORT: '6443', VITE_PORT: '5173', BFF_PORT: '3500', AGENT_PERMISSION_FIXTURE: fixture,
       AGENT_PERMISSION_EVIDENCE: root, AGENT_ACCEPTANCE_REAL_MODEL: 'deepseek' };
-    for (const [scope, count] of [['forms', 2], ['governance', 3], ['recovery', 4]]) {
+    for (const [scope, count] of [['forms', 2], ['governance', 3], ['recovery', 4], ['checkpoint', 1]]) {
       const result = collect('playwright.agent-approval.config.ts', { ...environment,
         AGENT_ACCEPTANCE_SCOPE: scope, AGENT_PROCESS_FAULTS: 'owned-jvm' });
       assert.equal(result.status, 0, result.stderr + result.stdout);

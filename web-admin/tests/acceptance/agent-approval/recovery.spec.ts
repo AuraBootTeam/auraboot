@@ -1,9 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { Client } from 'pg';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { execFileSync, execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { interruptBackend, restore } from './process-support';
 import {
   fixture,
   evidence,
@@ -18,7 +17,6 @@ import {
   approvalWitness,
 } from './qualification-support';
 
-const execute = promisify(execFile);
 let database: Client;
 test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
@@ -36,68 +34,6 @@ test.afterAll(async () => {
   await database?.end();
 });
 
-async function workspace(args: string[], name: string) {
-  const result = await execute(join(fixture.runtime.workspace, 'aura'), args, {
-    cwd: fixture.runtime.workspace,
-    timeout: 300_000,
-    maxBuffer: 8 * 1024 * 1024,
-  });
-  writeFileSync(join(evidence, name + '.log'), result.stdout + result.stderr, { mode: 0o600 });
-  return result.stdout;
-}
-async function interruptBackend(name: string) {
-  await workspace(
-    ['runtime', 'process', 'check', fixture.runtime.name, 'backend'],
-    name + '-ownership',
-  );
-  const row = readFileSync(join(fixture.runtime.processDirectory, 'backend.tsv'), 'utf8')
-    .trimEnd()
-    .split('\t');
-  expect(row).toHaveLength(7);
-  expect(row[0]).toBe('backend');
-  const pid = Number(row[1]);
-  expect(Number.isSafeInteger(pid) && pid > 1).toBe(true);
-  const command = execFileSync('ps', ['-ww', '-p', String(pid), '-o', 'command='], {
-    encoding: 'utf8',
-  }).trim();
-  expect(command).toContain(fixture.runtime.bundle + '/backend/app.jar');
-  expect(command).toContain(' -jar ');
-  const cwd = execFileSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], {
-    encoding: 'utf8',
-  });
-  expect(cwd).toContain(fixture.runtime.name + '/work/agent-product/backend');
-  record(name + '-before-sigkill', {
-    pid,
-    command,
-    cwd,
-    signal: 'SIGKILL',
-    bundleSha256: fixture.bundleSha256,
-  });
-  // This is the owned product JVM, not a provider exception or graceful shutdown.
-  process.kill(pid, 'SIGKILL');
-  await expect
-    .poll(() => {
-      try {
-        return execFileSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
-          .trim()
-          .startsWith('Z');
-      } catch {
-        return true;
-      }
-    })
-    .toBe(true);
-  return pid;
-}
-async function restore(name: string, previous: number) {
-  await workspace(['runtime', 'suspend', fixture.runtime.name], name + '-retaining-suspend');
-  await workspace(['runtime', 'resume', fixture.runtime.name], name + '-resume');
-  const row = readFileSync(join(fixture.runtime.processDirectory, 'backend.tsv'), 'utf8').split(
-    '\t',
-  );
-  expect(Number(row[1])).not.toBe(previous);
-  await workspace(['runtime', 'verify', fixture.runtime.name, '--json'], name + '-verified');
-  return Number(row[1]);
-}
 async function decide(page: Page, pending: any) {
   const response = await page.request.post(fixture.backendURL + '/api/ai/aurabot/execute', {
     headers: { Authorization: 'Bearer ' + fixture.adminBearer },
@@ -223,7 +159,9 @@ test('FT2: killing the JVM during a blocked real INSERT rolls back and never rep
     expect(interrupted).toHaveLength(1);
     expect(['running', 'failed']).toContain(interrupted[0].run_status);
     if (interrupted[0].run_status === 'failed')
-      expect(interrupted[0].error_message).toMatch(/Run stalled — no heartbeat for 5 minutes|stale|timeout|timed out|interrupt/i);
+      expect(interrupted[0].error_message).toMatch(
+        /Run stalled — no heartbeat for 5 minutes|stale|timeout|timed out|interrupt/i,
+      );
     const repeated = await decide(page, pending);
     expect(repeated.some((item) => item.name === 'error')).toBe(true);
     expect(await modelEffect(database, code)).toEqual({ rows: [], physical: null });
@@ -263,7 +201,9 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
   const complete = new Promise<void>((resolve) => {
     fetched = resolve;
   });
-  const delivery = new Promise<void>((resolve) => { delivered = resolve; });
+  const delivery = new Promise<void>((resolve) => {
+    delivered = resolve;
+  });
   let received = '';
   await page.route('**/api/ai/aurabot/execute', async (route) => {
     const response = await route.fetch({ timeout: 150_000 });
