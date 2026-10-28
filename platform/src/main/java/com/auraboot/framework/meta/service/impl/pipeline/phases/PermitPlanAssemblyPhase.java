@@ -201,7 +201,7 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         // A declaration alone is not a completed callback. Bind its host-only witness to
         // the exact current root/action; generic READ SQL must not replace this decision.
         var invocation = ctx.getHandlerInvocationAuthorization();
-        return "handler".equals(values.get("invocationAuthorization")) && invocation != null
+        return ("handler".equals(values.get("invocationAuthorization")) || "handler-with-result-reads".equals(values.get("invocationAuthorization"))) && invocation != null
                 && java.util.Objects.equals(invocation.commandCode(), ctx.getCommandCode())
                 && java.util.Objects.equals(invocation.modelCode(), ctx.getCommand().getModelCode())
                 && java.util.Objects.equals(invocation.targetRecordId(), ctx.getRequest().getTargetRecordId())
