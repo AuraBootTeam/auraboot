@@ -223,7 +223,7 @@ test('FT2: killing the JVM during a blocked real INSERT rolls back and never rep
     expect(interrupted).toHaveLength(1);
     expect(['running', 'failed']).toContain(interrupted[0].run_status);
     if (interrupted[0].run_status === 'failed')
-      expect(interrupted[0].error_message).toMatch(/stale|timeout|timed out|interrupt/i);
+      expect(interrupted[0].error_message).toMatch(/Run stalled — no heartbeat for 5 minutes|stale|timeout|timed out|interrupt/i);
     const repeated = await decide(page, pending);
     expect(repeated.some((item) => item.name === 'error')).toBe(true);
     expect(await modelEffect(database, code)).toEqual({ rows: [], physical: null });
