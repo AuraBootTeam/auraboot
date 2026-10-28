@@ -5,7 +5,7 @@ import { verifyGoldenProduct } from '../lib/golden-product-identity.mjs';
 // Hermetic identity controls. These do not replace native process/environment probes.
 function fixture() {
   const repo = '/owned/oss', runtime = 'owned', token = 'fixture-token';
-  const report = { verdict: 'ok', runtime, environment: { POSTGRES_DB: 'auraboot_211', REDIS_DATABASE: '12' },
+  const report = { verdict: 'ok', runtime, stateDir: '/state', environment: { POSTGRES_DB: 'auraboot_211', REDIS_DATABASE: '12' },
     sources: [{ key: 'auraboot', status: 'ok', expected: { root: repo, commit: 'frozen-sha' } }],
     artifacts: [{ key: 'backend', path: '/owned/runtime/boot.jar', status: 'ok',
       expected: { sourceCommit: 'frozen-sha', hash: 'fixture-hash' } }], ports: {}, processes: [] };
@@ -18,9 +18,11 @@ function fixture() {
       SERVER_PORT: '6611', VITE_PORT: '5311', BFF_PORT: '6311',
       SPRING_DATASOURCE_URL: 'jdbc:postgresql://127.0.0.1:5432/auraboot_211?charSet=UTF8',
       SPRING_DATA_REDIS_DATABASE: '12', SPRING_BOOT_URL: 'http://127.0.0.1:6611',
-      BFF_INTERNAL_URL: 'http://127.0.0.1:6611' };
+      BFF_INTERNAL_URL: 'http://127.0.0.1:6611', AURA_FILE_STORAGE_PATH: '/state/runtimes/owned/oss-stack/file-storage' };
   }
-  return { report, repo, token, environments, commands: { backend: ['java', '-jar', '/owned/runtime/boot.jar'] },
+  return { report, repo, token, environments,
+    fileStorage: { runtime, repo, alias: '/state/runtimes/owned/oss-stack/file-storage', directory: '/state/runtime-data/owned/files' },
+    commands: { backend: ['java', '-jar', '/owned/runtime/boot.jar'] },
     database: 'auraboot_211', health: { backend: { status: 'UP' }, bff: { status: 'ok',
       services: { springBoot: { status: 'healthy', backend: { status: 'UP' } } } } } };
 }
@@ -31,6 +33,10 @@ test('records only verified runtime facts without ownership tokens or raw comman
   assert.doesNotMatch(text, /fixture-token|secret-hash|tokenFile|tokenHash|java|PASSWORD/);
 });
 const mutations = {
+  'missing persistent file storage proof': f => { delete f.fileStorage; },
+  'disposable file storage target': f => { f.fileStorage.directory = '/state/runtimes/owned/files'; },
+  'foreign persistent storage owner': f => { f.fileStorage.runtime = 'foreign'; },
+  'backend file storage drift': f => { f.environments.backend.AURA_FILE_STORAGE_PATH = '/temporary'; },
   'Workspace failure': f => { f.report.verdict = 'invalid'; },
   'foreign source': f => { f.report.sources[0].expected.root = '/foreign'; },
   'artifact drift': f => { f.report.artifacts[0].status = 'drift'; },
