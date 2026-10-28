@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Unified base class for all domain events in AuraBoot.
@@ -46,7 +47,14 @@ public abstract class AuraEvent extends ApplicationEvent {
         this.tenantId = tenantId;
         this.modelCode = modelCode;
         this.recordId = recordId;
-        this.payload = payload != null ? Map.copyOf(payload) : Map.of();
+        if (payload == null) {
+            this.payload = Map.of();
+        } else {
+            // Preserve explicit null values in an independent, shallow, immutable snapshot.
+            var snapshot = new HashMap<>(payload);
+            snapshot.keySet().forEach(key -> Objects.requireNonNull(key, "Payload key must not be null"));
+            this.payload = Collections.unmodifiableMap(snapshot);
+        }
         this.occurredAt = Instant.now();
         this.mutableMetadata = new HashMap<>();
     }
