@@ -164,7 +164,7 @@
     "name:en": "Skills",
     "path": "/p/agent_skill",
     "component": null,
-    "icon": null,
+    "icon": "sparkles",
     "type": 1,
     "permissionCode": "acp_agent_skill",
     "orderNo": 15,

@@ -88,6 +88,10 @@ export function SkillDefinitionEditor({ runtime }: Props) {
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
   const [result, setResult] = useState<EngineResult>();
+  useEffect(() => {
+    setConsent(false);
+    setResult(undefined);
+  }, [values, message]);
   const generation = useRef(0);
   const authoring = useRef<HTMLFieldSetElement>(null);
   const trial = useRef<HTMLFieldSetElement>(null);
@@ -247,7 +251,8 @@ export function SkillDefinitionEditor({ runtime }: Props) {
         saved?.pid,
       );
       const pid =
-        saved?.pid ?? String((response.data as Record<string, unknown> | undefined)?.recordPid ?? '');
+        saved?.pid ??
+        String((response.data as Record<string, unknown> | undefined)?.recordPid ?? '');
       if (!pid)
         throw new Error(
           label(
@@ -263,6 +268,8 @@ export function SkillDefinitionEditor({ runtime }: Props) {
       setDraft(stored);
       setSchema(inputSchema(stored.skill_input_schema));
       setDirty(false);
+      setValues({});
+      setMessage('');
       setConsent(false);
       setResult(undefined);
       setNotice(
