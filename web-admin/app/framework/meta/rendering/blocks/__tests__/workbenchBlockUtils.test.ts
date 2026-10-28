@@ -54,25 +54,124 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
 
 describe('workbenchBlockUtils action runner', () => {
   it('does not interpret a resolved business value again when opening an input form', async () => {
-    const runtime=makeRuntime() as any;
-    runtime.getContext().state.selectedLine.altText='\$\{state.secret}';
-    runtime.getContext().state.secret='must-not-replace-business-text';
+    const runtime = makeRuntime() as any;
+    runtime.getContext().state.selectedLine.altText = '\$\{state.secret}';
+    runtime.getContext().state.secret = 'must-not-replace-business-text';
     let observed: any;
-    window.addEventListener('dialog:form', ((event: CustomEvent) => {
-      observed=event.detail.defaults;
-      event.detail.onSubmit(event.detail.defaults);
-    }) as EventListener, { once: true });
-    await executeSimpleWorkbenchAction(runtime, { action: 'command.execute', args: {
-      command: 'catalog:edit_media', inputFields: [{ field: 'altText', type: 'text', defaultValue: '\$\{state.selectedLine.altText}' }],
-    } });
-    expect(observed).toEqual({altText: '\$\{state.secret}'});
-    expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/catalog:edit_media', expect.objectContaining({params: expect.objectContaining({payload: {altText: '\$\{state.secret}'}})}));
+    window.addEventListener(
+      'dialog:form',
+      ((event: CustomEvent) => {
+        observed = event.detail.defaults;
+        event.detail.onSubmit(event.detail.defaults);
+      }) as EventListener,
+      { once: true },
+    );
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'catalog:edit_media',
+        inputFields: [
+          { field: 'altText', type: 'text', defaultValue: '\$\{state.selectedLine.altText}' },
+        ],
+      },
+    });
+    expect(observed).toEqual({ altText: '\$\{state.secret}' });
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/catalog:edit_media',
+      expect.objectContaining({
+        params: expect.objectContaining({ payload: { altText: '\$\{state.secret}' } }),
+      }),
+    );
   });
 
   beforeEach(() => {
     fetchResultMock.mockReset();
     fetchResultMock.mockResolvedValue({ code: '0', data: {} });
     vi.unstubAllGlobals();
+  });
+
+  it('groups dynamic prompt values under a captured payload key without numeric coercion', async () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().dataSource = {
+      form: {
+        fields: [{ field: 'value_cost', type: 'text', defaultValue: '1234567890123456.79' }],
+      },
+    };
+    window.addEventListener(
+      'dialog:form',
+      ((event: CustomEvent) => {
+        expect(event.detail.defaults.value_cost).toBe('1234567890123456.79');
+        event.detail.onSubmit({
+          value_cost: event.detail.defaults.value_cost,
+          storePid: 'untrusted-input',
+        });
+      }) as EventListener,
+      { once: true },
+    );
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'catalog:edit_attributes',
+        payload: { storePid: 'captured-store', revision: 'captured-version' },
+        inputFields: '${dataSource.form.fields}',
+        inputFieldsPayloadKey: 'formInputs',
+        idempotent: true,
+      },
+    });
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/catalog:edit_attributes',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          payload: {
+            storePid: 'captured-store',
+            revision: 'captured-version',
+            formInputs: { value_cost: '1234567890123456.79', storePid: 'untrusted-input' },
+          },
+        }),
+      }),
+    );
+    expect(fetchResultMock.mock.calls[0][1].params.clientRequestId).toMatch(/^[a-f0-9-]{36}$/);
+  });
+
+  it('rejects unsafe or colliding prompt groups before opening a dialog or dispatching', async () => {
+    const listener = vi.fn();
+    window.addEventListener('dialog:form', listener);
+    try {
+      for (const key of ['__proto__', 'constructor', 'a.b', '', null, 'storePid']) {
+        await expect(
+          executeSimpleWorkbenchAction(makeRuntime() as any, {
+            action: 'command.execute',
+            args: {
+              command: 'catalog:edit_attributes',
+              payload: { storePid: 'captured-store' },
+              inputFieldsPayloadKey: key,
+              inputFields: [{ field: 'value', type: 'text' }],
+            },
+          }),
+        ).rejects.toThrow('Invalid or conflicting command input payload key');
+      }
+      expect(listener).not.toHaveBeenCalled();
+      expect(fetchResultMock).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('dialog:form', listener);
+    }
+  });
+
+  it('cancelling a grouped prompt never submits its captured command', async () => {
+    window.addEventListener(
+      'dialog:form',
+      ((event: CustomEvent) => event.detail.onCancel()) as EventListener,
+      { once: true },
+    );
+    await executeSimpleWorkbenchAction(makeRuntime() as any, {
+      action: 'command.execute',
+      args: {
+        command: 'catalog:edit_attributes',
+        inputFieldsPayloadKey: 'formInputs',
+        inputFields: [{ field: 'value', type: 'text' }],
+      },
+    });
+    expect(fetchResultMock).not.toHaveBeenCalled();
   });
 
   it('evaluates numeric pagination actions and notifies dependent data sources', async () => {

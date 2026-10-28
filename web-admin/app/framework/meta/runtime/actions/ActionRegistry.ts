@@ -1,3 +1,4 @@
+import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
 import type { RequestKeySession } from './request-key/session';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
@@ -670,11 +671,18 @@ function isLegacyPromptChoices(result: any): boolean {
   // Existing plugin option endpoints also return raw items/records on HTTP 200.
   // Direct callers may also provide that raw shape; explicit failures are excluded.
   const status = result?.httpStatus;
-  return result != null && result.success !== false && String(result.code ?? '').trim() === ''
-    && (status == null || (Number(status) >= 200 && Number(status) < 300))
-    && result.context == null && result.error == null && result.exception == null
-    && !String(result.message ?? '').trim() && !String(result.desc ?? '').trim()
-    && (Array.isArray(result) || Array.isArray(result.items) || Array.isArray(result.records));
+  return (
+    result != null &&
+    result.success !== false &&
+    String(result.code ?? '').trim() === '' &&
+    (status == null || (Number(status) >= 200 && Number(status) < 300)) &&
+    result.context == null &&
+    result.error == null &&
+    result.exception == null &&
+    !String(result.message ?? '').trim() &&
+    !String(result.desc ?? '').trim() &&
+    (Array.isArray(result) || Array.isArray(result.items) || Array.isArray(result.records))
+  );
 }
 
 async function fetchPromptChoices(
@@ -683,8 +691,13 @@ async function fetchPromptChoices(
   options: Record<string, unknown>,
   feedback: PromptFeedbackContext,
 ): Promise<any> {
-  const fallback = translateOrFallback(feedback.t, 'error.data_load_failed',
-    feedback.locale?.toLowerCase().startsWith('zh') ? '数据加载失败，请重试。' : 'Unable to load data. Try again.');
+  const fallback = translateOrFallback(
+    feedback.t,
+    'error.data_load_failed',
+    feedback.locale?.toLowerCase().startsWith('zh')
+      ? '数据加载失败，请重试。'
+      : 'Unable to load data. Try again.',
+  );
   let result: any;
   try {
     result = await fetchResult(endpoint, options);
@@ -692,12 +705,24 @@ async function fetchPromptChoices(
     // A thrown transport error is diagnostic text, never public business copy.
     throw new Error(fallback);
   }
-  if (!result || Number(result.httpStatus) >= 400 || result.success === false
-    || (!ResultHelper.isSuccess(result) && !isLegacyPromptChoices(result))) {
+  if (
+    !result ||
+    Number(result.httpStatus) >= 400 ||
+    result.success === false ||
+    (!ResultHelper.isSuccess(result) && !isLegacyPromptChoices(result))
+  ) {
     const detail = result ? ResultHelper.getErrorDetail(result) : undefined;
-    throw new Error(detail
-      ? resolveCommandErrorMessage({ context: { detail } }, '', feedback.t, feedback.locale, fallback)
-      : fallback);
+    throw new Error(
+      detail
+        ? resolveCommandErrorMessage(
+            { context: { detail } },
+            '',
+            feedback.t,
+            feedback.locale,
+            fallback,
+          )
+        : fallback,
+    );
   }
   return result;
 }
@@ -714,23 +739,29 @@ export async function promptInputForm(
   const normalizedFields = fields.map((field) => normalizePromptInputField(field));
   const fieldOptions: Record<
     string,
-    Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any; options?: Array<{ value: string; disabled?: boolean }>; defaultValues?: unknown }>
+    Array<{
+      label: any;
+      value: string;
+      description?: any;
+      disabled?: boolean;
+      visibleWhen?: any;
+      options?: Array<{ value: string; disabled?: boolean }>;
+      defaultValues?: unknown;
+    }>
   > = {};
   for (const field of normalizedFields) {
     if (field.dictCode && fetchResult) {
-      const result = await fetchPromptChoices(fetchResult,
+      const result = await fetchPromptChoices(
+        fetchResult,
         `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,
-        { method: 'get' }, feedback,
+        { method: 'get' },
+        feedback,
       );
       const resultPayload = (result as any)?.data ?? result;
       const data = resultPayload as
         | { items?: Array<Record<string, any>> }
         | Array<Record<string, any>>;
-      const rawOptions = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-          ? data.items
-          : [];
+      const rawOptions = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
       fieldOptions[field.field] = rawOptions
         .map((option: any) => {
           const value = option?.value;
@@ -754,14 +785,18 @@ export async function promptInputForm(
     } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
       const endpoint = options.bindingsResolved
         ? String(field.dataSource.endpoint)
-        : String(field.dataSource.endpoint).replace(
-            /\$\{([^}]+)\}/g,
-            (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
+        : String(field.dataSource.endpoint).replace(/\$\{([^}]+)\}/g, (_match, path) =>
+            String(readInputPath(runtimeContext, path) ?? ''),
           );
-      const result = await fetchPromptChoices(fetchResult, endpoint, {
-        method: 'get',
-        ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
-      }, feedback);
+      const result = await fetchPromptChoices(
+        fetchResult,
+        endpoint,
+        {
+          method: 'get',
+          ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
+        },
+        feedback,
+      );
       const valueField = field.dataSource.valueField || 'value';
       const labelField = field.dataSource.labelField || 'label';
       const descriptionField = field.dataSource.descriptionField;
@@ -791,14 +826,30 @@ export async function promptInputForm(
                         ? description
                         : String(description),
                   }),
-              ...(field.type === 'grouped-multiselect' ? { options: Array.isArray(option.options)
-                ? option.options.filter((choice: any) => choice && typeof choice.value === 'string' && choice.value.trim()
-                    && (typeof choice.label === 'string' || (choice.label && typeof choice.label === 'object')))
-                  .map((choice: any) => ({ value: choice.value, label: choice.label,
-                    ...(choice.disabled === true ? { disabled: true } : {}) })) : [] } : {}),
+              ...(field.type === 'grouped-multiselect'
+                ? {
+                    options: Array.isArray(option.options)
+                      ? option.options
+                          .filter(
+                            (choice: any) =>
+                              choice &&
+                              typeof choice.value === 'string' &&
+                              choice.value.trim() &&
+                              (typeof choice.label === 'string' ||
+                                (choice.label && typeof choice.label === 'object')),
+                          )
+                          .map((choice: any) => ({
+                            value: choice.value,
+                            label: choice.label,
+                            ...(choice.disabled === true ? { disabled: true } : {}),
+                          }))
+                      : [],
+                  }
+                : {}),
               ...(option.disabled === true ? { disabled: true } : {}),
               ...(field.type === 'grouped-multiselect' && field.props?.defaultValuesField
-                ? { defaultValues: option[field.props.defaultValuesField] } : {}),
+                ? { defaultValues: option[field.props.defaultValuesField] }
+                : {}),
             };
           }
           if (option === undefined || option === null) return null;
@@ -851,9 +902,15 @@ export async function promptInputForm(
       const valuesField = field.props.valuesField || 'values';
       defaults[field.field] = (fieldOptions[field.field] || []).map((group) => {
         const values = group.defaultValues;
-        const eligible = new Set((group.options || []).filter((choice) => !choice.disabled).map((choice) => choice.value));
-        if (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || !eligible.has(value))
-          || new Set(values).size !== values.length || (group.disabled && values.length > 0)) {
+        const eligible = new Set(
+          (group.options || []).filter((choice) => !choice.disabled).map((choice) => choice.value),
+        );
+        if (
+          !Array.isArray(values) ||
+          values.some((value) => typeof value !== 'string' || !eligible.has(value)) ||
+          new Set(values).size !== values.length ||
+          (group.disabled && values.length > 0)
+        ) {
           throw new Error(`Invalid grouped defaults for ${field.field}`);
         }
         return { [groupField]: group.value, [valuesField]: [...values] };
@@ -950,20 +1007,29 @@ function readInputPath(source: unknown, path: string): unknown {
  *   }
  * }
  */
-actionRegistry.register('dialog.form', async ({ args, stateManager, scopeId, fetchResult, expressionContext, t, locale }) => {
-  if (!args?.fields) {
-    console.error('[ActionRegistry] dialog.form: missing fields in args');
-    return;
-  }
-  const formData = await promptInputForm(args.fields, args.title, fetchResult, args.submitLabel,
-    (expressionContext as Record<string, unknown> | undefined) ?? {}, { t, locale });
-  // Store form values in stateManager under form.{fieldName}
-  if (stateManager && scopeId) {
-    Object.entries(formData).forEach(([key, value]) => {
-      stateManager.updateForm(scopeId, key, value);
-    });
-  }
-});
+actionRegistry.register(
+  'dialog.form',
+  async ({ args, stateManager, scopeId, fetchResult, expressionContext, t, locale }) => {
+    if (!args?.fields) {
+      console.error('[ActionRegistry] dialog.form: missing fields in args');
+      return;
+    }
+    const formData = await promptInputForm(
+      args.fields,
+      args.title,
+      fetchResult,
+      args.submitLabel,
+      (expressionContext as Record<string, unknown> | undefined) ?? {},
+      { t, locale },
+    );
+    // Store form values in stateManager under form.{fieldName}
+    if (stateManager && scopeId) {
+      Object.entries(formData).forEach(([key, value]) => {
+        stateManager.updateForm(scopeId, key, value);
+      });
+    }
+  },
+);
 
 /**
  * event.emit - Dispatch a custom DOM event
@@ -1062,73 +1128,120 @@ actionRegistry.register('form.reset', ({ stateManager, scopeId }) => {
 });
 
 /** Explicitly replace declared form fields using evaluated values; other fields stay intact. */
-actionRegistry.register('form.set', ({ stateManager, scopeId, args, expressionEvaluator, expressionContext }) => {
-  if (!stateManager || !scopeId || !args || typeof args !== 'object' || Array.isArray(args)) {
-    throw new Error('form.set requires a scoped form and field values');
-  }
-  const entries = Object.entries(args);
-  if (entries.some(([key]) => !key.trim() || ['__proto__', 'prototype', 'constructor'].includes(key))) {
-    throw new Error('form.set contains an invalid field key');
-  }
-  const values = expressionEvaluator && expressionContext
-    ? expressionEvaluator.evaluateObject(args, expressionContext) : args;
-  if (Object.values(values).some((value) => value === undefined)) {
-    throw new Error('form.set contains an unresolved field value');
-  }
-  Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
-});
+actionRegistry.register(
+  'form.set',
+  ({ stateManager, scopeId, args, expressionEvaluator, expressionContext }) => {
+    if (!stateManager || !scopeId || !args || typeof args !== 'object' || Array.isArray(args)) {
+      throw new Error('form.set requires a scoped form and field values');
+    }
+    const entries = Object.entries(args);
+    if (
+      entries.some(
+        ([key]) => !key.trim() || ['__proto__', 'prototype', 'constructor'].includes(key),
+      )
+    ) {
+      throw new Error('form.set contains an invalid field key');
+    }
+    const values =
+      expressionEvaluator && expressionContext
+        ? expressionEvaluator.evaluateObject(args, expressionContext)
+        : args;
+    if (Object.values(values).some((value) => value === undefined)) {
+      throw new Error('form.set contains an unresolved field value');
+    }
+    Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
+  },
+);
 
 /** Allocate one domain request key in the existing scoped state, never per click. */
-actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
-  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
-    || Object.keys(args).some(key => !['field','persistence'].includes(key)) || typeof args.field !== 'string'
-    || (args.persistence !== undefined && args.persistence !== 'session')
-    || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
-    || ['__proto__', 'prototype', 'constructor'].includes(args.field))
-    throw new Error('state.ensureRequestKey requires a scoped field');
-  const current = stateManager.getContext(scopeId).state[args.field];
-  if (args.persistence === 'session') {
-    if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
-    stateManager.updateState(scopeId, args.field, requestKeySession.ensure(args.field, current));
-    return;
-  }
-  if (current !== undefined && current !== null) {
-    if (typeof current !== 'string' || !current.length || current.length > 128
-      || current.trim() !== current || /[\x00-\x1f\x7f]/.test(current))
-      throw new Error('Invalid existing request key');
-    return;
-  }
-  if (typeof globalThis.crypto?.randomUUID !== 'function')
-    throw new Error('Secure request key generation is unavailable');
-  const key = globalThis.crypto.randomUUID();
-  stateManager.updateState(scopeId, args.field, key);
-});
+actionRegistry.register(
+  'state.ensureRequestKey',
+  ({ stateManager, scopeId, args, requestKeySession }) => {
+    if (
+      !stateManager ||
+      !scopeId ||
+      !stateManager.getScope(scopeId) ||
+      !args ||
+      Object.keys(args).some((key) => !['field', 'persistence'].includes(key)) ||
+      typeof args.field !== 'string' ||
+      (args.persistence !== undefined && args.persistence !== 'session') ||
+      !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field) ||
+      ['__proto__', 'prototype', 'constructor'].includes(args.field)
+    )
+      throw new Error('state.ensureRequestKey requires a scoped field');
+    const current = stateManager.getContext(scopeId).state[args.field];
+    if (args.persistence === 'session') {
+      if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
+      stateManager.updateState(scopeId, args.field, requestKeySession.ensure(args.field, current));
+      return;
+    }
+    if (current !== undefined && current !== null) {
+      if (
+        typeof current !== 'string' ||
+        !current.length ||
+        current.length > 128 ||
+        current.trim() !== current ||
+        /[\x00-\x1f\x7f]/.test(current)
+      )
+        throw new Error('Invalid existing request key');
+      return;
+    }
+    if (typeof globalThis.crypto?.randomUUID !== 'function')
+      throw new Error('Secure request key generation is unavailable');
+    const key = globalThis.crypto.randomUUID();
+    stateManager.updateState(scopeId, args.field, key);
+  },
+);
 
 /** Restore only an existing authenticated session UUID; never allocate or persist one. */
-actionRegistry.register('state.peekRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
-  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
-    || Object.keys(args).length !== 2 || Object.keys(args).some(key => !['field','persistence'].includes(key))
-    || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
-    || ['__proto__','prototype','constructor'].includes(args.field) || args.persistence !== 'session')
-    throw new Error('Invalid request key peek');
-  if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
-  const restored = requestKeySession.peek(args.field, stateManager.getContext(scopeId).state[args.field]);
-  stateManager.updateState(scopeId, args.field, restored);
-});
+actionRegistry.register(
+  'state.peekRequestKey',
+  ({ stateManager, scopeId, args, requestKeySession }) => {
+    if (
+      !stateManager ||
+      !scopeId ||
+      !stateManager.getScope(scopeId) ||
+      !args ||
+      Object.keys(args).length !== 2 ||
+      Object.keys(args).some((key) => !['field', 'persistence'].includes(key)) ||
+      typeof args.field !== 'string' ||
+      !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field) ||
+      ['__proto__', 'prototype', 'constructor'].includes(args.field) ||
+      args.persistence !== 'session'
+    )
+      throw new Error('Invalid request key peek');
+    if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
+    const restored = requestKeySession.peek(
+      args.field,
+      stateManager.getContext(scopeId).state[args.field],
+    );
+    stateManager.updateState(scopeId, args.field, restored);
+  },
+);
 
 /** Explicit completion/next-attempt transition; ordinary state.set never clears persisted intent. */
-actionRegistry.register('state.clearRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
-  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
-    || Object.keys(args).some(key => !['field','persistence'].includes(key))
-    || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
-    || ['__proto__','prototype','constructor'].includes(args.field)
-    || (args.persistence !== undefined && args.persistence !== 'session')) throw new Error('Invalid request key clear');
-  if (args.persistence === 'session') {
-    if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
-    requestKeySession.clear(args.field, stateManager.getContext(scopeId).state[args.field]);
-  }
-  stateManager.updateState(scopeId, args.field, null);
-});
+actionRegistry.register(
+  'state.clearRequestKey',
+  ({ stateManager, scopeId, args, requestKeySession }) => {
+    if (
+      !stateManager ||
+      !scopeId ||
+      !stateManager.getScope(scopeId) ||
+      !args ||
+      Object.keys(args).some((key) => !['field', 'persistence'].includes(key)) ||
+      typeof args.field !== 'string' ||
+      !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field) ||
+      ['__proto__', 'prototype', 'constructor'].includes(args.field) ||
+      (args.persistence !== undefined && args.persistence !== 'session')
+    )
+      throw new Error('Invalid request key clear');
+    if (args.persistence === 'session') {
+      if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
+      requestKeySession.clear(args.field, stateManager.getContext(scopeId).state[args.field]);
+    }
+    stateManager.updateState(scopeId, args.field, null);
+  },
+);
 
 /**
  * state.set - 设置状态
@@ -1248,7 +1361,8 @@ actionRegistry.register(
       // or subsequent success feedback. HTTP success alone is insufficient.
       if (!ResultHelper.isSuccess(result)) {
         const fallback = translateOrFallback(
-          t, 'message.operation.failed',
+          t,
+          'message.operation.failed',
           locale?.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed',
         );
         throw new Error(resolveCommandErrorMessage(result, '', t, locale, fallback));
@@ -1348,28 +1462,38 @@ actionRegistry.register(
 
     let validatedVersion: number | undefined;
     if (args?.expectedVersion !== undefined) {
-      const version = typeof expectedVersion === 'number' || typeof expectedVersion === 'string'
-        ? (String(expectedVersion).trim() === '' ? NaN : Number(expectedVersion)) : NaN;
+      const version =
+        typeof expectedVersion === 'number' || typeof expectedVersion === 'string'
+          ? String(expectedVersion).trim() === ''
+            ? NaN
+            : Number(expectedVersion)
+          : NaN;
       if (!Number.isSafeInteger(version) || version < 0) {
-        throw new Error(translateOrFallback(t, 'error.data_load_failed', 'Unable to load the current record'));
+        throw new Error(
+          translateOrFallback(t, 'error.data_load_failed', 'Unable to load the current record'),
+        );
       }
       validatedVersion = version;
     }
+
+    mergeCommandInputPayload(payload, {}, args?.inputFieldsPayloadKey);
 
     // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
     // fields, then merge the collected values into the command payload. Lets a DSL
     // page express "click button → small form → submit command" in one action,
     // without a page-specific React component. User cancel aborts (no submit).
+    let collectedInputs: Record<string, unknown> = {};
     if (Array.isArray(args?.inputFields) && args.inputFields.length > 0) {
-      const collected = await promptInputForm(
-          args.inputFields,
-          args?.inputFieldsTitle,
-          fetchResult,
-          args?.inputFieldsSubmitLabel,
-          (expressionContext as Record<string, unknown> | undefined) ?? {}, { t, locale },
-        );
-      payload = { ...payload, ...collected };
+      collectedInputs = await promptInputForm(
+        args.inputFields,
+        args?.inputFieldsTitle,
+        fetchResult,
+        args?.inputFieldsSubmitLabel,
+        (expressionContext as Record<string, unknown> | undefined) ?? {},
+        { t, locale },
+      );
     }
+    payload = mergeCommandInputPayload(payload, collectedInputs, args?.inputFieldsPayloadKey);
 
     const body: Record<string, any> = {
       ...buildCommandTargetParams(targetRecordPid ?? targetRecordPid),

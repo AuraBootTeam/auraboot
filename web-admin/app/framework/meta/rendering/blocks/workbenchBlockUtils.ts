@@ -1,3 +1,4 @@
+import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
@@ -427,7 +428,10 @@ function snapshotActionValue(value: any, seen = new WeakMap<object, any>()): any
   seen.set(value, copy);
   for (const [key, item] of Object.entries(value)) {
     Object.defineProperty(copy, key, {
-      value: snapshotActionValue(item, seen), enumerable: true, writable: true, configurable: true,
+      value: snapshotActionValue(item, seen),
+      enumerable: true,
+      writable: true,
+      configurable: true,
     });
   }
   return copy;
@@ -500,6 +504,7 @@ async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: an
     // THIS path (not ActionRegistry), so the platform inputFields feature must be wired here
     // too — otherwise a detail-page action with inputFields silently skips the form and fails
     // (the cr_account "导入凭据" gate-gap, caught by the credential golden).
+    mergeCommandInputPayload(args.payload || {}, {}, args.inputFieldsPayloadKey);
     let collectedInputs: Record<string, any> = {};
     if (Array.isArray(args.inputFields) && args.inputFields.length > 0) {
       const { promptInputForm } = await import('~/framework/meta/runtime/actions/ActionRegistry');
@@ -539,8 +544,13 @@ async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: an
       expectedVersion,
       targetRecordPid,
       operationType,
-      payload: { ...(args.payload || {}), ...collectedInputs },
+      payload: mergeCommandInputPayload(
+        args.payload || {},
+        collectedInputs,
+        args.inputFieldsPayloadKey,
+      ),
     };
+    if (args.idempotent === true) params.clientRequestId = crypto.randomUUID();
     // Upload only after the form and command preflight succeed. Reuse the platform
     // multipart bridge; browser authentication stays in the same-origin BFF session.
     // Neither File bytes nor a DSL-supplied upload URL belong in command JSON.
