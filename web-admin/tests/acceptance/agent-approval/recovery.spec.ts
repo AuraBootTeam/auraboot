@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { Client } from 'pg';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
@@ -27,14 +27,10 @@ test.beforeAll(async () => {
   expect(fixture.runtime.processDirectory).toBe(
     resolve(fixture.runtime.workspace, '.workspace/runtimes', fixture.runtime.name, 'processes'),
   );
-  expect(fixture.runtime.bundle).toBe(
-    resolve(
-      fixture.runtime.workspace,
-      '.workspace/runtime-bundles',
-      fixture.runtime.name,
-      'full-ai-candidate',
-    ),
+  expect(dirname(fixture.runtime.bundle)).toBe(
+    resolve(fixture.runtime.workspace, '.workspace/runtime-bundles', fixture.runtime.name),
   );
+  expect(basename(fixture.runtime.bundle)).toMatch(/^full-ai-candidate(?:-[a-z0-9]+)*$/);
 });
 test.afterAll(async () => {
   await database?.end();

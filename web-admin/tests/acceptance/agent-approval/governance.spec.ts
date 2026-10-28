@@ -117,6 +117,15 @@ test('WB4: permission revoked after a real proposal is enforced at execution, fo
   await expect(page.getByTestId('chat-msg-agent').last()).toContainText(fixture.form.manualName);
   await expect(page.getByTestId('chat-msg-agent').last()).toContainText(fixture.form.manualContact);
   expect(await modelEffect(database, code)).toEqual({ rows: [], physical: null });
+  const queryCard = page.getByTestId('chatbi-result-card').last();
+  await expect(queryCard).toHaveAttribute('data-model-code', 'e2et_customer');
+  await expect(
+    queryCard.getByRole('columnheader', { name: '客户名称', exact: true }),
+  ).toBeVisible();
+  await expect(queryCard.getByRole('columnheader', { name: '联系人', exact: true })).toBeVisible();
+  await expect(
+    queryCard.getByRole('columnheader', { name: /^(tenant_id|pid|id|e2et_cust_)/ }),
+  ).toHaveCount(0);
   await page.screenshot({ path: join(evidence, 'WB4-read-recovered.png'), fullPage: true });
   record('WB4-proof', {
     code,
