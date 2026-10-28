@@ -1403,6 +1403,26 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             }
             return;
           }
+
+          default: {
+            // Unknown action.type (e.g. "command.execute", which is only valid
+            // as an ActionRegistry flow step) used to fall through this switch
+            // silently, leaving the button a no-op with no diagnostic
+            // (plugins#771). Surface the misconfiguration loudly instead:
+            // always log with the page identifier; throw in development so the
+            // catch block turns it into a visible error surface.
+            const supportedTypes =
+              'command, navigate, state_transition, builtin, workflow, flow';
+            const detail =
+              `Unknown action.type "${actionDef.type}" on button "${normalizedButton.code}" ` +
+              `(page: ${tableName}). Supported types: ${supportedTypes}. ` +
+              `Note: "command.execute" is a flow-step action, not a button action type.`;
+            console.error(`[useActionHandler] ${detail}`);
+            if (process.env.NODE_ENV === 'development') {
+              throw new Error(detail);
+            }
+            return;
+          }
         }
       } catch (err) {
         if (actionSignal?.aborted || actionScope?.aborted) return;
