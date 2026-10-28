@@ -374,7 +374,15 @@ public class StepLoopService {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> approvedInput = pending.get("approvalInput") instanceof Map<?, ?> input
                         ? (Map<String, Object>) input : Map.of("stepIndex", i);
-                if (!approvalGate.consumeResumeGrant(tenantId, taskPid, approvalPid, toolName, approvedInput)) {
+                AgentToolDefinition resumedDefinition = findToolDef(tools, toolName);
+                if (pending.containsKey("approvalToolName") && resumedDefinition == null) {
+                    throw new org.springframework.security.access.AccessDeniedException(
+                            "Saved approved tool is not available in the current tool scope");
+                }
+                boolean toolBoundaryClaimsApproval = pending.containsKey("approvalToolName")
+                        && !"AURABOT_SKILL".equals(resumedDefinition.getToolType());
+                if (!toolBoundaryClaimsApproval
+                        && !approvalGate.consumeResumeGrant(tenantId, taskPid, approvalPid, toolName, approvedInput)) {
                     throw new org.springframework.security.access.AccessDeniedException(
                             "Resumed step requires an unconsumed approval for its exact input");
                 }
@@ -1135,13 +1143,13 @@ public class StepLoopService {
         long started = System.currentTimeMillis();
         step.setStatus(AgentPlanStep.StepStatus.RUNNING);
         step.setStartedAt(LocalDateTime.now());
-        List<AgentToolDefinition> approvedTools = markToolApproved(tools, toolName);
         String previewToken = output.get("approvalPreviewToken") instanceof String token ? token : null;
+        String approvalPid = output.get("approvalPid") instanceof String pid ? pid : null;
         String result = previewToken != null && !previewToken.isBlank()
                 ? toolLoopService.confirmAuraBotSkill(tenantId, runPid, taskPid, agentCode,
                         toolName, approvedInput, tools, previewToken, traceCtx)
-                : toolLoopService.executeToolCall(tenantId, runPid, taskPid, agentCode,
-                        toolName, approvedInput, approvedTools, traceCtx);
+                : toolLoopService.executeApprovedToolCall(tenantId, runPid, taskPid, agentCode,
+                        toolName, approvedInput, tools, traceCtx, approvalPid);
         throwIfApprovalRequiredToolResult(result, toolName, approvedInput, tenantId, runPid, taskPid, tools);
         if (!ToolResultOutcome.isSuccess(result, objectMapper)) {
             String failure = "Approved tool execution failed: " + toolName;
@@ -1177,33 +1185,6 @@ public class StepLoopService {
                 "step", stepIndex,
                 "resumedApproval", true));
         return true;
-    }
-
-    private List<AgentToolDefinition> markToolApproved(List<AgentToolDefinition> tools, String approvedToolName) {
-        if (tools == null || tools.isEmpty()) {
-            return List.of();
-        }
-        List<AgentToolDefinition> approved = new ArrayList<>(tools.size());
-        for (AgentToolDefinition def : tools) {
-            if (def == null) {
-                continue;
-            }
-            boolean approvedTarget = approvedToolName != null && approvedToolName.equals(def.getName());
-            approved.add(AgentToolDefinition.builder()
-                    .name(def.getName())
-                    .description(def.getDescription())
-                    .inputSchema(def.getInputSchema())
-                    .toolType(def.getToolType())
-                    .sourceCode(def.getSourceCode())
-                    .requiresApproval(approvedTarget ? false : def.isRequiresApproval())
-                    .requiresConfirmation(def.isRequiresConfirmation())
-                    .riskLevel(def.getRiskLevel())
-                    .requiredPermissions(def.getRequiredPermissions())
-                    .confirmationPolicy(def.getConfirmationPolicy())
-                    .nativeToolConfig(def.getNativeToolConfig())
-                    .build());
-        }
-        return approved;
     }
 
     private void throwIfApprovalRequiredToolResult(String rawResult, String toolName, Map<String, Object> input,
