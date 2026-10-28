@@ -33,6 +33,21 @@ class AgentApprovalGateServiceConcurrencyTest {
     @Mock private AgentDispatchHandler dispatchHandler;
 
     @Test
+    void approvalPersistenceFailureCannotAuthorizeTheTool() {
+        when(dynamicDataMapper.selectByQuery(anyString(), any())).thenAnswer(call ->
+                ((String) call.getArgument(0)).contains("FROM ab_approval_policy")
+                        ? List.of(Map.of("pid", "owned-policy", "timeout_hours", 24,
+                            "trigger_rules", "[{\"type\":\"tool_call\",\"pattern\":\"custom:owned\"}]"))
+                        : List.of());
+        when(dynamicDataMapper.insert(eq("ab_agent_approval"), any()))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("owned storage failure"));
+        assertThatThrownBy(() -> newService().checkAndRequestApproval(
+                1L, "run", "task", "custom:owned", "Owned controlled tool", Map.of(), true))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Tool approval is unavailable");
+        verify(eventBus, never()).publishAfterCommit(any());
+    }
+
+    @Test
     @DisplayName("approve uses pending-status compare-and-set update")
     void approveUsesPendingStatusCompareAndSetUpdate() {
         AgentApprovalGateService service = newService();

@@ -158,7 +158,7 @@ public class AgentApprovalGateService {
             return approvalPid;
         } catch (Exception e) {
             log.error("Failed to create approval request: {}", e.getMessage(), e);
-            return null;
+            throw new IllegalStateException("Tool approval is unavailable; execution is blocked", e);
         }
     }
 
