@@ -46,7 +46,8 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   const agentPid = fixtureBody.data.data.recordPid;
   expect(agentPid).toBeTruthy();
   await page.goto('/home');
-  await page.getByText('AI 中心', { exact: true }).first().click();
+  const skillsMenu = page.getByRole('link', { name: '技能管理', exact: true });
+  if (!(await skillsMenu.isVisible())) await page.getByRole('button', { name: 'AI 中心', exact: true }).click();
   await page.getByRole('link', { name: '技能管理', exact: true }).click();
   await expect(page).toHaveURL(/\/p\/agent_skill$/);
   await expect(page.getByRole('button', { name: /新建|Create/ }).first()).toBeVisible();
