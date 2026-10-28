@@ -77,6 +77,8 @@ test('A1: committed model survives JVM death before its step checkpoint without 
       ),
     ).toHaveLength(0);
     record('A1-observed-commit-checkpoint-window', { before, window, waiting, committed });
+    await expect(page.getByTestId('result-contract').getByText('工具已执行', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('result-contract').getByText('已完成', { exact: true })).toHaveCount(0);
     await page.screenshot({ path: join(evidence, 'A1-awaiting-checkpoint.png'), fullPage: true });
     const oldPid = await interruptBackend('A1');
     await blocker.query('ROLLBACK');

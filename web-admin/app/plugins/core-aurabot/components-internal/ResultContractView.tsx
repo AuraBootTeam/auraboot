@@ -286,8 +286,8 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
       <div className={`flex items-center gap-2 text-sm ${color}`}>
         <Icon className="h-4 w-4 shrink-0" />
         <span>{text({
-          'zh-CN': ({ success: '已完成', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
-          'en-US': ({ success: 'Completed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
+          'zh-CN': ({ success: '工具已执行', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
+          'en-US': ({ success: 'Tool executed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
         })}</span>
       </div>
       <details className="min-w-0 text-xs text-gray-500" data-testid="rc-diagnostics">
