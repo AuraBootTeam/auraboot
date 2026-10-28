@@ -119,30 +119,8 @@ public class AnnouncementAcknowledgementAccessorImpl implements AnnouncementAckn
 
     private Check check(Requirement required, Long tenant, String user, Announcement root,
                         Map<String,Object> version, Instant now) {
-        if (root == null || Boolean.TRUE.equals(root.getDeletedFlag())) return absent(required, Status.MISSING, now);
-        String active = root.getActiveVersionPid(), hash = (String) version.get("snapshot_hash");
-        Instant expiry = instant(version.get("expires_at"));
-        String publication = (String) version.get("publication_state");
-        Status unavailable = "withdrawn".equals(publication) ? Status.WITHDRAWN
-                : "expired".equals(publication) || expiry != null && !now.isBefore(expiry) ? Status.EXPIRED
-                : !required.versionPid().equals(active) ? Status.SUPERSEDED
-                : !"published".equals(publication) || !"published".equals(root.getStatus()) ? Status.NOT_VISIBLE : null;
-        if (unavailable != null) return new Check(required.versionPid(), active, null, unavailable,
-                false, false, true, false, null, null, now, expiry);
-        var recipient = proof.recipient(tenant, required.versionPid(), user, required.memberPid());
-        if (recipient == null) return new Check(required.versionPid(), active, null, Status.NOT_VISIBLE,
-                true, false, true, false, null, null, now, expiry);
-        var snapshot = codec.object((String) version.get("snapshot"));
-        boolean needsAck = snapshot.get("policy") instanceof Map<?,?> policy
-                && Boolean.TRUE.equals(policy.get("acknowledgementRequired"));
-        Instant acknowledged = instant(recipient.get("acknowledged_at"));
-        String acknowledgedHash = (String) recipient.get("acknowledged_hash");
-        Status status = !required.snapshotHash().equals(hash) ? Status.SNAPSHOT_CHANGED
-                : !needsAck ? Status.NOT_REQUIRED
-                : recipient.get("first_read_at") == null || acknowledged == null || !hash.equals(acknowledgedHash)
-                    || acknowledged.isAfter(now) ? Status.NOT_ACKNOWLEDGED : Status.SATISFIED;
-        return new Check(required.versionPid(), active, hash, status, true, true, true,
-                needsAck, acknowledged, acknowledgedHash, now, expiry);
+        return new AnnouncementSubjectAcknowledgementService(proof, lifecycle, codec)
+                .evaluate(required, tenant, user, root, version, now);
     }
 
     private static Check absent(Requirement required, Status status, Instant now) {

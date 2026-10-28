@@ -111,9 +111,16 @@ public class AnnouncementContentSealService {
     }
 
     private void verifyBeforeCommit(Long tenant,String version,String hash,Map<String,Object> snapshot) {
+        var publisher=MetaContext.snapshot();
+        if(publisher==null || !Objects.equals(tenant,publisher.tenantId())) throw denied();
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                 new org.springframework.transaction.support.TransactionSynchronization() {
-                    @Override public void beforeCommit(boolean readOnly) { verifySeal(tenant,version,hash,snapshot); }
+                    @Override public void beforeCommit(boolean readOnly) {
+                        // A release worker restores its caller before the outer transaction commits.
+                        // Replay only the original identity, preserving the same transaction and restoring
+                        // the commit thread's prior context even when byte/retention verification rejects.
+                        MetaContext.runWithSnapshot(publisher,()->verifySeal(tenant,version,hash,snapshot));
+                    }
                 });
     }
 
