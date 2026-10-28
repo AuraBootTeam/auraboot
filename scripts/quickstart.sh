@@ -187,5 +187,10 @@ fi
 say "${GREEN}✓${NC} plugin reference integrity"
 
 say "\n${GREEN}AuraBoot is ready.${NC}"
-say "  ${BACKEND_URL}   ${DIM}(configured frontend URL)${NC}"
+say "  API endpoint: ${BACKEND_URL}"
+if [[ -n "${FRONTEND_BASE_URL:-}" ]]; then
+  say "  Web app: ${FRONTEND_BASE_URL}"
+else
+  say "  Open your configured web app URL to sign in."
+fi
 say "  ${ADMIN_EMAIL}   ${DIM}— use your configured administrator password${NC}"

@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 // Hermetic shell/API contract only. This fixture does not prove product installation.
-async function runQuickstart(spaces, args = []) {
+async function runQuickstart(spaces, args = [], envOverrides = {}) {
   const calls = [];
   const server = http.createServer(async (req, res) => {
     let input = '';
@@ -30,7 +30,7 @@ async function runQuickstart(spaces, args = []) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try {
     const script = process.env.AURA_QUICKSTART_TEST_SCRIPT || fileURLToPath(new URL('./quickstart.sh', import.meta.url));
-    const child = spawn('bash', [script, ...args], { env: { ...process.env, BACKEND_URL: `http://127.0.0.1:${server.address().port}`, ADMIN_EMAIL: 'fixture-admin@example.test', ADMIN_PASSWORD: 'fixture-private-password', AURA_ADMIN_TENANT_ID: '', NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1' } });
+    const child = spawn('bash', [script, ...args], { env: { ...process.env, BACKEND_URL: `http://127.0.0.1:${server.address().port}`, ADMIN_EMAIL: 'fixture-admin@example.test', ADMIN_PASSWORD: 'fixture-private-password', AURA_ADMIN_TENANT_ID: '', NO_PROXY: 'localhost,127.0.0.1', no_proxy: 'localhost,127.0.0.1', FRONTEND_BASE_URL: '', ...envOverrides } });
     let output = ''; child.stdout.on('data', chunk => output += chunk); child.stderr.on('data', chunk => output += chunk);
     const code = await new Promise((resolve, reject) => { child.on('exit', resolve); child.on('error', reject); });
     return { code, output, calls, baseURL: `http://127.0.0.1:${server.address().port}` };
@@ -68,4 +68,19 @@ test('unknown quickstart options are rejected before contacting the backend', as
   const result = await runQuickstart([business], ['--unknown']);
   assert.equal(result.code, 2);
   assert.equal(result.calls.length, 0);
+});
+
+
+test('host-first quickstart distinguishes a configured web app from the API endpoint', async () => {
+  const result=await runQuickstart([business],[],{FRONTEND_BASE_URL:'http://127.0.0.1:5187'});
+  assert.equal(result.code,0,result.output);
+  assert.ok(result.output.includes('API endpoint: '+result.baseURL));
+  assert.ok(result.output.includes('Web app: http://127.0.0.1:5187'));
+  assert.ok(!result.output.includes('(configured frontend URL)'));
+});
+test('quickstart never invents a web app URL when only an API endpoint is known', async () => {
+  const result=await runQuickstart([business]);assert.equal(result.code,0,result.output);
+  assert.ok(result.output.includes('API endpoint: '+result.baseURL));
+  assert.ok(!result.output.includes('Web app: '));
+  assert.ok(result.output.includes('Open your configured web app URL'));
 });
