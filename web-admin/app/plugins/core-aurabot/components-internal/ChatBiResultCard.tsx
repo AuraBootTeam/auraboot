@@ -231,13 +231,13 @@ function DataTable({
   );
   return (
     <div className="max-h-[300px] overflow-auto">
-      <table className="w-full text-xs text-gray-700 dark:text-gray-300">
+      <table className="w-full min-w-max text-xs text-gray-700 dark:text-gray-300">
         <thead>
           <tr className="border-b border-gray-200 dark:border-gray-700">
             {columns.map((col) => (
               <th
                 key={col}
-                className={`px-2 py-1.5 font-medium text-gray-500 dark:text-gray-400 ${numeric.has(col) ? 'text-right' : 'text-left'}`}
+                className={`whitespace-nowrap px-2 py-1.5 font-medium text-gray-500 dark:text-gray-400 ${numeric.has(col) ? 'text-right' : 'text-left'}`}
               >
                 {labels[col] || col}
               </th>
@@ -253,7 +253,7 @@ function DataTable({
               {columns.map((col) => (
                 <td
                   key={col}
-                  className={`px-2 py-1.5 ${numeric.has(col) ? 'text-right tabular-nums' : ''}`}
+                  className={`whitespace-nowrap px-2 py-1.5 ${numeric.has(col) ? 'text-right tabular-nums' : ''}`}
                 >
                   {typeof row[col] === 'number' && formats[col]
                     ? formats[col].format(row[col])

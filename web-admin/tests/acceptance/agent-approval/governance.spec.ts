@@ -128,6 +128,7 @@ test('WB4: permission revoked after a real proposal is enforced at execution, fo
   await expect(
     queryCard.getByRole('columnheader', { name: /^(tenant_id|pid|id|e2et_cust_)/ }),
   ).toHaveCount(0);
+  await queryCard.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(evidence, 'WB4-read-recovered.png'), fullPage: true });
   record('WB4-proof', {
     code,
