@@ -140,6 +140,22 @@ function resolveTargetExpectedVersion(
  * (e.g. confirming a quote line from a price-evidence row) it fetches the
  * target record so strict UPDATE/DELETE mutations always send a version.
  */
+/**
+ * Resolve the model that backs this page's records for a direct record read
+ * (the pin-GET snapshot before command inputs). Callers holding a page schema
+ * pass `recordReadModel` (route segments are page keys on custom pages and may
+ * differ from the model, while /api/dynamic record reads authorize
+ * `model.{pageKey}.read` against the raw URL segment). Block renderers already
+ * resolve their row model into `tableName` (resolveRowActionModel), so the
+ * default keeps that contract.
+ */
+function resolveRecordReadModel(
+  recordReadModel: string | undefined,
+  tableName: string,
+): string {
+  return toNonBlankString(recordReadModel) || tableName;
+}
+
 async function resolveCommandExpectedVersion(
   targetRecordPid: string | undefined,
   operationType: string | undefined,
@@ -351,6 +367,15 @@ export interface UseActionHandlerOptions {
   // 路由相关
   navigate: NavigateFunction;
   tableName: string;
+  /**
+   * Model used for direct record reads (the pin-GET snapshot before command
+   * inputs). Route segments are page keys on custom pages (e.g. wg_my_wage)
+   * and may differ from the model, while /api/dynamic reads authorize
+   * `model.{pageKey}.read` against the raw segment — page-level callers pass
+   * `schema.modelCode` here. Defaults to tableName, which block renderers
+   * already resolve to the row model (resolveRowActionModel).
+   */
+  recordReadModel?: string;
 
   // 业务上下文 (可选 - 根据页面类型提供不同的上下文)
   context?: {
@@ -437,6 +462,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     runtime,
     navigate,
     tableName,
+    recordReadModel,
     context = {},
     dataSourceManager,
     locale,
@@ -815,15 +841,16 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // the page snapshot after background writes causes false CAS conflicts;
             // fetching at submit would instead hide edits made while the dialog is open.
             // Explicit row actions and confirmations retain the snapshot the user reviewed.
+            const resolvedRecordModel = resolveRecordReadModel(recordReadModel, tableName);
             if (
               (inputFields.length > 0 || (!record && !confirmKey)) &&
               targetRecordPid &&
-              tableName &&
+              resolvedRecordModel &&
               !offboardingAction &&
               resolveTargetExpectedVersion(targetRecordPid, actionRecord) != null
             ) {
               const freshResult = await fetchResult(
-                `/api/dynamic/${encodeURIComponent(tableName)}/${encodeURIComponent(targetRecordPid)}`,
+                `/api/dynamic/${encodeURIComponent(resolvedRecordModel)}/${encodeURIComponent(targetRecordPid)}`,
                 { method: 'get', token },
               );
               if (!ResultHelper.isSuccess(freshResult)) {
@@ -1400,6 +1427,26 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 }
               }
               if (context.loadData) await context.loadData({ filters: context.filters });
+            }
+            return;
+          }
+
+          default: {
+            // Unknown action.type (e.g. "command.execute", which is only valid
+            // as an ActionRegistry flow step) used to fall through this switch
+            // silently, leaving the button a no-op with no diagnostic
+            // (plugins#771). Surface the misconfiguration loudly instead:
+            // always log with the page identifier; throw in development so the
+            // catch block turns it into a visible error surface.
+            const supportedTypes =
+              'command, navigate, state_transition, builtin, workflow, flow';
+            const detail =
+              `Unknown action.type "${actionDef.type}" on button "${normalizedButton.code}" ` +
+              `(page: ${tableName}). Supported types: ${supportedTypes}. ` +
+              `Note: "command.execute" is a flow-step action, not a button action type.`;
+            console.error(`[useActionHandler] ${detail}`);
+            if (process.env.NODE_ENV === 'development') {
+              throw new Error(detail);
             }
             return;
           }
