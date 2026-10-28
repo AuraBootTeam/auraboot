@@ -121,6 +121,30 @@ class SkillEngineTest {
     }
 
     @Test
+    void jdbcJsonbSchemasToolsAndStepMappingsPreserveTheExecutionContract() throws Exception {
+        org.postgresql.util.PGobject schema = new org.postgresql.util.PGobject();
+        schema.setType("jsonb");
+        schema.setValue("{\"type\":\"object\",\"properties\":{\"count\":{\"type\":\"integer\",\"minimum\":1}},\"required\":[\"count\"]}");
+        org.postgresql.util.PGobject tools = new org.postgresql.util.PGobject();
+        tools.setType("jsonb"); tools.setValue("[\"first\",\"second\"]");
+        org.postgresql.util.PGobject mappings = new org.postgresql.util.PGobject();
+        mappings.setType("jsonb"); mappings.setValue("{\"1\":{\"copiedCount\":\"$ref:input.count\"}}");
+        when(agentSkillService.loadSkill(1L, "jdbc")).thenReturn(Map.of(
+                "execution_mode", "sequential", "skill_input_schema", schema,
+                "skill_tools", tools, "step_input_mappings", mappings));
+        when(agentSkillService.resolveSkillTools(1L, "jdbc")).thenReturn(List.of(
+                AgentToolDefinition.builder().name("first").build(),
+                AgentToolDefinition.builder().name("second").build()));
+        when(toolLoopService.executeToolCall(anyLong(), anyString(), any(), any(), anyString(), any(), any(), any()))
+                .thenReturn("{\"success\":true}");
+        SkillResult result = skillEngine.execute(1L, "run", "jdbc",
+                SkillInput.builder().parameters(Map.of("count", 2)).build(), null, null, null);
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+        verify(toolLoopService).executeToolCall(eq(1L), eq("run"), any(), any(), eq("second"),
+                eq(Map.of("count", 2, "copiedCount", 2)), any(), any());
+    }
+
+    @Test
     void pendingSequentialStepStopsBestEffortAndWholeRecipeRetry() {
         when(agentSkillService.loadSkill(1L, "sequence")).thenReturn(Map.of(
                 "execution_mode", "sequential", "failure_mode", "retry_then_fail", "max_retry", 3,

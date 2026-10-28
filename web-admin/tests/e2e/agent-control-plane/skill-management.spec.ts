@@ -13,6 +13,7 @@ test.use({
 });
 const shots = process.env.AURA_EVIDENCE_DIR ?? 'test-results/skill-management';
 const code = `skill_ui_${Date.now()}`;
+const skillName = `技能管理业务验收-${code}`;
 test('SM01-07: maintain, bind and execute a skill from the AI Center menu', async ({
   page,
   baseURL,
@@ -60,7 +61,7 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
     .click();
   const editor = page.getByTestId('skill-definition-editor');
   await expect(editor).toBeVisible();
-  await editor.getByLabel('技能名称', { exact: true }).fill('技能管理业务验收');
+  await editor.getByLabel('技能名称', { exact: true }).fill(skillName);
   await editor.getByLabel('技能标识', { exact: true }).fill(code);
   await editor.getByLabel('版本', { exact: true }).fill('1.0.0');
   await editor.getByLabel('使用状态', { exact: true }).selectOption('active');
@@ -70,6 +71,10 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   await editor.getByLabel('业务模型范围', { exact: true }).fill('agent_skill');
   await editor.getByRole('button', { name: '加载工具', exact: true }).click();
   await editor.getByTestId('skill-tool-list:agent_skill').check();
+  await editor.getByRole('button', { name: '添加参数', exact: true }).click();
+  await editor.getByLabel('参数名称', { exact: true }).fill('keyword');
+  await editor.getByLabel('显示名称', { exact: true }).fill('查找技能');
+  await editor.getByLabel('必填', { exact: true }).check();
   const saved = page.waitForResponse(
     (response) =>
       response.url().includes('/api/meta/commands/execute/acp:create_agent_skill') &&
@@ -81,16 +86,16 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   const skillPid = savedBody.data.data.recordPid;
   expect(skillPid).toBeTruthy();
   await expect(page).toHaveURL(new RegExp(`/p/agent_skill/edit/${skillPid}$`));
-  await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue('技能管理业务验收');
+  await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue(skillName);
   await page.reload();
   await expect(editor.getByTestId('skill-tool-list:agent_skill')).toHaveCount(0); // scoped tools are explicitly reloaded, never fabricated
-  await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue('技能管理业务验收');
+  await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue(skillName);
   await page.screenshot({ path: path.join(shots, 'SM02.png'), fullPage: true });
-  await editor.getByLabel('技能名称', { exact: true }).fill('技能管理业务验收·修订');
+  await editor.getByLabel('技能名称', { exact: true }).fill(`${skillName}·修订`);
   await editor.getByRole('button', { name: '保存技能', exact: true }).click();
   await expect(editor.getByRole('status').filter({ hasText: '技能已保存' })).toBeVisible();
   const current = await (await page.request.get(`/api/dynamic/agent-skill/${skillPid}`)).json();
-  expect(current.data.skill_name).toBe('技能管理业务验收·修订');
+  expect(current.data.skill_name).toBe(`${skillName}·修订`);
   expect(current.data.execution_mode).toBe('template');
   expect(typeof current.data.skill_input_schema).toBe('string');
   await page.screenshot({ path: path.join(shots, 'SM03.png'), fullPage: true });
@@ -103,6 +108,7 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   expect(JSON.parse(bound.data.skills)).toContain(code);
   expect(JSON.parse(bound.data.skills)).toContain('form_draft_fill');
   await page.screenshot({ path: path.join(shots, 'SM05.png'), fullPage: true });
+  await editor.getByLabel('查找技能', { exact: true }).fill(code);
   const run = editor.getByRole('button', { name: '执行一次', exact: true });
   await expect(run).toBeDisabled();
   await editor.getByLabel('我已核对输入，允许本次真实执行。', { exact: true }).check();
@@ -114,6 +120,8 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   expect(execution.code).toBe('0');
   expect(execution.data.status).toBe('SUCCESS');
   expect(execution.data.toolCallCount).toBe(1);
+  expect(JSON.stringify(execution.data.data)).toContain(code);
+  expect(JSON.stringify(execution.data.data)).toContain(`${skillName}·修订`);
   await expect(editor.getByTestId('skill-trial-result')).toBeVisible();
   await expect(run).toBeDisabled();
   await page.screenshot({ path: path.join(shots, 'SM06.png'), fullPage: true });

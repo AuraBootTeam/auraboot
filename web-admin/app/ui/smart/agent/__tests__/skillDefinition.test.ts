@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type SkillSchema,
   bindSkill,
   editableSchema,
   inputSchema,
@@ -13,7 +14,7 @@ describe('skill authoring safety', () => {
     expect(bindSkill(['existing'], 'bom')).toEqual(['existing', 'bom']);
     expect(() => bindSkill('{"existing":true}', 'bom')).toThrow();
   });
-  it.each([
+  it.each<SkillSchema>([
     { type: 'object', properties: { amount: { type: 'number', minimum: 0 } } },
     { type: 'object', properties: { items: { type: 'array', items: { type: 'string' } } } },
     { type: 'object', oneOf: [{ required: ['code'] }] },
