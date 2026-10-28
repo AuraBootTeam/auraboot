@@ -154,6 +154,13 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         }
         try {
             String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+            // A scalar SELF grade cannot represent TEAM, department or custom predicates.
+            // Synchronous, explicitly read-only handlers keep the ordinary record/query policy
+            // instead of substituting creator ownership. Write and async permit metadata stays
+            // on its established path, including writer authorization and optimistic versions.
+            if (StringUtils.hasText(rowFilter) && requiresReadonlyPolicyFallback(ctx)) {
+                return null;
+            }
             return StringUtils.hasText(rowFilter) ? ScopeGrade.SELF : ScopeGrade.ALL;
         } catch (RuntimeException e) {
             // An unresolved scope is never published. The legacy data-layer path therefore remains
@@ -162,6 +169,21 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
                     ctx.getCommandCode(), modelCode, e);
             return null;
         }
+    }
+
+    private boolean requiresReadonlyPolicyFallback(CommandPipelineContext ctx) {
+        if (!ctx.isHasPluginHandler() || ctx.isPluginRequiresDslPersistence()
+                || ctx.getRequest() == null || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+                || !Boolean.TRUE.equals(ctx.getTargetRecordReadable())
+                || ctx.getAuthorizationVerdict() == null || !ctx.getAuthorizationVerdict().isAuthorized()) {
+            return false;
+        }
+        Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
+        if (!(params instanceof java.util.Map<?, ?> values) || !"read".equals(values.get("targetRecordAction"))) {
+            return false;
+        }
+        Object async = values.get("async");
+        return !Boolean.TRUE.equals(async) && !"true".equalsIgnoreCase(String.valueOf(async));
     }
 
     private boolean hasAuthorizedHandlerTarget(CommandPipelineContext ctx) {
