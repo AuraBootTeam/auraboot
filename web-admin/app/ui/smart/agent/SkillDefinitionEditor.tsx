@@ -572,6 +572,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
                   >
                     <input
                       type="checkbox"
+                      data-testid={`skill-tool-${tool.toolCode}`}
                       checked={selectedTools.includes(tool.toolCode)}
                       onChange={(e) => {
                         setSelectedTools((previous) =>
