@@ -256,12 +256,14 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
   const before = await approvalWitness(database, pending);
   let release!: () => void;
   let fetched!: () => void;
+  let delivered!: () => void;
   const hold = new Promise<void>((resolve) => {
     release = resolve;
   });
   const complete = new Promise<void>((resolve) => {
     fetched = resolve;
   });
+  const delivery = new Promise<void>((resolve) => { delivered = resolve; });
   let received = '';
   await page.route('**/api/ai/aurabot/execute', async (route) => {
     const response = await route.fetch({ timeout: 150_000 });
@@ -269,6 +271,7 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
     fetched();
     await hold;
     await route.fulfill({ response });
+    delivered();
   });
   try {
     await page.getByTestId('skill-preview-card').getByTestId('confirm-btn').click();
@@ -286,9 +289,11 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
     await expect(
       page.getByTestId('aurabot-panel').getByText('正在提交审批决定…', { exact: true }),
     ).toBeVisible();
+    record('FT3-committed-before-sigkill', { pending, actual, terminal, receiptWithheld: true });
     const oldPid = await interruptBackend('FT3');
     const newPid = await restore('FT3', oldPid);
     release();
+    await delivery;
     await page.unroute('**/api/ai/aurabot/execute');
     const repeated = await decide(page, pending);
     expect(repeated.some((item) => item.name === 'error')).toBe(true);
@@ -302,7 +307,7 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
     const recovery = await send(
       page,
       `请实际调用只读工具 list_e2et_customer，pageNum=1、pageSize=20，不加关键词筛选。告诉我编码 ${fixture.form.code} 的客户名称和联系人，不进行修改。`,
-      'FT4-new-read',
+      'FT3-new-read',
     );
     expect(recovery.some((item) => item.name === 'tool_result' && item.data.success === true)).toBe(
       true,
@@ -323,7 +328,7 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
     });
   } finally {
     release();
-    await page.unroute('**/api/ai/aurabot/execute');
+    if (!page.isClosed()) await page.unrouteAll({ behavior: 'wait' });
   }
 });
 
