@@ -39,6 +39,22 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class UserPermissionServiceImpl implements UserPermissionService {
+
+    @Override
+    public Set<String> getCurrentEffectiveRoleCodes() {
+        Long tenant=MetaContext.getCurrentTenantId(),user=MetaContext.getCurrentUserId(),member=MetaContext.getCurrentMemberId();
+        if(tenant==null || tenant<=0 || user==null || member==null) return Set.of();
+        var ids=new LinkedHashSet<>(permissionSnapshotCache.getUserRoleIds(tenant,user,member));
+        var baseline=roleMapper.findByTenantIdAndCode(tenant,"tenant_member");
+        if(baseline!=null && baseline.getId()!=null) ids.add(baseline.getId());
+        if(ids.isEmpty()) return Set.of();
+        var codes=new LinkedHashSet<String>();
+        for(var role:roleMapper.selectBatchIds(ids)) {
+            if(Objects.equals(tenant,role.getTenantId()) && Boolean.FALSE.equals(role.getDeletedFlag())
+                    && "active".equalsIgnoreCase(role.getStatus()) && role.getCode()!=null && !role.getCode().isBlank()) codes.add(role.getCode());
+        }
+        return Collections.unmodifiableSet(codes);
+    }
     private final PermissionSnapshotCache permissionSnapshotCache;
     private final com.auraboot.framework.application.security.AdminRoleChecker adminRoleChecker;
     private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;

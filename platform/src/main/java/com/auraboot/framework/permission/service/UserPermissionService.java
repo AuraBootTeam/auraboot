@@ -29,6 +29,10 @@ import java.util.Set;
  * @since V4
  */
 public interface UserPermissionService {
+
+    /** Effective role codes for the trusted current subject, including the native member baseline.
+     * Implementations without this capability fail closed; callers may not supply another subject. */
+    default Set<String> getCurrentEffectiveRoleCodes() { return Set.of(); }
     
     /**
      * Get user's permission IDs (with cache)

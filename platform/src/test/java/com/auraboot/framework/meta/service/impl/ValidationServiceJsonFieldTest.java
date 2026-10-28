@@ -14,6 +14,17 @@ import static org.mockito.Mockito.mock;
 
 /** Hermetic validation of strict JSON values; native reference and model checks have separate tests. */
 class ValidationServiceJsonFieldTest {
+    @Test void unicodeBlankTextCannotSatisfyRequiredPublicationButDraftUpdateRemainsPartial() {
+        var field=FieldDefinition.builder().code("material").name("Material").dataType("string").required(true).build();
+        var value=new com.fasterxml.jackson.databind.node.TextNode("\u00a0\u3000");
+        assertFalse(service.validateJsonField(field,value,ValidationContext.CUSTOM).isValid());
+        assertTrue(service.validateJsonField(field,value,ValidationContext.UPDATE).isValid());
+        assertEquals("\u00a0\u3000",value.textValue());
+    }
+    @Test void extremeExponentsCannotOverflowTheDeclaredIntegerDigitCount() {
+        var field=FieldDefinition.builder().code("cost").name("Cost").dataType("decimal").precision(20).scale(2).build();
+        assertFalse(service.validateJsonField(field,new com.fasterxml.jackson.databind.node.DecimalNode(new BigDecimal("1E+2147483647")),ValidationContext.CUSTOM).isValid());
+    }
     private final ObjectMapper json = new ObjectMapper();
     private final ValidationServiceImpl service = new ValidationServiceImpl(
             mock(DynamicDataMapper.class), mock(UserService.class), mock(MetaModelService.class));

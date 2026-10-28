@@ -240,6 +240,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         Object nativeValue;
         try {
             nativeValue = JsonFieldValueAdapter.toNativeValue(field, value);
+            if(nativeValue instanceof String text && text.codePoints().allMatch(c->Character.isWhitespace(c)||Character.isSpaceChar(c))) nativeValue="";
         } catch (IllegalArgumentException failure) {
             return FieldValidationResult.invalid(failure.getMessage());
         }
