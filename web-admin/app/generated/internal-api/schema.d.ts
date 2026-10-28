@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 631d615ebcac5d9acf488a473ce883f67e5af1a371a05cd9c8ee587e04b5eb32
+ * Contract SHA-256: a292efa48546286c0f36fa01aef974f7460cec2f8088d52e07ac6b689deb016f
  */
 export interface paths {
     "/api/activities": {
@@ -45591,7 +45591,9 @@ export interface operations {
     };
     listToolRegistry: {
         parameters: {
-            query?: never;
+            query?: {
+                modelHint?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
