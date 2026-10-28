@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  cloneElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { usePermissions } from '~/contexts/AuthContext';
@@ -18,10 +26,12 @@ import {
 } from './skillDefinition';
 
 const CONTROL =
-  'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
+  'scroll-mt-24 w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
 const BUTTON =
   'rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text hover:bg-hover focus:outline-none focus:ring-2 focus:ring-accent-weak disabled:opacity-50';
-const PRIMARY = `${BUTTON} bg-accent text-white hover:bg-accent-hover`;
+const PRIMARY = BUTTON.replace('bg-panel', 'bg-accent')
+  .replace('text-text', 'text-white')
+  .replace('hover:bg-hover', 'hover:bg-accent-hover');
 interface Tool {
   toolCode: string;
   toolName: string;
@@ -358,11 +368,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
     }
   };
   const field = (title: string, control: ReactNode, help?: string) => (
-    <label className="block space-y-1 text-sm">
-      <span className="text-text font-medium">{title}</span>
-      {control}
-      {help && <span className="text-text-2 block text-xs">{help}</span>}
-    </label>
+    <SkillEditorField title={title} control={control} help={help} />
   );
   const section = (title: string, children: ReactNode) => (
     <section className="rounded-card border-border bg-panel space-y-4 border p-5">
@@ -951,6 +957,34 @@ export function SkillDefinitionEditor({ runtime }: Props) {
             </div>
           )}
         </>,
+      )}
+    </div>
+  );
+}
+
+function SkillEditorField({
+  title,
+  control,
+  help,
+}: {
+  title: string;
+  control: ReactNode;
+  help?: string;
+}) {
+  const id = useId();
+  return (
+    <div className="space-y-1 text-sm">
+      <label htmlFor={id} className="text-text block font-medium">
+        {title}
+      </label>
+      {cloneElement(control as ReactElement<{ id?: string; 'aria-describedby'?: string }>, {
+        id,
+        'aria-describedby': help ? `${id}-help` : undefined,
+      })}
+      {help && (
+        <p id={`${id}-help`} className="text-text-2 text-xs">
+          {help}
+        </p>
       )}
     </div>
   );

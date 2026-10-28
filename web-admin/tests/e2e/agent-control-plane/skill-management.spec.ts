@@ -168,61 +168,65 @@ test('SM09: a real approval stop is shown as pending without execution or automa
     DEFAULT_TEST_ACCOUNT.password,
   );
   const suffix = `sm_approval_${Date.now()}`;
-  const createdPolicy = await page.request.post(
-    '/api/meta/commands/execute/acp:create_approval_policy',
-    {
-      data: {
-        operationType: 'CREATE',
-        payload: {
-          policy_name: suffix,
-          trigger_rules: JSON.stringify([{ type: 'tool_call', pattern: 'aurabot:model:create' }]),
-          approver_rules: JSON.stringify([{ type: 'role', roleCode: 'tenant_admin' }]),
-          auto_approve: false,
-          policy_status: 'active',
-          timeout_hours: 24,
-          timeout_action: 'reject',
-        },
+  const name = `专用工具审批验收-${suffix}`;
+  const toolCode = `${suffix}_tool`;
+  const tool = await page.request.post('/api/meta/commands/execute/acp:create_agent_tool', {
+    data: {
+      operationType: 'CREATE',
+      payload: {
+        tool_code: toolCode,
+        tool_name: name,
+        tool_description: 'Owned approval-only fixture; must stop before dispatch',
+        tool_type: 'custom_api',
+        source_type: 'custom',
+        source_code: 'POST http://127.0.0.1:9/not-called',
+        requires_approval: true,
+        risk_level: 'high',
+        tool_status: 'active',
+        input_schema: JSON.stringify({ type: 'object', properties: {} }),
       },
     },
-  );
-  expect((await createdPolicy.json()).code).toBe('0');
-  const createdSkill = await page.request.post(
-    '/api/meta/commands/execute/acp:create_agent_skill',
-    {
-      data: {
-        operationType: 'CREATE',
-        payload: {
-          skill_code: suffix,
-          skill_name: '模型创建审批验收',
-          skill_level: 'atomic',
-          skill_status: 'active',
-          execution_mode: 'template',
-          skill_tools: JSON.stringify(['aurabot:model:create']),
-          skill_input_schema: JSON.stringify({
-            type: 'object',
-            properties: {
-              code: { type: 'string', title: '业务模型标识' },
-              displayName: { type: 'string', title: '业务模型名称' },
-            },
-            required: ['code', 'displayName'],
-          }),
-        },
+  });
+  expect((await tool.json()).code).toBe('0');
+  const policy = await page.request.post('/api/meta/commands/execute/acp:create_approval_policy', {
+    data: {
+      operationType: 'CREATE',
+      payload: {
+        policy_name: suffix,
+        trigger_rules: JSON.stringify([{ type: 'tool_call', pattern: toolCode }]),
+        approver_rules: JSON.stringify([{ type: 'role', roleCode: 'tenant_admin' }]),
+        auto_approve: false,
+        policy_status: 'active',
+        timeout_hours: 24,
+        timeout_action: 'reject',
       },
     },
-  );
-  const created = await createdSkill.json();
-  expect(created.code).toBe('0');
+  });
+  expect((await policy.json()).code).toBe('0');
+  const skill = await page.request.post('/api/meta/commands/execute/acp:create_agent_skill', {
+    data: {
+      operationType: 'CREATE',
+      payload: {
+        skill_code: suffix,
+        skill_name: name,
+        skill_level: 'atomic',
+        skill_status: 'active',
+        execution_mode: 'template',
+        skill_tools: JSON.stringify([toolCode]),
+        skill_input_schema: JSON.stringify({ type: 'object', properties: {} }),
+      },
+    },
+  });
+  expect((await skill.json()).code).toBe('0');
   await page.goto('/home');
   const menu = page.getByRole('link', { name: '技能管理', exact: true });
   if (!(await menu.isVisible()))
     await page.getByRole('button', { name: 'AI 中心', exact: true }).click();
   await menu.click();
-  const row = page.getByRole('row').filter({ hasText: '模型创建审批验收' });
+  const row = page.getByRole('row').filter({ hasText: name });
   await row.getByRole('button', { name: /编辑|Edit/ }).click();
   const editor = page.getByTestId('skill-definition-editor');
   await expect(editor).toBeVisible();
-  await editor.getByLabel('业务模型标识', { exact: true }).fill(suffix);
-  await editor.getByLabel('业务模型名称', { exact: true }).fill('不得自动创建的审批样本');
   await editor.getByLabel('我已核对输入，允许本次真实执行。', { exact: true }).check();
   const response = page.waitForResponse((r) =>
     r.url().includes(`/api/agent/skills/${suffix}/execute`),
@@ -232,13 +236,14 @@ test('SM09: a real approval stop is shown as pending without execution or automa
   expect(output.code).toBe('0');
   expect(output.data.data.approvalRequired).toBe(true);
   expect(output.data.status).not.toBe('SUCCESS');
+  expect(output.data.actionCount).toBe(0);
   await expect(editor.getByTestId('skill-trial-result')).toContainText('已暂停');
   await expect(editor.getByRole('button', { name: '执行一次', exact: true })).toBeDisabled();
-  const models = await (
-    await page.request.get(`/api/meta/models?keyword=${suffix}&page=1&size=20`)
-  ).json();
-  expect(models.code).toBe('0');
-  expect(models.data.records.some((m: { code: string }) => m.code === suffix)).toBe(false);
+  const pending = await (await page.request.get('/api/agent/approvals/pending')).json();
+  expect(pending.code).toBe('0');
+  expect(
+    pending.data.some((approval: { pid: string }) => approval.pid === output.data.data.approvalPid),
+  ).toBe(true);
   await page.screenshot({ path: path.join(shots, 'SM09.png'), fullPage: true });
 });
 
