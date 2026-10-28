@@ -144,7 +144,7 @@ test('FT1: pending approval survives actual JVM death and requires an explicit o
   expect(after.approval.approval_status).toBe('approved');
   expect(
     after.runs.some(
-      (row) => row.resumed_from === before.approval.run_id && row.run_status === 'completed',
+      (row) => row.resumed_from === before.approval.run_id && row.run_status === 'success',
     ),
   ).toBe(true);
   const repeated = await decide(page, pending);
@@ -283,7 +283,7 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
     expect(terminal.approval.approval_status).toBe('approved');
     const completed = terminal.runs.filter((row) => row.resumed_from === before.approval.run_id);
     expect(completed).toHaveLength(1);
-    expect(completed[0].run_status).toBe('completed');
+    expect(completed[0].run_status).toBe('success');
     // The interception holds a real product response; no result/model/tool is substituted.
     await expect(page.getByTestId('aurabot-input')).toBeDisabled();
     await expect(

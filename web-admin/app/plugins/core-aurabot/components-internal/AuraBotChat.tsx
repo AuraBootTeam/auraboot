@@ -19,6 +19,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useSmartText } from '~/utils/i18n';
 import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';
+import { toolQueryPresentation } from './toolQueryPresentation';
 import { ConfirmCard } from './ConfirmCard';
 import { SkillPreviewCard } from '../components-shell/SkillPreviewCard';
 import { ModelSuggestionCard } from './ModelSuggestionCard';
@@ -199,7 +200,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     // toolResult shape varies: { records, ... } or { success, data: { records, ... }, durationMs }
     const resultData = message.toolResult?.data || message.toolResult;
     if (resultData?.records && Array.isArray(resultData.records) && resultData.records.length > 0) {
-      return <ChatBiResultCard result={resultData as any} />;
+      return <ChatBiResultCard result={toolQueryPresentation(resultData, message.toolName)} />;
     }
     const isModelSuggest =
       message.toolName === 'builtin__model_suggest' && message.toolResult?.modelCode;
