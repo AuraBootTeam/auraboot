@@ -175,3 +175,41 @@ test('agent permission profile collects exactly the three real UI journeys witho
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('explicit form, governance and process profiles collect their bounded real-product journeys', () => {
+  const root = mkdtempSync(join(tmpdir(), 'agent-qualification-profile-'));
+  try {
+    const fixture = join(root, 'private.json');
+    writeFileSync(fixture, JSON.stringify({
+      baseURL: 'http://localhost:5173', backendURL: 'http://localhost:6443', tenantId: '1',
+      admin: { email: 'owner@example.invalid', password: 'fixture-only', userId: '11' },
+      reader: { email: 'reader@example.invalid', password: 'fixture-only', userId: '12' },
+      writer: { memberPid: 'owned-member' }, codes: { pendingCrash: 'owned_pending' },
+      approvalPolicyPid: 'owned-policy',
+      readerRolePid: 'read-role', writerInitialRolePids: ['writer-role', 'read-role'],
+      adminBearer: 'collection-only', readerBearer: 'collection-only', foreignBearer: 'collection-only',
+      memory: { value: 'independent-private-truth' },
+      database: { database: 'owned_database' }, productIdentity: join(root, 'identity.json'), bundleSha256: 'a'.repeat(64),
+      form: { code: 'OWNED1', manualName: 'Manual owner', contact: 'Contact', manualContact: 'Edited contact' },
+      runtime: { workspace: root, name: 'owned-runtime', processDirectory: join(root, 'processes'), bundle: join(root, 'bundle') },
+    }), { mode: 0o600 });
+    const environment = { PLAYWRIGHT_BASE_URL: 'http://localhost:5173', BACKEND_URL: 'http://localhost:6443',
+      BE_PORT: '6443', VITE_PORT: '5173', BFF_PORT: '3500', AGENT_PERMISSION_FIXTURE: fixture,
+      AGENT_PERMISSION_EVIDENCE: root, AGENT_ACCEPTANCE_REAL_MODEL: 'deepseek' };
+    for (const [scope, count] of [['forms', 2], ['governance', 3], ['recovery', 4]]) {
+      const result = collect('playwright.agent-approval.config.ts', { ...environment,
+        AGENT_ACCEPTANCE_SCOPE: scope, AGENT_PROCESS_FAULTS: 'owned-jvm' });
+      assert.equal(result.status, 0, result.stderr + result.stdout);
+      const report = JSON.parse(result.stdout);
+      assert.deepEqual(report.errors, []);
+      const identities = caseIdentities(report);
+      assert.equal(identities.length, count);
+      assert.ok(identities.every(value => value.includes(scope + '.spec.ts')));
+      assert.ok(!identities.some(value => value.includes('setup')));
+    }
+    const denied = collect('playwright.agent-approval.config.ts', { ...environment,
+      AGENT_ACCEPTANCE_SCOPE: 'recovery', AGENT_PROCESS_FAULTS: '' });
+    assert.notEqual(denied.status, 0);
+    assert.match(denied.stderr + denied.stdout, /explicit AGENT_PROCESS_FAULTS=owned-jvm/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
