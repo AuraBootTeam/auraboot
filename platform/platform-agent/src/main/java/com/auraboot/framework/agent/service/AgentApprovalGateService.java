@@ -77,21 +77,34 @@ public class AgentApprovalGateService {
     public String checkAndRequestApproval(Long tenantId, String runId, String taskId,
                                            String toolCode, String toolDescription,
                                            Map<String, Object> requestData, boolean toolRequiresApproval) {
+        return checkAndRequestApproval(tenantId, runId, taskId, toolCode, toolDescription,
+                requestData, toolRequiresApproval, null);
+    }
+
+    /** Consume a saved step's exact approval at the tool boundary, never request a replacement. */
+    public String checkAndRequestApproval(Long tenantId, String runId, String taskId,
+                                           String toolCode, String toolDescription,
+                                           Map<String, Object> requestData, boolean toolRequiresApproval,
+                                           String expectedApprovalPid) {
         // P0 fix: findMatchingPolicy 统一替代原 matchesAnyPolicy + resolveTimeoutFromPolicy；
         // 一次 SQL 既做 match 判定又拿 policy_id，避免 approval 创建后 policy_id=null 导致 fail-open。
         PolicyMatch matched = findMatchingPolicy(tenantId, toolCode, requestData);
-        if (!toolRequiresApproval && matched == null) {
+        if (!toolRequiresApproval && expectedApprovalPid == null && matched == null) {
             return null;
         }
-        if (toolRequiresApproval && matched == null) {
+        if ((toolRequiresApproval || expectedApprovalPid != null) && matched == null) {
             throw new org.springframework.security.access.AccessDeniedException(
                     "Required tool approval has no matching policy: " + toolCode);
         }
 
         // Both new tool calls and saved steps require the same exact grant.
-        if (consumeResumeGrant(tenantId, taskId, null, toolCode, requestData)) {
+        if (consumeResumeGrant(tenantId, taskId, expectedApprovalPid, toolCode, requestData)) {
             log.info("Exact approval grant consumed: tool={}, task={}", toolCode, taskId);
             return null;
+        }
+        if (expectedApprovalPid != null) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Resumed tool requires its unconsumed approval for the exact input");
         }
 
         // Build idempotency key: {runId}:{toolCode}
@@ -145,7 +158,7 @@ public class AgentApprovalGateService {
             return approvalPid;
         } catch (Exception e) {
             log.error("Failed to create approval request: {}", e.getMessage(), e);
-            return null;
+            throw new IllegalStateException("Tool approval is unavailable; execution is blocked", e);
         }
     }
 

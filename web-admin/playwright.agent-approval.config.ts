@@ -14,6 +14,7 @@ const agentApprovalSpecNames = [
   'forms',
   'governance',
   'recovery',
+  'checkpoint',
 ];
 if (!agentApprovalSpecNames.includes(scope)) throw new Error('Unknown agent acceptance scope');
 if (
@@ -126,7 +127,26 @@ if (
     'Governed qualification requires distinct private identities, pending codes and independent source truth',
   );
 }
-if (scope === 'recovery' && process.env.AGENT_PROCESS_FAULTS !== 'owned-jvm') {
+if (
+  scope === 'checkpoint' &&
+  (!inputs.admin?.email ||
+    !inputs.admin?.password ||
+    !inputs.adminBearer ||
+    !inputs.codes?.checkpointCrash ||
+    !inputs.form?.code ||
+    !inputs.runtime?.workspace ||
+    !inputs.runtime?.name ||
+    !inputs.runtime?.processDirectory ||
+    !inputs.runtime?.bundle)
+) {
+  throw new Error(
+    'Checkpoint qualification requires exact owned process identities and a fresh model code',
+  );
+}
+if (
+  ['recovery', 'checkpoint'].includes(scope) &&
+  process.env.AGENT_PROCESS_FAULTS !== 'owned-jvm'
+) {
   throw new Error('Process interruption requires explicit AGENT_PROCESS_FAULTS=owned-jvm');
 }
 
@@ -141,7 +161,7 @@ export default defineConfig({
   outputDir: evidence + '/artifacts',
   workers: 1,
   retries: 0,
-  timeout: scope === 'recovery' ? 600_000 : 180_000,
+  timeout: ['recovery', 'checkpoint'].includes(scope) ? 600_000 : 180_000,
   reporter: [['list'], ['json', { outputFile: evidence + '/report.json' }]],
   use: {
     ...baseConfig.use,
