@@ -881,5 +881,19 @@
     "en-US": "Step mappings",
     "source": "import",
     "refType": "field"
+  },
+{
+    "key": "ai.skills.editor.boundTools",
+    "zh-CN": "当前绑定的工具",
+    "en-US": "Currently bound tools",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.boundToolsHelp",
+    "zh-CN": "原有绑定会保留。若当前目录没有对应选项，可加载其业务模型范围后修改。",
+    "en-US": "Existing bindings are retained. Load their business model scope to edit options missing from this catalog.",
+    "source": "import",
+    "refType": "message"
   }
 ]

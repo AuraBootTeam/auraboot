@@ -622,6 +622,32 @@ export function SkillDefinitionEditor({ runtime }: Props) {
               <p className="text-text-2 text-xs">
                 {label('selected', '已选择工具数', 'Selected tools')}: {selectedTools.length}
               </p>
+              {selectedTools.length > 0 && (
+                <div
+                  className="rounded-control border-border bg-subtle border p-3"
+                  data-testid="skill-bound-tools"
+                >
+                  <h3 className="text-sm font-medium">
+                    {label('boundTools', '当前绑定的工具', 'Currently bound tools')}
+                  </h3>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {selectedTools.map((code) => (
+                      <li key={code}>
+                        {catalogText(tools.find((tool) => tool.toolCode === code)?.toolName) || (
+                          <code className="text-xs">{code}</code>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-text-2 mt-2 text-xs">
+                    {label(
+                      'boundToolsHelp',
+                      '原有绑定会保留。若当前目录没有对应选项，可加载其业务模型范围后修改。',
+                      'Existing bindings are retained. Load their business model scope to edit options missing from this catalog.',
+                    )}
+                  </p>
+                </div>
+              )}
             </>,
           )}
           {section(

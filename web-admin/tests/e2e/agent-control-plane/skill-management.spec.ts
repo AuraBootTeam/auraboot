@@ -54,6 +54,8 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   await page.getByRole('link', { name: '技能管理', exact: true }).click();
   await expect(page).toHaveURL(/\/p\/agent_skill$/);
   await expect(page.getByRole('button', { name: /新建|Create/ }).first()).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Execute DSL Command' })).toBeVisible();
+  await expect(page.getByText('加载中...', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(shots, 'SM01.png'), fullPage: true });
   await page
     .getByRole('button', { name: /新建|Create/ })
@@ -88,7 +90,8 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   await expect(page).toHaveURL(new RegExp(`/p/agent_skill/edit/${skillPid}$`));
   await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue(skillName);
   await page.reload();
-  await expect(editor.getByTestId('skill-tool-list:agent_skill')).toHaveCount(0); // scoped tools are explicitly reloaded, never fabricated
+  await expect(editor.getByTestId('skill-tool-list:agent_skill')).toHaveCount(0);
+  await expect(editor.getByTestId('skill-bound-tools')).toContainText('list:agent_skill'); // scoped tools are explicitly reloaded, never fabricated
   await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue(skillName);
   await page.screenshot({ path: path.join(shots, 'SM02.png'), fullPage: true });
   await editor.getByLabel('技能名称', { exact: true }).fill(`${skillName}·修订`);
