@@ -126,6 +126,8 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   expect(JSON.stringify(execution.data.data)).toContain(`${skillName}·修订`);
   await expect(editor.getByTestId('skill-trial-result')).toBeVisible();
   await expect(editor.getByTestId('chatbi-result-card')).toBeVisible();
+  await editor.getByTestId('chatbi-result-card').scrollIntoViewIfNeeded();
+  await expect(editor.getByTestId('chatbi-result-card')).toContainText(`${skillName}·修订`);
   await expect(editor.getByTestId('skill-trial-result').locator('pre')).not.toBeVisible();
   await expect(run).toBeDisabled();
   await page.screenshot({ path: path.join(shots, 'SM06.png'), fullPage: true });
@@ -238,7 +240,7 @@ test('SM09: a real approval stop is shown as pending without execution or automa
   if (!(await menu.isVisible()))
     await page.getByRole('button', { name: 'AI 中心', exact: true }).click();
   await menu.click();
-  const row = page.getByTestId(`table-row-${skillReceipt.data.data.recordPid}`);
+  const row = page.locator(`tr[data-record-pid="${skillReceipt.data.data.recordPid}"]`);
   await row.getByRole('button', { name: /编辑|Edit/ }).click();
   const editor = page.getByTestId('skill-definition-editor');
   await expect(editor).toBeVisible();

@@ -10,6 +10,7 @@ import {
 import { Link, useNavigate } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { usePermissions } from '~/contexts/AuthContext';
+import { useToastContext } from '~/contexts/ToastContext';
 import { get, post } from '~/shared/services/http-client';
 import { SkillTrialResult, type EngineResult } from './SkillTrialResult';
 import {
@@ -64,6 +65,7 @@ const empty = (): SkillRecord => ({
 export function SkillDefinitionEditor({ runtime }: Props) {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
+  const toast = useToastContext();
   const { hasPermission } = usePermissions();
   const label = (key: string, cn: string, en: string) =>
     t(`ai.skills.editor.${key}`, undefined, locale.startsWith('zh') ? cn : en);
@@ -87,6 +89,10 @@ export function SkillDefinitionEditor({ runtime }: Props) {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const notify = (message: string) => {
+    setNotice(message);
+    toast.showSuccessToast(message);
+  };
   const [toolError, setToolError] = useState('');
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [message, setMessage] = useState('');
@@ -96,6 +102,10 @@ export function SkillDefinitionEditor({ runtime }: Props) {
     setConsent(false);
     setResult(undefined);
   }, [values, message]);
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [result]);
   const generation = useRef(0);
   const authoring = useRef<HTMLFieldSetElement>(null);
   const trial = useRef<HTMLFieldSetElement>(null);
@@ -276,7 +286,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
       setMessage('');
       setConsent(false);
       setResult(undefined);
-      setNotice(
+      notify(
         label(
           'saved',
           '技能已保存，可以绑定AI同事或试运行。',
@@ -328,7 +338,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
             'Binding did not persist. Reopen the colleague to verify.',
           ),
         );
-      setNotice(
+      notify(
         label(
           'bound',
           '技能已绑定，原有技能已保留。',
@@ -394,7 +404,10 @@ export function SkillDefinitionEditor({ runtime }: Props) {
         </div>
       )}
       {notice && (
-        <p role="status" className="rounded-control bg-subtle text-text p-3">
+        <p
+          role="status"
+          className="rounded-control border-border bg-subtle text-text sticky top-4 z-10 border p-3 shadow-sm"
+        >
           {notice}
         </p>
       )}
@@ -921,7 +934,12 @@ export function SkillDefinitionEditor({ runtime }: Props) {
             </p>
           )}
           {result && (
-            <div data-testid="skill-trial-result" aria-live="polite">
+            <div
+              ref={resultRef}
+              className="scroll-mt-24"
+              data-testid="skill-trial-result"
+              aria-live="polite"
+            >
               <SkillTrialResult result={result} />
             </div>
           )}

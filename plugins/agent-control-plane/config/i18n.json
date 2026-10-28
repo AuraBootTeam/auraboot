@@ -860,5 +860,26 @@
     "en-US": "Execution diagnostics",
     "source": "import",
     "refType": "message"
+  },
+{
+    "key": "model.agent_skill.execution_mode.label",
+    "zh-CN": "执行方式",
+    "en-US": "Execution mode",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.agent_skill.max_steps.label",
+    "zh-CN": "最大步数",
+    "en-US": "Maximum steps",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.agent_skill.step_input_mappings.label",
+    "zh-CN": "步骤映射",
+    "en-US": "Step mappings",
+    "source": "import",
+    "refType": "field"
   }
 ]

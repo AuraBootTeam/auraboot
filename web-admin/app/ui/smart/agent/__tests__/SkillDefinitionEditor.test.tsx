@@ -5,12 +5,14 @@ const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), navigate: vi.fn()
 vi.mock('~/shared/services/http-client', () => ({ get: mocks.get, post: mocks.post }));
 vi.mock('react-router', () => ({ Link: ({ children, to }: any) => <a href={to}>{children}</a>, useNavigate: () => mocks.navigate }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'en', t: (_: string, _params: unknown, fallback: string) => fallback }) }));
+vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showSuccessToast: vi.fn() }) }));
 vi.mock('~/contexts/AuthContext', () => ({ usePermissions: () => ({ hasPermission: (code: string) => mocks.allowed.has(code) }) }));
 vi.mock('~/plugins/core-aurabot/components-internal/ChatBiResultCard', () => ({ ChatBiResultCard: () => <div /> }));
 vi.mock('~/plugins/core-aurabot/components-internal/ResultContractView', () => ({ ResultContractView: ({ contract }: any) => <div>{contract.status} {contract.textSummary}</div> }));
 const record = { pid: 'skill-record', skill_code: 'review', skill_name: 'BOM review', skill_status: 'active', skill_level: 'atomic', execution_mode: 'template', skill_tools: ['list:part'], skill_input_schema: { type: 'object', properties: {} } };
 const ok = (data: unknown) => ({ code: '0', data });
 beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn();
   mocks.get.mockReset(); mocks.post.mockReset(); mocks.allowed = new Set(['acp_agent_skill', 'acp_agent_definition', 'acp.runtime.manage']);
   mocks.get.mockImplementation(async (path: string) => path.includes('registry') ? ok({ tools: [{ toolCode: 'list:part', toolName: 'Read parts' }] }) : ok(record));
 });
