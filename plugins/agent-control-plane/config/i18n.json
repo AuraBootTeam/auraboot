@@ -252,7 +252,7 @@
   { "key": "model.agent_skill.skill_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
   { "key": "model.agent_skill.is_builtin.label", "zh-CN": "内置技能", "en-US": "Built-in", "source": "import", "refType": "field" },
 
-  { "key": "menu.acp_skills", "zh-CN": "技能市场", "en-US": "Skills Market", "source": "import", "refType": "menu" },
+  { "key": "menu.acp_skills", "zh-CN": "技能管理", "en-US": "Skills", "source": "import", "refType": "menu" },
 
   { "key": "dict.acp_skill_level.ATOMIC", "zh-CN": "原子工具", "en-US": "Atomic Tool", "source": "import", "refType": "dict" },
   { "key": "dict.acp_skill_level.WORKFLOW", "zh-CN": "流程技能", "en-US": "Workflow Skill", "source": "import", "refType": "dict" },

@@ -2611,7 +2611,8 @@
               "type": "command",
               "command": "acp:delete_agent_skill"
             },
-            "type": "command"
+            "type": "command",
+            "visibleWhen": "row.is_builtin !== true"
           }
         ],
         "defaultSort": {
