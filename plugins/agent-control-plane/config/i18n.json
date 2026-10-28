@@ -825,5 +825,40 @@
     "en-US": "Yes / No",
     "source": "import",
     "refType": "message"
+  },
+{
+    "key": "ai.skills.result.pending",
+    "zh-CN": "已暂停，等待确认或审批。本页不会自动重试；请前往审批入口核查。",
+    "en-US": "Paused for confirmation or approval. This page will not retry. Review it in approvals.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.result.executed",
+    "zh-CN": "工具已执行，请核对结果。",
+    "en-US": "Tool executed. Review the result.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.result.partial",
+    "zh-CN": "部分步骤已完成，请检查详情，勿直接重跑全部步骤。",
+    "en-US": "Some steps completed. Review details before rerunning any steps.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.result.failed",
+    "zh-CN": "执行未完成，请检查输入、权限及工具配置。",
+    "en-US": "Execution did not complete. Check inputs, permissions and tool configuration.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.result.diagnostics",
+    "zh-CN": "查看执行诊断",
+    "en-US": "Execution diagnostics",
+    "source": "import",
+    "refType": "message"
   }
 ]

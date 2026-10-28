@@ -121,6 +121,25 @@ class SkillEngineTest {
     }
 
     @Test
+    void templateListQueryRetainsItsSourceAndProducesNoBusinessActions() {
+        when(agentSkillService.loadSkill(1L, "query-recipe")).thenReturn(Map.of(
+                "execution_mode", "template", "skill_tools", List.of("list:customer")));
+        when(agentSkillService.resolveSkillTools(1L, "query-recipe")).thenReturn(List.of(
+                AgentToolDefinition.builder().name("list:customer").build()));
+        when(toolLoopService.executeToolCall(anyLong(), anyString(), any(), any(), anyString(), any(), any(), any()))
+                .thenReturn("{\"success\":true,\"records\":[{\"name\":\"Owned customer\"}],\"total\":1}");
+        SkillResult result = skillEngine.execute(1L, "run", "query-recipe",
+                SkillInput.builder().parameters(Map.of()).build(), null, null, null);
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
+        assertThat(result.getSourceToolCode()).isEqualTo("list:customer");
+        assertThat(result.getOutputType()).isEqualTo("structured_result");
+        assertThat(result.getRenderHint()).isEqualTo("table");
+        assertThat(result.getActionCount()).isZero();
+        assertThat(result.getData()).doesNotContainKey("success");
+        assertThat(result.getData().get("records")).isEqualTo(List.of(Map.of("name", "Owned customer")));
+    }
+
+    @Test
     void jdbcJsonbSchemasToolsAndStepMappingsPreserveTheExecutionContract() throws Exception {
         org.postgresql.util.PGobject schema = new org.postgresql.util.PGobject();
         schema.setType("jsonb");

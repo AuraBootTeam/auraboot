@@ -11,8 +11,7 @@ import { Link, useNavigate } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { usePermissions } from '~/contexts/AuthContext';
 import { get, post } from '~/shared/services/http-client';
-import { ResultContractView } from '~/plugins/core-aurabot/components-internal/ResultContractView';
-import type { ResultContract } from '~/plugins/core-aurabot/types/ResultContract';
+import { SkillTrialResult, type EngineResult } from './SkillTrialResult';
 import {
   bindSkill,
   editableSchema,
@@ -45,16 +44,6 @@ interface Colleague {
   name: string;
   skills: unknown;
 }
-interface EngineResult {
-  status: string;
-  data?: Record<string, unknown>;
-  outputType?: string;
-  renderHint?: string;
-  textSummary?: string;
-  errorMessage?: string;
-  durationMs?: number;
-  toolCallCount?: number;
-}
 interface Props {
   runtime?: { recordPid?: string; initialRecord?: Record<string, unknown> };
 }
@@ -78,6 +67,11 @@ export function SkillDefinitionEditor({ runtime }: Props) {
   const { hasPermission } = usePermissions();
   const label = (key: string, cn: string, en: string) =>
     t(`ai.skills.editor.${key}`, undefined, locale.startsWith('zh') ? cn : en);
+  const catalogText = (value?: string) => {
+    if (!value?.startsWith('aurabot.skill.')) return value;
+    const translated = t(value, undefined, '');
+    return translated === value ? undefined : translated;
+  };
   const [draft, setDraft] = useState<SkillRecord>(empty);
   const [saved, setSaved] = useState<SkillRecord>();
   const [schema, setSchema] = useState<SkillSchema>({ type: 'object', properties: {} });
@@ -382,8 +376,6 @@ export function SkillDefinitionEditor({ runtime }: Props) {
     orchestration: label('orchestration', '由模型编排工具', 'Model orchestration'),
   };
   if (loading) return <p role="status">{label('loading', '正在加载技能…', 'Loading skill…')}</p>;
-  const approvalRequired =
-    result?.data?.approvalRequired === true || result?.data?.confirmationRequired === true;
   return (
     <div
       className="space-y-5"
@@ -598,14 +590,18 @@ export function SkillDefinitionEditor({ runtime }: Props) {
                     />
                     <span>
                       <span className="font-medium">
-                        {tool.toolName || tool.description || tool.toolCode}
+                        {catalogText(tool.toolName) ||
+                          catalogText(tool.description) ||
+                          tool.toolCode}
                       </span>
                       {(tool.requiresApproval || tool.requiresConfirmation) && (
                         <span className="text-text-2 ml-2 text-xs">
                           {label('governed', '需确认或审批', 'Confirmation or approval')}
                         </span>
                       )}
-                      <span className="text-text-2 block text-xs">{tool.description}</span>
+                      <span className="text-text-2 block text-xs">
+                        {catalogText(tool.description)}
+                      </span>
                     </span>
                   </label>
                 ))}
@@ -926,34 +922,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
           )}
           {result && (
             <div data-testid="skill-trial-result" aria-live="polite">
-              {approvalRequired ? (
-                <p role="status">
-                  {label(
-                    'pending',
-                    '已暂停，等待确认或审批。本页不会自动重试；请前往审批入口核查。',
-                    'Paused for confirmation or approval. This page will not retry. Review it in approvals.',
-                  )}
-                </p>
-              ) : (
-                <ResultContractView
-                  contract={
-                    {
-                      outputType: result.outputType ?? 'text',
-                      renderHint: result.renderHint,
-                      data: result.data,
-                      textSummary: result.textSummary ?? result.errorMessage,
-                      status:
-                        result.status === 'SUCCESS'
-                          ? 'success'
-                          : result.status === 'PARTIAL_SUCCESS'
-                            ? 'partial_success'
-                            : 'failed',
-                      actionability: 'read_only',
-                      durationMs: result.durationMs,
-                    } as ResultContract
-                  }
-                />
-              )}
+              <SkillTrialResult result={result} />
             </div>
           )}
         </>,

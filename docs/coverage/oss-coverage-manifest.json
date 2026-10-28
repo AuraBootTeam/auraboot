@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "6a6b2f967",
+    "commit": "ab1b466bb",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -142,6 +142,7 @@
             "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/skill-management.spec.ts",
             "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
             "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
@@ -223,7 +224,8 @@
           "evidence": [
             "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
-            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/skill-management.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -259,7 +261,8 @@
             "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
-            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/skill-management.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
           "verdict": "partial"
@@ -275,6 +278,7 @@
             "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/skill-management.spec.ts",
             "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
             "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
           ],
@@ -900,9 +904,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/skill-management.spec.ts"
+          ],
+          "assertion": "browser page reference registered; execution and assertions not verified",
+          "verdict": "partial",
           "note": "kind=form model=agent_skill"
         },
         {
@@ -4680,7 +4686,8 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/project-management/customer-delivery-extension-real.spec.ts",
-            "web-admin/tests/e2e/project-management/showcase-page-designer-real.spec.ts"
+            "web-admin/tests/e2e/project-management/showcase-page-designer-real.spec.ts",
+            "web-admin/tests/e2e/showcase/crud-default-case.spec.ts"
           ],
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
@@ -5729,6 +5736,17 @@
           "note": "kind=list model=e2et_crm_opp"
         },
         {
+          "id": "page:e2et_customer_ai_intake",
+          "action": "e2et_customer_ai_intake",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=e2et_customer"
+        },
+        {
           "id": "page:e2et_customer_form",
           "action": "e2et_customer_form",
           "surface": "ui",
@@ -6632,6 +6650,7 @@
             "web-admin/tests/e2e/page-designer/undo-redo-authoring.spec.ts",
             "web-admin/tests/e2e/page-designer/upload-authoring.spec.ts",
             "web-admin/tests/e2e/page-designer/widget-specific-authoring.spec.ts",
+            "web-admin/tests/e2e/showcase/crud-default-case.spec.ts",
             "web-admin/tests/e2e/showcase/detail-configpanel-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/form-blocksdesigner-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/list-configpanel-e2e.spec.ts",
@@ -6857,6 +6876,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/skill-management.spec.ts",
             "web-admin/tests/e2e/amos-lenses/amos-lens-coverage.spec.ts",
             "web-admin/tests/e2e/amos-lenses/amos-lens-faults.spec.ts",
             "web-admin/tests/e2e/amos-lenses/amos-lens-journeys.spec.ts",
@@ -7571,7 +7591,7 @@
   "stats": {
     "commands": 279,
     "untested": 153,
-    "pages": 196,
+    "pages": 197,
     "pagesUntested": 91,
     "platformPages": 95,
     "platformPagesUntested": 36

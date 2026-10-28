@@ -13,7 +13,7 @@ test.use({
 });
 const shots = process.env.AURA_EVIDENCE_DIR ?? 'test-results/skill-management';
 const code = `skill_ui_${Date.now()}`;
-const skillName = `技能管理业务验收-${code}`;
+const skillName = '技能目录核对';
 test('SM01-07: maintain, bind and execute a skill from the AI Center menu', async ({
   page,
   baseURL,
@@ -120,9 +120,13 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   expect(execution.code).toBe('0');
   expect(execution.data.status).toBe('SUCCESS');
   expect(execution.data.toolCallCount).toBe(1);
+  expect(execution.data.actionCount).toBe(0);
+  expect(execution.data.sourceToolCode).toBe('list:agent_skill');
   expect(JSON.stringify(execution.data.data)).toContain(code);
   expect(JSON.stringify(execution.data.data)).toContain(`${skillName}·修订`);
   await expect(editor.getByTestId('skill-trial-result')).toBeVisible();
+  await expect(editor.getByTestId('chatbi-result-card')).toBeVisible();
+  await expect(editor.getByTestId('skill-trial-result').locator('pre')).not.toBeVisible();
   await expect(run).toBeDisabled();
   await page.screenshot({ path: path.join(shots, 'SM06.png'), fullPage: true });
   await editor.getByLabel('使用状态', { exact: true }).selectOption('deprecated');
@@ -178,7 +182,7 @@ test('SM09: a real approval stop is shown as pending without execution or automa
     DEFAULT_TEST_ACCOUNT.password,
   );
   const suffix = `sm_approval_${Date.now()}`;
-  const name = `专用工具审批验收-${suffix}`;
+  const name = '受控接口审批检查';
   const toolCode = `${suffix}_tool`;
   const tool = await page.request.post('/api/meta/commands/execute/acp:create_agent_tool', {
     data: {
@@ -227,13 +231,14 @@ test('SM09: a real approval stop is shown as pending without execution or automa
       },
     },
   });
-  expect((await skill.json()).code).toBe('0');
+  const skillReceipt = await skill.json();
+  expect(skillReceipt.code).toBe('0');
   await page.goto('/home');
   const menu = page.getByRole('link', { name: '技能管理', exact: true });
   if (!(await menu.isVisible()))
     await page.getByRole('button', { name: 'AI 中心', exact: true }).click();
   await menu.click();
-  const row = page.getByRole('row').filter({ hasText: name });
+  const row = page.getByTestId(`table-row-${skillReceipt.data.data.recordPid}`);
   await row.getByRole('button', { name: /编辑|Edit/ }).click();
   const editor = page.getByTestId('skill-definition-editor');
   await expect(editor).toBeVisible();
@@ -274,6 +279,7 @@ test('SM04/10: native required validation and builtin read-only protection are v
   await menu.click();
   const builtin = page.getByRole('row').filter({ hasText: 'Execute DSL Command' });
   await expect(builtin).toBeVisible();
+  await expect(builtin.getByTestId('row-action-more')).toHaveCount(0);
   await expect(builtin.getByRole('button', { name: /删除|Delete/ })).toHaveCount(0);
   await builtin.getByRole('button', { name: /编辑|Edit/ }).click();
   const editor = page.getByTestId('skill-definition-editor');

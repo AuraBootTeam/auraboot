@@ -6,6 +6,7 @@ vi.mock('~/shared/services/http-client', () => ({ get: mocks.get, post: mocks.po
 vi.mock('react-router', () => ({ Link: ({ children, to }: any) => <a href={to}>{children}</a>, useNavigate: () => mocks.navigate }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'en', t: (_: string, _params: unknown, fallback: string) => fallback }) }));
 vi.mock('~/contexts/AuthContext', () => ({ usePermissions: () => ({ hasPermission: (code: string) => mocks.allowed.has(code) }) }));
+vi.mock('~/plugins/core-aurabot/components-internal/ChatBiResultCard', () => ({ ChatBiResultCard: () => <div /> }));
 vi.mock('~/plugins/core-aurabot/components-internal/ResultContractView', () => ({ ResultContractView: ({ contract }: any) => <div>{contract.status} {contract.textSummary}</div> }));
 const record = { pid: 'skill-record', skill_code: 'review', skill_name: 'BOM review', skill_status: 'active', skill_level: 'atomic', execution_mode: 'template', skill_tools: ['list:part'], skill_input_schema: { type: 'object', properties: {} } };
 const ok = (data: unknown) => ({ code: '0', data });

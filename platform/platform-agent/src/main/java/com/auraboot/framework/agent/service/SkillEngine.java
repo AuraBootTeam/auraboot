@@ -234,7 +234,7 @@ public class SkillEngine {
         String resultJson = toolLoopService.executeToolCall(
                 tenantId, runPid, null, null, toolCode, params, tools, traceCtx);
 
-        return parseToolResult(resultJson, 1);
+        return normalizeSingleToolResult(toolCode, resultJson);
     }
 
     /**
@@ -520,8 +520,13 @@ public class SkillEngine {
         // Dynamic dispatch is a recipe adapter, never an alternate execution authority.
         String result = toolLoopService.executeToolCall(tenantId, runPid, null, null,
                 tool.getName(), toolInput, List.of(tool), traceCtx);
+        return normalizeSingleToolResult(code, result);
+    }
+
+    private SkillResult normalizeSingleToolResult(String code, String result) {
         SkillResult outcome = parseToolResult(result, 1);
-        if ("dsl.query".equals(skillCode) && (code.startsWith("get:") || code.startsWith("list:"))) {
+        outcome.setSourceToolCode(code);
+        if (code.startsWith("get:") || code.startsWith("list:")) {
             outcome.setOutputType("structured_result");
             outcome.setActionCount(0);
             if (outcome.getStatus() == SkillResult.Status.SUCCESS) {
