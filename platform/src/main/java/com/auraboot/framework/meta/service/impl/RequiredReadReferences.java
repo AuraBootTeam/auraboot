@@ -23,6 +23,10 @@ final class RequiredReadReferences {
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     record Field(String field, String model, boolean many, boolean allowEmpty) { }
     record Reference(String model, String pid) { }
+    static final class InvalidRecordReferences extends MetaServiceException {
+        private static final long serialVersionUID = 1L;
+        InvalidRecordReferences() { super("Required record read references are incomplete or unsupported"); }
+    }
     record Policy(int maxCandidates, int minimumReferences, List<Field> fields) {
         Policy { fields = List.copyOf(fields); }
         List<Reference> references(Map<String,Object> record) {
@@ -30,27 +34,27 @@ final class RequiredReadReferences {
             for (var field : fields) {
                 Object value = record.get(field.field());
                 if (value == null || value instanceof String text && text.isBlank()) {
-                    if (!field.allowEmpty()) throw invalid();
+                    if (!field.allowEmpty()) throw new InvalidRecordReferences();
                     continue;
                 }
                 List<?> values;
                 if (field.many()) {
                     if (value instanceof String text) {
-                        if (text.length() > 262144) throw invalid();
+                        if (text.length() > 262144) throw new InvalidRecordReferences();
                         try { value = JSON.readValue(text, Object.class); }
-                        catch (java.io.IOException malformed) { throw invalid(); }
+                        catch (java.io.IOException malformed) { throw new InvalidRecordReferences(); }
                     }
-                    if (!(value instanceof List<?> list) || list.size() > 256 || list.isEmpty() && !field.allowEmpty()) throw invalid();
+                    if (!(value instanceof List<?> list) || list.size() > 256 || list.isEmpty() && !field.allowEmpty()) throw new InvalidRecordReferences();
                     values = list;
                 } else values = List.of(value);
                 var seen = new LinkedHashSet<String>();
                 for (Object item : values) {
-                    if (!(item instanceof String pid) || !pid(pid) || !seen.add(pid)) throw invalid();
+                    if (!(item instanceof String pid) || !pid(pid) || !seen.add(pid)) throw new InvalidRecordReferences();
                     result.add(new Reference(field.model(), pid));
-                    if (result.size() > MAX_REFERENCES) throw invalid();
+                    if (result.size() > MAX_REFERENCES) throw new MetaServiceException("Required-read reference budget exceeded");
                 }
             }
-            if (result.size() < minimumReferences) throw invalid();
+            if (result.size() < minimumReferences) throw new InvalidRecordReferences();
             return List.copyOf(result);
         }
     }

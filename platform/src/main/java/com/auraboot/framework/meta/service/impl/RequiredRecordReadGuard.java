@@ -53,7 +53,10 @@ public class RequiredRecordReadGuard {
             var key=new RequiredReadReferences.Reference(modelCode,pid);
             if(traversal.path.size()>=16 || !traversal.path.add(key)) throw new MetaServiceException("Required-read dependency cycle or depth budget exceeded");
             try {
-                for(var reference:policy.references(record)) {
+                List<RequiredReadReferences.Reference> references;
+                try { references=policy.references(record); }
+                catch(RequiredReadReferences.InvalidRecordReferences incomplete) { throw denied(); }
+                for(var reference:references) {
                     if(++traversal.reads>RequiredReadReferences.MAX_REFERENCES) throw new MetaServiceException("Required-read reference budget exceeded");
                     if(!permissions.canAction(actor.member(),reference.model(),"read")) throw denied();
                     // Remove only the outer row permit. Identity and the exact writer/version plan are restored by Core.

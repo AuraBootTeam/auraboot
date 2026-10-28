@@ -96,4 +96,38 @@ class RequiredRecordReadGuardTest {
         assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("reference budget");
         guard.require("fixture_bundle",root(9,id(1)));
     }
+    @Test void incompleteLegacyRootsStayInvisibleWithoutPoisoningCompleteRoots() {
+        allow();
+        var missing=Map.<String,Object>of("pid",id(10),"tenant_id",7L);
+        var malformed=Map.<String,Object>of("pid",id(11),"tenant_id",7L,"members","not-json");
+        var duplicate=root(12,id(1),id(1));
+        for(var row:List.of(missing,malformed,duplicate))
+            assertThatThrownBy(()->guard.require("fixture_bundle",row)).isInstanceOf(AccessDeniedException.class);
+        when(rows.selectByQuery(anyString(),anyMap())).thenReturn(List.of(missing,root(9,id(1)),malformed,duplicate));
+        assertThat(guard.sqlFilter(7L,"fixture_bundle",42L,"")).isEqualTo("AND pid IN ('"+id(9)+"')");
+    }
+    @Test void invalidPolicyStillAbortsInsteadOfBecomingAnInvisibleRecord() {
+        var model=RequiredReadReferencesTest.model(10); model.setExtension(Map.of(RequiredReadReferences.KEY,Map.of("version",99)));
+        when(models.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(model));
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(MetaServiceException.class);
+        assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class);
+        verifyNoInteractions(rows,data);
+    }
+    @Test void oneRecordReferenceBudgetCannotBecomeAnOrdinaryInvisibleLegacyRoot() {
+        var model=RequiredReadReferencesTest.model(10);
+        var fields=new java.util.ArrayList<>(model.getFields());
+        var refs=new java.util.ArrayList<Map<String,Object>>();
+        var record=new java.util.LinkedHashMap<String,Object>(); record.put("pid",id(9999));record.put("tenant_id",7L);
+        for(int index=0;index<17;index++) {
+            String field="refs_"+index;
+            fields.add(com.auraboot.framework.meta.dto.FieldDefinition.builder().code(field).columnName(field).dataType("json").build());
+            refs.add(Map.of("field",field,"model","fixture_member","many",true,"allowEmpty",false));
+            record.put(field,java.util.stream.IntStream.range(index*256+1,index*256+257).mapToObj(RequiredRecordReadGuardTest::id).toList());
+        }
+        model.setFields(fields);model.setExtension(Map.of(RequiredReadReferences.KEY,Map.of("version",1,"references",refs,"maxCandidateRecords",10,"minimumReferences",1)));
+        when(models.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(model));
+        when(rows.selectByQuery(anyString(),anyMap())).thenReturn(List.of(record));
+        assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("budget");
+        verifyNoInteractions(data);
+    }
 }
