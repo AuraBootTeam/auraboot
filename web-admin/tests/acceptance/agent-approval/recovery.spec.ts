@@ -103,7 +103,8 @@ async function restore(name: string, previous: number) {
   return Number(row[1]);
 }
 async function decide(page: Page, pending: any) {
-  const response = await page.request.post('/api/ai/aurabot/execute', {
+  const response = await page.request.post(fixture.backendURL + '/api/ai/aurabot/execute', {
+    headers: { Authorization: 'Bearer ' + fixture.adminBearer },
     data: { pendingTurnId: pending.pendingTurnId, toolId: pending.toolId, confirmed: true },
     timeout: 150_000,
   });
@@ -336,8 +337,9 @@ test('FT4: a new approval with an actual zero-hour deadline stays non-executable
   await login(page);
   async function timeout(hours: number) {
     const response = await page.request.post(
-      '/api/meta/commands/execute/acp:update_approval_policy',
+      fixture.backendURL + '/api/meta/commands/execute/acp:update_approval_policy',
       {
+        headers: { Authorization: 'Bearer ' + fixture.adminBearer },
         data: {
           operationType: 'update',
           targetRecordPid: fixture.approvalPolicyPid,
