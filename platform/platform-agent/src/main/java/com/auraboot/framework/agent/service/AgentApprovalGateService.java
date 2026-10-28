@@ -7,6 +7,7 @@ import com.auraboot.framework.event.AuraEventBus;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.auraboot.framework.agent.util.JsonbColumns;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -216,7 +217,7 @@ public class AgentApprovalGateService {
 
         for (Map<String, Object> policy : policies) {
             if (policy == null) continue;
-            String triggerRulesJson = (String) policy.get("trigger_rules");
+            String triggerRulesJson = JsonbColumns.toJsonText(policy.get("trigger_rules"), objectMapper);
             if (triggerRulesJson == null) continue;
             try {
                 List<Map<String, Object>> rules = objectMapper.readValue(triggerRulesJson, RULE_LIST_TYPE);
@@ -248,7 +249,7 @@ public class AgentApprovalGateService {
                             (String) policy.get("pid"),
                             timeoutHours,
                             autoAction,
-                            (String) policy.get("approver_rules"));
+                            JsonbColumns.toJsonText(policy.get("approver_rules"), objectMapper));
                 }
             } catch (Exception e) {
                 log.warn("Failed to parse trigger rules while resolving policy: {}", e.getMessage());
@@ -441,7 +442,7 @@ public class AgentApprovalGateService {
             return false;
         }
 
-        String approverRulesJson = (String) policyRows.get(0).get("approver_rules");
+        String approverRulesJson = JsonbColumns.toJsonText(policyRows.get(0).get("approver_rules"), objectMapper);
         if (approverRulesJson == null || approverRulesJson.isBlank()) {
             log.error("Policy {} has no approver_rules configured. Rejecting (fail-secure). " +
                     "Action: tenant admin must define approver_rules JSONB on this policy.",
@@ -880,7 +881,7 @@ public class AgentApprovalGateService {
                 sql, Map.of("tenantId", tenantId));
         for (Map<String, Object> policy : policies) {
             if (policy == null) continue;
-            String triggerRulesJson = (String) policy.get("trigger_rules");
+            String triggerRulesJson = JsonbColumns.toJsonText(policy.get("trigger_rules"), objectMapper);
             if (triggerRulesJson == null) continue;
             try {
                 List<Map<String, Object>> rules = objectMapper.readValue(triggerRulesJson, RULE_LIST_TYPE);

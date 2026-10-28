@@ -33,6 +33,26 @@ class AgentApprovalGateServiceConcurrencyTest {
     @Mock private AgentDispatchHandler dispatchHandler;
 
     @Test
+    void jdbcJsonbApprovalRulesCreateAPendingApprovalWithTheOriginalPolicy() throws Exception {
+        org.postgresql.util.PGobject trigger = new org.postgresql.util.PGobject();
+        trigger.setType("jsonb"); trigger.setValue("[{\"type\":\"tool_call\",\"pattern\":\"owned-jdbc\"}]");
+        org.postgresql.util.PGobject approvers = new org.postgresql.util.PGobject();
+        approvers.setType("jsonb"); approvers.setValue("[{\"type\":\"role\",\"roleCode\":\"tenant_admin\"}]");
+        when(dynamicDataMapper.selectByQuery(anyString(), any())).thenAnswer(call ->
+                ((String) call.getArgument(0)).contains("FROM ab_approval_policy")
+                        ? List.of(Map.of("pid", "owned-policy", "trigger_rules", trigger,
+                            "approver_rules", approvers, "timeout_hours", 24)) : List.of());
+        String approval = newService().checkAndRequestApproval(1L, "run", "task",
+                "owned-jdbc", "Owned JDBC fixture", Map.of(), true);
+        assertThat(approval).hasSize(26);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> row = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).insert(eq("ab_agent_approval"), row.capture());
+        assertThat(row.getValue()).containsEntry("policy_id", "owned-policy")
+                .containsEntry("approval_status", "pending");
+    }
+
+    @Test
     void approvalPersistenceFailureCannotAuthorizeTheTool() {
         when(dynamicDataMapper.selectByQuery(anyString(), any())).thenAnswer(call ->
                 ((String) call.getArgument(0)).contains("FROM ab_approval_policy")

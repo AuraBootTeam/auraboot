@@ -58835,6 +58835,16 @@
     "/api/agent/tools/registry": {
       "get": {
         "operationId": "listToolRegistry",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "modelHint",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
