@@ -41,6 +41,19 @@ test('WB4: permission revoked after a real proposal is enforced at execution, fo
 }) => {
   const code = fixture.codes.revoked;
   expect(await modelEffect(database, code)).toEqual({ rows: [], physical: null });
+  const customer = (
+    await database.query(
+      'SELECT e2et_cust_code,e2et_cust_name,e2et_cust_contact FROM mt_e2et_customer WHERE tenant_id=$1 AND e2et_cust_code=$2',
+      [fixture.tenantId, fixture.form.code],
+    )
+  ).rows;
+  expect(customer).toEqual([
+    {
+      e2et_cust_code: fixture.form.code,
+      e2et_cust_name: fixture.form.manualName,
+      e2et_cust_contact: fixture.form.manualContact,
+    },
+  ]);
   const initialized = await page.request.put(fixture.backendURL + '/api/user-roles/sync-by-pid', {
     headers: { Authorization: 'Bearer ' + fixture.adminBearer },
     data: { memberPid: fixture.writer.memberPid, rolePids: fixture.writerInitialRolePids },
@@ -85,10 +98,24 @@ test('WB4: permission revoked after a real proposal is enforced at execution, fo
   await panel(page);
   const read = await send(
     page,
-    '请实际调用只读技能 model:query（aurabot_model_query），modelCode 为 e2et_customer，只查询模型元数据。',
+    `请实际调用只读工具 list_e2et_customer，pageNum=1、pageSize=20，不加关键词筛选，查询客户记录。告诉我客户编码 ${fixture.form.code} 的客户名称和联系人，用中文业务标签回答，不进行任何修改。`,
     'WB4-allowed-read-after-revocation',
   );
-  expect(read.some((item) => item.name === 'tool_result' && item.data.success === true)).toBe(true);
+  const started = read.find(
+    (item) => item.name === 'tool_start' && item.data.toolName === 'list_e2et_customer',
+  );
+  expect(started).toBeTruthy();
+  const queried = read.find(
+    (item) => item.name === 'tool_result' && item.data.toolId === started!.data.toolId,
+  );
+  expect(queried?.data.success).toBe(true);
+  expect(
+    queried?.data.result.records.some(
+      (row: { e2et_cust_code: string }) => row.e2et_cust_code === fixture.form.code,
+    ),
+  ).toBe(true);
+  await expect(page.getByTestId('chat-msg-agent').last()).toContainText(fixture.form.manualName);
+  await expect(page.getByTestId('chat-msg-agent').last()).toContainText(fixture.form.manualContact);
   expect(await modelEffect(database, code)).toEqual({ rows: [], physical: null });
   await page.screenshot({ path: join(evidence, 'WB4-read-recovered.png'), fullPage: true });
   record('WB4-proof', {
@@ -99,6 +126,7 @@ test('WB4: permission revoked after a real proposal is enforced at execution, fo
     effect: await modelEffect(database, code),
     revokedBeforeExecution: true,
     currentWriteToolRemovedFromAuthorizedCatalog: true,
+    allowedBusinessRead: customer,
   });
 });
 
