@@ -92,12 +92,14 @@ test('SM01-07: maintain, bind and execute a skill from the AI Center menu', asyn
   const current = await (await page.request.get(`/api/dynamic/agent-skill/${skillPid}`)).json();
   expect(current.data.skill_name).toBe('技能管理业务验收·修订');
   expect(current.data.execution_mode).toBe('template');
+  expect(typeof current.data.skill_input_schema).toBe('string');
   await page.screenshot({ path: path.join(shots, 'SM03.png'), fullPage: true });
   await editor.getByRole('button', { name: '选择AI同事', exact: true }).click();
   await editor.getByLabel('AI同事', { exact: true }).selectOption(agentPid);
   await editor.getByRole('button', { name: '绑定技能', exact: true }).click();
   await expect(editor.getByRole('status').filter({ hasText: '技能已绑定' })).toBeVisible();
   const bound = await (await page.request.get(`/api/dynamic/agent-definition/${agentPid}`)).json();
+  expect(typeof bound.data.skills).toBe('string');
   expect(JSON.parse(bound.data.skills)).toContain(code);
   expect(JSON.parse(bound.data.skills)).toContain('form_draft_fill');
   await page.screenshot({ path: path.join(shots, 'SM05.png'), fullPage: true });

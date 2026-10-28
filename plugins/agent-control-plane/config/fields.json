@@ -97,7 +97,7 @@
     "code": "skills",
     "displayName:zh-CN": "技能列表",
     "displayName:en": "Skills",
-    "dataType": "text",
+    "dataType": "json",
     "extension": {
       "multiline": true,
       "placeholder:zh-CN": "JSON 格式",
@@ -1215,7 +1215,7 @@
     "code": "skill_tools",
     "displayName:zh-CN": "关联工具",
     "displayName:en": "Tools",
-    "dataType": "text",
+    "dataType": "json",
     "extension": {
       "renderComponent": "agenttoolpicker",
       "placeholder:zh-CN": "选择工具...",
@@ -1237,7 +1237,7 @@
     "code": "skill_input_schema",
     "displayName:zh-CN": "输入 Schema",
     "displayName:en": "Input Schema",
-    "dataType": "text",
+    "dataType": "json",
     "extension": {
       "multiline": true,
       "rows": 4,
@@ -1761,6 +1761,6 @@
     "code": "step_input_mappings",
     "displayName:zh-CN": "步骤输入映射",
     "displayName:en": "Step input mappings",
-    "dataType": "text"
+    "dataType": "json"
   }
 ]
