@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router';
+import { Link, useSearchParams, useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
   UserCircleIcon,
@@ -1091,6 +1091,7 @@ function ToolsSkillsTab({
         <h3 className="text-text mb-3 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.tools.skills', undefined, 'Skills')}
         </h3>
+        <Link to="/p/agent_skill" className="text-accent text-sm underline">{t('ai.skills.manage', undefined, 'Manage skills')}</Link>
         {loadingSkills ? (
           skeleton
         ) : skills.length === 0 ? (
@@ -1115,7 +1116,7 @@ function ToolsSkillsTab({
               </tr>
             </thead>
             <tbody>
-              {skills.map((row) => (
+              {skills.filter(row => (asStringList(agent.skills) ?? []).includes(row.skill_code)).map((row) => (
                 <tr
                   key={row.pid}
                   className="border-border hover:bg-subtle dark:border-border dark:hover:bg-subtle/50 border-b"

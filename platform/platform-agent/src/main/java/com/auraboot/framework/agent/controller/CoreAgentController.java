@@ -104,10 +104,11 @@ public class CoreAgentController {
      * </pre>
      */
     @GetMapping("/tools/registry")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> listToolRegistry() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> listToolRegistry(@RequestParam(required = false) String modelHint) {
         Long tenantId = MetaContext.getCurrentTenantId();
         ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
+                .modelHint(modelHint)
                 .maxResults(Integer.MAX_VALUE)
                 .build();
         List<ToolDefinition> tools = toolProviderRegistry.discoverAll(ctx);

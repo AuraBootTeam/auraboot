@@ -2516,8 +2516,8 @@
   },
   {
     "pageKey": "agent_skill_list",
-    "name:zh-CN": "技能市场",
-    "name:en": "Skills Market",
+    "name:zh-CN": "技能管理",
+    "name:en": "Skills",
     "modelCode": "agent_skill",
     "kind": "list",
     "schemaVersion": 4,
@@ -2549,11 +2549,6 @@
         "blockType": "table",
         "columns": [
           {
-            "field": "skill_code",
-            "width": 150,
-            "sortable": true
-          },
-          {
             "field": "skill_name",
             "width": 200,
             "sortable": true
@@ -2569,10 +2564,6 @@
             "width": 120,
             "renderType": "tag",
             "dictCode": "acp_skill_category"
-          },
-          {
-            "field": "skill_icon",
-            "width": 60
           },
           {
             "field": "skill_version",
@@ -2628,12 +2619,18 @@
           "order": "desc"
         }
       }
-    ]
+    ],
+    "extension": {
+      "pageDescription": {
+        "zh-CN": "维护可复用的操作规程、绑定工具，并在权限和审批约束下验证效果。",
+        "en": "Maintain reusable procedures and tools, and verify them under permissions and approvals."
+      }
+    }
   },
   {
     "pageKey": "agent_skill_form",
-    "name:zh-CN": "技能详情",
-    "name:en": "Skill Detail",
+    "name:zh-CN": "维护技能",
+    "name:en": "Maintain skill",
     "modelCode": "agent_skill",
     "kind": "form",
     "schemaVersion": 4,
@@ -2643,102 +2640,19 @@
     },
     "blocks": [
       {
-        "id": "basic",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "基本信息",
-          "en-US": "Basic Information"
-        },
-        "fields": [
-          {
-            "field": "skill_code",
-            "colSpan": 6,
-            "required": true
-          },
-          {
-            "field": "skill_name",
-            "colSpan": 6,
-            "required": true
-          },
-          {
-            "field": "skill_level",
-            "colSpan": 4,
-            "required": true
-          },
-          {
-            "field": "skill_category",
-            "colSpan": 4
-          },
-          {
-            "field": "skill_status",
-            "colSpan": 4
-          },
-          {
-            "field": "skill_icon",
-            "colSpan": 4
-          },
-          {
-            "field": "skill_version",
-            "colSpan": 4
-          },
-          {
-            "field": "is_builtin",
-            "colSpan": 4
-          }
-        ]
-      },
-      {
-        "id": "definition",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "技能定义",
-          "en-US": "Skill Definition"
-        },
-        "fields": [
-          {
-            "field": "skill_description",
-            "colSpan": 12
-          },
-          {
-            "field": "skill_tools",
-            "colSpan": 12
-          },
-          {
-            "field": "prompt_template",
-            "colSpan": 12
-          },
-          {
-            "field": "skill_input_schema",
-            "colSpan": 12
-          }
-        ]
-      },
-      {
-        "id": "buttons",
-        "blockType": "form-buttons",
-        "buttons": [
-          {
-            "code": "submit",
-            "primary": true,
-            "label": {
-              "zh-CN": "保存",
-              "en-US": "Save"
-            },
-            "action": {
-              "type": "command",
-              "command": "acp:update_agent_skill"
-            }
-          },
-          {
-            "code": "cancel",
-            "label": {
-              "zh-CN": "取消",
-              "en-US": "Cancel"
-            }
-          }
-        ]
+        "id": "skill_definition",
+        "blockType": "custom",
+        "component": "SkillDefinitionEditor"
       }
-    ]
+    ],
+    "extension": {
+      "presentation": "workspace",
+      "backTo": "/p/agent_skill",
+      "pageDescription": {
+        "zh-CN": "配置规程、工具及输入，保存后绑定AI同事或进行真实试运行。",
+        "en": "Configure procedures, tools and inputs. Save before binding colleagues or running a real trial."
+      }
+    }
   },
   {
     "pageKey": "acp_mission_control_list",

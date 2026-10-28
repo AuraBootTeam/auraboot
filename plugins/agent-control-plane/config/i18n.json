@@ -314,5 +314,516 @@
   { "key": "menu.acp_actions", "zh-CN": "Agent 动作", "en-US": "Agent Actions", "source": "import", "refType": "menu" },
   { "key": "menu.acp_object_aliases", "zh-CN": "对象别名", "en-US": "Object Aliases", "source": "import", "refType": "menu" },
   { "key": "menu.acp_semantic_terms", "zh-CN": "语义术语", "en-US": "Semantic Terms", "source": "import", "refType": "menu" },
-  { "key": "menu.acp_mcp_servers", "zh-CN": "MCP 服务器", "en-US": "MCP Servers", "source": "import", "refType": "menu" }
+  { "key": "menu.acp_mcp_servers", "zh-CN": "MCP 服务器", "en-US": "MCP Servers", "source": "import", "refType": "menu" },
+{
+    "key": "ai.skills.editor.failed",
+    "zh-CN": "操作失败，请重新加载后再试。",
+    "en-US": "Operation failed. Reload and try again.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.toolsFailed",
+    "zh-CN": "工具目录加载失败，请重新加载；已保存的绑定会保留。",
+    "en-US": "Tool catalog failed to load. Reload; saved bindings are retained.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.toolsRequired",
+    "zh-CN": "单工具方式需选择一个工具；多工具请选择顺序执行或模型编排。",
+    "en-US": "Single-tool mode requires one tool. Choose sequential or orchestration for multiple tools.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.invalidFields",
+    "zh-CN": "参数名称须唯一，并使用字母、数字或下划线，不能以数字开头。",
+    "en-US": "Parameter names must be unique identifiers and cannot start with a digit.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.missingReceipt",
+    "zh-CN": "保存响应缺少记录凭据，请返回列表核实后重新打开。",
+    "en-US": "Save response has no record receipt. Return to the list and reopen.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.saved",
+    "zh-CN": "技能已保存，可以绑定AI同事或试运行。",
+    "en-US": "Skill saved. Bind a colleague or run a trial.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.bindFailed",
+    "zh-CN": "绑定未生效，请重新打开同事详情核实。",
+    "en-US": "Binding did not persist. Reopen the colleague to verify.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.bound",
+    "zh-CN": "技能已绑定，原有技能已保留。",
+    "en-US": "Skill bound; existing bindings were retained.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.single",
+    "zh-CN": "单工具执行",
+    "en-US": "Single tool",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.sequential",
+    "zh-CN": "按所选顺序执行",
+    "en-US": "Sequential",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.orchestration",
+    "zh-CN": "由模型编排工具",
+    "en-US": "Model orchestration",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.loading",
+    "zh-CN": "正在加载技能…",
+    "en-US": "Loading skill…",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.back",
+    "zh-CN": "返回技能管理",
+    "en-US": "Back to skills",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.readOnly",
+    "zh-CN": "此定义为内置技能、当前账号只读，或包含高级结构。本页保留原定义，不提供简化覆盖。",
+    "en-US": "This definition is built-in, read-only for your account, or uses an advanced structure. Its original definition is preserved.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.identity",
+    "zh-CN": "名称与适用范围",
+    "en-US": "Identity and scope",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.name",
+    "zh-CN": "技能名称",
+    "en-US": "Skill name",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.nameExample",
+    "zh-CN": "例如：BOM发布前检查",
+    "en-US": "e.g. BOM pre-release review",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.code",
+    "zh-CN": "技能标识",
+    "en-US": "Skill identifier",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.codeHelp",
+    "zh-CN": "创建后用于稳定绑定，不能修改。",
+    "en-US": "Stable binding identifier; cannot change after creation.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.version",
+    "zh-CN": "版本",
+    "en-US": "Version",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.status",
+    "zh-CN": "使用状态",
+    "en-US": "Availability",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.draft",
+    "zh-CN": "草稿",
+    "en-US": "Draft",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.active",
+    "zh-CN": "启用",
+    "en-US": "Active",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.disabled",
+    "zh-CN": "停用",
+    "en-US": "Disabled",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.description",
+    "zh-CN": "适用任务与边界",
+    "en-US": "Task and boundaries",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.descriptionExample",
+    "zh-CN": "说明何时使用、应输出什么，以及必须交给业务命令校验的事项。",
+    "en-US": "Describe when to use it, its outputs and required business validations.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.procedure",
+    "zh-CN": "执行规程与工具",
+    "en-US": "Procedure and tools",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.mode",
+    "zh-CN": "执行方式",
+    "en-US": "Execution mode",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.prompt",
+    "zh-CN": "操作规程",
+    "en-US": "Procedure",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.promptExample",
+    "zh-CN": "例如：先查当前BOM，缺少版本时询问；发布操作必须使用专用命令并等待审批。",
+    "en-US": "Read the current BOM; clarify missing versions. Publish only through the dedicated command and approval.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.promptHelp",
+    "zh-CN": "规程在模型编排时使用；单工具与顺序方式按配置直接执行。规程不授予权限，也不代替业务校验。",
+    "en-US": "The procedure guides model orchestration; single/sequential modes run configured tools directly. It grants no permissions.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.maxSteps",
+    "zh-CN": "最大工具轮数",
+    "en-US": "Maximum tool rounds",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.model",
+    "zh-CN": "业务模型范围",
+    "en-US": "Business model scope",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.loadTools",
+    "zh-CN": "加载工具",
+    "en-US": "Load tools",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.orderHelp",
+    "zh-CN": "按勾选顺序执行；取消再勾选可调整顺序。加载模型范围可发现列表与详情查询工具。",
+    "en-US": "Selection order determines sequential execution. Reselect to reorder. Load a model scope to discover list/detail tools.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.noTools",
+    "zh-CN": "当前范围没有可用工具。请检查权限或调整模型范围。",
+    "en-US": "No tools in this scope. Check permissions or change model scope.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.governed",
+    "zh-CN": "需确认或审批",
+    "en-US": "Confirmation or approval",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.selected",
+    "zh-CN": "已选择工具数",
+    "en-US": "Selected tools",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.inputs",
+    "zh-CN": "技能输入",
+    "en-US": "Skill inputs",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.inputsHelp",
+    "zh-CN": "定义调用者填写的参数。工具仍会独立校验参数；顺序方式将同一份输入交给各工具。",
+    "en-US": "Define caller inputs. Tools validate independently; sequential mode passes the same inputs to each tool.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.parameter",
+    "zh-CN": "参数名称",
+    "en-US": "Parameter name",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.parameterLabel",
+    "zh-CN": "显示名称",
+    "en-US": "Display label",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.parameterExample",
+    "zh-CN": "例如：业务模型",
+    "en-US": "e.g. Business model",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.type",
+    "zh-CN": "参数类型",
+    "en-US": "Parameter type",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.required",
+    "zh-CN": "必填",
+    "en-US": "Required",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.remove",
+    "zh-CN": "移除",
+    "en-US": "Remove",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.addInput",
+    "zh-CN": "添加参数",
+    "en-US": "Add input",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.saving",
+    "zh-CN": "处理中…",
+    "en-US": "Working…",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.save",
+    "zh-CN": "保存技能",
+    "en-US": "Save skill",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.colleagues",
+    "zh-CN": "绑定AI同事",
+    "en-US": "Bind an AI colleague",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.bindingHelp",
+    "zh-CN": "保存后可添加到同事的技能列表，不覆盖其他已有技能。",
+    "en-US": "After saving, add this skill to a colleague without replacing other bindings.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.loadColleagues",
+    "zh-CN": "选择AI同事",
+    "en-US": "Choose a colleague",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.colleague",
+    "zh-CN": "AI同事",
+    "en-US": "AI colleague",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.choose",
+    "zh-CN": "请选择",
+    "en-US": "Choose",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.bind",
+    "zh-CN": "绑定技能",
+    "en-US": "Bind skill",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.bindPermission",
+    "zh-CN": "绑定需具备AI同事管理权限。",
+    "en-US": "Colleague management permission is required.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.trial",
+    "zh-CN": "真实试运行",
+    "en-US": "Real trial run",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.trialHelp",
+    "zh-CN": "使用已保存且启用的版本。可能产生模型费用和真实业务操作；原有权限、确认与审批继续生效。本次结果在离开页面后清空。",
+    "en-US": "Uses the saved active definition. Model costs and real effects are possible. Permissions, confirmation and approval remain enforced. Results clear when leaving this page.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.unset",
+    "zh-CN": "未填写",
+    "en-US": "Unset",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.yes",
+    "zh-CN": "是",
+    "en-US": "Yes",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.no",
+    "zh-CN": "否",
+    "en-US": "No",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.task",
+    "zh-CN": "本次任务说明",
+    "en-US": "Task for this run",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.taskExample",
+    "zh-CN": "说明本次要查询或处理的对象。",
+    "en-US": "Describe the records or task for this run.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.consent",
+    "zh-CN": "我已核对输入，允许本次真实执行。",
+    "en-US": "I reviewed the input and allow this real execution.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.running",
+    "zh-CN": "正在执行，请勿重复提交…",
+    "en-US": "Running; do not resubmit…",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.run",
+    "zh-CN": "执行一次",
+    "en-US": "Run once",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.runPermission",
+    "zh-CN": "试运行需具备Agent运行时管理权限。",
+    "en-US": "Agent runtime management permission is required.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.pending",
+    "zh-CN": "已暂停，等待确认或审批。本页不会自动重试；请前往审批入口核查。",
+    "en-US": "Paused for confirmation or approval. This page will not retry. Review it in approvals.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.manage",
+    "zh-CN": "管理技能",
+    "en-US": "Manage skills",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.string",
+    "zh-CN": "文本",
+    "en-US": "Text",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.number",
+    "zh-CN": "数值",
+    "en-US": "Number",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.integer",
+    "zh-CN": "整数",
+    "en-US": "Integer",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "ai.skills.editor.boolean",
+    "zh-CN": "是／否",
+    "en-US": "Yes / No",
+    "source": "import",
+    "refType": "message"
+  }
 ]
