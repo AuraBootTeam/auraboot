@@ -49,6 +49,12 @@ public final class DynamicDataQueryScope implements AutoCloseable {
         return getOrCompute(new FilterKey(FilterKind.DOMAIN, tenantId, modelCode, userId), supplier);
     }
 
+    /** Row/domain predicates can contain data-derived identities from any model. */
+    static void invalidateFiltersAfterMutation() {
+        State state = CURRENT.get();
+        if (state != null) state.filters.clear();
+    }
+
     public static Set<String> nonWritableFields(
             Long tenantId,
             String modelCode,

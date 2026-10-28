@@ -1427,8 +1427,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private void notifyModelMutation(ModelDefinition model, String pid, ModelMutationObserver.Operation operation) {
         // Lazy resolution prevents model services and publication validators from forming a cycle.
         // Observer failures deliberately propagate: a published event is part of the business fact.
-        applicationContext.getBeansOfType(ModelMutationObserver.class).values()
-                .forEach(observer -> observer.observe(model, pid, operation));
+        DynamicDataQueryScope.invalidateFiltersAfterMutation();
+        try {
+            applicationContext.getBeansOfType(ModelMutationObserver.class).values()
+                    .forEach(observer -> observer.observe(model, pid, operation));
+        } finally {
+            // Observer reads must not leave intermediate data-derived guards in the outer command.
+            DynamicDataQueryScope.invalidateFiltersAfterMutation();
+        }
     }
 
     private int executeScopedUpdate(
