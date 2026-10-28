@@ -282,6 +282,34 @@ class FileUploadControllerTest {
         verifyNoInteractions(adminEventLogService);
     }
 
+    @Test void ownerFileMetadataListDoesNotRevealFilesWithARevokedAdditionalRelation() {
+        var own=storedFile("own.txt","text/plain","/tmp/own");own.setPid("own-file");
+        var hidden=storedFile("hidden.txt","text/plain","/tmp/hidden");hidden.setPid("hidden-file");
+        var relation=new FileRelationEntity().setEntityType("bundle").setEntityId("restricted-bundle").setFieldName("original");
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of(own,hidden));
+        when(fileService.getFileRelations("own-file")).thenReturn(List.of());
+        when(fileService.getFileRelations("hidden-file")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"),eq("read"),eq("restricted-bundle"),any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("revoked"));
+        assertThat(controller.getUserFiles(42L).getData()).extracting(com.auraboot.framework.file.dto.FileUploadResponseDTO::getFileId).containsExactly("own-file");
+    }
+    @Test void relationFileMetadataListChecksAllOtherRelationsBeforeReturningMetadata() {
+        var file=storedFile("hidden.txt","text/plain","/tmp/hidden");
+        var first=new FileRelationEntity().setEntityType("bundle").setEntityId("allowed-bundle").setFieldName("original");
+        var other=new FileRelationEntity().setEntityType("bundle").setEntityId("restricted-bundle").setFieldName("original");
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"),eq("read"),eq("allowed-bundle"),any())).thenReturn(true);
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"),eq("read"),eq("restricted-bundle"),any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("revoked"));
+        when(fileService.getFilesByEntity("bundle","allowed-bundle")).thenReturn(List.of(file));
+        when(fileService.getFilesByEntityAndField("bundle","allowed-bundle","original")).thenReturn(List.of(file));
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(first,other));
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L,42L,"actor","Actor");
+        try {
+            assertThat(controller.getEntityFiles("bundle","allowed-bundle").getData()).isEmpty();
+            assertThat(controller.getEntityFieldFiles("bundle","allowed-bundle","original").getData()).isEmpty();
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+    }
+
     private static void assertPermission(String methodName, String expected, Class<?>... parameterTypes)
             throws NoSuchMethodException {
         Method method = FileUploadController.class.getDeclaredMethod(methodName, parameterTypes);

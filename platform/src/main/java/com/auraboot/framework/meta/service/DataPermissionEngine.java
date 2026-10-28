@@ -27,6 +27,15 @@ import java.util.Set;
  */
 public interface DataPermissionEngine {
 
+    /** Additional immutable-reference AND restriction, including callers with an existing root row permit. */
+    String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId);
+
+    /** Same AND restriction for a trusted caller's already admitted root query boundary. */
+    String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId, String admittedRootFilter, boolean applyDomain);
+
+    /** Current required-member reads; this does not grant the root model operation. */
+    void requireRecordReads(String modelCode, Map<String, Object> record);
+
     /**
      * Build SQL WHERE clause fragment for row-level filtering.
      * Returns empty string if user has ALL access or no row policies defined.

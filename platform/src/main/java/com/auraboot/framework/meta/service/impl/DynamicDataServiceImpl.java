@@ -726,6 +726,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (record == null) {
                 throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(modelCode, recordId);
             }
+            dataPermissionEngine.requireRecordReads(modelCode, record);
             return record;
         }
 
@@ -766,6 +767,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
             throw new AccessDeniedException("Access denied: command permit scope does not include this record");
         }
+        if (commandPermitInForce) dataPermissionEngine.requireRecordReads(modelCode, record);
 
         if (!commandPermitInForce) {
             // Apply the Rule Center-backed permission pipeline before the

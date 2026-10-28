@@ -96,6 +96,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     private final DataScopeEvaluator dataScopeEvaluator;
     private final RecordShareEvaluator recordShareEvaluator;
     private final ObjectMapper objectMapper;
+    private final RequiredRecordReadGuard requiredReads;
 
     // Stateless compilers/evaluators for AST-based custom scopes (B2). Not Spring beans — pure.
     private final ConditionToSqlBuilder conditionToSqlBuilder = new ConditionToSqlBuilder();
@@ -113,6 +114,32 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
     @Override
     public String buildRowFilter(Long tenantId, String modelCode, String actionCode, Long userId) {
+        String base = baseRowFilter(tenantId, modelCode, actionCode, userId);
+        return "read".equals(actionCode) ? appendRequired(base, requiredReads.sqlFilter(tenantId, modelCode, userId, base)) : base;
+    }
+
+    @Override
+    public String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId) {
+        if (!requiredReads.isConfigured(modelCode)) return "";
+        String permit = CommandPermitDataAccess.rowFilter(modelCode, userId);
+        return requiredReads.sqlFilter(tenantId, modelCode, userId,
+                permit != null ? permit : baseRowFilter(tenantId, modelCode, "read", userId), permit == null);
+    }
+
+    @Override
+    public String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId, String admittedRootFilter, boolean applyDomain) {
+        return requiredReads.sqlFilter(tenantId, modelCode, userId, admittedRootFilter, applyDomain);
+    }
+
+    @Override
+    public void requireRecordReads(String modelCode, Map<String, Object> record) { requiredReads.require(modelCode, record); }
+
+    private static String appendRequired(String base, String required) {
+        if (required == null) throw new IllegalStateException("Required-read filtering must return an explicit predicate");
+        return required.isBlank() ? base : (base == null || base.isBlank() ? required : base + " " + required);
+    }
+
+    private String baseRowFilter(Long tenantId, String modelCode, String actionCode, Long userId) {
         // Machine paths must use bound constraints; unadapted SQL callers cannot inherit human defaults.
         if (MachineDataAccessContext.isActive()) return "AND 1 = 0";
         // Phase 2: findEffectivePolicies joins ab_user_role on member_id.
@@ -186,6 +213,12 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @Override
     public List<Map<String, Object>> filterRecords(Long tenantId, String modelCode, Long userId,
                                                     List<Map<String, Object>> records) {
+        var filtered = baseFilterRecords(tenantId, modelCode, userId, records);
+        return filtered == null ? null : filtered.stream().filter(record -> requiredReadAllows(modelCode, record)).toList();
+    }
+
+    private List<Map<String, Object>> baseFilterRecords(Long tenantId, String modelCode, Long userId,
+                                                    List<Map<String, Object>> records) {
         if (records == null || records.isEmpty()) {
             return records;
         }
@@ -226,6 +259,17 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @Override
     public boolean canAccessRecord(Long tenantId, String modelCode, String actionCode, Long userId,
                                    Map<String, Object> record) {
+        if (!baseCanAccessRecord(tenantId, modelCode, actionCode, userId, record)) return false;
+        return !"read".equals(actionCode) || requiredReadAllows(modelCode, record);
+    }
+
+    private boolean requiredReadAllows(String modelCode, Map<String, Object> record) {
+        try { requiredReads.require(modelCode, record); return true; }
+        catch (org.springframework.security.access.AccessDeniedException denied) { return false; }
+    }
+
+    private boolean baseCanAccessRecord(Long tenantId, String modelCode, String actionCode, Long userId,
+                                   Map<String, Object> record) {
         if (MachineDataAccessContext.isActive()) {
             var decision = MachineDataAccessContext.requireDecision(modelCode);
             decision.requireAction(actionCode);
@@ -260,6 +304,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
     @Override
     public boolean canAccessHistoricalRecord(Long tenantId, String modelCode, Long userId, Long memberId,
+                                             Map<String, Object> record) {
+        return baseCanAccessHistoricalRecord(tenantId, modelCode, userId, memberId, record) && requiredReadAllows(modelCode, record);
+    }
+
+    private boolean baseCanAccessHistoricalRecord(Long tenantId, String modelCode, Long userId, Long memberId,
                                              Map<String, Object> record) {
         if (tenantId == null || userId == null || memberId == null || record == null) return false;
         var policies = getEffectivePolicies(tenantId, modelCode, memberId).stream()

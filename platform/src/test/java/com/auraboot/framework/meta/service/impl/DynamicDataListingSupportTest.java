@@ -91,4 +91,24 @@ class DynamicDataListingSupportTest {
         var query=physicalListing(builder).applyStableListSort(builder.buildConditionQuery(model,List.of()),model,requested);
         assertThat(query.getSql()).endsWith("ORDER BY public_ref DESC");
     }
+    @Test void requiredMemberPredicateIsSharedByDataCountAndCursorUnderAnAllPermit() {
+        var mapper=mock(DynamicDataMapper.class);var policies=mock(DataPermissionEngine.class);
+        var builder=new QueryBuilderServiceImpl(mapper);var model=RequiredReadReferencesTest.model(10);
+        String allowed=RequiredReadReferencesTest.id(9),predicate="pid IN ('"+allowed+"')";
+        when(policies.buildRequiredReadFilter(42L,"fixture_bundle",43L)).thenReturn("AND "+predicate);
+        var listing=new DynamicDataListingSupport(builder,queries,new SecureSqlRewriter(),mapper,policies,
+                mock(FieldMaskService.class),mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m->model);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).contains(predicate);
+            return new ArrayList<>(List.of(new LinkedHashMap<>(Map.<String,Object>of("pid",allowed)))); });
+        when(mapper.countByQuery(anyString(),anyMap())).thenAnswer(call->{assertThat((String)call.getArgument(0)).contains(predicate);return 1L;});
+        MetaContext.runWithCommandPermitScope("ALL",()->{
+            var offset=listing.list("fixture_bundle",DynamicQueryRequest.builder().pageNum(1).pageSize(2).build());
+            assertThat(offset.getTotal()).isEqualTo(1L);assertThat(offset.getRecords()).hasSize(1);
+            var cursor=listing.list("fixture_bundle",DynamicQueryRequest.builder().pageNum(1).pageSize(2).cursor(RequiredReadReferencesTest.id(1)).build());
+            assertThat(cursor.getTotal()).isEqualTo(1L);assertThat(cursor.getNextCursor()).isEqualTo(allowed);
+        });
+        verify(policies,never()).buildRowFilter(any(),anyString(),any());
+        verify(policies,times(2)).buildRequiredReadFilter(42L,"fixture_bundle",43L);
+    }
 }

@@ -406,4 +406,15 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         verify(permissionFacade).canOperate(eq(FALLBACK_MEMBER_ID), eq(MODEL_CODE), eq("read"), anyMap());
         verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
     }
+    @Test void commandAllPermitCannotSkipRequiredMemberReadRestriction() {
+        wireHappyPathDbStubs();
+        doThrow(new org.springframework.security.access.AccessDeniedException("member revoked"))
+                .when(dataPermissionEngine).requireRecordReads(eq(MODEL_CODE),anyMap());
+        MetaContext.runWithCommandPermitScope("ALL",()->{
+            assertThatThrownBy(()->service.getById(MODEL_CODE,RECORD_ID))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessage("member revoked");
+        });
+        verify(dataPermissionEngine).requireRecordReads(eq(MODEL_CODE),anyMap());
+        verify(dataPermissionEngine,never()).canAccessRecord(anyLong(),anyString(),anyLong(),anyMap());
+    }
 }

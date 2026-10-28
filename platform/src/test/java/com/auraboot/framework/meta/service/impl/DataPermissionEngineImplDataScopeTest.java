@@ -48,8 +48,11 @@ class DataPermissionEngineImplDataScopeTest {
     void setUp() {
         MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
         MetaContext.setMemberId(MEMBER_ID);
+        var required = org.mockito.Mockito.mock(RequiredRecordReadGuard.class);
+        org.mockito.Mockito.lenient().when(required.sqlFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn("");
         engine = new DataPermissionEngineImpl(
-                policyMapper, dataScopeEvaluator, recordShareEvaluator, new ObjectMapper());
+                policyMapper, dataScopeEvaluator, recordShareEvaluator, new ObjectMapper(), required);
     }
 
     @AfterEach

@@ -129,7 +129,7 @@ public class FileUploadController {
     @RequirePermission(MetaPermission.SYS_FILE_READ)
     public ApiResponse<List<FileUploadResponseDTO>> getUserFiles(@CurrentUserId Long userId) {
         List<FileEntity> files = fileService.getFilesByUserId(userId);
-        return ApiResponse.success(files.stream().map(this::toDto).toList());
+        return ApiResponse.success(files.stream().filter(file -> canReadFile(file, userId)).map(this::toDto).toList());
     }
     
     /**
@@ -180,7 +180,8 @@ public class FileUploadController {
             @PathVariable String entityId) {
         authorizeRelationTarget(entityType, entityId, "read");
         List<FileEntity> files = fileService.getFilesByEntity(entityType, entityId);
-        return ApiResponse.success(files.stream().map(this::toDto).toList());
+        return ApiResponse.success(files.stream().filter(file -> canReadFile(file,
+                com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId())).map(this::toDto).toList());
     }
 
     /**
@@ -194,7 +195,8 @@ public class FileUploadController {
             @PathVariable String fieldName) {
         authorizeRelationTarget(entityType, entityId, "read");
         List<FileEntity> files = fileService.getFilesByEntityAndField(entityType, entityId, fieldName);
-        return ApiResponse.success(files.stream().map(this::toDto).toList());
+        return ApiResponse.success(files.stream().filter(file -> canReadFile(file,
+                com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId())).map(this::toDto).toList());
     }
     
     /**
@@ -295,6 +297,12 @@ public class FileUploadController {
         for (FileRelationEntity relation : relations) {
             authorizeRelationTarget(relation.getEntityType(), relation.getEntityId(), "read");
         }
+    }
+
+    private boolean canReadFile(FileEntity file, Long userId) {
+        if (file == null || !StringUtils.hasText(file.getPid())) throw new IllegalStateException("File metadata identity is missing");
+        try { authorizeFileAccess(file.getPid(), file, userId); return true; }
+        catch (AccessDeniedException denied) { return false; }
     }
 
     private static void requireRelationRequest(FileRelationRequestDTO request) {

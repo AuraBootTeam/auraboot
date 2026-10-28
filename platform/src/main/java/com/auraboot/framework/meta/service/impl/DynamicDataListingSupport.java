@@ -180,6 +180,14 @@ final class DynamicDataListingSupport extends BaseMetaService {
             }
         }
 
+        if (commandPermitInForce) {
+            String required = dataPermissionEngine.buildRequiredReadFilter(tenantId, modelCode, userId);
+            if (required != null && !required.isBlank()) {
+                queryBuilder.addRawCondition(required);
+                scopedRowFilter = scopedRowFilter == null || scopedRowFilter.isBlank() ? required : scopedRowFilter + " " + required;
+            }
+        }
+
         // Add keyword search across searchable fields
         if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
             queryBuilder = queryBuilderService.buildKeywordSearch(queryBuilder, request.getKeyword(), model);

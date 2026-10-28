@@ -181,4 +181,23 @@ class NamedQueryFieldProtectionAuthorizationTest {
         verifyNoInteractions(permissions);
     }
 
+    @Test void allPermitAndAggregateRootGrantStillApplyRequiredMemberScopeAtEverySource() {
+        when(policies.buildRequiredReadFilter(10L,"orders",20L)).thenReturn("AND pid IN ('allowed-order')");
+        when(policies.buildRequiredReadFilter(10L,"customers",20L)).thenReturn("AND 1 = 0");
+        MetaContext.runWithCommandPermitScope("ALL",()->{
+            var plan=protection.prepare(query,List.of(),"list",true);
+            assertTrue(plan.sourceScopes().get("orders").contains("pid IN ('allowed-order')"));
+            assertTrue(plan.sourceScopes().get("customers").contains("1 = 0"));
+            assertFalse(plan.sourceScopes().get("orders").contains("(AND"));
+        });
+        verify(policies,never()).buildRowFilter(any(),anyString(),anyString(),any());
+    }
+    @Test void selfAnchorKeepsItsOriginalRootBoundaryAndStillRequiresAllMembers() {
+        var policy=new NamedQueryPolicy();policy.setSelfAnchoredSources(true);query.setPolicy(policy);
+        when(policies.buildRequiredReadFilter(10L,"orders",20L,"AND created_by = 20",false)).thenReturn("AND pid IN ('allowed-order')");
+        var plan=protection.prepare(query,List.of(),"list");
+        assertTrue(plan.sourceScopes().get("orders").contains("created_by = 20"));
+        assertTrue(plan.sourceScopes().get("orders").contains("pid IN ('allowed-order')"));
+        verify(policies,never()).buildRowFilter(any(),anyString(),anyString(),any());
+    }
 }
