@@ -690,8 +690,15 @@ PYLOG
 XML
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"
+  # MANAGEMENT_HEALTH_RELIABLEINTEGRATION_ENABLED: the reliable-integration outbox
+  # indicator (expired leases / open DLQ / backlog older than 300s) reflects business
+  # data produced by whatever the stack is being used to test. One backoff-storm event
+  # holds the aggregate health at 503 for minutes while db/redis/disk are all healthy
+  # (observed 2026-10-28: slot69 goal14 flipped DOWN mid-run and masked the real stack
+  # state all night). A golden stack's health gate must answer "is this stack serving",
+  # so the business backlog signal is disabled here exactly like MANAGEMENT_HEALTH_DB_ENABLED.
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/logs/backend-console.log" \
-    env AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false MANAGEMENT_HEALTH_RELIABLEINTEGRATION_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT="$redis_port" SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -1116,7 +1123,7 @@ cmd_resume_retained() {
     while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
   fi
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env "${logging_args[@]}" ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env "${logging_args[@]}" ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false MANAGEMENT_HEALTH_RELIABLEINTEGRATION_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT="$redis_port" SPRING_DATA_REDIS_DATABASE="$redis_db" \
