@@ -119,3 +119,10 @@ it('respects an explicit vertical chart configuration', async () => {
     'vertical',
   );
 });
+
+it('honors an explicit empty presentation without falling back to private storage keys', () => {
+  render(<ChatBiResultCard result={{ modelCode: 'customer', columns: [], records: [{ tenant_id: 'private-tenant', pid: 'private-pid' }], total: 1 }} />);
+  expect(screen.queryByText('tenant_id')).not.toBeInTheDocument();
+  expect(screen.queryByText('private-tenant')).not.toBeInTheDocument();
+  expect(screen.queryByText('private-pid')).not.toBeInTheDocument();
+});

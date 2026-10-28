@@ -296,7 +296,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   const { interpretation, chartConfig, columns = [], records = [], total, sql, truncated } = result;
 
   const effectiveColumns =
-    columns.length > 0 ? columns : records.length > 0 ? Object.keys(records[0]) : [];
+    result.columns !== undefined ? columns : records.length > 0 ? Object.keys(records[0]) : [];
 
   // Use explicit chartType if provided. If a raw tool result has records but no
   // column metadata, render as a table so all returned evidence fields remain visible.
