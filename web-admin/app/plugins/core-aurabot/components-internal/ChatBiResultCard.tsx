@@ -377,8 +377,12 @@ export function ChatBiResultCard({
   const openReportReview = () => {
     setReportTitle(text({ 'zh-CN': '数据分析报告', 'en-US': 'Data analysis report' }));
     setReviewedNarrative(narrativeWithoutTables(reportNarrative || interpretation || ''));
+    const dimensionFields = new Set(dataSource?.dimensions || result.dimensions || []);
+    const reportFields = [...effectiveColumns].sort(
+      (left, right) => Number(dimensionFields.has(right)) - Number(dimensionFields.has(left)),
+    );
     setReviewedColumns(
-      effectiveColumns.map((field) => {
+      reportFields.map((field) => {
         const numeric =
           records.some((row) => typeof row[field] === 'number') &&
           records.every((row) => row[field] == null || typeof row[field] === 'number');

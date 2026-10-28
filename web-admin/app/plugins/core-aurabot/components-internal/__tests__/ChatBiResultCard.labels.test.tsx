@@ -124,7 +124,7 @@ it('respects an explicit vertical chart configuration', async () => {
 it('resolves generated aggregate aliases before persisting report column labels', async () => {
   const {reportDesignerService}=await import('~/plugins/core-designer/components/report-designer/services/reportDesignerService');
   vi.mocked(reportDesignerService.save).mockResolvedValueOnce('business-label-report');
-  render(<ChatBiResultCard result={{dataSource:{type:'aggregate',modelCode:'tpm_project',dimensions:['tpm_pj_name'],metrics:[{field:'tpm_pj_budget',aggregation:'sum'}]},columns:['tpm_pj_name','tpm_pj_budget_sum'],records:[{tpm_pj_name:'Project',tpm_pj_budget_sum:132000.5}]}} />);
+  render(<ChatBiResultCard result={{dataSource:{type:'aggregate',modelCode:'tpm_project',dimensions:['tpm_pj_name'],metrics:[{field:'tpm_pj_budget',aggregation:'sum'}]},columns:['tpm_pj_budget_sum','tpm_pj_name'],records:[{tpm_pj_name:'Project',tpm_pj_budget_sum:132000.5}]}} />);
   fireEvent.click(screen.getByTestId('chatbi-save-report'));
   expect(screen.getAllByRole('textbox',{name:'列显示名称'})[1]).toHaveValue('项目预算 · 合计');
   fireEvent.click(screen.getByRole('checkbox'));

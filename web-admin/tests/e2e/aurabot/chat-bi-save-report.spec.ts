@@ -83,6 +83,12 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
       r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/report-definitions',
   );
   await card.getByTestId('chatbi-save-report').click();
+  const review=page.getByTestId('analysis-report-review');
+  await expect(review).toBeVisible();
+  await expect(review.getByTestId('analysis-report-confirm')).toBeDisabled();
+  await review.getByLabel('报表名称',{exact:true}).fill('订单数量分析');
+  await review.getByRole('checkbox').check();
+  await review.getByTestId('analysis-report-confirm').click();
   const created = await createdPromise;
   expect(created.status()).toBe(200);
   const analysisId = await card.getAttribute('data-analysis-id');
@@ -90,12 +96,10 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   const persistedQuery = created.request().postDataJSON().dsl.dataSources.analysis.aggregateQuery;
   expect(persistedQuery).toMatchObject({ type: 'aggregate', ...query });
   const columns = created.request().postDataJSON().dsl.body[0].columns;
-  expect(columns).toEqual(
-    expect.arrayContaining([
-      { field: 'cnt', label: '数量' },
-      { field: 'e2et_order_title', label: '订单标题' },
-    ]),
-  );
+  expect(columns).toEqual([
+    { field: 'e2et_order_title', label: '订单标题', width:300, align:'left', format:'' },
+    { field: 'cnt', label: '数量', width:150, align:'right', format:'number' },
+  ]);
   const saved = (await created.json()).data;
   const db = new Client(PG_CONN);
   await db.connect();
