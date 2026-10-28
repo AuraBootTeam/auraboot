@@ -13,6 +13,8 @@ vi.mock('~/contexts/I18nContext', () => ({
       ({
         'model.tpm_project.tpm_pj_budget.label': '项目预算',
         'model.tpm_project.tpm_pj_name.label': '项目名称',
+        'model.e2et_customer.e2et_cust_name.label': '客户名称',
+        'model.e2et_customer.e2et_cust_contact.label': '联系人',
       })[key] ||
       fallback ||
       key,
@@ -45,6 +47,7 @@ vi.mock(
 );
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import { ChatBiResultCard } from '../ChatBiResultCard';
+import { toolQueryPresentation } from '../toolQueryPresentation';
 describe('chat chart presentation labels', () => {
   it('passes translated metric names into the existing chart renderer and persisted widget', async () => {
     const dataSource: ChartDataSource = {
@@ -125,4 +128,13 @@ it('honors an explicit empty presentation without falling back to private storag
   expect(screen.queryByText('tenant_id')).not.toBeInTheDocument();
   expect(screen.queryByText('private-tenant')).not.toBeInTheDocument();
   expect(screen.queryByText('private-pid')).not.toBeInTheDocument();
+});
+
+it('renders DSL customer records with translated labels as a table and excludes tenancy identities', () => {
+  render(<ChatBiResultCard result={toolQueryPresentation({ records: [{ tenant_id: 'private-tenant', pid: 'private-pid', e2et_cust_name: '手工客户', e2et_cust_contact: '联系人甲' }] }, 'list:e2et_customer')} />);
+  expect(screen.getByRole('columnheader', { name: '客户名称' })).toBeVisible();
+  expect(screen.getByRole('columnheader', { name: '联系人' })).toBeVisible();
+  expect(screen.getByTestId('chatbi-result-card')).toHaveAttribute('data-chart-type', 'table');
+  expect(screen.queryByText('tenant_id')).not.toBeInTheDocument();
+  expect(screen.queryByText('private-tenant')).not.toBeInTheDocument();
 });

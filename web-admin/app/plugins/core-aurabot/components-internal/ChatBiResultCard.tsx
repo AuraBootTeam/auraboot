@@ -208,7 +208,7 @@ function DataTable({
   columns: string[];
   labels?: Record<string, string>;
 }) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const numeric = new Set(
     columns.filter(
       (column) =>
@@ -257,7 +257,9 @@ function DataTable({
                 >
                   {typeof row[col] === 'number' && formats[col]
                     ? formats[col].format(row[col])
-                    : String(row[col] ?? '')}
+                    : typeof row[col] === 'boolean'
+                      ? row[col] ? t('common.yes', undefined, locale.startsWith('zh') ? '是' : 'Yes') : t('common.no', undefined, locale.startsWith('zh') ? '否' : 'No')
+                      : String(row[col] ?? '')}
                 </td>
               ))}
             </tr>

@@ -16,6 +16,7 @@
  */
 
 import { ChatBiResultCard, type ChatBiResult } from './ChatBiResultCard';
+import { toolQueryPresentation } from './toolQueryPresentation';
 import { useSmartText } from '~/utils/i18n';
 import { formatParamName } from './ConfirmCard';
 import { CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
@@ -254,6 +255,12 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
         </details>
       </div>
     );
+  }
+
+  // DSL list contracts share the business table projection with legacy tool output.
+  if (contract.status === 'success' && /^list:[a-z][a-z0-9_]*$/.test(contract.skillCode || '')) {
+    const records = resolveTableRows(contract);
+    return <ChatBiResultCard result={toolQueryPresentation({ records, total: records.length }, contract.skillCode)} />;
   }
 
   const skillPayload = contract.data?.data ?? contract.data;

@@ -296,3 +296,12 @@ describe('reference lookup presentation', () => {
     expect(screen.queryByText('01CUSTOMER')).not.toBeInTheDocument();
   });
 });
+
+it('projects canonical DSL lists as business tables without storage identities or inferred charts', () => {
+  render(<ResultContractView contract={{ ...baseContract, skillCode: 'list:customer', renderHint: 'table', table: [{ tenant_id: 'private-tenant', pid: 'private-pid', name: 'Customer', active: true, created_at: 'private-date', row_version: 3 }] }} />);
+  expect(screen.getByTestId('chatbi-result-card')).toHaveAttribute('data-chart-type', 'table');
+  expect(screen.getByText('Customer')).toBeVisible();
+  expect(screen.queryByText('private-tenant')).not.toBeInTheDocument();
+  expect(screen.queryByText('private-pid')).not.toBeInTheDocument();
+  expect(screen.queryByText('private-date')).not.toBeInTheDocument();
+});
