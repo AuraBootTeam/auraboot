@@ -129,7 +129,14 @@ test('FT1: pending approval survives actual JVM death and requires an explicit o
   const oldPid = await interruptBackend('FT1');
   const newPid = await restore('FT1', oldPid);
   expect(await modelEffect(database, code)).toEqual({ rows: [], physical: null });
-  const outcome = await decide(page, pending);
+  const decision = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/ai/aurabot/execute' &&
+      response.request().method() === 'POST',
+    { timeout: 150_000 },
+  );
+  await page.getByTestId('skill-preview-card').getByTestId('confirm-btn').click();
+  const outcome = events((await (await decision).body()).toString('utf8'));
   expect(outcome.some((item) => item.name === 'done')).toBe(true);
   expect(outcome.some((item) => item.name === 'error')).toBe(false);
   const actual = await assertCreatedOnce(code);
@@ -143,8 +150,24 @@ test('FT1: pending approval survives actual JVM death and requires an explicit o
   const repeated = await decide(page, pending);
   expect(repeated.some((item) => item.name === 'error')).toBe(true);
   expect(await assertCreatedOnce(code)).toEqual(actual);
+  const usageBefore = (
+    await database.query('SELECT count(*)::int AS n FROM ab_gen_ai_usage WHERE tenant_id=$1', [
+      fixture.tenantId,
+    ])
+  ).rows[0].n;
   await page.reload();
   await expect(page.getByTestId('ai-panel-toggle')).toBeVisible();
+  if (!(await page.getByTestId('aurabot-input').isVisible()))
+    await page.getByTestId('ai-panel-toggle').click();
+  await expect(page.getByTestId('skill-preview-card')).toHaveCount(0);
+  expect(
+    (
+      await database.query('SELECT count(*)::int AS n FROM ab_gen_ai_usage WHERE tenant_id=$1', [
+        fixture.tenantId,
+      ])
+    ).rows[0].n,
+  ).toBe(usageBefore);
+  expect(await assertCreatedOnce(code)).toEqual(actual);
   await page.screenshot({ path: join(evidence, 'FT1-restored.png'), fullPage: true });
   record('FT1-proof', { oldPid, newPid, pending, before, after, outcome, actual, repeated });
 });
@@ -262,7 +285,10 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
     expect(completed).toHaveLength(1);
     expect(completed[0].run_status).toBe('completed');
     // The interception holds a real product response; no result/model/tool is substituted.
-    await expect(page.getByTestId('skill-preview-card').getByTestId('confirm-btn')).toBeDisabled();
+    await expect(page.getByTestId('aurabot-input')).toBeDisabled();
+    await expect(
+      page.getByTestId('aurabot-panel').getByText('正在提交审批决定…', { exact: true }),
+    ).toBeVisible();
     const oldPid = await interruptBackend('FT3');
     const newPid = await restore('FT3', oldPid);
     release();
@@ -278,14 +304,13 @@ test('FT3: a committed action whose browser receipt is withheld remains single-e
     await panel(page);
     const recovery = await send(
       page,
-      '请实际调用只读技能 model:query（aurabot_model_query），modelCode 为 ' +
-        code +
-        '，只查询模型元数据，不进行修改。',
+      `请实际调用只读工具 list_e2et_customer，pageNum=1、pageSize=20，不加关键词筛选。告诉我编码 ${fixture.form.code} 的客户名称和联系人，不进行修改。`,
       'FT4-new-read',
     );
     expect(recovery.some((item) => item.name === 'tool_result' && item.data.success === true)).toBe(
       true,
     );
+    await expect(page.getByTestId('chat-msg-agent').last()).toContainText(fixture.form.manualName);
     await page.screenshot({
       path: join(evidence, 'FT3-single-effect-and-recovery.png'),
       fullPage: true,
@@ -371,12 +396,13 @@ test('FT4: a new approval with an actual zero-hour deadline stays non-executable
     await panel(page);
     const recovery = await send(
       page,
-      '请实际调用只读技能 model:query（aurabot_model_query），modelCode 为 e2et_customer，只查询模型元数据。',
+      `请实际调用只读工具 list_e2et_customer，pageNum=1、pageSize=20，不加关键词筛选。告诉我编码 ${fixture.form.code} 的客户名称和联系人，不进行修改。`,
       'FT4-expired-then-new-read',
     );
     expect(recovery.some((item) => item.name === 'tool_result' && item.data.success === true)).toBe(
       true,
     );
+    await expect(page.getByTestId('chat-msg-agent').last()).toContainText(fixture.form.manualName);
     await page.screenshot({
       path: join(evidence, 'FT4-expired-and-recovered.png'),
       fullPage: true,
