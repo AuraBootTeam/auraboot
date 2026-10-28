@@ -111,6 +111,9 @@ export function useDetailRuntime({
     runtime,
     navigate,
     tableName,
+    // Route segments are page keys on custom pages; record reads authorize by
+    // model, so pin the command snapshot against the schema's model.
+    recordReadModel: schema?.modelCode,
     context: {
       record: recordData,
       loadData: refreshDetailAfterChildChange,
