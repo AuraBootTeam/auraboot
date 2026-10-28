@@ -353,5 +353,6 @@ test('SM11/12: search empty state and English keyboard labels use the real menu'
   await page.keyboard.press('Tab');
   await expect(editor.getByLabel('Skill identifier', { exact: true })).toBeFocused();
   await expect(editor).not.toContainText('ai.skills.editor.');
+  await expect(page.getByRole('heading', { name: 'Create skill', exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(shots, 'SM12.png'), fullPage: true });
 });

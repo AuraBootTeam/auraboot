@@ -2667,6 +2667,8 @@
     "extension": {
       "presentation": "workspace",
       "backTo": "/p/agent_skill",
+      "createTitle": { "zh-CN": "新建技能", "en": "Create skill" },
+      "editTitle": { "zh-CN": "维护技能", "en": "Maintain skill" },
       "pageDescription": {
         "zh-CN": "配置规程、工具及输入，保存后绑定AI同事或进行真实试运行。",
         "en": "Configure procedures, tools and inputs. Save before binding colleagues or running a real trial."
