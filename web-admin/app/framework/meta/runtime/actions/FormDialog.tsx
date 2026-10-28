@@ -556,6 +556,23 @@ export default function FormDialog() {
                           {getLocalizedText(field.props?.emptyMessage, locale, t) ||
                             translatedOrFallback(t, 'common.noData', 'No options')}
                         </p>
+                      ) : field.props?.readOnly === true ? (
+                        <dl className="space-y-3">
+                          {Object.entries(formData[field.field] as Record<string, string>).map(
+                            ([key, value]) => (
+                              <div key={key}>
+                                <dt className="text-sm text-gray-500 dark:text-gray-300">
+                                  {getLocalizedText(field.props?.keyLabels?.[key], locale, t) ||
+                                    key}
+                                </dt>
+                                <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+                                  {getLocalizedText(field.props?.displayValues?.[key], locale, t) ||
+                                    value}
+                                </dd>
+                              </div>
+                            ),
+                          )}
+                        </dl>
                       ) : (
                         Object.entries(formData[field.field] as Record<string, string>).map(
                           ([key, value], index) => (

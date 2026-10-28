@@ -791,6 +791,60 @@ describe('FormDialog unavailable grouped options', () => {
 });
 
 describe('FormDialog fixed-key string maps', () => {
+  it('shows read-only business labels while submitting the exact original values', () => {
+    const axes = { color: 'blue_code', capacity: '1234567890123456.78' };
+    const onSubmit = vi.fn();
+    renderDialog({
+      submitLabel: 'Save information',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: {
+            readOnly: true,
+            keyLabels: { color: 'Colour', capacity: 'Capacity' },
+            displayValues: { color: 'Blue', capacity: '1234567890123456.78 GB' },
+          },
+        },
+      ],
+      defaults: { axes },
+      onSubmit,
+    });
+    const group = screen.getByRole('group', { name: 'Options' });
+    expect(group).toHaveTextContent('Colour');
+    expect(group).toHaveTextContent('Blue');
+    expect(group).toHaveTextContent('1234567890123456.78 GB');
+    expect(group).not.toHaveTextContent('blue_code');
+    expect(group.querySelector('input,select,textarea')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save information', exact: true }));
+    expect(onSubmit).toHaveBeenCalledWith({ axes });
+    expect(axes).toEqual({ color: 'blue_code', capacity: '1234567890123456.78' });
+  });
+  it('rejects malformed read-only values instead of trusting display labels', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: {
+            readOnly: true,
+            displayValues: { color: 'Blue' },
+            invalidMessage: 'Reload options',
+          },
+        },
+      ],
+      defaults: { axes: { color: 7 } },
+      onSubmit,
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Reload options');
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
   it('edits each labeled value without changing keys, coercing numbers or mutating the source', () => {
     const axes = { color: 'Red', size: 'M' },
       onSubmit = vi.fn();
