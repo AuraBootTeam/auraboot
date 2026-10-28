@@ -2550,7 +2550,7 @@
         "columns": [
           {
             "field": "skill_name",
-            "width": 200,
+            "width": 240,
             "sortable": true
           },
           {
@@ -2567,7 +2567,11 @@
           },
           {
             "field": "skill_version",
-            "width": 80
+            "width": 100,
+            "label": {
+              "zh-CN": "版本",
+              "en-US": "Version"
+            }
           },
           {
             "field": "skill_status",
@@ -2577,11 +2581,15 @@
           },
           {
             "field": "is_builtin",
-            "width": 80
+            "width": 100,
+            "label": {
+              "zh-CN": "内置",
+              "en-US": "Built-in"
+            }
           },
           {
             "field": "created_at",
-            "width": 160,
+            "width": 180,
             "format": "YYYY-MM-DD HH:mm"
           }
         ],
@@ -2618,6 +2626,16 @@
         "defaultSort": {
           "field": "created_at",
           "order": "desc"
+        },
+        "empty": {
+          "title": {
+            "zh-CN": "没有匹配的技能",
+            "en-US": "No matching skills"
+          },
+          "description": {
+            "zh-CN": "请调整搜索或筛选条件，也可以新建技能并绑定AI同事。",
+            "en-US": "Adjust the search or filters, or create a skill and bind a colleague."
+          }
         }
       }
     ],

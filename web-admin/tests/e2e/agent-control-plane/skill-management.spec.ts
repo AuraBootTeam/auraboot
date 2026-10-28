@@ -290,3 +290,47 @@ test('SM04/10: native required validation and builtin read-only protection are v
   await editor.getByRole('link', { name: '返回技能管理', exact: true }).click();
   await expect(page).toHaveURL(/\/p\/agent_skill$/);
 });
+
+test('SM11/12: search empty state and English keyboard labels use the real menu', async ({
+  page,
+  baseURL,
+}) => {
+  await authenticateBffSession(
+    page.context().request,
+    baseURL!,
+    DEFAULT_TEST_ACCOUNT.email,
+    DEFAULT_TEST_ACCOUNT.password,
+  );
+  await page.goto('/home');
+  const menu = page.getByRole('link', { name: '技能管理', exact: true });
+  if (!(await menu.isVisible()))
+    await page.getByRole('button', { name: 'AI 中心', exact: true }).click();
+  await menu.click();
+  const search = page.locator('main').getByPlaceholder('搜索...', { exact: true });
+  await search.fill(`no_skill_${Date.now()}`);
+  await search.press('Enter');
+  await expect(page.getByText('没有匹配的技能', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('请调整搜索或筛选条件，也可以新建技能并绑定AI同事。', { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({ path: path.join(shots, 'SM11.png'), fullPage: true });
+  await search.fill('');
+  await search.press('Enter');
+  await page.getByTestId('lang-toggle').getByRole('button').click();
+  await page
+    .getByTestId('lang-dropdown')
+    .getByRole('button', { name: /English/ })
+    .click();
+  await expect(page.getByRole('link', { name: 'Skills', exact: true })).toBeVisible();
+  await page
+    .getByRole('button', { name: /Create|New/ })
+    .first()
+    .click();
+  const editor = page.getByTestId('skill-definition-editor');
+  await expect(editor.getByLabel('Skill name', { exact: true })).toBeVisible();
+  await editor.getByLabel('Skill name', { exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(editor.getByLabel('Skill identifier', { exact: true })).toBeFocused();
+  await expect(editor).not.toContainText('ai.skills.editor.');
+  await page.screenshot({ path: path.join(shots, 'SM12.png'), fullPage: true });
+});
