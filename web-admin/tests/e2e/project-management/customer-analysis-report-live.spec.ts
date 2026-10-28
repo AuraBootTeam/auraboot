@@ -350,11 +350,15 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   if (referenceLookup) {
     const resolution = panel.getByTestId('reference-resolution-result');
     await expect(resolution).toContainText(customer);
-    await expect(resolution.getByTestId('reference-resolution-details')).not.toHaveAttribute('open');
-    await expect.poll(() => resolution.innerText()).not.toMatch(/storedValue|targetModel|modelCode/);
+    await expect(resolution.getByTestId('reference-resolution-details')).not.toHaveAttribute(
+      'open',
+    );
+    await expect
+      .poll(() => resolution.innerText())
+      .not.toMatch(/storedValue|targetModel|modelCode/);
   }
   await card.scrollIntoViewIfNeeded();
-  await expect(card).toBeInViewport({ratio: 1});
+  await expect(card).toBeInViewport({ ratio: 1 });
   await page.screenshot({
     path: join(evidence!, 'SC06-report-01-real-analysis.png'),
     fullPage: true,
@@ -365,6 +369,41 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
       response.request().method() === 'POST',
   );
   await card.getByTestId('chatbi-save-report').click();
+  const review = page.getByTestId('analysis-report-review');
+  await expect(review).toBeVisible();
+  await expect(review.getByTestId('analysis-report-confirm')).toBeDisabled();
+  await expect(review.getByLabel('采用的分析说明')).not.toHaveValue('');
+  const narrativeDraft = await review.getByLabel('采用的分析说明').inputValue();
+  expect(narrativeDraft).not.toMatch(/\|\s*:?-{3,}/);
+  await review.getByLabel('报表名称', { exact: true }).fill(`${customer} · 项目预算与交付建议`);
+  await review.getByLabel('采用的分析说明').fill(reviewedAnalysis);
+  const sourceBudget = selected.dataSource.metrics.find(
+    (entry: Metric) => entry.field === 'tpm_pj_budget' && entry.aggregation === 'sum',
+  );
+  expect(sourceBudget).toBeTruthy();
+  const sourceBudgetColumn =
+    sourceBudget.alias || `${sourceBudget.field}_${sourceBudget.aggregation}`;
+  for (const field of selected.columns) {
+    const row = review.locator(
+      `[data-testid="analysis-report-column"][data-field-code="${field}"]`,
+    );
+    if (!['tpm_pj_name', sourceBudgetColumn].includes(field))
+      await row.getByRole('button', { name: '移除列' }).click();
+  }
+  await review
+    .locator(`[data-field-code="${sourceBudgetColumn}"]`)
+    .getByRole('textbox')
+    .fill('项目预算（元）');
+  await review
+    .locator(`[data-field-code="${sourceBudgetColumn}"]`)
+    .getByRole('combobox')
+    .selectOption('currency');
+  await review.getByRole('checkbox').check();
+  await page.screenshot({
+    path: join(evidence!, 'SC06-report-adoption-review.png'),
+    fullPage: true,
+  });
+  await review.getByTestId('analysis-report-confirm').click();
   const savedResponse = await savedPromise;
   expect(savedResponse.status()).toBe(200);
   const payload = savedResponse.request().postDataJSON();
@@ -401,111 +440,28 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await page.reload();
   const toolbar = page.getByTestId('report-designer-toolbar');
   await expect(toolbar).toBeVisible();
-  await page
-    .getByRole('textbox', { name: '报表标题', exact: true })
-    .fill(`${customer} · 项目预算与交付建议`);
-  if (showcaseFixture) {
-    await toolbar.getByRole('button', { name: '设置', exact: true }).click();
-    const settings = page.getByRole('heading', { name: '页面设置', exact: true }).locator('../..');
-    await settings.getByRole('spinbutton').nth(0).fill('14');
-    await settings.getByRole('spinbutton').nth(2).fill('14');
-    await settings.getByRole('button', { name: '应用', exact: true }).click();
-  }
-  await page.getByTestId('block-palette').getByText('页眉', { exact: true }).click();
-  await page.getByTestId('block-palette').getByText('页脚', { exact: true }).click();
+  // The reviewed bridge already persisted presentation; no designer cleanup is needed.
+  await expect(page.getByRole('textbox', { name: '报表标题', exact: true })).toHaveValue(
+    `${customer} · 项目预算与交付建议`,
+  );
   await page.getByTestId('drag-handle-analysis').locator('..').click();
-  const columns = payload.dsl.body.find((block: any) => block.id === 'analysis').columns;
-  const reviewedLabels: Record<string, string> = {
-    tpm_pj_name: '项目名称',
-    tpm_pj_status: '项目状态',
-    tpm_pj_budget: '项目预算（元）',
-    tpm_pj_risk_summary: '交付风险',
-    [budgetColumn]: '项目预算（元）',
-  };
-  for (const entry of query.metrics as Metric[]) {
-    if (entry.aggregation === 'count') {
-      reviewedLabels[entry.alias || `${entry.field}_${entry.aggregation}`] = '项目记录数';
-    }
-  }
-  const tableProperties = page
-    .getByTestId('block-property-panel')
-    .getByTestId('schema-config-field-columns');
-  for (let index = 0; index < columns.length; index++) {
-    const column = columns[index];
-    await expect(
-      tableProperties.getByRole('textbox', { name: '字段名称*', exact: true }).nth(index),
-    ).toHaveValue(column.field);
-    if (reviewedLabels[column.field])
-      await tableProperties
-        .getByRole('textbox', { name: '显示名称', exact: true })
-        .nth(index)
-        .fill(reviewedLabels[column.field]);
-    if (column.field === budgetColumn) {
-      await tableProperties.getByRole('combobox', { name: '格式', exact: true }).nth(index).click();
-      await page.getByRole('option', { name: '金额', exact: true }).click();
-      await tableProperties
-        .getByRole('combobox', { name: '对齐方式', exact: true })
-        .nth(index)
-        .click();
-      await page.getByRole('option', { name: '右对齐', exact: true }).click();
-      await tableProperties
-        .getByRole('spinbutton', { name: '列宽', exact: true })
-        .nth(index)
-        .fill('150');
-    }
-    if (column.field === 'tpm_pj_name')
-      await tableProperties
-        .getByRole('spinbutton', { name: '列宽', exact: true })
-        .nth(index)
-        .fill('340');
-  }
-  {
-    // Review the requested name/budget presentation for every live response,
-    // including extra identity dimensions, without changing the governed query.
-    for (let index = columns.length - 1; index >= 0; index--) {
-      if (!['tpm_pj_name', budgetColumn].includes(columns[index].field)) {
-        await tableProperties
-          .getByRole('button', { name: 'remove', exact: true })
-          .nth(index)
-          .click();
-      }
-    }
-    const retained = columns.filter((column: any) =>
-      ['tpm_pj_name', budgetColumn].includes(column.field),
-    );
-    expect(retained).toHaveLength(2);
-    if (retained[0].field !== 'tpm_pj_name')
-      await tableProperties.getByRole('button', { name: '上移', exact: true }).nth(1).click();
-  }
   await page.screenshot({ path: join(evidence!, 'SC06-report-properties.png'), fullPage: true });
-  await page.getByTestId('drag-handle-analysis-summary').locator('..').click();
-  await page
-    .getByTestId('block-property-panel')
-    .getByPlaceholder('输入文本内容…')
-    .fill(reviewedAnalysis);
-  const reviewedSave = page.waitForResponse(
-    (r) =>
-      new URL(r.url()).pathname === `/api/report-definitions/${saved.pid}` &&
-      r.request().method() === 'PUT',
-  );
-  await page.getByTestId('report-designer-toolbar-btn-save').click();
-  expect((await reviewedSave).status()).toBe(200);
-  await page.reload();
   const reviewed = await (await page.request.get(`/api/report-definitions/${saved.pid}`)).json();
-  expect(reviewed.data.dsl.body.find((block: any) => block.id === 'analysis-summary').content).toBe(
-    reviewedAnalysis,
-  );
+  expect(
+    reviewed.data.dsl.body.find((block: any) => block.id === 'analysis-summary').content,
+  ).toContain(reviewedAnalysis);
   expect(reviewed.data.title).toBe(`${customer} · 项目预算与交付建议`);
   expect(
-      reviewed.data.dsl.body
-        .find((block: any) => block.id === 'analysis')
-        .columns.map((column: any) => column.field),
-    ).toEqual(['tpm_pj_name', budgetColumn]);
+    reviewed.data.dsl.body
+      .find((block: any) => block.id === 'analysis')
+      .columns.map((column: any) => column.field),
+  ).toEqual(['tpm_pj_name', budgetColumn]);
   expect(reviewed.data.dsl.dataSources.analysis.aggregateQuery).toEqual(query);
-  for (const column of reviewed.data.dsl.body.find((block: any) => block.id === 'analysis')
-    .columns) {
-    if (reviewedLabels[column.field]) expect(column.label).toBe(reviewedLabels[column.field]);
-  }
+  expect(
+    reviewed.data.dsl.body
+      .find((block: any) => block.id === 'analysis')
+      .columns.find((column: any) => column.field === budgetColumn).label,
+  ).toBe('项目预算（元）');
   await page.waitForFunction(() => {
     const toolbar = document.querySelector('[data-testid="report-designer-toolbar"]');
     const button =

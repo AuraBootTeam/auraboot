@@ -11,11 +11,22 @@
  */
 
 import { useState, useMemo, Suspense } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '~/ui/ui/dialog';
+import { narrativeWithoutTables } from './analysisReportDraft';
 import { toast } from 'sonner';
 import { useSmartText } from '~/utils/i18n';
 import { resolveFieldLabel } from '~/framework/meta/utils/i18nResolver';
 import { reportDesignerService } from '~/plugins/core-designer/components/report-designer/services/reportDesignerService';
-import { createEmptyReport } from '~/plugins/core-designer/components/report-designer/types';
+import {
+  createEmptyReport,
+  type ReportColumn,
+} from '~/plugins/core-designer/components/report-designer/types';
 import { useAnalyticsResultView } from './useAnalyticsResultView';
 import { AnalyticsSuggestions } from './AnalyticsSuggestions';
 import { useI18n } from '~/contexts/I18nContext';
@@ -59,6 +70,8 @@ const CHART_TYPE_TO_WIDGET: Record<string, string> = {
 
 interface ChatBiResultCardProps {
   result: ChatBiResult;
+  reportNarrative?: string;
+  narrativePending?: boolean;
 }
 
 /**
@@ -127,16 +140,21 @@ function ChatBiChart({
   labels: Record<string, string>;
 }) {
   const { locale } = useI18n();
-  const compactAxis = useMemo(() => ({
-    type: 'value' as const,
-    splitNumber: 2,
-    axisLabel: {
-      hideOverlap: true,
-      formatter: (value: number) => new Intl.NumberFormat(locale, {
-        notation: 'compact', maximumSignificantDigits: 3,
-      }).format(value),
-    },
-  }), [locale]);
+  const compactAxis = useMemo(
+    () => ({
+      type: 'value' as const,
+      splitNumber: 2,
+      axisLabel: {
+        hideOverlap: true,
+        formatter: (value: number) =>
+          new Intl.NumberFormat(locale, {
+            notation: 'compact',
+            maximumSignificantDigits: 3,
+          }).format(value),
+      },
+    }),
+    [locale],
+  );
   const dataSource = useMemo<ChartDataSource>(() => {
     const { labelField, valueField } = inferFields(records, columns, chartConfig);
     const effectiveDimensions =
@@ -155,17 +173,19 @@ function ChatBiChart({
 
   // Keep long business labels from consuming the narrow chat plot. Preserve the
   // original category data so the shared tooltip and persisted analysis stay exact.
-  const categoryField = dataSource.dimensions?.[0] || inferFields(records, columns, chartConfig).labelField;
+  const categoryField =
+    dataSource.dimensions?.[0] || inferFields(records, columns, chartConfig).labelField;
   const categoryAxis = {
     type: 'category' as const,
-    data: records.map(record => record[categoryField]),
+    data: records.map((record) => record[categoryField]),
     axisLabel: { width: 96, overflow: 'truncate' as const, hideOverlap: true },
   };
-  const chartOptions = chartType === 'bar'
-    ? chartConfig?.orientation === 'vertical'
-      ? { yAxis: compactAxis, xAxis: categoryAxis }
-      : { xAxis: compactAxis, yAxis: categoryAxis }
-    : undefined;
+  const chartOptions =
+    chartType === 'bar'
+      ? chartConfig?.orientation === 'vertical'
+        ? { yAxis: compactAxis, xAxis: categoryAxis }
+        : { xAxis: compactAxis, yAxis: categoryAxis }
+      : undefined;
 
   const widgetType = normalizeChartType(CHART_TYPE_TO_WIDGET[chartType] || 'smart-bar-chart');
   const ChartComponent = getChartComponent(widgetType);
@@ -288,7 +308,11 @@ function inferChartType(records: Record<string, unknown>[], columns: string[]): 
   return hasString && hasNumber ? 'bar' : 'table';
 }
 
-export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
+export function ChatBiResultCard({
+  result,
+  reportNarrative,
+  narrativePending = false,
+}: ChatBiResultCardProps) {
   const { t } = useI18n();
   const [showSql, setShowSql] = useState(false);
   const resultViewRef = useAnalyticsResultView(result.analysisId);
@@ -326,7 +350,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
   };
   for (const column of effectiveColumns) {
     const metric = (result.metrics || result.dataSource?.metrics || []).find(
-      (candidate) => (candidate.alias || candidate.field) === column,
+      (candidate) => [candidate.alias, candidate.field, `${candidate.field}_${candidate.aggregation}`].includes(column),
     );
     const field = metric?.field || column;
     const fieldLabel = resolveFieldLabel(
@@ -341,20 +365,66 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           : `${fieldLabel} · ${aggregations[metric.aggregation]}`
         : fieldLabel;
   }
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState('');
+  const [reviewedNarrative, setReviewedNarrative] = useState('');
+  const [reviewedColumns, setReviewedColumns] = useState<ReportColumn[]>([]);
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [savedReportPid, setSavedReportPid] = useState<string | null>(null);
   const dataSource = result.dataSource;
   const canSaveReport = dataSource?.type === 'aggregate' && records.length > 0 && !savedReportPid;
+  const openReportReview = () => {
+    setReportTitle(text({ 'zh-CN': '数据分析报告', 'en-US': 'Data analysis report' }));
+    setReviewedNarrative(narrativeWithoutTables(reportNarrative || interpretation || ''));
+    setReviewedColumns(
+      effectiveColumns.map((field) => {
+        const numeric =
+          records.some((row) => typeof row[field] === 'number') &&
+          records.every((row) => row[field] == null || typeof row[field] === 'number');
+        return {
+          field,
+          label: columnLabels[field],
+          width: numeric ? 150 : 300,
+          align: numeric ? 'right' : 'left',
+          format: numeric ? 'number' : '',
+        };
+      }),
+    );
+    setReviewConfirmed(false);
+    setReviewOpen(true);
+  };
   const handleSaveReport = async () => {
-    if (!canSaveReport || savingReport || !dataSource) return;
+    if (
+      !canSaveReport ||
+      savingReport ||
+      !dataSource ||
+      !reviewConfirmed ||
+      !reportTitle.trim() ||
+      !reviewedColumns.length
+    )
+      return;
     setSavingReport(true);
     try {
-      const report = createEmptyReport(
-        String(interpretation || text({ 'zh-CN': '分析报表', 'en-US': 'Analysis report' })).slice(
-          0,
-          200,
-        ),
-      );
+      const report = createEmptyReport(reportTitle.trim());
+      report.header = {
+        height: 12,
+        elements: [
+          {
+            type: 'text',
+            content: report.title,
+            align: 'center',
+            style: { fontSize: 16, fontWeight: 'bold' },
+          },
+        ],
+      };
+      report.footer = {
+        height: 8,
+        elements: [
+          { type: 'page-number', align: 'right', style: { fontSize: 9 } },
+          { type: 'date', align: 'left', style: { fontSize: 9 } },
+        ],
+      };
       report.dataSources = {
         analysis: { type: 'aggregate', aggregateQuery: { ...dataSource, type: 'aggregate' } },
       };
@@ -364,20 +434,30 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           blockType: 'table',
           dataSource: 'analysis',
           showHeader: true,
-          columns: effectiveColumns.map((field) => ({ field, label: columnLabels[field] })),
+          stripe: true,
+          border: true,
+          columns: reviewedColumns,
         },
       ];
-      if (interpretation?.trim()) {
+      if (reviewedNarrative.trim()) {
         report.body.push({
           id: 'analysis-summary',
           blockType: 'rich-text',
           title: text({ 'zh-CN': '分析说明', 'en-US': 'Analysis summary' }),
-          content: interpretation.trim(),
+          content:
+            text({
+              'zh-CN': 'AI 分析 · 经人工核对采用；建议不代替业务审批。',
+              'en-US':
+                'AI analysis · reviewed and adopted; recommendations do not replace business approval.',
+            }) +
+            '\n' +
+            reviewedNarrative.trim(),
         });
       }
       const pid = await reportDesignerService.save(report, undefined, result.analysisId);
       if (!pid) throw new Error('Saved report identity is missing');
       setSavedReportPid(pid);
+      setReviewOpen(false);
       toast.success(text({ 'zh-CN': '已存为报表', 'en-US': 'Saved as report' }));
     } catch {
       toast.error(
@@ -522,8 +602,8 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
             ) : canSaveReport ? (
               <button
                 data-testid="chatbi-save-report"
-                onClick={handleSaveReport}
-                disabled={savingReport}
+                onClick={openReportReview}
+                disabled={savingReport || narrativePending}
                 className="rounded-md px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
               >
                 {savingReport
@@ -592,6 +672,150 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           </div>
         )}
       </div>
+      <Dialog
+        open={reviewOpen}
+        onOpenChange={(open) => {
+          if (!savingReport) setReviewOpen(open);
+        }}
+      >
+        <DialogContent
+          className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+          data-testid="analysis-report-review"
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {text({ 'zh-CN': '核对并存为报表', 'en-US': 'Review and save report' })}
+            </DialogTitle>
+            <DialogDescription>
+              {text({
+                'zh-CN':
+                  '保留当前查询范围，表格随数据刷新。核对分析内容和列格式后再采用；原始 AI 对话与 Trace 保持不变。',
+                'en-US':
+                  'Keep the current query scope and refreshable table. Review the narrative and column formats before adoption. The original AI conversation and trace remain unchanged.',
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <label className="grid gap-2 text-sm">
+            {text({ 'zh-CN': '报表名称', 'en-US': 'Report name' })}
+            <input
+              className="rounded-md border px-3 py-2"
+              value={reportTitle}
+              maxLength={200}
+              onChange={(e) => setReportTitle(e.target.value)}
+            />
+          </label>
+          <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+            {text({ 'zh-CN': '实时数据表', 'en-US': 'Live data table' })} · {records.length}{' '}
+            {text({ 'zh-CN': '条记录', 'en-US': 'records' })}
+            <div className="mt-2 grid gap-2">
+              {reviewedColumns.map((column, index) => (
+                <div
+                  key={column.field}
+                  data-testid="analysis-report-column"
+                  data-field-code={column.field}
+                  className="grid grid-cols-[1fr_120px_32px] gap-2"
+                >
+                  <input
+                    aria-label={text({ 'zh-CN': '列显示名称', 'en-US': 'Column label' })}
+                    className="min-w-0 rounded border bg-white px-2 py-1.5"
+                    value={column.label || ''}
+                    onChange={(e) =>
+                      setReviewedColumns((rows) =>
+                        rows.map((row, i) =>
+                          i === index ? { ...row, label: e.target.value } : row,
+                        ),
+                      )
+                    }
+                  />
+                  <select
+                    aria-label={text({ 'zh-CN': '列格式', 'en-US': 'Column format' })}
+                    className="rounded border bg-white px-2"
+                    value={column.format || ''}
+                    onChange={(e) =>
+                      setReviewedColumns((rows) =>
+                        rows.map((row, i) =>
+                          i === index
+                            ? {
+                                ...row,
+                                format: e.target.value,
+                                align: e.target.value ? 'right' : 'left',
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="">{text({ 'zh-CN': '原值', 'en-US': 'Original' })}</option>
+                    <option value="number">{text({ 'zh-CN': '数字', 'en-US': 'Number' })}</option>
+                    <option value="currency">
+                      {text({ 'zh-CN': '金额', 'en-US': 'Currency' })}
+                    </option>
+                    <option value="percent">
+                      {text({ 'zh-CN': '百分比', 'en-US': 'Percentage' })}
+                    </option>
+                  </select>
+                  <button
+                    aria-label={text({ 'zh-CN': '移除列', 'en-US': 'Remove column' })}
+                    className="rounded border text-slate-500"
+                    onClick={() => setReviewedColumns((rows) => rows.filter((_, i) => i !== index))}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <label className="grid gap-2 text-sm">
+            {text({ 'zh-CN': '采用的分析说明', 'en-US': 'Adopted analysis' })}
+            <textarea
+              aria-label={text({ 'zh-CN': '采用的分析说明', 'en-US': 'Adopted analysis' })}
+              rows={8}
+              className="rounded-md border px-3 py-2 leading-6"
+              value={reviewedNarrative}
+              onChange={(e) => setReviewedNarrative(e.target.value)}
+            />
+            <span className="text-xs text-slate-500">
+              {text({
+                'zh-CN':
+                  '已从草稿移除 Markdown 表格，避免重复静态数据；原始输出可在对话中核对。预算、收入和利润应分别判断。',
+                'en-US':
+                  'Markdown tables are omitted from the draft to avoid duplicate static data. Review the original in the conversation. Distinguish budget, revenue and profit.',
+              })}
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={reviewConfirmed}
+              onChange={(e) => setReviewConfirmed(e.target.checked)}
+            />
+            {text({
+              'zh-CN': '我已核对查询范围、事实和采用内容',
+              'en-US': 'I reviewed the query scope, facts and adopted content',
+            })}
+          </label>
+          <div className="flex justify-end gap-3">
+            <button
+              className="rounded-md border px-4 py-2 text-sm"
+              disabled={savingReport}
+              onClick={() => setReviewOpen(false)}
+            >
+              {text({ 'zh-CN': '取消', 'en-US': 'Cancel' })}
+            </button>
+            <button
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+              data-testid="analysis-report-confirm"
+              disabled={
+                savingReport || !reviewConfirmed || !reportTitle.trim() || !reviewedColumns.length
+              }
+              onClick={handleSaveReport}
+            >
+              {text({ 'zh-CN': '采用并保存报表', 'en-US': 'Adopt and save report' })}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

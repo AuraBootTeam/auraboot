@@ -24,6 +24,7 @@ import { SkillPreviewCard } from '../components-shell/SkillPreviewCard';
 import { ModelSuggestionCard } from './ModelSuggestionCard';
 import { ResultContractView } from './ResultContractView';
 import { ThinkingBlock } from './ThinkingBlock';
+import { currentTurnNarrative } from './analysisReportDraft';
 
 // ============================================================================
 // Icons
@@ -123,25 +124,47 @@ function TraceLink({ traceId }: { traceId: string }) {
 
 interface MessageBubbleProps {
   message: SimpleMessage;
+  reportNarrative?: string;
+  narrativePending?: boolean;
   onConfirm?: (toolId: string) => void;
   onCancel?: (toolId: string) => void;
   isLoading?: boolean;
 }
 
-function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbleProps) {
+function MessageBubble({
+  message,
+  onConfirm,
+  onCancel,
+  isLoading,
+  reportNarrative,
+  narrativePending,
+}: MessageBubbleProps) {
   const isUser = message.sender === 'user';
   const { t, locale } = useI18n();
-  const displayContent = !isUser && message.content === 'Approved tool executed.'
-    ? t('ai.approval.approved', undefined, locale.startsWith('zh') ? '审批通过，操作已完成。' : message.content)
-    : !isUser && message.content === 'User denied the operation'
-      ? t('ai.approval.cancelled', undefined, locale.startsWith('zh') ? '操作已取消' : 'Operation cancelled')
-      : message.content;
+  const displayContent =
+    !isUser && message.content === 'Approved tool executed.'
+      ? t(
+          'ai.approval.approved',
+          undefined,
+          locale.startsWith('zh') ? '审批通过，操作已完成。' : message.content,
+        )
+      : !isUser && message.content === 'User denied the operation'
+        ? t(
+            'ai.approval.cancelled',
+            undefined,
+            locale.startsWith('zh') ? '操作已取消' : 'Operation cancelled',
+          )
+        : message.content;
   const st = useSmartText();
 
   // Text placeholders reserve streaming state, not an empty message bubble.
   // Keep an available trace reachable even when this turn has no prose yet.
-  if (message.type === 'text' && !isUser && !displayContent.trim()
-    && !message.retrievalEvidence?.length) {
+  if (
+    message.type === 'text' &&
+    !isUser &&
+    !displayContent.trim() &&
+    !message.retrievalEvidence?.length
+  ) {
     return message.traceId ? <TraceLink traceId={message.traceId} /> : null;
   }
 
@@ -152,7 +175,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
   if (message.type === 'error') {
     return (
       <div className="mb-3 flex justify-start">
-        <div className="min-w-0 max-w-[85%] rounded-2xl rounded-bl-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+        <div className="max-w-[85%] min-w-0 rounded-2xl rounded-bl-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 text-red-500">!</span>
             <p className="text-sm text-red-600">{st(message.content, message.content)}</p>
@@ -185,8 +208,12 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
   if (message.type === 'result_contract' && message.resultContract) {
     return (
       <div className="mb-3 flex justify-start">
-        <div className="min-w-0 max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3 py-2 shadow-sm dark:bg-gray-700">
-          <ResultContractView contract={message.resultContract} />
+        <div className="max-w-[88%] min-w-0 rounded-2xl rounded-bl-md bg-white px-3 py-2 shadow-sm dark:bg-gray-700">
+          <ResultContractView
+            contract={message.resultContract}
+            reportNarrative={reportNarrative}
+            narrativePending={narrativePending}
+          />
         </div>
       </div>
     );
@@ -195,11 +222,18 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
   // Tool result — any result with records array gets a chart card; others get collapsible table
   if (message.type === 'tool_result') {
     // Analytics is rendered by its canonical result_contract event.
-    if (message.toolName === 'aurabot:chat-bi' || message.toolName === 'aurabot_chat-bi') return null;
+    if (message.toolName === 'aurabot:chat-bi' || message.toolName === 'aurabot_chat-bi')
+      return null;
     // toolResult shape varies: { records, ... } or { success, data: { records, ... }, durationMs }
     const resultData = message.toolResult?.data || message.toolResult;
     if (resultData?.records && Array.isArray(resultData.records) && resultData.records.length > 0) {
-      return <ChatBiResultCard result={resultData as any} />;
+      return (
+        <ChatBiResultCard
+          result={resultData as any}
+          reportNarrative={reportNarrative}
+          narrativePending={narrativePending}
+        />
+      );
     }
     const isModelSuggest =
       message.toolName === 'builtin__model_suggest' && message.toolResult?.modelCode;
@@ -273,7 +307,9 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
     return (
       <div className="mb-3 flex justify-start" role="status" data-testid="chat-tool-cancelled">
         <div className="rounded-2xl rounded-bl-md border border-gray-200 bg-gray-100 px-4 py-2.5 dark:border-gray-600 dark:bg-gray-700">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-100">{message.content}</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-100">
+            {message.content}
+          </span>
         </div>
       </div>
     );
@@ -290,7 +326,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
       data-testid={isUser ? 'chat-msg-user' : 'chat-msg-agent'}
     >
       <div
-        className={`min-w-0 max-w-[85%] rounded-2xl px-4 py-2.5 ${
+        className={`max-w-[85%] min-w-0 rounded-2xl px-4 py-2.5 ${
           isUser
             ? 'rounded-br-md bg-blue-600 text-white'
             : 'rounded-bl-md bg-gray-100 text-gray-900'
@@ -328,7 +364,10 @@ function BotMessageContent({
       if ((node.type === 'text' || node.type === 'inlineCode') && node.value) {
         for (const item of evidence || []) {
           if (!item.evidenceId) continue;
-          const label = item.documentName || item.kbName || t('ai.knowledge.detail.tab.documents', undefined, 'Documents');
+          const label =
+            item.documentName ||
+            item.kbName ||
+            t('ai.knowledge.detail.tab.documents', undefined, 'Documents');
           node.value = node.value.split(item.evidenceId).join(label);
         }
       }
@@ -338,14 +377,58 @@ function BotMessageContent({
   };
   return (
     <div className="space-y-2 text-sm">
-      <div className="break-words space-y-2 [&_p]:my-2 [&_h1]:text-lg [&_h2]:text-base [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-black/5 [&_pre]:p-2 [&_code]:font-mono [&_code]:text-xs">
-        <ReactMarkdown remarkPlugins={[remarkGfm, resolveReferences]} skipHtml components={{
-          table: ({ children }) => <div className="max-w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-300" role="region" tabIndex={0} aria-label={t('aurabot.chat.resultTable', undefined, locale.startsWith('zh') ? '结果表格' : 'Result table')}><table className="min-w-[22rem] w-full table-fixed border-collapse text-left text-xs">{children}</table></div>,
-          th: ({ children, style }) => <th className="min-w-[6rem] border border-gray-300 bg-black/5 p-2 font-semibold dark:border-gray-600" style={style}>{children}</th>,
-          td: ({ children, style }) => <td className="min-w-[6rem] whitespace-normal break-words [&_code]:whitespace-normal border border-gray-300 p-2 align-top [overflow-wrap:anywhere] dark:border-gray-600" style={style}>{children}</td>,
-          a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-400">{children}</a>,
-          img: ({ alt }) => <span>{alt}</span>,
-        }}>{content}</ReactMarkdown>
+      <div className="space-y-2 break-words [&_code]:font-mono [&_code]:text-xs [&_h1]:text-lg [&_h2]:text-base [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-black/5 [&_pre]:p-2 [&_ul]:list-disc [&_ul]:pl-5">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, resolveReferences]}
+          skipHtml
+          components={{
+            table: ({ children }) => (
+              <div
+                className="max-w-full [scrollbar-width:thin] overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-300"
+                role="region"
+                tabIndex={0}
+                aria-label={t(
+                  'aurabot.chat.resultTable',
+                  undefined,
+                  locale.startsWith('zh') ? '结果表格' : 'Result table',
+                )}
+              >
+                <table className="w-full min-w-[22rem] table-fixed border-collapse text-left text-xs">
+                  {children}
+                </table>
+              </div>
+            ),
+            th: ({ children, style }) => (
+              <th
+                className="min-w-[6rem] border border-gray-300 bg-black/5 p-2 font-semibold dark:border-gray-600"
+                style={style}
+              >
+                {children}
+              </th>
+            ),
+            td: ({ children, style }) => (
+              <td
+                className="min-w-[6rem] border border-gray-300 p-2 align-top [overflow-wrap:anywhere] break-words whitespace-normal dark:border-gray-600 [&_code]:whitespace-normal"
+                style={style}
+              >
+                {children}
+              </td>
+            ),
+            a: ({ children, href }) => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline dark:text-blue-400"
+              >
+                {children}
+              </a>
+            ),
+            img: ({ alt }) => <span>{alt}</span>,
+          }}
+        >
+          {content}
+        </ReactMarkdown>
       </div>
       {evidence && evidence.length > 0 ? <EvidencePanel evidence={evidence} /> : null}
     </div>
@@ -775,10 +858,14 @@ export function AuraBotChat() {
       <div className="flex-1 overflow-y-auto">
         {hasMessages ? (
           <div className="px-4 py-4">
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <MessageBubble
                 key={message.id}
                 message={message}
+                reportNarrative={currentTurnNarrative(messages, index)}
+                narrativePending={Boolean(
+                  isLoading && !messages.slice(index + 1).some((entry) => entry.sender === 'user'),
+                )}
                 onConfirm={confirmTool}
                 onCancel={cancelTool}
                 isLoading={isLoading}

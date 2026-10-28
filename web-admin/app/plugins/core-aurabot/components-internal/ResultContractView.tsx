@@ -64,14 +64,31 @@ function contractMetric(contract: ResultContract): string | null {
 // Variant renderers
 // ============================================================================
 
-function TableView({ rows, label, structuredLabel }: { rows: Array<Record<string, unknown>>; label: (key: string) => string; structuredLabel: string }) {
+function TableView({
+  rows,
+  label,
+  structuredLabel,
+}: {
+  rows: Array<Record<string, unknown>>;
+  label: (key: string) => string;
+  structuredLabel: string;
+}) {
   if (rows.length === 0) {
     return <div className="text-sm text-gray-500">(no rows)</div>;
   }
   const cols = Object.keys(rows[0]);
   return (
-    <div className="max-w-full overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-300" data-testid="rc-table" role="region" tabIndex={0} aria-label={structuredLabel}>
-      <table className="w-full table-fixed border border-gray-200 text-sm" style={{ minWidth: `${cols.length * 8}rem` }}>
+    <div
+      className="max-w-full [scrollbar-width:thin] overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-300"
+      data-testid="rc-table"
+      role="region"
+      tabIndex={0}
+      aria-label={structuredLabel}
+    >
+      <table
+        className="w-full table-fixed border border-gray-200 text-sm"
+        style={{ minWidth: `${cols.length * 8}rem` }}
+      >
         <thead className="bg-gray-50">
           <tr>
             {cols.map((c) => (
@@ -85,11 +102,22 @@ function TableView({ rows, label, structuredLabel }: { rows: Array<Record<string
           {rows.slice(0, 20).map((row, i) => (
             <tr key={i} className={i % 2 ? 'bg-gray-50' : ''}>
               {cols.map((c) => (
-                <td key={c} className="break-words border-b border-gray-100 px-2 py-1 align-top [overflow-wrap:anywhere]">
-                  {row[c] != null && typeof row[c] === 'object' ? <details>
-                    <summary className="cursor-pointer">{structuredLabel}</summary>
-                    <pre className="max-w-full whitespace-pre-wrap break-words">{JSON.stringify(row[c], null, 2)}</pre>
-                  </details> : row[c] == null ? '—' : String(row[c])}
+                <td
+                  key={c}
+                  className="border-b border-gray-100 px-2 py-1 align-top [overflow-wrap:anywhere] break-words"
+                >
+                  {row[c] != null && typeof row[c] === 'object' ? (
+                    <details>
+                      <summary className="cursor-pointer">{structuredLabel}</summary>
+                      <pre className="max-w-full break-words whitespace-pre-wrap">
+                        {JSON.stringify(row[c], null, 2)}
+                      </pre>
+                    </details>
+                  ) : row[c] == null ? (
+                    '—'
+                  ) : (
+                    String(row[c])
+                  )}
                 </td>
               ))}
             </tr>
@@ -181,18 +209,32 @@ function JsonFallback({ contract }: { contract: ResultContract }) {
 
 export interface ResultContractViewProps {
   contract: ResultContract;
+  reportNarrative?: string;
+  narrativePending?: boolean;
 }
 
-export function ResultContractView({ contract }: ResultContractViewProps) {
+export function ResultContractView({
+  contract,
+  reportNarrative,
+  narrativePending,
+}: ResultContractViewProps) {
   const text = useSmartText();
   // Older persisted previews were incorrectly emitted as failed execution results.
   // Keep their diagnostic bytes inspectable without inventing a current execution status.
-  if (contract.status === 'failed'
-      && contract.textSummary === 'AuraBot skill requires confirmation before execution.') {
-    return <details data-testid="rc-approval-preview" className="text-xs text-gray-500">
-      <summary className="cursor-pointer py-1">{text({ 'zh-CN': '审批预览详情', 'en-US': 'Approval preview details' })}</summary>
-      <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words">{JSON.stringify(contract, null, 2)}</pre>
-    </details>;
+  if (
+    contract.status === 'failed' &&
+    contract.textSummary === 'AuraBot skill requires confirmation before execution.'
+  ) {
+    return (
+      <details data-testid="rc-approval-preview" className="text-xs text-gray-500">
+        <summary className="cursor-pointer py-1">
+          {text({ 'zh-CN': '审批预览详情', 'en-US': 'Approval preview details' })}
+        </summary>
+        <pre className="max-w-full overflow-x-auto break-words whitespace-pre-wrap">
+          {JSON.stringify(contract, null, 2)}
+        </pre>
+      </details>
+    );
   }
   if (contract.status === 'failed' && contract.errorCode === 'analytics_history_unavailable') {
     return (
@@ -218,13 +260,21 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
       'records' in candidate &&
       Array.isArray(candidate.records)
     ) {
-      return <ChatBiResultCard result={candidate as ChatBiResult} />;
+      return (
+        <ChatBiResultCard
+          result={candidate as ChatBiResult}
+          reportNarrative={reportNarrative}
+          narrativePending={narrativePending}
+        />
+      );
     }
   }
 
   // Reference resolution exposes the business label; storage identity remains diagnostic.
   if (
-    ['platform.resolve_reference', 'platform_resolve_reference'].includes(contract.skillCode || '') &&
+    ['platform.resolve_reference', 'platform_resolve_reference'].includes(
+      contract.skillCode || '',
+    ) &&
     contract.status === 'success'
   ) {
     const label = contract.data?.displayValue;
@@ -239,7 +289,10 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
       );
     }
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm" data-testid="reference-resolution-result">
+      <div
+        className="rounded-lg border border-gray-200 bg-white p-3 text-sm"
+        data-testid="reference-resolution-result"
+      >
         <div className="flex items-center gap-2">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <span>{text({ 'zh-CN': '已确认关联对象', 'en-US': 'Reference confirmed' })}</span>
@@ -249,7 +302,9 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
           <summary className="cursor-pointer">
             {text({ 'zh-CN': '匹配详情', 'en-US': 'Match details' })}
           </summary>
-          <div className="mt-2"><CardView contract={contract} /></div>
+          <div className="mt-2">
+            <CardView contract={contract} />
+          </div>
           <code>{contract.skillCode}</code>
         </details>
       </div>
@@ -257,17 +312,37 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
   }
 
   const skillPayload = contract.data?.data ?? contract.data;
-  const createdModel = contract.status === 'success' && contract.skillCode === 'aurabot:model:create'
-    && skillPayload && typeof skillPayload === 'object'
-    && 'displayName' in skillPayload && typeof skillPayload.displayName === 'string'
-    && 'modelCode' in skillPayload && typeof skillPayload.modelCode === 'string' ? skillPayload : null;
+  const createdModel =
+    contract.status === 'success' &&
+    contract.skillCode === 'aurabot:model:create' &&
+    skillPayload &&
+    typeof skillPayload === 'object' &&
+    'displayName' in skillPayload &&
+    typeof skillPayload.displayName === 'string' &&
+    'modelCode' in skillPayload &&
+    typeof skillPayload.modelCode === 'string'
+      ? skillPayload
+      : null;
 
-  const modelQuery = contract.status === 'success' && contract.skillCode === 'aurabot:model:query'
-    && skillPayload && typeof skillPayload === 'object' && 'matched' in skillPayload ? skillPayload : null;
-  const queriedModel = modelQuery && 'model' in modelQuery && modelQuery.model && typeof modelQuery.model === 'object'
-    && 'displayName' in modelQuery.model && typeof modelQuery.model.displayName === 'string'
-    && 'code' in modelQuery.model && typeof modelQuery.model.code === 'string'
-    ? { displayName: modelQuery.model.displayName, modelCode: modelQuery.model.code } : null;
+  const modelQuery =
+    contract.status === 'success' &&
+    contract.skillCode === 'aurabot:model:query' &&
+    skillPayload &&
+    typeof skillPayload === 'object' &&
+    'matched' in skillPayload
+      ? skillPayload
+      : null;
+  const queriedModel =
+    modelQuery &&
+    'model' in modelQuery &&
+    modelQuery.model &&
+    typeof modelQuery.model === 'object' &&
+    'displayName' in modelQuery.model &&
+    typeof modelQuery.model.displayName === 'string' &&
+    'code' in modelQuery.model &&
+    typeof modelQuery.model.code === 'string'
+      ? { displayName: modelQuery.model.displayName, modelCode: modelQuery.model.code }
+      : null;
   const businessModel = createdModel ?? queriedModel;
 
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
@@ -275,90 +350,130 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
   const metric = contractMetric(contract);
 
   return (
-    <div className="min-w-0 max-w-full space-y-2" data-testid="result-contract">
+    <div className="max-w-full min-w-0 space-y-2" data-testid="result-contract">
       <div className={`flex items-center gap-2 text-sm ${color}`}>
         <Icon className="h-4 w-4 shrink-0" />
-        <span>{text({
-          'zh-CN': ({ success: '已完成', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
-          'en-US': ({ success: 'Completed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
-        })}</span>
+        <span>
+          {text({
+            'zh-CN':
+              {
+                success: '已完成',
+                partial_success: '部分完成',
+                failed: '未完成',
+                unknown: '状态未知',
+              }[contract.status] ?? '状态未知',
+            'en-US':
+              {
+                success: 'Completed',
+                partial_success: 'Partially completed',
+                failed: 'Not completed',
+                unknown: 'Status unknown',
+              }[contract.status] ?? 'Status unknown',
+          })}
+        </span>
       </div>
       <details className="min-w-0 text-xs text-gray-500" data-testid="rc-diagnostics">
-        <summary className="cursor-pointer py-1">{text({ 'zh-CN': '执行详情', 'en-US': 'Execution details' })}</summary>
-      <div className="flex items-center gap-2 text-xs text-gray-600">
-        <Icon className={`h-4 w-4 ${color}`} />
-        <span className={`font-medium ${color}`}>{contract.status}</span>
-        {contract.skillCode && (
-          <>
-            <span className="text-gray-400">·</span>
-            <span className="font-mono">{contract.skillCode}</span>
-          </>
-        )}
-        {typeof contract.durationMs === 'number' && (
-          <>
-            <span className="text-gray-400">·</span>
-            <Clock className="h-3 w-3" />
-            <span>{contract.durationMs}ms</span>
-          </>
-        )}
-      </div>
-      <div
-        className="flex flex-wrap gap-1 text-[11px] text-gray-600"
-        data-testid="rc-protocol-meta"
-      >
-        <span
-          className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
-          data-testid="rc-meta-output-type"
+        <summary className="cursor-pointer py-1">
+          {text({ 'zh-CN': '执行详情', 'en-US': 'Execution details' })}
+        </summary>
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          <Icon className={`h-4 w-4 ${color}`} />
+          <span className={`font-medium ${color}`}>{contract.status}</span>
+          {contract.skillCode && (
+            <>
+              <span className="text-gray-400">·</span>
+              <span className="font-mono">{contract.skillCode}</span>
+            </>
+          )}
+          {typeof contract.durationMs === 'number' && (
+            <>
+              <span className="text-gray-400">·</span>
+              <Clock className="h-3 w-3" />
+              <span>{contract.durationMs}ms</span>
+            </>
+          )}
+        </div>
+        <div
+          className="flex flex-wrap gap-1 text-[11px] text-gray-600"
+          data-testid="rc-protocol-meta"
         >
-          output: {contract.outputType}
-        </span>
-        <span
-          className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
-          data-testid="rc-meta-actionability"
-        >
-          action: {contract.actionability}
-        </span>
-        {contract.renderHint && (
           <span
             className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
-            data-testid="rc-meta-render-hint"
+            data-testid="rc-meta-output-type"
           >
-            render: {contract.renderHint}
+            output: {contract.outputType}
           </span>
-        )}
-        {metric && (
           <span
             className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
-            data-testid="rc-meta-metric"
+            data-testid="rc-meta-actionability"
           >
-            {metric}
+            action: {contract.actionability}
           </span>
-        )}
-        {contract.canContinueFrom && (
-          <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-blue-700">
-            continuable
-          </span>
-        )}
-      </div>
+          {contract.renderHint && (
+            <span
+              className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
+              data-testid="rc-meta-render-hint"
+            >
+              render: {contract.renderHint}
+            </span>
+          )}
+          {metric && (
+            <span
+              className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5"
+              data-testid="rc-meta-metric"
+            >
+              {metric}
+            </span>
+          )}
+          {contract.canContinueFrom && (
+            <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-blue-700">
+              continuable
+            </span>
+          )}
+        </div>
 
-      {(createdModel || modelQuery) && <div className="mt-2"><CardView contract={contract} /></div>}
+        {(createdModel || modelQuery) && (
+          <div className="mt-2">
+            <CardView contract={contract} />
+          </div>
+        )}
       </details>
 
       {businessModel ? (
-        <dl className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm" data-testid={createdModel ? "rc-created-model" : "rc-queried-model"}>
+        <dl
+          className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm"
+          data-testid={createdModel ? 'rc-created-model' : 'rc-queried-model'}
+        >
           <dt className="text-gray-600">{text({ 'zh-CN': '模型名称', 'en-US': 'Model name' })}</dt>
-          <dd className="min-w-0 break-words font-medium">{String(businessModel.displayName)}</dd>
+          <dd className="min-w-0 font-medium break-words">{String(businessModel.displayName)}</dd>
           <dt className="text-gray-600">{text({ 'zh-CN': '模型编码', 'en-US': 'Model code' })}</dt>
-          <dd className="min-w-0 break-words [overflow-wrap:anywhere]">{String(businessModel.modelCode)}</dd>
+          <dd className="min-w-0 [overflow-wrap:anywhere] break-words">
+            {String(businessModel.modelCode)}
+          </dd>
         </dl>
       ) : modelQuery ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm" data-testid="rc-model-not-found">
+        <div
+          className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm"
+          data-testid="rc-model-not-found"
+        >
           {modelQuery.matched === false
-            ? text({ 'zh-CN': '未找到该模型，请核对模型编码或联系管理员。', 'en-US': 'Model not found. Check its code or contact an administrator.' })
-            : text({ 'zh-CN': '模型结果不完整，请重新查询或联系管理员。', 'en-US': 'The model result is incomplete. Try again or contact an administrator.' })}
+            ? text({
+                'zh-CN': '未找到该模型，请核对模型编码或联系管理员。',
+                'en-US': 'Model not found. Check its code or contact an administrator.',
+              })
+            : text({
+                'zh-CN': '模型结果不完整，请重新查询或联系管理员。',
+                'en-US': 'The model result is incomplete. Try again or contact an administrator.',
+              })}
         </div>
       ) : contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
-        <TableView rows={resolveTableRows(contract)} label={(key) => text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })} structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })} />
+        <TableView
+          rows={resolveTableRows(contract)}
+          label={(key) =>
+            text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })
+          }
+          structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })}
+        />
       ) : contract.renderHint === 'summary' ? (
         <SummaryView contract={contract} />
       ) : contract.renderHint === 'card' ? (
