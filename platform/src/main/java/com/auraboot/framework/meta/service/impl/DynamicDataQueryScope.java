@@ -51,6 +51,7 @@ public final class DynamicDataQueryScope implements AutoCloseable {
 
     /** Row/domain predicates can contain data-derived identities from any model. */
     static void invalidateFiltersAfterMutation() {
+        RequiredRecordReadGuard.invalidateCanonicalRead();
         State state = CURRENT.get();
         if (state != null) state.filters.clear();
     }

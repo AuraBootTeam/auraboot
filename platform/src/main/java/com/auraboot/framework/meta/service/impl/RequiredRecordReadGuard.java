@@ -32,6 +32,80 @@ public class RequiredRecordReadGuard {
     private final DataDomainService domains;
     private final ThreadLocal<Traversal> current = new ThreadLocal<>();
     private static final ThreadLocal<Integer> REFERENCE_READ_DEPTH = new ThreadLocal<>();
+    private static final ThreadLocal<CanonicalReadFrame> CANONICAL_READ = new ThreadLocal<>();
+    private static final class CanonicalReadFrame {
+        final Actor actor;
+        final String model, pid;
+        final CanonicalReadFrame parent;
+        RequiredRecordReadGuard verifier;
+        RequiredReadReferences.Policy policy;
+        List<RequiredReadReferences.Reference> references;
+        int phase; // 0: loader, 1: final authorizer, 2: closed
+        boolean completed, consumed, valid=true;
+        CanonicalReadFrame(Actor actor,String model,String pid,CanonicalReadFrame parent) {
+            this.actor=actor;this.model=model;this.pid=pid;this.parent=parent;
+        }
+        boolean matches(String model,String pid) { return java.util.Objects.equals(this.model,model) && java.util.Objects.equals(this.pid,pid); }
+    }
+    private static boolean sameCanonicalActor(Actor actor) {
+        return MetaContext.exists() && !MachineDataAccessContext.isActive() && !MetaContext.hasCommandPermitScope()
+                && java.util.Objects.equals(actor.tenant(),MetaContext.getCurrentTenantId())
+                && java.util.Objects.equals(actor.user(),MetaContext.getCurrentUserId())
+                && java.util.Objects.equals(actor.member(),MetaContext.getCurrentMemberId());
+    }
+    static void withCanonicalRead(String model,String pid,Runnable read) {
+        var previous=CANONICAL_READ.get();
+        CanonicalReadFrame frame=null;
+        try {
+            if (!MetaContext.exists() || MachineDataAccessContext.isActive() || MetaContext.hasCommandPermitScope()
+                    || isResolvingReference() || MetaContext.getCurrentTenantId()==null
+                    || MetaContext.getCurrentUserId()==null || MetaContext.getCurrentMemberId()==null) {
+                read.run();return;
+            }
+            frame=new CanonicalReadFrame(new Actor(MetaContext.getCurrentTenantId(),MetaContext.getCurrentUserId(),MetaContext.getCurrentMemberId()),model,pid,previous);
+            CANONICAL_READ.set(frame);
+            read.run();
+        }
+        catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
+        finally {
+            if(frame!=null) {
+                frame.phase=2;frame.valid=false;
+                if(previous==null)CANONICAL_READ.remove();else CANONICAL_READ.set(previous);
+            }
+        }
+    }
+    /** Called only at the end of the full human physical authorization read, after all masks/FLS. */
+    static void completePhysicalCanonicalRead(String model,String pid) {
+        var frame=CANONICAL_READ.get();
+        if(frame!=null && frame.phase==0 && frame.valid && frame.policy!=null
+                && frame.matches(model,pid) && sameCanonicalActor(frame.actor)) frame.completed=true;
+    }
+    /** Loader success alone never authorizes the masked result; the original helper still runs. */
+    static void finalizeCanonicalRead(String model,String pid,Runnable authorize) {
+        var frame=CANONICAL_READ.get();
+        boolean matches=frame!=null && frame.matches(model,pid);
+        try {
+            if(matches)frame.phase=1;
+            authorize.run();
+        }
+        catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
+        finally {if(matches) {frame.phase=2;frame.valid=false;}}
+    }
+    static void invalidateCanonicalRead() {
+        for(var frame=CANONICAL_READ.get();frame!=null;frame=frame.parent) frame.valid=false;
+    }
+    /** A later record loader is an independent read, not the final check of the loaded masked row. */
+    static void beforeIndependentRecordLoad() {
+        var frame=CANONICAL_READ.get();
+        if(frame!=null && (frame.phase==1 || frame.policy!=null)) invalidateCanonicalRead();
+    }
+    private static CanonicalReadFrame takeCanonicalAttempt(String model,Map<String,Object> record) {
+        var frame=CANONICAL_READ.get();
+        if(frame==null || frame.phase!=1 || frame.consumed || record==null
+                || !(record.get("pid") instanceof String pid) || !frame.matches(model,pid)) return null;
+        frame.consumed=true;
+        return frame;
+    }
     /** Dependency authorization needs canonical rows, not recursively derived display labels. */
     static boolean isResolvingReference() { return REFERENCE_READ_DEPTH.get() != null; }
     private Map<String,Object> readReference(RequiredReadReferences.Reference reference) {
@@ -62,8 +136,17 @@ public class RequiredRecordReadGuard {
             QueryBuilderService queries, DynamicDataMapper rows, DataDomainService domains) {
         this.models=models; this.data=data; this.permissions=permissions; this.queries=queries; this.rows=rows; this.domains=domains;
     }
-    public boolean isConfigured(String modelCode) { return RequiredReadReferences.policy(models.getModelDefinition(modelCode).orElse(null)) != null; }
+    public boolean isConfigured(String modelCode) {
+        try {return RequiredReadReferences.policy(models.getModelDefinition(modelCode).orElse(null)) != null;}
+        catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
+    }
     public void require(String modelCode, Map<String,Object> record) {
+        try {requireInternal(modelCode,record);}
+        catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
+    }
+    private void requireInternal(String modelCode, Map<String,Object> record) {
+        // SQL candidates and nested reference reads cannot consume a direct canonical-read witness.
+        var finalAttempt=current.get()==null && !isResolvingReference() ? takeCanonicalAttempt(modelCode,record) : null;
         var model=models.getModelDefinition(modelCode).orElse(null);
         var policy=RequiredReadReferences.policy(model); if(policy==null) return;
         var actor=actor(); var traversal=current.get(); boolean owner=traversal==null;
@@ -81,6 +164,9 @@ public class RequiredRecordReadGuard {
                 List<RequiredReadReferences.Reference> references;
                 try { references=policy.references(record); }
                 catch(RequiredReadReferences.InvalidRecordReferences incomplete) { throw denied(); }
+                if(finalAttempt!=null && finalAttempt.valid && finalAttempt.completed && finalAttempt.verifier==this
+                        && finalAttempt.actor.equals(actor) && sameCanonicalActor(actor)
+                        && policy.equals(finalAttempt.policy) && references.equals(finalAttempt.references)) return;
                 for(var reference:references) {
                     if(++traversal.reads>RequiredReadReferences.MAX_REFERENCES) throw new MetaServiceException("Required-read reference budget exceeded");
                     if(!actor.equals(actor())) throw denied();
@@ -95,6 +181,12 @@ public class RequiredRecordReadGuard {
                     // A nested guard alone is not success: masking and the rest of getById must finish.
                     if(terminal) traversal.terminals.add(reference);
                 }
+                var frame=CANONICAL_READ.get();
+                if(owner && root && !isResolvingReference() && frame!=null && frame.phase==0 && frame.valid
+                        && frame.matches(modelCode,pid) && frame.actor.equals(actor) && sameCanonicalActor(actor)) {
+                    // Immutable normalized identities, captured before the caller can mutate/mask its Map.
+                    frame.verifier=this;frame.policy=policy;frame.references=List.copyOf(references);
+                }
             } finally { traversal.path.remove(key); }
         } finally {
             if(root) traversal.terminals.clear();
@@ -106,6 +198,10 @@ public class RequiredRecordReadGuard {
         return sqlFilter(tenantId, modelCode, userId, baseRowFilter, true);
     }
     public String sqlFilter(Long tenantId, String modelCode, Long userId, String baseRowFilter, boolean applyDomain) {
+        try {return sqlFilterInternal(tenantId,modelCode,userId,baseRowFilter,applyDomain);}
+        catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
+    }
+    private String sqlFilterInternal(Long tenantId, String modelCode, Long userId, String baseRowFilter, boolean applyDomain) {
         var model=models.getModelDefinition(modelCode).orElse(null);
         var policy=RequiredReadReferences.policy(model); if(policy==null) return "";
         var actor=actor();
@@ -134,7 +230,11 @@ public class RequiredRecordReadGuard {
                 // Clear at both candidate boundaries; a completed candidate never proves another.
                 current.get().terminals.clear();
                 try { require(modelCode,record); permitted.add(pid); }
-                catch(AccessDeniedException | MetaRecordNotFoundException denied) { /* Expected invisible root; internal failures still abort. */ }
+                catch(AccessDeniedException | MetaRecordNotFoundException denied) {
+                    // Hidden candidates retain their original semantics, but an observed denial
+                    // cannot leave an earlier canonical witness usable by this or a parent operation.
+                    invalidateCanonicalRead();
+                }
                 finally { current.get().terminals.clear(); }
             }
         } finally { if(owner) current.remove(); }

@@ -287,6 +287,12 @@ public class FileUploadController {
     }
 
     private void authorizeRelationTarget(String entityType, String entityId, String action) {
+        if ("read".equals(action)) {
+            dynamicDataService.withCanonicalRecordRead(entityType,entityId,
+                    record -> dataAccessAuthorizationHelper.authorizeRecordId(
+                            entityType,action,entityId,ignored -> record));
+            return;
+        }
         dataAccessAuthorizationHelper.authorizeRecordId(
                 entityType,
                 action,

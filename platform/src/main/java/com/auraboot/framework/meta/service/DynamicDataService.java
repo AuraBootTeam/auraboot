@@ -45,6 +45,22 @@ public interface DynamicDataService {
     /** Read through every normal authorization and masking gate, without display-only reference expansion. */
     Map<String, Object> getByIdForAuthorization(String modelCode, String recordId);
 
+    /** Complete one canonical read and the caller's final masked-record authorization together. */
+    default void withCanonicalRecordRead(String modelCode, String recordId,
+            java.util.function.Consumer<Map<String, Object>> finalAuthorizer) {
+        java.util.Objects.requireNonNull(finalAuthorizer, "finalAuthorizer");
+        if(recordId==null || recordId.isBlank())
+            throw new com.auraboot.framework.meta.exception.MetaServiceException("Record ID cannot be null or empty");
+        Map<String, Object> record;
+        try { record=getByIdForAuthorization(modelCode,recordId); }
+        catch (org.springframework.security.access.AccessDeniedException denied) { throw denied; }
+        catch (Exception failure) {
+            throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                    "Failed to load record for authorization: "+recordId,failure);
+        }
+        finalAuthorizer.accept(record);
+    }
+
     /**
      * 创建数据
      * @param modelCode 模型编码

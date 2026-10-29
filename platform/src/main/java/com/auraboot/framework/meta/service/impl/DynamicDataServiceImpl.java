@@ -715,7 +715,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return getByIdInternal(modelCode, recordId, false);
     }
 
+    @Override
+    @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-authorize-record-read")
+    public void withCanonicalRecordRead(String modelCode, String recordId,
+            java.util.function.Consumer<Map<String,Object>> finalAuthorizer) {
+        java.util.Objects.requireNonNull(finalAuthorizer,"finalAuthorizer");
+        RequiredRecordReadGuard.withCanonicalRead(modelCode,recordId,() ->
+                DynamicDataService.super.withCanonicalRecordRead(modelCode,recordId,record ->
+                        RequiredRecordReadGuard.finalizeCanonicalRead(modelCode,recordId,() -> finalAuthorizer.accept(record))));
+    }
+
     private Map<String, Object> getByIdInternal(String modelCode, String recordId, boolean enrichDisplay) {
+        RequiredRecordReadGuard.beforeIndependentRecordLoad();
         validateModelCode(modelCode);
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
             com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
@@ -860,6 +871,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (!commandPermitInForce || MachineDataAccessContext.isActive()) {
             // Human and machine field policies are independent of command permit grades.
             record = applyFieldPermissionFilterSingle(modelCode, record);
+        }
+
+        if (!enrichDisplay && !commandPermitInForce && !MachineDataAccessContext.isActive()
+                && (model.getSourceType()==null || "physical".equals(model.getSourceType()))
+                && !"view".equals(model.getModelType())) {
+            RequiredRecordReadGuard.completePhysicalCanonicalRead(modelCode,recordId);
         }
 
         if (enrichDisplay && !commandPermitInForce && !RequiredRecordReadGuard.isResolvingReference()) {

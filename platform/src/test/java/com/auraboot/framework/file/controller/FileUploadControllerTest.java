@@ -62,6 +62,8 @@ class FileUploadControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().doCallRealMethod().when(dynamicDataService)
+                .withCanonicalRecordRead(any(),any(),any());
         controller = new FileUploadController();
         ReflectionTestUtils.setField(controller, "fileService", fileService);
         ReflectionTestUtils.setField(controller, "storageProvider", storageProvider);
@@ -296,6 +298,18 @@ class FileUploadControllerTest {
         assertThat(controller.getFile("file-pid", 42L).getStatusCode().value()).isEqualTo(200);
         verify(dynamicDataService).getByIdForAuthorization("bundle", "bundle-pid");
         org.mockito.Mockito.verify(dynamicDataService, org.mockito.Mockito.never()).getById(any(), any());
+    }
+    @Test void canonicalReadDefaultPreservesLoaderDenialAndFailureClassification() {
+        var called=new java.util.concurrent.atomic.AtomicBoolean();
+        var denied=new org.springframework.security.access.AccessDeniedException("revoked");
+        when(dynamicDataService.getByIdForAuthorization("bundle","bundle-pid")).thenThrow(denied);
+        assertThatThrownBy(()->dynamicDataService.withCanonicalRecordRead("bundle","bundle-pid",row -> called.set(true))).isSameAs(denied);
+        var failure=new IllegalStateException("database unavailable");
+        org.mockito.Mockito.doThrow(failure).when(dynamicDataService).getByIdForAuthorization("bundle","bundle-pid");
+        assertThatThrownBy(()->dynamicDataService.withCanonicalRecordRead("bundle","bundle-pid",row -> called.set(true)))
+                .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class)
+                .hasMessage("Failed to load record for authorization: bundle-pid").hasCause(failure);
+        assertThat(called.get()).isFalse();
     }
 
     @Test void fileListSharesOnlyRequestMetadataAndReauthorizesEveryRelationOnTheNextRequest() {

@@ -118,6 +118,137 @@ class RequiredRecordReadGuardTest {
         });
         verify(data).getById("fixture_member",id(1));verify(data).getById("fixture_member",id(2));
     }
+    @Test void nestedCanonicalFailureRestoresTheOuterOperationAndClosesTheInnerOne() {
+        allow();
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                assertThatThrownBy(()->RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(10),()->{
+                    guard.require("fixture_bundle",root(10,id(2)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(10));
+                    RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(10),()->{throw new IllegalStateException("inner failed");});
+                })).isInstanceOf(IllegalStateException.class).hasMessage("inner failed");
+                guard.require("fixture_bundle",root(9,id(1)));
+            });
+        });
+        verify(data,times(2)).getById("fixture_member",id(1));
+        guard.require("fixture_bundle",root(10,id(2)));verify(data,times(2)).getById("fixture_member",id(2));
+    }
+    @Test void nestedMutationInvalidatesBothCanonicalOperations() {
+        allow();
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(10),()->{
+                    guard.require("fixture_bundle",root(10,id(2)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(10));
+                    RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(10),()->{
+                        DynamicDataQueryScope.invalidateFiltersAfterMutation();guard.require("fixture_bundle",root(10,id(2)));
+                    });
+                });
+                guard.require("fixture_bundle",root(9,id(1)));
+            });
+        });
+        verify(data,times(2)).getById("fixture_member",id(1));verify(data,times(2)).getById("fixture_member",id(2));
+    }
+    @Test void canonicalOperationCannotSupplyAProofToAnotherRoot() {
+        allow();
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->guard.require("fixture_bundle",root(10,id(1))));
+        });
+        verify(data,times(2)).getById("fixture_member",id(1));
+    }
+    @Test void commandPermitKeepsBothOriginalDependencyTraversals() {
+        allow();
+        MetaContext.runWithCommandPermitPlan("ALL",9L,"fixture_bundle",id(9),()->{
+            RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+                guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+                RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->guard.require("fixture_bundle",root(9,id(1))));
+            });
+        });
+        verify(data,times(2)).getById("fixture_member",id(1));
+    }
+    @Test void anInvisibleSqlCandidateInvalidatesTheCanonicalWitnessBeforeFinalAuthorization() {
+        allow();when(rows.selectByQuery(anyString(),anyMap())).thenReturn(List.of(root(9,id(1))));
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(1));
+                assertThat(guard.sqlFilter(7L,"fixture_bundle",42L,"")).isEqualTo("AND 1 = 0");
+                assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+            });
+        });
+    }
+    @Test void caughtNestedDependencyDenialInvalidatesTheParentCanonicalWitness() {
+        allow();
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(1));
+                assertThatThrownBy(()->RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(10),()->
+                        guard.require("fixture_bundle",root(10,id(1))))).isInstanceOf(AccessDeniedException.class);
+                assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+            });
+        });
+    }
+    @Test void caughtCandidateBudgetFailureCannotLeaveACanonicalWitnessUsable() {
+        allow();when(rows.selectByQuery(anyString(),anyMap())).thenReturn(java.util.Collections.nCopies(11,root(10,id(1))));
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("budget");
+                guard.require("fixture_bundle",root(9,id(1)));
+            });
+        });
+        verify(data,times(2)).getById("fixture_member",id(1));
+    }
+    @Test void anotherGuardCannotConsumeTheCanonicalWitnessEvenForTheSameIdentity() {
+        allow();var otherPermissions=mock(PermissionFacade.class);
+        var other=new RequiredRecordReadGuard(models,data,otherPermissions,queries,rows,domains);
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->
+                    assertThatThrownBy(()->other.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class));
+        });
+    }
+    @Test void preGuardNestedFailureInvalidatesTheParentWitness() {
+        allow();
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(1));
+                assertThatThrownBy(()->RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(10),()->{
+                    throw new AccessDeniedException("pre-guard denial");
+                })).isInstanceOf(AccessDeniedException.class);
+                assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+            });
+        });
+    }
+    @Test void earlyPermitFallbackFailureInvalidatesTheParentWitness() {
+        allow();
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(1));
+                assertThatThrownBy(()->MetaContext.runWithCommandPermitPlan("ALL",1L,"fixture_bundle",id(10),()->
+                        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(10),()->{throw new AccessDeniedException("early fallback");})))
+                        .isInstanceOf(AccessDeniedException.class);
+                assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+            });
+        });
+    }
+    @Test void mismatchedFinalizeFallbackFailureInvalidatesTheParentWitness() {
+        allow();
+        RequiredRecordReadGuard.withCanonicalRead("fixture_bundle",id(9),()->{
+            guard.require("fixture_bundle",root(9,id(1)));RequiredRecordReadGuard.completePhysicalCanonicalRead("fixture_bundle",id(9));
+            RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(9),()->{
+                doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(1));
+                assertThatThrownBy(()->RequiredRecordReadGuard.finalizeCanonicalRead("fixture_bundle",id(10),()->{
+                    throw new AccessDeniedException("mismatched fallback");
+                })).isInstanceOf(AccessDeniedException.class);
+                assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+            });
+        });
+    }
     @Test void dependencyPresentationScopeRestoresAfterNestedSuccessAndFailure() {
         allow();assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
         when(data.getById("fixture_member",id(1))).thenAnswer(call->{
