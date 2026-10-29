@@ -36,6 +36,76 @@ class RequiredRecordReadGuardTest {
         when(permissions.canAction(43L,"fixture_member","read")).thenReturn(true);
         when(data.getById(eq("fixture_member"),anyString())).thenReturn(Map.of("pid",id(1)));
     }
+    void diamond(boolean immutable, String sourceType) {
+        var branch=RequiredReadReferencesTest.model(10); branch.setCode("fixture_member");
+        branch.setExtension(Map.of(RequiredReadReferences.KEY,Map.of("version",1,"maxCandidateRecords",10,"minimumReferences",1,
+                "references",List.of(Map.of("field","members","model","fixture_leaf","many",true,"allowEmpty",false)))));
+        when(models.getModelDefinition("fixture_member")).thenReturn(Optional.of(branch));
+        when(models.getModelDefinition("fixture_leaf")).thenReturn(Optional.of(
+                com.auraboot.framework.meta.dto.ModelDefinition.builder().code("fixture_leaf").immutable(immutable).sourceType(sourceType).build()));
+        when(permissions.canAction(eq(43L),anyString(),eq("read"))).thenReturn(true);
+        doAnswer(call->{
+            var row=root(call.getArgument(1).equals(id(1))?1:2,id(3));guard.require("fixture_member",row);return row;
+        }).when(data).getById(eq("fixture_member"),anyString());
+        doReturn(root(3)).when(data).getById("fixture_leaf",id(3));
+    }
+    @Test void immutablePhysicalTerminalIsReadOncePerDiamondButEveryEdgeIsAuthorized() {
+        diamond(true,"physical");guard.require("fixture_bundle",root(9,id(1),id(2)));
+        verify(data,times(1)).getById("fixture_leaf",id(3));
+        verify(permissions,times(2)).canAction(43L,"fixture_leaf","read");
+        doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_leaf",id(3));
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1),id(2)))).isInstanceOf(AccessDeniedException.class);
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void terminalProofNeverCrossesSqlCandidates() {
+        diamond(true,null);when(rows.selectByQuery(anyString(),anyMap())).thenReturn(List.of(root(9,id(1),id(2)),root(10,id(1),id(2))));
+        assertThat(guard.sqlFilter(7L,"fixture_bundle",42L,"")).contains(id(9),id(10));
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void mutableTerminalsRetainEveryOrdinaryRead() {
+        diamond(false,"physical");guard.require("fixture_bundle",root(9,id(1),id(2)));
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void virtualTerminalsRetainEveryOrdinaryRead() {
+        diamond(true,"remote");guard.require("fixture_bundle",root(9,id(1),id(2)));
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void viewTerminalsRetainEveryOrdinaryRead() {
+        diamond(true,null);var leaf=models.getModelDefinition("fixture_leaf").orElseThrow();leaf.setModelType("view");
+        guard.require("fixture_bundle",root(9,id(1),id(2)));
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void alternativePrimaryKeyTerminalsRetainEveryOrdinaryRead() {
+        diamond(true,"physical");var leaf=models.getModelDefinition("fixture_leaf").orElseThrow();leaf.setPrimaryKey("external_key");
+        guard.require("fixture_bundle",root(9,id(1),id(2)));
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void nestedSqlCandidatesNeverShareATerminalProof() {
+        diamond(true,"physical");when(rows.selectByQuery(anyString(),anyMap())).thenReturn(List.of(root(10,id(3)),root(11,id(3))));
+        doAnswer(call->{guard.sqlFilter(7L,"fixture_member",42L,"");return root(1,id(3));}).when(data).getById("fixture_member",id(1));
+        guard.require("fixture_bundle",root(9,id(1)));
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void failedDiamondNeverLeavesATerminalProofForTheNextRoot() {
+        diamond(true,"physical");doThrow(new IllegalStateException("unavailable")).when(data).getById("fixture_member",id(2));
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1),id(2)))).isInstanceOf(IllegalStateException.class);
+        doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_leaf",id(3));
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(10,id(1)))).isInstanceOf(AccessDeniedException.class);
+        verify(data,times(2)).getById("fixture_leaf",id(3));
+    }
+    @Test void repeatedTerminalStillChecksEveryFunctionPermission() {
+        diamond(true,"physical");when(permissions.canAction(43L,"fixture_leaf","read")).thenReturn(true,false);
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1),id(2)))).isInstanceOf(AccessDeniedException.class);
+        verify(data).getById("fixture_leaf",id(3));
+        verify(permissions,times(2)).canAction(43L,"fixture_leaf","read");
+    }
+    @Test void terminalReuseDoesNotDiscountTheOriginalLogicalEdgeBudget() {
+        diamond(true,"physical");when(models.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(RequiredReadReferencesTest.model(1100)));
+        var candidates=java.util.stream.IntStream.range(500,1600).mapToObj(n->root(n,id(1),id(2))).toList();
+        when(rows.selectByQuery(anyString(),anyMap())).thenReturn(candidates);
+        assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("reference budget");
+        guard.require("fixture_bundle",root(9,id(1),id(2)));
+    }
     @Test void allMembersUseCurrentActorWithoutOuterPermitAndRestoreExactVersionAfterward() {
         allow();
         when(data.getById(eq("fixture_member"),anyString())).thenAnswer(call->{

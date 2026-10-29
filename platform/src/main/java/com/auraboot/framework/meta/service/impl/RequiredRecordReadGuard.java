@@ -47,7 +47,16 @@ public class RequiredRecordReadGuard {
     private record Actor(Long tenant, Long user, Long member) { }
     private static final class Traversal {
         final Actor actor; final Set<RequiredReadReferences.Reference> path = new HashSet<>(); int reads;
+        final Set<RequiredReadReferences.Reference> terminals = new HashSet<>();
         Traversal(Actor actor) { this.actor=actor; }
+    }
+    private boolean immutablePhysicalTerminal(RequiredReadReferences.Reference reference) {
+        var model=models.getModelDefinition(reference.model()).orElse(null);
+        return model!=null && model.isImmutable()
+                && (model.getSourceType()==null || "physical".equals(model.getSourceType()))
+                && !"view".equals(model.getModelType())
+                && (model.getPrimaryKey()==null || "pid".equals(model.getPrimaryKey()))
+                && RequiredReadReferences.policy(model)==null;
     }
     public RequiredRecordReadGuard(MetaModelService models, @Lazy DynamicDataService data, PermissionFacade permissions,
             QueryBuilderService queries, DynamicDataMapper rows, DataDomainService domains) {
@@ -59,6 +68,9 @@ public class RequiredRecordReadGuard {
         var policy=RequiredReadReferences.policy(model); if(policy==null) return;
         var actor=actor(); var traversal=current.get(); boolean owner=traversal==null;
         if(owner) { traversal=new Traversal(actor); current.set(traversal); }
+        // SQL scans share the work budget, but never a completed read between root candidates.
+        boolean root=traversal.path.isEmpty();
+        if(root) traversal.terminals.clear();
         try {
             if(!actor.equals(traversal.actor) || record==null || !(record.get("pid") instanceof String pid) || !RequiredReadReferences.pid(pid)
                     || !(record.get("tenant_id") instanceof Number tenant) || tenant.longValue()!=actor.tenant()
@@ -71,13 +83,23 @@ public class RequiredRecordReadGuard {
                 catch(RequiredReadReferences.InvalidRecordReferences incomplete) { throw denied(); }
                 for(var reference:references) {
                     if(++traversal.reads>RequiredReadReferences.MAX_REFERENCES) throw new MetaServiceException("Required-read reference budget exceeded");
+                    if(!actor.equals(actor())) throw denied();
                     if(!permissions.canAction(actor.member(),reference.model(),"read")) throw denied();
+                    // Only leaf nodes have no omitted descendant work/depth. Mutable or virtual
+                    // records and every nonterminal still use the ordinary read on every edge.
+                    boolean terminal=immutablePhysicalTerminal(reference);
+                    if(terminal && traversal.terminals.contains(reference)) continue;
                     // Remove only the outer row permit. Identity and the exact writer/version plan are restored by Core.
                     var loaded=readReference(reference);
                     if(loaded==null) throw denied();
+                    // A nested guard alone is not success: masking and the rest of getById must finish.
+                    if(terminal) traversal.terminals.add(reference);
                 }
             } finally { traversal.path.remove(key); }
-        } finally { if(owner) current.remove(); }
+        } finally {
+            if(root) traversal.terminals.clear();
+            if(owner) current.remove();
+        }
     }
     /** Uses an immutable root set and one exact predicate for data/count/cursor/source SQL. Over-budget is an error, never truncation. */
     public String sqlFilter(Long tenantId, String modelCode, Long userId, String baseRowFilter) {
@@ -108,8 +130,12 @@ public class RequiredRecordReadGuard {
             for(var record:candidates) {
                 if(!(record.get("pid") instanceof String pid) || !RequiredReadReferences.pid(pid) || !seen.add(pid))
                     throw new MetaServiceException("Required-read candidate identity is invalid");
+                // A nested scan can share an outer traversal path as well as its budget.
+                // Clear at both candidate boundaries; a completed candidate never proves another.
+                current.get().terminals.clear();
                 try { require(modelCode,record); permitted.add(pid); }
                 catch(AccessDeniedException | MetaRecordNotFoundException denied) { /* Expected invisible root; internal failures still abort. */ }
+                finally { current.get().terminals.clear(); }
             }
         } finally { if(owner) current.remove(); }
         if(permitted.isEmpty()) return "AND 1 = 0";
