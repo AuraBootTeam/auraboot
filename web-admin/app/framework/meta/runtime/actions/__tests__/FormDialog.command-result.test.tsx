@@ -222,6 +222,9 @@ describe('actual FormDialog and native executor result handshake', () => {
     const fixture = nativeFixture();
     fireEvent.click(screen.getByRole('button', { name: 'Open action' }));
     await fill();
+    expect(screen.getByLabelText('Conclusion')).toBe(
+      screen.getByRole('combobox', { name: 'Conclusion' }),
+    );
     expect(screen.getByRole('combobox', { name: 'Conclusion' })).toHaveAttribute(
       'aria-required',
       'true',

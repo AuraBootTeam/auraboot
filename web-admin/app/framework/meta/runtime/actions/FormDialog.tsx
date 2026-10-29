@@ -816,6 +816,7 @@ function FormDialogHost() {
                     ) : fieldType === 'select' ? (
                       <select
                         id={`form-dialog-${field.field}-${sourceIndex}`}
+                        aria-label={label}
                         aria-required={field.required || undefined}
                         ref={
                           isFirst
@@ -1150,6 +1151,7 @@ function FormDialogHost() {
                     ) : fieldType === 'number' ? (
                       <input
                         id={`form-dialog-${field.field}-${sourceIndex}`}
+                        aria-label={label}
                         aria-required={field.required || undefined}
                         ref={
                           isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
@@ -1173,6 +1175,7 @@ function FormDialogHost() {
                     ) : fieldType === 'date' || fieldType === 'datetime' ? (
                       <input
                         id={`form-dialog-${field.field}-${sourceIndex}`}
+                        aria-label={label}
                         aria-required={field.required || undefined}
                         ref={
                           isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
@@ -1226,13 +1229,13 @@ function FormDialogHost() {
                     ) : fieldType === 'textarea' ? (
                       <textarea
                         id={`form-dialog-${field.field}-${sourceIndex}`}
+                        aria-label={label}
                         aria-required={field.required || undefined}
                         ref={
                           isFirst
                             ? (firstInputRef as React.RefObject<HTMLTextAreaElement>)
                             : undefined
                         }
-                        aria-label={label}
                         data-testid={`form-dialog-field-${field.field}`}
                         value={formData[field.field] ?? ''}
                         onChange={(e) => updateField(field.field, e.target.value)}
@@ -1247,6 +1250,7 @@ function FormDialogHost() {
                     ) : (
                       <input
                         id={`form-dialog-${field.field}-${sourceIndex}`}
+                        aria-label={label}
                         aria-required={field.required || undefined}
                         ref={
                           isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
