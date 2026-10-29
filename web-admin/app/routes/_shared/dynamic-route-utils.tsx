@@ -7,6 +7,7 @@ import React from 'react';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
+import { ReadonlyFileReference } from '~/ui/smart/display/ReadonlyFileReference';
 import { attachmentDownloadUrl } from '~/ui/smart/display/FileAttachmentField';
 
 // 导入并重新导出统一的 i18n 实现
@@ -668,7 +669,10 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       }
 
       // 7. File attachment - render download links
-      if (['fileattachment', 'file_attachment', 'attachment'].includes(componentType) && value) {
+      if (['fileattachment', 'file_attachment', 'attachment'].includes(componentType)) {
+        if (typeof value === 'string' && value.trim() && !value.trim().startsWith('[')) {
+          return <ReadonlyFileReference fileId={value} locale={locale} />;
+        }
         let files: Array<{ name: string; url: string; size?: number }> = [];
         try {
           files = typeof value === 'string' ? JSON.parse(value) : Array.isArray(value) ? value : [];
