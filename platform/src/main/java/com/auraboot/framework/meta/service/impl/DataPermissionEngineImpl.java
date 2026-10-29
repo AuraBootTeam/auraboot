@@ -119,6 +119,20 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     }
 
     @Override
+    public String buildRowFilterForRecords(Long tenantId, String modelCode, Long userId, java.util.Set<String> recordPids) {
+        if (!requiredReads.isConfigured(modelCode)) return buildRowFilter(tenantId, modelCode, userId);
+        if (recordPids==null || recordPids.isEmpty() || recordPids.size()>RequiredReadReferences.MAX_REFERENCES
+                || recordPids.stream().anyMatch(pid -> !RequiredReadReferences.pid(pid)))
+            throw new com.auraboot.framework.meta.exception.MetaServiceException("Exact required-read candidate identities are invalid");
+        String base=baseRowFilter(tenantId, modelCode, "read", userId);
+        String ids="AND pid IN ("+recordPids.stream().sorted().map(pid -> "'"+pid+"'")
+                .collect(java.util.stream.Collectors.joining(","))+")";
+        String admitted=base==null || base.isBlank() ? ids : base+" "+ids;
+        // Never cache this subset under a model/user key: another lookup has different exact identities.
+        return appendRequired(base, requiredReads.sqlFilter(tenantId, modelCode, userId, admitted));
+    }
+
+    @Override
     public String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId) {
         if (!requiredReads.isConfigured(modelCode)) return "";
         String permit = CommandPermitDataAccess.rowFilter(modelCode, userId);

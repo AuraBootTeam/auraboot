@@ -52,6 +52,11 @@ public interface DataPermissionEngine {
      */
     String buildRowFilter(Long tenantId, String modelCode, Long userId);
 
+    /** Same read boundary, compiled only for the exact records a trusted display lookup will query. */
+    default String buildRowFilterForRecords(Long tenantId, String modelCode, Long userId, Set<String> recordPids) {
+        return buildRowFilter(tenantId, modelCode, userId);
+    }
+
     /**
      * Build SQL WHERE clause fragment for row-level filtering with an explicit action.
      * Existing Dynamic callers use {@link #buildRowFilter(Long, String, Long)} which

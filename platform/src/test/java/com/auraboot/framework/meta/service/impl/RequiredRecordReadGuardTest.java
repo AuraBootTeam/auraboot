@@ -166,6 +166,16 @@ class RequiredRecordReadGuardTest {
         when(data.getById("fixture_member",id(1))).thenThrow(new MetaRecordNotFoundException("fixture_member",id(1)));
         assertThat(guard.sqlFilter(7L,"fixture_bundle",42L,"AND created_by = 42")).isEqualTo("AND 1 = 0");
     }
+    @Test void admittedDisplayIdentityKeepsDomainAndTenantWithoutScanningUnrelatedRoots() {
+        allow();when(domains.buildDomainFilter("fixture_bundle",42L)).thenReturn("AND domain_id = 5");
+        when(rows.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            String sql=call.getArgument(0);assertThat(sql).contains("tenant_id","domain_id = 5","created_by = 42");
+            return sql.contains("AND pid IN ('"+id(9)+"')") ? List.of(root(9,id(1))) : java.util.Collections.nCopies(11,root(10,id(2)));
+        });
+        assertThat(guard.sqlFilter(7L,"fixture_bundle",42L,"AND created_by = 42 AND pid IN ('"+id(9)+"')")).isEqualTo("AND pid IN ('"+id(9)+"')");
+        assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"AND created_by = 42"))
+                .isInstanceOf(MetaServiceException.class).hasMessageContaining("budget");
+    }
     @Test void candidateOverflowAndInternalFailuresAbortInsteadOfReturningPartialVisibility() {
         when(rows.selectByQuery(anyString(),anyMap())).thenReturn(java.util.Collections.nCopies(11,root(9,id(1))));
         assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("budget");
