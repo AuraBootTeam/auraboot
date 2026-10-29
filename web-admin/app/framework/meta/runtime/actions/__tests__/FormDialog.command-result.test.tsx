@@ -222,6 +222,11 @@ describe('actual FormDialog and native executor result handshake', () => {
     const fixture = nativeFixture();
     fireEvent.click(screen.getByRole('button', { name: 'Open action' }));
     await fill();
+    expect(screen.getByRole('combobox', { name: 'Conclusion' })).toHaveAttribute(
+      'aria-required',
+      'true',
+    );
+    expect(screen.getByRole('textbox', { name: 'Note' })).toHaveAttribute('aria-required', 'true');
     fixture.record.row_version = 9;
     fixture.record.title = 'Unrelated live title';
     const submit = screen.getByTestId('form-dialog-submit');
