@@ -280,7 +280,7 @@ public class FileUploadController {
                 entityType,
                 action,
                 entityId,
-                recordPid -> dynamicDataService.getById(entityType, recordPid));
+                recordPid -> dynamicDataService.getByIdForAuthorization(entityType, recordPid));
     }
 
     private void authorizeFileAccess(String fileId, FileEntity file, Long userId) {

@@ -42,6 +42,9 @@ public interface DynamicDataService {
      */
     Map<String, Object> getById(String modelCode, String recordId);
 
+    /** Read through every normal authorization and masking gate, without display-only reference expansion. */
+    Map<String, Object> getByIdForAuthorization(String modelCode, String recordId);
+
     /**
      * 创建数据
      * @param modelCode 模型编码

@@ -706,6 +706,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-by-id")
     public Map<String, Object> getById(String modelCode, String recordId) {
+        return getByIdInternal(modelCode, recordId, true);
+    }
+
+    @Override
+    @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-for-authorization")
+    public Map<String, Object> getByIdForAuthorization(String modelCode, String recordId) {
+        return getByIdInternal(modelCode, recordId, false);
+    }
+
+    private Map<String, Object> getByIdInternal(String modelCode, String recordId, boolean enrichDisplay) {
         validateModelCode(modelCode);
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
             com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
@@ -852,7 +862,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
 
-        if (!commandPermitInForce && !RequiredRecordReadGuard.isResolvingReference()) {
+        if (enrichDisplay && !commandPermitInForce && !RequiredRecordReadGuard.isResolvingReference()) {
             // Authorization dependencies retain every gate above, without presentation-only back-links.
             // Resolve reference display names (same as list) so the detail page shows names, not pids.
             // Internal command reads intentionally retain the canonical stored shape.

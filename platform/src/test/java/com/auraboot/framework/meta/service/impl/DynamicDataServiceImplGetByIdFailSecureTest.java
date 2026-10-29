@@ -201,6 +201,53 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         org.assertj.core.api.Assertions.assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
     }
 
+    @Test
+    void explicitAuthorizationReadKeepsGatesAndMaskedShapeWithoutReferencePresentation() {
+        wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(true);
+        when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE), anyMap(), eq(USER_ID))).thenAnswer(call -> call.getArgument(1));
+        when(fieldPermissionService.getFieldPermissions(USER_ID, MODEL_CODE)).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(java.util.Set.of("pid", "related"), java.util.Set.of("pid", "related"), java.util.Set.of("name")));
+        var model = metadataService.getModelDefinition(MODEL_CODE).orElseThrow();
+        var related = FieldDefinition.builder().code("related").columnName("related").dataType("reference").build();
+        related.setExtraProps(Map.of("refTarget", Map.of("targetEntity", "fixture_policy", "valueField", "pid", "displayField", "name")));
+        model.setFields(List.of(model.getFields().getFirst(), related));
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenAnswer(call -> List.of(
+                new java.util.LinkedHashMap<>(Map.of("pid", RECORD_ID, "name", "secret-value", "related", "policy-1"))));
+
+        var record = service.getByIdForAuthorization(MODEL_CODE, RECORD_ID);
+        org.assertj.core.api.Assertions.assertThat(record).containsEntry("pid", RECORD_ID).containsEntry("related", "policy-1").doesNotContainKey("name");
+        verify(permissionFacade).canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap());
+        verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap());
+        verify(dataPermissionEngine).getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID);
+        verify(fieldMaskService).applyMaskingForDetail(eq(MODEL_CODE), anyMap(), eq(USER_ID));
+        verify(fieldPermissionService).getFieldPermissions(USER_ID, MODEL_CODE);
+        verify(permissionFacade, never()).canAction(USER_ID, "fixture_policy", "read");
+        service.getById(MODEL_CODE, RECORD_ID);
+        verify(permissionFacade).canAction(USER_ID, "fixture_policy", "read");
+    }
+
+    @Test
+    void explicitAuthorizationReadStillRejectsDeniedRows() {
+        wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(false);
+        assertThatThrownBy(() -> service.getByIdForAuthorization(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(fieldMaskService);
+    }
+
+    @Test
+    void explicitAuthorizationReadDoesNotReturnUnmaskedDataWhenMaskingFails() {
+        wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(true);
+        when(dataPermissionEngine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID)).thenThrow(new IllegalStateException("mask lookup failed"));
+        assertThatThrownBy(() -> service.getByIdForAuthorization(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(MetaServiceException.class).hasMessageContaining("Field masking evaluation failed");
+    }
+
     // =====================================================================
     // Test (a): row-ACL check throws → getById must NOT return the record
     // =====================================================================

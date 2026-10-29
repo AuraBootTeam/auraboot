@@ -282,6 +282,22 @@ class FileUploadControllerTest {
         verifyNoInteractions(adminEventLogService);
     }
 
+    @Test void fileRelationAuthorizationUsesTheCanonicalReadWithoutDisplayExpansion() {
+        var file = storedFile("original.json", "application/json", "/tmp/original");
+        var relation = new FileRelationEntity().setEntityType("bundle").setEntityId("bundle-pid").setFieldName("original");
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dynamicDataService.getByIdForAuthorization("bundle", "bundle-pid")).thenReturn(java.util.Map.of("pid", "bundle-pid"));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any()))
+                .thenAnswer(call -> {
+                    java.util.function.Function<String, java.util.Map<String, Object>> loader = call.getArgument(3);
+                    return loader.apply("bundle-pid") != null;
+                });
+        assertThat(controller.getFile("file-pid", 42L).getStatusCode().value()).isEqualTo(200);
+        verify(dynamicDataService).getByIdForAuthorization("bundle", "bundle-pid");
+        org.mockito.Mockito.verify(dynamicDataService, org.mockito.Mockito.never()).getById(any(), any());
+    }
+
     @Test void ownerFileMetadataListDoesNotRevealFilesWithARevokedAdditionalRelation() {
         var own=storedFile("own.txt","text/plain","/tmp/own");own.setPid("own-file");
         var hidden=storedFile("hidden.txt","text/plain","/tmp/hidden");hidden.setPid("hidden-file");
