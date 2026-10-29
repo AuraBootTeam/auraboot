@@ -196,8 +196,8 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
           AND strpos(lower(CASE
             WHEN jsonb_typeof(ui_schema->'label') = 'string' AND btrim(ui_schema->>'label') != ''
               THEN btrim(ui_schema->>'label')
-            WHEN jsonb_typeof(extension->'displayName') = 'string' AND btrim(extension->>'displayName') != ''
-              THEN btrim(extension->>'displayName')
+            WHEN jsonb_typeof(extension->'extension'->'displayName') = 'string' AND btrim(extension->'extension'->>'displayName') != ''
+              THEN btrim(extension->'extension'->>'displayName')
             ELSE NULL END), lower(#{businessName})) > 0
         </if>
         <if test="code != null and code != ''">
