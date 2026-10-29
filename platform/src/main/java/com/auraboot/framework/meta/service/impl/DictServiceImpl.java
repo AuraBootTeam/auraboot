@@ -425,6 +425,16 @@ public class DictServiceImpl implements DictService {
     }
 
     @Override
+    public Page<DictDTO> findPublishedFamilies(String businessName, int page, int pageSize) {
+        IPage<Dict> result = dictMapper.selectPublishedFamilies(new Page<>(page, pageSize),
+                MetaContext.getCurrentTenantId(), businessName);
+        Page<DictDTO> output = new Page<>(page, pageSize);
+        output.setTotal(result.getTotal());
+        output.setRecords(dictConverter.toDTOList(result.getRecords()));
+        return output;
+    }
+
+    @Override
     public List<DictDTO> findByTenant() {
         // 验证租户上下文
           

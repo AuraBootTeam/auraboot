@@ -375,6 +375,27 @@ public interface DictMapper extends BaseMapper<Dict> {
      * @param status 状态（可选）
      * @return 字典列表
      */
+    /** Select family representatives before count and pagination, independently of is_current. */
+    @Select("""
+        <script>
+        SELECT d.* FROM ab_dict d
+        WHERE d.tenant_id = #{tenantId}
+          AND d.status = 'published' AND d.deleted_flag = FALSE
+          AND NOT EXISTS (
+            SELECT 1 FROM ab_dict newer
+            WHERE newer.tenant_id = d.tenant_id AND newer.code = d.code
+              AND newer.status = 'published' AND newer.deleted_flag = FALSE
+              AND newer.version &gt; d.version
+          )
+        <if test="businessName != null and businessName != ''">
+          AND strpos(lower(d.name), lower(#{businessName})) &gt; 0
+        </if>
+        ORDER BY d.created_at DESC, d.id DESC
+        </script>
+        """)
+    IPage<Dict> selectPublishedFamilies(Page<?> page, @Param("tenantId") Long tenantId,
+            @Param("businessName") String businessName);
+
     // Administration includes non-current drafts/deprecated versions needed for lifecycle actions.
     @Select("""
         <script>
