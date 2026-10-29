@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, fireEvent, waitFor } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared BEFORE importing the SUT so the hook mock is in place
@@ -478,6 +478,150 @@ describe('TableBlockRenderer', () => {
       }),
     });
   }
+
+  function externalState(runtime: any) {
+    const listeners = new Set<() => void>();
+    runtime.subscribeContext = (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    };
+    return (values: Record<string, unknown>) => {
+      Object.assign(runtime.getContext().state, values);
+      listeners.forEach((listener) => listener());
+    };
+  }
+
+  it.each([[], null, undefined])('clears bound checkboxes and derived ids on external reset %j without reviving rows', async (reset) => {
+    const rows = [
+      { pid: 'first', name: 'First' },
+      { pid: 'second', name: 'Second' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const publish = externalState(runtime);
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: { mode: 'multiple', bind: 'chosen', idsBind: 'chosenIds' },
+        columns: baseColumns,
+      },
+    };
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-select-row-first'));
+    expect(getByTestId('table-select-row-first')).toBeChecked();
+    expect(runtime.getContext().state.chosenIds).toEqual(['first']);
+    act(() => publish({ chosen: reset }));
+    await waitFor(() => expect(getByTestId('table-select-row-first')).not.toBeChecked());
+    expect(runtime.getContext().state.chosenIds).toEqual([]);
+    fireEvent.click(getByTestId('table-select-row-second'));
+    expect(runtime.getContext().state.chosen).toEqual([rows[1]]);
+    expect(runtime.getContext().state.chosenIds).toEqual(['second']);
+    expect(getByTestId('table-select-row-first')).not.toBeChecked();
+  });
+
+  it('uses a replacement external row selection instead of stale local keys', async () => {
+    const rows = [
+      { pid: 'first', name: 'First' },
+      { pid: 'second', name: 'Second' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const publish = externalState(runtime);
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: { mode: 'multiple', bind: 'chosen' },
+        columns: baseColumns,
+      },
+    };
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-select-row-first'));
+    act(() => publish({ chosen: [rows[1]] }));
+    await waitFor(() => expect(getByTestId('table-select-row-second')).toBeChecked());
+    expect(getByTestId('table-select-row-first')).not.toBeChecked();
+    fireEvent.click(getByTestId('table-select-row-first'));
+    expect(runtime.getContext().state.chosen).toEqual([rows[1], rows[0]]);
+  });
+
+  it('retains choices on other pages while replacing exactly one exclusive group', () => {
+    const first = { tupleKey: 'app-a-v1', applicationPid: 'a', name: 'A first' };
+    const other = { tupleKey: 'app-b-v1', applicationPid: 'b', name: 'B' };
+    const replacement = { tupleKey: 'app-a-v2', applicationPid: 'a', name: 'A second' };
+    const visible = [first, other];
+    const runtime = makeRuntimeWithRows(visible) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'tupleKey',
+        selection: { mode: 'multiple', bind: 'chosen', exclusiveBy: 'applicationPid' },
+        columns: baseColumns,
+      },
+    };
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(view.getByTestId('table-select-row-app-a-v1'));
+    fireEvent.click(view.getByTestId('table-select-row-app-b-v1'));
+    visible.splice(0, visible.length, replacement);
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(view.getByTestId('table-select-row-app-a-v2'));
+    expect(runtime.getContext().state.chosen).toEqual([other, replacement]);
+    visible.splice(0, visible.length, first, other);
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    expect(view.getByTestId('table-select-row-app-a-v1')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-app-b-v1')).toBeChecked();
+  });
+
+  it('preserves off-page grouped choices and replaces the same group by value', async () => {
+    const first = { tupleKey: 'a-first', applicationPid: 'a', name: 'A first' };
+    const other = { tupleKey: 'b-first', applicationPid: 'b', name: 'B' };
+    const replacement = { tupleKey: 'a-second', applicationPid: 'a', name: 'A second' };
+    let page = { records: [first, other], total: 3, current: 1, pageSize: 2 };
+    const runtime = makeRuntime({ getDataSourceManager: () => ({ getData: () => page, has: () => true, register: vi.fn() }) }) as any;
+    const block = { type: 'table', dataSource: 'list', table: { rowKey: 'tupleKey', pagination: { mode: 'server', pageField: 'current' },
+      selection: { mode: 'multiple', bind: 'chosen', exclusiveBy: 'applicationPid', presentation: 'grouped-radio', optionLabelField: 'name' }, columns: baseColumns } };
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(view.getByTestId('table-select-row-a-first'));
+    fireEvent.click(view.getByTestId('table-select-row-b-first'));
+    page = { records: [replacement], total: 3, current: 2, pageSize: 2 };
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    await waitFor(() => expect(runtime.getContext().state.chosen).toEqual([first, other]));
+    fireEvent.click(view.getByTestId('table-select-row-a-second'));
+    expect(runtime.getContext().state.chosen).toEqual([other, replacement]);
+    expect(view.getByTestId('table-select-row-a-second')).toBeChecked();
+    page = { records: [first, other], total: 3, current: 1, pageSize: 2 };
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    expect(view.getByTestId('table-select-row-a-first')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-b-first')).toBeChecked();
+  });
+
+  it('does not infer a unique safe recommendation from a partial server page', () => {
+    const row = { pid: 'one-visible', issueId: 'a', name: 'First page', recommended: true, safe: true };
+    const runtime = makeRuntime({ getDataSourceManager: () => ({ getData: () => ({ records: [row], total: 2, current: 1, pageSize: 1 }), has: () => true, register: vi.fn() }) }) as any;
+    const block = { type: 'table', dataSource: 'list', table: { rowKey: 'pid', pagination: { mode: 'server', pageField: 'current' },
+      selection: { mode: 'multiple', bind: 'chosen', exclusiveBy: 'issueId', presentation: 'grouped-radio', optionLabelField: 'name', recommendedField: 'recommended', safeField: 'safe' }, columns: baseColumns } };
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    expect(runtime.getContext().state.chosen).toBeUndefined();
+    expect(view.getByTestId('table-select-row-one-visible')).not.toBeChecked();
+  });
+
+  it('reflects an externally cleared single selection without a datasource reload', async () => {
+    const rows = [{ pid: 'first', name: 'First' }];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const publish = externalState(runtime);
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: { rowKey: 'pid', selection: { mode: 'single', bind: 'chosen' }, columns: baseColumns },
+    };
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-row-first'));
+    expect(getByTestId('table-row-first')).toHaveClass('bg-accent-weak');
+    act(() => publish({ chosen: null }));
+    await waitFor(() => expect(getByTestId('table-row-first')).not.toHaveClass('bg-accent-weak'));
+    expect(runtime.getContext().state.chosen).toBeNull();
+  });
 
   it('renders rows from table-adaptor data source records', () => {
     const runtime = makeRuntime({
