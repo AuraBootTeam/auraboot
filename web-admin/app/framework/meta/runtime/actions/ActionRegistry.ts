@@ -924,6 +924,7 @@ export async function promptInputForm(
         title,
         fields: normalizedFields,
         fieldOptions,
+        fetchResult,
         defaults,
         submitLabel,
         onSubmit: (formData: Record<string, any>) => resolve(formData),

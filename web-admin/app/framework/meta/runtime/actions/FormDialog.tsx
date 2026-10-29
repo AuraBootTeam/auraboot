@@ -96,6 +96,7 @@ interface FormDialogState {
   title?: string | Record<string, string>;
   fields: FormFieldConfig[];
   fieldOptions: Record<string, FormOptionConfig[]>;
+  fetchResult?: (url: string, options: any) => Promise<any>;
   defaults: Record<string, any>;
   submitLabel?: string | Record<string, string>;
   onSubmit?: (formData: Record<string, any>) => void;
@@ -189,11 +190,28 @@ export default function FormDialog() {
       if (!detail) return;
 
       const defaults = detail.defaults || {};
+      // Share only concurrent reads within this dialog, never across actors or revisions.
+      const reads = new Map<string, Promise<any>>();
+      const fetchReference = detail.fetchResult
+        ? (url: string, options: any) => {
+            if (String(options?.method).toLowerCase() !== 'get')
+              return detail.fetchResult(url, options);
+            const key = JSON.stringify([url, options]);
+            const current = reads.get(key);
+            if (current) return current;
+            const pending = Promise.resolve()
+              .then(() => detail.fetchResult(url, options))
+              .finally(() => reads.delete(key));
+            reads.set(key, pending);
+            return pending;
+          }
+        : undefined;
       setState({
         open: true,
         title: detail.title,
         fields: detail.fields || [],
         fieldOptions: detail.fieldOptions || {},
+        fetchResult: fetchReference,
         defaults,
         submitLabel: detail.submitLabel,
         onSubmit: detail.onSubmit,
@@ -556,6 +574,7 @@ export default function FormDialog() {
                       label={label}
                       value={formData[field.field]}
                       config={field.props as RecordListConfig}
+                      fetchResult={state.fetchResult}
                       submitted={Boolean(error)}
                       onChange={(value) => updateField(field.field, value)}
                     />

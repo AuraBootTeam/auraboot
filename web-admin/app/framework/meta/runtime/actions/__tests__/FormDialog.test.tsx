@@ -1145,3 +1145,236 @@ it('carries structured defaults through the original prompt input pipeline and r
   });
   expect(original).toEqual([{ key: 'capacity', fieldVersion: 3, publicReadable: false }]);
 });
+
+describe('FormDialog paged native references', () => {
+  const scope = { storePid: 'store-a', typePid: 'type-a', revision: '7' };
+  const field = (reference: Record<string, unknown>, name = 'fieldCode') => ({
+    field: 'bindings',
+    label: '属性',
+    type: 'record-list',
+    props: {
+      identityField: 'key',
+      defaults: { fieldCode: '', roles: [] },
+      fields: [
+        {
+          field: name,
+          label: '原生引用',
+          type: 'reference',
+          required: name === 'fieldCode',
+          reference: {
+            source: '/api/choices?expectedRevision=7',
+            selectedSource: '/api/selected?expectedRevision=7',
+            scope,
+            ...reference,
+          },
+        },
+      ],
+    },
+  });
+  const response = (records: unknown[], total = records.length, current = 1) => ({
+    ...scope,
+    records,
+    total,
+    current,
+    pageSize: 20,
+  });
+  const choice = (value: string, label: string, selection: Record<string, unknown> = {}) => ({
+    value,
+    label,
+    selection,
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('uses the original prompt transport, pages real totals and assigns an exact composite reference without leaking candidate metadata', async () => {
+    const onSubmit = vi.fn();
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([])
+        : url.includes('page=2')
+          ? response(
+              [
+                choice('field-v2', '容量 · v2', {
+                  fieldCode: 'capacity',
+                  fieldVersion: 2,
+                  secret: 'discard',
+                }),
+              ],
+              21,
+              2,
+            )
+          : response(
+              [choice('field-v1', '容量 · v1', { fieldCode: 'capacity', fieldVersion: 1 })],
+              21,
+            ),
+    );
+    render(
+      <I18nProvider initialData={{}} initialLocale="zh-CN">
+        <FormDialog />
+      </I18nProvider>,
+    );
+    let result!: Promise<Record<string, any>>;
+    act(() => {
+      result = promptInputForm(
+        [
+          {
+            ...field({ selectionFields: ['fieldCode', 'fieldVersion'] }),
+            defaultValue: [
+              {
+                key: 'capacity',
+                fieldCode: 'capacity',
+                fieldVersion: 1,
+                untouched: { tenant: '9007199254740993' },
+              },
+            ],
+          },
+        ],
+        '编辑属性',
+        fetchResult,
+      );
+    });
+    fireEvent.click(screen.getByLabelText(/^原生引用/));
+    await screen.findByRole('button', { name: '容量 · v1 ✓' });
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    fireEvent.click(await screen.findByRole('button', { name: '容量 · v2' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    await expect(result).resolves.toEqual({
+      bindings: [
+        {
+          key: 'capacity',
+          fieldCode: 'capacity',
+          fieldVersion: 2,
+          untouched: { tenant: '9007199254740993' },
+        },
+      ],
+    });
+    expect(
+      fetchResult.mock.calls.some(
+        ([url]) => url.includes('page=2') && url.includes('expectedRevision=7'),
+      ),
+    ).toBe(true);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('selects a family then an explicit dictionary version and clears the optional reference as null', async () => {
+    const onSubmit = vi.fn();
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([])
+        : url.includes('/families/family-a/versions')
+          ? response([
+              choice('dict-v3', '颜色 · v3', { dictionary: { code: 'colours', version: 3 } }),
+            ])
+          : response([choice('family-a', '颜色')]),
+    );
+    renderDialog({
+      fields: [
+        field(
+          {
+            nextSource: '/api/families/{value}/versions?expectedRevision=7',
+            selectionFields: ['dictionary'],
+          },
+          'dictionary',
+        ),
+      ],
+      defaults: { bindings: [{ key: 'colour', dictionary: null }] },
+      fetchResult,
+      onSubmit,
+    });
+    fireEvent.click(screen.getByLabelText('原生引用'));
+    fireEvent.click(await screen.findByRole('button', { name: '颜色' }));
+    fireEvent.click(await screen.findByRole('button', { name: '颜色 · v3' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      bindings: [{ key: 'colour', dictionary: { code: 'colours', version: 3 } }],
+    });
+  });
+
+  it('preserves unavailable selections on permission failure and retries without erasing the record', async () => {
+    const onSubmit = vi.fn();
+    const fetchResult = vi.fn().mockRejectedValue(new Error('forbidden'));
+    const defaults = { bindings: [{ key: 'capacity', fieldCode: 'capacity', fieldVersion: 1 }] };
+    renderDialog({
+      fields: [field({ selectionFields: ['fieldCode', 'fieldVersion'] })],
+      defaults,
+      fetchResult,
+      onSubmit,
+    });
+    await screen.findByText('无法读取已选名称，请检查权限或重试。');
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(defaults);
+    expect(defaults.bindings[0].fieldVersion).toBe(1);
+  });
+
+  it('rejects a stale candidate scope and never exposes its rows', async () => {
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([])
+        : {
+            ...response([choice('foreign', '别店字段', { fieldCode: 'foreign', fieldVersion: 1 })]),
+            storePid: 'store-b',
+          },
+    );
+    renderDialog({
+      fields: [field({ selectionFields: ['fieldCode', 'fieldVersion'] })],
+      defaults: { bindings: [{ key: 'a', fieldCode: 'a', fieldVersion: 1 }] },
+      fetchResult,
+    });
+    fireEvent.click(screen.getByLabelText(/^原生引用/));
+    await screen.findByText('候选读取失败，请检查权限、草稿版本或连接。');
+    expect(screen.queryByRole('button', { name: '别店字段' })).not.toBeInTheDocument();
+  });
+
+  it('keeps role selections across pages, excludes disabled choices and preserves cancellation', async () => {
+    const onSubmit = vi.fn(),
+      onCancel = vi.fn();
+    const defaults = { bindings: [{ key: 'a', roles: ['role-one'] }] };
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([choice('role-one', '目录编辑')])
+        : url.includes('page=2')
+          ? response(
+              [
+                choice('role-two', '商品审核'),
+                { ...choice('disabled', '停用角色'), disabled: true },
+              ],
+              22,
+              2,
+            )
+          : response([choice('role-one', '目录编辑')], 22),
+    );
+    renderDialog({
+      fields: [field({ multiple: true }, 'roles')],
+      defaults,
+      fetchResult,
+      onSubmit,
+      onCancel,
+    });
+    fireEvent.click(screen.getByLabelText('原生引用'));
+    await screen.findByRole('button', { name: '目录编辑 ✓' });
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    fireEvent.click(await screen.findByRole('button', { name: '商品审核' }));
+    expect(screen.getByRole('button', { name: '停用角色' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(defaults.bindings[0].roles).toEqual(['role-one']);
+  });
+
+  it('generates distinct hidden identities on add and never mutates defaults', () => {
+    const onSubmit = vi.fn();
+    const f = field({ multiple: true }, 'roles');
+    renderDialog({
+      fields: [f],
+      defaults: { bindings: [] },
+      onSubmit,
+      fetchResult: vi.fn(async () => response([])),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '添加记录' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加记录' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    const saved = onSubmit.mock.calls[0][0].bindings;
+    expect(saved[0].key).toMatch(/^r_[a-f0-9]{32}$/);
+    expect(saved[0].key).not.toBe(saved[1].key);
+    expect(f.props.defaults).toEqual({ fieldCode: '', roles: [] });
+  });
+});

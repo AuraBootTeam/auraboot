@@ -1,4 +1,8 @@
 import { useLayoutEffect, useRef } from 'react';
+import RecordReferencePicker, {
+  type ReferenceConfig,
+  validReferenceConfig,
+} from './RecordReferencePicker';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
@@ -10,15 +14,19 @@ export interface RecordListColumn {
   group?: Localized;
   helpText?: Localized;
   placeholder?: Localized;
-  type: 'text' | 'integer' | 'checkbox' | 'select' | 'multiselect';
+  type: 'text' | 'integer' | 'checkbox' | 'select' | 'multiselect' | 'reference';
+  reference?: ReferenceConfig;
   required?: boolean;
   min?: number;
   max?: number;
+  maxLength?: number;
+  emptyValue?: null;
   options?: Array<{ value: string; label: Localized; disabled?: boolean }>;
 }
 export interface RecordListConfig {
   fields: RecordListColumn[];
   defaults?: RecordValue;
+  identityField?: string;
   minItems?: number;
   maxItems?: number;
   itemLabel?: Localized;
@@ -82,6 +90,7 @@ function limits(config: RecordListConfig) {
 }
 function requireConfig(config: RecordListConfig) {
   limits(config);
+  if (config.identityField) pathParts(config.identityField);
   if (
     !Array.isArray(config.fields) ||
     !config.fields.length ||
@@ -92,6 +101,17 @@ function requireConfig(config: RecordListConfig) {
     throw new Error('Invalid record-list configuration');
   for (const field of config.fields) {
     pathParts(field.field);
+    if (
+      field.maxLength !== undefined &&
+      (!Number.isSafeInteger(field.maxLength) || field.maxLength < 1 || field.maxLength > 10000)
+    )
+      throw new Error('Invalid record-list text limit');
+    if (
+      config.identityField &&
+      (field.field === config.identityField ||
+        field.reference?.selectionFields?.includes(config.identityField))
+    )
+      throw new Error('Editable record identity');
     if (config.fields.some((other) => other !== field && other.field.startsWith(field.field + '.')))
       throw new Error('Overlapping record-list field paths');
     if (
@@ -101,8 +121,12 @@ function requireConfig(config: RecordListConfig) {
         (field.min !== undefined && field.max !== undefined && field.min > field.max))
     )
       throw new Error('Invalid record-list integer limits');
-    if (!['text', 'integer', 'checkbox', 'select', 'multiselect'].includes(field.type))
+    if (!['text', 'integer', 'checkbox', 'select', 'multiselect', 'reference'].includes(field.type))
       throw new Error('Unsupported record-list input');
+    if (field.type === 'reference') {
+      validReferenceConfig(field.reference);
+      for (const selected of field.reference!.selectionFields ?? []) pathParts(selected);
+    }
     if (
       ['select', 'multiselect'].includes(field.type) &&
       (!Array.isArray(field.options) ||
@@ -115,8 +139,20 @@ function requireConfig(config: RecordListConfig) {
 function validCell(field: RecordListColumn, value: unknown): boolean {
   if (value === undefined || value === null || value === '') return !field.required;
   switch (field.type) {
+    case 'reference':
+      return field.reference?.multiple
+        ? Array.isArray(value) &&
+            new Set(value).size === value.length &&
+            value.every((item) => typeof item === 'string' && item.length > 0)
+        : typeof value === 'string'
+          ? value.length > 0
+          : isRecord(value);
     case 'text':
-      return typeof value === 'string' && (!field.required || value.trim().length > 0);
+      return (
+        typeof value === 'string' &&
+        (!field.required || value.trim().length > 0) &&
+        (field.maxLength === undefined || value.length <= field.maxLength)
+      );
     case 'integer':
       return (
         typeof value === 'number' &&
@@ -167,6 +203,7 @@ export default function RecordListField({
   submitted,
   onChange,
   autoFocus,
+  fetchResult,
 }: {
   name: string;
   label: string;
@@ -174,6 +211,7 @@ export default function RecordListField({
   config: RecordListConfig;
   submitted: boolean;
   autoFocus?: boolean;
+  fetchResult?: (url: string, options: any) => Promise<any>;
   onChange: (value: unknown) => void;
 }) {
   const { t, locale } = useI18n();
@@ -181,8 +219,9 @@ export default function RecordListField({
   useLayoutEffect(() => {
     if (autoFocus)
       (
-        container.current?.querySelector<HTMLElement>('input, select') ??
-        container.current?.querySelector<HTMLElement>('button:not(:disabled)')
+        container.current?.querySelector<HTMLElement>(
+          '[data-record-reference-trigger], input, select',
+        ) ?? container.current?.querySelector<HTMLElement>('button:not(:disabled)')
       )?.focus();
   }, [autoFocus]);
   requireConfig(config);
@@ -225,7 +264,11 @@ export default function RecordListField({
     >
       {value.map((row, index) => (
         <fieldset
-          key={index}
+          key={
+            config.identityField && typeof readPath(row, config.identityField) === 'string'
+              ? String(readPath(row, config.identityField))
+              : index
+          }
           className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-600"
         >
           <legend className="px-1 text-sm font-medium">
@@ -261,7 +304,29 @@ export default function RecordListField({
                       {title}
                       {field.required && <span className="ml-1 text-red-500">*</span>}
                     </label>
-                    {field.type === 'checkbox' ? (
+                    {field.type === 'reference' ? (
+                      <RecordReferencePicker
+                        id={id}
+                        label={title}
+                        value={row}
+                        field={field.field}
+                        config={field.reference!}
+                        fetchResult={fetchResult}
+                        onChange={(changes) =>
+                          onChange(
+                            value.map((item, i) =>
+                              i === index
+                                ? Object.entries(changes).reduce(
+                                    (next, [path, selected]) =>
+                                      writePath(next, pathParts(path), selected),
+                                    item,
+                                  )
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    ) : field.type === 'checkbox' ? (
                       <input
                         id={id}
                         type="checkbox"
@@ -305,6 +370,7 @@ export default function RecordListField({
                       <input
                         id={id}
                         type="text"
+                        maxLength={field.maxLength}
                         inputMode={field.type === 'integer' ? 'numeric' : undefined}
                         value={
                           typeof current === 'string' || typeof current === 'number' ? current : ''
@@ -323,7 +389,9 @@ export default function RecordListField({
                               /^-?[0-9]+$/.test(text) &&
                               Number.isSafeInteger(Number(text))
                               ? Number(text)
-                              : text,
+                              : text === '' && field.emptyValue === null
+                                ? null
+                                : text,
                           );
                         }}
                       />
@@ -353,7 +421,16 @@ export default function RecordListField({
       <button
         type="button"
         disabled={value.length >= maximum}
-        onClick={() => onChange([...value, structuredClone(config.defaults ?? {})])}
+        onClick={() => {
+          let row = structuredClone(config.defaults ?? {});
+          if (config.identityField)
+            row = writePath(
+              row,
+              pathParts(config.identityField),
+              'r_' + crypto.randomUUID().replaceAll('-', ''),
+            );
+          onChange([...value, row]);
+        }}
         className="rounded-md border border-blue-200 px-3 py-2 text-sm text-blue-600 disabled:opacity-40"
       >
         {local(config.addLabel, '添加记录', 'Add record')}
