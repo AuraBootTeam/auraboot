@@ -347,12 +347,18 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     public PageResult<MetaFieldDTO> listFields(Integer page, Integer size, String code, 
                                               String dataType, String status,   Boolean currentOnly) {
+        return listFieldsByBusinessName(page, size, code, null, dataType, status, currentOnly);
+    }
+
+    @Override
+    public PageResult<MetaFieldDTO> listFieldsByBusinessName(Integer page, Integer size, String code,
+            String businessName, String dataType, String status, Boolean currentOnly) {
         log.debug("分页查询字段列表: page={}, size={}, code={}, dataType={}, status={}", 
                  page, size, logSafe(code), logSafe(dataType), logSafe(status));
         
         Page<Field> pageRequest = new Page<>(page, size);
         IPage<Field> pageResult = metaFieldMapper.selectPageList(
-            pageRequest, code, dataType, status, currentOnly
+            pageRequest, code, dataType, status, currentOnly, businessName
         );
         List<Field> entities = pageResult.getRecords();
         long total = pageResult.getTotal();

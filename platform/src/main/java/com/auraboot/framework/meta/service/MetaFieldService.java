@@ -102,6 +102,10 @@ public interface MetaFieldService {
                                        String dataType, String status,
                                         Boolean currentOnly);
 
+    /** Page by the displayed business label, with optional existing code/type/status filters. */
+    PageResult<MetaFieldDTO> listFieldsByBusinessName(Integer page, Integer size, String code,
+            String businessName, String dataType, String status, Boolean currentOnly);
+
     // ==================== 字段查询 ====================
 
     /**
