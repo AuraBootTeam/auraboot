@@ -198,15 +198,21 @@ public class RequiredRecordReadGuard {
         return sqlFilter(tenantId, modelCode, userId, baseRowFilter, true);
     }
     public String sqlFilter(Long tenantId, String modelCode, Long userId, String baseRowFilter, boolean applyDomain) {
-        try {return sqlFilterInternal(tenantId,modelCode,userId,baseRowFilter,applyDomain);}
+        return sqlFilter(tenantId,modelCode,userId,baseRowFilter,applyDomain,List.of(),null);
+    }
+    public String sqlFilter(Long tenantId, String modelCode, Long userId, String baseRowFilter, boolean applyDomain,
+            List<QueryCondition> conditions, String keyword) {
+        try {return sqlFilterInternal(tenantId,modelCode,userId,baseRowFilter,applyDomain,conditions,keyword);}
         catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
     }
-    private String sqlFilterInternal(Long tenantId, String modelCode, Long userId, String baseRowFilter, boolean applyDomain) {
+    private String sqlFilterInternal(Long tenantId, String modelCode, Long userId, String baseRowFilter, boolean applyDomain,
+            List<QueryCondition> conditions, String keyword) {
         var model=models.getModelDefinition(modelCode).orElse(null);
         var policy=RequiredReadReferences.policy(model); if(policy==null) return "";
         var actor=actor();
         if(!actor.tenant().equals(tenantId) || !actor.user().equals(userId)) throw denied();
-        var query=queries.buildConditionQuery(model,List.of());
+        var query=queries.buildConditionQuery(model,conditions);
+        if(keyword!=null && !keyword.isBlank()) query=queries.buildKeywordSearch(query,keyword,model);
         query.addCondition("tenant_id",QueryCondition.Operator.EQ.name(),tenantId);
         if(baseRowFilter!=null && !baseRowFilter.isBlank()) query.addRawCondition(baseRowFilter);
         String domain=applyDomain ? domains.buildDomainFilter(modelCode,userId) : null;

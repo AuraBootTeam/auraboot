@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.meta.dto.FieldMaskRule;
+import com.auraboot.framework.meta.dto.QueryCondition;
 
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,12 @@ public interface DataPermissionEngine {
     /** Additional immutable-reference AND restriction, including callers with an existing root row permit. */
     String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId);
 
+    /** Query-local restriction over the complete, unpaged condition/keyword universe. */
+    default String buildRequiredReadFilterForQuery(Long tenantId, String modelCode, Long userId,
+            List<QueryCondition> conditions, String keyword) {
+        return buildRequiredReadFilter(tenantId,modelCode,userId);
+    }
+
     /** Same AND restriction for a trusted caller's already admitted root query boundary. */
     String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId, String admittedRootFilter, boolean applyDomain);
 
@@ -51,6 +58,12 @@ public interface DataPermissionEngine {
      * @return SQL fragment (e.g. "AND (created_by = 123 OR ...)") or empty string
      */
     String buildRowFilter(Long tenantId, String modelCode, Long userId);
+
+    /** Same read boundary for one unpaged query; never cache this subset under a model/user key. */
+    default String buildRowFilterForQuery(Long tenantId, String modelCode, Long userId,
+            List<QueryCondition> conditions, String keyword) {
+        return buildRowFilter(tenantId,modelCode,userId);
+    }
 
     /** Same read boundary, compiled only for the exact records a trusted display lookup will query. */
     default String buildRowFilterForRecords(Long tenantId, String modelCode, Long userId, Set<String> recordPids) {

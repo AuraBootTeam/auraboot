@@ -116,6 +116,8 @@ final class DynamicDataListingSupport extends BaseMetaService {
             return listFromNamedQuery(resolveViewNamedQueryCode(modelCode), request);
         }
 
+        boolean queryScopedRequiredReads = RequiredReadReferences.policy(model) != null;
+
         // 构建查询
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(
                 model, request.getConditions());
@@ -153,8 +155,10 @@ final class DynamicDataListingSupport extends BaseMetaService {
         } else {
             // 添加数据权限行级过滤 — fail-secure: exception = deny all
             try {
-                scopedRowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
-                        () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+                scopedRowFilter = queryScopedRequiredReads
+                        ? dataPermissionEngine.buildRowFilterForQuery(tenantId,modelCode,userId,request.getConditions(),request.getKeyword())
+                        : DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                                () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
                 if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
                     queryBuilder.addRawCondition(scopedRowFilter);
                 }
@@ -181,7 +185,9 @@ final class DynamicDataListingSupport extends BaseMetaService {
         }
 
         if (commandPermitInForce) {
-            String required = dataPermissionEngine.buildRequiredReadFilter(tenantId, modelCode, userId);
+            String required = queryScopedRequiredReads
+                    ? dataPermissionEngine.buildRequiredReadFilterForQuery(tenantId,modelCode,userId,request.getConditions(),request.getKeyword())
+                    : dataPermissionEngine.buildRequiredReadFilter(tenantId,modelCode,userId);
             if (required != null && !required.isBlank()) {
                 queryBuilder.addRawCondition(required);
                 scopedRowFilter = scopedRowFilter == null || scopedRowFilter.isBlank() ? required : scopedRowFilter + " " + required;

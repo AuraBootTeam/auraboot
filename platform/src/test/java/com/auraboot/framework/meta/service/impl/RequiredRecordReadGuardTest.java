@@ -106,6 +106,30 @@ class RequiredRecordReadGuardTest {
         assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("reference budget");
         guard.require("fixture_bundle",root(9,id(1),id(2)));
     }
+    @Test void exactQueryCandidatesDoNotTraverseUnrelatedRootsOrRelaxTheirBudget() {
+        diamond(true,"physical");when(models.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(RequiredReadReferencesTest.model(1100)));
+        var unrelated=java.util.stream.IntStream.range(500,1600).mapToObj(n->root(n,id(1),id(2))).toList();
+        when(rows.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            Map<String,Object> params=call.getArgument(1);
+            return params.containsValue(id(9)) ? List.of(root(9,id(1),id(2))) : unrelated;
+        });
+        var condition=com.auraboot.framework.meta.dto.QueryCondition.builder().fieldName("pid")
+                .operator(com.auraboot.framework.meta.dto.QueryCondition.Operator.EQ).value(id(9)).build();
+        assertThat(guard.sqlFilter(7L,"fixture_bundle",42L,"",true,List.of(condition),null)).contains(id(9));
+        assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"",true,List.of(),null))
+                .isInstanceOf(MetaServiceException.class).hasMessageContaining("reference budget");
+    }
+    @Test void keywordUsesTheCanonicalCandidateCompilerInsteadOfAnUnfilteredScan() {
+        allow();var model=RequiredReadReferencesTest.model(10);var fields=new java.util.ArrayList<>(model.getFields());
+        fields.add(com.auraboot.framework.meta.dto.FieldDefinition.builder().code("name").columnName("name").dataType("string").searchable(true).build());
+        model.setFields(fields);when(models.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(model));
+        when(rows.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).contains("name");
+            assertThat((Map<String,Object>)call.getArgument(1)).containsValue("%chosen%");
+            return List.of(root(9,id(1)));
+        });
+        assertThat(guard.sqlFilter(7L,"fixture_bundle",42L,"",true,List.of(),"chosen")).contains(id(9));
+    }
     @Test void allMembersUseCurrentActorWithoutOuterPermitAndRestoreExactVersionAfterward() {
         allow();
         when(data.getById(eq("fixture_member"),anyString())).thenAnswer(call->{

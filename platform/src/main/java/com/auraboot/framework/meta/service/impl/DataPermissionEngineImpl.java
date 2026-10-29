@@ -10,6 +10,7 @@ import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.decision.ast.Truth;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.FieldMaskRule;
+import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.entity.DataPermissionPolicy;
 import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
@@ -133,11 +134,24 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     }
 
     @Override
+    public String buildRowFilterForQuery(Long tenantId, String modelCode, Long userId,
+            List<QueryCondition> conditions, String keyword) {
+        String base=baseRowFilter(tenantId,modelCode,"read",userId);
+        return appendRequired(base,requiredReads.sqlFilter(tenantId,modelCode,userId,base,true,conditions,keyword));
+    }
+
+    @Override
     public String buildRequiredReadFilter(Long tenantId, String modelCode, Long userId) {
+        return buildRequiredReadFilterForQuery(tenantId,modelCode,userId,List.of(),null);
+    }
+
+    @Override
+    public String buildRequiredReadFilterForQuery(Long tenantId, String modelCode, Long userId,
+            List<QueryCondition> conditions, String keyword) {
         if (!requiredReads.isConfigured(modelCode)) return "";
         String permit = CommandPermitDataAccess.rowFilter(modelCode, userId);
         return requiredReads.sqlFilter(tenantId, modelCode, userId,
-                permit != null ? permit : baseRowFilter(tenantId, modelCode, "read", userId), permit == null);
+                permit != null ? permit : baseRowFilter(tenantId, modelCode, "read", userId), permit == null,conditions,keyword);
     }
 
     @Override

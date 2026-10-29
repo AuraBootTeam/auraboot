@@ -100,6 +100,31 @@ class DataPermissionEngineImplDataScopeTest {
         when(legacy.buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID)).thenReturn("AND created_by = 20");
         assertThat(legacy.buildRowFilterForRecords(TENANT_ID,MODEL_CODE,USER_ID,java.util.Set.of("legacy-pid"))).isEqualTo("AND created_by = 20");
         assertThat(engine.buildRowFilterForRecords(TENANT_ID,MODEL_CODE,USER_ID,java.util.Set.of("legacy-pid"))).isEqualTo(engine.buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID));
+        assertThat(legacy.buildRowFilterForQuery(TENANT_ID,MODEL_CODE,USER_ID,List.of(),"query")).isEqualTo("AND created_by = 20");
+    }
+
+    @Test void typedQueryCandidatesRetainTheCanonicalBaseScopeAndKeyword() {
+        when(dataScopeEvaluator.getCondition(MEMBER_ID,MODEL_CODE,"read"))
+                .thenReturn(new DataScopeCondition("self","created_by",USER_ID,null,List.of(),List.of()));
+        var conditions=List.of(com.auraboot.framework.meta.dto.QueryCondition.builder().fieldName("pid")
+                .operator(com.auraboot.framework.meta.dto.QueryCondition.Operator.EQ).value(RequiredReadReferencesTest.id(9)).build());
+        when(required.sqlFilter(org.mockito.ArgumentMatchers.eq(TENANT_ID),org.mockito.ArgumentMatchers.eq(MODEL_CODE),
+                org.mockito.ArgumentMatchers.eq(USER_ID),org.mockito.ArgumentMatchers.contains("created_by"),
+                org.mockito.ArgumentMatchers.eq(true),org.mockito.ArgumentMatchers.eq(conditions),org.mockito.ArgumentMatchers.eq("chosen")))
+                .thenReturn("AND pid IN ('"+RequiredReadReferencesTest.id(9)+"')");
+        assertThat(engine.buildRowFilterForQuery(TENANT_ID,MODEL_CODE,USER_ID,conditions,"chosen"))
+                .contains("created_by",RequiredReadReferencesTest.id(9));
+        verify(required).sqlFilter(org.mockito.ArgumentMatchers.eq(TENANT_ID),org.mockito.ArgumentMatchers.eq(MODEL_CODE),
+                org.mockito.ArgumentMatchers.eq(USER_ID),org.mockito.ArgumentMatchers.contains("created_by"),
+                org.mockito.ArgumentMatchers.eq(true),org.mockito.ArgumentMatchers.eq(conditions),org.mockito.ArgumentMatchers.eq("chosen"));
+    }
+
+    @Test void queryRequiredReadsRetainAnExistingPermitWithoutAddingHumanDomainScope() {
+        when(required.isConfigured(MODEL_CODE)).thenReturn(true);
+        when(required.sqlFilter(TENANT_ID,MODEL_CODE,USER_ID,"",false,List.of(),"chosen")).thenReturn("AND 1 = 0");
+        MetaContext.runWithCommandPermitScope("ALL",()->
+                assertThat(engine.buildRequiredReadFilterForQuery(TENANT_ID,MODEL_CODE,USER_ID,List.of(),"chosen")).isEqualTo("AND 1 = 0"));
+        org.mockito.Mockito.verifyNoInteractions(policyMapper,dataScopeEvaluator);
     }
 
     @Test
