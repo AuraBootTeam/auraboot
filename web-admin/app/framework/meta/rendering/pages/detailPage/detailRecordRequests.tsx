@@ -294,11 +294,12 @@ export function hasCompleteDetailDisplayFields(
         ].includes(component)
       )
         return false;
+      // Default DynamicField resolves pure dictionaries through getDictItems, not _display.
+      // Settings cards and headers, which also consume dictionary _display, are excluded above.
       const needsDisplay =
         String(effective.dataType).toLowerCase() === 'reference' ||
         effective.refTarget ||
         effective.referenceModelCode ||
-        effective.dictCode ||
         effective.props?.refTarget ||
         effective.props?.referenceModelCode ||
         ['reference', 'userselect', 'organizationselect', 'select', 'multiselect'].includes(

@@ -119,7 +119,6 @@ describe('detail master display completeness', () => {
   it.each([
     { dataType: 'string', extension: { renderComponent: 'userselect' } },
     { dataType: 'string', extension: { renderComponent: 'organizationselect' } },
-    { dataType: 'string', dictCode: 'choices' },
     { dataType: 'string', extension: { refTarget: { targetEntity: 'people' } } },
   ])('requires labels for declared picker/dictionary/reference consumers', (meta) => {
     const map = new Map(fields);
@@ -127,6 +126,26 @@ describe('detail master display completeness', () => {
     expect(hasCompleteDetailDisplayFields({ ...record, scope_display: '' }, map, schema)).toBe(
       false,
     );
+  });
+  it('does not request list labels for a pure dictionary in the default renderer', async () => {
+    const map = new Map(fields);
+    map.set('scope', { code: 'scope', dataType: 'enum', dictCode: 'choices' } as any);
+    const current = { ...record, scope_display: undefined };
+    expect(
+      await enrichDetailRecordDisplayFields('example', 'public', current, 'token', map, schema),
+    ).toBe(current);
+    expect(transport).not.toHaveBeenCalled();
+    expect(
+      hasCompleteDetailDisplayFields(current, map, {
+        blocks: [
+          {
+            blockType: 'detail-section',
+            extension: { displayVariant: 'settings-card' },
+            fields: [{ field: 'scope' }],
+          },
+        ],
+      }),
+    ).toBe(false);
   });
   it.each(['userselect', 'custom-picker'])(
     'honors the actual metadata uiComponent alias: %s',
