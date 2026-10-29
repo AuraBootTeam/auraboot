@@ -128,6 +128,17 @@ public class FileUploadController {
     @GetMapping("/list")
     @RequirePermission(MetaPermission.SYS_FILE_READ)
     public ApiResponse<List<FileUploadResponseDTO>> getUserFiles(@CurrentUserId Long userId) {
+        // Reuse the existing request-local query scope; every file relation is still authorized.
+        // Machine authority retains its independent path and does not enter the human cache.
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            return readableUserFiles(userId);
+        }
+        try (var scope = com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open()) {
+            return readableUserFiles(userId);
+        }
+    }
+
+    private ApiResponse<List<FileUploadResponseDTO>> readableUserFiles(Long userId) {
         List<FileEntity> files = fileService.getFilesByUserId(userId);
         return ApiResponse.success(files.stream().filter(file -> canReadFile(file, userId)).map(this::toDto).toList());
     }

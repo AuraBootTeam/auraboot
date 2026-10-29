@@ -298,6 +298,61 @@ class FileUploadControllerTest {
         org.mockito.Mockito.verify(dynamicDataService, org.mockito.Mockito.never()).getById(any(), any());
     }
 
+    @Test void fileListSharesOnlyRequestMetadataAndReauthorizesEveryRelationOnTheNextRequest() {
+        var file = storedFile("original.json", "application/json", "/tmp/original");
+        var relation = new FileRelationEntity().setEntityType("bundle").setEntityId("bundle-pid").setFieldName("original");
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of(file));
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any()))
+                .thenAnswer(call -> {
+                    assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+                    return true;
+                }).thenThrow(new org.springframework.security.access.AccessDeniedException("revoked"));
+        assertThat(controller.getUserFiles(42L).getData()).hasSize(1);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        assertThat(controller.getUserFiles(42L).getData()).isEmpty();
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        org.mockito.Mockito.verify(dataAccessAuthorizationHelper, org.mockito.Mockito.times(2))
+                .authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any());
+    }
+
+    @Test void fileListClosesItsMetadataScopeWhenAuthorizationHasAnUnexpectedFailure() {
+        var file = storedFile("original.json", "application/json", "/tmp/original");
+        var relation = new FileRelationEntity().setEntityType("bundle").setEntityId("bundle-pid").setFieldName("original");
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of(file));
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any()))
+                .thenAnswer(call -> {
+                    assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+                    throw new IllegalStateException("authorization storage unavailable");
+                });
+        assertThatThrownBy(() -> controller.getUserFiles(42L)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("authorization storage unavailable");
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test void fileListDoesNotCloseAnExistingCallerMetadataScope() {
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of());
+        try (var parent = com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open()) {
+            assertThat(controller.getUserFiles(42L).getData()).isEmpty();
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+        }
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test void machineFileListDoesNotOpenAHumanMetadataScope() {
+        var principal = new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                7L, "machine-pid", "machine", java.util.Set.of());
+        when(fileService.getFilesByUserId(null)).thenAnswer(call -> {
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+            return List.of();
+        });
+        try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+            assertThat(controller.getUserFiles(null).getData()).isEmpty();
+        }
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
     @Test void ownerFileMetadataListDoesNotRevealFilesWithARevokedAdditionalRelation() {
         var own=storedFile("own.txt","text/plain","/tmp/own");own.setPid("own-file");
         var hidden=storedFile("hidden.txt","text/plain","/tmp/hidden");hidden.setPid("hidden-file");
