@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import FormDialog from '../FormDialog';
+import { promptInputForm } from '../ActionRegistry';
+import { validRecordList, type RecordListConfig } from '../RecordListField';
 
 function renderDialog(detail: Record<string, any>) {
   render(
@@ -928,4 +930,218 @@ describe('FormDialog fixed-key string maps', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
     expect(onSubmit).toHaveBeenCalledWith({ axes: {} });
   });
+});
+
+describe('FormDialog structured record lists', () => {
+  const fields = [
+    {
+      field: 'bindings',
+      label: '属性声明',
+      type: 'record-list',
+      props: {
+        maxItems: 2,
+        addLabel: '添加属性',
+        removeLabel: '移除属性',
+        itemLabel: '属性',
+        fields: [
+          { field: 'label', label: '名称', type: 'text', required: true, group: '属性定义' },
+          {
+            field: 'dictionary.version',
+            label: '字典版本',
+            type: 'integer',
+            min: 1,
+            max: 10000,
+            required: true,
+            group: '属性定义',
+          },
+          { field: 'publicReadable', label: '买家可见', type: 'checkbox', group: '用途' },
+          {
+            field: 'roles',
+            label: '可写角色',
+            type: 'multiselect',
+            group: '用途',
+            options: [{ value: 'editor', label: '目录编辑' }],
+          },
+        ],
+        defaults: { label: '', dictionary: { version: 1 }, publicReadable: false, roles: [] },
+      },
+    },
+  ];
+  it('edits typed nested values without changing hidden metadata or the original defaults', () => {
+    const onSubmit = vi.fn();
+    const original = {
+      bindings: [
+        {
+          key: 'capacity',
+          label: '容量',
+          dictionary: { code: 'capacity', version: 3 },
+          publicReadable: true,
+          roles: ['editor'],
+          frozen: { tenant: '9007199254740993' },
+        },
+      ],
+    };
+    renderDialog({ fields, defaults: original, onSubmit });
+    expect(screen.getByLabelText(/^名称/)).toHaveFocus();
+    fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '存储容量' } });
+    fireEvent.change(screen.getByLabelText(/^字典版本/), { target: { value: '4' } });
+    fireEvent.click(screen.getByLabelText('买家可见'));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      bindings: [
+        {
+          ...original.bindings[0],
+          label: '存储容量',
+          dictionary: { code: 'capacity', version: 4 },
+          publicReadable: false,
+        },
+      ],
+    });
+    expect(original.bindings[0].label).toBe('容量');
+    expect(original.bindings[0].dictionary.version).toBe(3);
+  });
+  it('adds and removes declarations and cancels without mutating the input array', () => {
+    const onSubmit = vi.fn(),
+      onCancel = vi.fn();
+    const original = { bindings: [] };
+    renderDialog({ fields, defaults: original, onSubmit, onCancel });
+    fireEvent.click(screen.getByRole('button', { name: '添加属性' }));
+    fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '保修' } });
+    fireEvent.click(screen.getByRole('button', { name: '移除属性 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加属性' }));
+    expect(screen.getByLabelText(/^名称/)).toHaveValue('');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(original.bindings).toEqual([]);
+  });
+  it('rejects malformed data instead of silently replacing it with an empty list', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields, defaults: { bindings: { key: 'invalid' } }, onSubmit });
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '添加属性' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+  it('rejects incomplete records and out-of-range or noninteger version drafts', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields, defaults: { bindings: [] }, onSubmit });
+    fireEvent.click(screen.getByRole('button', { name: '添加属性' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '颜色' } });
+    fireEvent.change(screen.getByLabelText(/^字典版本/), { target: { value: '3.5' } });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/^字典版本/), { target: { value: '3' } });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      bindings: [{ label: '颜色', dictionary: { version: 3 }, publicReadable: false, roles: [] }],
+    });
+  });
+});
+
+describe('record-list trust boundary', () => {
+  const config: RecordListConfig = {
+    fields: [
+      { field: 'version', label: '版本', type: 'integer', required: true, min: 1, max: 100 },
+      { field: 'enabled', label: '启用', type: 'checkbox', required: true },
+      {
+        field: 'roles',
+        label: '角色',
+        type: 'multiselect',
+        options: [
+          { value: 'editor', label: '目录编辑' },
+          { value: 'retired', label: '历史角色', disabled: true },
+        ],
+      },
+    ],
+    maxItems: 1,
+  };
+  it('accepts false and an empty optional role set without coercing business values', () => {
+    expect(validRecordList([{ version: 1, enabled: false, roles: [] }], config)).toBe(true);
+  });
+  it.each([0, 101, 1.5, '2', '9007199254740993', 9007199254740992])(
+    'rejects invalid exact version %s',
+    (version) => {
+      expect(validRecordList([{ version, enabled: false, roles: [] }], config)).toBe(false);
+    },
+  );
+  it.each([['unknown'], ['retired'], ['editor', 'editor']])(
+    'rejects unavailable or duplicate role choices %j',
+    (...roles) => {
+      expect(validRecordList([{ version: 1, enabled: true, roles }], config)).toBe(false);
+    },
+  );
+  it('keeps the item quota and malformed row boundary in validation', () => {
+    expect(
+      validRecordList(
+        [
+          { version: 1, enabled: true, roles: [] },
+          { version: 2, enabled: true, roles: [] },
+        ],
+        config,
+      ),
+    ).toBe(false);
+    expect(validRecordList([null], config)).toBe(false);
+    expect(validRecordList([['version', 1]], config)).toBe(false);
+  });
+  it('rejects unsafe field paths before editing or submitting', () => {
+    expect(() =>
+      validRecordList([], {
+        fields: [{ field: '__proto__.polluted', label: '属性', type: 'text' }],
+      }),
+    ).toThrow('Invalid record-list field path');
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
+it('rejects corrupt intermediate objects instead of erasing metadata during nested editing', () => {
+  const config: RecordListConfig = {
+    fields: [{ field: 'dictionary.version', label: '版本', type: 'integer' }],
+  };
+  expect(validRecordList([{ dictionary: 'broken' }], config)).toBe(false);
+  expect(() =>
+    validRecordList([], {
+      fields: [{ field: 'dictionary', label: '字典', type: 'text' }, ...config.fields],
+    }),
+  ).toThrow('Overlapping record-list field paths');
+});
+
+it('carries structured defaults through the original prompt input pipeline and returns typed declarations', async () => {
+  render(
+    <I18nProvider initialData={{}} initialLocale="zh-CN">
+      <FormDialog />
+    </I18nProvider>,
+  );
+  const original = [{ key: 'capacity', fieldVersion: 3, publicReadable: false }];
+  let pending: Promise<Record<string, unknown>>;
+  await act(async () => {
+    pending = promptInputForm(
+      [
+        {
+          field: 'bindings',
+          label: '属性声明',
+          type: 'record-list',
+          defaultValue: '${state.type.bindings}',
+          props: {
+            fields: [
+              { field: 'fieldVersion', label: '字段版本', type: 'integer', required: true, min: 1 },
+              { field: 'publicReadable', label: '买家可见', type: 'checkbox' },
+            ],
+          },
+        },
+      ],
+      '编辑属性',
+      undefined,
+      '保存声明',
+      { state: { type: { bindings: original } } },
+    );
+  });
+  fireEvent.change(screen.getByLabelText(/^字段版本/), { target: { value: '4' } });
+  fireEvent.click(screen.getByRole('button', { name: '保存声明' }));
+  await expect(pending!).resolves.toEqual({
+    bindings: [{ key: 'capacity', fieldVersion: 4, publicReadable: false }],
+  });
+  expect(original).toEqual([{ key: 'capacity', fieldVersion: 3, publicReadable: false }]);
 });

@@ -11,6 +11,7 @@
  * - On cancel, calls onCancel() which rejects the action promise
  */
 
+import RecordListField, { validRecordList, type RecordListConfig } from './RecordListField';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
@@ -42,6 +43,7 @@ interface FormFieldConfig {
   type?:
     | 'text'
     | 'string-map'
+    | 'record-list'
     | 'select'
     | 'number'
     | 'textarea'
@@ -249,6 +251,13 @@ export default function FormDialog() {
             t,
           });
         }
+      }
+      if (
+        field.type === 'record-list' &&
+        !validRecordList(value, field.props as RecordListConfig)
+      ) {
+        const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+        newErrors[field.field] = buildRequiredFieldMessage(label, { dataType: 'text', locale, t });
       }
       if (field.type === 'string-map') {
         const maximum = field.props?.maxValueLength;
@@ -539,6 +548,16 @@ export default function FormDialog() {
                       onChange={(value) => updateField(field.field, value)}
                       multiple={field.props?.multiple === true}
                       placeholder={placeholder || undefined}
+                    />
+                  ) : fieldType === 'record-list' ? (
+                    <RecordListField
+                      name={field.field}
+                      autoFocus={isFirst}
+                      label={label}
+                      value={formData[field.field]}
+                      config={field.props as RecordListConfig}
+                      submitted={Boolean(error)}
+                      onChange={(value) => updateField(field.field, value)}
                     />
                   ) : fieldType === 'string-map' ? (
                     <fieldset
