@@ -237,6 +237,10 @@ public interface DictMapper extends BaseMapper<Dict> {
     @Update("UPDATE ab_dict SET is_current = FALSE  WHERE    code = #{code}")
     int clearCurrentFlag(  @Param("code") String code);
 
+    /** Serialize native publication across versions of one tenant-owned family. */
+    @Select("SELECT id FROM ab_dict WHERE tenant_id = #{tenantId} AND code = #{code} ORDER BY id FOR UPDATE")
+    List<Long> lockVersionFamily(@Param("tenantId") Long tenantId, @Param("code") String code);
+
     /**
      * 设置指定版本为当前版本
      * @param id 字典ID
