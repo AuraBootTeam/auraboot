@@ -30,6 +30,8 @@ final class DynamicDataListingSupport extends BaseMetaService {
 
     private static final String DEFAULT_LIST_SORT_DIRECTION = "DESC";
 
+    private static final String DEFAULT_LIST_IDENTITY_FIELD = "pid";
+
     private final QueryBuilderService queryBuilderService;
 
     private final NamedQueryService namedQueryService;
@@ -114,6 +116,8 @@ final class DynamicDataListingSupport extends BaseMetaService {
             return listFromNamedQuery(resolveViewNamedQueryCode(modelCode), request);
         }
 
+        boolean queryScopedRequiredReads = RequiredReadReferences.policy(model) != null;
+
         // 构建查询
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(
                 model, request.getConditions());
@@ -123,12 +127,7 @@ final class DynamicDataListingSupport extends BaseMetaService {
 
         // 添加排序 (skipped in cursor mode — cursor pagination requires ORDER BY pid ASC)
         if (!useCursor) {
-            if (request.getSortFields() != null && !request.getSortFields().isEmpty()) {
-                List<SortField> mappedSortFields = mapSortFields(model, request.getSortFields());
-                queryBuilder = queryBuilderService.buildOrderQuery(queryBuilder, mappedSortFields, model);
-            } else {
-                queryBuilder.addOrderBy(DEFAULT_LIST_SORT_COLUMN, DEFAULT_LIST_SORT_DIRECTION);
-            }
+            queryBuilder = applyStableListSort(queryBuilder, model, request.getSortFields());
         }
 
         // 添加租户条件
@@ -156,8 +155,10 @@ final class DynamicDataListingSupport extends BaseMetaService {
         } else {
             // 添加数据权限行级过滤 — fail-secure: exception = deny all
             try {
-                scopedRowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
-                        () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+                scopedRowFilter = queryScopedRequiredReads
+                        ? dataPermissionEngine.buildRowFilterForQuery(tenantId,modelCode,userId,request.getConditions(),request.getKeyword())
+                        : DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                                () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
                 if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
                     queryBuilder.addRawCondition(scopedRowFilter);
                 }
@@ -180,6 +181,16 @@ final class DynamicDataListingSupport extends BaseMetaService {
                 // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
                 log.error("Failed to apply domain filter for model {} — returning empty result for security", logSafe(modelCode), e);
                 throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
+            }
+        }
+
+        if (commandPermitInForce) {
+            String required = queryScopedRequiredReads
+                    ? dataPermissionEngine.buildRequiredReadFilterForQuery(tenantId,modelCode,userId,request.getConditions(),request.getKeyword())
+                    : dataPermissionEngine.buildRequiredReadFilter(tenantId,modelCode,userId);
+            if (required != null && !required.isBlank()) {
+                queryBuilder.addRawCondition(required);
+                scopedRowFilter = scopedRowFilter == null || scopedRowFilter.isBlank() ? required : scopedRowFilter + " " + required;
             }
         }
 
@@ -521,6 +532,30 @@ final class DynamicDataListingSupport extends BaseMetaService {
                 .build();
 
         return aggregate(modelCode, aggregateRequest);
+    }
+
+    QueryBuilderService.QueryBuilder applyStableListSort(QueryBuilderService.QueryBuilder queryBuilder,
+                                                        ModelDefinition model, List<SortField> requestedSorts) {
+        List<SortField> mappedSorts = mapSortFields(model, requestedSorts);
+        if (mappedSorts.isEmpty()) {
+            queryBuilder.addOrderBy(DEFAULT_LIST_SORT_COLUMN, DEFAULT_LIST_SORT_DIRECTION);
+        } else {
+            queryBuilder = queryBuilderService.buildOrderQuery(queryBuilder, mappedSorts, model);
+        }
+        String identityField = model.getPrimaryKey();
+        String identityColumn;
+        if (identityField == null || identityField.isBlank()) {
+            identityColumn = DEFAULT_LIST_IDENTITY_FIELD;
+        } else {
+            identityColumn = mapSortFields(model, List.of(SortField.builder()
+                    .fieldName(identityField).build())).get(0).getFieldName();
+        }
+        // Timestamp and business-field ties must not move records across offset pages.
+        // Preserve the caller's direction when its unique identity is already ordered.
+        if (mappedSorts.stream().noneMatch(sort -> identityColumn.equals(sort.getFieldName()))) {
+            queryBuilder.addOrderBy(identityColumn, SortField.SortDirection.ASC.name());
+        }
+        return queryBuilder;
     }
 
     List<SortField> mapSortFields(ModelDefinition model, List<SortField> sortFields){

@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.jdbc.core.JdbcTemplate;
+import java.util.HashSet;
 
 import java.util.Optional;
 import java.util.Set;
@@ -37,12 +39,54 @@ class PreviewTokenStoreIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private final Set<String> mintedKeys = new HashSet<>();
+
+    private String save(long tenant, String skill, JsonNode params, JsonNode payload) {
+        String token = store.save(tenant, skill, params, payload);
+        mintedKeys.add(PreviewTokenStore.buildKey(token));
+        return token;
+    }
+
     @AfterEach
     void cleanupPreviewKeys() {
-        Set<String> keys = redisTemplate.keys(PreviewTokenStore.KEY_PREFIX + "*");
-        if (keys != null && !keys.isEmpty()) {
-            redisTemplate.delete(keys);
+        if (!mintedKeys.isEmpty()) {
+            redisTemplate.delete(mintedKeys);
         }
+    }
+
+    @Test
+    @DisplayName("JSONB checkpoint reordering preserves the exact one-shot preview")
+    void jsonbRoundTripPreservesPreview() throws Exception {
+        String skill = freshSkill();
+        JsonNode params = objectMapper.readTree("{\"displayName\":\"Approval ledger\",\"code\":\"approve_log\",\"fields\":[{\"type\":\"TEXT\",\"code\":\"name\"}]}");
+        String token = save(9001L, skill, params, samplePayload());
+        String persisted = jdbcTemplate.queryForObject("SELECT CAST(? AS jsonb)::text", String.class,
+                objectMapper.writeValueAsString(params));
+        assertThat(persisted).isNotEqualTo(objectMapper.writeValueAsString(params));
+        JsonNode restored = objectMapper.readTree(persisted);
+        assertThat(restored).isEqualTo(params);
+        assertThat(store.consume(token, skill, restored)).isPresent();
+        assertThat(store.consume(token, skill, restored)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("legacy preview envelopes retain their original hash contract")
+    void legacyPreviewEnvelopeRemainsConsumable() throws Exception {
+        String skill = freshSkill();
+        String token = java.util.UUID.randomUUID().toString();
+        String key = PreviewTokenStore.buildKey(token);
+        mintedKeys.add(key);
+        ObjectNode envelope = objectMapper.createObjectNode();
+        envelope.put("tenantId", 9001L);
+        envelope.put("skillName", skill);
+        envelope.put("paramsHash", "a1d46c3cdb4e5795c8d637f80daeb578ebb1a9a65dc1ed5f11f51794c3c89f3a");
+        envelope.set("payload", samplePayload());
+        redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(envelope), PreviewTokenStore.TTL);
+        assertThat(store.consume(token, skill, objectMapper.readTree("{\"b\":1,\"a\":2}"))).isPresent();
+        assertThat(store.consume(token, skill, objectMapper.readTree("{\"b\":1,\"a\":2}"))).isEmpty();
     }
 
     private String freshSkill() {
@@ -71,7 +115,7 @@ class PreviewTokenStoreIntegrationTest extends BaseIntegrationTest {
         ObjectNode p = params("hello", 1);
         ObjectNode payload = samplePayload();
 
-        String token = store.save(tenant, skill, p, payload);
+        String token = save(tenant, skill, p, payload);
         assertThat(token).isNotBlank();
 
         Optional<PreviewTokenStore.PreviewPayload> first = store.consume(token, skill, p);
@@ -97,7 +141,7 @@ class PreviewTokenStoreIntegrationTest extends BaseIntegrationTest {
         ObjectNode original = params("hello", 1);
         ObjectNode tampered = params("hello", 2); // different value → different hash
 
-        String token = store.save(tenant, skill, original, samplePayload());
+        String token = save(tenant, skill, original, samplePayload());
 
         Optional<PreviewTokenStore.PreviewPayload> result = store.consume(token, skill, tampered);
         assertThat(result).as("paramsHash mismatch must produce empty").isEmpty();
@@ -109,7 +153,7 @@ class PreviewTokenStoreIntegrationTest extends BaseIntegrationTest {
 
         // Sanity: re-saving with the matching params on a fresh token still
         // succeeds — we haven't poisoned the store.
-        String token2 = store.save(tenant, skill, original, samplePayload());
+        String token2 = save(tenant, skill, original, samplePayload());
         assertThat(store.consume(token2, skill, original)).isPresent();
     }
 
@@ -121,7 +165,7 @@ class PreviewTokenStoreIntegrationTest extends BaseIntegrationTest {
         String otherSkill = freshSkill();
         ObjectNode p = params("hello", 1);
 
-        String token = store.save(tenant, savedSkill, p, samplePayload());
+        String token = save(tenant, savedSkill, p, samplePayload());
 
         Optional<PreviewTokenStore.PreviewPayload> result = store.consume(token, otherSkill, p);
         assertThat(result).as("skill mismatch must produce empty").isEmpty();

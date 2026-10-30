@@ -1,6 +1,5 @@
 import { PropertyFieldRenderer, DESIGNER_I18N } from '~/shared/designer';
 import { useI18n } from '~/contexts/I18nContext';
-import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 import { formPresentationProperties } from '~/shared/designer/formPresentationSchema';
 import React, { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
@@ -30,7 +29,7 @@ export function CrudTemplateWizard({
     createMenu: false,
     createPermissions: false,
     assignRoles: false,
-    openDesignerAfterGenerate: true,
+    openDesignerAfterGenerate: false,
     enableExport: false,
     enableImport: false,
     menuName: `${modelName}管理`,
@@ -38,7 +37,6 @@ export function CrudTemplateWizard({
     defaultRoles: [],
     listColumns: [],
     formFields: [],
-    formPresentation: resolveFormPresentation(),
     detailFields: [],
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -116,10 +114,14 @@ export function CrudTemplateWizard({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="border-border border-b px-6 py-5">
-            <h2 className="text-text text-lg font-semibold">生成基础 CRUD 页面</h2>
+            <h2 className="text-text text-lg font-semibold">
+              {locale === 'zh-CN' ? '生成 CRUD 页面' : 'Generate CRUD pages'}
+            </h2>
             <p className="text-text-2 mt-1 text-sm">
               为模型 <span className="text-accent font-mono">{modelName}</span>{' '}
-              生成页面骨架，后续可继续进入设计器调整。
+              {locale === 'zh-CN'
+                ? '生成即可使用，需要时再进入设计器微调。'
+                : 'Ready to use after generation. Fine-tune in the designer when needed.'}
             </p>
           </div>
 
@@ -149,12 +151,32 @@ export function CrudTemplateWizard({
                         <div className="text-text text-sm font-medium">{page.pageName}</div>
                         <div className="text-text-2 mt-1 text-xs">{page.route}</div>
                       </div>
-                      <button
-                        onClick={() => navigate(`/page-designer/${page.pid || page.id}`)}
-                        className="rounded-control text-accent hover:bg-accent-weak border border-blue-300 px-3 py-2 text-sm"
-                      >
-                        编辑设计
-                      </button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {(page.kind === 'list' ||
+                          page.pageType === 'list' ||
+                          page.kind === 'form' ||
+                          page.pageType === 'form') &&
+                          page.route && (
+                            <button
+                              type="button"
+                              data-testid="crud-open-page"
+                              onClick={() => {
+                                onComplete();
+                                onClose();
+                                navigate(page.route);
+                              }}
+                              className="rounded-control bg-accent px-3 py-2 text-sm font-medium text-white"
+                            >
+                              {locale === 'zh-CN' ? '打开页面' : 'Open page'}
+                            </button>
+                          )}
+                        <button
+                          onClick={() => navigate(`/page-designer/${page.pid || page.id}`)}
+                          className="rounded-control text-accent hover:bg-accent-weak border border-blue-300 px-3 py-2 text-sm"
+                        >
+                          编辑设计
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -223,25 +245,49 @@ export function CrudTemplateWizard({
                     <input
                       data-testid="crud-open-designer"
                       type="checkbox"
-                      checked={config.openDesignerAfterGenerate ?? true}
+                      checked={config.openDesignerAfterGenerate ?? false}
                       onChange={(e) => updateConfig('openDesignerAfterGenerate', e.target.checked)}
                       className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
                     />
                     <span className="text-text-2 ml-2 text-sm">生成后自动打开页面设计</span>
                   </label>
 
-                  {config.generateForm && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="crud-form-presentation">
-                      {formPresentationProperties
-                        .map(field => {
-                          const key = field.key.split('.').at(-1)!;
-                          const labels = DESIGNER_I18N.unified.inspectorLabels as Record<string, Record<string, string>>;
-                          const localize = (label: string) => labels[label]?.[locale] ?? label;
-                          return <PropertyFieldRenderer key={field.key}
-                            schema={{ ...field, label: localize(String(field.label)), options: field.options?.map(option => ({ ...option, label: localize(String(option.label)) })) }}
-                            adapter={{ value: (config.formPresentation as unknown as Record<string, unknown>)?.[key],
-                              setValue: value => updateConfig('formPresentation', { ...config.formPresentation, [key]: value }) }} />;
-                        })}
+                  {showAdvanced && config.generateForm && (
+                    <div
+                      className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                      data-testid="crud-form-presentation"
+                    >
+                      {formPresentationProperties.map((field) => {
+                        const key = field.key.split('.').at(-1)!;
+                        const labels = DESIGNER_I18N.unified.inspectorLabels as Record<
+                          string,
+                          Record<string, string>
+                        >;
+                        const localize = (label: string) => labels[label]?.[locale] ?? label;
+                        return (
+                          <PropertyFieldRenderer
+                            key={field.key}
+                            schema={{
+                              ...field,
+                              label: localize(String(field.label)),
+                              options: field.options?.map((option) => ({
+                                ...option,
+                                label: localize(String(option.label)),
+                              })),
+                            }}
+                            adapter={{
+                              value: (
+                                config.formPresentation as unknown as Record<string, unknown>
+                              )?.[key],
+                              setValue: (value) =>
+                                updateConfig('formPresentation', {
+                                  ...config.formPresentation,
+                                  [key]: value,
+                                }),
+                            }}
+                          />
+                        );
+                      })}
                     </div>
                   )}
 

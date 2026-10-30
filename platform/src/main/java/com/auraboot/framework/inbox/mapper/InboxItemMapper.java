@@ -14,18 +14,37 @@ import org.apache.ibatis.annotations.Update;
  */
 public interface InboxItemMapper extends BaseMapper<InboxItem> {
 
+    String VISIBLE_ACK=com.auraboot.framework.workbench.mapper.AnnouncementProjectionVisibility.INBOX;
+
+    String ACTIVE_ACK = """
+        (item_type != 'announcement_ack' OR EXISTS (
+          SELECT 1 FROM ab_announcement_recipient ar
+          JOIN ab_announcement_recipient_snapshot ars ON ars.tenant_id=ar.tenant_id AND ars.version_pid=ar.version_pid AND ars.sealed=TRUE
+          JOIN ab_announcement aa ON aa.tenant_id=ar.tenant_id AND aa.active_version_pid=ar.version_pid AND aa.deleted_flag=FALSE
+          JOIN ab_announcement_version_control ac ON ac.tenant_id=ar.tenant_id AND ac.version_pid=ar.version_pid AND ac.publication_state='published'
+          JOIN ab_tenant_member am ON am.tenant_id=ar.tenant_id AND am.pid=ar.member_pid AND am.user_id=ab_inbox_item.user_id AND am.status='active' AND am.deleted_flag=FALSE
+          JOIN ab_user au ON au.id=am.user_id AND au.pid=ar.user_pid AND au.is_enabled=TRUE AND au.deleted_flag=FALSE
+          WHERE ar.tenant_id=ab_inbox_item.tenant_id AND ar.version_pid=ab_inbox_item.source_id AND ar.acknowledged_at IS NULL
+            AND (ac.expires_at IS NULL OR ac.expires_at>clock_timestamp()) ))
+        """;
+
+    @Select("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND status='pending' AND (expires_at IS NULL OR expires_at>clock_timestamp()) AND "+ACTIVE_ACK)
+    int countPending(@Param("tenantId") Long tenantId,@Param("userId") Long userId);
+
     @Select("""
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND status = 'pending' AND is_read = FALSE
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countUnread(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Select("""
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND status = 'pending' AND is_read = FALSE AND item_type = #{itemType}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countUnreadByType(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                           @Param("itemType") String itemType);
 
@@ -33,13 +52,14 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         UPDATE ab_inbox_item SET is_read = TRUE, read_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND is_read = FALSE
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int markAllRead(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Update("""
         UPDATE ab_inbox_item SET status = 'acted', action_taken = #{action}, acted_at = NOW()
         WHERE id = #{id} AND tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
         """)
     int markActed(@Param("id") Long id, @Param("tenantId") Long tenantId,
                   @Param("userId") Long userId, @Param("action") String action);
@@ -60,7 +80,7 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
     @Update("""
         UPDATE ab_inbox_item SET status = 'dismissed', acted_at = NOW()
         WHERE id = #{id} AND tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
         """)
     int dismiss(@Param("id") Long id, @Param("tenantId") Long tenantId,
                 @Param("userId") Long userId);
@@ -80,6 +100,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         UPDATE ab_inbox_item SET is_read = TRUE, read_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND is_read = FALSE
+        AND
+        """ + VISIBLE_ACK + "\n" + """
           AND id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}
@@ -96,7 +118,7 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         <script>
         UPDATE ab_inbox_item SET status = 'acted', action_taken = #{action}, acted_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
           AND id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}
@@ -113,7 +135,7 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         <script>
         UPDATE ab_inbox_item SET status = 'dismissed', acted_at = NOW()
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
-          AND status = 'pending'
+          AND status = 'pending' AND item_type != 'announcement_ack'
           AND id IN
         <foreach item="id" collection="ids" open="(" separator="," close=")">
             #{id}
@@ -130,7 +152,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND status = 'pending' AND item_type = #{itemType}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countPendingByType(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                             @Param("itemType") String itemType);
 
@@ -143,7 +166,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND item_type = #{itemType}
           AND created_at >= #{startTime} AND created_at < #{endTime}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countByTypeInDateRange(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                                @Param("itemType") String itemType,
                                @Param("startTime") java.time.Instant startTime,
@@ -157,7 +181,8 @@ public interface InboxItemMapper extends BaseMapper<InboxItem> {
         SELECT COUNT(*) FROM ab_inbox_item
         WHERE tenant_id = #{tenantId} AND user_id = #{userId}
           AND created_at >= #{startTime} AND created_at < #{endTime}
-        """)
+        AND
+        """ + VISIBLE_ACK)
     int countAllInDateRange(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
                             @Param("startTime") java.time.Instant startTime,
                             @Param("endTime") java.time.Instant endTime);

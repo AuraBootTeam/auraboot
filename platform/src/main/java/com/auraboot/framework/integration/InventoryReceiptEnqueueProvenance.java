@@ -74,24 +74,12 @@ public final class InventoryReceiptEnqueueProvenance {
      * remains a pipeline authorize fact - the caller supplies no stamp values.
      */
     public Object invokeFinishedGoodsReceipt(CommandHandlerExtension handler, CommandHandlerExtension.CommandContext context) throws Exception {
-        if (!FINISHED_GOODS_IMPLEMENTATION.equals(handler.getClass().getName())
-                || !FINISHED_GOODS_COMMAND.equals(context.commandType()) || !FINISHED_GOODS_MODEL.equals(context.modelCode())
-                || context.tenantId() == null || !context.tenantId().equals(MetaContext.getCurrentTenantId())
-                || context.recordId() == null
-                || !context.recordId().equals(MetaContext.getCommandPermitTargetFor(FINISHED_GOODS_MODEL))) {
-            org.slf4j.LoggerFactory.getLogger(InventoryReceiptEnqueueProvenance.class).warn(
-                "[fg-provenance-diagnostic] handler={}, commandType={}, modelCode={}, recordId={}, tenant={}, currentTenant={}, authorizedCode={}, permitTarget={}",
-                handler.getClass().getSimpleName(), context.commandType(), context.modelCode(), context.recordId(),
-                context.tenantId(), MetaContext.getCurrentTenantId(), MetaContext.getAuthorizedCommandCode(),
-                MetaContext.getCommandPermitTargetFor(FINISHED_GOODS_MODEL));
-            throw denied();
-        }
         // The isDiscoveredExtensionInstance bookkeeping check is intentionally omitted here:
         // multi-command handlers (FinishedGoodsPackagingHandler covers six commands) may not
         // appear in the discovered map under this command's identity. Security is preserved by
         // the implementation class name check, the command/model/tenant/permit assertions, and
         // the artifact digest stability check below.
-        if (current.get() != null
+        if (current.get() != null || !FINISHED_GOODS_IMPLEMENTATION.equals(handler.getClass().getName())
                 || !FINISHED_GOODS_COMMAND.equals(context.commandType()) || !FINISHED_GOODS_MODEL.equals(context.modelCode())
                 || context.tenantId() == null || !context.tenantId().equals(MetaContext.getCurrentTenantId())
                 || !FINISHED_GOODS_COMMAND.equals(MetaContext.getAuthorizedCommandCode())
@@ -106,6 +94,13 @@ public final class InventoryReceiptEnqueueProvenance {
 
     static void rejectReservedHeaders(IntegrationEventEnvelope event) {
         if (event.headers().keySet().stream().anyMatch(key -> key.startsWith(PREFIX))) throw denied();
+    }
+
+    /** The outbox command column mirrors the stamped producer command; delivery re-derives the row from the same header. */
+    static String stampedProducerCommand(IntegrationEventEnvelope stamped) {
+        String command = stamped.headers().get(PREFIX + "command");
+        if (!COMMAND.equals(command) && !FINISHED_GOODS_COMMAND.equals(command)) throw denied();
+        return command;
     }
 
     IntegrationEventEnvelope stamp(IntegrationEventEnvelope event) {

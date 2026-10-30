@@ -689,9 +689,18 @@ PYLOG
 </configuration>
 XML
   log "5/9 start backend (java -jar) on $server_port"
+  node "$SCRIPT_DIR/lib/golden-file-storage.mjs" prepare "$name" "$REPO_ROOT" "$DEV" >/dev/null \
+    || die "cannot retain runtime file storage"
   mkdir -p "$sd/pf4j-plugins"
+  # MANAGEMENT_HEALTH_RELIABLEINTEGRATION_ENABLED: the reliable-integration outbox
+  # indicator (expired leases / open DLQ / backlog older than 300s) reflects business
+  # data produced by whatever the stack is being used to test. One backoff-storm event
+  # holds the aggregate health at 503 for minutes while db/redis/disk are all healthy
+  # (observed 2026-10-28: slot69 goal14 flipped DOWN mid-run and masked the real stack
+  # state all night). A golden stack's health gate must answer "is this stack serving",
+  # so the business backlog signal is disabled here exactly like MANAGEMENT_HEALTH_DB_ENABLED.
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/logs/backend-console.log" \
-    env AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false MANAGEMENT_HEALTH_RELIABLEINTEGRATION_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" LOGGING_CONFIG="file:$sd/backend-logback.xml" LOGGING_FILE_NAME="$sd/logs/backend.log" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT="$redis_port" SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -962,8 +971,16 @@ cmd_warm() {
     >>"$sd/logs/warm.log" 2>&1 || die "warm: setup execution evidence incomplete"
 
   rm -f "$admin_json"
+  # PW_ROLE_PROJECTS=1 makes auth.setup.ts execute all four logins for real
+  # (admin/operator/fixture-blocks/viewer) instead of structurally skipping the
+  # three role-gated ones — the zero-skip evidence gate below would otherwise
+  # fail with "auth execution evidence incomplete". The precondition is
+  # guaranteed by the warm[setup] step above: 01-multi-role-users provisions
+  # e2e-operator/e2e-viewer and 03-import-test-fixtures imports the e2et_*
+  # roles + fixture pages (that import is enabled by PW_PROFILE=oss here),
+  # mirroring the web-admin/scripts/run-auth-regression.mjs composition.
   ( cd "$fe" && eval "$env_exports" \
-    && PW_PROFILE=oss PW_RESULTS_JSON="$evidence_root/playwright/auth-results.json" \
+    && PW_PROFILE=oss PW_ROLE_PROJECTS=1 PW_RESULTS_JSON="$evidence_root/playwright/auth-results.json" \
        PLAYWRIGHT_JSON_OUTPUT_FILE="$evidence_root/playwright/auth-results.json" \
        pnpm exec playwright test --project=auth --no-deps --workers=1 --retries=0 --reporter=line,json \
   ) >>"$sd/logs/warm.log" 2>&1 || die "warm: auth failed; see $sd/logs/warm.log"
@@ -1076,6 +1093,8 @@ cmd_lifecycle_resume() {
 cmd_resume_retained() {
   local name="$1" sd recipe run_jar llm_stub_mode logging_config runtime_token server_port vite_port bff_port pg_db redis_db redis_host redis_port isolated_redis_port
   sd="$(state_dir "$name")"
+  node "$SCRIPT_DIR/lib/golden-file-storage.mjs" prepare "$name" "$REPO_ROOT" "$DEV" >/dev/null \
+    || die "cannot retain runtime file storage"
   recipe="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load "$name" "$REPO_ROOT" "$DEV")" \
     || die "retained launch inputs changed; resume refused"
   run_jar="$(printf '%s\n' "$recipe" | sed -n '1p')"
@@ -1108,7 +1127,7 @@ cmd_resume_retained() {
     while IFS= read -r line; do renderer_env_args+=("$line"); done <"$sd/report-renderer.env"
   fi
   spawn_detached "$sd/backend.pid" "$REPO_ROOT/platform" "$sd/backend.log" \
-    env "${logging_args[@]}" ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
+    env "${logging_args[@]}" ${telemetry_env_args[@]+"${telemetry_env_args[@]}"} AURA_FILE_STORAGE_PATH="$sd/file-storage" MANAGEMENT_HEALTH_DB_ENABLED=false MANAGEMENT_HEALTH_RELIABLEINTEGRATION_ENABLED=false AURA_RUNTIME_NAME="$name" AURA_RUNTIME_OWNERSHIP_TOKEN="$runtime_token" SERVER_PORT="$server_port" SERVER_ADDRESS=127.0.0.1 \
       SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/${pg_db}?charSet=UTF8" \
       SPRING_DATASOURCE_USERNAME=auraboot SPRING_DATASOURCE_PASSWORD=auraboot \
       SPRING_DATA_REDIS_HOST="$redis_host" SPRING_DATA_REDIS_PORT="$redis_port" SPRING_DATA_REDIS_DATABASE="$redis_db" \
@@ -1181,7 +1200,9 @@ assert_stack_stopped() {
 cmd_down() {
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" stop "$1" "$REPO_ROOT" "$DEV" \
     || die "owned process stop refused; runtime/DB retained"
-  log "stopped '$1' verified processes (runtime/DB retained)"
+  node "$SCRIPT_DIR/lib/golden-file-storage.mjs" prepare "$1" "$REPO_ROOT" "$DEV" >/dev/null \
+    || die "processes stopped but persistent file storage verification failed; source refresh must not proceed"
+  log "stopped '$1' verified processes (runtime/DB/files retained)"
 }
 
 # ---- destroy (down + infra cleanup + runtime destroy) --------------------------------

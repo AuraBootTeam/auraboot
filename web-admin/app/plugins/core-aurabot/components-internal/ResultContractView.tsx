@@ -16,6 +16,7 @@
  */
 
 import { ChatBiResultCard, type ChatBiResult } from './ChatBiResultCard';
+import { toolQueryPresentation } from './toolQueryPresentation';
 import { useSmartText } from '~/utils/i18n';
 import { formatParamName } from './ConfirmCard';
 import { CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
@@ -256,6 +257,26 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
     );
   }
 
+  // DSL list contracts share the business table projection with legacy tool output.
+  if (contract.status === 'success' && /^list:[a-z][a-z0-9_]*$/.test(contract.skillCode || '')) {
+    const records = resolveTableRows(contract);
+    return <ChatBiResultCard result={toolQueryPresentation({ records, total: records.length }, contract.skillCode)} />;
+  }
+
+  const skillPayload = contract.data?.data ?? contract.data;
+  const createdModel = contract.status === 'success' && contract.skillCode === 'aurabot:model:create'
+    && skillPayload && typeof skillPayload === 'object'
+    && 'displayName' in skillPayload && typeof skillPayload.displayName === 'string'
+    && 'modelCode' in skillPayload && typeof skillPayload.modelCode === 'string' ? skillPayload : null;
+
+  const modelQuery = contract.status === 'success' && contract.skillCode === 'aurabot:model:query'
+    && skillPayload && typeof skillPayload === 'object' && 'matched' in skillPayload ? skillPayload : null;
+  const queriedModel = modelQuery && 'model' in modelQuery && modelQuery.model && typeof modelQuery.model === 'object'
+    && 'displayName' in modelQuery.model && typeof modelQuery.model.displayName === 'string'
+    && 'code' in modelQuery.model && typeof modelQuery.model.code === 'string'
+    ? { displayName: modelQuery.model.displayName, modelCode: modelQuery.model.code } : null;
+  const businessModel = createdModel ?? queriedModel;
+
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
   const { color, Icon } = statusStyle;
   const metric = contractMetric(contract);
@@ -265,8 +286,8 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
       <div className={`flex items-center gap-2 text-sm ${color}`}>
         <Icon className="h-4 w-4 shrink-0" />
         <span>{text({
-          'zh-CN': ({ success: '已完成', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
-          'en-US': ({ success: 'Completed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
+          'zh-CN': ({ success: '工具已执行', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
+          'en-US': ({ success: 'Tool executed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
         })}</span>
       </div>
       <details className="min-w-0 text-xs text-gray-500" data-testid="rc-diagnostics">
@@ -327,9 +348,23 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
         )}
       </div>
 
+      {(createdModel || modelQuery) && <div className="mt-2"><CardView contract={contract} /></div>}
       </details>
 
-      {contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
+      {businessModel ? (
+        <dl className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm" data-testid={createdModel ? "rc-created-model" : "rc-queried-model"}>
+          <dt className="text-gray-600">{text({ 'zh-CN': '模型名称', 'en-US': 'Model name' })}</dt>
+          <dd className="min-w-0 break-words font-medium">{String(businessModel.displayName)}</dd>
+          <dt className="text-gray-600">{text({ 'zh-CN': '模型编码', 'en-US': 'Model code' })}</dt>
+          <dd className="min-w-0 break-words [overflow-wrap:anywhere]">{String(businessModel.modelCode)}</dd>
+        </dl>
+      ) : modelQuery ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm" data-testid="rc-model-not-found">
+          {modelQuery.matched === false
+            ? text({ 'zh-CN': '未找到该模型，请核对模型编码或联系管理员。', 'en-US': 'Model not found. Check its code or contact an administrator.' })
+            : text({ 'zh-CN': '模型结果不完整，请重新查询或联系管理员。', 'en-US': 'The model result is incomplete. Try again or contact an administrator.' })}
+        </div>
+      ) : contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
         <TableView rows={resolveTableRows(contract)} label={(key) => text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })} structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })} />
       ) : contract.renderHint === 'summary' ? (
         <SummaryView contract={contract} />

@@ -227,16 +227,8 @@ repositories {
 
 // 项目基本信息
 group = 'com.auraboot'
-// Explicit isolated-consumer builds can select one aligned, immutable preview version.
-// The default product version continues to come from the canonical VERSION file.
-version = providers.gradleProperty('auraPlatformVersion').getOrElse(file('../VERSION').text.trim())
-if (!(version ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
-    throw new GradleException('auraPlatformVersion must be a non-empty Maven version without path separators')
-}
-
-allprojects {
-    version = rootProject.version
-}
+apply from: 'gradle/library-version.gradle'
+apply from: 'gradle/library-publication.gradle'
 
 // Preserve project fixture consumers and expose the published artifact capability as well.
 ['testFixturesApiElements', 'testFixturesRuntimeElements'].each { name ->
@@ -279,7 +271,7 @@ ext {
     pf4jSpringVersion = '0.10.0'
     springKafkaVersion = '3.3.16'
     kafkaClientsVersion = '3.9.2'
-    mcpSdkVersion = '2.0.1'
+    mcpSdkVersion = '2.1.0'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
 // Allure 2.12 defaults its agent to 1.9.22.1 independently of dependency management.
@@ -319,7 +311,7 @@ dependencies {
     // Pulled in transitively only when the iot-tdengine bean profile is
     // active; HikariCP + spring-jdbc come from spring-boot-starter-jdbc
     // already on the classpath.
-    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.9.2'
+    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.10.0'
 
     // Micrometer Prometheus registry for metrics export
     implementation 'io.micrometer:micrometer-registry-prometheus'
@@ -346,7 +338,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    implementation 'com.github.ben-manes.caffeine:caffeine:3.3.0'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.3.1'
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
@@ -376,7 +368,7 @@ dependencies {
     // JDBC configuration, but the connector is NOT bundled: mysql-connector-j
     // is GPLv2 + FOSS Exception and must be supplied by the deployer (see
     // DEPLOY.md "Databases").
-    implementation 'org.postgresql:postgresql:42.7.13'
+    implementation 'org.postgresql:postgresql:42.7.14'
 
     // Apache POI for Excel export + RAG document parsing (docx / pptx / xlsx)
     implementation 'org.apache.poi:poi:5.5.1'
@@ -413,7 +405,7 @@ dependencies {
     // spring-boot-dependencies materializes as a resolved node differs between
     // resolution environments (macOS vs Linux CI), and dependency locking
     // requires an identical node set everywhere. See CONTRIBUTING lock notes.
-    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation platform('org.junit:junit-bom:5.14.4')
     // Same anchoring for the test-runtime XML validation trio: their presence
     // in the resolved graph is also environment-dependent, and the lockfile
     // lists them for testRuntimeClasspath.
@@ -456,7 +448,7 @@ dependencies {
     jacocoRuntime "org.jacoco:org.jacoco.agent:${jacocoToolVersion}:runtime"
 
     // PostgreSQL 数据库用于测试
-    testImplementation 'org.postgresql:postgresql:42.7.13'
+    testImplementation 'org.postgresql:postgresql:42.7.14'
 
     // TestContainers — PostgreSQL only for integration tests. MySQL appears in
     // the product solely as an external data source for the connector feature
@@ -475,19 +467,19 @@ dependencies {
     // JUnit 5 Platform
     // Keep the declared platform aligned with the existing locked JUnit 5.12.2 graph.
     // Otherwise Gradle rejects testCompileClasspath because the locked BOM is never requested.
-    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation platform('org.junit:junit-bom:5.14.4')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'
     testImplementation 'org.junit.platform:junit-platform-launcher'
 
     // Property-Based Testing with jqwik
-    testImplementation 'net.jqwik:jqwik:1.10.1'
+    testImplementation 'net.jqwik:jqwik:1.10.2'
 
     // ArchUnit — architecture constraint tests
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
 
     // DiffLib for version comparison
-    implementation 'io.github.java-diff-utils:java-diff-utils:4.17'
+    implementation 'io.github.java-diff-utils:java-diff-utils:4.18'
 
     // JSON Schema Validator (Draft-07) for DSL page validation
     implementation 'com.networknt:json-schema-validator:1.5.9'
@@ -497,7 +489,7 @@ dependencies {
     implementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
 
     // Google OAuth (for ID token verification) + Gmail API
-    implementation 'com.google.api-client:google-api-client:2.9.1'
+    implementation 'com.google.api-client:google-api-client:2.9.2'
     implementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
     implementation 'com.google.http-client:google-http-client-jackson2:1.47.1'
 
@@ -617,6 +609,40 @@ tasks.register('instrumentMainOffline') {
     }
 }
 
+// Keep default development memory unchanged; explicit CI limits apply to both original tasks.
+def configureBackendTestMemory = { testTask ->
+    // Task-owned CI may use a smaller worker under its enforced container budget.
+    // Development defaults remain unchanged; malformed explicit limits fail configuration.
+    def testMemory = [auraTestMaxHeap: '6g', auraTestMinHeap: '2g']
+    testMemory.each { key, fallback ->
+        def value = project.hasProperty(key) ? project.property(key).toString() : fallback
+        if (!(value ==~ /[1-9][0-9]*[mMgG]/)) {
+            throw new GradleException("Invalid test memory limit: ${key}")
+        }
+        testMemory[key] = value
+    }
+    testTask.jvmArgs "-Xmx${testMemory.auraTestMaxHeap}", "-Xms${testMemory.auraTestMinHeap}", '-XX:+UseG1GC'
+    if (project.hasProperty('auraTestMaxMetaspace')) {
+        def metaspace = project.property('auraTestMaxMetaspace').toString()
+        if (!(metaspace ==~ /[1-9][0-9]*[mMgG]/)) {
+            throw new GradleException('Invalid test memory limit: auraTestMaxMetaspace')
+        }
+        testTask.jvmArgs "-XX:MaxMetaspaceSize=${metaspace}"
+    }
+    if (project.hasProperty('auraTestMaxHeap')) {
+        def expected = ["-Xmx${testMemory.auraTestMaxHeap}".toString(), "-Xms${testMemory.auraTestMinHeap}".toString()]
+        if (project.hasProperty('auraTestMaxMetaspace')) {
+            expected.add("-XX:MaxMetaspaceSize=${project.property('auraTestMaxMetaspace')}".toString())
+        }
+        testTask.doFirst {
+            if (!expected.every { testTask.allJvmArgs.contains(it) }) {
+                throw new GradleException("Bounded CI JVM options did not reach ${testTask.name}")
+            }
+            logger.lifecycle("CI worker memory: ${testTask.name} ${expected.join(' ')}")
+        }
+    }
+}
+
 // 配置测试任务使用JUnit Platform
 test {
     // FreezingArchRule removes resolved violations. Keep those generated updates
@@ -652,24 +678,7 @@ test {
     }
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
-    // Task-owned CI may use a smaller worker under its enforced container budget.
-    // Development defaults remain unchanged; malformed explicit limits fail configuration.
-    def testMemory = [auraTestMaxHeap: '6g', auraTestMinHeap: '2g']
-    testMemory.each { key, fallback ->
-        def value = project.hasProperty(key) ? project.property(key).toString() : fallback
-        if (!(value ==~ /[1-9][0-9]*[mMgG]/)) {
-            throw new GradleException("Invalid test memory limit: ${key}")
-        }
-        testMemory[key] = value
-    }
-    jvmArgs "-Xmx${testMemory.auraTestMaxHeap}", "-Xms${testMemory.auraTestMinHeap}", '-XX:+UseG1GC'
-    if (project.hasProperty('auraTestMaxMetaspace')) {
-        def metaspace = project.property('auraTestMaxMetaspace').toString()
-        if (!(metaspace ==~ /[1-9][0-9]*[mMgG]/)) {
-            throw new GradleException('Invalid test memory limit: auraTestMaxMetaspace')
-        }
-        jvmArgs "-XX:MaxMetaspaceSize=${metaspace}"
-    }
+    configureBackendTestMemory(delegate)
 
     // TestContainers: Docker Desktop 29+ requires API v1.44+. The api.version
     // property in src/test/resources/docker-java.properties pins docker-java
@@ -758,9 +767,16 @@ tasks.register('bootstrapBillingAccountTest', Test) {
     useJUnitPlatform {
         includeTags 'destructive-bootstrap'
     }
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
+    filter {
+        includeTestsMatching 'com.auraboot.framework.saas.bootstrap.BootstrapBillingAccountIT'
+        failOnNoMatchingTests = true
+    }
+    // The extracted application owns this original test and its bootstrap context.
+    dependsOn { project(':platform-app').tasks.named('testClasses') }
+    testClassesDirs = files(provider { project(':platform-app').sourceSets.test.output.classesDirs })
+    classpath = files(provider { project(':platform-app').sourceSets.test.runtimeClasspath })
     mustRunAfter tasks.named('test')
+    mustRunAfter ':platform-app:test'
     // The database is recreated outside Gradle, so task outputs cannot prove the external
     // bootstrap contract was re-executed for this run.
     outputs.upToDateWhen { false }
@@ -782,7 +798,7 @@ tasks.register('bootstrapBillingAccountTest', Test) {
     systemProperty 'spring.test.context.cache.maxSize', '1'
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
-    jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
+    configureBackendTestMemory(delegate)
     jvmArgs '-Djdk.httpclient.allowRestrictedHeaders=host'
     jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
     testLogging {

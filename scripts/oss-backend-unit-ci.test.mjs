@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
 import YAML from 'yaml';
+import {inspectMemoryBudget,resourceArguments} from './lib/backend-ci-resources.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runner = path.join(here, 'oss-backend-unit-ci.sh');
@@ -148,7 +149,7 @@ test('backend CI runner executes isolated bootstrap verification only after the 
   assert.match(source, /run_backend_gradle aura_boot --continue bootstrapBillingAccountTest/);
   assert.match(source, /gradle_status=\$root_test_status/);
   assert.match(source, /gradle_status=\$bootstrap_test_status/);
-  const fixture = readFileSync(path.join(here, '..', 'platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
+  const fixture = readFileSync(path.join(here, '..', 'platform/platform-app/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
   assert.match(fixture, /SELECT current_database\(\)/);
   assert.match(fixture, /bootstrap progress must not be inherited/);
   assert.doesNotMatch(fixture, /TRUNCATE TABLE|DELETE FROM|@AfterEach/);
@@ -159,7 +160,7 @@ test('backend CI runner executes isolated bootstrap verification only after the 
 
 test('bootstrap task has a separately migrated database and refuses implicit shared URLs', () => {
   const buildSource = readFileSync(gradleBuild, 'utf8');
-  const fixture = readFileSync(path.join(here, '..', 'platform', 'src', 'test', 'java',
+  const fixture = readFileSync(path.join(here, '..', 'platform', 'platform-app', 'src', 'test', 'java',
     'com', 'auraboot', 'framework', 'saas', 'bootstrap', 'BootstrapBillingAccountIT.java'), 'utf8');
   assert.match(source, /createdb -U auraboot "\$BOOTSTRAP_DATABASE"/);
   assert.match(source, /run_flyway migrate "\$BOOTSTRAP_DATABASE"/);
@@ -187,6 +188,9 @@ test('backend CI runner points fixed-stack tests at runtime-owned host ports', (
   assert.match(source, /SPRING_DATASOURCE_PASSWORD='auraboot_dev'/);
   assert.match(source, /SPRING_DATA_REDIS_HOST='127\.0\.0\.1'/);
   assert.match(source, /SPRING_DATA_REDIS_PORT="\$AURA_OSS_CI_REDIS_PORT"/);
+  assert.match(source, /TEST_EXPECTED_DATABASE="\$database"/);
+  assert.match(source, /TEST_REDIS_DATABASE='0'/);
+  assert.match(source, /SPRING_DATA_REDIS_DATABASE='0'/);
   assert.match(source, /SPRING_DATA_REDIS_URL="redis:\/\/127\.0\.0\.1:\$AURA_OSS_CI_REDIS_PORT"/);
   assert.match(source, /SPRING_KAFKA_BOOTSTRAP_SERVERS="127\.0\.0\.1:\$AURA_OSS_CI_KAFKA_PORT"/);
   assert.match(source, /AURA_CI_REQUIRE_KAFKA='1'/);
@@ -341,7 +345,7 @@ for (const [sharedStatus, bootstrapStatus, expected] of [[0, 0, 0], [1, 0, 1], [
 }
 
 test('bootstrap fixture requires fresh state and preserves immutable tenant bindings', () => {
-  const fixture = readFileSync(path.join(here, '../platform/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
+  const fixture = readFileSync(path.join(here, '../platform/platform-app/src/test/java/com/auraboot/framework/saas/bootstrap/BootstrapBillingAccountIT.java'), 'utf8');
   assert.match(fixture, /SELECT COUNT\(\*\) FROM ab_tenant/);
   assert.match(fixture, /bootstrap result: %s/);
   assert.match(fixture, /SELECT billing_account_id FROM ab_tenant WHERE id = \?/);
@@ -349,4 +353,129 @@ test('bootstrap fixture requires fresh state and preserves immutable tenant bind
   const build = readFileSync(gradleBuild, 'utf8');
   assert.match(build, /systemProperty 'allure.results.directory', retainedAllure/);
   assert.match(source, /warning: unable to copy Allure results/);
+});
+
+function memoryFixture(t) {
+  const root=mkdtempSync(path.join(tmpdir(),'backend-memory-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  for(const [directory,current,high,max] of [['parent',2,16,18],['parent/agent',0.5,10,14]]) {
+    const folder=path.join(root,directory);mkdirSync(folder,{recursive:true});
+    for(const [file,value] of Object.entries({'memory.current':current,'memory.high':high,'memory.max':max}))
+      writeFileSync(path.join(folder,file),String(value*1024**3)+'\n');
+    writeFileSync(path.join(folder,'memory.stat'),'file 0\ninactive_file 0\nfile_dirty 0\nfile_writeback 0\nfile_mapped 0\nshmem 0\nkernel 0\nslab 0\nslab_reclaimable 0\n');
+  }
+  return {root,membership:'0::/parent/agent\n'};
+}
+test('CI JVM admission accounts for every finite ancestor soft and hard limit before execution',t=>{
+  const input=memoryFixture(t),plan=inspectMemoryBudget(input);
+  assert.equal(plan.requiredBytes,String(9*1024**3));assert.equal(plan.admitted,true);
+  assert.equal(plan.limits.length,4);assert.equal(plan.kernelLimitsChanged,false);
+  assert.equal(plan.testDenominatorChanged,false);
+  writeFileSync(path.join(input.root,'parent/memory.current'),String(13*1024**3));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'parent soft limit must block even with free child capacity');
+  writeFileSync(path.join(input.root,'parent/memory.high'),'max');
+  assert.equal(inspectMemoryBudget(input).admitted,false,'parent hard limit must still block');
+  writeFileSync(path.join(input.root,'parent/memory.max'),'max');
+  assert.equal(inspectMemoryBudget(input).admitted,true);
+  writeFileSync(path.join(input.root,'parent/agent/memory.current'),String(5*1024**3));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'existing child usage must be included');
+});
+test('only clean unmapped file pages release budget; anonymous and protected pages still block',t=>{
+  const input=memoryFixture(t),folder=path.join(input.root,'parent/agent'),gib=1024**3;
+  writeFileSync(path.join(folder,'memory.current'),String(4*gib));
+  const stats=overrides=>Object.entries({file:3*gib,inactive_file:2*gib,file_dirty:0,file_writeback:0,file_mapped:0,shmem:0,kernel:0,slab:0,slab_reclaimable:0,...overrides})
+    .map(([key,value])=>`${key} ${value}`).join('\n')+'\n';
+  writeFileSync(path.join(folder,'memory.stat'),stats({}));
+  let plan=inspectMemoryBudget(input);assert.equal(plan.admitted,true);
+  assert.equal(plan.requiredBytes,String(9*gib));assert.equal(plan.accounting,'protected-working-set-v2');
+  const soft=plan.limits.find(row=>row.directory===folder&&row.file==='memory.high');
+  assert.equal(soft.rawAvailableBytes,String(6*gib));assert.equal(soft.reclaimableFileBytes,String(3*gib));
+  assert.equal(soft.protectedBytes,String(1*gib));assert.equal(soft.availableBytes,String(9*gib));
+  for(const key of ['file_dirty','file_writeback','file_mapped','shmem']) {
+    writeFileSync(path.join(folder,'memory.stat'),stats({[key]:3*gib}));
+    assert.equal(inspectMemoryBudget(input).admitted,false,`${key} pages cannot fund the JVM reservation`);
+  }
+  writeFileSync(path.join(folder,'memory.stat'),stats({file:0,inactive_file:0}));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'anonymous residency remains occupied');
+  writeFileSync(path.join(folder,'memory.stat'),stats({}));
+  writeFileSync(path.join(input.root,'parent/memory.current'),String(13*gib));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'child file cache cannot fund a busy parent');
+});
+test('missing, duplicate, malformed or inconsistent file accounting cannot assume reclaimable capacity',t=>{
+  const input=memoryFixture(t),file=path.join(input.root,'parent/agent/memory.stat');
+  const original=readFileSync(file,'utf8');
+  for(const invalid of [original.replace('file_dirty 0\n',''),original+'file 0\n',original.replace('file 0','file max'),
+    original.replace('inactive_file 0','inactive_file 1')]) {
+    writeFileSync(file,invalid);assert.throws(()=>inspectMemoryBudget(input),/kernel.*statistics/);
+  }
+  rmSync(file);assert.throws(()=>inspectMemoryBudget(input),/ENOENT/);
+});
+test('only explicitly reclaimable kernel slab can fund the unchanged full test heap',t=>{
+  const input=memoryFixture(t),folder=path.join(input.root,'parent/agent'),gib=1024**3;
+  writeFileSync(path.join(folder,'memory.current'),String(2*gib));
+  const stats=reclaimable=>`file 0\ninactive_file 0\nfile_dirty 0\nfile_writeback 0\nfile_mapped 0\nshmem 0\nkernel ${2*gib}\nslab ${2*gib}\nslab_reclaimable ${reclaimable}\n`;
+  writeFileSync(path.join(folder,'memory.stat'),stats(gib));
+  const plan=inspectMemoryBudget(input),soft=plan.limits.find(row=>row.directory===folder&&row.file==='memory.high');
+  assert.equal(plan.resources.testHeapMiB,6144,'preserve the original six-GiB complete-suite heap');
+  assert.equal(plan.requiredBytes,String(9*gib));assert.equal(plan.admitted,true);
+  assert.equal(soft.reclaimableSlabBytes,String(gib));assert.equal(soft.protectedBytes,String(gib));
+  writeFileSync(path.join(folder,'memory.stat'),stats(0));
+  assert.equal(inspectMemoryBudget(input).admitted,false,'in-use kernel memory remains occupied');
+  writeFileSync(path.join(folder,'memory.stat'),stats(3*gib));
+  assert.throws(()=>inspectMemoryBudget(input),/kernel slab/);
+});
+test('unknown or incomplete memory boundaries fail closed without assuming an unlimited worker',t=>{
+  const input=memoryFixture(t);
+  for(const membership of ['1:memory:/parent/agent','0::/../escape','0::/parent/agent\n0::/parent'])
+    assert.throws(()=>inspectMemoryBudget({...input,membership}));
+  writeFileSync(path.join(input.root,'parent/agent/memory.max'),'invalid');
+  assert.throws(()=>inspectMemoryBudget(input),/Invalid kernel/);
+  rmSync(path.join(input.root,'parent/agent/memory.max'));
+  assert.throws(()=>inspectMemoryBudget(input),/ENOENT/);
+});
+test('both original Gradle tasks receive the admitted argument vector without changing their cases or exit status',t=>{
+  const root=mkdtempSync(path.join(tmpdir(),'backend-jvm-arguments-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(path.join(root,'platform'));
+  const wrapper=path.join(root,'platform/gradlew');
+  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({args:process.argv.slice(2),database:process.env.TEST_EXPECTED_DATABASE,redis:process.env.TEST_REDIS_DATABASE,springRedis:process.env.SPRING_DATA_REDIS_DATABASE}));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
+  const run=source.match(/run_backend_gradle\(\) \{[\s\S]*?\n\}/)?.[0];assert.ok(run);
+  const argv=resourceArguments();
+  const quoted=value=>"'"+value.replaceAll("'","'\\''")+"'";
+  const result=spawnSync('bash',['-c',`set -uo pipefail
+    AURA_OSS_CI_POSTGRES_PORT=25000 AURA_OSS_CI_REDIS_PORT=26000 AURA_OSS_CI_KAFKA_PORT=27000
+    BOOTSTRAP_DATABASE=aura_boot_bootstrap_contract ARTIFACTS=${quoted(root)}
+    RESOURCE_ARGUMENTS=(${argv.map(quoted).join(' ')})
+    ${run}
+    run_backend_gradle aura_boot --continue cleanTest test
+    run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
+  `],{cwd:root,encoding:'utf8',env:{PATH:process.env.PATH}});
+  assert.equal(result.status,23,result.stderr);
+  const invocations=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(invocations.length,2);
+  for(const row of invocations) {assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');}
+  const rows=invocations.map(row=>row.args);
+  for(const row of rows){assert.deepEqual(row.slice(3,8),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
+  assert.deepEqual(rows[0].slice(8),['--continue','cleanTest','test']);
+  assert.deepEqual(rows[1].slice(8),['--continue','bootstrapBillingAccountTest']);
+  assert.doesNotMatch(rows.flat().join('\n'),/--tests|exclude|retry|ContextCache/);
+});
+
+
+test('backend CI preserves JUnit evidence from every extracted module', t => {
+  const directory=mkdtempSync(path.join(tmpdir(),'module-junit-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));
+  for(const module of ['platform','platform/platform-agent','platform/platform-app']) {
+    const output=path.join(directory,module,'build/test-results/test');mkdirSync(output,{recursive:true});
+    writeFileSync(path.join(output,'TEST-owned.xml'),module);
+  }
+  const bootstrap=path.join(directory,'platform/build/test-results/bootstrapBillingAccountTest');mkdirSync(bootstrap,{recursive:true});
+  writeFileSync(path.join(bootstrap,'TEST-bootstrap.xml'),'bootstrap');
+  const body=source.slice(source.indexOf('for build in "$PROJECT_ROOT/platform/build"'),source.lastIndexOf('exit "$gradle_status"'));
+  assert.ok(body.includes('test-results/$task'));
+  const artifacts=path.join(directory,'evidence');mkdirSync(path.join(artifacts,'junit'),{recursive:true});
+  const run=spawnSync('bash',['-c',body],{encoding:'utf8',env:{...process.env,PROJECT_ROOT:directory,ARTIFACTS:artifacts}});
+  assert.equal(run.status,0,run.stderr);
+  for(const module of ['platform','platform-agent','platform-app'])assert.equal(readFileSync(path.join(artifacts,'junit',module,'test/TEST-owned.xml'),'utf8'),module==='platform'?'platform':'platform/'+module);
+  assert.equal(readFileSync(path.join(artifacts,'junit/platform/bootstrapBillingAccountTest/TEST-bootstrap.xml'),'utf8'),'bootstrap');
+  const build=readFileSync(gradleBuild,'utf8');
+  assert.match(build,/project\(':platform-app'\)\.sourceSets\.test\.output/);
+  assert.match(build,/project\(':platform-app'\)\.sourceSets\.test\.runtimeClasspath/);
 });

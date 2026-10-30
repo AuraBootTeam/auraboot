@@ -33,6 +33,9 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
     private final List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
             retrievalEvidence = new ArrayList<>();
     private String lastSignature;
+    private String traceId;
+
+    public String capturedTraceId() { return traceId; }
     private final List<ResultContract> resultContracts = new ArrayList<>();
 
     public List<ResultContract> capturedResultContracts() { return List.copyOf(resultContracts); }
@@ -113,11 +116,13 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
 
     @Override
     public void onError(String message, String traceId) {
+        if (traceId != null && !traceId.isBlank()) this.traceId = traceId;
         delegate.onError(message, traceId);
     }
 
     @Override
     public void onDone(String finalResponse, String traceId) {
+        if (traceId != null && !traceId.isBlank()) this.traceId = traceId;
         delegate.onDone(finalResponse, traceId);
     }
 

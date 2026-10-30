@@ -176,6 +176,13 @@ public class ToolbarActionValidator implements PluginValidator {
         }
     }
 
+    /** Native input-field dialogs supply a form before command dispatch. Empty or malformed declarations do not. */
+    private boolean hasInputDialog(Map<String, Object> action) {
+        Object value = action.get("inputFields");
+        return value instanceof List<?> fields && !fields.isEmpty() && fields.stream().allMatch(
+                field -> field instanceof Map<?, ?> config && config.get("field") instanceof String name && !name.isBlank());
+    }
+
     /**
      * Validate a single button's action configuration against the semantic rules.
      */
@@ -201,14 +208,14 @@ public class ToolbarActionValidator implements PluginValidator {
             if (commandCode != null) {
                 String cmdType = resolveEffectiveCommandType(commandCode, commandTypeByCode);
 
-                if (CMD_TYPE_CREATE.equals(cmdType)) {
+                if (CMD_TYPE_CREATE.equals(cmdType) && !hasInputDialog(action)) {
                     // SEM-TB-001 ERROR: CREATE + type=command will silently fail
                     messages.add(error("SEM-TB-001", CATEGORY, buttonPath,
                             "Toolbar button '" + displayCode + "' on page '" + pageKey + "' uses type='command' " +
                                     "with CREATE command '" + commandCode + "'. CREATE commands require user input — " +
                                     "use type='navigate' with 'to' pointing to a form page."));
 
-                } else if (CMD_TYPE_UPDATE.equals(cmdType)) {
+                } else if (CMD_TYPE_UPDATE.equals(cmdType) && !hasInputDialog(action)) {
                     // SEM-TB-002 ERROR: UPDATE + type=command needs form input
                     messages.add(error("SEM-TB-002", CATEGORY, buttonPath,
                             "Toolbar button '" + displayCode + "' on page '" + pageKey + "' uses type='command' " +

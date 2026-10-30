@@ -52,7 +52,7 @@ import static org.mockito.Mockito.when;
  *     <li>{@code pendingTurnId} found in {@code ab_agent_approval} (via
  *         {@link AgentApprovalGateService#findApproval}) → drives
  *         approve/reject through the gate and sync-resumes the run via
- *         {@link AgentRunService#executeTaskSync}.</li>
+ *         {@link AgentRunService#resumeTaskSync}.</li>
  *     <li>Neither lookup succeeds → Failed.</li>
  * </ol>
  *
@@ -153,7 +153,7 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("APPROVED -> approvalGate.approve(triggerAutoResume=false) + sync executeTaskSync resume -> Success")
+    @DisplayName("APPROVED -> approvalGate.approve(triggerAutoResume=false) + sync resumeTaskSync resume -> Success")
     void approved_drivesApproveAndSyncResume() {
         withTestIdentity(() -> {
             Long tenantId = getTestTenant().getId();
@@ -166,7 +166,7 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
             when(agentApprovalGateService.approve(
                     eq(tenantId), eq(approvalPid), anyLong(), eq(false)))
                     .thenReturn(Map.of("pid", approvalPid, "approval_status", "approved"));
-            when(agentRunService.executeTaskSync(
+            when(agentRunService.resumeTaskSync(
                     eq(tenantId), eq(taskPid), eq("aurabot"), eq(runPid)))
                     .thenReturn(new RunOutcome.Success(runPid, "Action completed.", 50, 12, 0.001d));
 
@@ -178,9 +178,9 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
             // gate.approve called with triggerAutoResume=false (chokepoint drives the resume itself)
             verify(agentApprovalGateService, times(1))
                     .approve(eq(tenantId), eq(approvalPid), anyLong(), eq(false));
-            // executeTaskSync called with resumeFromRunPid=runPid
+            // resumeTaskSync called with resumeFromRunPid=runPid
             verify(agentRunService, times(1))
-                    .executeTaskSync(eq(tenantId), eq(taskPid), eq("aurabot"), eq(runPid));
+                    .resumeTaskSync(eq(tenantId), eq(taskPid), eq("aurabot"), eq(runPid));
             verify(metricsRecorder, atLeastOnce())
                     .recordTurnBegin(argThat(ctx -> taskPid.equals(ctx.taskPid())));
             verify(sink, times(1)).onDone(eq("Action completed."), any());
@@ -224,7 +224,7 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
             verify(agentChatPort, times(1))
                     .executeApprovedPendingTool(eq(tenantId), eq(approvalPid));
             verify(agentRunService, never())
-                    .executeTaskSync(anyLong(), anyString(), anyString(), anyString());
+                    .resumeTaskSync(anyLong(), anyString(), anyString(), anyString());
             verify(persistence).persistOutbound(argThat(ctx -> Long.valueOf(77L).equals(ctx.conversationId())
                     && "approval-writer".equals(ctx.agentCode()) && tenantId.equals(ctx.tenantId())),
                     any(TurnOutcome.class), any(TurnArtifacts.class));
@@ -233,7 +233,7 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("DENIED -> approvalGate.reject + Interrupted(user_denied); executeTaskSync NOT called")
+    @DisplayName("DENIED -> approvalGate.reject + Interrupted(user_denied); resumeTaskSync NOT called")
     void denied_drivesReject() {
         withTestIdentity(() -> {
             Long tenantId = getTestTenant().getId();
@@ -251,7 +251,7 @@ class ConversationTurnServiceImplAcpResumeTest extends BaseIntegrationTest {
             verify(agentApprovalGateService, never())
                     .approve(anyLong(), anyString(), anyLong(), anyBoolean());
             verify(agentRunService, never())
-                    .executeTaskSync(anyLong(), anyString(), anyString(), anyString());
+                    .resumeTaskSync(anyLong(), anyString(), anyString(), anyString());
         });
     }
 

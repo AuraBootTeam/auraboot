@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, fireEvent, waitFor } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared BEFORE importing the SUT so the hook mock is in place
@@ -64,6 +64,7 @@ import { FormButtonsBlockRenderer } from '../FormButtonsBlockRenderer';
 import { ToolbarBlockRenderer } from '../ToolbarBlockRenderer';
 import { TableBlockRenderer } from '../TableBlockRenderer';
 import { SelectionInfoBlockRenderer } from '../SelectionInfoBlockRenderer';
+import { readServerTablePage, ServerTablePageError } from '../serverTablePage';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 
 // ---------------------------------------------------------------------------
@@ -477,6 +478,150 @@ describe('TableBlockRenderer', () => {
       }),
     });
   }
+
+  function externalState(runtime: any) {
+    const listeners = new Set<() => void>();
+    runtime.subscribeContext = (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    };
+    return (values: Record<string, unknown>) => {
+      Object.assign(runtime.getContext().state, values);
+      listeners.forEach((listener) => listener());
+    };
+  }
+
+  it.each([[], null, undefined])('clears bound checkboxes and derived ids on external reset %j without reviving rows', async (reset) => {
+    const rows = [
+      { pid: 'first', name: 'First' },
+      { pid: 'second', name: 'Second' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const publish = externalState(runtime);
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: { mode: 'multiple', bind: 'chosen', idsBind: 'chosenIds' },
+        columns: baseColumns,
+      },
+    };
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-select-row-first'));
+    expect(getByTestId('table-select-row-first')).toBeChecked();
+    expect(runtime.getContext().state.chosenIds).toEqual(['first']);
+    act(() => publish({ chosen: reset }));
+    await waitFor(() => expect(getByTestId('table-select-row-first')).not.toBeChecked());
+    expect(runtime.getContext().state.chosenIds).toEqual([]);
+    fireEvent.click(getByTestId('table-select-row-second'));
+    expect(runtime.getContext().state.chosen).toEqual([rows[1]]);
+    expect(runtime.getContext().state.chosenIds).toEqual(['second']);
+    expect(getByTestId('table-select-row-first')).not.toBeChecked();
+  });
+
+  it('uses a replacement external row selection instead of stale local keys', async () => {
+    const rows = [
+      { pid: 'first', name: 'First' },
+      { pid: 'second', name: 'Second' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const publish = externalState(runtime);
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: { mode: 'multiple', bind: 'chosen' },
+        columns: baseColumns,
+      },
+    };
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-select-row-first'));
+    act(() => publish({ chosen: [rows[1]] }));
+    await waitFor(() => expect(getByTestId('table-select-row-second')).toBeChecked());
+    expect(getByTestId('table-select-row-first')).not.toBeChecked();
+    fireEvent.click(getByTestId('table-select-row-first'));
+    expect(runtime.getContext().state.chosen).toEqual([rows[1], rows[0]]);
+  });
+
+  it('retains choices on other pages while replacing exactly one exclusive group', () => {
+    const first = { tupleKey: 'app-a-v1', applicationPid: 'a', name: 'A first' };
+    const other = { tupleKey: 'app-b-v1', applicationPid: 'b', name: 'B' };
+    const replacement = { tupleKey: 'app-a-v2', applicationPid: 'a', name: 'A second' };
+    const visible = [first, other];
+    const runtime = makeRuntimeWithRows(visible) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'tupleKey',
+        selection: { mode: 'multiple', bind: 'chosen', exclusiveBy: 'applicationPid' },
+        columns: baseColumns,
+      },
+    };
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(view.getByTestId('table-select-row-app-a-v1'));
+    fireEvent.click(view.getByTestId('table-select-row-app-b-v1'));
+    visible.splice(0, visible.length, replacement);
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(view.getByTestId('table-select-row-app-a-v2'));
+    expect(runtime.getContext().state.chosen).toEqual([other, replacement]);
+    visible.splice(0, visible.length, first, other);
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    expect(view.getByTestId('table-select-row-app-a-v1')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-app-b-v1')).toBeChecked();
+  });
+
+  it('preserves off-page grouped choices and replaces the same group by value', async () => {
+    const first = { tupleKey: 'a-first', applicationPid: 'a', name: 'A first' };
+    const other = { tupleKey: 'b-first', applicationPid: 'b', name: 'B' };
+    const replacement = { tupleKey: 'a-second', applicationPid: 'a', name: 'A second' };
+    let page = { records: [first, other], total: 3, current: 1, pageSize: 2 };
+    const runtime = makeRuntime({ getDataSourceManager: () => ({ getData: () => page, has: () => true, register: vi.fn() }) }) as any;
+    const block = { type: 'table', dataSource: 'list', table: { rowKey: 'tupleKey', pagination: { mode: 'server', pageField: 'current' },
+      selection: { mode: 'multiple', bind: 'chosen', exclusiveBy: 'applicationPid', presentation: 'grouped-radio', optionLabelField: 'name' }, columns: baseColumns } };
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(view.getByTestId('table-select-row-a-first'));
+    fireEvent.click(view.getByTestId('table-select-row-b-first'));
+    page = { records: [replacement], total: 3, current: 2, pageSize: 2 };
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    await waitFor(() => expect(runtime.getContext().state.chosen).toEqual([first, other]));
+    fireEvent.click(view.getByTestId('table-select-row-a-second'));
+    expect(runtime.getContext().state.chosen).toEqual([other, replacement]);
+    expect(view.getByTestId('table-select-row-a-second')).toBeChecked();
+    page = { records: [first, other], total: 3, current: 1, pageSize: 2 };
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    expect(view.getByTestId('table-select-row-a-first')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-b-first')).toBeChecked();
+  });
+
+  it('does not infer a unique safe recommendation from a partial server page', () => {
+    const row = { pid: 'one-visible', issueId: 'a', name: 'First page', recommended: true, safe: true };
+    const runtime = makeRuntime({ getDataSourceManager: () => ({ getData: () => ({ records: [row], total: 2, current: 1, pageSize: 1 }), has: () => true, register: vi.fn() }) }) as any;
+    const block = { type: 'table', dataSource: 'list', table: { rowKey: 'pid', pagination: { mode: 'server', pageField: 'current' },
+      selection: { mode: 'multiple', bind: 'chosen', exclusiveBy: 'issueId', presentation: 'grouped-radio', optionLabelField: 'name', recommendedField: 'recommended', safeField: 'safe' }, columns: baseColumns } };
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    expect(runtime.getContext().state.chosen).toBeUndefined();
+    expect(view.getByTestId('table-select-row-one-visible')).not.toBeChecked();
+  });
+
+  it('reflects an externally cleared single selection without a datasource reload', async () => {
+    const rows = [{ pid: 'first', name: 'First' }];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const publish = externalState(runtime);
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: { rowKey: 'pid', selection: { mode: 'single', bind: 'chosen' }, columns: baseColumns },
+    };
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-row-first'));
+    expect(getByTestId('table-row-first')).toHaveClass('bg-accent-weak');
+    act(() => publish({ chosen: null }));
+    await waitFor(() => expect(getByTestId('table-row-first')).not.toHaveClass('bg-accent-weak'));
+    expect(runtime.getContext().state.chosen).toBeNull();
+  });
 
   it('renders rows from table-adaptor data source records', () => {
     const runtime = makeRuntime({
@@ -1238,10 +1383,43 @@ describe('TableBlockRenderer', () => {
     });
   });
 
-  it('refreshes the bound selected row when the data source returns a newer snapshot', async () => {
-    const rows = {
-      current: [{ id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'draft' }],
-    };
+  it.each([true, false])(
+    'refreshes the bound selected row with defaultFirst=%s',
+    async (defaultFirst) => {
+      const rows = {
+        current: [{ id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'draft' }],
+      };
+      const runtime = makeRuntime({
+        getDataSourceManager: () => ({
+          getData: () => rows.current,
+          has: () => true,
+          register: vi.fn(),
+        }),
+      }) as any;
+      runtime.getContext().state.selectedLine = rows.current[0];
+      const block = {
+        type: 'table',
+        dataSource: 'list',
+        table: {
+          rowKey: 'pid',
+          selection: { mode: 'single', bind: 'selectedLine', defaultFirst },
+          columns: baseColumns,
+        },
+      };
+
+      const { rerender } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+      const refreshedRow = { id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'released' };
+      rows.current = [refreshedRow];
+      rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+      await waitFor(() => {
+        expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', refreshedRow);
+      });
+    },
+  );
+
+  it('clears a removed explicit selection without choosing another visible row', async () => {
+    const rows = { current: [{ pid: 'selected', name: 'Selected' }] };
     const runtime = makeRuntime({
       getDataSourceManager: () => ({
         getData: () => rows.current,
@@ -1255,19 +1433,19 @@ describe('TableBlockRenderer', () => {
       dataSource: 'list',
       table: {
         rowKey: 'pid',
-        selection: { mode: 'single', bind: 'selectedLine', defaultFirst: true },
+        selection: { mode: 'single', bind: 'selectedLine' },
         columns: baseColumns,
       },
     };
-
     const { rerender } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
-    const refreshedRow = { id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'released' };
-    rows.current = [refreshedRow];
+    rows.current = [{ pid: 'other', name: 'Other' }];
     rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
-
-    await waitFor(() => {
-      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', refreshedRow);
-    });
+    await waitFor(() => expect(runtime.getContext().state.selectedLine).toBeNull());
+    expect(runtime.__updateState).not.toHaveBeenCalledWith(
+      'scope-1',
+      'selectedLine',
+      rows.current[0],
+    );
   });
 
   it('uses compact table density when configured', () => {
@@ -1337,5 +1515,96 @@ describe('SelectionInfoBlockRenderer', () => {
     expect(getByTestId('selection-info-title')).toHaveTextContent('Selected record');
     expect(getByTestId('selection-info-count')).toHaveTextContent('1');
     expect(getByTestId('selection-info-label')).toHaveTextContent('Copper audit line');
+  });
+});
+
+
+describe('server-paged table contract', () => {
+  it('shows configured business explanations for empty array classifications', () => {
+    const manager = { getData: () => [{ pid: 'person-1', departments: [], roles: [] }], has: () => true, register: vi.fn() };
+    const runtime = makeRuntime({ getDataSourceManager: () => manager });
+    const view = render(<TableBlockRenderer block={{ type: 'table', dataSource: 'people', columns: [
+      { field: 'departments', label: 'Departments', emptyText: { 'zh-CN': '无可显示部门', 'en-US': 'No visible department' } },
+      { field: 'roles', label: 'Matched roles', emptyText: { 'zh-CN': '无可显示角色', 'en-US': 'No visible roles' } },
+    ] } as any} runtime={runtime} />);
+    expect(view.getByText('No visible department')).toBeInTheDocument();expect(view.getByText('No visible roles')).toBeInTheDocument();
+  });
+
+  const rows = (start: number, count: number) => Array.from({ length: count }, (_, i) => ({ pid: `row-${start + i}`, name: `Person ${start + i}` }));
+  const block = { type: 'table', dataSource: 'recipients', table: { columns: [{ field: 'name', label: 'Name' }], pagination: { mode: 'server' } } };
+  const fixture = () => {
+    let page: unknown = { records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 };
+    let state: { loading: boolean; error: unknown } = { loading: false, error: null };
+    const fetch = vi.fn().mockResolvedValue(undefined);
+    const reload = vi.fn();
+    const manager = { getData: () => page, getState: () => state, has: () => true, register: vi.fn(), fetch, reload };
+    const runtime = makeRuntime({ getDataSourceManager: () => manager });
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    return { ...view, fetch, reload, update: (next: unknown, nextState = { loading: false, error: null } as typeof state) => {
+      page = next; state = nextState; view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    } };
+  };
+
+  it('requests the selected page and accepts navigation only from server metadata', () => {
+    const view = fixture();
+    fireEvent.click(view.getByRole('button', { name: '2', exact: true }));
+    expect(view.fetch).toHaveBeenLastCalledWith('recipients', { pageNum: 2, pageSize: 20 }, { force: false });
+    expect(view.getByText('Person 1')).toBeInTheDocument();
+    expect(view.queryByText('Person 21')).not.toBeInTheDocument();
+    view.update({ records: rows(21, 20), pageNum: 2, pageSize: 20, total: 45 });
+    expect(view.queryByText('Person 1')).not.toBeInTheDocument();
+    expect(view.getByText('Person 21')).toBeInTheDocument();
+    fireEvent.change(view.getByRole('combobox'), { target: { value: '50' } });
+    expect(view.fetch).toHaveBeenLastCalledWith('recipients', { pageNum: 1, pageSize: 50 }, { force: false });
+  });
+
+  it('disables navigation while a page request is loading', () => {
+    const view = fixture();
+    view.update({ records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 }, { loading: true, error: null });
+    expect(view.getByRole('button', { name: '2', exact: true })).toBeDisabled();
+    expect(view.getByRole('combobox')).toBeDisabled();
+    expect(view.getByTestId('table-server-pagination')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('preserves a transiently failed page and retries the exact attempted parameters', () => {
+    const view = fixture();
+    fireEvent.click(view.getByRole('button', { name: '3', exact: true }));
+    view.update({ records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 }, { loading: false, error: { statusCode: 503, message: 'Temporarily unavailable' } });
+    expect(view.getByText('Person 1')).toBeInTheDocument();
+    expect(view.getByTestId('table-stale-state')).toBeInTheDocument();
+    fireEvent.click(view.getByTestId('table-stale-retry'));
+    expect(view.fetch).toHaveBeenLastCalledWith('recipients', { pageNum: 3, pageSize: 20 }, { force: true });
+    expect(view.reload).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 403])('hides preserved rows and pagination after access failure %s', statusCode => {
+    const view = fixture();
+    view.update({ records: rows(1, 20), pageNum: 1, pageSize: 20, total: 45 }, { loading: false, error: { statusCode, message: 'Access denied' } });
+    expect(view.getByTestId(`table-error-state-${statusCode}`)).toBeInTheDocument();
+    expect(view.queryByText('Person 1')).not.toBeInTheDocument();
+    expect(view.queryByTestId('table-server-pagination')).not.toBeInTheDocument();
+  });
+
+  it('rejects a fabricated empty page instead of displaying a successful empty state', () => {
+    const view = fixture();
+    view.update({ records: [], pageNum: 1, pageSize: 20, total: 45 });
+    expect(view.getByTestId('table-page-contract-error')).toBeInTheDocument();
+    expect(view.queryByTestId('table-server-pagination')).not.toBeInTheDocument();
+    expect(view.queryByText('Person 1')).not.toBeInTheDocument();
+  });
+
+  it('accepts an explicitly empty result and the partial last page', () => {
+    expect(readServerTablePage({ records: [], pageNum: 1, pageSize: 20, total: 0 })).toEqual({ current: 1, pageSize: 20, total: 0 });
+    expect(readServerTablePage({ records: rows(41, 5), pageNum: 3, pageSize: 20, total: 45 })).toEqual({ current: 3, pageSize: 20, total: 45 });
+    expect(readServerTablePage({ records: rows(1, 1), current: 1, pageSize: 20, total: 1 }, 'current').total).toBe(1);
+  });
+
+  it.each([
+    [], { records: [], pageNum: 0, pageSize: 20, total: 0 },
+    { records: [], pageNum: 2, pageSize: 20, total: 0 },
+    { records: [null], pageNum: 1, pageSize: 20, total: 1 },
+    { records: [], pageNum: 1, pageSize: 20, total: '0' },
+  ])('rejects malformed or out-of-range server metadata: %j', page => {
+    expect(() => readServerTablePage(page)).toThrow(ServerTablePageError);
   });
 });

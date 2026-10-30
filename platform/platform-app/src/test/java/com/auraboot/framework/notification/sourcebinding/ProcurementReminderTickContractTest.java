@@ -234,11 +234,14 @@ class ProcurementReminderTickContractTest {
     }
 
     @Test
-    void isolatedAutomaticContextRetainsProductionAnnotationDiscoveryAndLeavesAllPriorSourcesUnchanged() throws Exception {
+    void isolatedAutomaticContextRetainsProductionAnnotationDiscoveryAndReviewedSources() throws Exception {
         assertThat(java.util.Arrays.stream(ProcurementReminderTickNativeIT.class.getDeclaredClasses())
                 .noneMatch(type -> org.springframework.core.annotation.AnnotatedElementUtils.hasAnnotation(type,
                         org.springframework.context.annotation.Configuration.class))).isTrue();
         Path root = sourceDirectory();
+        // dcccc905a807ec2315f90baf9c349d5d225ec7d1 replaces two machine-specific
+        // paths outside the additive section with NativeProcurementWorkspace.root().
+        // All other protected bytes, assertions and both companion digests are unchanged.
         Map<String, String> originalHashes = Map.of(
                 // Frozen source51751c9c already included prior Native runner fixes.
                 "ProcurementReminderTickNativeIT.java", "3a6e7aeda36155148abc29521b2ab3ba5f72f4c666880ccd31933179ce17f866",

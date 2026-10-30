@@ -80,7 +80,7 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
         event.setEventId(envelope.eventId());
         event.setEventType(envelope.eventType());
         if (InventoryReceiptEnqueueProvenance.EVENT.equals(envelope.eventType()))
-            event.setCommandCode(InventoryReceiptEnqueueProvenance.COMMAND);
+            event.setCommandCode(InventoryReceiptEnqueueProvenance.stampedProducerCommand(envelope));
         event.setSchemaVersion(envelope.schemaVersion());
         event.setEventSource(envelope.source());
         event.setSubject(envelope.subject());

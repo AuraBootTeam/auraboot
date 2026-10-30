@@ -13,6 +13,9 @@ import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.entity.payload.FieldUiSchemaBean;
+import com.auraboot.framework.meta.entity.payload.FieldIndexHintBean;
+import com.auraboot.framework.meta.entity.payload.FieldQuerySchemaBean;
+import com.auraboot.framework.meta.entity.payload.FieldRuleSchemaBean;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
@@ -67,6 +70,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     private final MetaModelFieldBindingMapper fieldBindingMapper;
     private final com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;  // ✅ 新增: 模型-字段绑定服务
     private final ObjectMapper objectMapper;
+    private final FieldDeletionGuard fieldDeletionGuard;
 
     @Autowired
     @Lazy
@@ -91,6 +95,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     // ==================== 基础CRUD操作 ====================
 
     @Override
+    @Transactional
     public MetaFieldDTO create(MetaFieldCreateRequest request) {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "创建请求不能为空");
@@ -128,6 +133,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setFeature(mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
         entity.setRefTarget(mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
         entity.setUiSchema(mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
+        entity.setIndexHint(mapToBean(request.getIndexHint(), FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(mapToBean(request.getQuerySchema(), FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(mapToBean(request.getRuleSchema(), FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
         entity.setStatus(Boolean.TRUE.equals(request.getAutoPublish()) ? "published"
@@ -251,22 +259,52 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setPid(UniqueIdGenerator.generate());
         entity.setCode(existingEntity.getCode());
         entity.setDataType(request.getDataType());
-        entity.setDataSourceId(request.getDataSourceId());
+        entity.setDataSourceId(request.getDataSourceId() == null ? existingEntity.getDataSourceId() : request.getDataSourceId());
+        entity.setFeature(request.getFeature() == null ? existingEntity.getFeature()
+                : mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
+        entity.setRefTarget(request.getRefTarget() == null ? existingEntity.getRefTarget()
+                : mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
+        entity.setIndexHint(request.getIndexHint() == null ? existingEntity.getIndexHint()
+                : mapToBean(request.getIndexHint(), com.auraboot.framework.meta.entity.payload.FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(request.getQuerySchema() == null ? existingEntity.getQuerySchema()
+                : mapToBean(request.getQuerySchema(), com.auraboot.framework.meta.entity.payload.FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(request.getRuleSchema() == null ? existingEntity.getRuleSchema()
+                : mapToBean(request.getRuleSchema(), com.auraboot.framework.meta.entity.payload.FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
+        entity.setFeature(request.getFeature() == null ? existingEntity.getFeature()
+                : mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
+        entity.setRefTarget(request.getRefTarget() == null ? existingEntity.getRefTarget()
+                : mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
+        entity.setIndexHint(request.getIndexHint() == null ? existingEntity.getIndexHint()
+                : mapToBean(request.getIndexHint(), FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(request.getQuerySchema() == null ? existingEntity.getQuerySchema()
+                : mapToBean(request.getQuerySchema(), FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(request.getRuleSchema() == null ? existingEntity.getRuleSchema()
+                : mapToBean(request.getRuleSchema(), FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setUiSchema(request.getUiSchema() == null ? existingEntity.getUiSchema()
                 : mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
+        entity.setPluginPid(existingEntity.getPluginPid());
         entity.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : StatusConstants.DRAFT);
         entity.setTenantId(MetaContext.getCurrentTenantId());
         entity.setCreatedAt(Instant.now());
         entity.setUpdatedAt(Instant.now());
 
-        if (request.getExtension() != null) {
-            entity.setExtension(extensionConverter.toBean(request.getExtension()));
-        }
+        entity.setExtension(request.getExtension() == null ? existingEntity.getExtension()
+                : extensionConverter.toBean(request.getExtension()));
 
         metaFieldMapper.clearCurrentFlag(existingEntity.getCode());
         metaFieldMapper.insert(entity);
+        FieldDictBinding dictionary = fieldDictBindingMapper.findByFieldPid(existingEntity.getPid(), MetaContext.getCurrentTenantId());
+        if (dictionary != null) {
+            // Keep historical bindings intact while giving the new field version the same semantics.
+            fieldDictBindingMapper.insert(FieldDictBinding.builder()
+                    .pid(UniqueIdGenerator.generate()).fieldId(entity.getId()).fieldPid(entity.getPid())
+                    .fieldCode(entity.getCode()).dictId(dictionary.getDictId()).dictCode(dictionary.getDictCode())
+                    .isRequired(dictionary.getIsRequired()).allowMultiple(dictionary.getAllowMultiple())
+                    .defaultValue(dictionary.getDefaultValue()).remark(dictionary.getRemark())
+                    .tenantId(MetaContext.getCurrentTenantId()).createdAt(Instant.now()).updatedAt(Instant.now()).build());
+        }
         return entity;
     }
 
@@ -330,12 +368,18 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     public PageResult<MetaFieldDTO> listFields(Integer page, Integer size, String code, 
                                               String dataType, String status,   Boolean currentOnly) {
+        return listFieldsByBusinessName(page, size, code, null, dataType, status, currentOnly);
+    }
+
+    @Override
+    public PageResult<MetaFieldDTO> listFieldsByBusinessName(Integer page, Integer size, String code,
+            String businessName, String dataType, String status, Boolean currentOnly) {
         log.debug("分页查询字段列表: page={}, size={}, code={}, dataType={}, status={}", 
                  page, size, logSafe(code), logSafe(dataType), logSafe(status));
         
         Page<Field> pageRequest = new Page<>(page, size);
         IPage<Field> pageResult = metaFieldMapper.selectPageList(
-            pageRequest, code, dataType, status, currentOnly
+            pageRequest, code, dataType, status, currentOnly, businessName
         );
         List<Field> entities = pageResult.getRecords();
         long total = pageResult.getTotal();
@@ -354,6 +398,28 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     }
 
     // ==================== 字段查询 ====================
+
+    @Override
+    public Optional<PublishedFieldDefinition> resolvePublishedDefinition(String code, Integer version) {
+        Long tenant = MetaContext.getCurrentTenantId();
+        if (tenant == null || tenant <= 0) throw new IllegalStateException("A trusted tenant is required");
+        if (code == null || code.isBlank() || version == null || version < 1) {
+            throw new IllegalArgumentException("An exact field code and positive version are required");
+        }
+        Field field = metaFieldMapper.findByCodeAndVersion(code, version);
+        if (field == null || Boolean.TRUE.equals(field.getDeletedFlag())
+                || !tenant.equals(field.getTenantId()) || !code.equals(field.getCode())
+                || !version.equals(field.getVersion()) || !"published".equals(field.getStatus())) {
+            return Optional.empty();
+        }
+        // The canonical assembler does not yet translate rule_schema. Never silently discard it.
+        if (field.getRuleSchema() != null && !objectMapper.valueToTree(field.getRuleSchema()).isEmpty()) {
+            throw new UnsupportedOperationException("Published rule_schema requires an explicit rule adapter");
+        }
+        FieldDefinition definition = new ModelFieldDefinitionAssembler(
+                fieldBindingMapper, metaFieldMapper, objectMapper).convertToFieldDefinition(field, null);
+        return Optional.of(new PublishedFieldDefinition(tenant, field.getPid(), code, version, definition));
+    }
 
     @Override
     public Optional<MetaFieldDTO> findCurrentByCode(String code) {
@@ -512,6 +578,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions", "modelFieldBindings", "metaField", "viewModelFields", "viewModelSummary"
+    }, allEntries = true)
     public boolean bindDictionary(String fieldPid, String dictCode) {
         log.info("绑定字典到字段: fieldPid={}, dictCode={}", logSafe(fieldPid), logSafe(dictCode));
         
@@ -582,6 +651,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions", "modelFieldBindings", "metaField", "viewModelFields", "viewModelSummary"
+    }, allEntries = true)
     public boolean unbindDictionary(String fieldPid) {
         log.info("解绑字段的字典: fieldPid={}", logSafe(fieldPid));
         
@@ -748,6 +820,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .feature(beanToMap(entity.getFeature()))
                 .refTarget(beanToMap(entity.getRefTarget()))
                 .uiSchema(beanToMap(entity.getUiSchema()))
+                .indexHint(beanToMap(entity.getIndexHint()))
+                .querySchema(beanToMap(entity.getQuerySchema()))
+                .ruleSchema(beanToMap(entity.getRuleSchema()))
                 .extension(extensionConverter.toMap(entity.getExtension())) // ✅ 使用ExtensionConverter将ExtensionBean转换为Map
                 .createdAt(DateUtil.toUtcLocalDateTime(entity.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(entity.getUpdatedAt()))
@@ -922,11 +997,17 @@ public class MetaFieldServiceImpl implements MetaFieldService {
      */
     private void validateCanDelete(Field entity) {
         if (StatusConstants.PUBLISHED.equals(entity.getStatus())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, 
-                "已发布的字段不能删除，请先取消发布");
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "已发布的字段不能删除，请先取消发布");
+        }
+        fieldDeletionGuard.requireDefinitionDeletion(entity.getCode());
+        if (!fieldBindingMapper.findByFieldId(entity.getId()).isEmpty()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Field has active model bindings; remove bindings through the protected model operation first");
         }
     }
     
+
     /**
      * Bind field to model after field creation
      * This method is called after field is successfully created via Git-First flow
@@ -1207,27 +1288,17 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 "removeFromModel tableName");
         columnName = SqlSafetyUtils.requireIdentifier(columnName, "removeFromModel columnName");
 
-        // 3) Optional data probe (refuseIfDataExists)
+        // An explicitly requested probe must succeed; uncertainty is never an empty column.
         if (request.isRefuseIfDataExists()) {
-            boolean hasData = false;
-            try {
-                // Note: dynamic mt_* tables don't carry deleted_flag (no soft-delete on
-                // dynamic data) — see AGENTS.md "动态表 mt_* 加 deleted_flag 条件".
-                Integer cnt = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM " + tableName
-                                + " WHERE " + columnName + " IS NOT NULL",
-                        Integer.class);
-                hasData = cnt != null && cnt > 0;
-            } catch (DataAccessException dae) {
-                // F-7 mitigation: if table or column is missing (race / partial state),
-                // treat as empty and continue with cleanup. Log for diagnostics.
-                log.warn("removeFromModel data probe skipped (table/column may not exist): "
-                        + "table={}, column={}, error={}", logSafe(tableName), logSafe(columnName), logSafe(dae.getMessage()));
+            Boolean hasData = jdbcTemplate.queryForObject("SELECT EXISTS(SELECT 1 FROM " + tableName
+                    + " WHERE " + columnName + " IS NOT NULL)", Boolean.class);
+            if (hasData == null) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Column data state cannot be verified; deletion refused");
             }
             if (hasData) {
-                throw new ColumnHasDataException(
-                        "column has non-null rows; refuseIfDataExists=true: table="
-                                + tableName + ", column=" + columnName);
+                throw new ColumnHasDataException("column has non-null rows; refuseIfDataExists=true: table="
+                        + tableName + ", column=" + columnName);
             }
         }
 
@@ -1253,28 +1324,20 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                     "could not resolve numeric field id for: " + fieldCode);
         }
 
-        // 5) Unbind: this triggers DDL DROP COLUMN inside MetaModelServiceImpl
-        //    when model.isPublished() (verified at MetaModelServiceImpl line ~1604).
-        //    No need to call schemaManagementService.removeFieldFromModel ourselves.
-        try {
-            metaModelService.unbindFieldFromModel(modelId, fieldId);
-        } catch (RuntimeException re) {
+        // One protected lifecycle owns physical removal and binding changes.
+        if (!metaModelService.unbindFieldFromModel(modelId, fieldId)) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
-                    "unbind failed for " + modelCode + "." + fieldCode + ": " + re.getMessage());
+                    "Field unbind did not remove a binding; field definition retained");
         }
 
-        // 6) Hard-delete ab_meta_field row (F-3/F-5 mitigation: same code can be re-added).
-        //    BaseMapper.deleteById may be wired to logical-delete via @TableLogic; we need a
-        //    true physical DELETE so the (tenant_id, code, version) unique index is freed.
-        try {
-            int rows = jdbcTemplate.update("DELETE FROM ab_meta_field WHERE id = ?", fieldId);
-            if (rows == 0) {
-                log.warn("hard-delete affected 0 rows for fieldId={}", fieldId);
+        // A field definition is reusable across models. Do not delete it (or cascade its
+        // other bindings) merely because one model stopped using it.
+        if (fieldBindingMapper.findByFieldId(fieldId).isEmpty()) {
+            fieldDeletionGuard.requireDefinitionDeletion(fieldCode);
+            if (jdbcTemplate.update("DELETE FROM ab_meta_field WHERE id = ?", fieldId) != 1) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Field definition deletion did not affect exactly one row");
             }
-        } catch (RuntimeException re) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed,
-                    "hard-delete of ab_meta_field row failed for fieldId=" + fieldId
-                            + ": " + re.getMessage());
         }
 
         log.info("removeFromModel done: model={}, field={}, table={}, column={}",

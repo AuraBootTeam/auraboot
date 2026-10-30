@@ -46,6 +46,7 @@ class InventoryReceiptEnqueueProvenanceTest {
     InventoryReceiptEnqueueProvenance provenance;
     ReliableIntegrationAccessorImpl accessor;
     CommandHandlerExtension producer;
+    CommandHandlerExtension finishedGoodsProducer;
     Runnable effect = () -> {};
     URLClassLoader loader;
     Model model;
@@ -64,15 +65,31 @@ class InventoryReceiptEnqueueProvenanceTest {
               public Object execute(CommandContext context) { effect.run(); return null; }
             }
             """);
+        // Multi-command handler: its static command type is not the receipt command, so only the
+        // executing context can select the finished-goods producer entry.
+        Path finishedGoodsSource = directory.resolve("FinishedGoodsPackagingHandler.java");
+        Files.writeString(finishedGoodsSource, """
+            package com.auraboot.plugins.inventory.handler;
+            import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+            public class FinishedGoodsPackagingHandler implements CommandHandlerExtension {
+              private final Runnable effect;
+              public FinishedGoodsPackagingHandler(Runnable effect) { this.effect=effect; }
+              public String getCommandType() { return "inv:create_fg_pack_task"; }
+              public Object execute(CommandContext context) { effect.run(); return null; }
+            }
+            """);
         assertThat(ToolProvider.getSystemJavaCompiler().run(null,null,null,"-proc:none","-classpath",
-                System.getProperty("java.class.path"),"-d",directory.toString(),source.toString())).isZero();
+                System.getProperty("java.class.path"),"-d",directory.toString(),source.toString(),finishedGoodsSource.toString())).isZero();
         loader = new URLClassLoader(new java.net.URL[]{directory.toUri().toURL()},getClass().getClassLoader());
         producer = (CommandHandlerExtension) loader.loadClass("com.auraboot.plugins.inventory.handler.ConfirmWarehouseInHandler")
                 .getConstructor(Runnable.class).newInstance((Runnable) () -> effect.run());
+        finishedGoodsProducer = (CommandHandlerExtension) loader.loadClass("com.auraboot.plugins.inventory.handler.FinishedGoodsPackagingHandler")
+                .getConstructor(Runnable.class).newInstance((Runnable) () -> effect.run());
         artifact = new AuraPluginManager.LoadedPluginArtifact("com.auraboot.inventory",directory,"sha256:"+"a".repeat(64));
-        when(plugins.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(producer));
+        when(plugins.getExtensionsOfType(CommandHandlerExtension.class)).thenReturn(List.of(producer,finishedGoodsProducer));
         when(plugins.isDiscoveredExtensionInstance(CommandHandlerExtension.class,producer)).thenReturn(true);
         when(plugins.observeLoadedArtifact(producer.getClass())).thenReturn(Optional.of(artifact));
+        when(plugins.observeLoadedArtifact(finishedGoodsProducer.getClass())).thenReturn(Optional.of(artifact));
         model = new Model(); model.setId(1L); model.setPid("model"); model.setCode("inv_inbound"); model.setTenantId(31L);
         model.setIsCurrent(true); model.setStatus("published"); model.setDeletedFlag(false); model.setVersion(1);
         model.setRowVersion(1); model.setPluginPid("owner");
@@ -80,6 +97,13 @@ class InventoryReceiptEnqueueProvenanceTest {
         when(definitions.getModelDefinition("inv_inbound")).thenReturn(Optional.of(ModelDefinition.builder()
                 .id(1L).code("inv_inbound").version(1).status("published").sourceType("physical")
                 .tableName(SystemFieldConstants.generateTableName("inv_inbound")).build()));
+        Model task = new Model(); task.setId(2L); task.setPid("task-model"); task.setCode("inv_fg_pack_task"); task.setTenantId(31L);
+        task.setIsCurrent(true); task.setStatus("published"); task.setDeletedFlag(false); task.setVersion(1);
+        task.setRowVersion(1); task.setPluginPid("owner");
+        when(models.findCurrentByCode("inv_fg_pack_task")).thenReturn(task);
+        when(definitions.getModelDefinition("inv_fg_pack_task")).thenReturn(Optional.of(ModelDefinition.builder()
+                .id(2L).code("inv_fg_pack_task").version(1).status("published").sourceType("physical")
+                .tableName(SystemFieldConstants.generateTableName("inv_fg_pack_task")).build()));
         when(owners.findByPid("owner")).thenReturn(PluginRecord.builder().pid("owner").tenantId(31L)
                 .pluginId("com.auraboot.inventory").deletedFlag(false).build());
         provenance = new InventoryReceiptEnqueueProvenance(plugins,new InventoryOwnerModelAuthority(definitions,models,owners),outbox,json);
@@ -223,6 +247,56 @@ class InventoryReceiptEnqueueProvenanceTest {
         assertThatThrownBy(()->accessor.enqueue(forged)).isInstanceOf(SecurityException.class);
         verify(outbox,times(1)).insertEnvelope(any());
     }
+
+    @Test void finishedGoodsProducerRoutedByExecutingCommandStampsTheLinkedInboundReceipt() throws Exception {
+        // The FG task pid ("task") and the linked inbound receipt pid ("receipt") intentionally differ.
+        effect = () -> accessor.enqueue(event(Map.of()));
+        routeFinishedGoods(finishedGoodsProducer, finishedGoodsContext());
+        var captured = org.mockito.ArgumentCaptor.forClass(OutboxEvent.class); verify(outbox).insertEnvelope(captured.capture());
+        OutboxEvent stored = captured.getValue();
+        assertThat(stored.getCommandCode()).isEqualTo("inv:confirm_finished_goods_receipt");
+        var headers = json.readTree(stored.getHeaders());
+        assertThat(headers.path("core.inventory.producer.command").asText()).isEqualTo("inv:confirm_finished_goods_receipt");
+        assertThat(headers.path("core.inventory.producer.implementation").asText())
+                .isEqualTo("com.auraboot.plugins.inventory.handler.FinishedGoodsPackagingHandler");
+        assertThat(headers.path("core.inventory.producer.artifact").asText()).isEqualTo("a".repeat(64));
+        assertThat(MetaContext.getAuthorizedCommandCode()).isNull();
+        // Delivery rebuilds the expected row from the stamped header; it must match the persisted command column.
+        AtomicReference<IntegrationEventEnvelope> stamped = new AtomicReference<>();
+        effect = () -> stamped.set(provenance.stamp(event(Map.of())));
+        routeFinishedGoods(finishedGoodsProducer, finishedGoodsContext());
+        when(outbox.countMatchingEnvelope(any())).thenReturn(1);
+        when(outbox.countActiveDeliveryLease(31L,stamped.get().eventId(),"lease")).thenReturn(1);
+        provenance.assertPersistedDelivery(stamped.get(),"lease");
+        var expected = org.mockito.ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outbox).countMatchingEnvelope(expected.capture());
+        assertThat(expected.getValue().getCommandCode()).isEqualTo(stored.getCommandCode());
+        assertThat(json.readTree(expected.getValue().getHeaders())).isEqualTo(headers);
+    }
+
+    @Test void finishedGoodsEntryRejectsImpostorClassForeignPermitOrInboundAuthorization() throws Exception {
+        effect = () -> accessor.enqueue(event(Map.of()));
+        // The inbound producer class carries an otherwise valid FG context: only the implementation
+        // class name separates it from the trusted producer, so this clause must stay in the guard.
+        assertThatThrownBy(() -> routeFinishedGoods(producer, finishedGoodsContext())).isInstanceOf(SecurityException.class);
+        // Permit issued for a different FG task than the executing record.
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitPlan("ALL",1L,"inv_fg_pack_task","other-task", () ->
+                MetaContext.runWithAuthorizedCommandCode("inv:confirm_finished_goods_receipt", () -> route(finishedGoodsProducer, finishedGoodsContext()))))
+                .isInstanceOf(SecurityException.class);
+        // Pipeline authorized the inbound command, not the FG receipt command.
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitPlan("ALL",1L,"inv_fg_pack_task","task", () ->
+                MetaContext.runWithAuthorizedCommandCode("inv:confirm_warehouse_in", () -> route(finishedGoodsProducer, finishedGoodsContext()))))
+                .isInstanceOf(SecurityException.class);
+        // No permit plan at all.
+        assertThatThrownBy(() -> provenance.route(finishedGoodsProducer, finishedGoodsContext())).isInstanceOf(SecurityException.class);
+        // A non-FG context with the FG handler passes through without a producer invocation, so the fact cannot be stamped.
+        var creation = CommandHandlerExtension.CommandContext.builder().tenantId(31L).commandType("inv:create_fg_pack_task")
+                .modelCode("inv_fg_pack_task").recordId("task").payload(Map.of()).build();
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitPlan("ALL",1L,"inv_fg_pack_task","task", () ->
+                MetaContext.runWithAuthorizedCommandCode("inv:create_fg_pack_task", () -> route(finishedGoodsProducer, creation))))
+                .isInstanceOf(SecurityException.class);
+        verify(outbox,never()).insertEnvelope(any());
+    }
     private void invoke(CommandHandlerExtension handler) {
         MetaContext.runWithCommandPermitPlan("ALL",1L,"inv_inbound","receipt", () ->
                 MetaContext.runWithAuthorizedCommandCode("inv:confirm_warehouse_in",()-> {
@@ -230,6 +304,19 @@ class InventoryReceiptEnqueueProvenanceTest {
                     catch (RuntimeException failure) { throw failure; }
                     catch (Exception failure) { throw new IllegalStateException("Unexpected checked fixture exception",failure); }
                 }));
+    }
+    private void routeFinishedGoods(CommandHandlerExtension handler, CommandHandlerExtension.CommandContext executing) {
+        MetaContext.runWithCommandPermitPlan("ALL",1L,"inv_fg_pack_task","task", () ->
+                MetaContext.runWithAuthorizedCommandCode("inv:confirm_finished_goods_receipt",()-> route(handler,executing)));
+    }
+    private Object route(CommandHandlerExtension handler, CommandHandlerExtension.CommandContext executing) {
+        try { return provenance.route(handler,executing); }
+        catch (RuntimeException failure) { throw failure; }
+        catch (Exception failure) { throw new IllegalStateException("Unexpected checked fixture exception",failure); }
+    }
+    private static CommandHandlerExtension.CommandContext finishedGoodsContext() {
+        return CommandHandlerExtension.CommandContext.builder().tenantId(31L).commandType("inv:confirm_finished_goods_receipt")
+                .modelCode("inv_fg_pack_task").recordId("task").payload(Map.of()).build();
     }
     private String jsonValue(Object value) { try { return json.writeValueAsString(value); } catch(Exception e) { throw new AssertionError(e); } }
     private static IntegrationEventEnvelope event(Map<String,String> headers) {

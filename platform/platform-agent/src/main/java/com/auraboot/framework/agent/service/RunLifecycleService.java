@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.StubLlmProvider;
 import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
 import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
 import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -409,7 +410,8 @@ public class RunLifecycleService {
                     .maxTokens(1000)
                     .build();
 
-            LlmChatResponse resp = provider.chat(req, config.getApiKey(), config.getBaseUrl());
+            LlmChatResponse resp = LlmResponseGuard.requireCompleteContent(
+                    provider.chat(req, config.getApiKey(), config.getBaseUrl()), "run memory extraction");
             String responseText = resp.getContent().stream()
                     .filter(b -> "text".equals(b.getType()))
                     .map(LlmChatResponse.ContentBlock::getText)

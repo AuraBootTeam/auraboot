@@ -486,7 +486,8 @@ export const auraBotApi = {
       });
 
       if (!response.ok) {
-        callbacks.onError(await readErrorMessage(response));
+        const detail = await readErrorMessage(response);
+        callbacks.onError(response.status >= 500 ? formatFetchError(new Error(detail), 'chat') : detail);
         return;
       }
 
@@ -529,7 +530,8 @@ export const auraBotApi = {
       });
 
       if (!response.ok) {
-        callbacks.onError(await readErrorMessage(response));
+        const detail = await readErrorMessage(response);
+        callbacks.onError(response.status >= 500 ? formatFetchError(new Error(detail), 'execute') : detail);
         return;
       }
 

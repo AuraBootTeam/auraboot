@@ -8,7 +8,12 @@ import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { useI18n } from '~/contexts/I18nContext';
-import { executeSimpleWorkbenchAction } from './workbenchBlockUtils';
+import {
+  executeSimpleWorkbenchAction,
+  writeRuntimeState,
+  useRuntimeStateSubscription,
+} from './workbenchBlockUtils';
+import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 
 export interface FiltersBlockRendererProps {
   block: BlockConfig;
@@ -17,11 +22,17 @@ export interface FiltersBlockRendererProps {
 
 export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ block, runtime }) => {
   const { t } = useI18n();
+  useRuntimeStateSubscription(runtime);
   const windowConfig = (block as any).props?.timeWindow;
   if (windowConfig) return <TimeWindowFilter config={windowConfig} runtime={runtime} />;
   const fields = block.fields || [];
   const density = (block as any).density || 'default';
   const compact = density === 'compact';
+  const visibleFields = fields.filter(
+    (field) =>
+      runtime.getStateManager().getFieldMeta(runtime.getScopeId(), field.field)?.hidden !== true &&
+      (!field.visibleWhen || evaluateCondition(field.visibleWhen, runtime.getContext())),
+  );
 
   const executeFilterHandler = async (handler: unknown) => {
     if (!handler) return;
@@ -45,6 +56,14 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
 
   // 处理重置
   const handleReset = async () => {
+    if (block.resetFieldsOnReset === true) {
+      for (const field of fields) {
+        const value = null;
+        runtime.getStateManager().updateField(runtime.getScopeId(), field.field, value);
+        const bound = (field as { bindState?: string }).bindState;
+        if (bound) writeRuntimeState(runtime, bound, value);
+      }
+    }
     if (block.onReset) {
       try {
         await executeFilterHandler(block.onReset);
@@ -71,7 +90,7 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
               : 'grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
           }
         >
-          {fields.map((field) => (
+          {visibleFields.map((field) => (
             <div key={field.field} data-authoring-node-id={(field as any).id || field.field}>
               <FieldRenderer field={field} runtime={runtime} />
             </div>

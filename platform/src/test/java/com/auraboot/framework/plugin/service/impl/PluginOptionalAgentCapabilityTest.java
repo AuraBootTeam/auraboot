@@ -131,6 +131,7 @@ class PluginOptionalAgentCapabilityTest {
         ReflectionTestUtils.setField(service, "resourceMapper", resources);
         ReflectionTestUtils.setField(service, "pluginRecordMapper", plugins);
         ReflectionTestUtils.setField(service, "jdbcTemplate", jdbc);
+        ReflectionTestUtils.setField(service, "auraPluginManager", mock(com.auraboot.framework.plugin.pf4j.AuraPluginManager.class));
         when(plugins.findByPid("plugin")).thenReturn(new PluginRecord());
         when(resources.findByPluginPid("plugin")).thenReturn(List.of(
                 resource(ResourceType.MODEL), resource(ResourceType.AGENT_DEFINITION)));

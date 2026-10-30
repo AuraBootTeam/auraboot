@@ -17,9 +17,9 @@ test('the established runtime catalog targets every current test source owner', 
       bindings.get(match[1]).add(task);
     }
   }
-  assert.equal(bindings.size, 57);
+  assert.equal(bindings.size, 61);
   const fingerprint = createHash('sha256').update([...bindings.keys()].sort().join('\n') + '\n').digest('hex');
-  assert.equal(fingerprint, '06d74a203d1023bac6cb776a9eddf34ef4ab98113c840cb6f907f6132062a3b3');
+  assert.equal(fingerprint, 'f7e578f7a54f6b82d66467ca538af36c527b75c6f3ca50e2dad5c62d2ddaf56f');
   const classes = [];
   const visit = (directory, task) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -49,4 +49,16 @@ test('the established runtime catalog targets every current test source owner', 
     assert.ok(matched.length > 0, `Unowned selector: ${selector}`);
     assert.deepEqual([...actual].sort(), [...new Set(matched.map(item => item.task))].sort(), selector);
   }
+});
+
+test('the PostgreSQL governance member is registered and cannot reuse a cached green', () => {
+  assert.match(script, /^\.\/gradlew :platform-agent:memoryGovernanceIntegrationTest --no-daemon$/m);
+  const build = readFileSync(join(root, 'platform/platform-agent/build.gradle'), 'utf8');
+  const task = build.slice(build.indexOf("tasks.register('memoryGovernanceIntegrationTest'"));
+  assert.match(task, /includeTags 'agent-memory-postgres'/);
+  assert.match(task, /outputs\.upToDateWhen \{ false \}/);
+  assert.match(task, /outputs\.cacheIf \{ false \}/);
+  const member = readFileSync(join(root, 'platform/platform-agent/src/test/java/com/auraboot/framework/agent/service/MemoryGovernancePostgresTest.java'), 'utf8');
+  assert.match(member, /@Tag\("agent-memory-postgres"\)/);
+  assert.match(member, /throw new IllegalStateException\("Requires an explicit TEST_DATABASE_URL/);
 });

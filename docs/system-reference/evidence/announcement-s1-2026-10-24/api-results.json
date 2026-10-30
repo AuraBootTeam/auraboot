@@ -1,0 +1,84 @@
+{
+  "suites": [
+    {
+      "title": "api/announcement-controlled-writes.spec.ts",
+      "file": "api/announcement-controlled-writes.spec.ts",
+      "line": 0,
+      "column": 0,
+      "specs": [
+        {
+          "title": "draft commands enforce replay, revision, protected fields and audit atomicity",
+          "ok": true,
+          "file": "api/announcement-controlled-writes.spec.ts",
+          "line": 12,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "api",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 379,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "concurrent edits admit one observed revision and preserve the winner",
+          "ok": true,
+          "file": "api/announcement-controlled-writes.spec.ts",
+          "line": 138,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "api",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 98,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "REST compatibility writes delegate to the same operation and revision contract",
+          "ok": true,
+          "file": "api/announcement-controlled-writes.spec.ts",
+          "line": 173,
+          "column": 1,
+          "tests": [
+            {
+              "projectName": "api",
+              "expectedStatus": "passed",
+              "status": "expected",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 148,
+                  "retry": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "startTime": "2026-10-24T12:19:43.414Z",
+    "duration": 1084.638,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "errors": []
+}

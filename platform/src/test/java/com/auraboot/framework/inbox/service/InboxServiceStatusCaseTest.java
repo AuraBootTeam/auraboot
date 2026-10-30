@@ -66,4 +66,17 @@ class InboxServiceStatusCaseTest {
         assertFalse(values.containsValue("pending") || values.containsValue("PENDING"),
                 "blank status must not filter, got " + values);
     }
+    @Test void protectedAnnouncementTitlesNeverEnterGenericPreCommitPushPayloads() {
+        InboxItemMapper mapper=mock(InboxItemMapper.class);
+        InboxRealtimePushPort push=mock(InboxRealtimePushPort.class);
+        InboxServiceImpl service=new InboxServiceImpl(mapper);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"realtimePushPort",push);
+        InboxItem item=new InboxItem();item.setTenantId(1L);item.setUserId(2L);
+        item.setItemType("announcement_ack");item.setTitle("Protected frozen title");
+        service.createItem(item);
+        verify(mapper).insert(item);verifyNoInteractions(push);
+        InboxItem ordinary=new InboxItem();ordinary.setTenantId(1L);ordinary.setUserId(2L);ordinary.setItemType("task");
+        service.createItem(ordinary);verify(push).pushNewItem(ordinary);
+    }
+
 }

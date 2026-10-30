@@ -1,0 +1,32 @@
+// Explicit library production is separate from the existing application version.
+// This selects native project/publication versions; it never rewrites metadata.
+import java.nio.file.Files
+
+def mode = providers.gradleProperty('aura.library.release').orNull
+if (mode != null && mode != 'true') {
+    throw new GradleException('aura.library.release must be explicitly true or absent')
+}
+def applicationVersion = file('../VERSION').text.trim()
+def previewVersion = providers.gradleProperty('auraPlatformVersion').orNull
+if (previewVersion != null && !(previewVersion ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+    throw new GradleException('auraPlatformVersion must be a non-empty Maven version without path separators')
+}
+if (mode == 'true' && previewVersion != null) {
+    throw new GradleException('Library release mode and auraPlatformVersion cannot be combined')
+}
+def selectedVersion = previewVersion ?: applicationVersion
+if (mode == 'true') {
+    def source = file('../LIBRARY_VERSION')
+    if (!source.isFile() || Files.isSymbolicLink(source.toPath())) {
+        throw new GradleException('A regular LIBRARY_VERSION is required for library production')
+    }
+    selectedVersion = source.text.trim()
+    if (!(selectedVersion ==~ /[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?/) ||
+            selectedVersion.toLowerCase().contains('snapshot') ||
+            selectedVersion.toLowerCase().contains('latest')) {
+        throw new GradleException('A literal immutable library version is required')
+    }
+}
+allprojects {
+    version = selectedVersion
+}

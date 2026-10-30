@@ -1,0 +1,114 @@
+[
+  {
+    "commandCode": "announcement:create_announcement",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:update_announcement",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:delete_announcement",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:publish",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:archive",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:republish",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:cancel_schedule",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:submit_approval",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:withdraw_approval",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:update_policy",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:export_statistics",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:remind",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:resume_reminders",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:set_pinned",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:reconcile_approval",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "announcement:retry_publication",
+    "ruleType": "handler",
+    "handlerClass": "announcementCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  }
+]

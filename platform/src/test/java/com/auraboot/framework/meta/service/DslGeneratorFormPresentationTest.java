@@ -79,4 +79,111 @@ class DslGeneratorFormPresentationTest {
         group.setFields(List.of("name","name"));
         assertThatThrownBy(() -> generator.generateFormPage(model,List.of(binding(1)),List.of(field(1,"name","string")),config)).hasMessageContaining("Duplicate form group field");
     }
+    @Test void usesTypedSmartControlsForZeroConfigGeneration() {
+        assertThat(mapper.getFormComponent(field(1, "quantity", "INTEGER"))).isEqualTo("SmartNumberInput");
+        assertThat(mapper.getFormComponent(field(2, "payload", "jsonb"))).isEqualTo("SmartJsonEditor");
+        assertThat(mapper.getFormComponent(field(3, "attachment", "file"))).isEqualTo("SmartUpload");
+    }
+    @Test void zeroConfigDetailsUseDeclaredIdentityAndFullWidthContent() throws Exception {
+        model.getExtension().setExtension(java.util.Map.of("titleField", "name"));
+        var one = binding(1); one.setVisible(true);
+        var two = binding(2); two.setVisible(true);
+        var page = generator.generateDetailPage(model, List.of(one, two),
+                List.of(field(1, "name", "string"), field(2, "notes", "text")), new CrudTemplateConfig());
+        assertThat(page.getExtension().get("headerTitleField")).isEqualTo("name");
+        assertThat(page.getExtension().get("presentation")).isNull();
+        var detailFields = json.readTree(page.getBlocks()).get(0).path("fields");
+        assertThat(detailFields.get(1).path("layout").path("colSpan").asInt()).isEqualTo(12);
+        assertThat(detailFields.get(1).path("component").isMissingNode()).isTrue();
+        assertThat(detailFields.get(1).path("dataType").asText()).isEqualTo("text");
+    }
+    @Test void generatedReadOnlyFieldsAreNotRequiredInputs() throws Exception {
+        var locked = binding(1); locked.setVisible(true); locked.setEditable(false); locked.setRequired(true);
+        var page = generator.generateFormPage(model, List.of(locked),
+                List.of(field(1, "name", "string")), new CrudTemplateConfig());
+        var value = json.readTree(page.getBlocks()).get(0).path("fields").get(0);
+        assertThat(value.path("readOnly").asBoolean()).isTrue();
+        assertThat(value.path("validation").isMissingNode()).isTrue();
+    }
+    @Test void defaultFormOmitsInfrastructureButDetailRetainsVisibleAuditFields() throws Exception {
+        var created = binding(1); created.setVisible(true);
+        var updated = binding(2); updated.setVisible(true);
+        var due = binding(3); due.setVisible(true);
+        var bindings = List.of(created, updated, due);
+        var fields = List.of(field(1, "created_at", "datetime"),
+                field(2, "updated_at", "datetime"), field(3, "due_date", "datetime"));
+        var form = json.readTree(generator.generateFormPage(model, bindings, fields, new CrudTemplateConfig()).getBlocks());
+        var inputs = form.get(0).path("fields");
+        assertThat(inputs.size()).isEqualTo(1);
+        assertThat(inputs.get(0).path("field").asText()).isEqualTo("due_date");
+        assertThat(inputs.get(0).path("readOnly").asBoolean()).isFalse();
+        var detail = json.readTree(generator.generateDetailPage(model, bindings, fields, new CrudTemplateConfig()).getBlocks());
+        assertThat(detail.get(0).path("fields").findValuesAsText("field"))
+                .contains("created_at", "updated_at", "due_date");
+    }
+    @Test void explicitlySelectedInfrastructureRemainsReadOnlyEvenWithEditableBinding() throws Exception {
+        var config = new CrudTemplateConfig(); config.setFormFields(List.of("created_at"));
+        var created = binding(1); created.setVisible(true); created.setRequired(true);
+        var page = generator.generateFormPage(model, List.of(created),
+                List.of(field(1, "created_at", "datetime")), config);
+        var input = json.readTree(page.getBlocks()).get(0).path("fields").get(0);
+        assertThat(input.path("readOnly").asBoolean()).isTrue();
+        assertThat(input.path("validation").isMissingNode()).isTrue();
+    }
+    @Test void declaredIdentityMustBeVisibleAndBound() {
+        model.getExtension().setExtension(java.util.Map.of("titleField", "secret"));
+        var one = binding(1); one.setVisible(false);
+        var page = generator.generateDetailPage(model, List.of(one),
+                List.of(field(1, "secret", "string")), new CrudTemplateConfig());
+        assertThat(page.getExtension() == null ? null : page.getExtension().get("headerTitleField")).isNull();
+    }
+
+    @Test void respectsRegisteredModelComponentOverrides() {
+        var notes = field(1, "notes", "string");
+        var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        extension.setExtension(java.util.Map.of("renderComponent", "SmartRichTextEditor")); notes.setExtension(extension);
+        assertThat(mapper.getFormComponent(notes)).isEqualTo("SmartRichTextEditor");
+    }
+    @Test void limitsDefaultColumnsButPreservesExplicitSelectionsAndBindingOrder() throws Exception {
+        var fields = new java.util.ArrayList<Field>();
+        var bindings = new java.util.ArrayList<ModelFieldBinding>();
+        for (int i = 1; i <= 9; i++) {
+            fields.add(field(i, "f" + i, "string"));
+            var binding = binding(i); binding.setVisible(true); binding.setFieldOrder(10 - i); bindings.add(binding);
+        }
+        var page = generator.generateListPage(model, bindings, fields, new CrudTemplateConfig());
+        var columns = json.readTree(page.getBlocks()).findValue("columns");
+        assertThat(columns.size()).isEqualTo(8);
+        assertThat(columns.get(0).path("field").asText()).isEqualTo("f9");
+        var config = new CrudTemplateConfig(); config.setListColumns(fields.stream().map(Field::getCode).toList());
+        columns = json.readTree(generator.generateListPage(model, bindings, fields, config).getBlocks()).findValue("columns");
+        assertThat(columns.size()).isEqualTo(10);
+        assertThat(columns.get(0).path("field").asText()).isEqualTo("f1");
+    }
+
+    @Test void generatesOneDetailToolbarAndModeAwareFormTitlesWithoutVisualOverrides() throws Exception {
+        var config = new CrudTemplateConfig();
+        var form = generator.generateFormPage(model, List.of(), List.of(), config);
+        assertThat(form.getExtension().get("formPresentation")).isNull();
+        assertThat(form.getExtension().get("createTitle")).isEqualTo(java.util.Map.of("zh-CN", "新建Delivery", "en", "New Delivery"));
+        assertThat(form.getExtension().get("editTitle")).isEqualTo(java.util.Map.of("zh-CN", "编辑Delivery", "en", "Edit Delivery"));
+        var detail = json.readTree(generator.generateDetailPage(model, List.of(), List.of(), config).getBlocks());
+        assertThat(detail.get(1).path("blockType").asText()).isEqualTo("toolbar");
+        assertThat(detail.get(1).path("buttons").size()).isEqualTo(1);
+        assertThat(detail.get(1).path("buttons").get(0).path("code").asText()).isEqualTo("edit");
+        assertThat(detail.get(1).path("buttons").get(0).path("permissionCode").asText()).isEqualTo("model.delivery.update");
+    }
+
+    @Test void preservesFieldGuidanceWithoutViolatingPageI18nContract() throws Exception {
+        var field = field(1, "stage", "string");
+        var ui = new com.auraboot.framework.meta.entity.payload.FieldUiSchemaBean();
+        ui.setHelpText("按实际交付阶段维护项目状态。");
+        ui.setPlaceholder("$i18n:delivery.stage.placeholder"); field.setUiSchema(ui);
+        var page = generator.generateFormPage(model, List.of(binding(1)), List.of(field), new CrudTemplateConfig());
+        var blocks = json.readTree(page.getBlocks());
+        assertThat(blocks.get(0).path("fields").get(0).path("helpText").path("zh-CN").asText()).isEqualTo(ui.getHelpText());
+        assertThat(blocks.get(0).path("fields").get(0).path("placeholder").asText()).isEqualTo(ui.getPlaceholder());
+        var schema = java.util.Map.<String, Object>of("blocks", json.readValue(page.getBlocks(), List.class));
+        assertThatCode(() -> com.auraboot.framework.meta.validator.PageSchemaDslI18nValidator.validatePageSchema(schema, "delivery_form")).doesNotThrowAnyException();
+    }
 }

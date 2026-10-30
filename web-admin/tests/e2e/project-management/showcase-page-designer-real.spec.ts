@@ -287,12 +287,14 @@ test('mature project creation and editing preserve customer owner dates budget a
     .evaluate((element) => element.scrollTo({ top: 0 }));
   await expect(page.getByText('保存成功', { exact: true })).toHaveCount(0);
   await shot(page, 'PJ04-mature-project-edit');
+  await expect(page.getByTestId('form-btn-submit')).toHaveCount(0);
+  await expect(page.getByTestId('form-btn-update')).toBeVisible();
   const updating = page.waitForResponse(
     (response) =>
       response.url().includes('/execute/tpm:update_project') &&
       response.request().method() === 'POST',
   );
-  await page.getByTestId('form-btn-submit').click();
+  await page.getByTestId('form-btn-update').click();
   expect((await data(await updating)).phaseReached).toBe('completed');
   await expect(page).toHaveURL(/\/p\/tpm_project$/);
   const reopened = page.getByRole('row').filter({ has: page.getByText(name, { exact: true }) });

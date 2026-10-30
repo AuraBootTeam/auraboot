@@ -42,6 +42,9 @@ class AgentChatToolExecutionAdapter {
             }
             log.debug("Agent chat tool call via ToolLoopService: tool={}, input={}",
                     toolName, LogSanitizer.safe(input));
+            var bif = BifContext.getCurrentBif();
+            String profileId = firstNonBlank(ctx.profileId(), bif != null ? bif.getProfileId() : null, agentCode);
+            String channel = firstNonBlank(ctx.channel(), bif != null ? bif.getChannel() : null);
             String rawResult = toolLoopService.executeToolCall(
                     ctx.tenantId(),
                     ctx.turnId(),
@@ -50,7 +53,7 @@ class AgentChatToolExecutionAdapter {
                     toolName,
                     input != null ? input : Map.of(),
                     toAgentToolDefinitions(toolDefs),
-                    null);
+                    null, profileId, channel);
             return ToolLoopResultNormalizer.normalize(objectMapper, rawResult, toolName, input);
         } catch (Exception e) {
             log.warn("Tool execution failed in agent chat: tool={}, errorType={}, message={}",
@@ -65,6 +68,13 @@ class AgentChatToolExecutionAdapter {
                     "Use corrected arguments or summarize the failure to the user."),
                     0L);
         }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return null;
     }
 
     private ToolDefinition findToolDef(List<ToolDefinition> defs, String toolName) {

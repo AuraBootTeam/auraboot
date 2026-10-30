@@ -18,6 +18,26 @@ import java.time.LocalDate;
  */
 @Mapper
 public interface UserRoleMapper extends BaseMapper<UserRole> {
+    @Select("""
+        SELECT DISTINCT ur.role_id FROM ab_user_role ur JOIN ab_role r ON r.id=ur.role_id
+        WHERE ur.tenant_id=#{tenantId} AND ur.member_id=#{memberId} AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND r.status='active' AND r.deleted_flag=FALSE AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+        """)
+    List<Long> findEffectiveRoleIdsByMemberId(@Param("tenantId") Long tenantId,@Param("memberId") Long memberId);
+
+    @Select("""
+        SELECT DISTINCT u.pid FROM ab_role r JOIN ab_user_role ur ON ur.role_id=r.id AND ur.tenant_id=r.tenant_id
+        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=r.tenant_id AND m.status='active' AND m.deleted_flag=FALSE
+        JOIN ab_user u ON u.id=m.user_id AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+        WHERE r.tenant_id=#{tenantId} AND r.pid=#{rolePid} AND r.status='active' AND r.deleted_flag=FALSE
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE) ORDER BY u.pid
+        """)
+    List<String> findEffectiveUserPidsByRolePid(@Param("tenantId") Long tenantId,@Param("rolePid") String rolePid);
+
 
     /**
      * Find role associations by member ID

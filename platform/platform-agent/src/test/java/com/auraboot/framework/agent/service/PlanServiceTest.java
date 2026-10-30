@@ -115,6 +115,18 @@ class PlanServiceTest {
     }
 
     @Test
+    void aParseableJsonArrayFromATokenLimitedReplyIsNotAnExecutablePlan() throws Exception {
+        when(provider.chat(any(), anyString(), anyString())).thenReturn(LlmChatResponse.builder()
+                .stopReason("max_tokens")
+                .content(List.of(LlmChatResponse.ContentBlock.builder().type("text")
+                        .text("[{\"description\":\"Partial action\",\"toolCode\":\"platform.write\",\"requiresApproval\":false}]")
+                        .build())).build());
+        assertThatThrownBy(() -> service.generatePlan(provider, providerConfig(), "model", "System", "Task", List.of()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Incomplete response from LLM");
+        verifyNoInteractions(dynamicDataMapper, approvalGate);
+    }
+
+    @Test
     @DisplayName("planning prompt uses structured tool catalog and SQL fallback policy")
     void planningPromptUsesStructuredToolCatalogAndSqlFallbackPolicy() throws Exception {
         LlmProviderFactory.ProviderConfig config = providerConfig();

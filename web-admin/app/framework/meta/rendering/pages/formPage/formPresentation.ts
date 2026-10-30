@@ -11,19 +11,30 @@ export interface FormPresentation {
 export function resolveFormPresentation(
   extension: Record<string, any> | null = {},
   embedded = false,
+  content?: { fieldCount: number; hasWideContent?: boolean },
 ): FormPresentation {
   const config = extension ?? {};
   const legacy = config.presentation === 'workspace';
   const value = config.formPresentation ?? {};
+  const simple =
+    !legacy &&
+    Boolean(
+      content && content.fieldCount > 0 && content.fieldCount <= 4 && !content.hasWideContent,
+    );
   const choice = <T extends string>(candidate: unknown, options: readonly T[], fallback: T): T =>
     options.includes(candidate as T) ? (candidate as T) : fallback;
   return {
     width: choice(
       value.width,
       ['comfortable', 'wide', 'full'],
-      legacy ? 'full' : config.formWidth === 'comfortable' ? 'comfortable' : 'wide',
+      legacy ? 'full' : config.formWidth === 'comfortable' || simple ? 'comfortable' : 'wide',
     ),
-    columns: value.columns === 1 || value.columns === 3 ? value.columns : 2,
+    columns:
+      value.columns === 1 || value.columns === 2 || value.columns === 3
+        ? value.columns
+        : simple
+          ? 1
+          : 2,
     surface: value.surface === 'plain' ? 'plain' : 'card',
     density: value.density === 'compact' ? 'compact' : 'comfortable',
     actions: embedded
@@ -45,7 +56,10 @@ export function formGridClass(columns: number): string {
 
 export function formFieldSpanClass(span: number, columns: number): string {
   if (columns === 1) return '';
-  if (span >= 12) return columns === 3 ? '@[32rem]/form:col-span-2 @[56rem]/form:col-span-3' : '@[32rem]/form:col-span-2';
+  if (span >= 12)
+    return columns === 3
+      ? '@[32rem]/form:col-span-2 @[56rem]/form:col-span-3'
+      : '@[32rem]/form:col-span-2';
   return columns === 3 && span >= 8 ? '@[32rem]/form:col-span-2' : '';
 }
 

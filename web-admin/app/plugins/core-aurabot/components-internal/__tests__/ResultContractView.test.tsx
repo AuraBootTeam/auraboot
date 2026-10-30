@@ -27,6 +27,41 @@ const baseContract: ResultContract = {
 };
 
 describe('ResultContractView', () => {
+  it('restores created model identity without exposing the execution envelope in the business card', () => {
+    render(<ResultContractView contract={{ ...baseContract, skillCode: 'aurabot:model:create', renderHint: 'card',
+      data: { data: { displayName: 'Acceptance ledger', modelCode: 'acceptance_ledger', modelPid: 'internal-pid', tableName: 'mt_acceptance_ledger' }, status: 'SUCCESS' } }} />);
+    const result = screen.getByTestId('rc-created-model');
+    expect(result).toHaveTextContent('Acceptance ledger');
+    expect(result).toHaveTextContent('acceptance_ledger');
+    expect(result).not.toHaveTextContent('internal-pid');
+    expect(result).not.toHaveTextContent('SUCCESS');
+    const details = screen.getByTestId('rc-diagnostics');
+    expect(details).not.toHaveAttribute('open');
+    expect(details).toHaveTextContent('internal-pid');
+  });
+
+  it('shows queried model identity and keeps the nested storage envelope collapsed', () => {
+    render(<ResultContractView contract={{ ...baseContract, skillCode: 'aurabot:model:query', renderHint: 'card',
+      data: { success: true, data: { matched: true, model: { displayName: 'Read-only ledger', code: 'readonly_ledger', pid: 'private-storage-pid', tableName: 'mt_readonly' } }, status: 'SUCCESS' } }} />);
+    const result = screen.getByTestId('rc-queried-model');
+    expect(result).toHaveTextContent('Read-only ledger');
+    expect(result).toHaveTextContent('readonly_ledger');
+    expect(result).not.toHaveTextContent('private-storage-pid');
+    expect(result).not.toHaveTextContent('SUCCESS');
+    expect(screen.getByTestId('rc-diagnostics')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('rc-card')).not.toBeVisible();
+    fireEvent.click(screen.getByText(/Execution details|执行详情/));
+    expect(screen.getByTestId('rc-card')).toBeVisible();
+  });
+
+  it('explains an unmatched model without displaying its protocol envelope', () => {
+    render(<ResultContractView contract={{ ...baseContract, skillCode: 'aurabot:model:query', renderHint: 'card',
+      data: { success: true, data: { matched: false, model: null }, status: 'SUCCESS' } }} />);
+    expect(screen.getByTestId('rc-model-not-found')).toHaveTextContent(/Model not found|未找到该模型/);
+    expect(screen.queryByTestId('rc-queried-model')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rc-card')).not.toBeVisible();
+  });
+
   it('preserves the complete business code in a result table', () => {
     const code = 'long_' + 'business'.repeat(8);
     render(<ResultContractView contract={{ ...baseContract, renderHint: 'table', table: [{ code }] }} />);
@@ -260,4 +295,13 @@ describe('reference lookup presentation', () => {
     expect(screen.getByRole('alert')).toBeVisible();
     expect(screen.queryByText('01CUSTOMER')).not.toBeInTheDocument();
   });
+});
+
+it('projects canonical DSL lists as business tables without storage identities or inferred charts', () => {
+  render(<ResultContractView contract={{ ...baseContract, skillCode: 'list:customer', renderHint: 'table', table: [{ tenant_id: 'private-tenant', pid: 'private-pid', name: 'Customer', active: true, created_at: 'private-date', row_version: 3 }] }} />);
+  expect(screen.getByTestId('chatbi-result-card')).toHaveAttribute('data-chart-type', 'table');
+  expect(screen.getByText('Customer')).toBeVisible();
+  expect(screen.queryByText('private-tenant')).not.toBeInTheDocument();
+  expect(screen.queryByText('private-pid')).not.toBeInTheDocument();
+  expect(screen.queryByText('private-date')).not.toBeInTheDocument();
 });

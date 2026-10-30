@@ -34,6 +34,8 @@ class PluginResourceImporterFieldReimportTest {
     private final MetaModelFieldBindingMapper bindings = mock(MetaModelFieldBindingMapper.class);
     private final SchemaManagementService schemas = mock(SchemaManagementService.class);
     private final MetaModelService models = mock(MetaModelService.class);
+    private final org.springframework.context.ApplicationEventPublisher publisher =
+            mock(org.springframework.context.ApplicationEventPublisher.class);
     private final Field existing = new Field();
 
     @BeforeEach
@@ -44,6 +46,7 @@ class PluginResourceImporterFieldReimportTest {
         ReflectionTestUtils.setField(importer, "schemaManagementService", schemas);
         ReflectionTestUtils.setField(importer, "metaModelService", models);
         ReflectionTestUtils.setField(importer, "extensionConverter", new ExtensionConverter());
+        ReflectionTestUtils.setField(importer, "applicationEventPublisher", publisher);
         existing.setId(17L);
         existing.setPid("field-pid");
         existing.setDataType("decimal");
@@ -160,5 +163,34 @@ class PluginResourceImporterFieldReimportTest {
         verifyNoInteractions(schemas);
         reimport(changed);
         verify(schemas).updateTableByModel("quote_line");
+    }
+
+    @Test
+    void guardRunsAfterBatchSchemaAndFailurePreventsSuccessfulImport() {
+        var changed = definition(); changed.getConstraints().setScale(7);
+        importer.beginFieldImportBatch();
+        reimport(changed);
+        verifyNoInteractions(publisher);
+        doThrow(new IllegalStateException("guard rejected altered schema"))
+                .when(publisher).publishEvent(any(com.auraboot.framework.meta.event.ModelTablePublishedEvent.class));
+        assertThatThrownBy(() -> importer.endFieldImportBatch(true))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("guard rejected");
+        var ordered = inOrder(schemas, publisher);
+        ordered.verify(schemas).updateTableByModel("quote_line");
+        ordered.verify(publisher).publishEvent(any(com.auraboot.framework.meta.event.ModelTablePublishedEvent.class));
+    }
+
+    @Test
+    void failedSchemaDoesNotDispatchGuardAndMissingDispatcherFailsClosed() {
+        var changed = definition(); changed.getConstraints().setScale(7);
+        when(schemas.updateTableByModel("quote_line"))
+                .thenReturn(SchemaOperationResult.builder().success(false).errorMessage("DDL failed").build());
+        assertThatThrownBy(() -> reimport(changed)).isInstanceOf(PluginException.class);
+        verifyNoInteractions(publisher);
+        when(schemas.updateTableByModel("quote_line"))
+                .thenReturn(SchemaOperationResult.builder().success(true).build());
+        ReflectionTestUtils.setField(importer, "applicationEventPublisher", null);
+        assertThatThrownBy(() -> reimport(changed)).isInstanceOf(PluginException.class)
+                .hasMessageContaining("guard dispatcher is unavailable");
     }
 }

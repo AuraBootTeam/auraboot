@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventPolicyDesignerBlock } from '../EventPolicyDesignerBlock';
@@ -158,6 +158,16 @@ describe('EventPolicyDesignerBlock', () => {
   });
 
   it('filters rule field picker to the selected policy target model', async () => {
+    const originalGet = get.getMockImplementation()!;
+    let releaseModelFields!: () => void;
+    const modelFieldsReady = new Promise<void>((resolve) => {
+      releaseModelFields = resolve;
+    });
+    get.mockImplementation((endpoint: string, params?: Record<string, unknown>) =>
+      endpoint === '/decision/model/fields'
+        ? modelFieldsReady.then(() => originalGet(endpoint, params))
+        : originalGet(endpoint, params),
+    );
     render(
       <MemoryRouter>
         <EventPolicyDesignerBlock block={{ props: { policyCode: 'leave_request_event_policy' } }} />
@@ -169,6 +179,15 @@ describe('EventPolicyDesignerBlock', () => {
     fireEvent.click(screen.getByTestId('cb-add'));
 
     const fieldPicker = screen.getByLabelText('field-0');
+    await act(async () => {
+      releaseModelFields();
+    });
+    // Catalog arrival must not silently replace a condition's selected event model.
+    await screen.findByRole('option', { name: '请假申请', exact: true });
+    const modelPicker = screen.getByLabelText('model-0');
+    expect(modelPicker).not.toHaveTextContent('投诉');
+    expect(modelPicker).not.toHaveTextContent('Agent 记忆');
+    fireEvent.change(modelPicker, { target: { value: 'record:wd_leave_request' } });
     expect(fieldPicker).toHaveTextContent('请假天数');
     expect(fieldPicker).not.toHaveTextContent('访问次数');
     expect(fieldPicker).not.toHaveTextContent('客户等级');

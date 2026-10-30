@@ -78,6 +78,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     private String nameField;
     private String configField;
     private String stampField;
+    private String attachmentField;
     private boolean modelReady = false;
     private final List<String> createdPids = Collections.synchronizedList(new ArrayList<>());
 
@@ -90,6 +91,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         nameField = "jb_name_" + suffix;
         configField = "jb_config_" + suffix;
         stampField = "jb_stamp_" + suffix;
+        attachmentField = "jb_files_" + suffix;
     }
 
     @BeforeEach
@@ -116,6 +118,27 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     @AfterAll
     void teardown() {
         dropIfExists();
+    }
+
+    @Test
+    @DisplayName("native file arrays create, update and read through PostgreSQL JSONB")
+    void native_file_arrays_persist_without_untyped_jdbc_parameters() {
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            assertThat(jdbcTemplate.queryForObject("SELECT data_type FROM information_schema.columns "
+                    + "WHERE table_schema='public' AND table_name=? AND column_name=?", String.class,
+                    "mt_" + modelCode, attachmentField)).isEqualTo("jsonb");
+            Map<String, Object> created = dynamicDataService.create(modelCode, Map.of(
+                    nameField, "Delivery attachments", attachmentField,
+                    List.of(Map.of("fileId", "file-first", "name", "scope.pdf"))));
+            String pid = Objects.toString(created.get("pid"));
+            createdPids.add(pid);
+            assertThat(dynamicDataService.getById(modelCode, pid).get(attachmentField))
+                    .isInstanceOf(String.class).asString().contains("file-first");
+            dynamicDataService.update(modelCode, pid, Map.of(attachmentField,
+                    List.of(Map.of("fileId", "file-second", "name", "delivery.pdf"))));
+            assertThat(dynamicDataService.getById(modelCode, pid).get(attachmentField))
+                    .isInstanceOf(String.class).asString().contains("file-second").doesNotContain("file-first");
+        });
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────
@@ -357,6 +380,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         // Temporal column — the immutable-payload regression above needs one: the temporal
         // normalizer only rewrites the payload when it actually contains a date/time value.
         bindField(stampField, "datetime", false, false, 3);
+        bindField(attachmentField, "file", false, false, 4);
     }
 
     private void bindField(String code, String dataType, boolean primaryKey, boolean required, int order) {
@@ -380,6 +404,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         ExtensionBean ext = new ExtensionBean();
         Map<String, Object> extMap = new HashMap<>();
         extMap.put("displayName", code.toUpperCase());
+        if (code.equals(attachmentField)) extMap.put("multiple", true);
         if (primaryKey) extMap.put("primaryKey", true);
         ext.setExtension(extMap);
         f.setExtension(ext);

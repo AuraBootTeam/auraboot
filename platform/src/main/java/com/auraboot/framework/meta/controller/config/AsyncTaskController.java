@@ -31,7 +31,7 @@ public class AsyncTaskController {
     public ApiResponse<AsyncTaskDTO> submitTask(@Valid @RequestBody AsyncTaskSubmitRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
-        AsyncTaskDTO dto = asyncTaskService.submitTask(request, tenantId, userId);
+        AsyncTaskDTO dto = asyncTaskService.submitPublicTask(request, tenantId, userId);
         return ApiResponse.success(dto);
     }
 
@@ -41,7 +41,7 @@ public class AsyncTaskController {
      */
     @GetMapping("/{taskCode}")
     public ApiResponse<AsyncTaskDTO> getTask(@PathVariable String taskCode) {
-        AsyncTaskDTO dto = asyncTaskService.getTask(taskCode);
+        AsyncTaskDTO dto = asyncTaskService.getOwnedTask(taskCode);
         return ApiResponse.success(dto);
     }
 
@@ -67,6 +67,7 @@ public class AsyncTaskController {
      */
     @PostMapping("/{taskCode}/cancel")
     public ApiResponse<AsyncTaskDTO> cancelTask(@PathVariable String taskCode) {
+        asyncTaskService.requireCurrentOwner(taskCode);
         AsyncTaskDTO dto = asyncTaskService.cancelTask(taskCode);
         return ApiResponse.success(dto);
     }
@@ -77,6 +78,7 @@ public class AsyncTaskController {
      */
     @DeleteMapping("/{taskCode}")
     public ApiResponse<Void> deleteTask(@PathVariable String taskCode) {
+        asyncTaskService.requireCurrentOwner(taskCode);
         asyncTaskService.deleteTask(taskCode);
         return ApiResponse.success(null);
     }

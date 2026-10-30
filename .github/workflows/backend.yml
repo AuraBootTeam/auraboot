@@ -109,6 +109,33 @@ jobs:
           path: platform/build/test-results/test/TEST-com.auraboot.framework.architecture.CoreAgentBoundaryTest.xml
           if-no-files-found: warn
 
+      - name: Verify customization and field deletion protection
+        if: steps.changes.outputs.run == 'true'
+        working-directory: platform
+        run: >-
+          ./gradlew --no-daemon :test
+          --tests '*PluginCustomizationProtectionTest'
+          --tests '*FieldDeletionGuardTest'
+          --tests '*MetaFieldRemovalProtectionTest'
+          --tests '*ModelFieldUnbindProtectionTest'
+          --tests '*SchemaManagementServiceMethodsTest'
+          --tests '*ModelFieldRenameColumnPolicyTest'
+          --tests '*PluginDefinitionResourceImporterTest'
+          --tests '*FieldVersionMetadataTest'
+          --tests '*FieldDictionaryCacheTest'
+          --tests '*PublishedFieldDefinitionTest'
+          --tests '*TemplateGeneratorStubUpgradeTest'
+          --tests '*ModelFieldBindingServiceTest'
+          --max-workers=2 -PauraTestMaxHeap=2g -PauraTestMinHeap=256m
+
+      - name: Retain customization protection test results
+        if: always() && steps.changes.outputs.run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: customization-protection-java-${{ matrix.java }}
+          path: platform/build/test-results/test/TEST-*.xml
+          if-no-files-found: error
+
       - name: Verify isolated core agent app publications
         if: steps.changes.outputs.run == 'true'
         working-directory: platform

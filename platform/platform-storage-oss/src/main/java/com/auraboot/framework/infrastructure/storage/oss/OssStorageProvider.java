@@ -69,7 +69,7 @@ public class OssStorageProvider implements StorageProvider, DisposableBean {
         metadata.setContentLength(size);
 
         ossClient.putObject(bucket, key, input, metadata);
-        log.debug("File uploaded to OSS: bucket={}, key={}", bucket, key);
+        log.debug("File uploaded to OSS (bytes={})", size);
 
         return "oss://" + bucket + "/" + key;
     }

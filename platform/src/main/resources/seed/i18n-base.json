@@ -1,5 +1,45 @@
 [
   {
+    "key": "common.error.networkRequestUncertain",
+    "zh-CN": "网络连接中断，暂时无法确认操作结果。请先刷新检查最新状态，再按页面提示重试。",
+    "en-US": "Connection lost; the operation result is uncertain. Refresh to check the latest status, then retry as the page directs."
+  },
+  {
+    "key": "export.domain_task_retained",
+    "zh-CN": "导出有效期内需保留任务记录。到期后可删除。",
+    "en-US": "Keep the task record while its export is available. You can delete it after expiry."
+  },
+  {
+    "key": "table.pagination.invalid_response",
+    "zh-CN": "分页信息不可用，请刷新后重试。",
+    "en-US": "Page information is unavailable. Refresh to try again."
+  },
+  {
+    "key": "file.download.failed",
+    "zh-CN": "文件下载失败，请刷新并检查文件有效期及当前访问权限。",
+    "en-US": "Could not download the file. Refresh and check its expiry and current access."
+  },
+  {
+    "key": "file.download.invalid_response",
+    "zh-CN": "服务端未返回完整文件，请刷新或重新创建导出任务。",
+    "en-US": "The server did not return a complete file. Refresh or create a new export."
+  },
+  {
+    "key": "file.download.invalid_url",
+    "zh-CN": "受控文件链接不可用，请刷新任务后重试。",
+    "en-US": "The protected file link is unavailable. Refresh the task."
+  },
+  {
+    "key": "export.domain_failed",
+    "zh-CN": "导出失败，请检查当前权限或重新创建导出任务。",
+    "en-US": "Export failed. Check current permissions or create a new export task."
+  },
+  {
+    "key": "export.private_storage_required",
+    "zh-CN": "导出需要私有文件存储，请联系管理员确认存储访问策略。",
+    "en-US": "Export requires private file storage. Ask an administrator to confirm the storage access policy."
+  },
+  {
     "key": "about.menuLabel",
     "zh-CN": "关于 {productName}",
     "en-US": "About {productName}",
@@ -6361,6 +6401,101 @@
     "key": "auth.phone_enrollment.rejected",
     "zh-CN": "手机号授权登录未完成，请联系管理员核对入驻信息。",
     "en-US": "Phone authorization login could not complete. Ask the administrator to check your enrollment details."
+  },
+  {
+    "key": "inbox.pendingCount",
+    "zh-CN": "{count} 项待处理",
+    "en-US": "{count} pending items"
+  },
+  {
+    "key": "inbox.markAllRead",
+    "zh-CN": "全部已读",
+    "en-US": "Mark all read"
+  },
+  {
+    "key": "inbox.empty",
+    "zh-CN": "暂无待处理事项",
+    "en-US": "No pending items"
+  },
+  {
+    "key": "inbox.viewAll",
+    "zh-CN": "查看全部待办",
+    "en-US": "View all pending work"
+  },
+  {
+    "key": "inbox.loadFailed",
+    "zh-CN": "暂时无法加载待办，请重试。",
+    "en-US": "Pending work could not be loaded. Retry."
+  },
+  {
+    "key": "inbox.type.announcement_ack",
+    "zh-CN": "公告待知悉",
+    "en-US": "Announcement acknowledgement"
+  },
+  {
+    "key": "inbox.type.approval",
+    "zh-CN": "审批",
+    "en-US": "Approval"
+  },
+  {
+    "key": "inbox.type.task",
+    "zh-CN": "任务",
+    "en-US": "Task"
+  },
+  {
+    "key": "inbox.type.mention",
+    "zh-CN": "提及",
+    "en-US": "Mention"
+  },
+  {
+    "key": "inbox.type.ai_suggestion",
+    "zh-CN": "建议",
+    "en-US": "Suggestion"
+  },
+  {
+    "key": "inbox.type.alert",
+    "zh-CN": "提醒",
+    "en-US": "Alert"
+  },
+  {
+    "key": "inbox.type.assignment",
+    "zh-CN": "分派",
+    "en-US": "Assignment"
+  },
+  {
+    "key": "inbox.type.system",
+    "zh-CN": "事项",
+    "en-US": "Work item"
+  },
+  {
+    "key": "workbench.inbox.announcement_ack",
+    "zh-CN": "公告知悉",
+    "en-US": "Acknowledgements"
+  },
+  {
+    "key": "workbench.inbox.sourceAnnouncement",
+    "zh-CN": "公告",
+    "en-US": "Announcement"
+  },
+  {
+    "key": "workbench.inbox.queueAcknowledgementsTitle",
+    "zh-CN": "公告知悉待办",
+    "en-US": "Announcement acknowledgements"
+  },
+  {
+    "key": "workbench.inbox.queueAcknowledgementsDescription",
+    "zh-CN": "打开准确版本的公告，阅读后确认已知悉。",
+    "en-US": "Open the exact announcement version and acknowledge after reading."
+  },
+  {
+    "key": "export.artifact_unavailable",
+    "zh-CN": "导出文件不可用或已过期，请重新导出。",
+    "en-US": "The export file is unavailable or expired. Create a new export."
+  },
+  {
+    "key": "export.artifact_integrity",
+    "zh-CN": "导出文件校验失败，下载已拒绝，请重新导出。",
+    "en-US": "Export file integrity verification failed. Download was denied; create a new export."
   },
   {
     "key": "currency.error.document_snapshot_unavailable",

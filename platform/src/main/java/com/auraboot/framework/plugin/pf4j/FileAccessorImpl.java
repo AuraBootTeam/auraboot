@@ -103,6 +103,7 @@ public class FileAccessorImpl implements FileAccessor {
         requireText(entityType, "entityType");
         requireText(entityId, "entityId");
         requireText(fieldName, "fieldName");
+        fileService.assertFileRelationMutationAllowed(entityType, entityId, fieldName);
         SavedFile saved = save(originalName, contentType, bytes);
         FileRelationRequestDTO relation = new FileRelationRequestDTO();
         relation.setEntityType(entityType);
@@ -121,6 +122,7 @@ public class FileAccessorImpl implements FileAccessor {
         requireText(entityType, "entityType");
         requireText(entityId, "entityId");
         requireText(fieldName, "fieldName");
+        fileService.assertFileRelationMutationAllowed(entityType, entityId, fieldName);
         SavedFile saved = save(originalName, contentType, bytes);
         FileRelationRequestDTO relation = new FileRelationRequestDTO();
         relation.setEntityType(entityType);
@@ -142,10 +144,11 @@ public class FileAccessorImpl implements FileAccessor {
 
     @Override
     public void linkExisting(String fileId, String entityType, String entityId, String fieldName) {
-        FileEntity file = requirePublicFile(fileId);
         requireText(entityType, "entityType");
         requireText(entityId, "entityId");
         requireText(fieldName, "fieldName");
+        fileService.assertFileRelationMutationAllowed(entityType, entityId, fieldName);
+        FileEntity file = requirePublicFile(fileId);
         if (!"success".equalsIgnoreCase(file.getStatus())) {
             throw new IllegalArgumentException("File upload is not finalized: " + fileId);
         }

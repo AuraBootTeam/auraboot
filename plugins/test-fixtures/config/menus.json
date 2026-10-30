@@ -140,5 +140,18 @@
   "orderNo": 60,
   "visible": true,
   "pageKey": "e2et_crm_opp_list"
+ },
+ {
+  "code": "e2et_customer_ai_intake",
+  "parentCode": "e2et_menu",
+  "name:zh-CN": "AI整理客户资料",
+  "name:en": "AI customer intake",
+  "path": "/p/c/e2et_customer_ai_intake",
+  "type": 1,
+  "icon": "Sparkles",
+  "permissionCode": "e2et.customer.manage",
+  "orderNo": 21,
+  "visible": true,
+  "pageKey": "e2et_customer_ai_intake"
  }
 ]

@@ -95,6 +95,16 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final com.auraboot.framework.meta.service.impl.CommandMetadataCacheService commandMetadataCache;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private CacheManager cacheManager;
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
+
+    void verifyPublishedModelGuards(String modelCode) {
+        if (applicationEventPublisher == null) {
+            throw new com.auraboot.framework.plugin.exception.PluginException("Model publish guard dispatcher is unavailable");
+        }
+        applicationEventPublisher.publishEvent(
+                new com.auraboot.framework.meta.event.ModelTablePublishedEvent(this, modelCode));
+    }
 
     @Override
     public void beginFieldImportBatch() {
@@ -141,6 +151,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
      */
     public void clearMenuCodeMap() {
         pageNavigationResources().clearMenuCodeMap();
+    }
+
+    @Override
+    public boolean checkDashboardExists(Long tenantId, String code) {
+        return dashboardService.findByCode(code) != null;
     }
 
     @Override

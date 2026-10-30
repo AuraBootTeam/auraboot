@@ -177,3 +177,20 @@ test('a missing plugin root fails loudly rather than reporting nothing wrong', (
   const r = auditReachability({ roots: ['/no/such/plugins'], config: {} });
   assert.deepEqual(kinds(r), ['missing-root']);
 });
+
+for (const nested of [false, true]) {
+  test(`POST command endpoint in an executable flow is reachable (args=${nested})`, () => {
+    const request = { method: 'post', endpoint: '/api/meta/commands/execute/demo:flow' };
+    const { root } = makeRepo({ commands: ['demo:flow'], pagesJson: [{ pageKey: 'flow_list',
+      flow: [{ action: 'api.request', ...(nested ? { args: request } : request) }] }] });
+    assert.deepEqual(errs(auditReachability({ roots: [root], config: {} })), []);
+  });
+}
+test('prose, GET requests and inert endpoint metadata do not make commands reachable', () => {
+  const { root } = makeRepo({ commands: ['demo:prose', 'demo:get', 'demo:inert'], pagesJson: [{
+    helpText: '/api/meta/commands/execute/demo:prose',
+    flow: [{ action: 'api.request', method: 'get', endpoint: '/api/meta/commands/execute/demo:get' }],
+    metadata: { method: 'post', endpoint: '/api/meta/commands/execute/demo:inert' },
+  }] });
+  assert.equal(errs(auditReachability({ roots: [root], config: {} })).length, 3);
+});

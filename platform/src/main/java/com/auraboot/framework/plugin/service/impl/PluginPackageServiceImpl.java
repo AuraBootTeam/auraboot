@@ -594,6 +594,7 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         if (plugin == null) {
             return PackageUninstallResult.failure(pluginPid, null, "Plugin not found");
         }
+        auraPluginManager.requireTenantLifecycleChange(plugin);
 
         PackageUninstallResult result = PackageUninstallResult.builder()
                 .pluginPid(pluginPid)

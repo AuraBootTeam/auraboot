@@ -4,14 +4,26 @@ export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown)
   return { [field.field]: value };
 }
 
+/** Nested blocks identify content tabs; filter tabs retain their legacy query semantics. */
+export function isContentTabsBlock(block: any): boolean {
+  if (block?.blockType !== 'tabs' || !Array.isArray(block.tabs)) return false;
+  const hasContent = block.tabs.some((tab: any) => tab && Object.hasOwn(tab, 'blocks'));
+  if (!hasContent) return false;
+  if (block.tabs.some((tab: any) => !Array.isArray(tab?.blocks) || tab.filter != null)) {
+    throw new Error(`Tabs block ${block.id ?? ''} mixes content and filter tabs`);
+  }
+  return true;
+}
+
+export function findListFilterTabsBlock(blocks: any): any {
+  if (!Array.isArray(blocks)) return undefined;
+  return blocks.find((block: any) => block?.blockType === 'tabs' && !isContentTabsBlock(block));
+}
+
 export function resolveInitialListTabKey(blocks: unknown): string {
-  if (!Array.isArray(blocks)) return 'all';
-  const tabsBlock = blocks.find(
-    (block): block is { blockType: string; tabs?: Array<{ key?: unknown }> } =>
-      Boolean(block && typeof block === 'object' && (block as any).blockType === 'tabs'),
-  );
+  const tabsBlock = findListFilterTabsBlock(blocks);
   const tabs = Array.isArray(tabsBlock?.tabs) ? tabsBlock.tabs : [];
-  const allTab = tabs.find((tab) => tab?.key === 'all');
+  const allTab = tabs.find((tab: any) => tab?.key === 'all');
   const initialKey = allTab?.key ?? tabs[0]?.key;
   return typeof initialKey === 'string' && initialKey.length > 0 ? initialKey : 'all';
 }
@@ -41,8 +53,13 @@ export function buildToolbarConditionContext(
   base: Record<string, any>,
   runtimeContext: Record<string, any> = {},
 ): Record<string, any> {
-  return { ...base, ...runtimeContext, state: { ...runtimeContext.state, ...base.state },
-    recordCount: list.records?.length ?? 0, total: list.total ?? 0 };
+  return {
+    ...base,
+    ...runtimeContext,
+    state: { ...runtimeContext.state, ...base.state },
+    recordCount: list.records?.length ?? 0,
+    total: list.total ?? 0,
+  };
 }
 
 export function shouldSkipListData(
@@ -81,13 +98,28 @@ export function resolveListMiscBlocksPosition(
 }
 
 /** Custom-only lists still render declared external tables, without enabling native model reads. */
-export function collectListMiscBlocks(schema: any, skipListData = shouldSkipListData(schema)): any[] {
+export function collectListMiscBlocks(
+  schema: any,
+  skipListData = shouldSkipListData(schema),
+): any[] {
   if (!Array.isArray(schema?.blocks)) return [];
-  const specialized = new Set(['table', 'filters', 'toolbar', 'tabs', 'form-buttons', 'form-section']);
+  const specialized = new Set([
+    'table',
+    'filters',
+    'toolbar',
+    'tabs',
+    'form-buttons',
+    'form-section',
+  ]);
   return schema.blocks.filter((block: any) => {
+    if (isContentTabsBlock(block)) return true;
     if (skipListData && block.blockType === 'table' && typeof block.dataSource === 'string') {
       const source = schema.dataSources?.[block.dataSource];
-      return source?.type === 'api' && typeof source.endpoint === 'string' && source.endpoint.trim() !== '';
+      return (
+        source?.type === 'api' &&
+        typeof source.endpoint === 'string' &&
+        source.endpoint.trim() !== ''
+      );
     }
     return !specialized.has(block.blockType);
   });

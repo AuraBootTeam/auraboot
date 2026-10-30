@@ -52,6 +52,18 @@ final class PluginImportChangePreview {
             }
         }
 
+        if (manifest.getDashboards() != null) {
+            for (DashboardDefinitionDTO dashboard : manifest.getDashboards()) {
+                boolean exists = resourceImporter.checkDashboardExists(tenantId, dashboard.getCode());
+                result.addChange(ResourceType.DASHBOARD, enrichWithUserModified(tenantId,
+                        ResourceType.DASHBOARD, dashboard.getCode(),
+                        ImportPreviewResult.ResourceChange.builder()
+                                .resourceType(ResourceType.DASHBOARD)
+                                .resourceCode(dashboard.getCode()).resourceName(dashboard.getTitle())
+                                .action(exists ? ResourceAction.UPDATE : ResourceAction.CREATE).build()));
+            }
+        }
+
         // Preview fields
         if (manifest.getFields() != null) {
             for (FieldDefinitionDTO field : manifest.getFields()) {
@@ -223,9 +235,17 @@ final class PluginImportChangePreview {
             Long tenantId, ResourceType type, String resourceCode,
             ImportPreviewResult.ResourceChange change){
         if (change.getAction() == ResourceAction.UPDATE) {
+            if (type == ResourceType.PAGE || type == ResourceType.DASHBOARD) {
+                var state = pluginResourceMapper.findModificationState(tenantId, type.code(), resourceCode);
+                if (state != null && state.modified() == null) {
+                    throw new com.auraboot.framework.plugin.exception.PluginException("Customization protection state is missing");
+                }
+                change.setUserModified(state == null || Boolean.TRUE.equals(state.modified()));
+                return change;
+            }
             try {
                 PluginResource pr = pluginResourceMapper.findByTypeAndCode(
-                        tenantId, type.name(), resourceCode);
+                        tenantId, type.code(), resourceCode);
                 if (pr != null && Boolean.TRUE.equals(pr.getUserModified())) {
                     change.setUserModified(true);
                     change.setUserModifiedAt(pr.getUserModifiedAt());

@@ -104,8 +104,16 @@ public class ActiveMemoryService {
         return SHADOW_ANNOTATION_PREFIX + content;
     }
 
+    /** Episodic trust survives lifecycle category changes such as L1-to-L2 promotion. */
+    public static String applyHistoricalMarker(String content, Object memoryType, Object category) {
+        String prefix = "[Historical model response; verify current business data] ";
+        if (content == null || content.startsWith(prefix)) return content;
+        return "turn_summary".equals(memoryType) || "conversation_turn".equals(category)
+                ? prefix + content : content;
+    }
+
     /** Hard cap on snippets returned to Grounding — keep prompt size bounded. */
-    private static final int MAX_SNIPPETS = 8;
+    public static final int MAX_SNIPPETS = 8;
     /** Keyword hits weighted more heavily than importance recall. */
     private static final int KEYWORD_LIMIT = 5;
     private static final int IMPORTANCE_LIMIT = 5;
@@ -162,9 +170,9 @@ public class ActiveMemoryService {
         // when no embedding provider is wired, or when the embedding call fails.
         if (semanticRecallEnabled && embeddingService != null
                 && snippets.size() < MAX_SNIPPETS && userMessage != null && !userMessage.isBlank()) {
-            float[] q = safeEmbed(tenantId, userMessage.trim());
+            EmbeddingService.EmbeddedVector q = safeEmbed(tenantId, userMessage.trim());
             if (q != null) {
-                for (Map<String, Object> row : memoryService.searchScopedSemantic(
+                for (Map<String, Object> row : memoryService.searchScopedSemanticInSpace(
                         tenantId, userId, agent, q, semanticLimit)) {
                     if (snippets.size() >= MAX_SNIPPETS) break;
                     if (seenPids.add(String.valueOf(row.get("pid")))) {
@@ -226,9 +234,9 @@ public class ActiveMemoryService {
     }
 
     /** Embed the query text for CAP-01 semantic recall; null on any failure (graceful skip). */
-    private float[] safeEmbed(Long tenantId, String text) {
+    private EmbeddingService.EmbeddedVector safeEmbed(Long tenantId, String text) {
         try {
-            return embeddingService.embed(tenantId, text, semanticProvider);
+            return embeddingService.embedWithIdentity(tenantId, text, semanticProvider);
         } catch (Exception e) {
             log.warn("Semantic pre-recall embedding failed for tenant {}: {}", tenantId, e.getMessage());
             return null;
@@ -268,9 +276,21 @@ public class ActiveMemoryService {
         m.put("pid", row.get("pid"));
         m.put("type", row.get("memory_type"));
         m.put("title", row.get("memory_title"));
+        Object recorded = row.get("created_at");
+        String instant = recorded instanceof java.sql.Timestamp timestamp ? timestamp.toInstant().toString()
+                : recorded instanceof java.time.OffsetDateTime date ? date.toInstant().toString()
+                : recorded instanceof java.time.Instant date ? date.toString() : null;
+        m.put("recorded_at", instant);
         Object content = row.get("memory_content");
         String contentStr = content == null ? null : content.toString();
-        if (contentStr != null && contentStr.length() > 400) {
+        // Keep citation text separate from rendering/trust annotations. The legacy
+        // annotated content remains available to existing memory consumers.
+        boolean truncated = contentStr != null && contentStr.length() > 400;
+        m.put("source_content", truncated ? contentStr.substring(0, 400) : contentStr);
+        m.put("truncated", truncated);
+        m.put("historical", "turn_summary".equals(row.get("memory_type"))
+                || "conversation_turn".equals(row.get("category")));
+        if (truncated) {
             contentStr = contentStr.substring(0, 400) + "…";
         }
         // Shadow-mode annotation (plan §8): tenant memories still in the
@@ -279,6 +299,7 @@ public class ActiveMemoryService {
         // "这条不对" retract button keyed on the marker.
         Object shadow = row.get("shadow_mode");
         boolean isShadow = shadow instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(shadow));
+        contentStr = applyHistoricalMarker(contentStr, row.get("memory_type"), row.get("category"));
         contentStr = applyShadowMarker(contentStr, isShadow);
         m.put("content", contentStr);
         m.put("importance", row.get("importance"));

@@ -289,6 +289,64 @@ class AgentRunServiceSyncTest {
     }
 
     @Test
+    @DisplayName("synchronous approval resume binds and clears the original immutable identity")
+    void syncResumeRestoresPersistedExecutionContext() throws Exception {
+        ExecutionPrincipal principal = new ExecutionPrincipal(
+                TENANT_ID,
+                301L,
+                401L,
+                "USR_AGENT",
+                "agent-resume",
+                501L,
+                "EMP_RESUME",
+                Initiator.human(101L, 201L, "approval"),
+                DelegationGrant.employeeAutonomous(),
+                AGENT_CODE,
+                "AGENT_RELEASE_V1",
+                "DEPLOYMENT_1",
+                "release-hash-v1",
+                "approval",
+                ExecutionPrincipal.Type.DIGITAL_EMPLOYEE,
+                Set.of(11L));
+        ContextEnvelope envelope = new ContextEnvelopeFactory().compile(
+                new ContextEnvelopeFactory.CompileRequest(
+                        "RUN_V1",
+                        principal,
+                        "approval",
+                        null,
+                        null,
+                        null,
+                        "ACP_RUN",
+                        Set.of(),
+                        List.of("KB_1"),
+                        Map.of("durable", true),
+                        "zh-CN",
+                        "Asia/Shanghai",
+                        Instant.parse("2026-07-29T10:00:00Z")));
+        when(dynamicDataMapper.selectByQuery(
+                argThat(sql -> sql != null && sql.contains("context_envelope")),
+                anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "context_envelope", objectMapper.writeValueAsString(envelope),
+                        "context_envelope_hash", envelope.envelopeHash())));
+        when(agentProperties.isEnabled()).thenAnswer(invocation -> {
+            assertThat(ExecutionPrincipalContext.current()).contains(principal);
+            assertThat(com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current())
+                    .contains(envelope);
+            return false;
+        });
+
+        service.resumeTaskSync(
+                TENANT_ID,
+                TASK_PID,
+                AGENT_CODE,
+                "RUN_V1");
+
+        verifyNoInteractions(executionPrincipalResolver);
+        assertThat(ExecutionPrincipalContext.current()).isEmpty();
+    }
+
+    @Test
     @DisplayName("async principal resolution failure is persisted as blocked task evidence")
     void asyncPrincipalResolutionFailureIsPersisted() {
         when(executionPrincipalResolver.resolve(any()))
@@ -661,6 +719,63 @@ class AgentRunServiceSyncTest {
     }
 
     @Test
+    @DisplayName("approval resume restores only the exact visible skill omitted by discovery limits")
+    void resumeRestoresExactVisibleSkill() throws Exception {
+        assertResumedSkillDiscovery(true, false);
+    }
+
+    @Test
+    @DisplayName("approval resume cannot restore a skill hidden by current permissions")
+    void resumeCannotRestoreRevokedSkill() throws Exception {
+        assertResumedSkillDiscovery(false, false);
+    }
+
+    @Test
+    @DisplayName("approval resume preserves current agent scope restrictions")
+    void resumePreservesAgentScope() throws Exception {
+        assertResumedSkillDiscovery(true, true);
+    }
+
+    private void assertResumedSkillDiscovery(boolean visible, boolean restricted) throws Exception {
+        primeHappyPath();
+        String exact = "aurabot:model:create";
+        AgentPlanStep pending = new AgentPlanStep(0, "create approved model");
+        pending.setStatus(AgentPlanStep.StepStatus.AWAITING_APPROVAL);
+        pending.setOutput(Map.of("approvalToolName", exact, "approvalPreviewToken", "saved-preview"));
+        when(planService.loadPlanFromRun("RUN_PENDING")).thenReturn(List.of(pending));
+        when(toolProviderRegistry.discoverByProvider(eq("aurabot"), any())).thenReturn(visible
+                ? List.of(ToolDefinition.builder().toolCode(exact).toolType("AURABOT_SKILL")
+                        .sourceCode("model:create").modelCode("restricted_model").operationKind("create").build(),
+                        ToolDefinition.builder().toolCode("aurabot:field:add").toolType("AURABOT_SKILL").build())
+                : List.of());
+        if (restricted) {
+            Map<String, Object> agent = baseAgentDef();
+            agent.put("allowed_operations", "[\"query\"]");
+            when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
+                    anyMap())).thenReturn(List.of(agent));
+        }
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "done";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(ok);
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenAnswer(this::persistLoopResult);
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, "RUN_PENDING");
+
+        ArgumentCaptor<List<AgentToolDefinition>> captured = ArgumentCaptor.forClass(List.class);
+        verify(stepLoopService).executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), captured.capture(), any(), any(), any(), any(), any(), eq(true));
+        if (visible && !restricted) {
+            assertThat(captured.getValue()).extracting(AgentToolDefinition::getName).containsExactly(exact);
+        } else {
+            assertThat(captured.getValue()).isEmpty();
+        }
+        verify(planService, never()).generatePlan(any(), any(), any(), anyString(), anyString(), any());
+    }
+
+    @Test
     @DisplayName("stub-routed provider config -> uses stub provider bean, not preferred provider")
     void stubRoutedConfigUsesStubProviderBean() throws Exception {
         primeHappyPath();
@@ -815,6 +930,37 @@ class AgentRunServiceSyncTest {
                 .containsEntry("verdict", "abandoned")
                 .containsEntry("completedSteps", 0)
                 .containsEntry("runStatus", "failed");
+    }
+
+    @Test
+    void promptRecallUsesInitiatorAndOnlyReinforcesInjectedRows() {
+        when(agentProperties.getMemoryMaxItems()).thenReturn(20);
+        when(agentProperties.getMemoryMaxChars()).thenReturn(320);
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")), anyMap()))
+                .thenReturn(List.of(baseAgentDef()));
+        ExecutionPrincipal principal = new ExecutionPrincipal(TENANT_ID, 301L, 401L,
+                "USR_AGENT", "agent", 501L, "EMP", Initiator.human(101L, 201L, "web"),
+                DelegationGrant.employeeAutonomous(), AGENT_CODE, "release", "deployment", "hash",
+                "web", ExecutionPrincipal.Type.DIGITAL_EMPLOYEE, Set.of());
+        ExecutionPrincipalContext.restore(principal);
+        when(memoryService.loadForPrompt(TENANT_ID, "101", AGENT_CODE, null, 20)).thenReturn(List.of(
+                Map.of("pid", "visible", "memory_type", "turn_summary", "memory_content", "A short observation"),
+                Map.of("pid", "over-budget", "memory_content", "x".repeat(500))));
+        String text = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "loadMemorySection", TENANT_ID, AGENT_CODE);
+        assertThat(text).contains("A short observation", "[Historical model response; verify current business data]").doesNotContain("xxx");
+        verify(memoryService).trackAccess(TENANT_ID, "101", "visible");
+        verify(memoryService, never()).trackAccess(TENANT_ID, "101", "over-budget");
+        verify(memoryService).recordMemoryAccess("visible", "101");
+    }
+
+    @Test
+    void promptRecallDoesNotInferPrivateOwnerFromAmbientMetaContext() {
+        when(agentProperties.getMemoryMaxItems()).thenReturn(20);
+        MetaContext.setContext(TENANT_ID, 666L, "ambient", "ambient");
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service,
+                "loadMemorySection", TENANT_ID, AGENT_CODE);
+        verify(memoryService).loadForPrompt(TENANT_ID, null, AGENT_CODE, null, 20);
     }
 
     // =========================================================================

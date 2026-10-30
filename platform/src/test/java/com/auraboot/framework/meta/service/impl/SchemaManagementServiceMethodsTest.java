@@ -65,6 +65,9 @@ class SchemaManagementServiceMethodsTest {
     @Mock
     private DdlDialect ddlDialect;
 
+    @Mock
+    private FieldDeletionGuard fieldDeletionGuard;
+
     @InjectMocks
     private SchemaManagementServiceImpl schemaManagementService;
 
@@ -850,4 +853,14 @@ class SchemaManagementServiceMethodsTest {
         assertFalse(result.getHasDifferences());
         assertEquals("test_model", result.getModelCode());
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"ab_user","se_task"})
+    void ordinaryFieldRemovalNeverAltersFrameworkOwnedTables(String table) {
+        testModel.setTableName(table);
+        when(metaModelService.getModelDefinition("test_model")).thenReturn(Optional.of(testModel));
+        when(metaModelService.getFieldDefinition("test_model","test_field")).thenReturn(testField);
+        assertFalse(schemaManagementService.removeFieldFromModel("test_model","test_field").getSuccess());
+        verify(dynamicDataMapper,never()).alterTable(anyString());
+    }
+
 }

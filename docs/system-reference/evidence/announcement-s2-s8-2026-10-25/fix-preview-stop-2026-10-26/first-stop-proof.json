@@ -1,0 +1,27 @@
+{
+  "phase": "first",
+  "firstPublicAttemptPassed": true,
+  "portsFree": [
+    6501,
+    5401
+  ],
+  "ownerGenerations": [
+    {
+      "key": "backend",
+      "pid": 51052,
+      "group": 51052,
+      "startedAt": "Mon Oct 26 15:02:18 2026",
+      "stoppedAt": "2026-10-26T07:02:45.935Z"
+    },
+    {
+      "key": "web",
+      "pid": 51976,
+      "group": 51976,
+      "startedAt": "Mon Oct 26 15:02:34 2026",
+      "stoppedAt": "2026-10-26T07:02:45.936Z"
+    }
+  ],
+  "processMetadataPreserved": true,
+  "diagnosticPreloadUsed": false,
+  "elapsedSeconds": 6.173422084015328
+}

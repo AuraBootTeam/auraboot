@@ -120,6 +120,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private final PluginImportHistoryMapper importHistoryMapper;
     private final PluginRecordMapper pluginRecordMapper;
+    private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
     private final PluginResourceMapper pluginResourceMapper;
     private final PluginResourceImporter resourceImporter;
     private final PlatformTransactionManager transactionManager;
@@ -1069,12 +1070,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                 case BINDING_RULE -> importBindingRules(manifest, request, result, pluginPid, importId, tenantId);
                 case NAMED_QUERY -> importNamedQueries(manifest, request, result, pluginPid, importId, tenantId);
                 case AGENT_DEFINITION -> importAgentDefinitions(manifest, request, result, pluginPid, importId, tenantId);
-                case PAGE -> {
-                    importPages(manifest, request, result, pluginPid, importId, tenantId);
-                    // Also import first-class dashboards (config/dashboards/*.json, Plan #8).
-                    // These are keyed to the PAGE import stage so they run after models/queries are in place.
-                    importDashboards(manifest, request, result, pluginPid, importId, tenantId);
-                }
+                case PAGE -> importPages(manifest, request, result, pluginPid, importId, tenantId);
+                case DASHBOARD -> importDashboards(manifest, request, result, pluginPid, importId, tenantId);
                 case SAVED_VIEW -> importSavedViews(manifest, result, tenantId);
                 case NOTIFICATION_TEMPLATE -> importNotificationTemplates(manifest, result, tenantId);
                 case I18N -> importI18nResources(manifest, result, tenantId);
@@ -1213,11 +1210,15 @@ public class PluginImportServiceImpl implements PluginImportService {
                                 .syncMode(SchemaSyncOptions.SyncMode.SAFE)
                                 .createIndexes(true)
                                 .build());
-                if (syncResult.isSuccess()) {
-                    log.info("Schema sync for {}: {}", logSafe(modelCode), logSafe(syncResult.getMessage()));
-                } else {
-                    log.warn("Schema sync failed for {}: {}", logSafe(modelCode), logSafe(syncResult.getErrorMessage()));
+                if (syncResult == null || !syncResult.isSuccess()) {
+                    throw new PluginException("Failed to synchronize published model " + modelCode + ": "
+                            + (syncResult == null ? "missing schema result" : syncResult.getErrorMessage()));
                 }
+                log.info("Schema sync for {}: {}", logSafe(modelCode), logSafe(syncResult.getMessage()));
+                // Published imports do not traverse MetaModelService.publish. Apply the same
+                // transaction-bound guards after their physical schema is synchronized.
+                applicationEventPublisher.publishEvent(
+                        new com.auraboot.framework.meta.event.ModelTablePublishedEvent(this, modelCode));
 
                 // Ensure hierarchical permissions exist (idempotent — skips if already created)
                 autoPermissionAssignmentService.registerPermissions(modelCode, pluginNamespace, tenantId);
@@ -1495,10 +1496,13 @@ public class PluginImportServiceImpl implements PluginImportService {
             PluginAgentResourceGuard.requireResources(pluginResourceMapper.findUpdatedResourcesForRollback(
                     history.getTenantId(), history.getPluginPid(), importId), null);
         }
-        modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
         if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
             throw new PluginException("Rollback tenant does not match import owner");
         }
+        var rollbackOwner = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
+        if (rollbackOwner == null) throw new PluginException("Plugin rollback owner is missing");
+        auraPluginManager.requireTenantLifecycleChange(rollbackOwner);
+        modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
 
         PluginMetadataRollbackSnapshot metadataRollback = null;
         boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()
@@ -1796,6 +1800,11 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Otherwise, insert a new record.
      */
     private void saveOrUpdatePluginResource(PluginResource resource, Long tenantId) {
+        // SKIP is an outcome, never a new baseline or an ownership transfer.
+        // Resetting user_modified here would make the next safe reimport overwrite customer work.
+        if (resource.getActionEnum() == ResourceAction.SKIP) {
+            return;
+        }
         PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
                 tenantId, resource.getPluginPid(), resource.getResourceType(), resource.getResourceCode());
 

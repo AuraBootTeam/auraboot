@@ -563,11 +563,18 @@ public class CommandFieldMapExecutor {
     }
 
     private String resolveOperationType(Map<String, Object> execConfig, CommandExecuteRequest request) {
+        Object type = execConfig != null ? execConfig.get("type") : null;
+        // A state_transition mutates an existing row — it must always route to UPDATE.
+        // A client-supplied operationType (e.g. 'EXECUTE' from raw API callers) must not
+        // win over the configured type here: falling through to the INSERT branch silently
+        // created a partial blank row instead of transitioning the target record.
+        if (type instanceof String t && "state_transition".equalsIgnoreCase(t)) {
+            return "update";
+        }
         String operationType = request != null ? request.getOperationType() : null;
         if (StringUtils.hasText(operationType)) {
             return operationType;
         }
-        Object type = execConfig != null ? execConfig.get("type") : null;
         return type instanceof String ? (String) type : null;
     }
 

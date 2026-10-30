@@ -7,6 +7,8 @@ import React from 'react';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
+import { ReadonlyFileReference } from '~/ui/smart/display/ReadonlyFileReference';
+import { attachmentDownloadUrl } from '~/ui/smart/display/FileAttachmentField';
 
 // 导入并重新导出统一的 i18n 实现
 import {
@@ -660,13 +662,17 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         return (
           <div
             className="prose prose-sm max-w-none rounded-md border border-gray-200 bg-gray-50 p-3 text-gray-900"
+            data-rendered-field={field.field}
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(value)) }}
           />
         );
       }
 
       // 7. File attachment - render download links
-      if (['fileattachment', 'file_attachment', 'attachment'].includes(componentType) && value) {
+      if (['fileattachment', 'file_attachment', 'attachment'].includes(componentType)) {
+        if (typeof value === 'string' && value.trim() && !value.trim().startsWith('[')) {
+          return <ReadonlyFileReference fileId={value} locale={locale} />;
+        }
         let files: Array<{ name: string; url: string; size?: number }> = [];
         try {
           files = typeof value === 'string' ? JSON.parse(value) : Array.isArray(value) ? value : [];
@@ -681,8 +687,10 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
             {files.map((f, i) => (
               <a
                 key={i}
-                href={f.url}
-                target="_blank"
+                href={typeof f.url === 'string' ? attachmentDownloadUrl(f.url) || undefined : undefined}
+                aria-disabled={typeof f.url !== 'string' || !attachmentDownloadUrl(f.url)}
+                download={f.name}
+                target="_self"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
               >

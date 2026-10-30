@@ -90,12 +90,28 @@ class PlatformAiScoringServiceTest {
     }
 
     private void oneRecordAndResponse(String json) throws Exception {
+        oneRecordAndResponse(json, null);
+    }
+
+    private void oneRecordAndResponse(String json, String stopReason) throws Exception {
         providerReady();
         when(readProtection.execute(any(), anyString(), anyMap())).thenReturn(List.of(
                 Map.of("id", 101L, "pid", "pid001", "name", "Acme", "status", "active")));
         when(llmProvider.chat(any(), anyString(), anyString())).thenReturn(LlmChatResponse.builder()
+                .stopReason(stopReason)
                 .content(List.of(LlmChatResponse.ContentBlock.builder().type("text").text(json).build()))
                 .inputTokens(100).outputTokens(50).build());
+    }
+
+    @Test
+    void truncatedScoreBatchCannotWriteEvenIfTheJsonArrayParses() throws Exception {
+        oneRecordAndResponse("[{\"id\":\"pid001\",\"score\":85}]", "max_tokens");
+        var result = service.score(buildRequest(), TENANT_ID);
+        assertThat(result.getScoredCount()).isZero();
+        assertThat(result.getFailedCount()).isEqualTo(1);
+        assertThat(result.getScores()).isEmpty();
+        verify(dynamicDataService, never()).update(anyString(), any(), anyMap());
+        verify(llmProvider).chat(any(), anyString(), anyString());
     }
 
     @Test

@@ -231,6 +231,22 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         return validateField(fieldDefinition, value, context, false);
     }
 
+    @Override
+    public FieldValidationResult validateJsonField(FieldDefinition field,
+            com.fasterxml.jackson.databind.JsonNode value, ValidationContext context) {
+        if (field == null || field.getDataType() == null || context == null) {
+            return FieldValidationResult.invalid("A field definition, data type and context are required");
+        }
+        Object nativeValue;
+        try {
+            nativeValue = JsonFieldValueAdapter.toNativeValue(field, value);
+            if(nativeValue instanceof String text && text.codePoints().allMatch(c->Character.isWhitespace(c)||Character.isSpaceChar(c))) nativeValue="";
+        } catch (IllegalArgumentException failure) {
+            return FieldValidationResult.invalid(failure.getMessage());
+        }
+        return validateField(field, nativeValue, context, false);
+    }
+
     private FieldValidationResult validateField(FieldDefinition fieldDefinition, Object value,
                                                 ValidationContext context, boolean businessReferencesVerified) {
         if (fieldDefinition == null) {

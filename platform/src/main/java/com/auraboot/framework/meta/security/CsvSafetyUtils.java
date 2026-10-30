@@ -30,20 +30,28 @@ public final class CsvSafetyUtils {
             return "";
         }
         String str = val.toString();
-        // Formula-injection neutralization: prefix a single quote when the cell
-        // starts with a spreadsheet formula trigger.
-        if (!str.isEmpty()) {
-            char first = str.charAt(0);
-            if (first == '=' || first == '+' || first == '-' || first == '@'
-                    || first == '\t' || first == '\r') {
-                str = "'" + str;
-            }
-        }
+        // Importers may discard whitespace or invisible prefixes before interpreting a formula.
+        if (hasFormulaPrefix(str)) str = "'" + str;
         // RFC-4180 quoting: quote when the value contains a delimiter, quote,
         // newline, or the injected leading single quote.
-        if (str.contains(",") || str.contains("\"") || str.contains("\n") || str.contains("'")) {
+        if (str.contains(",") || str.contains("\"") || str.contains("\n") || str.contains("\r") || str.contains("'")) {
             return "\"" + str.replace("\"", "\"\"") + "\"";
         }
         return str;
+    }
+
+    private static boolean hasFormulaPrefix(String value) {
+        int offset=0;boolean control=false;
+        while(offset<value.length()) {
+            int point=value.codePointAt(offset);
+            if(Character.isISOControl(point)) control=true;
+            if(!Character.isWhitespace(point) && !Character.isSpaceChar(point)
+                && !Character.isISOControl(point) && point!=0xFEFF && point!=0x200B) break;
+            offset+=Character.charCount(point);
+        }
+        if(control) return true;
+        if(offset==value.length()) return false;
+        char first=value.charAt(offset);
+        return first=='=' || first=='+' || first=='-' || first=='@';
     }
 }

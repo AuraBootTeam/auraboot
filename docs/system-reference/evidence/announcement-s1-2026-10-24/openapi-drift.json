@@ -1,0 +1,8 @@
+{
+  "claim": "captured-snapshot-drift-only",
+  "contractSha256": "dba460efe0bf09f6cdfc063f4ba0e846eca80e87a1d8666451d48d4604ef700e",
+  "observedSha256": "9c4b67215045b8952d4adb69b7c1e8d2d41468e2e187b725c57e1bb80678a51d",
+  "operations": 1514,
+  "schemaVersion": 1,
+  "verdict": "pass"
+}

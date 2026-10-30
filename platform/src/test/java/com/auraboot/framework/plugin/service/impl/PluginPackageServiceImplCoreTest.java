@@ -78,6 +78,19 @@ class PluginPackageServiceImplCoreTest {
 
     @InjectMocks private PluginPackageServiceImpl service;
 
+    @Test void compositionRejectionPrecedesEveryFrontendBackendAndConfigUninstallMutation() {
+        var record=PluginRecord.builder().pid("composition").pluginId("shared-application")
+                .hasFrontend(true).hasBackend(true).hasConfig(true).build();
+        org.mockito.Mockito.when(pluginRecordMapper.findByPid("composition")).thenReturn(record);
+        org.mockito.Mockito.doThrow(com.auraboot.framework.exception.BusinessException.i18n("plugin.error.composition_lifecycle"))
+                .when(auraPluginManager).requireTenantLifecycleChange(record);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.uninstall("composition",
+                new com.auraboot.framework.plugin.dto.packages.PackageUninstallOptions()))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        org.mockito.Mockito.verify(pluginRecordMapper,org.mockito.Mockito.never()).softDelete(org.mockito.ArgumentMatchers.anyString());
+        org.mockito.Mockito.verifyNoInteractions(pluginResourceService,pluginResourceMapper,extensionRegistry,pluginExtensionRegistryBridge);
+    }
+
     @BeforeEach
     void setUp() {
         if (MetaContext.exists()) {

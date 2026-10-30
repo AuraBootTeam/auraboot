@@ -35,7 +35,7 @@ dependencies {
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
     implementation 'com.baomidou:mybatis-plus-jsqlparser'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
-    implementation 'com.github.ben-manes.caffeine:caffeine:3.3.0'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.3.1'
     implementation 'com.networknt:json-schema-validator:1.5.9'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
     implementation 'org.apache.poi:poi:5.5.1'
@@ -43,7 +43,7 @@ dependencies {
     implementation 'org.apache.poi:poi-scratchpad:5.5.1'
     implementation 'org.apache.pdfbox:pdfbox:2.0.37'
     implementation 'org.jsoup:jsoup:1.23.2'
-    implementation 'org.postgresql:postgresql:42.7.13'
+    implementation 'org.postgresql:postgresql:42.7.14'
     implementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
     implementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}") {
         exclude group: 'com.networknt', module: 'json-schema-validator'
@@ -83,4 +83,18 @@ publishing {
     configurations.named(name) {
         outgoing.capability("com.auraboot:auraboot-agent-test-fixtures:${project.version}")
     }
+}
+
+// Explicit real-PostgreSQL qualification; never silently skipped in an opted-in run.
+tasks.named('test', Test) {
+    useJUnitPlatform { excludeTags 'agent-memory-postgres' }
+}
+tasks.register('memoryGovernanceIntegrationTest', Test) {
+    description = 'Qualify memory isolation and compaction against the owned migrated PostgreSQL runtime.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'agent-memory-postgres' }
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+    shouldRunAfter tasks.named('test')
 }

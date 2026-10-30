@@ -4,15 +4,22 @@
     "displayName:zh-CN": "标题",
     "displayName:en": "Title",
     "dataType": "string",
-    "constraints": { "required": true, "maxLength": 256 },
-    "feature": { "searchable": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 256
+    },
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "content",
     "displayName:zh-CN": "内容",
     "displayName:en": "Content",
     "dataType": "text",
-    "extension": { "multiline": true }
+    "extension": {
+      "multiline": true
+    }
   },
   {
     "code": "announcement_priority",
@@ -21,7 +28,9 @@
     "dataType": "enum",
     "dictCode": "announcement_priority",
     "defaultValue": "normal",
-    "feature": { "searchable": true }
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "status",
@@ -30,7 +39,9 @@
     "dataType": "enum",
     "dictCode": "announcement_status",
     "defaultValue": "draft",
-    "feature": { "searchable": true }
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "pinned",
@@ -56,5 +67,107 @@
     "displayName:zh-CN": "过期时间",
     "displayName:en": "Expires At",
     "dataType": "datetime"
+  },
+  {
+    "code": "row_version",
+    "displayName:zh-CN": "记录版本",
+    "displayName:en": "Record version",
+    "dataType": "integer"
+  },
+  {
+    "code": "editor_revision",
+    "displayName:zh-CN": "草稿版本",
+    "displayName:en": "Draft revision",
+    "dataType": "integer"
+  },
+  {
+    "code": "lifecycle_revision",
+    "displayName:zh-CN": "生命周期版本",
+    "displayName:en": "Lifecycle revision",
+    "dataType": "integer"
+  },
+  {
+    "code": "current_version_pid",
+    "displayName:zh-CN": "已冻结版本",
+    "displayName:en": "Frozen version",
+    "dataType": "string"
+  },
+  {
+    "code": "audience_kind",
+    "displayName:zh-CN": "通知范围",
+    "displayName:en": "Audience kind",
+    "dataType": "enum",
+    "dictCode": "announcement_audience_kind"
+  },
+  {
+    "code": "audience_users",
+    "displayName:zh-CN": "人员",
+    "displayName:en": "People",
+    "dataType": "json"
+  },
+  {
+    "code": "audience_departments",
+    "displayName:zh-CN": "部门及下级",
+    "displayName:en": "Departments and descendants",
+    "dataType": "json"
+  },
+  {
+    "code": "audience_roles",
+    "displayName:zh-CN": "管理范围内角色",
+    "displayName:en": "Roles within management scope",
+    "dataType": "json"
+  },
+  {
+    "code": "ack_required",
+    "displayName:zh-CN": "需要确认知悉",
+    "displayName:en": "Require acknowledgement",
+    "dataType": "boolean"
+  },
+  {
+    "code": "ack_required_effective",
+    "displayName:zh-CN": "知悉要求",
+    "displayName:en": "Acknowledgement policy",
+    "dataType": "boolean"
+  },
+  {
+    "code": "ack_days",
+    "displayName:zh-CN": "知悉期限（天）",
+    "displayName:en": "Acknowledgement period (days)",
+    "dataType": "integer"
+  },
+  {
+    "code": "approval_mode",
+    "displayName:zh-CN": "发布方式",
+    "displayName:en": "Approval mode",
+    "dataType": "enum",
+    "dictCode": "announcement_approval_mode"
+  },
+  {
+    "code": "approval_definition",
+    "displayName:zh-CN": "审批流程",
+    "displayName:en": "Approval process",
+    "dataType": "string"
+  },
+  {
+    "code": "scheduled_at",
+    "displayName:zh-CN": "预约发布时间",
+    "displayName:en": "Scheduled publication",
+    "dataType": "datetime"
+  },
+  {
+    "code": "exemption_reason",
+    "displayName:zh-CN": "免审原因",
+    "displayName:en": "Exemption reason",
+    "dataType": "text"
+  },
+  {
+    "code": "attachments",
+    "displayName:zh-CN": "附件",
+    "displayName:en": "Attachments",
+    "dataType": "file",
+    "extension": {
+      "multiple": true,
+      "maxCount": 10
+    }
   }
 ]

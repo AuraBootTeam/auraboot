@@ -23,6 +23,39 @@ class CommandDefinitionDTOTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    void formalExecutionSchemaAcceptsOnlyBooleanCachePolicy() throws Exception {
+        var manifest = mapper.readTree(java.nio.file.Files.readString(
+                java.nio.file.Path.of("../plugins/schemas/plugin-manifest.schema.json")));
+        var schema = com.networknt.schema.JsonSchemaFactory.getInstance(com.networknt.schema.SpecVersion.VersionFlag.V7)
+                .getSchema(manifest.at("/$defs/commandDefinition/properties/executionConfig"));
+        for (String value : java.util.List.of("true", "false"))
+            assertTrue(schema.validate(mapper.readTree("{\"cacheResult\":" + value + "}")).isEmpty());
+        for (String value : java.util.List.of("\"false\"", "null", "0", "{}", "[]"))
+            assertFalse(schema.validate(mapper.readTree("{\"cacheResult\":" + value + "}")).isEmpty());
+    }
+
+    @Test
+    void resultCachePolicySurvivesTypedImportAndStoredJson() throws Exception {
+        for (boolean cache : new boolean[]{false, true}) {
+            var dto = mapper.readValue("{\"code\":\"fixture:query\",\"type\":\"query\","
+                    + "\"executionConfig\":{\"cacheResult\":" + cache + "}}", CommandDefinitionDTO.class);
+            var stored = mapper.readTree(mapper.writeValueAsString(dto.getConsolidatedExecutionConfig()));
+            assertEquals(cache, stored.get("cacheResult").booleanValue());
+            assertEquals("query", stored.get("type").textValue());
+        }
+        assertFalse(mapper.readValue("{\"type\":\"query\"}", CommandDefinitionDTO.class)
+                .getConsolidatedExecutionConfig().containsKey("cacheResult"));
+    }
+
+    @Test
+    void resultCachePolicyRejectsJacksonScalarCoercion() {
+        for (String invalid : java.util.List.of("\"false\"", "\"true\"", "0", "1", "null", "{}", "[]"))
+            org.junit.jupiter.api.Assertions.assertThrows(com.fasterxml.jackson.core.JsonProcessingException.class,
+                    () -> mapper.readValue("{\"type\":\"query\",\"executionConfig\":{\"cacheResult\":"
+                            + invalid + "}}", CommandDefinitionDTO.class));
+    }
+
+    @Test
     void crudDefaultSurvivesPluginImportWithoutChangingCommandExecutionType() throws Exception {
         var dto = mapper.readValue("""
                 {"code":"wd:update_leave_request","type":"update","crudDefault":true}

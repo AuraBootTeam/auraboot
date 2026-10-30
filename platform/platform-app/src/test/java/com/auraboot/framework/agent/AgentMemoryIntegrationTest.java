@@ -67,7 +67,7 @@ public class AgentMemoryIntegrationTest extends BaseIntegrationTest {
 
         // Retrieve the initial access_count for a high-importance memory (importance=5 → tracked)
         List<Map<String, Object>> before = jdbcTemplate.queryForList(
-                "SELECT access_count FROM ab_agent_memory "
+                "SELECT pid, access_count FROM ab_agent_memory "
                 + "WHERE tenant_id = ? AND memory_agent_id = ? "
                 + "AND memory_title = ? "
                 + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
@@ -77,10 +77,10 @@ public class AgentMemoryIntegrationTest extends BaseIntegrationTest {
         assertFalse(before.isEmpty(), "Memory 'System Architecture' must exist from test 1");
         long countBefore = ((Number) before.get(0).get("access_count")).longValue();
 
-        agentMemoryService.trackAccess(tenantId, agentCode);
+        agentMemoryService.trackAccess(tenantId, null, String.valueOf(before.get(0).get("pid")));
 
         List<Map<String, Object>> after = jdbcTemplate.queryForList(
-                "SELECT access_count FROM ab_agent_memory "
+                "SELECT pid, access_count FROM ab_agent_memory "
                 + "WHERE tenant_id = ? AND memory_agent_id = ? "
                 + "AND memory_title = ? "
                 + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "

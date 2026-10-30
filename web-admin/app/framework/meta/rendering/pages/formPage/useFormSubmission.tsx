@@ -1,4 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
+import {
+  commandRequestMetadata,
+  projectCommandPayload,
+  type CommandRequestIdentity,
+} from '~/framework/meta/utils/commandRequestPolicy';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { fetchResult } from '~/shared/services/http-client';
@@ -89,6 +94,7 @@ export function useFormSubmission({
   tableName,
   locale,
 }: UseFormSubmissionArgs) {
+  const requestIdentity = useRef<CommandRequestIdentity | undefined>(undefined);
   // In new mode, override form button commandCodes with the create command
   // so that save_draft/submit use CREATE instead of UPDATE
   const handleFormAction = useCallback(
@@ -230,11 +236,14 @@ export function useFormSubmission({
       }
       setFieldErrors({});
       setSummaryErrors([]);
-      const commandPayload = buildFormCommandPayload(
-        dispatchActionRecord,
-        modelFields,
-        schema?.blocks,
-        recordPid ? dirtyFieldsRef.current : undefined,
+      const commandPayload = projectCommandPayload(
+        buildFormCommandPayload(
+          dispatchActionRecord,
+          modelFields,
+          schema?.blocks,
+          recordPid ? dirtyFieldsRef.current : undefined,
+        ),
+        schema.extension?.commandRequest,
       );
       // Review metadata is command input rather than model data, so it is intentionally absent
       // from the model-field whitelist used by buildFormCommandPayload.
@@ -296,6 +305,18 @@ export function useFormSubmission({
           return;
         }
 
+        const request = commandRequestMetadata(
+          schema.extension?.commandRequest,
+          recordPid ? initialFormData : undefined,
+          {
+            command: effectiveCommandCode,
+            targetRecordPid,
+            payload: commandPayload,
+            version: initialFormData?.[schema.extension?.commandRequest?.versionField || ''],
+          },
+          requestIdentity.current,
+        );
+        requestIdentity.current = request.identity;
         setSubmitting(true);
         fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
           method: 'post',
@@ -303,6 +324,7 @@ export function useFormSubmission({
             ...buildCommandTargetParams(targetRecordPid),
             payload: commandPayload,
             operationType,
+            ...request.metadata,
           },
           token: token || undefined,
         })
@@ -429,6 +451,25 @@ export function useFormSubmission({
           initialFormData,
         );
 
+        if (dynamicCrudOperation === 'update' && Object.keys(normalizedPayload).length === 0) {
+          setError(null);
+          setFieldErrors({});
+          setSummaryErrors([]);
+          dirtyFieldsRef.current.clear();
+          clearFormDraftRef.current();
+          showInfoToast(
+            getLocalizedText(
+              {
+                'zh-CN': '内容未修改，无需保存。',
+                'en-US': 'No changes to save.',
+              },
+              locale,
+              t,
+            ),
+          );
+          navigate(resolveAfterSubmitRedirect(schema, targetModelCode, undefined, recordPid));
+          return;
+        }
         setSubmitting(true);
         return fetchResult(endpoint, {
           method,

@@ -25,7 +25,7 @@ export function flattenFields(fields:any[],prefix=''):any[] {
 export function collectDesignerSchemas() {
   const rows:any[]=[];
   const declarations=new Set<string>();
-  for(const relative of ['shared/designer/PropertyFieldRenderer.tsx','plugins/core-dashboard/components/dashboardPropertySchemas.tsx','plugins/core-designer/components/report-designer/components/ReportDataSourceEditor.tsx']) {
+  for(const relative of ['shared/designer/PropertyFieldRenderer.tsx','shared/designer/ColorPropertyEditor.tsx','plugins/core-dashboard/components/dashboardPropertySchemas.tsx','plugins/core-designer/components/report-designer/components/ReportDataSourceEditor.tsx']) {
     const file=path.join(root,'web-admin/app',relative);
     const ast=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
     const visit=(node:ts.Node)=>{
@@ -104,7 +104,7 @@ export function writeInventory(output:string,runFile?:string) {
       if(executed)field.execution='passed';
     }
   }
-  const sourceFiles=['plugins/core-dashboard/widgets/widgetRegistry.ts','plugins/core-dashboard/components/dashboardPropertySchemas.tsx','plugins/core-designer/components/report-designer/registry/reportAuthoringSchemas.ts','plugins/core-designer/components/unified-designer/registry/BlockRegistry.ts','plugins/core-designer/components/unified-designer/registry/InspectorSchemaRegistry.ts','shared/designer/PropertyFieldRenderer.tsx','shared/designer/ArrayItemEditor.tsx'].map(file=>({file:'web-admin/app/'+file,sha256:digest(path.join(root,'web-admin/app',file))}));
+  const sourceFiles=['plugins/core-dashboard/widgets/widgetRegistry.ts','plugins/core-dashboard/components/dashboardPropertySchemas.tsx','plugins/core-designer/components/report-designer/registry/reportAuthoringSchemas.ts','plugins/core-designer/components/unified-designer/registry/BlockRegistry.ts','plugins/core-designer/components/unified-designer/registry/InspectorSchemaRegistry.ts','shared/designer/PropertyFieldRenderer.tsx','shared/designer/ColorPropertyEditor.tsx','shared/designer/ArrayItemEditor.tsx'].map(file=>({file:'web-admin/app/'+file,sha256:digest(path.join(root,'web-admin/app',file))}));
   const report={format:'auraboot.designer-schema-inventory.v1',source:{root,commit,clean,files:sourceFiles},rows,actions:collectActions(),
     limitations:['Native registries only; runtime-only plugin contributions require their own registry/manifest audit','Source action callbacks are an inventory, not all executed DOM states','Registered assertions and passed browser evidence are separate; no unit result is inferred from registration'],
     bindingsSha256:digest(bindingsFile),nativeRun:runFile?path.resolve(runFile):null};

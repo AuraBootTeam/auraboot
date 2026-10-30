@@ -16,7 +16,31 @@ public final class ModelMutationGuard {
     private ModelMutationGuard() {
     }
 
+    /** Model-scoped ownership avoids protecting globally shared fields such as title. */
+    public static void assertCommandWriter(ModelDefinition model, String operation) {
+        Object raw = model == null || model.getExtension() == null ? null : model.getExtension().get("commandWriters");
+        if (raw == null) return;
+        if (!(raw instanceof Map<?, ?> policy)
+                || !policy.keySet().equals(java.util.Set.of("create", "update", "delete"))) {
+            throw new MetaServiceException("Invalid model commandWriters policy");
+        }
+        for (Object value : policy.values()) {
+            // An explicit empty list denies every command for this operation.
+            if (!(value instanceof java.util.List<?> codes)
+                    || codes.stream().anyMatch(code -> !(code instanceof String text) || text.isBlank())) {
+                throw new MetaServiceException("Invalid model commandWriters policy");
+            }
+        }
+        java.util.List<?> allowed = (java.util.List<?>) policy.get(operation);
+        String commandCode = MetaContext.getAuthorizedCommandCode();
+        if (allowed == null || !MetaContext.hasCommandPermitScope()
+                || commandCode == null || !allowed.contains(commandCode)) {
+            throw new MetaServiceException("Model mutation requires its exact authorized command");
+        }
+    }
+
     public static void assertMutable(ModelDefinition model, String operation) {
+        assertCommandWriter(model, "update");
         if (model == null || !model.isImmutable()) {
             return;
         }
@@ -27,6 +51,10 @@ public final class ModelMutationGuard {
 
     public static void assertMutableForOperation(ModelDefinition model, String operationType) {
         if (operationType == null) {
+            return;
+        }
+        if ("create".equalsIgnoreCase(operationType)) {
+            assertCreateAllowed(model);
             return;
         }
         if ("delete".equalsIgnoreCase(operationType)) {
@@ -41,7 +69,10 @@ public final class ModelMutationGuard {
 
     /** Require command authorization for deletes without preventing review or revocation updates. */
     public static void assertDeleteAllowed(ModelDefinition model) {
-        assertMutable(model, "deleted");
+        assertCommandWriter(model, "delete");
+        if (model != null && model.isImmutable()) {
+            throw new ImmutableModelMutationException("Model '" + model.getCode() + "' is immutable; records cannot be deleted");
+        }
         if (model == null || model.getExtension() == null) {
             return;
         }
@@ -61,6 +92,7 @@ public final class ModelMutationGuard {
 
     /** Protect sole-writer facts from generic create APIs while retaining authorized Commands. */
     public static void assertCreateAllowed(ModelDefinition model) {
+        assertCommandWriter(model, "create");
         if (model == null || !model.isCommandOnlyCreate()
                 || MetaContext.hasCommandPermitScope()) {
             return;
@@ -80,6 +112,7 @@ public final class ModelMutationGuard {
             String operation,
             Map<String, Object> fieldMapResults,
             String recordId) {
+        assertCommandWriter(model, "update");
         if (model == null || !model.isImmutable()) {
             return;
         }

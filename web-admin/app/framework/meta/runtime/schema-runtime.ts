@@ -111,7 +111,7 @@ export class SchemaRuntime {
     this.dataSourceManager.bindStateManager(this.stateManager, this.scopeId);
 
     // 获取上下文
-    this.context = this.stateManager.getContext(this.scopeId);
+    this.context = this.getContext();
     (this.context as any).__dataSourceManager = this.dataSourceManager;
     (this.context as any).fetchResult = fetchResult; // 用于 api.request action
 
@@ -120,7 +120,9 @@ export class SchemaRuntime {
 
     this.flowRunner = new FlowRunner({
       loadData: config.loadData,
-      requestKeySession: config.getRequestKeyIdentity ? createRequestKeySession(config.getRequestKeyIdentity) : undefined,
+      requestKeySession: config.getRequestKeyIdentity
+        ? createRequestKeySession(config.getRequestKeyIdentity)
+        : undefined,
       evaluator: expressionEvaluator,
       actionRegistry,
       navigate: this.navigate,
@@ -178,11 +180,7 @@ export class SchemaRuntime {
       onError: (ruleId, error) => {
         console.error(`[SchemaRuntime] Linkage rule ${ruleId} failed:`, error);
       },
-      getContext: () => {
-        const ctx = this.stateManager.getContext(this.scopeId);
-        (ctx as any).__dataSourceManager = this.dataSourceManager;
-        return ctx;
-      },
+      getContext: () => this.getContext(),
     });
 
     this.linkageEngine.register(rules);
@@ -195,7 +193,7 @@ export class SchemaRuntime {
   triggerFieldLinkage(fieldCode: string, event: TriggerEvent): void {
     if (!this.linkageEngine) return;
 
-    const freshContext = this.stateManager.getContext(this.scopeId);
+    const freshContext = this.getContext();
     (freshContext as any).__dataSourceManager = this.dataSourceManager;
     this.linkageEngine.onFieldEvent(fieldCode, event, freshContext);
   }
@@ -290,7 +288,7 @@ export class SchemaRuntime {
 
     // 关键修复：每次执行时获取最新 context
     // 避免使用构造函数中缓存的旧 this.context，确保能读取到最新的 form 和 state
-    const freshContext = this.stateManager.getContext(this.scopeId);
+    const freshContext = this.getContext();
     (freshContext as any).__dataSourceManager = this.dataSourceManager;
     (freshContext as any).fetchResult = fetchResult;
 
@@ -339,9 +337,21 @@ export class SchemaRuntime {
    * 获取上下文
    */
   getContext(): ExpressionContext {
-    const ctx = this.stateManager.getContext(this.scopeId);
+    const ctx = this.dataSourceManager.getBindingContext(
+      this.stateManager.getContext(this.scopeId),
+    );
     (ctx as any).__dataSourceManager = this.dataSourceManager;
-    return ctx;
+    return this.dataSourceManager.getRuntimeContext?.(ctx, this.stateManager, this.scopeId) ?? ctx;
+  }
+
+  /** Subscribe to both scoped state and named-source changes without copying server data into form state. */
+  subscribeContext(listener: () => void): () => void {
+    const stopState = this.stateManager.getStore(this.scopeId)?.subscribe(listener);
+    const stopSources = this.dataSourceManager.subscribeContext?.(listener);
+    return () => {
+      stopState?.();
+      stopSources?.();
+    };
   }
 
   /**
@@ -406,7 +416,12 @@ export class SchemaRuntime {
       ...((context as any).record !== undefined ? { record: (context as any).record } : {}),
       ...((context as any).$page !== undefined ? { $page: (context as any).$page } : {}),
       ...(context.state
-        ? { state: { ...((current.state as Record<string, any> | undefined) || {}), ...context.state } }
+        ? {
+            state: {
+              ...((current.state as Record<string, any> | undefined) || {}),
+              ...context.state,
+            },
+          }
         : {}),
     });
   }
@@ -440,7 +455,10 @@ export class SchemaRuntime {
     this.linkageEngine?.dispose();
     this.linkageEngine = null;
     this.registeredDataSources.forEach((id) => {
-      if (this.dataSourceManager.has(id)) {
+      if (
+        this.dataSourceManager.isBoundTo(this.stateManager, this.scopeId) &&
+        this.dataSourceManager.has(id)
+      ) {
         this.dataSourceManager.unregister(id);
       }
     });

@@ -36,7 +36,7 @@ public class InboxServiceImpl implements InboxService {
     private InboxRealtimePushPort realtimePushPort;
 
     private static final List<String> ITEM_TYPES = List.of(
-            "approval", "task", "mention", "ai_suggestion", "alert", "assignment", "system"
+            "approval", "task", "mention", "ai_suggestion", "alert", "assignment", "system", "announcement_ack"
     );
 
     @Override
@@ -70,6 +70,9 @@ public class InboxServiceImpl implements InboxService {
      * Delegates to {@link InboxRealtimePushPort} when enterprise-comm is present.
      */
     private void pushToUser(InboxItem item) {
+        // Protected announcement hints are resolved by the authenticated list/count polls.
+        // Do not broadcast their titles through a pre-commit generic WebSocket payload.
+        if ("announcement_ack".equals(item.getItemType())) return;
         if (realtimePushPort == null) {
             log.debug("No InboxRealtimePushPort available, skipping real-time push for userId={}", item.getUserId());
             return;
@@ -85,11 +88,10 @@ public class InboxServiceImpl implements InboxService {
 
     @Override
     public InboxItem getItem(Long id, Long userId, Long tenantId) {
-        InboxItem item = inboxItemMapper.selectById(id);
-        if (item == null || !item.getTenantId().equals(tenantId) || !item.getUserId().equals(userId)) {
-            return null;
-        }
-        return item;
+        if(id==null || userId==null || tenantId==null) return null;
+        return inboxItemMapper.selectOne(new LambdaQueryWrapper<InboxItem>()
+            .eq(InboxItem::getId,id).eq(InboxItem::getTenantId,tenantId).eq(InboxItem::getUserId,userId)
+            .apply(InboxItemMapper.VISIBLE_ACK));
     }
 
     @Override
@@ -109,6 +111,8 @@ public class InboxServiceImpl implements InboxService {
             wrapper.eq(InboxItem::getStatus, status.trim().toLowerCase());
         }
 
+        wrapper.apply("pending".equalsIgnoreCase(status==null ? "" : status.trim())
+            ? InboxItemMapper.ACTIVE_ACK : InboxItemMapper.VISIBLE_ACK);
         wrapper.orderByDesc(InboxItem::getCreatedAt);
 
         return inboxItemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
@@ -131,6 +135,8 @@ public class InboxServiceImpl implements InboxService {
             wrapper.eq(InboxItem::getStatus, status.trim().toLowerCase());
         }
 
+        wrapper.apply("pending".equalsIgnoreCase(status==null ? "" : status.trim())
+            ? InboxItemMapper.ACTIVE_ACK : InboxItemMapper.VISIBLE_ACK);
         wrapper.orderByDesc(InboxItem::getCreatedAt);
 
         return inboxItemMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
@@ -163,6 +169,7 @@ public class InboxServiceImpl implements InboxService {
         wrapper.eq(InboxItem::getId, id)
                .eq(InboxItem::getTenantId, tenantId)
                .eq(InboxItem::getUserId, userId)
+               .apply(InboxItemMapper.VISIBLE_ACK)
                .eq(InboxItem::getIsRead, false)
                .set(InboxItem::getIsRead, true)
                .set(InboxItem::getReadAt, Instant.now());
@@ -176,8 +183,14 @@ public class InboxServiceImpl implements InboxService {
     }
 
     @Override
+    public int getPendingCount(Long userId, Long tenantId) {return inboxItemMapper.countPending(tenantId,userId);}
+
+    @Override
     @Transactional
     public void markActed(Long id, Long userId, Long tenantId, String action) {
+        var item=getItem(id,userId,tenantId);
+        if(item!=null && "announcement_ack".equals(item.getItemType()))
+            throw com.auraboot.framework.exception.BusinessException.i18n("announcement.error.ack_business_action_required");
         int rows = inboxItemMapper.markActed(id, tenantId, userId, action);
         if (rows == 0) {
             log.warn("Failed to mark inbox item as acted: id={}, userId={} (not found or already acted)", id, userId);
@@ -195,6 +208,9 @@ public class InboxServiceImpl implements InboxService {
     @Override
     @Transactional
     public void dismiss(Long id, Long userId, Long tenantId) {
+        var item=getItem(id,userId,tenantId);
+        if(item!=null && "announcement_ack".equals(item.getItemType()))
+            throw com.auraboot.framework.exception.BusinessException.i18n("announcement.error.ack_business_action_required");
         int rows = inboxItemMapper.dismiss(id, tenantId, userId);
         if (rows == 0) {
             log.warn("Failed to dismiss inbox item: id={}, userId={} (not found or already acted)", id, userId);

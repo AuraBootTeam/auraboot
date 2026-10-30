@@ -1014,6 +1014,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             appendAccessClause(clauses, permitFilter);
+            appendAccessClause(clauses, dataPermissionEngine.buildRequiredReadFilter(tenantId, modelCode, userId));
             return clauses;
         }
 
@@ -1042,6 +1043,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         if (permitFilter != null) {
             List<String> clauses = new ArrayList<>();
             appendAccessClause(clauses, permitFilter);
+            if (resourceCode != null) appendAccessClause(clauses, dataPermissionEngine.buildRequiredReadFilter(tenantId, resourceCode, userId));
             return clauses;
         }
 

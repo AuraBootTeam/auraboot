@@ -162,6 +162,178 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
                         new EvaluationStep("RolePermission", EvaluationVerdict.ALLOW, "rbac ok"))));
     }
 
+    private static final String CANONICAL_PID=RequiredReadReferencesTest.id(900);
+    private DynamicDataService wireCanonicalClosure(
+            java.util.function.UnaryOperator<Map<String,Object>> mask,
+            java.util.function.Predicate<Map<String,Object>> maskedScope) {
+        wireHappyPathDbStubs();wireRuleCenterPermissionAllows();
+        ModelDefinition model=metadataService.getModelDefinition(MODEL_CODE).orElseThrow();
+        var declaration=RequiredReadReferencesTest.model(10);model.setImmutable(true);
+        model.setFields(declaration.getFields());model.setExtension(declaration.getExtension());
+        when(queryBuilder.getParameterMap()).thenReturn(Map.of("pid",CANONICAL_PID,"tenant_id",TENANT_ID));
+        when(dynamicDataMapper.selectByQuery(anyString(),anyMap())).thenAnswer(call -> List.of(new java.util.LinkedHashMap<>(
+                Map.of("pid",CANONICAL_PID,"tenant_id",TENANT_ID,"members",new java.util.ArrayList<>(List.of(RequiredReadReferencesTest.id(1))),"team","visible"))));
+        when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE),anyMap(),eq(USER_ID))).thenAnswer(call -> mask.apply(call.getArgument(1)));
+        lenient().when(fieldPermissionService.getFieldPermissions(USER_ID,MODEL_CODE)).thenReturn(
+                com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(java.util.Set.of("pid","tenant_id","members","team")));
+        DynamicDataService dependencies=mock(DynamicDataService.class);
+        when(permissionFacade.canAction(USER_ID,"fixture_member","read")).thenReturn(true);
+        when(dependencies.getById(eq("fixture_member"),anyString())).thenAnswer(call -> Map.of("pid",call.getArgument(1)));
+        var guard=new RequiredRecordReadGuard(metadataService,dependencies,permissionFacade,queryBuilderService,dynamicDataMapper,dataDomainService);
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap())).thenAnswer(call -> {
+            guard.require(MODEL_CODE,call.getArgument(3));return true;
+        });
+        lenient().when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq("read"),eq(USER_ID),anyMap())).thenAnswer(call -> {
+            Map<String,Object> row=call.getArgument(4);if(!maskedScope.test(row))return false;
+            try {guard.require(MODEL_CODE,row);return true;}
+            catch(org.springframework.security.access.AccessDeniedException denied) {return false;}
+        });
+        return dependencies;
+    }
+    private void authorizeCanonicalRead() {
+        var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,
+                row -> helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row));
+    }
+    @Test void sameCanonicalReadKeepsMaskedRootCheckButReadsItsDependencyOnce() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> row.containsKey("team"));
+        authorizeCanonicalRead();
+        verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap());
+        verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq("read"),eq(USER_ID),anyMap());
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void sameCanonicalReadCannotBypassAMaskedRootScopeDenial() {
+        var dependencies=wireCanonicalClosure(row -> {row.remove("team");return row;},row -> row.containsKey("team"));
+        assertThatThrownBy(this::authorizeCanonicalRead).isInstanceOf(MetaServiceException.class).hasMessageContaining("Access denied");
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(1));
+        verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq("read"),eq(USER_ID),anyMap());
+    }
+    @Test void canonicalReadReauthorizesAnInPlaceReferenceReplacement() {
+        var dependencies=wireCanonicalClosure(row -> {
+            row.put("members","[\""+RequiredReadReferencesTest.id(2)+"\"]");return row;
+        },row -> true);
+        authorizeCanonicalRead();
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(1));
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(2));
+    }
+    @Test void canonicalReadRejectsADeniedReplacementInsteadOfReusingTheOldReference() {
+        var dependencies=wireCanonicalClosure(row -> {
+            row.put("members","[\""+RequiredReadReferencesTest.id(2)+"\"]");return row;
+        },row -> true);
+        doThrow(new org.springframework.security.access.AccessDeniedException("replacement revoked")).when(dependencies)
+                .getById("fixture_member",RequiredReadReferencesTest.id(2));
+        assertThatThrownBy(this::authorizeCanonicalRead).isInstanceOf(MetaServiceException.class).hasMessageContaining("Access denied");
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(1));
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(2));
+    }
+    @Test void canonicalReadRejectsMissingMaskedReferences() {
+        var dependencies=wireCanonicalClosure(row -> {row.remove("members");return row;},row -> true);
+        assertThatThrownBy(this::authorizeCanonicalRead).isInstanceOf(MetaServiceException.class).hasMessageContaining("Access denied");
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadRejectsAMissingMaskedTenant() {
+        var dependencies=wireCanonicalClosure(row -> {row.remove("tenant_id");return row;},row -> true);
+        assertThatThrownBy(this::authorizeCanonicalRead).isInstanceOf(MetaServiceException.class).hasMessageContaining("Access denied");
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadNeverReusesItsWitnessForTheNextOperation() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);authorizeCanonicalRead();
+        doThrow(new org.springframework.security.access.AccessDeniedException("revoked")).when(dependencies)
+                .getById("fixture_member",RequiredReadReferencesTest.id(1));
+        assertThatThrownBy(this::authorizeCanonicalRead).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(dependencies,times(2)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadWitnessCanOnlyAvoidOneFinalTraversal() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> {
+            helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row);
+            helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row);
+        });
+        verify(dependencies,times(2)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void anIndependentLoaderInsideFinalAuthorizationCannotBorrowTheWitness() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> {
+            doThrow(new org.springframework.security.access.AccessDeniedException("revoked")).when(dependencies)
+                    .getById("fixture_member",RequiredReadReferencesTest.id(1));
+            assertThatThrownBy(()->service.getByIdForAuthorization(MODEL_CODE,CANONICAL_PID))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(()->helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row))
+                    .isInstanceOf(MetaServiceException.class);
+        });
+    }
+    @Test void anAllowedIndependentLoaderStillPerformsItsOwnAndTheFinalDependencyChecks() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> {
+            service.getByIdForAuthorization(MODEL_CODE,CANONICAL_PID);
+            helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row);
+        });
+        verify(dependencies,times(3)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadRechecksAfterAnObservedMutation() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> {
+            DynamicDataQueryScope.invalidateFiltersAfterMutation();
+            helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row);
+        });
+        verify(dependencies,times(2)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadCannotReuseADifferentActor() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        assertThatThrownBy(()->service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> {
+            MetaContext.setMemberId(999L);
+            helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row);
+        })).isInstanceOf(MetaServiceException.class).hasMessageContaining("Access denied");
+        verify(dependencies).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadRechecksWhenItsPolicyChanges() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> {
+            metadataService.getModelDefinition(MODEL_CODE).orElseThrow().setExtension(RequiredReadReferencesTest.model(20).getExtension());
+            helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row);
+        });
+        verify(dependencies,times(2)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadMaskFailureCannotCompleteOrLeakAWitness() {
+        var dependencies=wireCanonicalClosure(row -> {throw new IllegalStateException("mask unavailable");},row -> true);
+        var called=new java.util.concurrent.atomic.AtomicBoolean();
+        assertThatThrownBy(()->service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> called.set(true)))
+                .isInstanceOf(MetaServiceException.class).hasMessageContaining("Failed to load record");
+        org.assertj.core.api.Assertions.assertThat(called.get()).isFalse();
+        doThrow(new org.springframework.security.access.AccessDeniedException("revoked")).when(dependencies)
+                .getById("fixture_member",RequiredReadReferencesTest.id(1));
+        assertThatThrownBy(this::authorizeCanonicalRead).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(dependencies,times(2)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void canonicalReadFinalAuthorizerFailureDoesNotLeakAWitness() {
+        var dependencies=wireCanonicalClosure(row -> row,row -> true);var helper=new DataAccessAuthorizationHelperImpl(dataPermissionEngine);
+        assertThatThrownBy(()->service.withCanonicalRecordRead(MODEL_CODE,CANONICAL_PID,row -> {
+            helper.authorizeRecordId(MODEL_CODE,"read",CANONICAL_PID,ignored -> row);
+            throw new IllegalStateException("final failed");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("final failed");
+        doThrow(new org.springframework.security.access.AccessDeniedException("revoked")).when(dependencies)
+                .getById("fixture_member",RequiredReadReferencesTest.id(1));
+        assertThatThrownBy(this::authorizeCanonicalRead).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(dependencies,times(2)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+    }
+    @Test void executorEarlyReturnCannotCompleteAPhysicalCanonicalWitness() {
+        var model=RequiredReadReferencesTest.model(10);model.setCode(MODEL_CODE);
+        when(metadataService.getModelDefinition(MODEL_CODE)).thenReturn(Optional.of(model));
+        var executor=mock(com.auraboot.framework.meta.service.executor.ModelDataExecutor.class);
+        when(executorRegistry.resolve(any())).thenReturn(Optional.of(executor));
+        when(executor.get(MODEL_CODE,CANONICAL_PID)).thenReturn(new java.util.LinkedHashMap<>(
+                Map.of("pid",CANONICAL_PID,"tenant_id",TENANT_ID,"members",List.of(RequiredReadReferencesTest.id(1)))));
+        var dependencies=mock(DynamicDataService.class);when(dependencies.getById(eq("fixture_member"),anyString())).thenReturn(Map.of("pid",RequiredReadReferencesTest.id(1)));
+        when(permissionFacade.canAction(USER_ID,"fixture_member","read")).thenReturn(true);
+        var guard=new RequiredRecordReadGuard(metadataService,dependencies,permissionFacade,queryBuilderService,dynamicDataMapper,dataDomainService);
+        doAnswer(call -> {guard.require(MODEL_CODE,call.getArgument(1));return null;}).when(dataPermissionEngine).requireRecordReads(eq(MODEL_CODE),anyMap());
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq("read"),eq(USER_ID),anyMap()))
+                .thenAnswer(call -> {guard.require(MODEL_CODE,call.getArgument(4));return true;});
+        authorizeCanonicalRead();verify(dependencies,times(2)).getById("fixture_member",RequiredReadReferencesTest.id(1));
+        verify(dataPermissionEngine,never()).canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap());
+        verifyNoInteractions(fieldMaskService,fieldPermissionService);
+    }
+
     private TenantMember tenantMember(Long memberId) {
         TenantMember member = new TenantMember();
         member.setId(memberId);
@@ -169,6 +341,83 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         member.setUserId(USER_ID);
         member.setStatus("ACTIVE");
         return member;
+    }
+
+    @Test
+    void dependencyReadsKeepAuthorizationAndMaskingButDoNotExpandDisplayBackLinks() {
+        wireHappyPathDbStubs();wireRuleCenterPermissionAllows();
+        when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE),anyMap(),eq(USER_ID))).thenAnswer(call -> call.getArgument(1));
+        when(fieldPermissionService.getFieldPermissions(USER_ID,MODEL_CODE)).thenReturn(com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(java.util.Set.of("pid","name","related")));
+        ModelDefinition model=metadataService.getModelDefinition(MODEL_CODE).orElseThrow();
+        FieldDefinition ref=FieldDefinition.builder().code("related").columnName("related").dataType("reference").build();
+        ref.setExtraProps(Map.of("refTarget",Map.of("targetEntity","fixture_policy","valueField","pid","displayField","name")));
+        model.setFields(List.of(model.getFields().getFirst(),ref));
+        when(dynamicDataMapper.selectByQuery(anyString(),anyMap())).thenAnswer(call -> List.of(new java.util.LinkedHashMap<>(Map.of("pid",RECORD_ID,"name","secret-value","related","policy-1"))));
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap())).thenReturn(true);
+        var dependencyModels=mock(MetaModelService.class);var dependencyData=mock(DynamicDataService.class);
+        var dependencyPermissions=mock(PermissionFacade.class);
+        when(dependencyModels.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(RequiredReadReferencesTest.model(10)));
+        when(dependencyPermissions.canAction(USER_ID,"fixture_member","read")).thenReturn(true);
+        var guard=new RequiredRecordReadGuard(dependencyModels,dependencyData,dependencyPermissions,queryBuilderService,dynamicDataMapper,dataDomainService);
+        when(dependencyData.getById(eq("fixture_member"),anyString())).thenAnswer(call -> service.getById(MODEL_CODE,RECORD_ID));
+        guard.require("fixture_bundle",Map.of("pid",RequiredReadReferencesTest.id(9),"tenant_id",TENANT_ID,"members",List.of(RequiredReadReferencesTest.id(1))));
+        verify(permissionFacade,never()).canAction(USER_ID,"fixture_policy","read");
+        verify(permissionFacade).canOperate(eq(USER_ID),eq(MODEL_CODE),eq("read"),anyMap());
+        verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap());
+        verify(dataPermissionEngine).getFieldMaskRules(TENANT_ID,MODEL_CODE,USER_ID);
+        service.getById(MODEL_CODE,RECORD_ID);
+        verify(permissionFacade).canAction(USER_ID,"fixture_policy","read");
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID),eq(MODEL_CODE),eq(USER_ID),anyMap())).thenReturn(false);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> guard.require("fixture_bundle",Map.of("pid",RequiredReadReferencesTest.id(9),"tenant_id",TENANT_ID,"members",List.of(RequiredReadReferencesTest.id(1)))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.assertj.core.api.Assertions.assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
+    }
+
+    @Test
+    void explicitAuthorizationReadKeepsGatesAndMaskedShapeWithoutReferencePresentation() {
+        wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(true);
+        when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE), anyMap(), eq(USER_ID))).thenAnswer(call -> call.getArgument(1));
+        when(fieldPermissionService.getFieldPermissions(USER_ID, MODEL_CODE)).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(java.util.Set.of("pid", "related"), java.util.Set.of("pid", "related"), java.util.Set.of("name")));
+        var model = metadataService.getModelDefinition(MODEL_CODE).orElseThrow();
+        var related = FieldDefinition.builder().code("related").columnName("related").dataType("reference").build();
+        related.setExtraProps(Map.of("refTarget", Map.of("targetEntity", "fixture_policy", "valueField", "pid", "displayField", "name")));
+        model.setFields(List.of(model.getFields().getFirst(), related));
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenAnswer(call -> List.of(
+                new java.util.LinkedHashMap<>(Map.of("pid", RECORD_ID, "name", "secret-value", "related", "policy-1"))));
+
+        var record = service.getByIdForAuthorization(MODEL_CODE, RECORD_ID);
+        org.assertj.core.api.Assertions.assertThat(record).containsEntry("pid", RECORD_ID).containsEntry("related", "policy-1").doesNotContainKey("name");
+        verify(permissionFacade).canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap());
+        verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap());
+        verify(dataPermissionEngine).getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID);
+        verify(fieldMaskService).applyMaskingForDetail(eq(MODEL_CODE), anyMap(), eq(USER_ID));
+        verify(fieldPermissionService).getFieldPermissions(USER_ID, MODEL_CODE);
+        verify(permissionFacade, never()).canAction(USER_ID, "fixture_policy", "read");
+        service.getById(MODEL_CODE, RECORD_ID);
+        verify(permissionFacade).canAction(USER_ID, "fixture_policy", "read");
+    }
+
+    @Test
+    void explicitAuthorizationReadStillRejectsDeniedRows() {
+        wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(false);
+        assertThatThrownBy(() -> service.getByIdForAuthorization(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(fieldMaskService);
+    }
+
+    @Test
+    void explicitAuthorizationReadDoesNotReturnUnmaskedDataWhenMaskingFails() {
+        wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(true);
+        when(dataPermissionEngine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID)).thenThrow(new IllegalStateException("mask lookup failed"));
+        assertThatThrownBy(() -> service.getByIdForAuthorization(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(MetaServiceException.class).hasMessageContaining("Field masking evaluation failed");
     }
 
     // =====================================================================
@@ -405,5 +654,16 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
 
         verify(permissionFacade).canOperate(eq(FALLBACK_MEMBER_ID), eq(MODEL_CODE), eq("read"), anyMap());
         verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
+    }
+    @Test void commandAllPermitCannotSkipRequiredMemberReadRestriction() {
+        wireHappyPathDbStubs();
+        doThrow(new org.springframework.security.access.AccessDeniedException("member revoked"))
+                .when(dataPermissionEngine).requireRecordReads(eq(MODEL_CODE),anyMap());
+        MetaContext.runWithCommandPermitScope("ALL",()->{
+            assertThatThrownBy(()->service.getById(MODEL_CODE,RECORD_ID))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessage("member revoked");
+        });
+        verify(dataPermissionEngine).requireRecordReads(eq(MODEL_CODE),anyMap());
+        verify(dataPermissionEngine,never()).canAccessRecord(anyLong(),anyString(),anyLong(),anyMap());
     }
 }

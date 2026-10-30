@@ -9,12 +9,15 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.plugin.extension.AiProviderAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -22,6 +25,46 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LlmProviderAccessorImplTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not JSON", "[]", "null", "1", "{} {}", "{} trailing", "{\"a\":"})
+    void rejectsInvalidMachineObjectWithoutRetry(String text) throws Exception {
+        assertThrows(IllegalStateException.class, () -> invokeResponse(text, "end_turn", true));
+    }
+
+    @Test
+    void rejectsParseableMachineObjectWhenProviderReportsTruncation() throws Exception {
+        assertThrows(IllegalStateException.class, () -> invokeResponse("{}", "max_tokens", true));
+    }
+
+    @Test
+    void preservesOrdinaryPartialTextAndCompleteMachineObjects() throws Exception {
+        assertEquals("partial prose", invokeResponse("partial prose", "max_tokens", false).text());
+        assertEquals("{\"value\":1}", invokeResponse("{\"value\":1}", "end_turn", true).text());
+    }
+
+    private AiProviderAccessor.ChatResponse invokeResponse(String text, String stopReason, boolean structured)
+            throws Exception {
+        LlmProviderFactory factory = mock(LlmProviderFactory.class);
+        LlmProvider provider = mock(LlmProvider.class);
+        when(factory.resolveConfig(7L, "deepseek")).thenReturn(LlmProviderFactory.ProviderConfig.builder()
+                .providerCode("deepseek").apiKey("test-key").baseUrl("https://example.invalid")
+                .defaultModel("test-model").maxTokens(1024).build());
+        when(factory.getProvider("deepseek")).thenReturn(provider);
+        when(provider.chat(any(), eq("test-key"), eq("https://example.invalid")))
+                .thenReturn(LlmChatResponse.builder().stopReason(stopReason)
+                        .content(List.of(LlmChatResponse.ContentBlock.builder().type("text").text(text).build()))
+                        .build());
+        var accessor = new LlmProviderAccessorImpl(factory, new ObjectMapper(), 7L);
+        try {
+            return accessor.chat(new AiProviderAccessor.ChatRequest("test", null, "deepseek", "",
+                    "Test", List.of(AiProviderAccessor.Message.user("Input")), 1024,
+                    structured ? Map.of("responseFormat", "json_object") : Map.of()));
+        } finally {
+            verify(provider).chat(any(), eq("test-key"), eq("https://example.invalid"));
+            assertEquals(false, MetaContext.exists());
+        }
+    }
 
     @Test
     void resolvesCloudConfigProviderAndReturnsPluginSafeResponse() throws Exception {

@@ -75,7 +75,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         }
         ResponseSinkContext.set(sink);
         try {
-            RunOutcome resumeOutcome = agentRunService.executeTaskSync(
+            RunOutcome resumeOutcome = agentRunService.resumeTaskSync(
                     ctx.tenantId(), taskPid, ActiveMemoryService.DEFAULT_AGENT, runPid);
             return mapRunToTurnOutcome(resumeOutcome, sink);
         } finally {
@@ -111,6 +111,10 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         Map<String, Object> inputData = new LinkedHashMap<>();
         inputData.put("turnId", ctx.turnId());
         inputData.put("conversationId", ctx.conversationId());
+        inputData.put("agentCode", ctx.agentCode());
+        inputData.put("channel", ctx.channel());
+        inputData.put("profileId", ctx.profileId());
+        inputData.put("channelSessionId", ctx.channelSessionId());
         inputData.put("inboundMessageId", ctx.inboundMessageId());
         inputData.put("triageBucket", ctx.triageBucket() != null ? ctx.triageBucket().name() : null);
         inputData.put("userMessage", legacyRequest != null ? legacyRequest.getMessage() : null);
@@ -159,7 +163,7 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         return switch (ro) {
             case RunOutcome.Success s -> {
                 String response = s.finalResponse() != null ? s.finalResponse() : "";
-                sink.onDone(response, null);
+                sink.onDone(response, s.traceId());
                 Map<String, Object> meta = new LinkedHashMap<>();
                 meta.put("runPid", s.runPid());
                 meta.put("inputTokens", s.inputTokens());
@@ -184,12 +188,16 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
                         approvalPid,
                         "agent_approval_gate",
                         pa.message() != null ? pa.message() : "Approval required",
-                        input,
-                        approvalPid);
-                sink.onDone("", null);
+                        pa.review() != null && pa.review().get("preview") instanceof Map<?, ?> preview
+                                && preview.get("input") instanceof Map<?, ?> approvedInput
+                                ? objectMapper.convertValue(approvedInput, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}) : input,
+                        approvalPid,
+                        pa.review() == null ? Map.of() : pa.review());
+                sink.onDone("", pa.traceId());
                 yield new TurnOutcome.PendingConfirmation(
                         approvalPid,
-                        pa.message() != null ? pa.message() : "Approval required",
+                        pa.review() != null && Boolean.TRUE.equals(pa.review().get("_aurabot_skill"))
+                                ? "" : pa.message() != null ? pa.message() : "Approval required",
                         approvalPid);
             }
             case RunOutcome.Cancelled c -> {

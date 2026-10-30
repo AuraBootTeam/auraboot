@@ -44,9 +44,16 @@ public class ApplicationModuleRegistry {
         this.extensionRegistry = extensionRegistry;
     }
 
-    public synchronized void register(String pluginId) {
+    public void register(String pluginId) {
+        if (registerModules(pluginId)) {
+            // Notify only after the live module map is visible and its monitor is released.
+            hostContext.publishEvent(new ApplicationModulesChangedEvent(pluginId));
+        }
+    }
+
+    private synchronized boolean registerModules(String pluginId) {
         if (modulesByPlugin.containsKey(pluginId)) {
-            return;
+            return false;
         }
         List<ApplicationModuleExtension> extensions =
                 pluginManager.getExtensionsOfType(ApplicationModuleExtension.class, pluginId);
@@ -78,6 +85,7 @@ public class ApplicationModuleRegistry {
                 log.info("Registered plugin application module {} ({})", extension.moduleId(), pluginId);
             }
             modulesByPlugin.put(pluginId, List.copyOf(loaded));
+            return !loaded.isEmpty();
         } catch (RuntimeException error) {
             extensionRegistry.unregisterApplicationModuleActions(pluginId);
             usageSources.unregister(pluginId);
@@ -87,11 +95,18 @@ public class ApplicationModuleRegistry {
         }
     }
 
-    public synchronized void unregister(String pluginId) {
-        extensionRegistry.unregisterApplicationModuleActions(pluginId);
-        workflowCapabilities.unregister(pluginId);
-        usageSources.unregister(pluginId);
-        closeReverse(modulesByPlugin.remove(pluginId));
+    public void unregister(String pluginId) {
+        boolean changed;
+        synchronized (this) {
+            pluginManager.requireTenantLifecycleChange(pluginId);
+            extensionRegistry.unregisterApplicationModuleActions(pluginId);
+            workflowCapabilities.unregister(pluginId);
+            usageSources.unregister(pluginId);
+            List<LoadedModule> removed = modulesByPlugin.remove(pluginId);
+            changed = removed != null && !removed.isEmpty();
+            closeReverse(removed);
+        }
+        if (changed) hostContext.publishEvent(new ApplicationModulesChangedEvent(pluginId));
     }
 
     public synchronized List<String> registeredModuleIds(String pluginId) {
@@ -133,6 +148,7 @@ public class ApplicationModuleRegistry {
     }
 
     public record ApplicationModuleReadyEvent(String moduleId) {}
+    public record ApplicationModulesChangedEvent(String pluginId) {}
     private record LoadedModule(String moduleId, AnnotationConfigApplicationContext context,
                                 List<Object> controllers,
                                 List<DecisionUsageSourceContributor> usageSources) {}

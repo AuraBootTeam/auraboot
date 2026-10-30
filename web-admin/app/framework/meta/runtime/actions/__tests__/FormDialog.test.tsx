@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import FormDialog from '../FormDialog';
+import { promptInputForm } from '../ActionRegistry';
+import { validRecordList, type RecordListConfig } from '../RecordListField';
 
 function renderDialog(detail: Record<string, any>) {
   render(
@@ -51,7 +53,15 @@ describe('FormDialog choice fields', () => {
 
   it('names a required command textarea by its business label and submits its value', () => {
     const onSubmit = vi.fn();
-    renderDialog({ title: '登记交付跟进', submitLabel: '保存跟进', fields: [{ field: 'tpm_pj_next_action', label: '下一步行动', type: 'textarea', required: true }], defaults: {}, onSubmit });
+    renderDialog({
+      title: '登记交付跟进',
+      submitLabel: '保存跟进',
+      fields: [
+        { field: 'tpm_pj_next_action', label: '下一步行动', type: 'textarea', required: true },
+      ],
+      defaults: {},
+      onSubmit,
+    });
     const input = screen.getByRole('textbox', { name: '下一步行动', exact: true });
     fireEvent.change(input, { target: { value: '林晓于11月8日前完成范围确认。' } });
     fireEvent.click(screen.getByRole('button', { name: '保存跟进', exact: true }));
@@ -116,6 +126,25 @@ describe('FormDialog choice fields', () => {
 
     expect(onSubmit).toHaveBeenCalledWith({ crm_lpi_claimed_by: 'user-sales-1' });
   });
+
+  it.each(['select', 'segmented'])('accepts an optional null %s choice when no workflow is configured', (type) => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [{ field: 'workflow', label: '审批流程', type }],
+      fieldOptions: { workflow: [] }, defaults: { workflow: null }, onSubmit });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({ workflow: null });
+  });
+
+  it.each([['select', null], ['segmented', null], ['select', 'missing'], ['segmented', 'missing']])(
+    'rejects a required or unknown %s choice: %s', (type, value) => {
+      const onSubmit = vi.fn();
+      renderDialog({ fields: [{ field: 'workflow', label: '审批流程', type, required: true }],
+        fieldOptions: { workflow: [{ value: 'known', label: '可用流程' }] }, defaults: { workflow: value }, onSubmit });
+      fireEvent.click(screen.getByTestId('form-dialog-submit'));
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText(type === 'segmented' ? '请填写审批流程' : '请选择审批流程', { exact: true })).toBeInTheDocument();
+    },
+  );
 
   it('uses localized fallbacks instead of leaking missing i18n keys', () => {
     renderDialog({
@@ -550,14 +579,17 @@ describe('FormDialog choice fields', () => {
   });
 });
 
-
 describe('FormDialog calendar and instant fields', () => {
   it('submits a calendar day unchanged and converts a selected local time into an instant', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [
-      { field: 'deliveryDate', label: '交付日期', type: 'date', required: true },
-      { field: 'cutoffAt', label: '报价截止时间', type: 'datetime', required: true },
-    ], defaults: {}, onSubmit });
+    renderDialog({
+      fields: [
+        { field: 'deliveryDate', label: '交付日期', type: 'date', required: true },
+        { field: 'cutoffAt', label: '报价截止时间', type: 'datetime', required: true },
+      ],
+      defaults: {},
+      onSubmit,
+    });
     const delivery = screen.getByLabelText(/交付日期/);
     const cutoff = screen.getByLabelText(/报价截止时间/);
     expect(delivery).toHaveAttribute('type', 'date');
@@ -565,26 +597,36 @@ describe('FormDialog calendar and instant fields', () => {
     fireEvent.change(delivery, { target: { value: '2026-11-01' } });
     fireEvent.change(cutoff, { target: { value: '2026-10-30T15:45' } });
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
-    expect(onSubmit).toHaveBeenCalledWith({ deliveryDate: '2026-11-01',
-      cutoffAt: new Date('2026-10-30T15:45').toISOString() });
+    expect(onSubmit).toHaveBeenCalledWith({
+      deliveryDate: '2026-11-01',
+      cutoffAt: new Date('2026-10-30T15:45').toISOString(),
+    });
   });
 
   it('preserves the original instant when the user leaves its default unchanged', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'cutoffAt', label: '截止时间', type: 'datetime' }],
-      defaults: { cutoffAt: '2026-10-30T07:45:32.123Z' }, onSubmit });
+    renderDialog({
+      fields: [{ field: 'cutoffAt', label: '截止时间', type: 'datetime' }],
+      defaults: { cutoffAt: '2026-10-30T07:45:32.123Z' },
+      onSubmit,
+    });
     const value = (screen.getByLabelText('截止时间') as HTMLInputElement).value;
     const local = new Date('2026-10-30T07:45:32.123Z');
     const pad = (v: number) => String(v).padStart(2, '0');
-    expect(value).toBe(`${local.getFullYear()}-${pad(local.getMonth()+1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`);
+    expect(value).toBe(
+      `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`,
+    );
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).toHaveBeenCalledWith({ cutoffAt: '2026-10-30T07:45:32.123Z' });
   });
 
   it('blocks submission when a required calendar field is cleared', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'deliveryDate', label: '交付日期', type: 'date', required: true }],
-      defaults: { deliveryDate: '2026-11-01' }, onSubmit });
+    renderDialog({
+      fields: [{ field: 'deliveryDate', label: '交付日期', type: 'date', required: true }],
+      defaults: { deliveryDate: '2026-11-01' },
+      onSubmit,
+    });
     fireEvent.change(screen.getByLabelText(/交付日期/), { target: { value: '' } });
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
@@ -592,54 +634,115 @@ describe('FormDialog calendar and instant fields', () => {
   });
 });
 
-
 describe('FormDialog grouped choices', () => {
   const groups = [
-    { value: 'resistors', label: '电阻', options: [{ value: 'supplier-a', label: '供应商甲' }, { value: 'supplier-b', label: '供应商乙' }] },
-    { value: 'capacitors', label: '电容', options: [{ value: 'supplier-a', label: '供应商甲' }, { value: 'supplier-c', label: '停用供应商', disabled: true }] },
+    {
+      value: 'resistors',
+      label: '电阻',
+      options: [
+        { value: 'supplier-a', label: '供应商甲' },
+        { value: 'supplier-b', label: '供应商乙' },
+      ],
+    },
+    {
+      value: 'capacitors',
+      label: '电容',
+      options: [
+        { value: 'supplier-a', label: '供应商甲' },
+        { value: 'supplier-c', label: '停用供应商', disabled: true },
+      ],
+    },
   ];
-  const field = { field: 'categorySuppliers', type: 'grouped-multiselect', label: '各品类供应商', required: true,
-    props: { groupField: 'category', valuesField: 'supplierPids' } };
+  const field = {
+    field: 'categorySuppliers',
+    type: 'grouped-multiselect',
+    label: '各品类供应商',
+    required: true,
+    props: { groupField: 'category', valuesField: 'supplierPids' },
+  };
   it('requires explicit selection in every group and submits independent multi selections', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [field], fieldOptions: { categorySuppliers: groups }, defaults: {}, onSubmit });
+    renderDialog({
+      fields: [field],
+      fieldOptions: { categorySuppliers: groups },
+      defaults: {},
+      onSubmit,
+    });
     const resistors = screen.getByRole('group', { name: '电阻' });
     const capacitors = screen.getByRole('group', { name: '电容' });
-    expect(screen.getAllByRole('checkbox').every((input: HTMLElement) => !(input as HTMLInputElement).checked)).toBe(true);
+    expect(
+      screen
+        .getAllByRole('checkbox')
+        .every((input: HTMLElement) => !(input as HTMLInputElement).checked),
+    ).toBe(true);
     fireEvent.click(screen.getAllByRole('checkbox', { name: '供应商甲' })[0]);
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('checkbox', { name: '供应商乙' }));
     fireEvent.click(screen.getAllByRole('checkbox', { name: '供应商甲' })[1]);
-    expect(resistors).toBeInTheDocument(); expect(capacitors).toBeInTheDocument();
+    expect(resistors).toBeInTheDocument();
+    expect(capacitors).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: '停用供应商' })).toBeDisabled();
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
-    expect(onSubmit).toHaveBeenCalledWith({ categorySuppliers: [
-      { category: 'resistors', supplierPids: ['supplier-a', 'supplier-b'] },
-      { category: 'capacitors', supplierPids: ['supplier-a'] },
-    ] });
+    expect(onSubmit).toHaveBeenCalledWith({
+      categorySuppliers: [
+        { category: 'resistors', supplierPids: ['supplier-a', 'supplier-b'] },
+        { category: 'capacitors', supplierPids: ['supplier-a'] },
+      ],
+    });
   });
-  it.each([
-    [],
-    [{ category: 'resistors', supplierPids: ['supplier-a'] }],
-    [{ category: 'resistors', supplierPids: ['supplier-a', 'supplier-a'] }, { category: 'capacitors', supplierPids: ['supplier-a'] }],
-    [{ category: 'resistors', supplierPids: ['supplier-a'] }, { category: 'capacitors', supplierPids: ['supplier-c'] }],
-    [{ category: 'resistors', supplierPids: ['supplier-a'] }, { category: 'capacitors', supplierPids: ['forged'] }],
-  ].map((value) => ({ value })))('rejects incomplete or invalid submitted defaults', ({ value }) => {
+  it.each(
+    [
+      [],
+      [{ category: 'resistors', supplierPids: ['supplier-a'] }],
+      [
+        { category: 'resistors', supplierPids: ['supplier-a', 'supplier-a'] },
+        { category: 'capacitors', supplierPids: ['supplier-a'] },
+      ],
+      [
+        { category: 'resistors', supplierPids: ['supplier-a'] },
+        { category: 'capacitors', supplierPids: ['supplier-c'] },
+      ],
+      [
+        { category: 'resistors', supplierPids: ['supplier-a'] },
+        { category: 'capacitors', supplierPids: ['forged'] },
+      ],
+    ].map((value) => ({ value })),
+  )('rejects incomplete or invalid submitted defaults', ({ value }) => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [field], fieldOptions: { categorySuppliers: groups }, defaults: { categorySuppliers: value }, onSubmit });
+    renderDialog({
+      fields: [field],
+      fieldOptions: { categorySuppliers: groups },
+      defaults: { categorySuppliers: value },
+      onSubmit,
+    });
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
 
-
 describe('FormDialog grouped default selections', () => {
   it('submits manual changes to a suggested selection without restoring the original default', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: 'Selection', required: true }],
-      fieldOptions: { selection: [{ value: 'materials', label: 'Materials', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] },
-      defaults: { selection: [{ group: 'materials', values: ['a'] }] }, onSubmit });
+    renderDialog({
+      fields: [
+        { field: 'selection', type: 'grouped-multiselect', label: 'Selection', required: true },
+      ],
+      fieldOptions: {
+        selection: [
+          {
+            value: 'materials',
+            label: 'Materials',
+            options: [
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ],
+          },
+        ],
+      },
+      defaults: { selection: [{ group: 'materials', values: ['a'] }] },
+      onSubmit,
+    });
     fireEvent.click(screen.getByRole('checkbox', { name: 'A' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'B' }));
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
@@ -648,9 +751,23 @@ describe('FormDialog grouped default selections', () => {
   it('preserves an explicitly supplied valid selection without adding suppliers', () => {
     const onSubmit = vi.fn();
     const value = [{ group: 'materials', values: ['a'] }];
-    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: 'Selection' }],
-      fieldOptions: { selection: [{ value: 'materials', label: 'Materials', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] },
-      defaults: { selection: value }, onSubmit });
+    renderDialog({
+      fields: [{ field: 'selection', type: 'grouped-multiselect', label: 'Selection' }],
+      fieldOptions: {
+        selection: [
+          {
+            value: 'materials',
+            label: 'Materials',
+            options: [
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ],
+          },
+        ],
+      },
+      defaults: { selection: value },
+      onSubmit,
+    });
     expect(screen.getByRole('checkbox', { name: 'A' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'B' })).not.toBeChecked();
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
@@ -658,15 +775,18 @@ describe('FormDialog grouped default selections', () => {
   });
 });
 
-
 describe('FormDialog named native inputs', () => {
   it('associates business labels with native command input controls', () => {
-    renderDialog({ fields: [
-      { field: 'title', type: 'text', label: '询价标题' },
-      { field: 'notes', type: 'textarea', label: '说明' },
-      { field: 'quantity', type: 'number', label: '数量' },
-      { field: 'category', type: 'select', label: '采购品类' },
-    ], defaults: {}, fieldOptions: { category: [{ value: 'a', label: '电阻' }] } });
+    renderDialog({
+      fields: [
+        { field: 'title', type: 'text', label: '询价标题' },
+        { field: 'notes', type: 'textarea', label: '说明' },
+        { field: 'quantity', type: 'number', label: '数量' },
+        { field: 'category', type: 'select', label: '采购品类' },
+      ],
+      defaults: {},
+      fieldOptions: { category: [{ value: 'a', label: '电阻' }] },
+    });
     expect(screen.getByRole('textbox', { name: '询价标题' })).toHaveAttribute('type', 'text');
     expect(screen.getByRole('textbox', { name: '说明' })).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: '数量' })).toBeInTheDocument();
@@ -674,14 +794,606 @@ describe('FormDialog named native inputs', () => {
   });
 });
 
-
 describe('FormDialog unavailable grouped options', () => {
   it('explains an empty group and prevents its submission', () => {
     const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'selection', type: 'grouped-multiselect', label: '各品类供应商', required: true }],
-      fieldOptions: { selection: [{ value: 'empty', label: '电阻', options: [] }] }, defaults: {}, onSubmit });
+    renderDialog({
+      fields: [
+        { field: 'selection', type: 'grouped-multiselect', label: '各品类供应商', required: true },
+      ],
+      fieldOptions: { selection: [{ value: 'empty', label: '电阻', options: [] }] },
+      defaults: {},
+      onSubmit,
+    });
     expect(screen.getByRole('group', { name: '电阻' })).toHaveTextContent('暂无可选项');
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe('FormDialog fixed-key string maps', () => {
+  it('shows read-only business labels while submitting the exact original values', () => {
+    const axes = { color: 'blue_code', capacity: '1234567890123456.78' };
+    const onSubmit = vi.fn();
+    renderDialog({
+      submitLabel: 'Save information',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: {
+            readOnly: true,
+            keyLabels: { color: 'Colour', capacity: 'Capacity' },
+            displayValues: { color: 'Blue', capacity: '1234567890123456.78 GB' },
+          },
+        },
+      ],
+      defaults: { axes },
+      onSubmit,
+    });
+    const group = screen.getByRole('group', { name: 'Options' });
+    expect(group).toHaveTextContent('Colour');
+    expect(group).toHaveTextContent('Blue');
+    expect(group).toHaveTextContent('1234567890123456.78 GB');
+    expect(group).not.toHaveTextContent('blue_code');
+    expect(group.querySelector('input,select,textarea')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save information', exact: true }));
+    expect(onSubmit).toHaveBeenCalledWith({ axes });
+    expect(axes).toEqual({ color: 'blue_code', capacity: '1234567890123456.78' });
+  });
+  it('rejects malformed read-only values instead of trusting display labels', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: {
+            readOnly: true,
+            displayValues: { color: 'Blue' },
+            invalidMessage: 'Reload options',
+          },
+        },
+      ],
+      defaults: { axes: { color: 7 } },
+      onSubmit,
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Reload options');
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+  it('edits each labeled value without changing keys, coercing numbers or mutating the source', () => {
+    const axes = { color: 'Red', size: 'M' },
+      onSubmit = vi.fn();
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: { keyLabels: { color: 'Colour', size: 'Size' }, maxValueLength: 128 },
+        },
+      ],
+      defaults: { axes },
+      onSubmit,
+    });
+    expect(screen.getByRole('group', { name: 'Options' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Colour'), { target: { value: 'Wine red' } });
+    fireEvent.change(screen.getByLabelText('Size'), { target: { value: '007' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(onSubmit).toHaveBeenCalledWith({ axes: { color: 'Wine red', size: '007' } });
+    expect(axes).toEqual({ color: 'Red', size: 'M' });
+  });
+  it('keeps empty values in the dialog and does not submit malformed maps as valid empty options', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          props: { invalidMessage: 'Review options' },
+        },
+      ],
+      defaults: { axes: { Colour: 'Red' } },
+      onSubmit,
+    });
+    fireEvent.change(screen.getByLabelText('Colour'), { target: { value: ' ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(screen.getByText('Review options')).toBeTruthy();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+  it.each([null, ['Red'], { colour: 7 }])('rejects a non-string-map source: %j', (axes) => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          props: { invalidMessage: 'Reload options' },
+        },
+      ],
+      defaults: { axes },
+      onSubmit,
+    });
+    expect(screen.getByRole('alert').textContent).toBe('Reload options');
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+  it('accepts the explicit empty map of a single variant without inventing options', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      submitLabel: 'Save options',
+      fields: [
+        {
+          field: 'axes',
+          label: 'Options',
+          type: 'string-map',
+          required: true,
+          props: { emptyMessage: 'No options needed' },
+        },
+      ],
+      defaults: { axes: {} },
+      onSubmit,
+    });
+    expect(screen.getByText('No options needed')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save options', exact: true }));
+    expect(onSubmit).toHaveBeenCalledWith({ axes: {} });
+  });
+});
+
+describe('FormDialog structured record lists', () => {
+  const fields = [
+    {
+      field: 'bindings',
+      label: '属性声明',
+      type: 'record-list',
+      props: {
+        maxItems: 2,
+        addLabel: '添加属性',
+        removeLabel: '移除属性',
+        itemLabel: '属性',
+        fields: [
+          { field: 'label', label: '名称', type: 'text', required: true, group: '属性定义' },
+          {
+            field: 'dictionary.version',
+            label: '字典版本',
+            type: 'integer',
+            min: 1,
+            max: 10000,
+            required: true,
+            group: '属性定义',
+          },
+          { field: 'publicReadable', label: '买家可见', type: 'checkbox', group: '用途' },
+          {
+            field: 'roles',
+            label: '可写角色',
+            type: 'multiselect',
+            group: '用途',
+            options: [{ value: 'editor', label: '目录编辑' }],
+          },
+        ],
+        defaults: { label: '', dictionary: { version: 1 }, publicReadable: false, roles: [] },
+      },
+    },
+  ];
+  it('edits typed nested values without changing hidden metadata or the original defaults', () => {
+    const onSubmit = vi.fn();
+    const original = {
+      bindings: [
+        {
+          key: 'capacity',
+          label: '容量',
+          dictionary: { code: 'capacity', version: 3 },
+          publicReadable: true,
+          roles: ['editor'],
+          frozen: { tenant: '9007199254740993' },
+        },
+      ],
+    };
+    renderDialog({ fields, defaults: original, onSubmit });
+    expect(screen.getByLabelText(/^名称/)).toHaveFocus();
+    fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '存储容量' } });
+    fireEvent.change(screen.getByLabelText(/^字典版本/), { target: { value: '4' } });
+    fireEvent.click(screen.getByLabelText('买家可见'));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      bindings: [
+        {
+          ...original.bindings[0],
+          label: '存储容量',
+          dictionary: { code: 'capacity', version: 4 },
+          publicReadable: false,
+        },
+      ],
+    });
+    expect(original.bindings[0].label).toBe('容量');
+    expect(original.bindings[0].dictionary.version).toBe(3);
+  });
+  it('adds and removes declarations and cancels without mutating the input array', () => {
+    const onSubmit = vi.fn(),
+      onCancel = vi.fn();
+    const original = { bindings: [] };
+    renderDialog({ fields, defaults: original, onSubmit, onCancel });
+    fireEvent.click(screen.getByRole('button', { name: '添加属性' }));
+    fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '保修' } });
+    fireEvent.click(screen.getByRole('button', { name: '移除属性 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加属性' }));
+    expect(screen.getByLabelText(/^名称/)).toHaveValue('');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(original.bindings).toEqual([]);
+  });
+  it('rejects malformed data instead of silently replacing it with an empty list', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields, defaults: { bindings: { key: 'invalid' } }, onSubmit });
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '添加属性' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+  it('rejects incomplete records and out-of-range or noninteger version drafts', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields, defaults: { bindings: [] }, onSubmit });
+    fireEvent.click(screen.getByRole('button', { name: '添加属性' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/^名称/), { target: { value: '颜色' } });
+    fireEvent.change(screen.getByLabelText(/^字典版本/), { target: { value: '3.5' } });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/^字典版本/), { target: { value: '3' } });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      bindings: [{ label: '颜色', dictionary: { version: 3 }, publicReadable: false, roles: [] }],
+    });
+  });
+});
+
+describe('record-list trust boundary', () => {
+  const config: RecordListConfig = {
+    fields: [
+      { field: 'version', label: '版本', type: 'integer', required: true, min: 1, max: 100 },
+      { field: 'enabled', label: '启用', type: 'checkbox', required: true },
+      {
+        field: 'roles',
+        label: '角色',
+        type: 'multiselect',
+        options: [
+          { value: 'editor', label: '目录编辑' },
+          { value: 'retired', label: '历史角色', disabled: true },
+        ],
+      },
+    ],
+    maxItems: 1,
+  };
+  it('accepts false and an empty optional role set without coercing business values', () => {
+    expect(validRecordList([{ version: 1, enabled: false, roles: [] }], config)).toBe(true);
+  });
+  it.each([0, 101, 1.5, '2', '9007199254740993', 9007199254740992])(
+    'rejects invalid exact version %s',
+    (version) => {
+      expect(validRecordList([{ version, enabled: false, roles: [] }], config)).toBe(false);
+    },
+  );
+  it.each([['unknown'], ['retired'], ['editor', 'editor']])(
+    'rejects unavailable or duplicate role choices %j',
+    (...roles) => {
+      expect(validRecordList([{ version: 1, enabled: true, roles }], config)).toBe(false);
+    },
+  );
+  it('keeps the item quota and malformed row boundary in validation', () => {
+    expect(
+      validRecordList(
+        [
+          { version: 1, enabled: true, roles: [] },
+          { version: 2, enabled: true, roles: [] },
+        ],
+        config,
+      ),
+    ).toBe(false);
+    expect(validRecordList([null], config)).toBe(false);
+    expect(validRecordList([['version', 1]], config)).toBe(false);
+  });
+  it('rejects unsafe field paths before editing or submitting', () => {
+    expect(() =>
+      validRecordList([], {
+        fields: [{ field: '__proto__.polluted', label: '属性', type: 'text' }],
+      }),
+    ).toThrow('Invalid record-list field path');
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
+it('rejects corrupt intermediate objects instead of erasing metadata during nested editing', () => {
+  const config: RecordListConfig = {
+    fields: [{ field: 'dictionary.version', label: '版本', type: 'integer' }],
+  };
+  expect(validRecordList([{ dictionary: 'broken' }], config)).toBe(false);
+  expect(() =>
+    validRecordList([], {
+      fields: [{ field: 'dictionary', label: '字典', type: 'text' }, ...config.fields],
+    }),
+  ).toThrow('Overlapping record-list field paths');
+});
+
+it('carries structured defaults through the original prompt input pipeline and returns typed declarations', async () => {
+  render(
+    <I18nProvider initialData={{}} initialLocale="zh-CN">
+      <FormDialog />
+    </I18nProvider>,
+  );
+  const original = [{ key: 'capacity', fieldVersion: 3, publicReadable: false }];
+  let pending: Promise<Record<string, unknown>>;
+  await act(async () => {
+    pending = promptInputForm(
+      [
+        {
+          field: 'bindings',
+          label: '属性声明',
+          type: 'record-list',
+          defaultValue: '${state.type.bindings}',
+          props: {
+            fields: [
+              { field: 'fieldVersion', label: '字段版本', type: 'integer', required: true, min: 1 },
+              { field: 'publicReadable', label: '买家可见', type: 'checkbox' },
+            ],
+          },
+        },
+      ],
+      '编辑属性',
+      undefined,
+      '保存声明',
+      { state: { type: { bindings: original } } },
+    );
+  });
+  fireEvent.change(screen.getByLabelText(/^字段版本/), { target: { value: '4' } });
+  fireEvent.click(screen.getByRole('button', { name: '保存声明' }));
+  await expect(pending!).resolves.toEqual({
+    bindings: [{ key: 'capacity', fieldVersion: 4, publicReadable: false }],
+  });
+  expect(original).toEqual([{ key: 'capacity', fieldVersion: 3, publicReadable: false }]);
+});
+
+describe('FormDialog paged native references', () => {
+  const scope = { storePid: 'store-a', typePid: 'type-a', revision: '7' };
+  const field = (reference: Record<string, unknown>, name = 'fieldCode') => ({
+    field: 'bindings',
+    label: '属性',
+    type: 'record-list',
+    props: {
+      identityField: 'key',
+      defaults: { fieldCode: '', roles: [] },
+      fields: [
+        {
+          field: name,
+          label: '原生引用',
+          type: 'reference',
+          required: name === 'fieldCode',
+          reference: {
+            source: '/api/choices?expectedRevision=7',
+            selectedSource: '/api/selected?expectedRevision=7',
+            scope,
+            ...reference,
+          },
+        },
+      ],
+    },
+  });
+  const response = (records: unknown[], total = records.length, current = 1) => ({
+    ...scope,
+    records,
+    total,
+    current,
+    pageSize: 20,
+  });
+  const choice = (value: string, label: string, selection: Record<string, unknown> = {}) => ({
+    value,
+    label,
+    selection,
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('uses the original prompt transport, pages real totals and assigns an exact composite reference without leaking candidate metadata', async () => {
+    const onSubmit = vi.fn();
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([])
+        : url.includes('page=2')
+          ? response(
+              [
+                choice('field-v2', '容量 · v2', {
+                  fieldCode: 'capacity',
+                  fieldVersion: 2,
+                  secret: 'discard',
+                }),
+              ],
+              21,
+              2,
+            )
+          : response(
+              [choice('field-v1', '容量 · v1', { fieldCode: 'capacity', fieldVersion: 1 })],
+              21,
+            ),
+    );
+    render(
+      <I18nProvider initialData={{}} initialLocale="zh-CN">
+        <FormDialog />
+      </I18nProvider>,
+    );
+    let result!: Promise<Record<string, any>>;
+    act(() => {
+      result = promptInputForm(
+        [
+          {
+            ...field({ selectionFields: ['fieldCode', 'fieldVersion'] }),
+            defaultValue: [
+              {
+                key: 'capacity',
+                fieldCode: 'capacity',
+                fieldVersion: 1,
+                untouched: { tenant: '9007199254740993' },
+              },
+            ],
+          },
+        ],
+        '编辑属性',
+        fetchResult,
+      );
+    });
+    fireEvent.click(screen.getByLabelText(/^原生引用/));
+    await screen.findByRole('button', { name: '容量 · v1 ✓' });
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    fireEvent.click(await screen.findByRole('button', { name: '容量 · v2' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    await expect(result).resolves.toEqual({
+      bindings: [
+        {
+          key: 'capacity',
+          fieldCode: 'capacity',
+          fieldVersion: 2,
+          untouched: { tenant: '9007199254740993' },
+        },
+      ],
+    });
+    expect(
+      fetchResult.mock.calls.some(
+        ([url]) => url.includes('page=2') && url.includes('expectedRevision=7'),
+      ),
+    ).toBe(true);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('selects a family then an explicit dictionary version and clears the optional reference as null', async () => {
+    const onSubmit = vi.fn();
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([])
+        : url.includes('/families/family-a/versions')
+          ? response([
+              choice('dict-v3', '颜色 · v3', { dictionary: { code: 'colours', version: 3 } }),
+            ])
+          : response([choice('family-a', '颜色')]),
+    );
+    renderDialog({
+      fields: [
+        field(
+          {
+            nextSource: '/api/families/{value}/versions?expectedRevision=7',
+            selectionFields: ['dictionary'],
+          },
+          'dictionary',
+        ),
+      ],
+      defaults: { bindings: [{ key: 'colour', dictionary: null }] },
+      fetchResult,
+      onSubmit,
+    });
+    fireEvent.click(screen.getByLabelText('原生引用'));
+    fireEvent.click(await screen.findByRole('button', { name: '颜色' }));
+    fireEvent.click(await screen.findByRole('button', { name: '颜色 · v3' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      bindings: [{ key: 'colour', dictionary: { code: 'colours', version: 3 } }],
+    });
+  });
+
+  it('preserves unavailable selections on permission failure and retries without erasing the record', async () => {
+    const onSubmit = vi.fn();
+    const fetchResult = vi.fn().mockRejectedValue(new Error('forbidden'));
+    const defaults = { bindings: [{ key: 'capacity', fieldCode: 'capacity', fieldVersion: 1 }] };
+    renderDialog({
+      fields: [field({ selectionFields: ['fieldCode', 'fieldVersion'] })],
+      defaults,
+      fetchResult,
+      onSubmit,
+    });
+    await screen.findByText('无法读取已选名称，请检查权限或重试。');
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(defaults);
+    expect(defaults.bindings[0].fieldVersion).toBe(1);
+  });
+
+  it('rejects a stale candidate scope and never exposes its rows', async () => {
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([])
+        : {
+            ...response([choice('foreign', '别店字段', { fieldCode: 'foreign', fieldVersion: 1 })]),
+            storePid: 'store-b',
+          },
+    );
+    renderDialog({
+      fields: [field({ selectionFields: ['fieldCode', 'fieldVersion'] })],
+      defaults: { bindings: [{ key: 'a', fieldCode: 'a', fieldVersion: 1 }] },
+      fetchResult,
+    });
+    fireEvent.click(screen.getByLabelText(/^原生引用/));
+    await screen.findByText('候选读取失败，请检查权限、草稿版本或连接。');
+    expect(screen.queryByRole('button', { name: '别店字段' })).not.toBeInTheDocument();
+  });
+
+  it('keeps role selections across pages, excludes disabled choices and preserves cancellation', async () => {
+    const onSubmit = vi.fn(),
+      onCancel = vi.fn();
+    const defaults = { bindings: [{ key: 'a', roles: ['role-one'] }] };
+    const fetchResult = vi.fn(async (url: string) =>
+      url.includes('/selected')
+        ? response([choice('role-one', '目录编辑')])
+        : url.includes('page=2')
+          ? response(
+              [
+                choice('role-two', '商品审核'),
+                { ...choice('disabled', '停用角色'), disabled: true },
+              ],
+              22,
+              2,
+            )
+          : response([choice('role-one', '目录编辑')], 22),
+    );
+    renderDialog({
+      fields: [field({ multiple: true }, 'roles')],
+      defaults,
+      fetchResult,
+      onSubmit,
+      onCancel,
+    });
+    fireEvent.click(screen.getByLabelText('原生引用'));
+    await screen.findByRole('button', { name: '目录编辑 ✓' });
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    fireEvent.click(await screen.findByRole('button', { name: '商品审核' }));
+    expect(screen.getByRole('button', { name: '停用角色' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(defaults.bindings[0].roles).toEqual(['role-one']);
+  });
+
+  it('generates distinct hidden identities on add and never mutates defaults', () => {
+    const onSubmit = vi.fn();
+    const f = field({ multiple: true }, 'roles');
+    renderDialog({
+      fields: [f],
+      defaults: { bindings: [] },
+      onSubmit,
+      fetchResult: vi.fn(async () => response([])),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '添加记录' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加记录' }));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    const saved = onSubmit.mock.calls[0][0].bindings;
+    expect(saved[0].key).toMatch(/^r_[a-f0-9]{32}$/);
+    expect(saved[0].key).not.toBe(saved[1].key);
+    expect(f.props.defaults).toEqual({ fieldCode: '', roles: [] });
   });
 });

@@ -20,6 +20,8 @@ public class AgentApprovalPendingException extends RuntimeException {
     private final String approvalPid;
     private final String toolName;
     private final Map<String, Object> input;
+    private final String previewToken;
+    private final Map<String, Object> review;
 
     public AgentApprovalPendingException(String message) {
         this(null, message);
@@ -31,10 +33,17 @@ public class AgentApprovalPendingException extends RuntimeException {
 
     public AgentApprovalPendingException(String approvalPid, String message,
                                          String toolName, Map<String, Object> input) {
+        this(approvalPid, message, toolName, input, null, Map.of());
+    }
+
+    public AgentApprovalPendingException(String approvalPid, String message, String toolName,
+                                         Map<String, Object> input, String previewToken, Map<String, Object> review) {
         super(message);
         this.approvalPid = approvalPid;
         this.toolName = toolName;
         this.input = input;
+        this.previewToken = previewToken;
+        this.review = review == null ? Map.of() : Map.copyOf(review);
     }
 
     /** {@code ab_agent_approval.pid} of the pending approval row, or null when
@@ -50,4 +59,7 @@ public class AgentApprovalPendingException extends RuntimeException {
     public Map<String, Object> getInput() {
         return input;
     }
+    public String getPreviewToken() { return previewToken; }
+
+    public Map<String, Object> getReview() { return review; }
 }

@@ -231,7 +231,6 @@ export function renderListPageFeedback(
         t={translateCommon}
       />
       {/* Page title, view selector, and action buttons */}
-      {!workspace && pageHeader}
 
       {actionError && (
         <div

@@ -2,6 +2,12 @@
   "$comment": "Which spec directories are governed by a name allowlist, and which orphans are deliberate. See scripts/check-e2e-spec-registration.mjs for why an unregistered spec is an error rather than a warning.",
   "registries": [
     {
+      "dir": "web-admin/tests/acceptance/agent-approval",
+      "configFile": "web-admin/playwright.agent-approval.config.ts",
+      "arrayName": "agentApprovalSpecNames",
+      "project": "agent-approval-ui"
+    },
+    {
       "dir": "web-admin/tests/e2e/pcba-solution",
       "configFile": "web-admin/playwright.config.ts",
       "arrayName": "quoteOpsCurrentSpecNames",

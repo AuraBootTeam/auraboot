@@ -44,6 +44,7 @@ export interface ListPageHeaderProps {
   resolveLabel: (button: ButtonConfig) => string;
   t?: (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   evaluateVisible: (button: ButtonConfig) => boolean;
+  evaluateDisabled?: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
   /** Current filter conditions for export */
@@ -81,6 +82,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   resolveLabel,
   t: providedT,
   evaluateVisible,
+  evaluateDisabled,
   onImport,
   onExport,
   exportFilters,
@@ -95,11 +97,15 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   const { t: contextT } = useI18n();
   const t = providedT ?? contextT;
   return (
-    <div className={workspace ? 'mb-6 bg-transparent pt-1' : 'border-border bg-panel border-b px-5 py-4'}>
+    <div className="mb-6 bg-transparent pt-1">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div><h2 className={`text-text min-w-0 font-semibold tracking-tight break-words ${workspace ? 'text-2xl' : 'text-xl'}`}>{title}</h2>
-          {workspace && description && <p className="text-text-2 mt-2 text-xs">{description}</p>}</div>
+          <div>
+            <h2 className={`text-text min-w-0 text-2xl font-semibold tracking-tight break-words`}>
+              {title}
+            </h2>
+            {description && <p className="text-text-2 mt-2 text-xs">{description}</p>}
+          </div>
           {!hideSavedViews && (
             <ViewSelector
               views={savedViews}
@@ -146,7 +152,17 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               {t('member.import')}
             </button>
           )}
-          {workspace && !hideBuiltInExport && <button type="button" onClick={() => onExport('xlsx')} data-testid="workspace-export" className="border-border-strong text-text-2 inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs"><Download className="h-3.5 w-3.5" />{t('action.export', undefined, 'Export')}</button>}
+          {workspace && !hideBuiltInExport && (
+            <button
+              type="button"
+              onClick={() => onExport('xlsx')}
+              data-testid="workspace-export"
+              className="border-border-strong text-text-2 inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t('action.export', undefined, 'Export')}
+            </button>
+          )}
           <ToolbarActionGroup
             buttons={buttons}
             toolbarActions={toolbarActions}
@@ -155,6 +171,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
             resolveLabel={resolveLabel}
             t={t}
             evaluateVisible={evaluateVisible}
+            evaluateDisabled={evaluateDisabled}
             onImport={onImport}
             onExport={onExport}
             modelCode={modelCode}

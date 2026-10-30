@@ -1,0 +1,401 @@
+{
+  "schema": 1,
+  "testedSource": "c1921cd6b45a59ed2a51607985d0dbc70ea9e2da",
+  "claim": "targeted-tested; incomplete S2-S8 scope",
+  "evidenceRound": "2026-10-25T01-03-32-015Z-5fa48cff-efb4-424a-946d-e63e1322aba8",
+  "browser": {
+    "executed": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "setupAuthentications": 1,
+    "specs": [
+      "announcement-lifecycle.spec.ts",
+      "announcement-policy.spec.ts",
+      "announcement-reminders.spec.ts",
+      "announcement-statistics.spec.ts"
+    ]
+  },
+  "backend": {
+    "executed": 22,
+    "passed": 22,
+    "failed": 0,
+    "skipped": 0,
+    "surface": "Actual PostgreSQL/HTTP/reliable outbox; automatic calendar fixtures replace host time only"
+  },
+  "requirementGroups": [
+    "D10",
+    "D11",
+    "D14"
+  ],
+  "visualReviews": [
+    {
+      "scenario": "reminder-batch-completed",
+      "group": "reminder",
+      "file": "visual/reminder-batch-completed.png",
+      "sha256": "71e0d959d14fde819f17e87ede8573f67078f4c45764162c68d081858f795e4b",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-batch-reloaded",
+      "group": "reminder",
+      "file": "visual/reminder-batch-reloaded.png",
+      "sha256": "8ac49427562c4c3ce1ca1ce28714fc4ab078ba2a99399c4910998a5460035a65",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-confirm-open",
+      "group": "reminder",
+      "file": "visual/reminder-confirm-open.png",
+      "sha256": "378e63ede263c1a42e09276fffc77c3a6e7331e66985b17bb23485d23f88513b",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-management-return",
+      "group": "reminder",
+      "file": "visual/reminder-management-return.png",
+      "sha256": "709dfc4ae21f6ba4adecbde38780bd0299593f068bbe4f072b2260f6212712d8",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-plan-active",
+      "group": "reminder",
+      "file": "visual/reminder-plan-active.png",
+      "sha256": "3f103a0a13ef6060db1c8b432741bc2c40354d8d35f1684ba1796b45bd568756",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-preview-ready",
+      "group": "reminder",
+      "file": "visual/reminder-preview-ready.png",
+      "sha256": "92168edf942a862409cb89da9a6881c7026439e5c5b4079e6f686cb0401ee8af",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-preview-throttled",
+      "group": "reminder",
+      "file": "visual/reminder-preview-throttled.png",
+      "sha256": "90cd1c43c3e6087c87260b351695f129965fbd21ab04d9c817120f9347286fe5",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "reminder-uncertain-response",
+      "group": "reminder",
+      "file": "visual/reminder-uncertain-response.png",
+      "sha256": "a6f737e61b0b665ddae0ee80d9ab7f79695d4bd60794fa2ec27e613b1084b902",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "export-completed",
+      "group": "statistics",
+      "file": "visual/export-completed.png",
+      "sha256": "a71e7ee25f7979762a49fd8c7fcee267bd442d2bbab5540e4b1906281d86953d",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "export-downloaded",
+      "group": "statistics",
+      "file": "visual/export-downloaded.png",
+      "sha256": "5754fc2fe53bab659f7def7dc53715dbb8c0e73b8d6d2c8e1d1c603542406f07",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "export-uncertain-network",
+      "group": "statistics",
+      "file": "visual/export-uncertain-network.png",
+      "sha256": "e5ef2d8f6fbc47483cf2c24962f1a456d802cd43f35763d458a84e1b51cea506",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-filter-open",
+      "group": "statistics",
+      "file": "visual/statistics-filter-open.png",
+      "sha256": "359cd175bbf3a00b0e2caf35fde75b648a3b5ccc85948cb48f48e3a215d3df8d",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-filtered-empty",
+      "group": "statistics",
+      "file": "visual/statistics-filtered-empty.png",
+      "sha256": "c7de1fd52a045a6e1d60e0656e85cbc08975fca59f0c221cfd66717226407a8e",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-overview",
+      "group": "statistics",
+      "file": "visual/statistics-overview.png",
+      "sha256": "5eeb89a3cfb5939f04f5c62a19a8176c7073416f028505b3547b092c4560fd09",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-recipients-left",
+      "group": "statistics",
+      "file": "visual/statistics-recipients-left.png",
+      "sha256": "f5ef3df015e71f949a23aa76042f06b1e54785faf7078ecbc83bb164d1727e0c",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    },
+    {
+      "scenario": "statistics-recipients-right",
+      "group": "statistics",
+      "file": "visual/statistics-recipients-right.png",
+      "sha256": "a9984e383ed765c68f5fe77ce693b9d88c0e9cf216325a7ca7aa8c8b4e56b99a",
+      "review": "reviewed_pass",
+      "scope": "This captured synthetic state only; complete feature/state/permission coverage remains open"
+    }
+  ],
+  "artifact": "artifact-validation.json",
+  "excludedFromPublicEvidence": [
+    "authentication storage",
+    "raw CSV",
+    "private artifact descriptors and keys",
+    "database credentials",
+    "unreviewed lifecycle/policy images"
+  ],
+  "remainingScope": "Canonical design §16.8 and acceptance report; this is not the complete feature denominator",
+  "historyValidation": {
+    "testedSource": "19fce7258",
+    "productEquivalentSource": "6ab56e451",
+    "backend": {
+      "executed": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0
+    },
+    "mutation": {
+      "executed": 2,
+      "assertionFailures": 2,
+      "restoredCachedPassed": 25
+    },
+    "browser": {
+      "reminderPassed": 1,
+      "existingRegressionPassed": 12,
+      "statisticsPassedAtEquivalentSource": 1,
+      "retries": 0,
+      "skipped": 0
+    },
+    "evidenceRound": "2026-10-25T01-31-22-041Z-89e4cf47-06b9-47dc-9ba8-9b8e26f98013",
+    "visualReviews": [
+      {
+        "scenario": "reminder-history-page-one",
+        "file": "history/reminder-history-page-one.png",
+        "sha256": "a19f0d2c8d297ce4da6f3d7dc2f8a5a9bf69db625f9f9ec66154f588c0c64a0a",
+        "review": "reviewed_partial",
+        "observation": "First-page rows are legible; the viewport excludes the pagination footer. Supplementary region capture remains required."
+      },
+      {
+        "scenario": "reminder-history-page-two",
+        "file": "history/reminder-history-page-two.png",
+        "sha256": "0df1bd84bdbf83f19bd1a36e04b66e52900292c68e4c71b98e35046f07802700",
+        "review": "reviewed_pass",
+        "observation": "The second page and footer, or the original completed batch, are clear and readable."
+      },
+      {
+        "scenario": "reminder-history-exact-batch",
+        "file": "history/reminder-history-exact-batch.png",
+        "sha256": "42432590b9398cb6dd203f34d5eb7152eceb2984ebee552f110d281e686242c3",
+        "review": "reviewed_pass",
+        "observation": "The second page and footer, or the original completed batch, are clear and readable."
+      }
+    ],
+    "claim": "Targeted functional evidence; first-page region capture and full S2-S8 acceptance remain open",
+    "subsequentActualExecution": {
+      "source": "707da9c92",
+      "integrationPassed": 26,
+      "unitPassed": 98,
+      "failures": 0,
+      "skipped": 0
+    }
+  },
+  "managementValidation": {
+    "testedSource": "5cfd5fcd0af96bc836fcb007078ea8594dbf0e66",
+    "evidenceRound": "2026-10-25T01-47-00-260Z-071c0a16-df2d-4268-9602-87bff108d01e",
+    "unitPassed": 104,
+    "integrationPassed": 28,
+    "browserPassed": 15,
+    "skipped": 0,
+    "retries": 0,
+    "visualReviews": [
+      {
+        "scenario": "announcement-pin-confirm",
+        "file": "management/announcement-pin-confirm.png",
+        "sha256": "2a6cccd60042c1d63a3f31cb3782b9afbd7a94828aa02b7d35720360990c2834",
+        "review": "reviewed_pass",
+        "observation": "Open confirmation explains root ordering and no notification resend; cancel/confirm focus and labels are clear."
+      },
+      {
+        "scenario": "announcement-pinned",
+        "file": "management/announcement-pinned.png",
+        "sha256": "c8ed9224494114b2afe9017ac56860aa1b3838bfcd4d404fd25195814f37acdd",
+        "review": "reviewed_pass",
+        "observation": "Reloaded detail shows the pinned state, unpin action and human publisher; all five header actions fit the captured viewport."
+      }
+    ],
+    "claim": "Targeted functional validation; these two current originals reviewed; full visual and BPM matrix remains open"
+  },
+  "publicationRecoveryValidation": {
+    "testedSource": "2e248b1c9943201f82e4d629277f541955b982c2",
+    "evidenceRound": "2026-10-25T02-32-58-732Z-ceda6732-80e0-4f4d-b402-1e76812d17a4",
+    "unitPassed": 106,
+    "integrationPassed": 32,
+    "targetBrowserPassed": 1,
+    "existingBrowserRegressionPassed": 15,
+    "skipped": 0,
+    "retries": 0,
+    "frontendUnitPassedAtEquivalentProductionSource": 212,
+    "visualReviews": [
+      {
+        "scenario": "publication-blocked",
+        "file": "recovery/publication-blocked.png",
+        "sha256": "aa41020d3ef7877568e62c3726d804d7e784dd38ad388f2f4c280b748c73bb0c",
+        "review": "reviewed_pass",
+        "observation": "Blocked state shows the last completed attempt, original-member issue, cumulative attempt count and explicit recovery action."
+      },
+      {
+        "scenario": "publication-retry-confirm",
+        "file": "recovery/publication-retry-confirm.png",
+        "sha256": "769337b3accc436513e1fc4579e4f353983855fd29122c490ab77e2648d0a7ff",
+        "review": "reviewed_pass",
+        "observation": "Confirmation explains preservation of original version, actor and time window; cancel and confirm are legible."
+      },
+      {
+        "scenario": "publication-recovered",
+        "file": "recovery/publication-recovered.png",
+        "sha256": "7f60339253f78436c723b05c06efed743e8ccfefd413d443a3d69f893f9e8781",
+        "review": "reviewed_pass",
+        "observation": "Completed state shows two attempts, the actual publisher and publication time; the issue is cleared and recovery action is absent."
+      },
+      {
+        "scenario": "reminder-history-page-one",
+        "file": "history-current/reminder-history-page-one.png",
+        "sha256": "6ff8ed1d63579b2c172b26ac22ba38fc16ff1eba28a3fad2e7259d1634ab6cd9",
+        "review": "reviewed_pass",
+        "observation": "Visible first-page rows and all table headings are legible. The separate pagination original supplies the offscreen footer; row-count assertion confirms 20 records."
+      },
+      {
+        "scenario": "reminder-history-page-one-pagination",
+        "file": "history-current/reminder-history-page-one-pagination.png",
+        "sha256": "e1a3978cd4d211288f041d16ad775e5f7d61e0b8b22666f0814d1d826d468169",
+        "review": "reviewed_pass",
+        "observation": "Footer shows page one of two, 26 records, page size 20, disabled previous and available next page."
+      }
+    ],
+    "claim": "Targeted publication recovery and existing announcement regression; full S2-S8 acceptance remains open. New tenant-default approval changes are not covered by this round."
+  },
+  "operationsValidation": {
+    "browserTestedSource": "c5b1fe1dd",
+    "backendTestedSource": "3bf2fdfd10693edd8c12205e5ed3565cfb3b6129",
+    "unitPassed": 117,
+    "integrationPassed": 35,
+    "frontendUnitPassed": 17,
+    "browserPassed": 16,
+    "authenticationPassedSeparately": 1,
+    "skipped": 0,
+    "retries": 0,
+    "sourceEquivalence": "Backend source is unchanged from 3bf to c5b; later changes adjust only DSL channel width, browser geometry assertion and docs. Typecheck passed at 43d with equivalent production TypeScript.",
+    "visualReviews": [
+      {
+        "scenario": "approval-modes-provider-unavailable",
+        "file": "operations/approval-modes-provider-unavailable.png",
+        "sha256": "1c56432eae3a38e22056d3b430cdd17aa64c3efcedd73245a1deac2d775e4edd",
+        "testedSource": "3bf2fdfd10693edd8c12205e5ed3565cfb3b6129",
+        "evidenceRound": "2026-10-25T02-59-16-614Z-0a275c0f-2e1e-4629-b10b-19ba75e39a66",
+        "review": "reviewed_pass",
+        "observation": "Exempt mode is selected and enabled. Approval is visibly disabled with a readable provider-unavailable reason."
+      },
+      {
+        "scenario": "statistics-overview",
+        "file": "operations/statistics-overview.png",
+        "sha256": "b71897d0556eba7dbb8de42bb2eed11ab9ecc1b642ff7d318b2d00a235fc0cb6",
+        "testedSource": "3bf2fdfd10693edd8c12205e5ed3565cfb3b6129",
+        "evidenceRound": "2026-10-25T02-59-16-614Z-0a275c0f-2e1e-4629-b10b-19ba75e39a66",
+        "review": "reviewed_pass",
+        "observation": "All nine actions fit the toolbar; original-export lookup and channel history are visible, and statistics guidance and denominators are clear."
+      },
+      {
+        "scenario": "channel-history",
+        "file": "operations/channel-history.png",
+        "sha256": "aa109331fba29c468d1929beb439fc0054529e2763762f70b42d70de8ec4ceda",
+        "testedSource": "c5b1fe1dd",
+        "evidenceRound": "2026-10-25T03-04-06-365Z-d8df0603-743f-4971-9e88-6eb88365b647",
+        "review": "reviewed_pass",
+        "observation": "Channel, notification kind, persistence state and both dates are single-line and legible; footer and refresh/back actions are visible. The prior channel wrapping defect is resolved."
+      }
+    ],
+    "claim": "Targeted current announcement regression; attachment, full BPM composition, export races, capacity and remaining D01-D15 coverage are still open."
+  },
+  "automaticPlanRecoveryValidation": {
+    "testedSource": "6a6b2f967239b17cee666fd62466fe9285ffbf12",
+    "evidenceRound": "2026-10-25T06-53-58-237Z-d00375a4-1556-4045-a9df-b6b07fb7835c",
+    "browser": {
+      "executed": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "seconds": 49.5,
+      "setupAuthentications": 1
+    },
+    "assertions": [
+      "Real scanner blocks the original publisher without reminder authority.",
+      "Formal permission grant permits that same membership to resume through the native plan page.",
+      "Cancelling confirmation does not change the plan.",
+      "The exact resume command binds the original record and version; its public response redacts the internal member ID.",
+      "Reload renders Active, preserves the original actor, consumes no quota and creates no catch-up batch."
+    ],
+    "visualReviews": [
+      {
+        "scenario": "original-plan-blocked",
+        "file": "reminder-original-plan-blocked.png",
+        "sha256": "9859aa9ae32275e9cce7a686f31c8fdb54a7cc0e8cd362e7195409b5f7b977bd",
+        "review": "reviewed_pass",
+        "findings": "The original plan is visibly blocked with an actionable explanation and a primary resume action; the complete footer and zero quota are visible.",
+        "authority": "agent-vision",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        }
+      },
+      {
+        "scenario": "original-plan-resume-confirm",
+        "file": "reminder-original-plan-resume-confirm.png",
+        "sha256": "811ff242d0cb8f25a56ec67a5390decc4b9234cff966123d87d5e9111f59bbec",
+        "review": "reviewed_pass",
+        "findings": "The open confirmation explains original-actor resumption without catch-up; both controls and focus are visible without clipping.",
+        "authority": "agent-vision",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        }
+      },
+      {
+        "scenario": "original-plan-resumed",
+        "file": "reminder-original-plan-resumed.png",
+        "sha256": "88273c437ad2ae12c20949022da38d876f69e550fed083d4ad61105339807823",
+        "review": "reviewed_pass",
+        "findings": "The rendered plan says Active, the resume action is absent, quota remains zero and the complete empty-batch footer is visible. The earlier loading-skeleton capture was rejected.",
+        "authority": "agent-vision",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        }
+      }
+    ],
+    "previousLoadingCapture": "retained privately and rejected as completion evidence"
+  }
+}

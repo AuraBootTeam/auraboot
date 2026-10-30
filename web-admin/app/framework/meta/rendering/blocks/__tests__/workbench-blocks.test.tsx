@@ -21,6 +21,8 @@ import { StageRailBlockRenderer } from '../StageRailBlockRenderer';
 import { FiltersBlockRenderer } from '../FiltersBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 import { fetchResult } from '~/shared/services/http-client';
+import { registerConfirmDialog, unregisterConfirmDialog } from '~/utils/confirmDialog';
+import * as timezoneContext from '~/contexts/TimezoneContext';
 
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: vi.fn(() => Promise.resolve({ code: '0', data: {} })),
@@ -73,6 +75,47 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
 }
 
 describe('FiltersBlockRenderer', () => {
+  it('removes hidden filter wrappers from the grid and restores them when their condition changes', () => {
+    const runtime = makeRuntime();
+    runtime.getContext().form = { scope: 'ALL' };
+    const block = {
+      id: 'conditional-filters',
+      blockType: 'filters',
+      fields: [
+        { field: 'scope', label: 'Scope' },
+        { field: 'category', label: 'Category', visibleWhen: "form.scope == 'CATEGORY'" },
+      ],
+    } as any;
+    const view = render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+    expect(view.container.querySelector('[data-authoring-node-id="category"]')).toBeNull();
+    runtime.getContext().form = { scope: 'CATEGORY' };
+    view.rerender(<FiltersBlockRenderer block={block} runtime={runtime} />);
+    expect(view.container.querySelector('[data-authoring-node-id="category"]')).not.toBeNull();
+  });
+  it('resets only declared filter inputs before the configured reset action when enabled', async () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().form = { keyword: 'old query', status: 'ARCHIVED', unrelated: 'keep' };
+    const block = {
+      id: 'reset-inputs',
+      blockType: 'filters',
+      resetFieldsOnReset: true,
+      fields: [
+        { field: 'keyword', label: 'Keyword' },
+        { field: 'status', label: 'Status' },
+      ],
+      onReset: { action: 'state.set', args: { appliedFilters: null } },
+    } as any;
+    render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('filter-btn-reset'));
+    await waitFor(() =>
+      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'appliedFilters', null),
+    );
+    expect(runtime.getContext().form).toEqual({
+      keyword: null,
+      status: null,
+      unrelated: 'keep',
+    });
+  });
   it('executes direct workbench search and reset actions without page-level handlers', async () => {
     const runtime = makeRuntime() as any;
     const block = {
@@ -113,6 +156,25 @@ describe('FiltersBlockRenderer', () => {
 });
 
 describe('MetricStripBlockRenderer', () => {
+  it('reads nested metrics from the loaded parent record without fetching a second statistics source', () => {
+    const record = { summary: { recipients: 5, read: 2, acknowledged: null } };
+    const getData = vi.fn(() => { throw new Error('A second data source must not be read'); });
+    const runtime = makeRuntime({
+      getContext: () => ({ locale: 'en-US', t: (key: string) => key, record, state: {}, global: {}, form: {} }),
+      getDataSourceManager: () => ({ getData }),
+    });
+    const block = { id: 'parent-metrics', blockType: 'metric-strip', context: '${record}', metrics: [
+      { key: 'recipients', label: 'Recipients', valueField: 'summary.recipients' },
+      { key: 'read', label: 'Read', valueField: 'summary.read' },
+      { key: 'ack', label: 'Acknowledged', valueField: 'summary.acknowledged', valueMap: { __empty: 'Not applicable' } },
+    ] } as BlockConfig;
+    const view = render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+    expect(screen.getByTestId('metric-strip-item-recipients')).toHaveTextContent('5');
+    expect(screen.getByTestId('metric-strip-item-read')).toHaveTextContent('2');
+    expect(screen.getByTestId('metric-strip-item-ack')).toHaveTextContent('Not applicable');
+    record.summary.read = 4;view.rerender(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+    expect(screen.getByTestId('metric-strip-item-read')).toHaveTextContent('4');expect(getData).not.toHaveBeenCalled();
+  });
   it('renders compact cards for dense operational workbenches', () => {
     const runtime = makeRuntime({ data: { summary: { availableCount: 12 } } });
     const block = {
@@ -660,6 +722,138 @@ describe('MetricStripBlockRenderer', () => {
 });
 
 describe('WorkbenchActionBarBlockRenderer', () => {
+  it('subscribes action readiness to its declared data source and releases the subscription', async () => {
+    const runtime = makeRuntime() as any;
+    const ctx = runtime.getContext();
+    ctx.dataSourceStatus = { media: { loading: true, error: false } };
+    let changed: (() => void) | undefined;
+    const unsubscribe = vi.fn();
+    const subscribe = vi.fn((_id, callback) => {
+      changed = callback;
+      return unsubscribe;
+    });
+    runtime.getDataSourceManager = () => ({ subscribe });
+    const block = {
+      id: 'media_actions',
+      blockType: 'workbench-action-bar',
+      dataSource: 'media',
+      actions: [
+        {
+          code: 'add',
+          label: 'Add',
+          disabledWhen: '\$\{dataSourceStatus.media.loading || dataSourceStatus.media.error}',
+          onClick: { action: 'state.set', args: { added: true } },
+        },
+      ],
+    } as BlockConfig;
+    const view = render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+    expect(screen.getByTestId('workbench-action-add')).toBeDisabled();
+    expect(subscribe).toHaveBeenCalledWith('media', expect.any(Function));
+    act(() => {
+      ctx.dataSourceStatus.media.loading = false;
+      changed?.();
+    });
+    expect(screen.getByTestId('workbench-action-add')).toBeEnabled();
+    act(() => {
+      ctx.dataSourceStatus.media.error = true;
+      changed?.();
+    });
+    expect(screen.getByTestId('workbench-action-add')).toBeDisabled();
+    view.unmount();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the clicked target and revision through confirmation without interpreting business text twice', async () => {
+    const runtime = makeRuntime() as any;
+    const ctx = runtime.getContext();
+    ctx.state.selectedProduct = { pid: 'product-1', title: '\$\{state.secret}' };
+    ctx.state.secret = 'must-not-replace-title';
+    ctx.dataSource = { media: { revision: 'revision-1' } };
+    let confirm: ((accepted: boolean) => void) | undefined;
+    registerConfirmDialog(
+      () =>
+        new Promise<boolean>((resolve) => {
+          confirm = resolve;
+        }),
+    );
+    try {
+      const block = {
+        id: 'media_actions',
+        blockType: 'workbench-action-bar',
+        actions: [
+          {
+            code: 'remove',
+            label: 'Remove',
+            confirm: { en: 'Unlink this image?' },
+            onClick: {
+              action: 'command.execute',
+              args: {
+                command: 'catalog:unlink',
+                payload: {
+                  productPid: '\$\{state.selectedProduct.pid}',
+                  title: '\$\{state.selectedProduct.title}',
+                  expectedRevision: '\$\{dataSource.media.revision}',
+                },
+              },
+            },
+          },
+        ],
+      } as BlockConfig;
+      render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+      fireEvent.click(screen.getByTestId('workbench-action-remove'));
+      expect(confirm).toBeTypeOf('function');
+      expect(fetchResult).not.toHaveBeenCalled();
+      ctx.state.selectedProduct = { pid: 'product-2', title: 'Another product' };
+      ctx.dataSource.media.revision = 'revision-2';
+      await act(async () => {
+        confirm?.(true);
+      });
+      expect(fetchResult).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/catalog:unlink',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            payload: {
+              productPid: 'product-1',
+              title: '\$\{state.secret}',
+              expectedRevision: 'revision-1',
+            },
+          }),
+        }),
+      );
+    } finally {
+      unregisterConfirmDialog();
+    }
+  });
+
+  it('executes no command when a prepared confirmation is cancelled', async () => {
+    registerConfirmDialog(async () => false);
+    try {
+      const runtime = makeRuntime() as any;
+      const block = {
+        id: 'media_actions',
+        blockType: 'workbench-action-bar',
+        actions: [
+          {
+            code: 'remove_cancel',
+            label: 'Remove',
+            confirm: { en: 'Unlink?' },
+            onClick: {
+              action: 'command.execute',
+              args: { command: 'catalog:unlink', payload: { productPid: 'product-1' } },
+            },
+          },
+        ],
+      } as BlockConfig;
+      render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('workbench-action-remove_cancel'));
+      });
+      expect(fetchResult).not.toHaveBeenCalled();
+    } finally {
+      unregisterConfirmDialog();
+    }
+  });
+
   beforeEach(() => {
     vi.mocked(fetchResult).mockReset();
     vi.mocked(fetchResult).mockResolvedValue({ code: '0', data: {} } as any);
@@ -3084,6 +3278,21 @@ describe('ReviewDrawerBlockRenderer', () => {
 });
 
 describe('RecordInspectorBlockRenderer', () => {
+  it('formats nested capture times in the effective zone and keeps missing-value labels explicit', () => {
+    const zone = vi.spyOn(timezoneContext, 'useTimezone').mockReturnValue({ timezone: 'America/New_York',
+      formats: { date: 'YYYY-MM-DD', datetime: 'YYYY-MM-DD HH:mm:ss', time: 'HH:mm:ss' } });
+    try {
+      const runtime = makeRuntime({ getContext: () => ({ locale: 'en-US', t: (key: string) => key, state: {}, form: {}, global: {},
+        record: { source: { asOf: '2026-07-01T12:00:00Z', deadline: '2026-11-01T07:00:00Z', missing: null } } }) });
+      render(<RecordInspectorBlockRenderer runtime={runtime} block={{ id: 'capture-times', blockType: 'record-inspector', context: '${record.source}',
+        fields: [{ field: 'asOf', label: 'Captured at', valueType: 'datetime' }, { field: 'deadline', label: 'Deadline', dataType: 'datetime' },
+          { field: 'missing', label: 'Historical time', valueMap: { __empty: 'Unknown' } }],
+      } as BlockConfig} />);
+      expect(screen.getByText('2026-07-01 08:00:00')).toBeInTheDocument();
+      expect(screen.getByText('2026-11-01 02:00:00')).toBeInTheDocument();expect(screen.getByText('Unknown')).toBeInTheDocument();
+      expect(screen.queryByText('2026-07-01T12:00:00Z')).not.toBeInTheDocument();
+    } finally { zone.mockRestore(); }
+  });
   it('renders an empty state when the configured context is missing', () => {
     const runtime = makeRuntime();
     const block: BlockConfig = {

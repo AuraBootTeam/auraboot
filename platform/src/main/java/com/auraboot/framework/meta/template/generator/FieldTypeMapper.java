@@ -23,13 +23,22 @@ public class FieldTypeMapper {
             return "SmartInput";
         }
         
+        if (field.getExtension() != null) {
+            for (String key : java.util.List.of("renderComponent", "component", "uiComponent")) {
+                Object preferred = field.getExtension().get(key);
+                if (preferred instanceof String component && !component.isBlank()) return component.trim();
+            }
+        }
+
         String dataType = field.getDataType().toLowerCase(java.util.Locale.ROOT);
         
         return switch (dataType) {
             case "string" -> "SmartInput";
             case "text" -> "SmartTextarea";
-            case "integer", "decimal", "number" -> "SmartInput";
+            case "integer", "decimal", "number" -> "SmartNumberInput";
             case "money" -> "SmartMoneyInput";
+            case "json", "jsonb" -> "SmartJsonEditor";
+            case "file" -> "SmartUpload";
             case "boolean" -> "SmartSwitch";
             case "date" -> "SmartDatePicker";
             case "datetime", "timestamp" -> "SmartDatePicker";

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +9,8 @@ vi.mock('~/shared/services/http-client', () => ({
 
 import { fetchResult } from '~/shared/services/http-client';
 import { useSchemaLoader } from '../useSchemaLoader';
+import { resolveDetailRecordEndpoint } from '~/framework/meta/rendering/pages/detailPage/detailRecordRequests';
+import { validateStructure } from '~/framework/meta/validation/DslValidator';
 
 const mockFetchResult = vi.mocked(fetchResult);
 
@@ -215,5 +219,29 @@ describe('useSchemaLoader', () => {
     expect(result.current.error?.message).toBe('Network error: Failed to fetch');
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+});
+
+
+describe('native announcement statistics route contracts', () => {
+  const pages = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../../plugins/core-announcement/config/pages.json'), 'utf8'));
+  it.each([
+    ['announcement_statistics', '/api/announcements/statistics/snapshots/capture-fixture'],
+    ['announcement_statistics_export', '/api/exports/domain/capture-fixture'],
+  ])('loads the imported %s detail through the production route and endpoint resolvers', async (tableName, endpoint) => {
+    const requests: string[] = [];
+    mockFetchResult.mockImplementation(async (url: string) => {
+      requests.push(url);
+      const key = url.split('/').at(-1);
+      const page = pages.find((candidate: any) => candidate.pageKey === key);
+      return (page ? { code: '0', data: page } : { code: '40000', message: 'Page not found' }) as any;
+    });
+    const { result } = renderHook(() => useSchemaLoader({ tableName, type: 'detail' }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(requests).toContain(`/api/pages/key/${tableName}_detail`);
+    expect(result.current.error).toBeNull();
+    expect(result.current.schema).not.toBeNull();
+    expect(validateStructure(result.current.schema!)).toEqual([]);
+    expect(resolveDetailRecordEndpoint(result.current.schema, tableName, 'capture-fixture')).toEqual({ endpoint, method: 'get' });
   });
 });

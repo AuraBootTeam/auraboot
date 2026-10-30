@@ -126,13 +126,13 @@ class MemoryCompactionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("summary memory inherits median importance and dominant scope")
+    @DisplayName("summary memory inherits median importance within one scope")
     void summary_metadata() {
         seed(1,  "tenant", "T1");
         seed(2,  "tenant", "T2");
         seed(3,  "tenant", "T3");
         seed(4,  "tenant", "T4");
-        seed(5,  "global", "T5"); // dominant = tenant (4 vs 1)
+        seed(5,  "global", "T5"); // A different visibility namespace is excluded from the batch.
         for (int i = 6; i <= 12; i++) seed(i, "tenant", "T" + i);
 
         compactor.compactBucket(tenantId, agent);
@@ -141,11 +141,11 @@ class MemoryCompactionIntegrationTest extends BaseIntegrationTest {
                 "SELECT importance, scope, memory_title, memory_content FROM ab_agent_memory " +
                         "WHERE tenant_id = ? AND memory_agent_id = ? AND category = 'compressed'",
                 tenantId, agent);
-        // Median of [1,2,3,4,5] is 3 (lowest 5 by importance, flushBatchSize=5).
+        // Median of [1,2,3,4,6] is 3 (lowest five tenant rows).
         assertThat(((Number) summary.get("importance")).intValue()).isEqualTo(3);
         assertThat(summary.get("scope")).isEqualTo("tenant");
         assertThat((String) summary.get("memory_title")).contains("Compressed");
-        assertThat((String) summary.get("memory_content")).contains("T1").contains("T5");
+        assertThat((String) summary.get("memory_content")).contains("T1").contains("T6").doesNotContain("body-T5");
     }
 
     @Test

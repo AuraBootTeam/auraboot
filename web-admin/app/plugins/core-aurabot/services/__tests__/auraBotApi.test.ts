@@ -21,6 +21,18 @@ describe('auraBotApi SSE requests', () => {
     vi.unstubAllGlobals();
   });
 
+  it('localizes server transport failures without retrying or exposing response detail', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('private upstream diagnostic', { status: 503 }));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));
+    vi.stubGlobal('fetch', fetchMock);
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    await auraBotApi.chatStream({ sessionId: 'failure', message: 'hello' }, { onChunk: vi.fn(), onDone, onError });
+    expect(onError).toHaveBeenCalledExactlyOnceWith('$i18n:aurabot.error.connect_chat');
+    expect(onDone).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/chat/stream'))).toHaveLength(1);
+  });
+
   it('requests SSE for chat streams', async () => {
     const fetchMock = vi.fn().mockResolvedValue(sseResponse());
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));

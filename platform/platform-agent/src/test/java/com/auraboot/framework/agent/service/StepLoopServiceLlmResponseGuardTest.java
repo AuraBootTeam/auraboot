@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -89,6 +90,27 @@ class StepLoopServiceLlmResponseGuardTest {
                 List.of(),
                 null))
                 .isFalse();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"max_tokens", "end_turn"})
+    void replanPreservesOriginalStepsUnlessTheMachineReplyCompleted(String stopReason) throws Exception {
+        StepLoopService service = newService();
+        LlmProvider provider = mock(LlmProvider.class);
+        when(provider.chat(any(LlmChatRequest.class), anyString(), anyString()))
+                .thenReturn(LlmChatResponse.builder().stopReason(stopReason)
+                        .content(List.of(LlmChatResponse.ContentBlock.builder().type("text")
+                                .text("[{\"description\":\"Replacement step\",\"toolCode\":null,\"requiresApproval\":false}]")
+                                .build())).build());
+        AgentPlanStep remaining = new AgentPlanStep(1, "Original remaining step");
+        List<AgentPlanStep> plan = new java.util.ArrayList<>(List.of(new AgentPlanStep(0, "Failed step"), remaining));
+        boolean replanned = service.attemptReplan(plan, 0, "failure", provider, providerConfig(), "model",
+                "system", List.of(), List.of(), null);
+        assertThat(replanned).isEqualTo("end_turn".equals(stopReason));
+        assertThat(plan).hasSize(2);
+        if (replanned) assertThat(plan.get(1).getDescription()).isEqualTo("Replacement step");
+        else assertThat(plan.get(1)).isSameAs(remaining);
+        verify(provider, times(1)).chat(any(LlmChatRequest.class), anyString(), anyString());
     }
 
     @Test
@@ -265,11 +287,10 @@ class StepLoopServiceLlmResponseGuardTest {
     @DisplayName("executePlanSteps resumes only the approved input and preserves later same-tool approval")
     void executePlanSteps_resumedApprovalTool_executesApprovedInput() throws Exception {
         ToolLoopService toolLoopService = mock(ToolLoopService.class);
-        when(toolLoopService.executeToolCall(any(), anyString(), anyString(), anyString(),
-                anyString(), anyMap(), anyList(), any()))
+        when(toolLoopService.executeApprovedToolCall(any(), anyString(), anyString(), anyString(),
+                anyString(), anyMap(), anyList(), any(), eq("approval-1")))
                 .thenReturn("{\"success\":true,\"sendLogId\":123}");
         AgentApprovalGateService gate = mock(AgentApprovalGateService.class);
-        when(gate.consumeResumeGrant(eq(1L), eq("task-pid"), eq("approval-1"), eq("custom:send_customer_reply"), anyMap())).thenReturn(true);
         when(gate.checkAndRequestApproval(eq(1L), eq("resume-run"), eq("task-pid"), eq("custom:send_customer_reply"), anyString(), eq(Map.of("stepIndex", 1)), eq(true))).thenReturn("approval-2");
         StepLoopService service = newService(persistentMapper(), gate, toolLoopService);
 
@@ -322,17 +343,18 @@ class StepLoopServiceLlmResponseGuardTest {
         assertThat(duplicateSendStep.getResult()).isNull();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AgentToolDefinition>> toolsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(toolLoopService).executeToolCall(eq(1L), eq("resume-run"), eq("task-pid"), eq("aurabot"),
-                eq("custom:send_customer_reply"), eq(approvedInput), toolsCaptor.capture(), any());
+        verify(toolLoopService).executeApprovedToolCall(eq(1L), eq("resume-run"), eq("task-pid"), eq("aurabot"),
+                eq("custom:send_customer_reply"), eq(approvedInput), toolsCaptor.capture(), any(), eq("approval-1"));
         assertThat(toolsCaptor.getValue())
                 .filteredOn(t -> "custom:send_customer_reply".equals(t.getName()))
                 .singleElement()
-                .satisfies(t -> assertThat(t.isRequiresApproval()).isFalse());
+                .satisfies(t -> assertThat(t.isRequiresApproval()).isTrue());
+        verify(gate, never()).consumeResumeGrant(any(), any(), any(), any(), any());
         verifyNoInteractions(provider);
     }
 
     @Test
-    void resumedToolWithoutAnExactGrantCannotExecute() {
+    void savedApprovalForAnUnavailableToolCannotDispatch() {
         var tools = mock(ToolLoopService.class);
         var gate = mock(AgentApprovalGateService.class);
         var service = newService(persistentMapper(), gate, tools);
@@ -352,10 +374,9 @@ class StepLoopServiceLlmResponseGuardTest {
     @org.junit.jupiter.params.provider.NullSource
     void failedApprovedToolPersistsFailureAndStopsLaterSteps(String result) {
         var tools = mock(ToolLoopService.class);
-        when(tools.executeToolCall(any(), anyString(), anyString(), anyString(), anyString(), anyMap(), any(), any()))
+        when(tools.executeApprovedToolCall(any(), anyString(), anyString(), anyString(), anyString(), anyMap(), any(), any(), eq("approved")))
                 .thenReturn(result);
         var gate = mock(AgentApprovalGateService.class);
-        when(gate.consumeResumeGrant(any(), anyString(), anyString(), anyString(), anyMap())).thenReturn(true);
         var mapper = persistentMapper();
         var service = newService(mapper, gate, tools);
         var step = new AgentPlanStep(0, "Approved action");
@@ -364,8 +385,10 @@ class StepLoopServiceLlmResponseGuardTest {
         var later = new AgentPlanStep(1, "Follow-up action");
         var previousStatus = later.getStatus();
         var provider = mock(LlmProvider.class);
+        var available = AgentToolDefinition.builder().name("write").toolType("custom")
+                .requiresApproval(true).build();
         assertThatThrownBy(() -> service.executePlanSteps(new java.util.ArrayList<>(List.of(step, later)), 0,
-                1L, "run", "task", "aurabot", "system", "user", List.of(), Map.of(), Map.of(), provider,
+                1L, "run", "task", "aurabot", "system", "user", List.of(available), Map.of(), Map.of(), provider,
                 providerConfig(), null, true)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Approved tool execution failed");
         assertThat(step.getStatus()).isEqualTo(AgentPlanStep.StepStatus.FAILED);

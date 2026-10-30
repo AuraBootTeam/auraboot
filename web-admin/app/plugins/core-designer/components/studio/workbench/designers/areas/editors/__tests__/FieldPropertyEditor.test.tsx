@@ -113,3 +113,17 @@ describe('field property editor localization and DSL values', () => {
     expect(screen.getByRole('button', { name: 'Fixture widget \u5c5e\u6027' })).toBeTruthy();
   });
 });
+
+
+it('reads generated validation and component aliases, updates constraints without dropping unrelated rules', () => {
+  const onChange = vi.fn();
+  render(<FieldPropertyEditor fieldRef={{ field: 'name', component: 'SmartInput', validation: [{ type: 'required', message: 'Keep me' }, { type: 'maxLength', value: 80 }], layout: { colSpan: 12, rowSpan: 2 } }} blockType="form-section" onChange={onChange} onClose={vi.fn()} />);
+  expect(screen.getByTestId('field-property-component-select')).toHaveValue('SmartInput');
+  expect(screen.getByTestId('field-property-required-switch')).toHaveAttribute('aria-checked', 'true');
+  fireEvent.click(screen.getByTestId('field-property-required-switch'));
+  expect(onChange).toHaveBeenLastCalledWith({ required: false, validation: [{ type: 'maxLength', value: 80 }] });
+  expandSection('layout');
+  expect(screen.getByTestId('field-property-span-select')).toHaveValue('2');
+  fireEvent.change(screen.getByTestId('field-property-span-select'), { target: { value: '1' } });
+  expect(onChange).toHaveBeenLastCalledWith({ span: 1, layout: { colSpan: 6, rowSpan: 2 } });
+});

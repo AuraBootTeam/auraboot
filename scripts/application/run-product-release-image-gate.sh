@@ -86,6 +86,29 @@ for command_name in cmp curl diff docker git node openssl pnpm python3 sha256sum
 [[ "$(uname -m)" == x86_64 ]] || fatal 'release image builder must be x86_64'
 [[ "${AURA_OCI_BUILDER:-docker}" == docker ]] || fatal 'AURA_OCI_BUILDER must be docker; local container fallbacks are prohibited'
 MUTATION="${AURA_RELEASE_MUTATION:-}"
+case "${AURA_RELEASE_EXPORT_PACKAGE:-0}" in
+  0|1) ;;
+  *) fatal 'AURA_RELEASE_EXPORT_PACKAGE must be 0 or 1' ;;
+esac
+case "${AURA_RELEASE_EXPORT_PLATFORM_PACKAGE:-0}" in
+  0|1) ;;
+  *) fatal 'AURA_RELEASE_EXPORT_PLATFORM_PACKAGE must be 0 or 1' ;;
+esac
+PLATFORM_ARCHIVE="${AURA_PRODUCT_PLATFORM_ARCHIVE:-}"
+if [[ -n "$PLATFORM_ARCHIVE" ]]; then
+  [[ "$PLATFORM_ARCHIVE" == /* ]] || fatal 'absolute frozen platform archive required'
+  : "${AURA_CI_DATASET_INPUTS:?original dataset receipt required for platform reuse}"
+fi
+WEB_PLATFORM_ARCHIVE="${AURA_PRODUCT_WEB_PLATFORM_ARCHIVE:-}"
+WEB_PLATFORM_SELECTION="${AURA_PRODUCT_WEB_PLATFORM_SELECTION:-}"
+CORE_WEB_ARGS=()
+[[ -z "${AURA_PRODUCT_WEB_PLATFORM_SOURCE:-}" ]] || fatal 'Managed Web reuse requires a frozen selection record, not an ambient source override'
+if [[ -n "$WEB_PLATFORM_ARCHIVE" || -n "$WEB_PLATFORM_SELECTION" ]]; then
+  [[ -z "$PLATFORM_ARCHIVE" && "$WEB_PLATFORM_ARCHIVE" == /* && "$WEB_PLATFORM_SELECTION" == /* ]] \
+    || fatal 'Web reuse requires absolute archive/selection inputs; full-platform selection is mutually exclusive'
+  : "${AURA_CI_DATASET_INPUTS:?original dataset receipt required for Web reuse}"
+  CORE_WEB_ARGS=(--web-platform-archive "$WEB_PLATFORM_ARCHIVE" --web-platform-selection "$WEB_PLATFORM_SELECTION")
+fi
 case "$MUTATION" in
   ''|locked-plugin-byte) ;;
   *) fatal "unsupported release mutation: $MUTATION" ;;
@@ -200,7 +223,7 @@ mkdir -p "$ARTIFACTS/logs" "$ARTIFACTS/e2e"
 WORK_PARENT="${AURA_CI_RELEASE_WORK_ROOT:-/opt/aura-ci/state/release-image-work}"
 mkdir -p "$WORK_PARENT"
 WORK_ROOT="$WORK_PARENT/${AURA_CI_JOB_ID}-${AURA_PRODUCT_ID}"
-[[ ! -e "$WORK_ROOT" ]] || rm -rf "$WORK_ROOT"  # same-job retry: clean-recreate instead of fatal
+[[ ! -e "$WORK_ROOT" && ! -L "$WORK_ROOT" ]] || fatal 'existing product work root must be inspected; explicit recovery required'
 mkdir "$WORK_ROOT"
 CORE_RELEASE="$WORK_ROOT/core-release"
 PRODUCT_RELEASE="$WORK_ROOT/product-release"
@@ -223,6 +246,7 @@ FLYWAY_IMAGE="${AURA_CI_FLYWAY_IMAGE:-flyway/flyway:12.8.1}"
 
 cleanup() {
   local status=$?
+  trap - EXIT INT TERM
   # Preserve the final application log even when the runtime became healthy and
   # failed later during browser acceptance. The earlier runtime snapshot is
   # intentionally retained as startup evidence; this file captures shutdown-time
@@ -248,8 +272,13 @@ cleanup() {
     exit "$status"
   fi
   if [[ -x "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" ]]; then
-    AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
-      "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >/dev/null 2>&1 || true
+    if ! (umask 077; AURA_APP_ARTIFACT_ROOT="$PRODUCT_RELEASE" AURA_STATE_ROOT="$STATE_ROOT" \
+      "$PRODUCT_RELEASE/$AURA_PRODUCT_LIFECYCLE" stop >"$ARTIFACTS/logs/product-stop.log" 2>&1); then
+      printf 'job=%s\nexit_code=%s\nwork_root=%s\ncleanup=product-stop-failed\n' \
+        "$AURA_CI_JOB_ID" "$status" "$WORK_ROOT" >"$ARTIFACTS/runtime-retained.txt"
+      [[ "$status" != 0 ]] || status=2
+      exit "$status"
+    fi
   fi
   docker rm -f "$PLAYWRIGHT_CONTAINER" "$APP_CONTAINER" "$PUBLISH_CONTAINER" "$PAYLOAD_CONTAINER" "$PG_CONTAINER" "$BUILD_PG_CONTAINER" >/dev/null 2>&1 || true
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
@@ -263,16 +292,26 @@ cleanup() {
   [[ ! -d "$WORK_ROOT" ]] || find "$WORK_ROOT" -depth -delete
   exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-info "building AuraBoot artifacts core=$CORE_SHA"
 CI=1 pnpm --dir "$CORE_ROOT" install --frozen-lockfile --ignore-scripts \
   >"$ARTIFACTS/logs/core-pnpm-install.log" 2>&1 \
   || fatal 'AuraBoot artifact build dependencies unavailable'
-NPM_CONFIG_REGISTRY=https://registry.npmjs.org AURA_OCI_BUILDER=docker \
+if [[ -n "$PLATFORM_ARCHIVE" ]]; then
+  info "consuming selected AuraBoot artifacts core=$CORE_SHA (no Core compilation)"
+  node "$CORE_ROOT/scripts/application/platform-artifact-package.mjs" consume \
+    "$PLATFORM_ARCHIVE" "$AURA_CI_DATASET_INPUTS" "$CORE_RELEASE" "$CORE_SHA" \
+    >"$ARTIFACTS/platform-consumption-receipt.json" 2>"$ARTIFACTS/logs/core-artifacts.log" \
+    || fail 'selected AuraBoot artifacts rejected; no source-build fallback'
+else
+  info "building AuraBoot artifacts core=$CORE_SHA"
+  NPM_CONFIG_REGISTRY=https://registry.npmjs.org AURA_OCI_BUILDER=docker \
   node "$CORE_ROOT/scripts/application/stage-core-only-artifacts.mjs" \
-  --repo-root "$CORE_ROOT" --output "$CORE_RELEASE" >"$ARTIFACTS/logs/core-artifacts.log" 2>&1 \
+  --repo-root "$CORE_ROOT" --output "$CORE_RELEASE" "${CORE_WEB_ARGS[@]}" >"$ARTIFACTS/logs/core-artifacts.log" 2>&1 \
   || fail 'AuraBoot artifact build failed; see logs/core-artifacts.log'
+fi
 
 info "building $AURA_PRODUCT_ID artifacts product=$PRODUCT_SHA"
 env CI=1 "${PRODUCT_PNPM_ENV[@]}" pnpm --dir "$PRODUCT_ROOT" install --frozen-lockfile --ignore-scripts \
@@ -719,4 +758,15 @@ if fixture_path:
                                     "includedInReleaseImage": False}
 json.dump(receipt, open(path, "w"), indent=2, sort_keys=True)
 PY
+if [[ "${AURA_RELEASE_EXPORT_PACKAGE:-0}" == 1 ]]; then
+  node "$CORE_ROOT/scripts/application/export-product-image.mjs" \
+    "$PRODUCT_RELEASE/$AURA_PRODUCT_IMAGE_LAYOUT" "$ARTIFACTS/release-image-receipt.json" \
+    || fail 'tested OCI artifact export failed'
+fi
+if [[ "${AURA_RELEASE_EXPORT_PLATFORM_PACKAGE:-0}" == 1 ]]; then
+  node "$CORE_ROOT/scripts/application/platform-artifact-package.mjs" export \
+    "$CORE_RELEASE" "$CORE_SHA" "$ARTIFACTS/platform-artifacts.tar" \
+    >"$ARTIFACTS/platform-package-receipt.json" \
+    || fail 'verified platform artifact export failed'
+fi
 info "$AURA_PRODUCT_ID release image VERIFIED on Linux CI Docker (image=$IMAGE_ID)"

@@ -43,6 +43,17 @@ import java.util.List;
 @RequestMapping("/api/file")
 @Tag(name = "Files", description = "File upload and management")
 public class FileUploadController {
+    public record UploadLimits(long maxFileBytes,long maxRequestBytes) {}
+    @Autowired
+    private org.springframework.boot.autoconfigure.web.servlet.MultipartProperties multipartProperties;
+
+    @GetMapping("/limits")
+    @RequirePermission(MetaPermission.SYS_FILE_UPLOAD)
+    public ApiResponse<UploadLimits> limits() {
+        return ApiResponse.success(new UploadLimits(multipartProperties.getMaxFileSize().toBytes(),
+                multipartProperties.getMaxRequestSize().toBytes()));
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(FileUploadController.class);
 
     @Autowired
@@ -117,8 +128,19 @@ public class FileUploadController {
     @GetMapping("/list")
     @RequirePermission(MetaPermission.SYS_FILE_READ)
     public ApiResponse<List<FileUploadResponseDTO>> getUserFiles(@CurrentUserId Long userId) {
+        // Reuse the existing request-local query scope; every file relation is still authorized.
+        // Machine authority retains its independent path and does not enter the human cache.
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+            return readableUserFiles(userId);
+        }
+        try (var scope = com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open()) {
+            return readableUserFiles(userId);
+        }
+    }
+
+    private ApiResponse<List<FileUploadResponseDTO>> readableUserFiles(Long userId) {
         List<FileEntity> files = fileService.getFilesByUserId(userId);
-        return ApiResponse.success(files.stream().map(this::toDto).toList());
+        return ApiResponse.success(files.stream().filter(file -> canReadFile(file, userId)).map(this::toDto).toList());
     }
     
     /**
@@ -169,7 +191,8 @@ public class FileUploadController {
             @PathVariable String entityId) {
         authorizeRelationTarget(entityType, entityId, "read");
         List<FileEntity> files = fileService.getFilesByEntity(entityType, entityId);
-        return ApiResponse.success(files.stream().map(this::toDto).toList());
+        return ApiResponse.success(files.stream().filter(file -> canReadFile(file,
+                com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId())).map(this::toDto).toList());
     }
 
     /**
@@ -183,7 +206,8 @@ public class FileUploadController {
             @PathVariable String fieldName) {
         authorizeRelationTarget(entityType, entityId, "read");
         List<FileEntity> files = fileService.getFilesByEntityAndField(entityType, entityId, fieldName);
-        return ApiResponse.success(files.stream().map(this::toDto).toList());
+        return ApiResponse.success(files.stream().filter(file -> canReadFile(file,
+                com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId())).map(this::toDto).toList());
     }
     
     /**
@@ -263,11 +287,17 @@ public class FileUploadController {
     }
 
     private void authorizeRelationTarget(String entityType, String entityId, String action) {
+        if ("read".equals(action)) {
+            dynamicDataService.withCanonicalRecordRead(entityType,entityId,
+                    record -> dataAccessAuthorizationHelper.authorizeRecordId(
+                            entityType,action,entityId,ignored -> record));
+            return;
+        }
         dataAccessAuthorizationHelper.authorizeRecordId(
                 entityType,
                 action,
                 entityId,
-                recordPid -> dynamicDataService.getById(entityType, recordPid));
+                recordPid -> dynamicDataService.getByIdForAuthorization(entityType, recordPid));
     }
 
     private void authorizeFileAccess(String fileId, FileEntity file, Long userId) {
@@ -284,6 +314,12 @@ public class FileUploadController {
         for (FileRelationEntity relation : relations) {
             authorizeRelationTarget(relation.getEntityType(), relation.getEntityId(), "read");
         }
+    }
+
+    private boolean canReadFile(FileEntity file, Long userId) {
+        if (file == null || !StringUtils.hasText(file.getPid())) throw new IllegalStateException("File metadata identity is missing");
+        try { authorizeFileAccess(file.getPid(), file, userId); return true; }
+        catch (AccessDeniedException denied) { return false; }
     }
 
     private static void requireRelationRequest(FileRelationRequestDTO request) {

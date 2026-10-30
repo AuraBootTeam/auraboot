@@ -37,6 +37,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired private com.auraboot.framework.meta.mapper.MetaModelMapper modelMapper;
     @Autowired private CommandService commands;
+    @Autowired private com.auraboot.framework.plugin.service.impl.PluginResourceImporter commandImporter;
     @Autowired private CommandExecutor executor;
     @Autowired private OpenApiLegacyAuthority legacy;
     @Autowired private OpenApiActionPublicationService actionPublications;
@@ -2273,15 +2274,23 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .singleElement().satisfies(row -> assertThat(row.available()).isFalse());
     }
 
-    @Test void publishedBusinessSourceCannotFloatAndDisabledApplicationsCannotReceiveNewGrants() {
+    @Test void publishedBusinessSourceCannotFloatAndDisabledApplicationsCannotReceiveNewGrants() throws Exception {
         var action = publishBusinessAction("command"); var source = commands.findByCode(action.sourceCode());
-        var changed = new CommandDefinitionCreateRequest(); changed.setCode(source.getCode()); changed.setDisplayName(source.getDisplayName());
-        changed.setModelCode(source.getModelCode()); changed.setCmdRiskLevel(source.getCmdRiskLevel()); changed.setInputSchema(source.getInputSchema());
-        changed.setExecutionConfig(source.getExecutionConfig().replace("Assigned", "Changed"));
-        // Reinstalling a source can replace its configuration while retaining its public identity.
-        commands.delete(source.getPid());
-        var replaced = commands.create(changed);
+        var changed = json.readValue(source.getExecutionConfig().replace("Assigned", "Changed"),
+                com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO.class);
+        changed.setCode(source.getCode()); changed.setDisplayName(source.getDisplayName());
+        changed.setModelCode(source.getModelCode()); changed.setCmdRiskLevel(source.getCmdRiskLevel());
+        changed.setInputSchema(json.readValue(source.getInputSchema(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
+        assertThat(changed.getConsolidatedExecutionConfig())
+                .containsEntry("type", "state_transition").containsEntry("toState", "Changed");
+        // Plugin reimport updates the published source in place. Delete/create allocates
+        // another historical version and PID, which would test identity drift instead.
+        var imported = commandImporter.importCommand(changed, null, UniqueIdGenerator.generate(), principal.tenantId(),
+                com.auraboot.framework.plugin.dto.imports.ImportRequest.ConflictStrategy.OVERWRITE, true);
+        var replaced = commands.findByCode(action.sourceCode());
+        assertThat(imported.getResourcePid()).isEqualTo(source.getPid());
         assertThat(replaced.getPid()).isEqualTo(source.getPid());
+        assertThat(replaced.getVersion()).isEqualTo(source.getVersion());
         assertThat(replaced.getStatus()).isEqualTo(source.getStatus());
         assertThat(commands.findByCode(action.sourceCode()).getExecutionConfig()).contains("Changed");
         assertThatThrownBy(() -> installedBusinessCall(() -> publicActions.execute(principal, action.code(), "changed-source-denied", null, allowedPid, Map.of("zone", "A"))))

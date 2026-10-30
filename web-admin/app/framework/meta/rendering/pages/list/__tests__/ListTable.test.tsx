@@ -40,8 +40,37 @@ function renderListTable(overrides: Partial<ListTableProps> = {}) {
 }
 
 describe('ListTable selection column layout', () => {
+  it('fills spare viewport space without expanding personalized column widths', () => {
+    const viewport = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    try {
+      const mixed = renderListTable({ columnWidths: { name: 310 } });
+      expect(screen.getByTestId('table-cell-0-name')).toHaveStyle({ width: '310px' });
+      expect(mixed.container.querySelector('table')).toHaveStyle({ width: '1000px' });
+      mixed.unmount();
+      const fixed = renderListTable({ columnWidths: { name: 310, kind: 110 } });
+      expect(screen.getByTestId('table-cell-0-name')).toHaveStyle({ width: '310px' });
+      expect(fixed.container.querySelector('table')).toHaveStyle({ width: '420px' });
+      fixed.unmount();
+      const defaults = renderListTable();
+      expect(defaults.container.querySelector('table')).toHaveStyle({ width: '1000px' });
+      defaults.unmount();
+    } finally {
+      viewport.mockRestore();
+    }
+  });
+  it('gives the business identity readable default space while preserving saved widths', () => {
+    const identity = { field: 'name', label: 'Project', presentation: { kind: 'object' as const } };
+    const { container, unmount } = renderListTable({ columns: [identity] });
+    expect(container.querySelector('col')).toHaveStyle({ width: '280px' });
+    unmount();
+    const saved = renderListTable({ columns: [identity], columnWidths: { name: 210 } });
+    expect(saved.container.querySelector('col')).toHaveStyle({ width: '210px' });
+  });
+
   it('declares column scope on data and action headers for browser table semantics', () => {
-    renderListTable({ columns: [...columns, { field: 'actions', label: 'Actions', isActionColumn: true }] });
+    renderListTable({
+      columns: [...columns, { field: 'actions', label: 'Actions', isActionColumn: true }],
+    });
     for (const field of ['name', 'kind', 'actions']) {
       expect(screen.getByTestId(`table-header-${field}`)).toHaveAttribute('scope', 'col');
     }
@@ -80,8 +109,10 @@ describe('ListTable selection column layout', () => {
 
   it('honors explicit non-ellipsis columns without changing the exact displayed value', () => {
     const quantity = '12345678901234567890.000001';
-    renderListTable({ columns: [{ field: 'quantity', label: 'Quantity', width: 140, ellipsis: false }],
-      data: [{ pid: 'row-1', quantity }] });
+    renderListTable({
+      columns: [{ field: 'quantity', label: 'Quantity', width: 140, ellipsis: false }],
+      data: [{ pid: 'row-1', quantity }],
+    });
     const cell = screen.getByTestId('table-cell-0-quantity');
     expect(cell).toHaveTextContent(quantity);
     expect(cell.querySelector('div.truncate')).toBeNull();
@@ -455,4 +486,28 @@ describe('ListTable expandable tree rows (T10)', () => {
     expect(toggleAfter).toHaveAttribute('aria-expanded', 'false');
     expect(toggleAfter).toHaveAttribute('aria-label', 'Expand row');
   });
+});
+
+
+it('uses the same compact widths and spacing for headers, rows and aggregates', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 480 });
+  try {
+    const { container } = renderListTable({ columns: [
+      { field: 'name', label: 'Project', presentation: { kind: 'object' } },
+      { field: 'amount', label: 'Budget', valueType: 'currency', aggregate: 'sum' },
+      { field: 'status', label: 'Status', valueType: 'tag' },
+    ], data: [{ pid: 'one', name: 'Delivery', amount: 680000, status: 'Active' }] });
+    await waitFor(() => expect(Number.parseFloat(container.querySelector('table')!.style.width)).toBeLessThanOrEqual(480));
+    const widths = Array.from(container.querySelectorAll('col')).map(col => Number.parseFloat((col as HTMLTableColElement).style.width));
+    expect(widths.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(480);
+    for (const field of ['name', 'amount', 'status']) {
+      expect(screen.getByTestId(`table-header-${field}`)).toHaveClass('px-3');
+      expect(screen.getByTestId(`table-cell-0-${field}`)).toHaveClass('px-3');
+      expect(screen.getByTestId(`summary-cell-${field}`)).toHaveClass('px-3');
+    }
+  } finally {
+    if (descriptor) Object.defineProperty(HTMLElement.prototype, 'clientWidth', descriptor);
+    else delete (HTMLElement.prototype as any).clientWidth;
+  }
 });

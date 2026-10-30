@@ -1,3 +1,4 @@
+import { isButtonDisabled } from '~/framework/meta/utils/buttonPermissions';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import React, { useCallback, useMemo } from 'react';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
@@ -93,6 +94,29 @@ export function useListExport({
       return evaluateCondition(button.visibleWhen, conditionContext as any);
     },
     [canUseButton, pagination.total, data, filters, toolbarRuntimeContext],
+  );
+
+  const evaluateButtonDisabled = useCallback(
+    (button: ButtonConfig): boolean => {
+      const conditionContext = buildToolbarConditionContext(
+        { total: pagination.total, records: data },
+        createExpressionContext({
+          state: { filters, selectedIds: selectedIdList, selectedCount: effectiveSelectedCount },
+        }),
+        toolbarRuntimeContext,
+      );
+      return isButtonDisabled(button, (expression) =>
+        evaluateCondition(expression, conditionContext as any),
+      );
+    },
+    [
+      pagination.total,
+      data,
+      filters,
+      selectedIdList,
+      effectiveSelectedCount,
+      toolbarRuntimeContext,
+    ],
   );
 
   const visibleBulkActions = useMemo(() => {
@@ -265,6 +289,7 @@ export function useListExport({
 
   return {
     evaluateButtonVisible,
+    evaluateButtonDisabled,
     visibleBulkActions,
     bulkEditColumns,
     builtInBulkCapabilities,

@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 
@@ -93,8 +95,8 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     @Mock private PermissionFacade permissionFacade;
     @Mock private TenantMemberService tenantMemberService;
     @Mock private WorkflowCapabilityRegistry workflowCapabilityRegistry;
-    @org.mockito.Spy private com.auraboot.framework.event.context.ThreadContextScopes threadContexts =
-            new com.auraboot.framework.event.context.ThreadContextScopes(List.of());
+
+    @Spy private ThreadContextScopes threadContexts = new ThreadContextScopes(List.of());
 
     @InjectMocks
     private DynamicDataServiceImpl service;
@@ -190,6 +192,45 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         assertThat(created).containsEntry("pid", RECORD_ID);
         // The read-back must not have been projected through the caller's read permission.
         verify(permissionFacade, never()).canOperate(anyLong(), anyString(), eq("read"), anyMap());
+    }
+
+    @Test
+    void realCreateInvalidatesPredicatesForDependentModelsInsideTheSameCommand() {
+        stubReadVerdict(false);
+        var visible=new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.function.Supplier<String> filter=()->visible.get()?"AND pid = 'new-child'":"AND 1 = 0";
+        when(dynamicDataMapper.insert(anyString(),anyMap())).thenAnswer(call->{visible.set(true);return 1;});
+        try (DynamicDataQueryScope scope=DynamicDataQueryScope.open()) {
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND 1 = 0");
+            service.create(MODEL_CODE,new HashMap<>(Map.of("pid",RECORD_ID,"name","written-value")));
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND pid = 'new-child'");
+        }
+    }
+
+    @Test
+    void observersReadFreshPredicatesAndDoNotLeakIntermediateFilters() { assertObserverInvalidation(false); }
+
+    @Test
+    void observerFailureStillDiscardsIntermediatePredicatesAndPropagates() { assertObserverInvalidation(true); }
+
+    private void assertObserverInvalidation(boolean fail) {
+        stubReadVerdict(false);
+        var version=new java.util.concurrent.atomic.AtomicInteger();
+        java.util.function.Supplier<String> filter=()->"AND version = "+version.get();
+        when(dynamicDataMapper.insert(anyString(),anyMap())).thenAnswer(call->{version.set(1);return 1;});
+        ModelMutationObserver observer=(changed,pid,operation)->{
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 1");
+            version.set(2);
+            if(fail)throw new IllegalStateException("observer failed");
+        };
+        when(applicationContext.getBeansOfType(ModelMutationObserver.class)).thenReturn(Map.of("fixture",observer));
+        try (DynamicDataQueryScope scope=DynamicDataQueryScope.open()) {
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 0");
+            Runnable create=()->service.create(MODEL_CODE,new HashMap<>(Map.of("pid",RECORD_ID,"name","written-value")));
+            if(fail)org.assertj.core.api.Assertions.assertThatThrownBy(create::run).isInstanceOf(IllegalStateException.class).hasMessage("observer failed");
+            else create.run();
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 2");
+        }
     }
 
     @Test

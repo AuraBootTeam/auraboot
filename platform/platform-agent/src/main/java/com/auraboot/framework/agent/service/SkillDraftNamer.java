@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.runtime.LlmResponseGuard;
+
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
@@ -141,7 +143,8 @@ public class SkillDraftNamer {
                 .build();
 
         try {
-            LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
+            LlmChatResponse response = LlmResponseGuard.requireCompleteContent(
+                    provider.chat(request, config.getApiKey(), config.getBaseUrl()), "skill draft naming");
             String text = extractText(response);
             if (text == null || text.isBlank()) return null;
 

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "profile": "lifecycle-v1",
+  "expectedSamples": 8,
+  "provider": "deepseek",
+  "maxTokens": 4096,
+  "businessRetries": 0,
+  "cases": [
+    {
+      "id": "LC1",
+      "prompt": "从现在开始我的ACME-184经营周会汇报抬头固定使用【星河周会】。请查询该订单当前状态和逾期天数并按这个抬头回答。",
+      "heading": "【星河周会】",
+      "status": "OPEN",
+      "daysLate": 12
+    },
+    {
+      "id": "LC2",
+      "prompt": "新会话：请查询ACME-184订单当前状态和逾期天数，沿用我此前指定的汇报抬头。",
+      "heading": "【星河周会】",
+      "status": "OPEN",
+      "daysLate": 12
+    },
+    {
+      "id": "LC3",
+      "prompt": "订单已由业务人员更新。请重新查询ACME-184当前状态和逾期天数，不要把先前回复作为实时记录，沿用我的汇报抬头。",
+      "heading": "【星河周会】",
+      "status": "CLOSED",
+      "daysLate": 0,
+      "updateBusiness": true
+    },
+    {
+      "id": "LC4",
+      "prompt": "纠正我的汇报偏好：今后ACME-184汇报抬头改成【星河复盘】，此前的抬头不再使用。请查询当前状态和逾期天数并按新抬头回答。",
+      "heading": "【星河复盘】",
+      "status": "CLOSED",
+      "daysLate": 0
+    },
+    {
+      "id": "LC5",
+      "prompt": "新会话：请查询ACME-184当前状态和逾期天数，按我最近一次明确修正后的抬头汇报。",
+      "heading": "【星河复盘】",
+      "status": "CLOSED",
+      "daysLate": 0
+    },
+    {
+      "id": "LC6",
+      "prompt": "请查询ACME-184当前状态和逾期天数，按我的汇报抬头回答。若没有已生效的奖励码信息，请明确说明缺少该信息，不要猜测。",
+      "heading": "【星河复盘】",
+      "status": "CLOSED",
+      "daysLate": 0,
+      "inactiveSources": true
+    },
+    {
+      "id": "LC7",
+      "prompt": "请查询ACME-184当前状态和逾期天数。仅使用当前可访问的有效记忆；没有汇报抬头偏好时使用【普通汇报】。",
+      "heading": "【普通汇报】",
+      "status": "CLOSED",
+      "daysLate": 0,
+      "revokeOwnedSources": true
+    },
+    {
+      "id": "LC8",
+      "prompt": "再次开启新会话，请查询ACME-184当前状态和逾期天数。没有有效的专属抬头偏好时使用【普通汇报】。",
+      "heading": "【普通汇报】",
+      "status": "CLOSED",
+      "daysLate": 0
+    }
+  ],
+  "invariants": [
+    "no business writes by agent",
+    "all normal calls use real provider/tools",
+    "every phase has a new conversation and exact-turn writeback",
+    "do not clear prior turns between phases except explicit scoped revoke phase",
+    "foreign and inactive canaries absent from provider requests and replies"
+  ]
+}

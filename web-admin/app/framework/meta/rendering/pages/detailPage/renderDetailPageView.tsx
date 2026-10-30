@@ -1,3 +1,6 @@
+import { createPortal } from 'react-dom';
+import { DetailActionButtons } from './DetailActionButtons';
+import type { DetailPresentation } from '../detail/DetailPresentationContext';
 import { WorkspaceTabCount } from '../detail/WorkspaceTabCount';
 import { WorkspaceObjectSummary } from '../detail/WorkspaceObjectSummary';
 import { Link } from 'react-router';
@@ -15,11 +18,10 @@ import { LayoutRenderer } from '~/framework/meta/rendering/layout/LayoutRenderer
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { BlockConfig, ButtonConfig, FieldConfig } from '~/framework/meta/schemas/types';
-import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
+import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import {
   resolveDetailMissingRecordTitle,
   resolveDetailReturnTarget,
-  canRenderDetailToolbarButton,
   shouldRenderInlineDetailApproval,
   resolveDetailPdfFileName,
 } from './detailLayoutValues';
@@ -27,6 +29,7 @@ import { resolveTextFallback } from './detailFieldDisplay';
 import { prepareDetailRuntimeBlock } from './detailBlockValues';
 import { DetailBlockRenderer } from './DetailBlockRenderer';
 import { FallbackDetailView } from './FallbackDetailView';
+import { resolveWorkspaceShell } from '~/shared/layout/workspaceShell';
 import type { useDetailPageState } from './useDetailPageState';
 import type { useDetailRuntime } from './useDetailRuntime';
 import type { useDetailLayout } from './useDetailLayout';
@@ -34,7 +37,7 @@ import type { useDetailMetadata } from './useDetailMetadata';
 import type { useDetailSharing } from './useDetailSharing';
 import type { useDetailTabs } from './useDetailTabs';
 
-type RenderDetailPageViewArgs = Pick<
+type RenderDetailPageViewArgs = { presentation: DetailPresentation | null } & Pick<
   ReturnType<typeof useDetailPageState>,
   | 'recordLoading'
   | 'recordError'
@@ -101,6 +104,7 @@ type RenderDetailPageViewArgs = Pick<
   >;
 
 export function renderDetailPageView({
+  presentation,
   recordLoading,
   recordError,
   schema,
@@ -201,12 +205,22 @@ export function renderDetailPageView({
                     )
                   : recordError}
             </p>
-            <Link
-              to={`/p/${tableName}`}
-              className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover mx-auto inline-flex border px-3 py-1.5 text-sm font-medium"
-            >
-              {resolveTextFallback(t, 'action.back', 'Back')}
-            </Link>
+            {presentation ? (
+              <button
+                type="button"
+                onClick={presentation.onClose}
+                className="rounded-control border-border border px-3 py-1.5"
+              >
+                {closeLabel}
+              </button>
+            ) : (
+              <Link
+                to={`/p/${tableName}`}
+                className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover mx-auto inline-flex border px-3 py-1.5 text-sm font-medium"
+              >
+                {resolveTextFallback(t, 'action.back', 'Back')}
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -214,6 +228,7 @@ export function renderDetailPageView({
   }
 
   const workspace = schema.extension?.presentation === 'workspace';
+  const workspaceShell = workspace ? resolveWorkspaceShell(schema.extension?.workspaceShell) : null;
   const headerTitleField = String(schema?.extension?.headerTitleField || '').trim();
   const headerTitleValue = headerTitleField ? recordData?.[headerTitleField] : undefined;
   const headerTitle =
@@ -243,29 +258,63 @@ export function renderDetailPageView({
     </svg>
   );
 
+  const nativeActions = effectiveHeaderToolbar?.buttons?.length ? (
+    <DetailActionButtons
+      buttons={effectiveHeaderToolbar.buttons}
+      modelCode={schema?.modelCode || tableName}
+      recordData={recordData}
+      hasPermission={hasPermission}
+      evaluateVisibleWhen={evaluateVisibleWhen}
+      actionLoading={actionLoading}
+      resolveButtonLabel={resolveButtonLabel}
+      handleAction={handleAction}
+      locale={locale}
+      t={t}
+      placement={presentation ? 'footer' : 'header'}
+    />
+  ) : null;
+
   return (
     <div
       className={
-        workspace
-          ? 'min-h-[calc(100vh-56px)] bg-[#F7F7F8] px-6 pt-7 pb-8 lg:px-8'
-          : 'mx-auto w-full px-2 py-3'
+        presentation
+          ? 'bg-panel min-h-0 w-full min-w-0'
+          : workspace
+            ? `${workspaceShell?.useThemeTokens ? 'bg-bg' : 'bg-[#F7F7F8]'} min-h-[calc(100vh-56px)] px-6 pt-7 pb-8 lg:px-8`
+            : 'bg-subtle mx-auto min-h-[calc(100vh-56px)] w-full px-4 py-6 sm:px-6 lg:px-8'
+      }
+      style={
+        presentation
+          ? { minHeight: 0, background: 'var(--color-panel)' }
+          : workspaceShell
+            ? {
+                minHeight: `calc(100vh - var(--workspace-header-height, ${workspaceShell.headerHeight}px))`,
+              }
+            : undefined
       }
       data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
     >
-      <div
-        className={workspace ? 'min-w-0' : 'rounded-card border-border bg-panel border shadow-sm'}
-      >
+      <div className="min-w-0">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
         <div
           className={
-            workspace ? 'print-hide pb-6' : 'print-hide border-border border-b px-4 py-4 sm:px-6'
+            presentation ? 'print-hide border-border mb-4 border-b pb-4' : 'print-hide pb-6'
           }
           data-print="hide"
         >
           <div className={headerLayout.container}>
             <div className="flex min-w-0 items-start gap-3">
               {schema.extension?.showBack !== false &&
-                (preserveListContext && (preservedReturnTarget || location.key !== 'default') ? (
+                (presentation ? (
+                  <button
+                    type="button"
+                    aria-label={closeLabel}
+                    onClick={presentation.onClose}
+                    className="text-text-3 hover:text-text-2 mt-0.5 shrink-0"
+                  >
+                    {backIcon}
+                  </button>
+                ) : preserveListContext && (preservedReturnTarget || location.key !== 'default') ? (
                   <button
                     type="button"
                     aria-label={resolveTextFallback(t, 'action.back', 'Back')}
@@ -289,10 +338,12 @@ export function renderDetailPageView({
                 ))}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-text text-2xl leading-tight font-semibold tracking-tight break-words">
-                    {headerTitle}
-                  </h2>
-                  {workspace && schema.extension?.headerStatusField && (
+                  {!presentation && (
+                    <h2 className="text-text text-2xl leading-tight font-semibold tracking-tight break-words">
+                      {headerTitle}
+                    </h2>
+                  )}
+                  {schema.extension?.headerStatusField && (
                     <span className="text-accent bg-accent-weak rounded px-2 py-1 text-xs">
                       {(() => {
                         const field = enrichField({
@@ -341,82 +392,7 @@ export function renderDetailPageView({
                   orientation="portrait"
                 />
               )}
-              {effectiveHeaderToolbar?.buttons && effectiveHeaderToolbar.buttons.length > 0 && (
-                <>
-                  {effectiveHeaderToolbar.buttons
-                    .filter((button: ButtonConfig) =>
-                      canRenderDetailToolbarButton(button, hasPermission),
-                    )
-                    .filter((button: ButtonConfig) => evaluateVisibleWhen(button.visibleWhen))
-                    .filter((button: ButtonConfig) => !(button as any).overflow)
-                    .map((button: ButtonConfig) => (
-                      <button
-                        key={button.code}
-                        data-testid={`toolbar-btn-${button.code}`}
-                        data-ab-testid={buttonTestId(
-                          'detail',
-                          schema?.modelCode || tableName,
-                          button.code,
-                        )}
-                        onClick={() => handleAction(button, recordData)}
-                        disabled={actionLoading}
-                        className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
-                          button.primary
-                            ? 'bg-accent hover:bg-accent-hover text-white'
-                            : button.danger
-                              ? 'bg-status-red hover:bg-status-red/90 text-white'
-                              : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        {resolveButtonLabel(button)}
-                      </button>
-                    ))}
-                  {effectiveHeaderToolbar.buttons.some(
-                    (button: ButtonConfig) =>
-                      (button as any).overflow &&
-                      canRenderDetailToolbarButton(button, hasPermission) &&
-                      evaluateVisibleWhen(button.visibleWhen),
-                  ) && (
-                    <details className="relative" data-testid="detail-toolbar-more">
-                      <summary
-                        aria-label={getLocalizedText(
-                          { 'zh-CN': '更多操作', en: 'More actions' },
-                          locale,
-                          t,
-                        )}
-                        className="text-text-2 hover:bg-hover rounded-control flex h-8 w-8 cursor-pointer list-none items-center justify-center text-xl"
-                      >
-                        ⋮
-                      </summary>
-                      <div className="border-border bg-panel rounded-card absolute top-10 right-0 z-40 min-w-40 border p-1 shadow-lg">
-                        {effectiveHeaderToolbar.buttons
-                          .filter(
-                            (button: ButtonConfig) =>
-                              (button as any).overflow &&
-                              canRenderDetailToolbarButton(button, hasPermission) &&
-                              evaluateVisibleWhen(button.visibleWhen),
-                          )
-                          .map((button: ButtonConfig) => (
-                            <button
-                              key={button.code}
-                              type="button"
-                              data-testid={`toolbar-btn-${button.code}`}
-                              disabled={actionLoading}
-                              className={`hover:bg-hover block w-full rounded px-3 py-2 text-left text-xs ${button.danger ? 'text-status-red' : 'text-text-2'}`}
-                              onClick={(event) => {
-                                const menu = event.currentTarget.closest('details');
-                                if (menu) menu.open = false;
-                                void handleAction(button, recordData);
-                              }}
-                            >
-                              {resolveButtonLabel(button)}
-                            </button>
-                          ))}
-                      </div>
-                    </details>
-                  )}
-                </>
-              )}
+              {!presentation && nativeActions}
             </div>
           </div>
         </div>
@@ -466,7 +442,7 @@ export function renderDetailPageView({
             )}
           </div>
 
-          {workspace && schema.extension?.objectSummary && (
+          {schema.extension?.objectSummary && (
             <WorkspaceObjectSummary
               items={schema.extension.objectSummary}
               record={recordData || {}}
@@ -483,7 +459,15 @@ export function renderDetailPageView({
                   className={workspace ? 'mb-5 space-y-3' : 'space-y-3 p-6 pb-0'}
                   data-testid="detail-persistent-header"
                 >
-                  {persistentHeaderBlocks.map(renderWorkspaceBlock)}
+                  {schema.extension?.detailHeaderLayout ? (
+                    <LayoutRenderer
+                      layout={schema.extension.detailHeaderLayout}
+                      blocks={persistentHeaderBlocks}
+                      renderBlock={renderWorkspaceBlock}
+                    />
+                  ) : (
+                    persistentHeaderBlocks.map(renderWorkspaceBlock)
+                  )}
                 </div>
               )}
 
@@ -680,144 +664,163 @@ export function renderDetailPageView({
               </div>
             </div>
           ) : (
-            <div className="space-y-4 p-5">
-              {/* Opt-in: misc blocks with detailPlacement === 'header' render at the
+            <div className={presentation ? 'space-y-4' : 'space-y-4 p-5'}>
+              {workspace && schema.extension?.detailBodyOrder === 'schema' ? (
+                <>
+                  {persistentHeaderBlocks.length > 0 && (
+                    <div data-testid="detail-persistent-header">
+                      <LayoutRenderer
+                        layout={schema.extension?.detailHeaderLayout}
+                        blocks={persistentHeaderBlocks}
+                        renderBlock={renderWorkspaceBlock}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-4" data-testid="detail-schema-body">
+                    {workspaceContentBlocks.map(renderWorkspaceBlock)}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Opt-in: misc blocks with detailPlacement === 'header' render at the
                 top (before form-sections / sub-tables). Default placement is
                 unchanged (rendered last), so existing pages are unaffected. */}
-              {runtime &&
-                directMiscBlocks
-                  .filter(
-                    (b: BlockConfig) =>
-                      (b as { detailPlacement?: string }).detailPlacement === 'header',
-                  )
-                  .map((block: BlockConfig, blockIndex: number) => (
-                    <BlockRenderer
-                      key={block.id || `misc-header-${blockIndex}`}
-                      block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
-                      runtime={runtime}
-                      areaId="detail-direct"
+                  {runtime &&
+                    directMiscBlocks
+                      .filter(
+                        (b: BlockConfig) =>
+                          (b as { detailPlacement?: string }).detailPlacement === 'header',
+                      )
+                      .map((block: BlockConfig, blockIndex: number) => (
+                        <BlockRenderer
+                          key={block.id || `misc-header-${blockIndex}`}
+                          block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
+                          runtime={runtime}
+                          areaId="detail-direct"
+                        />
+                      ))}
+                  {effectiveDirectFormBlocks.map((block: BlockConfig, blockIndex: number) => (
+                    <DetailBlockRenderer
+                      key={block.id || `block-${blockIndex}`}
+                      block={block}
+                      recordData={recordData}
+                      rawData={rawData}
+                      recordPid={recordPid!}
+                      token={token || undefined}
+                      locale={locale}
+                      t={t}
+                      modelCode={schema?.modelCode || tableName}
+                      evaluateEditableWhen={evaluateVisibleWhen}
+                      onDataChange={refreshDetailAfterChildChange}
+                      getDictItems={getDictItems}
+                      enrichField={enrichField}
+                      runtime={runtime as SchemaRuntime}
+                      schemaDataSources={schema?.dataSources}
+                      dataSourceManager={dataSourceManager}
                     />
                   ))}
-              {effectiveDirectFormBlocks.map((block: BlockConfig, blockIndex: number) => (
-                <DetailBlockRenderer
-                  key={block.id || `block-${blockIndex}`}
-                  block={block}
-                  recordData={recordData}
-                  rawData={rawData}
-                  recordPid={recordPid!}
-                  token={token || undefined}
-                  locale={locale}
-                  t={t}
-                  modelCode={schema?.modelCode || tableName}
-                  evaluateEditableWhen={evaluateVisibleWhen}
-                  onDataChange={refreshDetailAfterChildChange}
-                  getDictItems={getDictItems}
-                  enrichField={enrichField}
-                  runtime={runtime as SchemaRuntime}
-                  schemaDataSources={schema?.dataSources}
-                  dataSourceManager={dataSourceManager}
-                />
-              ))}
-              {directSubTableBlocks.map((block: BlockConfig, blockIndex: number) => (
-                <DetailBlockRenderer
-                  key={block.id || `sub-${blockIndex}`}
-                  block={block}
-                  recordData={recordData}
-                  rawData={rawData}
-                  recordPid={recordPid!}
-                  token={token || undefined}
-                  locale={locale}
-                  t={t}
-                  modelCode={schema?.modelCode || tableName}
-                  evaluateEditableWhen={evaluateVisibleWhen}
-                  onDataChange={refreshDetailAfterChildChange}
-                  getDictItems={getDictItems}
-                  enrichField={enrichField}
-                  runtime={runtime as SchemaRuntime}
-                  schemaDataSources={schema?.dataSources}
-                  dataSourceManager={dataSourceManager}
-                />
-              ))}
-              {directMonthlyGridBlocks.map((block: BlockConfig, blockIndex: number) => (
-                <DetailBlockRenderer
-                  key={block.id || `monthly-${blockIndex}`}
-                  block={block}
-                  recordData={recordData}
-                  rawData={rawData}
-                  recordPid={recordPid!}
-                  token={token || undefined}
-                  locale={locale}
-                  t={t}
-                  modelCode={schema?.modelCode || tableName}
-                  evaluateEditableWhen={evaluateVisibleWhen}
-                  onDataChange={refreshDetailAfterChildChange}
-                  getDictItems={getDictItems}
-                  enrichField={enrichField}
-                  runtime={runtime as SchemaRuntime}
-                  schemaDataSources={schema?.dataSources}
-                  dataSourceManager={dataSourceManager}
-                />
-              ))}
-              {directEmbeddedListBlocks.map((block: BlockConfig, blockIndex: number) => (
-                <DetailBlockRenderer
-                  key={block.id || `embedded-${blockIndex}`}
-                  block={block}
-                  recordData={recordData}
-                  rawData={rawData}
-                  recordPid={recordPid!}
-                  token={token || undefined}
-                  locale={locale}
-                  t={t}
-                  modelCode={schema?.modelCode || tableName}
-                  evaluateEditableWhen={evaluateVisibleWhen}
-                  onDataChange={refreshDetailAfterChildChange}
-                  getDictItems={getDictItems}
-                  enrichField={enrichField}
-                  runtime={runtime as SchemaRuntime}
-                  schemaDataSources={schema?.dataSources}
-                  dataSourceManager={dataSourceManager}
-                />
-              ))}
-              {directSpecializedBlocks.map((block: BlockConfig, blockIndex: number) => (
-                <DetailBlockRenderer
-                  key={block.id || `specialized-${blockIndex}`}
-                  block={block}
-                  recordData={recordData}
-                  rawData={rawData}
-                  recordPid={recordPid!}
-                  token={token || undefined}
-                  locale={locale}
-                  t={t}
-                  modelCode={schema?.modelCode || tableName}
-                  evaluateEditableWhen={evaluateVisibleWhen}
-                  onDataChange={refreshDetailAfterChildChange}
-                  getDictItems={getDictItems}
-                  enrichField={enrichField}
-                  runtime={runtime as SchemaRuntime}
-                  schemaDataSources={schema?.dataSources}
-                  dataSourceManager={dataSourceManager}
-                />
-              ))}
+                  {directSubTableBlocks.map((block: BlockConfig, blockIndex: number) => (
+                    <DetailBlockRenderer
+                      key={block.id || `sub-${blockIndex}`}
+                      block={block}
+                      recordData={recordData}
+                      rawData={rawData}
+                      recordPid={recordPid!}
+                      token={token || undefined}
+                      locale={locale}
+                      t={t}
+                      modelCode={schema?.modelCode || tableName}
+                      evaluateEditableWhen={evaluateVisibleWhen}
+                      onDataChange={refreshDetailAfterChildChange}
+                      getDictItems={getDictItems}
+                      enrichField={enrichField}
+                      runtime={runtime as SchemaRuntime}
+                      schemaDataSources={schema?.dataSources}
+                      dataSourceManager={dataSourceManager}
+                    />
+                  ))}
+                  {directMonthlyGridBlocks.map((block: BlockConfig, blockIndex: number) => (
+                    <DetailBlockRenderer
+                      key={block.id || `monthly-${blockIndex}`}
+                      block={block}
+                      recordData={recordData}
+                      rawData={rawData}
+                      recordPid={recordPid!}
+                      token={token || undefined}
+                      locale={locale}
+                      t={t}
+                      modelCode={schema?.modelCode || tableName}
+                      evaluateEditableWhen={evaluateVisibleWhen}
+                      onDataChange={refreshDetailAfterChildChange}
+                      getDictItems={getDictItems}
+                      enrichField={enrichField}
+                      runtime={runtime as SchemaRuntime}
+                      schemaDataSources={schema?.dataSources}
+                      dataSourceManager={dataSourceManager}
+                    />
+                  ))}
+                  {directEmbeddedListBlocks.map((block: BlockConfig, blockIndex: number) => (
+                    <DetailBlockRenderer
+                      key={block.id || `embedded-${blockIndex}`}
+                      block={block}
+                      recordData={recordData}
+                      rawData={rawData}
+                      recordPid={recordPid!}
+                      token={token || undefined}
+                      locale={locale}
+                      t={t}
+                      modelCode={schema?.modelCode || tableName}
+                      evaluateEditableWhen={evaluateVisibleWhen}
+                      onDataChange={refreshDetailAfterChildChange}
+                      getDictItems={getDictItems}
+                      enrichField={enrichField}
+                      runtime={runtime as SchemaRuntime}
+                      schemaDataSources={schema?.dataSources}
+                      dataSourceManager={dataSourceManager}
+                    />
+                  ))}
+                  {directSpecializedBlocks.map((block: BlockConfig, blockIndex: number) => (
+                    <DetailBlockRenderer
+                      key={block.id || `specialized-${blockIndex}`}
+                      block={block}
+                      recordData={recordData}
+                      rawData={rawData}
+                      recordPid={recordPid!}
+                      token={token || undefined}
+                      locale={locale}
+                      t={t}
+                      modelCode={schema?.modelCode || tableName}
+                      evaluateEditableWhen={evaluateVisibleWhen}
+                      onDataChange={refreshDetailAfterChildChange}
+                      getDictItems={getDictItems}
+                      enrichField={enrichField}
+                      runtime={runtime as SchemaRuntime}
+                      schemaDataSources={schema?.dataSources}
+                      dataSourceManager={dataSourceManager}
+                    />
+                  ))}
 
-              {/* G7 — unified fallback dispatch for blocks not handled by the
+                  {/* G7 — unified fallback dispatch for blocks not handled by the
                 hardcoded detail switch (chart / description / rich-text /
                 divider / stat-card / etc.). Renders via BlockRenderer using
                 the fallback renderer registry. Unknown blockTypes surface as
                 a visible placeholder + console.warn (not silently dropped). */}
-              {runtime &&
-                directMiscBlocks
-                  .filter(
-                    (b: BlockConfig) =>
-                      (b as { detailPlacement?: string }).detailPlacement !== 'header',
-                  )
-                  .map((block: BlockConfig, blockIndex: number) => (
-                    <BlockRenderer
-                      key={block.id || `misc-${blockIndex}`}
-                      block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
-                      runtime={runtime}
-                      areaId="detail-direct"
-                    />
-                  ))}
+                  {runtime &&
+                    directMiscBlocks
+                      .filter(
+                        (b: BlockConfig) =>
+                          (b as { detailPlacement?: string }).detailPlacement !== 'header',
+                      )
+                      .map((block: BlockConfig, blockIndex: number) => (
+                        <BlockRenderer
+                          key={block.id || `misc-${blockIndex}`}
+                          block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
+                          runtime={runtime}
+                          areaId="detail-direct"
+                        />
+                      ))}
+                </>
+              )}
 
               {/* Fallback: no structured blocks found, show all fields */}
               {effectiveDirectFormBlocks.length === 0 &&
@@ -836,31 +839,54 @@ export function renderDetailPageView({
               )}
 
               {/* Default back/edit buttons (hidden in print) */}
-              {!effectiveHeaderToolbar && (
-                <div
-                  className="print-hide border-border flex justify-end space-x-3 border-t pt-6"
-                  data-print="hide"
-                >
-                  <Link
-                    to={`/p/${tableName}${location.search}`}
-                    className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
+              {!presentation &&
+                !effectiveHeaderToolbar &&
+                (schema.extension?.showBack !== false || showDefaultEditAction) && (
+                  <div
+                    className="print-hide border-border flex justify-end space-x-3 border-t pt-6"
+                    data-print="hide"
                   >
-                    {t('action.back')}
-                  </Link>
-                  {showDefaultEditAction && (
-                    <Link
-                      to={`/p/${tableName}/edit/${recordPid}`}
-                      className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
-                    >
-                      {t('action.update')}
-                    </Link>
-                  )}
-                </div>
-              )}
+                    {schema.extension?.showBack !== false && (
+                      <Link
+                        to={`/p/${tableName}${location.search}`}
+                        className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
+                      >
+                        {t('action.back')}
+                      </Link>
+                    )}
+                    {showDefaultEditAction && (
+                      <Link
+                        to={`/p/${tableName}/edit/${recordPid}`}
+                        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
+                      >
+                        {t('action.update')}
+                      </Link>
+                    )}
+                  </div>
+                )}
             </div>
           )}
         </div>
       </div>
+
+      {presentation?.footerTarget &&
+        createPortal(
+          <div
+            className="aura-dialog-presentation__footer print-hide border-border bg-panel flex flex-wrap items-center justify-end border-t"
+            data-testid="detail-modal-footer"
+          >
+            <button
+              type="button"
+              onClick={presentation.onClose}
+              disabled={actionLoading}
+              className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2 text-sm disabled:opacity-50"
+            >
+              {closeLabel}
+            </button>
+            {nativeActions}
+          </div>,
+          presentation.footerTarget,
+        )}
 
       {/* Record Share Dialog */}
       {shareDialogOpen && recordPid && (

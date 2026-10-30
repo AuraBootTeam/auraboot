@@ -25,6 +25,7 @@ import {
 export interface SummaryRowProps {
   /** Ordered data columns (excludes the action column). */
   columns: ColumnConfig[];
+  compact?: boolean;
   /** Rows currently rendered on this page. */
   rows: Record<string, unknown>[];
   /** Whether a leading selection (checkbox) column is present. */
@@ -65,6 +66,7 @@ export function hasAnyAggregate(columns: ColumnConfig[]): boolean {
 
 export function SummaryRow({
   columns,
+  compact = false,
   rows,
   enableSelection,
   hasActionColumn,
@@ -131,7 +133,7 @@ export function SummaryRow({
             return (
               <td
                 key={column.field}
-                className={`text-text-3 px-6 py-2 whitespace-nowrap ${
+                className={`text-text-3 ${compact ? 'px-3' : 'px-6'} py-2 whitespace-nowrap ${
                   isLabelCell ? 'text-left' : ''
                 }`}
                 style={{ width: `${width}px`, maxWidth: `${width}px` }}
@@ -145,7 +147,7 @@ export function SummaryRow({
           return (
             <td
               key={column.field}
-              className={`px-6 py-2 whitespace-nowrap tabular-nums ${alignClass}`}
+              className={`${compact ? 'px-3' : 'px-6'} py-2 whitespace-nowrap tabular-nums ${alignClass}`}
               style={{ width: `${width}px`, maxWidth: `${width}px` }}
               data-testid={`summary-cell-${column.field}`}
               data-aggregate={cell.kind}

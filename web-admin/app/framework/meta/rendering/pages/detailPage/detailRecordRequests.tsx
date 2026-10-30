@@ -4,6 +4,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { expressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { ResultHelper } from '~/utils/type';
+import { enrichDetailField } from './detailFieldDisplay';
 import type { RecordData, DetailListResult, DetailRecordRefreshSnapshot } from './detailPageTypes';
 
 export function isDetailRecordAccessDenied(result: {
@@ -87,11 +88,21 @@ export function resolveDetailRecordEndpoint(
   recordPid: string,
 ): { endpoint: string; method: 'get' | 'post' } {
   const ds = schema?.extension?.dataSource as
-    | { type?: string; endpoint?: string; method?: string; adaptor?: string }
+    | {
+        type?: string;
+        endpoint?: string;
+        method?: string;
+        adaptor?: string;
+        detailEndpoint?: string;
+        recordEndpoint?: string;
+      }
     | undefined;
   if (ds && ds.type === 'api' && typeof ds.endpoint === 'string' && ds.endpoint.length > 0) {
     const method = String(ds.method || 'get').toLowerCase() === 'post' ? 'post' : 'get';
-    let endpoint = ds.endpoint;
+    const declaredDetail = ds.detailEndpoint || ds.recordEndpoint;
+    const hasExplicitDetail =
+      typeof declaredDetail === 'string' && declaredDetail.trim().length > 0;
+    let endpoint = hasExplicitDetail ? declaredDetail.trim() : ds.endpoint;
     const legacyRecordKey = 'record' + 'Id';
     const publicRecordEndpointPlaceholder = new RegExp(
       `\\{recordPid\\}|\\$\\{recordPid\\}|\\{pid\\}|\\$\\{pid\\}|\\{id\\}|\\{${legacyRecordKey}\\}|\\$\\{${legacyRecordKey}\\}`,
@@ -99,7 +110,7 @@ export function resolveDetailRecordEndpoint(
     );
     if (recordPid && publicRecordEndpointPlaceholder.test(endpoint)) {
       endpoint = endpoint.replace(publicRecordEndpointPlaceholder, encodeURIComponent(recordPid));
-    } else if (recordPid && ds.adaptor !== 'commandRecord') {
+    } else if (recordPid && !hasExplicitDetail && ds.adaptor !== 'commandRecord') {
       endpoint = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordPid)}`;
     } else {
       endpoint = endpoint.replace(/\/+$/, '');
@@ -224,12 +235,106 @@ export async function resolveDetailListDisplayRecord(
   }
 }
 
+/**
+ * A static detail section can use display values already returned by its master
+ * read. Unknown/custom layouts and incomplete metadata keep the legacy list
+ * enrichment; this is a presentation optimization, never an authorization read.
+ */
+export function hasCompleteDetailDisplayFields(
+  record: Record<string, any>,
+  fieldMap?: Map<string, any>,
+  schema?: any,
+): boolean {
+  if (!fieldMap?.size || !Array.isArray(schema?.blocks) || !schema.blocks.length) return false;
+  const serialized = JSON.stringify(schema);
+  if (
+    serialized.includes('_display') ||
+    serialized.includes('visibleWhen') ||
+    schema.extension?.headerSubtitleFields?.length ||
+    schema.extension?.dataSource
+  )
+    return false;
+  let references = 0;
+  for (const block of schema.blocks) {
+    if (block.blockType === 'toolbar') continue;
+    if (block.blockType === 'rich-text') {
+      if (JSON.stringify(block).includes('${')) return false;
+      continue;
+    }
+    if (
+      block.blockType !== 'detail-section' ||
+      !Array.isArray(block.fields) ||
+      block.extension?.displayVariant ||
+      block.dataPath ||
+      block.dataSource ||
+      block.extension?.dataSource
+    )
+      return false;
+    for (const field of block.fields) {
+      const code = field.field;
+      const meta = fieldMap.get(code);
+      if (typeof code !== 'string' || !meta) return false;
+      if (JSON.stringify(field).includes('${')) return false;
+      const effective = enrichDetailField(field, meta) as any;
+      const component = String(effective.component || '').toLowerCase();
+      if (
+        component &&
+        ![
+          'text',
+          'number',
+          'date',
+          'datetime',
+          'switch',
+          'jsonviewer',
+          'reference',
+          'userselect',
+          'organizationselect',
+          'select',
+          'multiselect',
+        ].includes(component)
+      )
+        return false;
+      // Default DynamicField resolves pure dictionaries through getDictItems, not _display.
+      // Settings cards and headers, which also consume dictionary _display, are excluded above.
+      const needsDisplay =
+        String(effective.dataType).toLowerCase() === 'reference' ||
+        effective.refTarget ||
+        effective.referenceModelCode ||
+        effective.props?.refTarget ||
+        effective.props?.referenceModelCode ||
+        ['reference', 'userselect', 'organizationselect', 'select', 'multiselect'].includes(
+          component,
+        );
+      if (
+        !needsDisplay ||
+        !Object.prototype.hasOwnProperty.call(record, code) ||
+        record[code] === null ||
+        record[code] === undefined ||
+        record[code] === ''
+      )
+        continue;
+      references++;
+      const displayCode = `${code}_display`;
+      if (
+        !Object.prototype.hasOwnProperty.call(record, displayCode) ||
+        typeof record[displayCode] !== 'string' ||
+        !record[displayCode].trim()
+      )
+        return false;
+    }
+  }
+  return references > 0;
+}
+
 export async function enrichDetailRecordDisplayFields(
   modelCode: string,
   recordPid: string,
   record: Record<string, any>,
   token?: string,
+  fieldMap?: Map<string, any>,
+  schema?: any,
 ): Promise<Record<string, any>> {
+  if (hasCompleteDetailDisplayFields(record, fieldMap, schema)) return record;
   const listRecord = await resolveDetailListDisplayRecord(modelCode, recordPid, token);
   return mergeDetailDisplayFields(record, listRecord);
 }

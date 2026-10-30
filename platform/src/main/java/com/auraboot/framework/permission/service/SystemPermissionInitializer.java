@@ -262,6 +262,11 @@ public class SystemPermissionInitializer {
             "Execute Business Commands", "Invoke native business commands; domain authorization remains mandatory",
             LEVEL_ACTION, buildCode("system", "command", null), catalog, allPermissions, counts, pendingByLevel, parentCodes);
 
+        // Runtime schema reads use a canonical resource code distinct from the legacy system catalog.
+        createOrSkipPermission(tenantId, "page", "page", "read",
+            "Read Runtime Page Schemas", "Read published page render metadata; domain access remains separately authorized",
+            LEVEL_ACTION, buildCode("system", "page", null), catalog, allPermissions, counts, pendingByLevel, parentCodes);
+
         String platformModuleCode = buildCode("module", "platform", null);
         for (InternalSystemModel model : INTERNAL_SYSTEM_MODELS) {
             String resourcePermissionCode = buildCode("model", model.code(), null);

@@ -56,4 +56,25 @@ describe('composable form presentation', () => {
     expect(formFieldSpanClass(6, 3)).toBe('');
     expect(formGridClass(3)).toContain('@[56rem]/form:grid-cols-3');
   });
+  it('adapts small forms to content without storing a visual preset', () => {
+    expect(resolveFormPresentation({}, false, { fieldCount: 3 })).toMatchObject({
+      width: 'comfortable',
+      columns: 1,
+    });
+    expect(resolveFormPresentation({}, false, { fieldCount: 12 })).toMatchObject({
+      width: 'wide',
+      columns: 2,
+    });
+    expect(
+      resolveFormPresentation({}, false, { fieldCount: 3, hasWideContent: true }),
+    ).toMatchObject({ width: 'wide', columns: 2 });
+    expect(
+      resolveFormPresentation({ formPresentation: { width: 'full', columns: 2 } }, false, {
+        fieldCount: 3,
+      }),
+    ).toMatchObject({ width: 'full', columns: 2 });
+    expect(
+      resolveFormPresentation({ presentation: 'workspace' }, false, { fieldCount: 3 }),
+    ).toMatchObject({ width: 'full', columns: 2, actions: 'fixed' });
+  });
 });

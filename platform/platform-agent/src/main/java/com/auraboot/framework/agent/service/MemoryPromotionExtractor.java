@@ -257,11 +257,11 @@ public class MemoryPromotionExtractor {
         // before old ones during large backlogs.
         List<MemoryRow> seeds = jdbcTemplate.query(
                 "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
-                        + "       importance, embedding::text AS embedding_text "
+                        + "       importance, embedding_space, embedding_content_hash, embedding::text AS embedding_text "
                         + "FROM ab_agent_memory "
                         + "WHERE tenant_id = ? "
                         + "AND scope = 'user' "
-                        + "AND embedding IS NOT NULL "
+                        + "AND " + com.auraboot.framework.agent.memory.MemoryVectorPolicy.fresh("") + " "
                         + "AND (deleted_flag = FALSE OR deleted_flag IS NULL) "
                         + "AND updated_at > NOW() - INTERVAL '90 days' "
                         + "ORDER BY updated_at DESC",
@@ -287,19 +287,19 @@ public class MemoryPromotionExtractor {
             // Ask pgvector for K nearest neighbours (excluding seed + same user).
             List<MemoryRow> neighbours = jdbcTemplate.query(
                     "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
-                            + "       importance, embedding::text AS embedding_text "
+                            + "       importance, embedding_space, embedding_content_hash, embedding::text AS embedding_text "
                             + "FROM ab_agent_memory "
                             + "WHERE tenant_id = ? "
                             + "AND scope = 'user' "
                             + "AND (deleted_flag = FALSE OR deleted_flag IS NULL) "
-                            + "AND embedding IS NOT NULL "
-                            + "AND pid <> ? "
+                            + "AND " + com.auraboot.framework.agent.memory.MemoryVectorPolicy.fresh("") + " "
+                            + "AND embedding_space = ? AND pid <> ? "
                             + "AND (scope_key IS NULL OR scope_key <> ?) "
-                            + "ORDER BY embedding <=> (SELECT embedding FROM ab_agent_memory WHERE pid = ?) "
+                            + "ORDER BY embedding <=> ?::vector "
                             + "LIMIT ?",
                     (rs, rn) -> MemoryRow.fromResultSet(rs),
-                    tenantId, seed.pid, seed.scopeKey == null ? "" : seed.scopeKey,
-                    seed.pid, ANN_CANDIDATE_LIMIT);
+                    tenantId, seed.space, seed.pid, seed.scopeKey == null ? "" : seed.scopeKey,
+                    java.util.Arrays.toString(seed.embedding), ANN_CANDIDATE_LIMIT);
 
             List<MemoryRow> cluster = new ArrayList<>();
             cluster.add(seed);
@@ -331,7 +331,13 @@ public class MemoryPromotionExtractor {
         for (MemoryRow r : rows) {
             double[] v = r.embedding;
             if (v == null || v.length == 0) {
-                v = memoryEmbeddingService.resolveEmbedding(r.pid);
+                var resolved = memoryEmbeddingService.resolveVersionedEmbedding(r.pid);
+                if (resolved != null) {
+                    float[] values = resolved.values();
+                    v = new double[values.length];
+                    for (int i=0; i<values.length; i++) v[i]=values[i];
+                    r.space = resolved.space();
+                }
             }
             if (v != null && v.length > 0) {
                 r.embedding = v;
@@ -362,6 +368,7 @@ public class MemoryPromotionExtractor {
                 if (used[j]) continue;
                 MemoryRow other = embedded.get(j);
                 if (alreadyProposed.contains(other.pid)) continue;
+                if (seed.space == null || !seed.space.equals(other.space)) continue;
                 double sim = EmbeddingSimilarity.cosine(seed.embedding, other.embedding);
                 if (sim >= minSimilarity) {
                     clusterIdx.add(j);
@@ -501,7 +508,7 @@ public class MemoryPromotionExtractor {
         // access-log source.
         List<MemoryRow> candidates = jdbcTemplate.query(
                 "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
-                        + "       importance, embedding::text AS embedding_text "
+                        + "       importance, embedding_space, embedding_content_hash, embedding::text AS embedding_text "
                         + "FROM ab_agent_memory "
                         + "WHERE tenant_id = ? "
                         + "AND scope = 'user' "
@@ -582,7 +589,7 @@ public class MemoryPromotionExtractor {
     int extractImportanceSpike(Long tenantId, Set<String> alreadyProposed) {
         List<MemoryRow> candidates = jdbcTemplate.query(
                 "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
-                        + "       importance, embedding::text AS embedding_text "
+                        + "       importance, embedding_space, embedding_content_hash, embedding::text AS embedding_text "
                         + "FROM ab_agent_memory "
                         + "WHERE tenant_id = ? "
                         + "AND scope = 'user' "
@@ -616,11 +623,11 @@ public class MemoryPromotionExtractor {
     private List<MemoryRow> loadUserMemories(Long tenantId) {
         return jdbcTemplate.query(
                 "SELECT pid, tenant_id, scope_key, category, memory_title, memory_content, "
-                        + "       importance, embedding::text AS embedding_text "
+                        + "       importance, embedding_space, embedding_content_hash, embedding::text AS embedding_text "
                         + "FROM ab_agent_memory "
                         + "WHERE tenant_id = ? "
                         + "AND scope = 'user' "
-                        + "AND (deleted_flag = FALSE OR deleted_flag IS NULL) "
+                        + "AND " + com.auraboot.framework.agent.memory.MemoryReadPolicy.LIVE + " "
                         + "AND updated_at > NOW() - INTERVAL '90 days'",
                 (rs, rn) -> MemoryRow.fromResultSet(rs),
                 tenantId);
@@ -759,6 +766,7 @@ public class MemoryPromotionExtractor {
         public String content;
         public int importance;
         public double[] embedding;
+        public String space;
 
         static MemoryRow fromResultSet(java.sql.ResultSet rs) throws java.sql.SQLException {
             MemoryRow r = new MemoryRow();
@@ -769,7 +777,11 @@ public class MemoryPromotionExtractor {
             r.title = rs.getString("memory_title");
             r.content = rs.getString("memory_content");
             r.importance = rs.getInt("importance");
-            r.embedding = MemoryEmbeddingService.parseVectorLiteral(rs.getString("embedding_text"));
+            r.space = rs.getString("embedding_space");
+            String hash = rs.getString("embedding_content_hash");
+            if (r.space != null && r.content != null && com.auraboot.framework.agent.memory.MemoryVectorPolicy.sha256(r.content).equals(hash)) {
+                r.embedding = MemoryEmbeddingService.parseVectorLiteral(rs.getString("embedding_text"));
+            }
             return r;
         }
 

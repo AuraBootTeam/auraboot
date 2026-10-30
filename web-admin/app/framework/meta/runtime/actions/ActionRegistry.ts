@@ -1,7 +1,22 @@
+import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
+import {
+  createPromptSubmissionFeedback,
+  type PromptSubmissionFeedback,
+} from './promptSubmissionFeedback';
+import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
+import type { CommandInputPresentation } from '~/framework/meta/schemas/types';
+import { snapshotPromptPresentation } from './promptPresentation';
+import { currentFormDialogScope, cancelCurrentFormDialog } from './formDialogLifecycle';
 import type { RequestKeySession } from './request-key/session';
+import {
+  downloadWithAuth,
+  FileDownloadHttpError,
+  FileDownloadValidationError,
+} from '~/framework/meta/utils/commandDownload';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
 import { completedCommandOptions } from '../data-pipeline/completed-command-array';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -208,6 +223,63 @@ class ActionRegistry {
 // 导出单例
 export const actionRegistry = new ActionRegistry();
 
+actionRegistry.register(
+  'file.download',
+  async ({ args, t, locale, expressionEvaluator, expressionContext }) => {
+    const failed = translateOrFallback(
+      t,
+      'file.download.failed',
+      'Could not download the file. Refresh and check its expiry and current access.',
+    );
+    const invalid = translateOrFallback(
+      t,
+      'file.download.invalid_response',
+      'The server did not return a complete file. Refresh or create a new export.',
+    );
+    const configured = args?.url;
+    const url =
+      typeof configured === 'string' && expressionEvaluator && expressionContext
+        ? expressionEvaluator.evaluateTemplate(configured, expressionContext)
+        : configured;
+    if (
+      typeof url !== 'string' ||
+      !url.startsWith('/api/') ||
+      url.includes('\\') ||
+      typeof window === 'undefined' ||
+      new URL(url, window.location.origin).pathname.indexOf('/api/') !== 0
+    ) {
+      throw new Error(
+        translateOrFallback(
+          t,
+          'file.download.invalid_url',
+          'The protected file link is unavailable. Refresh the task.',
+        ),
+      );
+    }
+    const expected = args?.expectedContentType;
+    if (expected !== undefined && (typeof expected !== 'string' || !expected.includes('/')))
+      throw new Error(invalid);
+    try {
+      await downloadWithAuth(url, {
+        expectedContentTypes: expected ? [expected] : undefined,
+        requireAttachment: true,
+        requireNonEmpty: true,
+        resolveFailure: async (response) => {
+          const body = response.headers.get('Content-Type')?.includes('json')
+            ? await response.json()
+            : undefined;
+          return resolveCommandErrorMessage(body, '', t, locale, failed);
+        },
+      });
+    } catch (failure) {
+      if (failure instanceof FileDownloadHttpError) throw failure;
+      throw new Error(failure instanceof FileDownloadValidationError ? invalid : failed, {
+        cause: failure,
+      });
+    }
+  },
+);
+
 // ============================================
 // 注册内置动作处理器
 // ============================================
@@ -234,18 +306,25 @@ function resolveDataSourceTargets(args?: Record<string, any>): string | string[]
 /**
  * 导航动作 - 跳转到指定路径
  */
-actionRegistry.register('navigate', ({ args, navigate }) => {
-  if (!navigate) {
-    console.error('[ActionRegistry] navigate: navigate function not provided');
-    return;
-  }
-  const path = args?.path;
-  if (!path) {
-    console.error('[ActionRegistry] navigate: missing path argument');
-    return;
-  }
-  navigate(path);
-});
+actionRegistry.register(
+  'navigate',
+  ({ args, navigate, expressionEvaluator, expressionContext }) => {
+    if (!navigate) {
+      console.error('[ActionRegistry] navigate: navigate function not provided');
+      return;
+    }
+    const path = args?.path;
+    if (!path) {
+      console.error('[ActionRegistry] navigate: missing path argument');
+      return;
+    }
+    const resolvedPath =
+      expressionEvaluator && expressionContext
+        ? expressionEvaluator.evaluateTemplate(path, expressionContext)
+        : path;
+    navigate(resolvedPath);
+  },
+);
 
 /**
  * 新建记录 - 跳转到新建页面
@@ -540,18 +619,25 @@ actionRegistry.register('setState', ({ setFilters, args }) => {
 /**
  * router.push - 路由跳转
  */
-actionRegistry.register('router.push', ({ args, navigate }) => {
-  if (!navigate) {
-    console.error('[ActionRegistry] router.push: missing navigate');
-    return;
-  }
-  const path = args?.path;
-  if (!path) {
-    console.error('[ActionRegistry] router.push: missing path argument');
-    return;
-  }
-  navigate(path);
-});
+actionRegistry.register(
+  'router.push',
+  ({ args, navigate, expressionEvaluator, expressionContext }) => {
+    if (!navigate) {
+      console.error('[ActionRegistry] router.push: missing navigate');
+      return;
+    }
+    const path = args?.path;
+    if (!path) {
+      console.error('[ActionRegistry] router.push: missing path argument');
+      return;
+    }
+    const resolvedPath =
+      expressionEvaluator && expressionContext
+        ? expressionEvaluator.evaluateTemplate(path, expressionContext)
+        : path;
+    navigate(resolvedPath);
+  },
+);
 
 /**
  * router.back - 返回上一页
@@ -610,11 +696,8 @@ actionRegistry.register('dataSource.reload', async ({ dataSourceManager, args })
 /**
  * toast.show - 显示提示消息
  */
-actionRegistry.register('toast.show', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content;
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || JSON.stringify(message);
-  }
+actionRegistry.register('toast.show', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t);
   const level = args?.level || 'info';
   showToast?.(message as string, level);
 });
@@ -622,22 +705,17 @@ actionRegistry.register('toast.show', ({ args, showToast }) => {
 /**
  * toast.success - 成功提示
  */
-actionRegistry.register('toast.success', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content || 'Operation successful';
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Operation successful';
-  }
+actionRegistry.register('toast.success', ({ args, showToast, locale, t }) => {
+  const message =
+    getLocalizedText(args?.message || args?.content, locale, t) || 'Operation successful';
   showToast?.(message as string, 'success');
 });
 
 /**
  * toast.error - 错误提示
  */
-actionRegistry.register('toast.error', ({ args, showToast }) => {
-  let message: any = args?.message || args?.content || 'Operation failed';
-  if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Operation failed';
-  }
+actionRegistry.register('toast.error', ({ args, showToast, locale, t }) => {
+  const message = getLocalizedText(args?.message || args?.content, locale, t) || 'Operation failed';
   showToast?.(message as string, 'error');
 });
 
@@ -663,7 +741,9 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
  *
  * Shared by the `dialog.form` action (which stores the values into stateManager)
  * and `command.execute`'s `inputFields` sugar (which merges them into the command
- * payload). Pre-fetches options for choice fields with dictCode or api/static dataSources.
+ * payload). Resolves choice options for select-like fields from, in priority
+ * order: inline `options: [{ value, label }]`, `dictCode`, or api/static
+ * `dataSource`.
  */
 type PromptFeedbackContext = Pick<ActionContext, 't' | 'locale'>;
 
@@ -671,11 +751,18 @@ function isLegacyPromptChoices(result: any): boolean {
   // Existing plugin option endpoints also return raw items/records on HTTP 200.
   // Direct callers may also provide that raw shape; explicit failures are excluded.
   const status = result?.httpStatus;
-  return result != null && result.success !== false && String(result.code ?? '').trim() === ''
-    && (status == null || (Number(status) >= 200 && Number(status) < 300))
-    && result.context == null && result.error == null && result.exception == null
-    && !String(result.message ?? '').trim() && !String(result.desc ?? '').trim()
-    && (Array.isArray(result) || Array.isArray(result.items) || Array.isArray(result.records));
+  return (
+    result != null &&
+    result.success !== false &&
+    String(result.code ?? '').trim() === '' &&
+    (status == null || (Number(status) >= 200 && Number(status) < 300)) &&
+    result.context == null &&
+    result.error == null &&
+    result.exception == null &&
+    !String(result.message ?? '').trim() &&
+    !String(result.desc ?? '').trim() &&
+    (Array.isArray(result) || Array.isArray(result.items) || Array.isArray(result.records))
+  );
 }
 
 async function fetchPromptChoices(
@@ -684,8 +771,13 @@ async function fetchPromptChoices(
   options: Record<string, unknown>,
   feedback: PromptFeedbackContext,
 ): Promise<any> {
-  const fallback = translateOrFallback(feedback.t, 'error.data_load_failed',
-    feedback.locale?.toLowerCase().startsWith('zh') ? '数据加载失败，请重试。' : 'Unable to load data. Try again.');
+  const fallback = translateOrFallback(
+    feedback.t,
+    'error.data_load_failed',
+    feedback.locale?.toLowerCase().startsWith('zh')
+      ? '数据加载失败，请重试。'
+      : 'Unable to load data. Try again.',
+  );
   let result: any;
   try {
     result = await fetchResult(endpoint, options);
@@ -693,15 +785,40 @@ async function fetchPromptChoices(
     // A thrown transport error is diagnostic text, never public business copy.
     throw new Error(fallback);
   }
-  if (!result || Number(result.httpStatus) >= 400 || result.success === false
-    || (!ResultHelper.isSuccess(result) && !isLegacyPromptChoices(result))) {
+  if (
+    !result ||
+    Number(result.httpStatus) >= 400 ||
+    result.success === false ||
+    (!ResultHelper.isSuccess(result) && !isLegacyPromptChoices(result))
+  ) {
     const detail = result ? ResultHelper.getErrorDetail(result) : undefined;
-    throw new Error(detail
-      ? resolveCommandErrorMessage({ context: { detail } }, '', feedback.t, feedback.locale, fallback)
-      : fallback);
+    throw new Error(
+      detail
+        ? resolveCommandErrorMessage(
+            { context: { detail } },
+            '',
+            feedback.t,
+            feedback.locale,
+            fallback,
+          )
+        : fallback,
+    );
   }
   return result;
 }
+
+let nextPromptRequestId = 0;
+
+/** One renderable choice of a prompt select field (see FormDialog FormOptionConfig). */
+type PromptFieldOption = {
+  label: any;
+  value: string;
+  description?: any;
+  disabled?: boolean;
+  visibleWhen?: any;
+  options?: Array<{ value: string; disabled?: boolean }>;
+  defaultValues?: unknown;
+};
 
 export async function promptInputForm(
   fields: Array<Record<string, any> | string>,
@@ -710,47 +827,99 @@ export async function promptInputForm(
   submitLabel?: any,
   runtimeContext: Record<string, unknown> = {},
   feedback: PromptFeedbackContext = {},
+  presentation?: CommandInputPresentation,
+  signal?: AbortSignal,
+  submissionFeedback?: PromptSubmissionFeedback,
+  options: { bindingsResolved?: boolean } = {},
 ): Promise<Record<string, any>> {
+  // Capture lifecycle and display values before any async choices request.
+  const signals = [
+    ...new Set(
+      [signal, currentFormDialogScope()].filter((value): value is AbortSignal => Boolean(value)),
+    ),
+  ];
+  const aborted = () => signals.some((value) => value.aborted);
+  if (aborted()) throw new ActionCancelledError();
+  const snapshot = snapshotPromptPresentation(title, presentation, runtimeContext, feedback);
   const normalizedFields = fields.map((field) => normalizePromptInputField(field));
-  const fieldOptions: Record<
+  const fieldOptions: Record<string, PromptFieldOption[]> = {};
+  const dictOptions = new Map<
     string,
-    Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any; options?: Array<{ value: string; disabled?: boolean }>; defaultValues?: unknown }>
-  > = {};
+    Promise<Array<{ label: any; value: string; description?: any; disabled?: boolean }>>
+  >();
+  const loadDictionary = (code: string) => {
+    let pending = dictOptions.get(code);
+    if (!pending) {
+      pending = (async () => {
+        if (!fetchResult) return [];
+        const result = await fetchPromptChoices(
+          fetchResult,
+          `/api/meta/dict/by-code/${encodeURIComponent(code)}/data`,
+          { method: 'get' },
+          feedback,
+        );
+        const resultPayload = (result as any)?.data ?? result;
+        const data = resultPayload as
+          | { items?: Array<Record<string, any>> }
+          | Array<Record<string, any>>;
+        const rawOptions = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+            ? data.items
+            : [];
+        return rawOptions
+          .map((option: any) => {
+            const value = option?.value;
+            const label = option?.label ?? option?.['label:zh-CN'] ?? option?.['label:en'] ?? value;
+            if (value === undefined || value === null) return null;
+            return {
+              value: String(value),
+              label: label && typeof label === 'object' ? label : String(label ?? value),
+              ...(option?.description === undefined || option?.description === null
+                ? {}
+                : { description: option.description }),
+              ...(option?.disabled === true ? { disabled: true } : {}),
+            };
+          })
+          .filter(Boolean) as Array<{
+          label: any;
+          value: string;
+          description?: any;
+          disabled?: boolean;
+        }>;
+      })();
+      dictOptions.set(code, pending);
+    }
+    return pending;
+  };
   for (const field of normalizedFields) {
+    // Inline options win over dictCode/dataSource (options > dictCode >
+    // dataSource): an author-provided `options: [{ value, label }]` list is
+    // used verbatim with no fetch. Previously inline options were silently
+    // dropped and the select rendered empty (plugins#747).
+    const inlineOptions = Array.isArray(field.options) ? field.options : [];
+    if (inlineOptions.length > 0) {
+      fieldOptions[field.field] = normalizeInlinePromptOptions(inlineOptions);
+      continue;
+    }
+    if (field.dataSource?.pagination === true) {
+      if (
+        field.type !== 'multiselect' ||
+        field.dataSource.type !== 'api' ||
+        !field.dataSource.endpoint
+      ) {
+        throw new Error('Paged choices require an API multiselect endpoint');
+      }
+      field.dataSource = {
+        ...field.dataSource,
+        endpoint: String(field.dataSource.endpoint).replace(/\$\{([^}]+)\}/g, (_match, path) =>
+          String(readInputPath(runtimeContext, path) ?? ''),
+        ),
+      };
+      continue;
+    }
     if (field.dictCode && fetchResult) {
-      const result = await fetchPromptChoices(fetchResult,
-        `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,
-        { method: 'get' }, feedback,
-      );
-      const resultPayload = (result as any)?.data ?? result;
-      const data = resultPayload as
-        | { items?: Array<Record<string, any>> }
-        | Array<Record<string, any>>;
-      const rawOptions = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-          ? data.items
-          : [];
-      fieldOptions[field.field] = rawOptions
-        .map((option: any) => {
-          const value = option?.value;
-          const label = option?.label ?? option?.['label:zh-CN'] ?? option?.['label:en'] ?? value;
-          if (value === undefined || value === null) return null;
-          return {
-            value: String(value),
-            label: label && typeof label === 'object' ? label : String(label ?? value),
-            ...(option?.description === undefined || option?.description === null
-              ? {}
-              : { description: option.description }),
-            ...(option?.disabled === true ? { disabled: true } : {}),
-          };
-        })
-        .filter(Boolean) as Array<{
-        label: any;
-        value: string;
-        description?: any;
-        disabled?: boolean;
-      }>;
+      fieldOptions[field.field] = await loadDictionary(String(field.dictCode));
     } else if (field.dataSource?.type === 'command') {
       // Choice commands use the governed command boundary; incomplete collections
       // must not open an empty form or continue to its mutation command.
@@ -774,14 +943,20 @@ export async function promptInputForm(
         throw new Error(fallback);
       }
     } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
-      const endpoint = String(field.dataSource.endpoint).replace(
-        /\$\{([^}]+)\}/g,
-        (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
+      const endpoint = options.bindingsResolved
+        ? String(field.dataSource.endpoint)
+        : String(field.dataSource.endpoint).replace(/\$\{([^}]+)\}/g, (_match, path) =>
+            String(readInputPath(runtimeContext, path) ?? ''),
+          );
+      const result = await fetchPromptChoices(
+        fetchResult,
+        endpoint,
+        {
+          method: 'get',
+          ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
+        },
+        feedback,
       );
-      const result = await fetchPromptChoices(fetchResult, endpoint, {
-        method: 'get',
-        ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
-      }, feedback);
       const valueField = field.dataSource.valueField || 'value';
       const labelField = field.dataSource.labelField || 'label';
       const descriptionField = field.dataSource.descriptionField;
@@ -811,14 +986,30 @@ export async function promptInputForm(
                         ? description
                         : String(description),
                   }),
-              ...(field.type === 'grouped-multiselect' ? { options: Array.isArray(option.options)
-                ? option.options.filter((choice: any) => choice && typeof choice.value === 'string' && choice.value.trim()
-                    && (typeof choice.label === 'string' || (choice.label && typeof choice.label === 'object')))
-                  .map((choice: any) => ({ value: choice.value, label: choice.label,
-                    ...(choice.disabled === true ? { disabled: true } : {}) })) : [] } : {}),
+              ...(field.type === 'grouped-multiselect'
+                ? {
+                    options: Array.isArray(option.options)
+                      ? option.options
+                          .filter(
+                            (choice: any) =>
+                              choice &&
+                              typeof choice.value === 'string' &&
+                              choice.value.trim() &&
+                              (typeof choice.label === 'string' ||
+                                (choice.label && typeof choice.label === 'object')),
+                          )
+                          .map((choice: any) => ({
+                            value: choice.value,
+                            label: choice.label,
+                            ...(choice.disabled === true ? { disabled: true } : {}),
+                          }))
+                      : [],
+                  }
+                : {}),
               ...(option.disabled === true ? { disabled: true } : {}),
               ...(field.type === 'grouped-multiselect' && field.props?.defaultValuesField
-                ? { defaultValues: option[field.props.defaultValuesField] } : {}),
+                ? { defaultValues: option[field.props.defaultValuesField] }
+                : {}),
             };
           }
           if (option === undefined || option === null) return null;
@@ -835,11 +1026,33 @@ export async function promptInputForm(
     }
   }
 
+  if (snapshot.presentation?.summary) {
+    snapshot.presentation.summary.items = await Promise.all(
+      snapshot.presentation.summary.items.map(async (item) => {
+        if (!item.dictCode || item.value === '—') return item;
+        const choice = (await loadDictionary(item.dictCode)).find(
+          (option) => option.value === item.value,
+        );
+        return {
+          ...item,
+          value: choice
+            ? feedback.locale === undefined && typeof choice.label === 'object'
+              ? { ...choice.label }
+              : getLocalizedText(choice.label, feedback.locale, feedback.t)
+            : '—',
+        };
+      }),
+    );
+  }
+  if (aborted()) throw new ActionCancelledError();
+
   // Build default values from field configs
   const defaults: Record<string, any> = {};
   for (const field of normalizedFields) {
     if (field.defaultValue !== undefined) {
-      const resolvedDefaultValue = resolveInputDefaultValue(field.defaultValue, runtimeContext);
+      const resolvedDefaultValue = options.bindingsResolved
+        ? field.defaultValue
+        : resolveInputDefaultValue(field.defaultValue, runtimeContext);
       if (field.type === 'multiselect') {
         const raw = resolvedDefaultValue;
         if (Array.isArray(raw)) {
@@ -869,9 +1082,15 @@ export async function promptInputForm(
       const valuesField = field.props.valuesField || 'values';
       defaults[field.field] = (fieldOptions[field.field] || []).map((group) => {
         const values = group.defaultValues;
-        const eligible = new Set((group.options || []).filter((choice) => !choice.disabled).map((choice) => choice.value));
-        if (!Array.isArray(values) || values.some((value) => typeof value !== 'string' || !eligible.has(value))
-          || new Set(values).size !== values.length || (group.disabled && values.length > 0)) {
+        const eligible = new Set(
+          (group.options || []).filter((choice) => !choice.disabled).map((choice) => choice.value),
+        );
+        if (
+          !Array.isArray(values) ||
+          values.some((value) => typeof value !== 'string' || !eligible.has(value)) ||
+          new Set(values).size !== values.length ||
+          (group.disabled && values.length > 0)
+        ) {
           throw new Error(`Invalid grouped defaults for ${field.field}`);
         }
         return { [groupField]: group.value, [valuesField]: [...values] };
@@ -880,19 +1099,76 @@ export async function promptInputForm(
   }
 
   return new Promise<Record<string, any>>((resolve, reject) => {
-    const event = new CustomEvent('dialog:form', {
-      detail: {
-        title,
-        fields: normalizedFields,
-        fieldOptions,
-        defaults,
-        submitLabel,
-        onSubmit: (formData: Record<string, any>) => resolve(formData),
-        onCancel: () => reject(new ActionCancelledError()),
-      },
-    });
-    window.dispatchEvent(event);
+    const requestId = ++nextPromptRequestId;
+    // Plain dialog.form/legacy collectors have no result channel and still close.
+    const submission =
+      snapshot.presentation?.waitForResult === true ? submissionFeedback : undefined;
+    submission?.attach(requestId, signals, () => cancelCurrentFormDialog(requestId));
+    let settled = false;
+    const cleanup = () => signals.forEach((value) => value.removeEventListener('abort', onAbort));
+    const finish = (submitted: boolean, formData: Record<string, any> = {}) => {
+      if (settled) return;
+      if (submitted && submission && !submission.submit()) return;
+      settled = true;
+      cleanup();
+      if (submitted) resolve(formData);
+      else {
+        submission?.dispose();
+        reject(new ActionCancelledError());
+      }
+    };
+    const onAbort = () => {
+      finish(false);
+      cancelCurrentFormDialog(requestId);
+    };
+    signals.forEach((value) => value.addEventListener('abort', onAbort, { once: true }));
+    if (aborted()) {
+      onAbort();
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent('dialog:form', {
+        detail: {
+          requestId,
+          submission,
+          title: snapshot.title,
+          presentation: snapshot.presentation,
+          fields: normalizedFields,
+          fieldOptions,
+          fetchResult,
+          defaults,
+          submitLabel,
+          onSubmit: (formData: Record<string, any>) => finish(true, formData),
+          onCancel: () => finish(false),
+        },
+      }),
+    );
   });
+}
+
+/**
+ * Normalize author-provided inline options (`options: [{ value, label }]` on a
+ * prompt input field) into the option shape FormDialog renders: string-coerced
+ * `value`, label kept as a localized object or stringified; sibling keys
+ * (description, disabled, visibleWhen, grouped `options`) pass through
+ * untouched. Scalar entries become `{ value, label }` pairs.
+ */
+function normalizeInlinePromptOptions(options: Array<unknown>): PromptFieldOption[] {
+  return options
+    .map((option: any) => {
+      if (option && typeof option === 'object') {
+        if (option.value === undefined || option.value === null) return null;
+        const label = option.label ?? option.name ?? option.value;
+        return {
+          ...option,
+          value: String(option.value),
+          label: label && typeof label === 'object' ? label : String(label ?? option.value),
+        };
+      }
+      if (option === undefined || option === null) return null;
+      return { value: String(option), label: String(option) };
+    })
+    .filter(Boolean) as PromptFieldOption[];
 }
 
 function normalizePromptInputField(field: Record<string, any> | string): Record<string, any> {
@@ -968,20 +1244,30 @@ function readInputPath(source: unknown, path: string): unknown {
  *   }
  * }
  */
-actionRegistry.register('dialog.form', async ({ args, stateManager, scopeId, fetchResult, expressionContext, t, locale }) => {
-  if (!args?.fields) {
-    console.error('[ActionRegistry] dialog.form: missing fields in args');
-    return;
-  }
-  const formData = await promptInputForm(args.fields, args.title, fetchResult, args.submitLabel,
-    (expressionContext as Record<string, unknown> | undefined) ?? {}, { t, locale });
-  // Store form values in stateManager under form.{fieldName}
-  if (stateManager && scopeId) {
-    Object.entries(formData).forEach(([key, value]) => {
-      stateManager.updateForm(scopeId, key, value);
-    });
-  }
-});
+actionRegistry.register(
+  'dialog.form',
+  async ({ args, stateManager, scopeId, fetchResult, expressionContext, t, locale }) => {
+    if (!args?.fields) {
+      console.error('[ActionRegistry] dialog.form: missing fields in args');
+      return;
+    }
+    const formData = await promptInputForm(
+      args.fields,
+      args.title,
+      fetchResult,
+      args.submitLabel,
+      (expressionContext as Record<string, unknown> | undefined) ?? {},
+      { t, locale },
+      args.presentation,
+    );
+    // Store form values in stateManager under form.{fieldName}
+    if (stateManager && scopeId) {
+      Object.entries(formData).forEach(([key, value]) => {
+        stateManager.updateForm(scopeId, key, value);
+      });
+    }
+  },
+);
 
 /**
  * event.emit - Dispatch a custom DOM event
@@ -1080,29 +1366,53 @@ actionRegistry.register('form.reset', ({ stateManager, scopeId }) => {
 });
 
 /** Explicitly replace declared form fields using evaluated values; other fields stay intact. */
-actionRegistry.register('form.set', ({ stateManager, scopeId, args, expressionEvaluator, expressionContext }) => {
-  if (!stateManager || !scopeId || !args || typeof args !== 'object' || Array.isArray(args)) {
-    throw new Error('form.set requires a scoped form and field values');
-  }
-  const entries = Object.entries(args);
-  if (entries.some(([key]) => !key.trim() || ['__proto__', 'prototype', 'constructor'].includes(key))) {
-    throw new Error('form.set contains an invalid field key');
-  }
-  const values = expressionEvaluator && expressionContext
-    ? expressionEvaluator.evaluateObject(args, expressionContext) : args;
-  if (Object.values(values).some((value) => value === undefined)) {
-    throw new Error('form.set contains an unresolved field value');
-  }
-  Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
-});
+actionRegistry.register(
+  'form.set',
+  ({ stateManager, scopeId, args, expressionEvaluator, expressionContext }) => {
+    if (!stateManager || !scopeId || !args || typeof args !== 'object' || Array.isArray(args)) {
+      throw new Error('form.set requires a scoped form and field values');
+    }
+    const entries = Object.entries(args);
+    if (
+      entries.some(
+        ([key]) => !key.trim() || ['__proto__', 'prototype', 'constructor'].includes(key),
+      )
+    ) {
+      throw new Error('form.set contains an invalid field key');
+    }
+    const values =
+      expressionEvaluator && expressionContext
+        ? expressionEvaluator.evaluateObject(args, expressionContext)
+        : args;
+    if (Object.values(values).some((value) => value === undefined)) {
+      throw new Error('form.set contains an unresolved field value');
+    }
+    Object.entries(values).forEach(([key, value]) => stateManager.updateForm(scopeId, key, value));
+  },
+);
+
+function resolveRequestKeyArgs(context: ActionContext): Record<string, any> | undefined {
+  const { args, expressionEvaluator, expressionContext } = context;
+  if (!args || typeof args.field !== 'string' || !expressionEvaluator || !expressionContext)
+    return args;
+  return { ...args, field: expressionEvaluator.evaluateTemplate(args.field, expressionContext) };
+}
 
 /** Allocate one domain request key in the existing scoped state, never per click. */
-actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
-  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
-    || Object.keys(args).some(key => !['field','persistence'].includes(key)) || typeof args.field !== 'string'
-    || (args.persistence !== undefined && args.persistence !== 'session')
-    || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
-    || ['__proto__', 'prototype', 'constructor'].includes(args.field))
+actionRegistry.register('state.ensureRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
+  if (
+    !stateManager ||
+    !scopeId ||
+    !stateManager.getScope(scopeId) ||
+    !args ||
+    Object.keys(args).some((key) => !['field', 'persistence'].includes(key)) ||
+    typeof args.field !== 'string' ||
+    (args.persistence !== undefined && args.persistence !== 'session') ||
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field) ||
+    ['__proto__', 'prototype', 'constructor'].includes(args.field)
+  )
     throw new Error('state.ensureRequestKey requires a scoped field');
   const current = stateManager.getContext(scopeId).state[args.field];
   if (args.persistence === 'session') {
@@ -1111,8 +1421,13 @@ actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args
     return;
   }
   if (current !== undefined && current !== null) {
-    if (typeof current !== 'string' || !current.length || current.length > 128
-      || current.trim() !== current || /[\x00-\x1f\x7f]/.test(current))
+    if (
+      typeof current !== 'string' ||
+      !current.length ||
+      current.length > 128 ||
+      current.trim() !== current ||
+      /[\x00-\x1f\x7f]/.test(current)
+    )
       throw new Error('Invalid existing request key');
     return;
   }
@@ -1123,24 +1438,46 @@ actionRegistry.register('state.ensureRequestKey', ({ stateManager, scopeId, args
 });
 
 /** Restore only an existing authenticated session UUID; never allocate or persist one. */
-actionRegistry.register('state.peekRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
-  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
-    || Object.keys(args).length !== 2 || Object.keys(args).some(key => !['field','persistence'].includes(key))
-    || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
-    || ['__proto__','prototype','constructor'].includes(args.field) || args.persistence !== 'session')
+actionRegistry.register('state.peekRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
+  if (
+    !stateManager ||
+    !scopeId ||
+    !stateManager.getScope(scopeId) ||
+    !args ||
+    Object.keys(args).length !== 2 ||
+    Object.keys(args).some((key) => !['field', 'persistence'].includes(key)) ||
+    typeof args.field !== 'string' ||
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field) ||
+    ['__proto__', 'prototype', 'constructor'].includes(args.field) ||
+    args.persistence !== 'session'
+  )
     throw new Error('Invalid request key peek');
   if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
-  const restored = requestKeySession.peek(args.field, stateManager.getContext(scopeId).state[args.field]);
+  const restored = requestKeySession.peek(
+    args.field,
+    stateManager.getContext(scopeId).state[args.field],
+  );
   stateManager.updateState(scopeId, args.field, restored);
 });
 
 /** Explicit completion/next-attempt transition; ordinary state.set never clears persisted intent. */
-actionRegistry.register('state.clearRequestKey', ({ stateManager, scopeId, args, requestKeySession }) => {
-  if (!stateManager || !scopeId || !stateManager.getScope(scopeId) || !args
-    || Object.keys(args).some(key => !['field','persistence'].includes(key))
-    || typeof args.field !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field)
-    || ['__proto__','prototype','constructor'].includes(args.field)
-    || (args.persistence !== undefined && args.persistence !== 'session')) throw new Error('Invalid request key clear');
+actionRegistry.register('state.clearRequestKey', (context) => {
+  const { stateManager, scopeId, requestKeySession } = context;
+  const args = resolveRequestKeyArgs(context);
+  if (
+    !stateManager ||
+    !scopeId ||
+    !stateManager.getScope(scopeId) ||
+    !args ||
+    Object.keys(args).some((key) => !['field', 'persistence'].includes(key)) ||
+    typeof args.field !== 'string' ||
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.field) ||
+    ['__proto__', 'prototype', 'constructor'].includes(args.field) ||
+    (args.persistence !== undefined && args.persistence !== 'session')
+  )
+    throw new Error('Invalid request key clear');
   if (args.persistence === 'session') {
     if (!requestKeySession) throw new Error('Authenticated request key identity is unavailable');
     requestKeySession.clear(args.field, stateManager.getContext(scopeId).state[args.field]);
@@ -1266,7 +1603,8 @@ actionRegistry.register(
       // or subsequent success feedback. HTTP success alone is insufficient.
       if (!ResultHelper.isSuccess(result)) {
         const fallback = translateOrFallback(
-          t, 'message.operation.failed',
+          t,
+          'message.operation.failed',
           locale?.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed',
         );
         throw new Error(resolveCommandErrorMessage(result, '', t, locale, fallback));
@@ -1361,58 +1699,76 @@ actionRegistry.register(
         operationType = expressionEvaluator.evaluateTemplate(operationType, expressionContext);
       }
     }
-    targetRecordPid = targetRecordPid ?? targetRecordPid;
-    targetRecordPid = targetRecordPid ?? targetRecordPid;
 
     let validatedVersion: number | undefined;
     if (args?.expectedVersion !== undefined) {
-      const version = typeof expectedVersion === 'number' || typeof expectedVersion === 'string'
-        ? (String(expectedVersion).trim() === '' ? NaN : Number(expectedVersion)) : NaN;
+      const version =
+        typeof expectedVersion === 'number' || typeof expectedVersion === 'string'
+          ? String(expectedVersion).trim() === ''
+            ? NaN
+            : Number(expectedVersion)
+          : NaN;
       if (!Number.isSafeInteger(version) || version < 0) {
-        throw new Error(translateOrFallback(t, 'error.data_load_failed', 'Unable to load the current record'));
+        throw new Error(
+          translateOrFallback(t, 'error.data_load_failed', 'Unable to load the current record'),
+        );
       }
       validatedVersion = version;
     }
 
-    // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
-    // fields, then merge the collected values into the command payload. Lets a DSL
-    // page express "click button → small form → submit command" in one action,
-    // without a page-specific React component. User cancel aborts (no submit).
-    if (Array.isArray(args?.inputFields) && args.inputFields.length > 0) {
-      const collected = await promptInputForm(
+    mergeCommandInputPayload(payload, {}, args?.inputFieldsPayloadKey);
+    const submissionFeedback = createPromptSubmissionFeedback({ t, locale });
+    try {
+      // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
+      // fields, then merge the collected values into the command payload. Lets a DSL
+      // page express "click button → small form → submit command" in one action,
+      // without a page-specific React component. User cancel aborts (no submit).
+      if (Array.isArray(args?.inputFields) && args.inputFields.length > 0) {
+        const collected = await promptInputForm(
           args.inputFields,
           args?.inputFieldsTitle,
           fetchResult,
           args?.inputFieldsSubmitLabel,
-          (expressionContext as Record<string, unknown> | undefined) ?? {}, { t, locale },
+          (expressionContext as Record<string, unknown> | undefined) ?? {},
+          { t, locale },
+          args.inputFieldsPresentation,
+          undefined,
+          submissionFeedback,
         );
-      payload = { ...payload, ...collected };
+        payload = mergeCommandInputPayload(payload, collected, args?.inputFieldsPayloadKey);
+      }
+
+      const body: Record<string, any> = {
+        ...buildCommandTargetParams(targetRecordPid ?? targetRecordPid),
+        payload,
+      };
+      if (operationType) {
+        body.operationType = String(operationType).toUpperCase();
+      }
+
+      if (validatedVersion !== undefined) body.expectedVersion = validatedVersion;
+      if (args?.idempotent === true) body.clientRequestId = crypto.randomUUID();
+
+      const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+        method: 'post',
+        params: body,
+        token,
+      });
+
+      if (!ResultHelper.isSuccess(result)) {
+        throw commandExecutionError(result, command, t, locale);
+      }
+
+      submissionFeedback.completeResult(result);
+      downloadBase64CommandArtifact(result.data);
+
+      return result.data;
+    } catch (error) {
+      submissionFeedback.fail(error);
+      throw error;
+    } finally {
+      submissionFeedback.finalize();
     }
-
-    const body: Record<string, any> = {
-      ...buildCommandTargetParams(targetRecordPid ?? targetRecordPid),
-      payload,
-    };
-    if (operationType) {
-      body.operationType = String(operationType).toUpperCase();
-    }
-
-    if (validatedVersion !== undefined) body.expectedVersion = validatedVersion;
-    if (args?.idempotent === true) body.clientRequestId = crypto.randomUUID();
-
-    const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
-      method: 'post',
-      params: body,
-      token,
-    });
-
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(resolveCommandErrorMessage(result, command, t, locale));
-    }
-
-    downloadBase64CommandArtifact(result.data);
-
-    return result.data;
   },
 );
 

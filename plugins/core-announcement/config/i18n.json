@@ -22,23 +22,660 @@
   },
   {
     "key": "message.announcement.archive.confirm.content",
-    "zh-CN": "撤回后该公告将不再对读者展示，可稍后重新发布。确定撤回吗？",
-    "en-US": "Withdrawing will hide this announcement from readers. You can publish it again later. Withdraw it?",
+    "zh-CN": "撤回后该公告将不再对读者展示。历史版本保留；重新发布须建立修订草稿并重新提交。确定撤回吗？",
+    "en-US": "Withdrawing hides this announcement from readers and preserves its historical version. Publishing again requires a revision draft and a new submission. Withdraw it?",
     "source": "import",
     "refType": "action"
   },
   {
     "key": "message.announcement.republish.confirm.title",
-    "zh-CN": "确认重新发布",
-    "en-US": "Confirm republication",
+    "zh-CN": "建立修订草稿",
+    "en-US": "Create revision draft",
     "source": "import",
     "refType": "action"
   },
   {
     "key": "message.announcement.republish.confirm.content",
-    "zh-CN": "重新发布后该公告将再次对读者可见，确定重新发布吗？",
-    "en-US": "Republishing will make this announcement visible to readers again. Republish it?",
+    "zh-CN": "将基于历史版本建立可编辑草稿，保存不会直接发布。确定建立吗？",
+    "en-US": "Create an editable draft from the historical version? Saving does not publish it.",
     "source": "import",
     "refType": "action"
+  },
+  {
+    "key": "announcement.error.operation_required",
+    "zh-CN": "请刷新后重试，操作标识缺失。",
+    "en-US": "Refresh and retry: the operation identity is missing.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.protected_input",
+    "zh-CN": "包含不可直接修改的公告字段，请刷新后重试。",
+    "en-US": "Protected announcement fields cannot be changed directly.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.publication_unavailable",
+    "zh-CN": "公告发布尚未启用：需要先完成受众授权与可靠分发接入。",
+    "en-US": "Announcement publication is not enabled until audience authorization and reliable delivery are installed.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.not_found",
+    "zh-CN": "公告不存在或无权访问。",
+    "en-US": "The announcement does not exist or is not accessible.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.not_editable",
+    "zh-CN": "当前状态不能执行此操作，请刷新查看最新状态。",
+    "en-US": "This action is unavailable in the current state. Refresh to see the latest state.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.history_protected",
+    "zh-CN": "此公告已有历史版本，不能删除。",
+    "en-US": "This announcement has historical versions and cannot be deleted.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.invalid_input",
+    "zh-CN": "公告输入不符合要求。",
+    "en-US": "The announcement input is invalid.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.title_length",
+    "zh-CN": "公告标题最多256个字符。",
+    "en-US": "The announcement title must not exceed 256 characters.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.command_required",
+    "zh-CN": "请通过公告受控操作完成修改。",
+    "en-US": "Use an authorized announcement command to make changes.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.attachment_unavailable",
+    "zh-CN": "附件不可用，请确认已上传完成且属于当前租户。",
+    "en-US": "The attachment is unavailable. Check that its upload is finalized in this tenant.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.exemption_required",
+    "zh-CN": "免审发布需要选择免审模式并填写免审原因。",
+    "en-US": "Choose exemption mode and provide an exemption reason.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.content_required",
+    "zh-CN": "发布前请补全公告标题和正文。",
+    "en-US": "Complete the announcement title and content before publication.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.schedule_invalid",
+    "zh-CN": "预约时间必须晚于当前时间，请重新选择。",
+    "en-US": "Choose a scheduled time in the future.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.expiry_invalid",
+    "zh-CN": "有效期不能早于发布时间或知悉截止时间，请调整。",
+    "en-US": "The expiry must cover publication and the acknowledgement deadline.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.audience_empty",
+    "zh-CN": "没有符合授权规则的接收人，请调整通知对象。",
+    "en-US": "No authorized recipients matched. Update the audience.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_not_ready",
+    "zh-CN": "审批依据尚未就绪，请核对审批进展。",
+    "en-US": "Approval authority is not ready. Check approval progress.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.authorization_changed",
+    "zh-CN": "发布授权已变化，请重新核对范围并提交。",
+    "en-US": "Publication authorization changed. Review the audience and submit again.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.delivery_disabled",
+    "zh-CN": "通知桥接尚未启用，请联系租户管理员完成配置后再发布。",
+    "en-US": "The notification bridge is disabled. Ask the tenant administrator to enable it before publication.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "message.announcement.cancel_schedule.confirm.title",
+    "zh-CN": "取消发布安排",
+    "en-US": "Cancel release",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.cancel_schedule.confirm.content",
+    "zh-CN": "取消后不会发布，冻结版本和历史记录仍会保留。确定取消吗？",
+    "en-US": "The release will stop. Its frozen version and history will remain. Cancel it?",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.submit_approval.confirm.title",
+    "zh-CN": "提交公告审批",
+    "en-US": "Submit announcement approval",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "message.announcement.submit_approval.confirm.content",
+    "zh-CN": "提交后将冻结正文、附件和通知设置；审批通过后按发布安排执行。确定提交吗？",
+    "en-US": "Content, attachments and notification settings will be frozen. Approval will authorize the configured release. Submit now?",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_required",
+    "zh-CN": "当前租户要求公告审批，请选择审批发布。",
+    "en-US": "This tenant requires announcement approval. Select approval before publishing.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_mode_required",
+    "zh-CN": "请在通知设置中选择审批发布。",
+    "en-US": "Select approval in notification settings.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_definition_required",
+    "zh-CN": "请选择可用审批流程，或由租户管理员设置默认流程。",
+    "en-US": "Select an available approval workflow or ask the tenant administrator to configure a default.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.approval_provider_changed",
+    "zh-CN": "审批提供方已变更，请由管理员核对组合安装版本。",
+    "en-US": "The approval provider changed. Ask an administrator to verify the installed composition.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.withdraw_reason_required",
+    "zh-CN": "请填写撤销审批的原因。",
+    "en-US": "Enter a reason for withdrawing the approval.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_empty_assignees",
+    "zh-CN": "排除申请人后没有有效审批人，请联系流程管理员。",
+    "en-US": "No eligible approver remains after excluding the applicant. Contact the workflow administrator.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_assignee_inactive",
+    "zh-CN": "指定审批人的成员身份已失效，请联系流程管理员。",
+    "en-US": "A designated approver is no longer an active member. Contact the workflow administrator.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_sync_blocked",
+    "zh-CN": "审批结果同步异常，请核对流程服务和当前权限后恢复。",
+    "en-US": "Approval synchronization is blocked. Verify the workflow service and current permissions before resuming.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.status.approval_provider_blocked",
+    "zh-CN": "审批流程执行异常，请联系流程管理员处理。",
+    "en-US": "The approval workflow requires attention from the workflow administrator.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.recipient_unavailable",
+    "zh-CN": "该公告已失效或你不在本版本接收范围内。",
+    "en-US": "This version is no longer available to your current membership.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.version_changed",
+    "zh-CN": "公告版本已变化，请刷新后再操作。",
+    "en-US": "The announcement version changed. Refresh before continuing.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.ack_not_required",
+    "zh-CN": "本版本不要求确认知悉。",
+    "en-US": "This version does not require acknowledgement.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.read_required",
+    "zh-CN": "请先打开并阅读公告正文，再确认知悉。",
+    "en-US": "Open the announcement content before acknowledging it.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.ack_business_action_required",
+    "zh-CN": "请打开公告并使用“确认已知悉”，不能直接完成或忽略此待办。",
+    "en-US": "Open the announcement and acknowledge it to complete this task.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "message.announcement.ack.confirm.title",
+    "zh-CN": "确认已知悉",
+    "en-US": "Acknowledge this announcement",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "message.announcement.ack.confirm.content",
+    "zh-CN": "确认你已阅读并知悉本版本公告。系统将保留首次确认时间。",
+    "en-US": "Confirm that you have read and understood this version. Your first acknowledgement time will be preserved.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.statistics_unavailable",
+    "zh-CN": "该公告版本的封存统计暂不可用。",
+    "en-US": "Sealed statistics are unavailable for this announcement version.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.statistics_expired",
+    "zh-CN": "统计快照已过期，请刷新统计后重试。",
+    "en-US": "This statistics snapshot has expired. Refresh statistics and try again.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.statistics_capacity_exceeded",
+    "zh-CN": "本版本接收人数超过当前统计容量，请联系管理员。",
+    "en-US": "This version exceeds the configured statistics capacity. Contact an administrator.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.title",
+    "zh-CN": "公告标题",
+    "en-US": "Announcement title",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.version",
+    "zh-CN": "版本号",
+    "en-US": "Version",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.published",
+    "zh-CN": "发布时间",
+    "en-US": "Published at",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.recipient",
+    "zh-CN": "接收者",
+    "en-US": "Recipient",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.departments",
+    "zh-CN": "发布时部门",
+    "en-US": "Departments at publication",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.roles",
+    "zh-CN": "匹配角色",
+    "en-US": "Matched roles",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.readState",
+    "zh-CN": "阅读状态",
+    "en-US": "Read status",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.firstRead",
+    "zh-CN": "首次阅读时间",
+    "en-US": "First read at",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackRequired",
+    "zh-CN": "要求知悉",
+    "en-US": "Acknowledgement required",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackDeadline",
+    "zh-CN": "知悉截止时间",
+    "en-US": "Acknowledgement deadline",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackState",
+    "zh-CN": "知悉状态",
+    "en-US": "Acknowledgement status",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.ackAt",
+    "zh-CN": "确认时间",
+    "en-US": "Acknowledged at",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.late",
+    "zh-CN": "逾期确认",
+    "en-US": "Late acknowledgement",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.membership",
+    "zh-CN": "快照时成员资格",
+    "en-US": "Membership at capture",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.column.notification",
+    "zh-CN": "发布站内通知状态",
+    "en-US": "Publication notification status",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.yes",
+    "zh-CN": "是",
+    "en-US": "Yes",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.no",
+    "zh-CN": "否",
+    "en-US": "No",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.none",
+    "zh-CN": "无",
+    "en-US": "None",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.hidden",
+    "zh-CN": "未获展示授权",
+    "en-US": "Not authorized for display",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.unknown",
+    "zh-CN": "历史未知",
+    "en-US": "Historical value unknown",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_applicable",
+    "zh-CN": "不适用",
+    "en-US": "Not applicable",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_yet",
+    "zh-CN": "尚未发生",
+    "en-US": "Not yet",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.unread",
+    "zh-CN": "未读",
+    "en-US": "Unread",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.read",
+    "zh-CN": "已读",
+    "en-US": "Read",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.read_after_migration",
+    "zh-CN": "迁移后已读",
+    "en-US": "Read after migration",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_required",
+    "zh-CN": "无需确认",
+    "en-US": "Not required",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.pending_ack",
+    "zh-CN": "待确认",
+    "en-US": "Pending acknowledgement",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.completed",
+    "zh-CN": "已完成",
+    "en-US": "Completed",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.active",
+    "zh-CN": "有效",
+    "en-US": "Active",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.inactive",
+    "zh-CN": "已失效",
+    "en-US": "Inactive",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.not_generated",
+    "zh-CN": "未生成通知",
+    "en-US": "Notification not generated",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.queued",
+    "zh-CN": "待发送",
+    "en-US": "Queued",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.failed",
+    "zh-CN": "发送失败",
+    "en-US": "Failed",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.csv.state.canceled",
+    "zh-CN": "已取消",
+    "en-US": "Canceled",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.statistics.version_option",
+    "zh-CN": "第 {0} 版",
+    "en-US": "Version {0}",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_legacy_unknown",
+    "zh-CN": "历史迁移公告缺少原始阅读依据，请修订并重新发布后使用催办。",
+    "en-US": "Historical migration has no original reading evidence. Publish a reviewed revision before sending reminders.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_policy_unavailable",
+    "zh-CN": "该版本未冻结催办政策，请修订并重新发布。",
+    "en-US": "This version has no frozen reminder policy. Publish a reviewed revision.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_version_inactive",
+    "zh-CN": "公告已撤回或失效，无法继续催办。",
+    "en-US": "This announcement is withdrawn or expired. Reminders are unavailable.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_preview_expired",
+    "zh-CN": "催办预览已过期或不属于当前身份，请重新预览。",
+    "en-US": "The reminder preview has expired or belongs to another identity. Preview again.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_not_blocked",
+    "zh-CN": "自动催办计划无需恢复，请刷新状态。",
+    "en-US": "The automatic reminder plan is not blocked. Refresh its status.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.reminder_plan_unavailable",
+    "zh-CN": "尚无已发布的自动催办计划，公告发布后可查看。",
+    "en-US": "No published reminder plan is available yet. View the plan after publication.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "message.announcement.pin.confirm.title",
+    "zh-CN": "置顶",
+    "en-US": "Pin announcement",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.pin.confirm.content",
+    "zh-CN": "仅调整公告列表的置顶排序，不改动已发布正文，也不会重新通知读者。确认置顶？",
+    "en-US": "Adjust list ordering only. The published content and notification history stay unchanged.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.unpin.confirm.title",
+    "zh-CN": "取消置顶",
+    "en-US": "Unpin announcement",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.unpin.confirm.content",
+    "zh-CN": "取消置顶，不改动已发布正文，也不会重新通知读者。确认取消置顶？",
+    "en-US": "Remove pinning without changing published content or generating notifications.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.reconcile_approval.confirm.title",
+    "zh-CN": "核对审批结果",
+    "en-US": "Reconcile approval",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "message.announcement.reconcile_approval.confirm.content",
+    "zh-CN": "将同一审批申请重新排队，从审批服务核对真实结果；不会直接批准公告或新建流程。确认核对？",
+    "en-US": "Queue the same approval for authoritative result verification. This does not approve or create a new process.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "announcement.error.publication_not_retryable",
+    "zh-CN": "此发布任务当前不能恢复；请刷新检查任务状态、有效期和执行窗口。",
+    "en-US": "This publication cannot be retried. Refresh and verify its state, expiry and execution window.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.tenant_default_required",
+    "zh-CN": "公告只能使用租户默认审批流程；请先在通知设置中明确选择租户默认审批。",
+    "en-US": "Announcements must use the tenant default approval workflow. Explicitly select the tenant default in notification settings first.",
+    "source": "import",
+    "refType": "message"
+  },
+  {
+    "key": "announcement.error.audience_capacity_exceeded",
+    "zh-CN": "受众人数超过当前公告处理容量，发布尚未受理。请缩小范围或联系管理员调整容量。",
+    "en-US": "The audience exceeds the configured announcement capacity. Publication was not accepted. Reduce the audience or contact an administrator.",
+    "source": "import",
+    "refType": "message"
   }
 ]

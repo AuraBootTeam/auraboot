@@ -19,6 +19,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.phases.PreActionsPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.PreInvariantPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.SchemaValidatePhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.SodCheckPhase;
+import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandSubjectAcknowledgementPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.StateCheckPhase;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.Order;
@@ -46,6 +47,7 @@ class CommandPipelinePhaseOrderTest {
             SchemaValidatePhase.class,
             EntitlementPhase.class,
             SodCheckPhase.class,
+            CommandSubjectAcknowledgementPhase.class,
             IdempotencyPhase.class,
             CommandTargetVersionLockPhase.class,
             PermitPlanAssemblyPhase.class,

@@ -21,6 +21,10 @@ vi.mock('@dnd-kit/sortable', () => ({
   verticalListSortingStrategy: {},
 }));
 
+vi.mock('../../panels/fields/FieldLibraryPanel', () => ({
+  FieldLibraryPanel: ({ modelCode }: { modelCode: string }) => <div data-testid={`field-library-${modelCode}`} />,
+}));
+
 vi.mock('../areas/BlockLibrary', () => ({
   BlockLibrary: () => <div data-testid="block-library" />,
 }));
@@ -76,6 +80,7 @@ describe('BlocksDesigner', () => {
 
     render(<BlocksDesigner schema={createSchema()} onSchemaChange={vi.fn()} />);
 
+    expect(screen.getByTestId('field-library-demo_model')).toBeVisible();
     await user.click(screen.getByTestId('designer-tab-outline'));
 
     expect(screen.getByRole('button', { name: 'Toolbar Block' })).toBeInTheDocument();

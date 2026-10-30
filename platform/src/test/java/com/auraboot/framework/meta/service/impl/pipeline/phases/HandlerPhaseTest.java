@@ -42,12 +42,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -118,6 +120,80 @@ class HandlerPhaseTest {
     void tearDown() {
         org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         MetaContext.clear();
+    }
+
+    @Test
+    void handlerOwnedResultsAreResponseOnly() {
+        CommandHandler owner = new CommandHandler() {
+            @Override public String getHandlerName() { return "owner"; }
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ctx) {
+                assertThat(ctx.getClientRequestId()).isEqualTo("operation-1");
+                assertThat(ctx.getExpectedVersion()).isEqualTo(3);
+                return Map.of("status","draft","row_version",4);
+            }
+        };
+        when(applicationContext.getBean("owner", CommandHandler.class)).thenReturn(owner);
+        CommandPipelineContext ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+        BindingRule rule=new BindingRule(); rule.setHandlerClass("owner");
+        ctx.setRulesByType(Map.of("handler",List.of(rule)));
+        ctx.setHandlerOwnedMutation(true);
+        ctx.getRequest().setClientRequestId("operation-1");
+        ctx.getRequest().setExpectedVersion(3);
+        phase.execute(ctx);
+        assertThat(ctx.getHandlerResults()).containsEntry("row_version",4).containsEntry("status","draft");
+        verify(metaModelService,never()).getModelDefinition("ab_announcement");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void nativeOwnershipAndConcurrencyDenialsKeepTheirHttpSemantics() {
+        CommandHandler owner=org.mockito.Mockito.mock(CommandHandler.class);
+        when(applicationContext.getBean("owner",CommandHandler.class)).thenReturn(owner);
+        for(RuntimeException failure : List.of(new AccessDeniedException("ownership revoked"),
+                new com.auraboot.framework.exception.ConflictException("CAS_VERSION_CONFLICT","changed",Map.of()))) {
+            org.mockito.Mockito.doThrow(failure).when(owner).execute(any());
+            var ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+            BindingRule rule=new BindingRule();rule.setHandlerClass("owner");
+            ctx.setRulesByType(Map.of("handler",List.of(rule)));
+            assertThatThrownBy(()->phase.execute(ctx)).isSameAs(failure);
+        }
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void dryRunNeverInvokesAnUnmarkedNativeHandler() {
+        AtomicBoolean invoked=new AtomicBoolean();
+        CommandHandler owner=new CommandHandler() {
+            @Override public String getHandlerName(){return "owner";}
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ctx){
+                invoked.set(true);return Map.of("status","published");
+            }
+        };
+        when(applicationContext.getBean("owner",CommandHandler.class)).thenReturn(owner);
+        var ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+        BindingRule rule=new BindingRule();rule.setHandlerClass("owner");
+        ctx.setRulesByType(Map.of("handler",List.of(rule)));ctx.getRequest().setDryRun(true);
+        phase.execute(ctx);
+        assertThat(invoked).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void declaredNativeHandlerIdentityResolvesWithoutDependingOnBeanName() {
+        CommandHandler owner=new CommandHandler() {
+            @Override public String getHandlerName(){return "declaredOwner";}
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ctx){
+                return Map.of("recordPid","created-record");
+            }
+        };
+        when(applicationContext.getBean("declaredOwner",CommandHandler.class))
+                .thenThrow(new org.springframework.beans.factory.NoSuchBeanDefinitionException("declaredOwner"));
+        when(applicationContext.getBeansOfType(CommandHandler.class)).thenReturn(Map.of("actualBean",owner));
+        var ctx=buildContext("notice:save","ab_announcement",Map.of("type","update"));
+        BindingRule rule=new BindingRule();rule.setHandlerClass("declaredOwner");
+        ctx.setRulesByType(Map.of("handler",List.of(rule)));
+        phase.execute(ctx);
+        assertThat(ctx.getHandlerResults()).containsEntry("recordPid","created-record");
     }
 
     @Test
@@ -601,6 +677,8 @@ class HandlerPhaseTest {
 
     @Test
     void execute_dispatchesAsyncWhenHandlerParamsAsyncTrue() throws Exception {
+        var targetFiles = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", targetFiles);
         RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
         when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
         AsyncTaskDTO dto = new AsyncTaskDTO();
@@ -627,7 +705,8 @@ class HandlerPhaseTest {
         MetaContext.runWithCommandPermitPlan(
                 "SELF", 6L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
 
-        // Handler must NOT run inline on the request thread.
+        // Handler must NOT run inline on the request thread or acquire a target write capability.
+        org.mockito.Mockito.verifyNoInteractions(targetFiles);
         assertThat(handler.capturedContext.get()).isNull();
         assertThat(ctx.getHandlerResults())
                 .containsEntry("async", true)
@@ -1127,6 +1206,179 @@ class HandlerPhaseTest {
             assertThat(body).doesNotContain("SELECT", "private_pricing_table", "private_tenant", "DataAccessResourceFailureException");
         }
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void targetFileFactoryFailureDoesNotLeakOrCloseTheCallerQueryScope(boolean outerScope) {
+        var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", factory);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE))
+                .thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
+        var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
+                Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+        var failure = new IllegalStateException("attachment transaction initialization failed");
+        when(factory.forCommand(ctx)).thenThrow(failure);
+        var callerScope = outerScope ? com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open() : null;
+        try {
+            assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isEqualTo(outerScope);
+            if (callerScope != null) callerScope.close();
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        } finally {
+            if (callerScope != null) callerScope.close();
+            // Release a deliberately exposed old-implementation leak after the assertions.
+            ((ThreadLocal<?>) ReflectionTestUtils.getField(
+                    com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.class, "CURRENT")).remove();
+        }
+    }
+
+    @Test
+    void targetFileCapabilityReceivesTrustedPipelineContextAndClosesOnSuccessAndFailure() {
+        var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", factory);
+        for (boolean reject : List.of(false, true)) {
+            var scope = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
+            var accessor = org.mockito.Mockito.mock(FileAccessor.class);
+            var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type","custom","handler",PLUGIN_HANDLER_CODE));
+            when(factory.forCommand(ctx)).thenReturn(scope);
+            when(scope.accessor()).thenReturn(accessor);
+            var handler = new CommandHandlerExtension() {
+                @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+                @Override public Object execute(CommandContext context) {
+                    assertThat(context.fileAccessor()).isSameAs(accessor);
+                    context.fileAccessor().appendAndRetainExistingToTarget("upload-pid", "photos");
+                    if (reject) throw new IllegalStateException("domain evidence failed");
+                    return Map.of();
+                }
+            };
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            if (reject) assertThatThrownBy(()->phase.execute(ctx)).hasMessageContaining("domain evidence failed");
+            else phase.execute(ctx);
+            verify(factory).forCommand(ctx);
+            verify(accessor).appendAndRetainExistingToTarget("upload-pid", "photos");
+            verify(scope).close();
+        }
+    }
+
+    @Test
+    void sealedContentCapabilityReceivesTheOriginalContextAndClosesBothCapabilities() {
+        var factory = mock(com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "sealedContentFactory", factory);
+        var files = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", files);
+        for (boolean fail : List.of(false, true)) {
+            var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
+                    Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+            var scope = mock(com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory.Scope.class);
+            var fileScope = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
+            var accessor = mock(com.auraboot.framework.plugin.extension.AnnouncementSealedContentAccessor.class);
+            when(factory.forCommand(ctx)).thenReturn(scope);
+            when(files.forCommand(ctx)).thenReturn(fileScope);
+            when(scope.accessor()).thenReturn(accessor);
+            when(fileScope.accessor()).thenReturn(mock(FileAccessor.class));
+            var handler = new CommandHandlerExtension() {
+                @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+                @Override public Object execute(CommandContext context) {
+                    assertThat(context.announcementSealedContentAccessor()).isSameAs(accessor);
+                    assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+                    if (fail) throw new IllegalStateException("sealed consumer failed");
+                    return Map.of();
+                }
+            };
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+            if (fail) assertThatThrownBy(() -> phase.execute(ctx)).hasMessageContaining("sealed consumer failed");
+            else phase.execute(ctx);
+            verify(factory).forCommand(ctx); verify(scope).close(); verify(fileScope).close();
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void sealedContentInitializationFailureClosesOwnedScopesAndPreservesTheCaller(boolean outerScope) {
+        var factory = mock(com.auraboot.framework.plugin.pf4j.AnnouncementSealedContentAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "sealedContentFactory", factory);
+        var files = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+        ReflectionTestUtils.setField(phase, "commandTargetFiles", files);
+        for (RuntimeException failure : List.of(new IllegalStateException("sealed initialization failed"),
+                new AccessDeniedException("publisher permission revoked"),
+                new com.auraboot.framework.exception.ConflictException("CAS_VERSION_CONFLICT", "changed", Map.of()))) {
+            var fileScope = mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
+            var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order",
+                    Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+            when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE))
+                    .thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
+            when(files.forCommand(ctx)).thenReturn(fileScope);
+            when(factory.forCommand(ctx)).thenThrow(failure);
+            var callerScope = outerScope
+                    ? com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open() : null;
+            try {
+                if (failure instanceof IllegalStateException) {
+                    assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class)
+                            .hasMessageContaining("sealed initialization failed");
+                } else {
+                    assertThatThrownBy(() -> phase.execute(ctx)).isSameAs(failure);
+                }
+                verify(fileScope).close();
+                assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isEqualTo(outerScope);
+                if (callerScope != null) callerScope.close();
+                assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+            } finally {
+                if (callerScope != null) callerScope.close();
+                ((ThreadLocal<?>) ReflectionTestUtils.getField(
+                        com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.class, "CURRENT")).remove();
+            }
+        }
+    }
+
+    @Test
+    void precedingSpringHandlerCannotGiveANestedCommandItsOwnFileTargetCapability() {
+        var source = org.mockito.Mockito.mock(javax.sql.DataSource.class);
+        var connection = org.mockito.Mockito.mock(java.sql.Connection.class);
+        var sessions = org.mockito.Mockito.mock(org.apache.ibatis.session.SqlSessionFactory.class);
+        var config = new org.apache.ibatis.session.Configuration(new org.apache.ibatis.mapping.Environment(
+                "test", new org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory(), source));
+        lenient().when(sessions.getConfiguration()).thenReturn(config);
+        var holder = new org.springframework.jdbc.datasource.ConnectionHolder(connection);
+        holder.setSynchronizedWithTransaction(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.bindResource(source, holder);
+        var realFactory = new com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory(
+                fileService, storageProvider, null, null, sessions, metaModelService, dynamicDataService, dynamicDataMapper);
+        var nested = buildContext("other:attach", "other", Map.of("type","update"));
+        nested.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("other.attach"));
+        nested.setPermitPlan(new com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan(
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.Decision.PERMIT, null, null, null,
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.TARGET, 1L));
+        nested.setTargetRecordReadable(true);
+        var seen = new java.util.concurrent.atomic.AtomicBoolean();
+        CommandHandler prelude = new CommandHandler() {
+            @Override public String getHandlerName() { return "prelude"; }
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ignored) {
+                assertThat(MetaContext.isRootAuthorizedCommand()).isTrue();
+                MetaContext.runWithCommandPermitPlan("TARGET",1L,"other","other-pid",()->
+                        MetaContext.runWithAuthorizedCommandCode("other:attach",()->{
+                            try(var scope = realFactory.forCommand(nested)) { assertThat(scope).isNull(); }
+                            seen.set(true);
+                        }));
+                return Map.of();
+            }
+        };
+        when(applicationContext.getBean("prelude",CommandHandler.class)).thenReturn(prelude);
+        var root = buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","update"));
+        BindingRule rule = new BindingRule(); rule.setHandlerClass("prelude");
+        root.setRulesByType(Map.of("handler",List.of(rule))); root.setHandlerOwnedMutation(true);
+        MetaContext.setContext(1L,2L,"actor","actor"); MetaContext.setMemberId(3L);
+        try {
+            MetaContext.runWithCommandPermitPlan("TARGET",1L,"pr_purchase_order","po-1",()->
+                    MetaContext.runWithAuthorizedCommandCode(BUSINESS_COMMAND_CODE,()->phase.execute(root)));
+            assertThat(seen).isTrue();
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.unbindResourceIfPossible(source);
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
     }
 
 }

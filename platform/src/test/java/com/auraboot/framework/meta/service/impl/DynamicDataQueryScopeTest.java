@@ -58,6 +58,25 @@ class DynamicDataQueryScopeTest {
         assertThat(DynamicDataQueryScope.isActive()).isFalse();
     }
 
+    @Test
+    void mutationInvalidatesAllTransitiveRowAndDomainPredicatesWithoutDroppingPermissionMetadata() {
+        AtomicInteger rowLoads=new AtomicInteger(),domainLoads=new AtomicInteger(),metadataLoads=new AtomicInteger();
+        try (DynamicDataQueryScope outer=DynamicDataQueryScope.open()) {
+            assertThat(DynamicDataQueryScope.rowFilter(1L,"bundle",2L,()->"AND version = "+rowLoads.incrementAndGet())).isEqualTo("AND version = 1");
+            assertThat(DynamicDataQueryScope.domainFilter(1L,"other_model",2L,()->"AND version = "+domainLoads.incrementAndGet())).isEqualTo("AND version = 1");
+            DynamicDataQueryScope.nonWritableFields(1L,"bundle",2L,()->fields(metadataLoads));
+            try (DynamicDataQueryScope inner=DynamicDataQueryScope.open()) {
+                DynamicDataQueryScope.invalidateFiltersAfterMutation();
+            }
+            assertThat(DynamicDataQueryScope.rowFilter(1L,"bundle",2L,()->"AND version = "+rowLoads.incrementAndGet())).isEqualTo("AND version = 2");
+            assertThat(DynamicDataQueryScope.domainFilter(1L,"other_model",2L,()->"AND version = "+domainLoads.incrementAndGet())).isEqualTo("AND version = 2");
+            DynamicDataQueryScope.nonWritableFields(1L,"bundle",2L,()->fields(metadataLoads));
+            assertThat(metadataLoads).hasValue(1);
+        }
+        DynamicDataQueryScope.invalidateFiltersAfterMutation();
+        assertThat(DynamicDataQueryScope.isActive()).isFalse();
+    }
+
     private static Set<String> fields(AtomicInteger loads) {
         loads.incrementAndGet();
         return Set.of("price");

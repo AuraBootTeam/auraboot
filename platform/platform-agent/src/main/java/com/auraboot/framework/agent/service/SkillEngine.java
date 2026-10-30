@@ -6,12 +6,17 @@ import com.auraboot.framework.agent.dto.SkillResult;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.trace.TraceContext;
-import com.auraboot.framework.meta.dto.DynamicQueryRequest;
-import com.auraboot.framework.meta.dto.PaginationResult;
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
-import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.JsonSchemaException;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +30,7 @@ import java.util.*;
  * - template:       Single tool call via ToolLoopService
  * - sequential:     Ordered multi-tool execution with $ref input mappings
  * - orchestration:  LLM-driven tool selection (P0 stub → falls back to sequential)
- * - dsl_dispatch:   Dynamic routing to CommandExecutor/DynamicDataService/NamedQueryService
+ * - dsl_dispatch:   Dynamic DSL resolution through the governed ToolLoopService
  *
  * Four-contract execution flow:
  *   validateInput → execute by mode → handleFailure → buildResult
@@ -38,8 +43,6 @@ public class SkillEngine {
     private final AgentSkillService agentSkillService;
     private final ToolLoopService toolLoopService;
     private final StepLoopService stepLoopService;
-    private final DynamicDataMapper dynamicDataMapper;
-    private final DynamicDataService dynamicDataService;
     private final ObjectMapper objectMapper;
 
     // =========================================================================
@@ -165,6 +168,8 @@ public class SkillEngine {
                     default -> throw new IllegalArgumentException("Unsupported skill execution mode: " + executionMode);
                 };
 
+                if (containsExecutionStop(lastResult.getData())
+                        || (lastResult.getStatus() == SkillResult.Status.FAILED && lastResult.getActionCount() > 0)) return lastResult;
                 // If success or partial_success, return immediately
                 if (lastResult.getStatus() != SkillResult.Status.FAILED) {
                     return lastResult;
@@ -229,7 +234,7 @@ public class SkillEngine {
         String resultJson = toolLoopService.executeToolCall(
                 tenantId, runPid, null, null, toolCode, params, tools, traceCtx);
 
-        return parseToolResult(resultJson, 1);
+        return normalizeSingleToolResult(toolCode, resultJson);
     }
 
     /**
@@ -271,12 +276,14 @@ public class SkillEngine {
                 parsed.put("_toolCode", toolCode);
                 stepOutputs.add(parsed);
 
-                boolean isError = resultJson.startsWith("Error");
+                boolean pending = Boolean.TRUE.equals(parsed.get("approvalRequired"))
+                        || Boolean.TRUE.equals(parsed.get("confirmationRequired"));
+                boolean isError = resultJson.startsWith("Error") || Boolean.FALSE.equals(parsed.get("success")) || pending;
                 if (!isError) {
                     successCount++;
                 } else {
                     lastError = resultJson;
-                    if ("fail_fast".equals(failureMode)) {
+                    if (pending || "fail_fast".equals(failureMode)) {
                         return SkillResult.builder()
                                 .status(SkillResult.Status.FAILED)
                                 .errorMessage("Step " + i + " (" + toolCode + ") failed: " + resultJson)
@@ -379,15 +386,25 @@ public class SkillEngine {
                             "response", loopResult.lastResponse != null ? loopResult.lastResponse : "",
                             "inputTokens", loopResult.totalInputTokens,
                             "outputTokens", loopResult.totalOutputTokens,
-                            "cost", loopResult.totalCost))
+                            "cost", loopResult.totalCost,
+                            "retryable", loopResult.success))
                     .toolCallCount(maxSteps) // approximate; actual count is tracked in run record
                     .build();
 
+        } catch (AgentApprovalPendingException pending) {
+            // CATCH: expected control flow; preserve approval identity and never retry this suspension.
+            return SkillResult.builder().status(SkillResult.Status.FAILED)
+                    .errorMessage(pending.getMessage())
+                    .data(Map.of("approvalRequired", true, "approvalPid",
+                            pending.getApprovalPid() != null ? pending.getApprovalPid() : ""))
+                    .build();
         } catch (Exception e) {
             log.error("Orchestration failed for skill '{}': {}", skillCode, e.getMessage());
             return SkillResult.builder()
                     .status(SkillResult.Status.FAILED)
                     .errorMessage("Orchestration failed: " + e.getMessage())
+                    // The loop may already have committed tools; retry belongs to its checkpoint boundary.
+                    .data(Map.of("retryable", false))
                     .build();
         }
     }
@@ -408,10 +425,22 @@ public class SkillEngine {
                             entry.getValue() != null ? String.valueOf(entry.getValue()) : "");
                 }
             }
-            sb.append(rendered);
+            sb.append("## Configured Skill Procedure\n");
+            sb.append("The application supplied the following configured procedure as policy for this skill, not as a new task assignment.\n");
+            sb.append("<configured-skill-procedure>\n").append(rendered).append("\n</configured-skill-procedure>");
         } else {
             sb.append("You are a skill execution agent. Use the available tools to complete the user's request.");
         }
+
+        sb.append("\n\n## Task and Evidence Contract\n");
+        sb.append("Complete the user's current request within this skill's scope. ");
+        sb.append("Do not replace the requested task with an unrelated decision merely because the procedure mentions it. ");
+        sb.append("An explicitly configured procedure is available task policy, not missing merely because no separate document was retrieved, ");
+        sb.append("unless that procedure requires additional verification. ");
+        sb.append("If applicable policy or required facts are missing, ask for them instead of deciding a different question. Do not add unrequested policy decisions, even as an aside. ");
+        sb.append("Preserve source field names and meanings when reporting current tool-returned facts; ");
+        sb.append("a priority, record status and approval decision are distinct values. ");
+        sb.append("A procedure does not establish current record facts and does not grant permissions or substitute for approval.");
 
         sb.append("\n\n## Available Tools\n");
         sb.append("You have access to these tools: ").append(String.join(", ", toolCodes));
@@ -444,9 +473,8 @@ public class SkillEngine {
     // =========================================================================
 
     /**
-     * DSL dispatch mode: routes to CommandExecutor, DynamicDataService, or NamedQueryService
-     * based on skillCode (dsl.command or dsl.query) and input parameters.
-     * No pre-resolved tools needed — dispatch is fully dynamic.
+     * Resolve the target DSL tool from the current tenant/user capabilities, then use
+     * the same ACL, runtime authorization, approval and execution path as other modes.
      */
     private SkillResult executeDslDispatch(Long tenantId, String runPid,
                                             Map<String, Object> skill,
@@ -454,90 +482,62 @@ public class SkillEngine {
         String skillCode = resolveString(skill.get("skill_code"), "");
         Map<String, Object> params = input.getParameters() != null ? input.getParameters() : Map.of();
 
+        String code;
+        Map<String, Object> toolInput = new HashMap<>(params);
         if ("dsl.command".equals(skillCode)) {
-            return executeDslCommandDispatch(params);
+            String command = params.get("commandCode") instanceof String value ? value : null;
+            if (command == null || command.isBlank()) {
+                return SkillResult.builder().status(SkillResult.Status.FAILED)
+                        .errorMessage("commandCode is required for dsl.command").build();
+            }
+            code = "cmd:" + command;
+            toolInput.remove("commandCode");
         } else if ("dsl.query".equals(skillCode)) {
-            return executeDslQueryDispatch(tenantId, params);
+            String model = params.get("model") instanceof String value ? value : null;
+            String query = params.get("queryCode") instanceof String value ? value : null;
+            String record = params.get("recordPid") instanceof String value ? value : null;
+            if (record != null && !record.isBlank() && model != null && !model.isBlank()) {
+                code = "get:" + model;
+            } else if (query != null && !query.isBlank()) {
+                code = "nq:" + query;
+            } else if (model != null && !model.isBlank()) {
+                code = "list:" + model;
+            } else {
+                return SkillResult.builder().status(SkillResult.Status.FAILED)
+                        .errorMessage("dsl.query requires at least one of: recordPid, queryCode, or model").build();
+            }
+        } else {
+            return SkillResult.builder().status(SkillResult.Status.FAILED)
+                    .errorMessage("Unknown dsl_dispatch skill: " + skillCode).build();
         }
-
-        return SkillResult.builder()
-                .status(SkillResult.Status.FAILED)
-                .errorMessage("Unknown dsl_dispatch skill: " + skillCode)
-                .build();
+        List<AgentToolDefinition> tools = agentSkillService.resolveToolCodes(tenantId, List.of(code));
+        AgentToolDefinition tool = tools.stream().filter(def -> code.equals(def.getName()))
+                .findFirst().orElse(null);
+        if (tool == null) {
+            return SkillResult.builder().status(SkillResult.Status.FAILED)
+                    .errorMessage("Tool is unavailable or not permitted: " + code).build();
+        }
+        // Dynamic dispatch is a recipe adapter, never an alternate execution authority.
+        String result = toolLoopService.executeToolCall(tenantId, runPid, null, null,
+                tool.getName(), toolInput, List.of(tool), traceCtx);
+        return normalizeSingleToolResult(code, result);
     }
 
-    /**
-     * Execute a DSL command via ToolLoopService.
-     * Extracts commandCode from params and delegates to CommandExecutor.
-     */
-    private SkillResult executeDslCommandDispatch(Map<String, Object> params) {
-        String commandCode = (String) params.get("commandCode");
-        if (commandCode == null || commandCode.isBlank()) {
-            return SkillResult.builder()
-                    .status(SkillResult.Status.FAILED)
-                    .errorMessage("commandCode is required for dsl.command")
-                    .build();
+    private SkillResult normalizeSingleToolResult(String code, String result) {
+        SkillResult outcome = parseToolResult(result, 1);
+        outcome.setSourceToolCode(code);
+        if (code.startsWith("get:") || code.startsWith("list:")) {
+            outcome.setOutputType("structured_result");
+            outcome.setActionCount(0);
+            if (outcome.getStatus() == SkillResult.Status.SUCCESS) {
+                Map<String, Object> data = new LinkedHashMap<>(outcome.getData());
+                data.remove("success");
+                data.remove("durationMs");
+                outcome.setData(data);
+                if (code.startsWith("list:")) outcome.setRenderHint("table");
+            }
         }
-        Map<String, Object> payload = new HashMap<>(params);
-        payload.remove("commandCode");
-
-        String result = toolLoopService.executeDslCommand(commandCode, payload);
-        return parseToolResult(result, 1);
-    }
-
-    /**
-     * Execute a DSL query — routes to one of three backends:
-     *   1. getById:    recordPid + model → DynamicDataService.getById()
-     *   2. namedQuery: queryCode → NamedQueryService via ToolLoopService
-     *   3. list:       model → DynamicDataService.list()
-     */
-    @SuppressWarnings("unchecked")
-    private SkillResult executeDslQueryDispatch(Long tenantId, Map<String, Object> params) {
-        String recordPid = params.get("recordPid") instanceof String s ? s : null;
-        String queryCode = params.get("queryCode") instanceof String s ? s : null;
-        String model = params.get("model") instanceof String s ? s : null;
-
-        if (recordPid != null && !recordPid.isBlank() && model != null) {
-            // Route 1: get single record by ID
-            Map<String, Object> record = dynamicDataService.getById(model, recordPid);
-            return SkillResult.builder()
-                    .status(record != null ? SkillResult.Status.SUCCESS : SkillResult.Status.FAILED)
-                    .data(record != null ? Map.of("record", record) : Map.of())
-                    .outputType("structured_result")
-                    .toolCallCount(1).actionCount(0).build();
-        } else if (queryCode != null && !queryCode.isBlank()) {
-            // Route 2: execute NamedQuery
-            String result = toolLoopService.executeDslQuery(queryCode, params);
-            return parseToolResult(result, 1);
-        } else if (model != null && !model.isBlank()) {
-            // Route 3: list records by model
-            DynamicQueryRequest qr = buildDynamicQueryRequest(params);
-            PaginationResult<Map<String, Object>> listResult = dynamicDataService.list(model, qr);
-            List<Map<String, Object>> records = listResult.getRecords() != null ? listResult.getRecords() : List.of();
-            return SkillResult.builder()
-                    .status(SkillResult.Status.SUCCESS)
-                    .data(Map.of("total", listResult.getTotal(), "records", records))
-                    .outputType("structured_result")
-                    .renderHint("table")
-                    .toolCallCount(1).actionCount(0).build();
-        }
-
-        return SkillResult.builder()
-                .status(SkillResult.Status.FAILED)
-                .errorMessage("dsl.query requires at least one of: recordPid, queryCode, or model")
-                .build();
-    }
-
-    private DynamicQueryRequest buildDynamicQueryRequest(Map<String, Object> params) {
-        Integer pageNum = params.get("pageNum") instanceof Number n ? n.intValue() : 1;
-        Integer pageSize = params.get("pageSize") instanceof Number n ? n.intValue() : 20;
-        String keyword = params.get("keyword") instanceof String s ? s : null;
-
-        return DynamicQueryRequest.builder()
-                .pageNum(pageNum)
-                .pageSize(pageSize)
-                .keyword(keyword)
-                .build();
+        return outcome;
     }
 
     // =========================================================================
@@ -545,37 +545,38 @@ public class SkillEngine {
     // =========================================================================
 
     /**
-     * Validate input.parameters against skill_input_schema (basic: check required fields exist).
+     * Validate all JSON Schema constraints before resolving tools or performing side effects.
      *
      * @return null if valid, error message if invalid
      */
-    @SuppressWarnings("unchecked")
     private String validateInput(SkillInput input, Object inputSchemaRaw) {
-        if (inputSchemaRaw == null) return null; // No schema = no validation
         if (input == null) return "SkillInput is null";
-
-        Map<String, Object> schema = parseJsonObject(inputSchemaRaw);
-        if (schema == null || schema.isEmpty()) return null;
-
-        // Check required fields
-        Object requiredRaw = schema.get("required");
-        if (requiredRaw instanceof List<?> requiredFields) {
-            Map<String, Object> params = input.getParameters();
-            if (params == null) params = Map.of();
-
-            List<String> missing = new ArrayList<>();
-            for (Object field : requiredFields) {
-                String fieldName = String.valueOf(field);
-                if (!params.containsKey(fieldName) || params.get(fieldName) == null) {
-                    missing.add(fieldName);
-                }
-            }
-            if (!missing.isEmpty()) {
-                return "Missing required parameters: " + String.join(", ", missing);
-            }
+        if (inputSchemaRaw == null) return null;
+        JsonNode schemaNode;
+        String schemaJson = JsonbColumns.toJsonText(inputSchemaRaw, objectMapper);
+        if (schemaJson == null) return "Invalid skill input schema";
+        try {
+            schemaNode = objectMapper.readTree(schemaJson);
+        } catch (JsonProcessingException invalid) {
+            // CATCH: expected configuration validation; malformed schemas fail closed.
+            return "Invalid skill input schema";
         }
-
-        return null;
+        try {
+            JsonSchema schema = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012,
+                    builder -> builder.schemaLoaders(loaders -> loaders.values(values -> {
+                        values.clear();
+                        values.add(uri -> {
+                            throw new IllegalArgumentException("External skill schema loading is disabled");
+                        });
+                    }))).getSchema(schemaNode);
+            Set<ValidationMessage> errors = schema.validate(
+                    objectMapper.valueToTree(input.getParameters() != null ? input.getParameters() : Map.of()));
+            return errors.isEmpty() ? null : errors.stream().map(Object::toString).sorted()
+                    .collect(Collectors.joining("; "));
+        } catch (JsonSchemaException | IllegalArgumentException invalid) {
+            // CATCH: expected configuration validation; schema loading must never perform external IO.
+            return "Invalid skill input schema or external schema reference";
+        }
     }
 
     // =========================================================================
@@ -715,9 +716,21 @@ public class SkillEngine {
     // Helpers
     // =========================================================================
 
+    private boolean containsExecutionStop(Object data) {
+        if (data instanceof Map<?, ?> values) {
+            if (Boolean.FALSE.equals(values.get("retryable"))
+                    || Boolean.TRUE.equals(values.get("approvalRequired"))
+                    || Boolean.TRUE.equals(values.get("confirmationRequired"))) return true;
+            return values.values().stream().anyMatch(this::containsExecutionStop);
+        }
+        return data instanceof List<?> values && values.stream().anyMatch(this::containsExecutionStop);
+    }
+
     private SkillResult parseToolResult(String resultJson, int toolCallCount) {
         Map<String, Object> parsed = parseJsonSafe(resultJson);
-        boolean isError = resultJson.startsWith("Error");
+        boolean pending = Boolean.TRUE.equals(parsed.get("approvalRequired"))
+                || Boolean.TRUE.equals(parsed.get("confirmationRequired"));
+        boolean isError = resultJson.startsWith("Error") || Boolean.FALSE.equals(parsed.get("success")) || pending;
 
         return SkillResult.builder()
                 .status(isError ? SkillResult.Status.FAILED : SkillResult.Status.SUCCESS)
@@ -733,9 +746,10 @@ public class SkillEngine {
     private List<String> parseToolCodes(Object skillTools) {
         if (skillTools == null) return List.of();
         if (skillTools instanceof List) return (List<String>) skillTools;
-        if (skillTools instanceof String s && !s.isBlank()) {
+        String json = JsonbColumns.toJsonText(skillTools, objectMapper);
+        if (json != null) {
             try {
-                return objectMapper.readValue(s, new TypeReference<>() {});
+                return objectMapper.readValue(json, new TypeReference<>() {});
             } catch (Exception e) {
                 log.warn("Failed to parse skill_tools: {}", e.getMessage());
             }
@@ -747,8 +761,8 @@ public class SkillEngine {
     private Map<String, Map<String, Object>> parseStepInputMappings(Object raw) {
         if (raw == null) return Map.of();
         try {
-            String json = raw instanceof String s ? s : objectMapper.writeValueAsString(raw);
-            if (json.isBlank() || "null".equals(json)) return Map.of();
+            String json = JsonbColumns.toJsonText(raw, objectMapper);
+            if (json == null) return Map.of();
             return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (Exception e) {
             log.debug("Failed to parse step_input_mappings: {}", e.getMessage());

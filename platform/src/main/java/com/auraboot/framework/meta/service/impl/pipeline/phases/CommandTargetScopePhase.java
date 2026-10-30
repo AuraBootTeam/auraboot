@@ -124,6 +124,31 @@ public class CommandTargetScopePhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        var nativeOwner = springTargetAuthorizer(ctx);
+        if (nativeOwner != null) {
+            if (ctx.getAuthorizationVerdict() == null || !ctx.getAuthorizationVerdict().isAuthorized()
+                    || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId())
+                    || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
+                    || !StringUtils.hasText(MetaContext.getCurrentUserPid())) {
+                throw new BusinessException(ResponseCode.FORBIDDEN, "Target authorization context is missing");
+            }
+            try {
+                long revision = nativeOwner.authorizeTarget(
+                        com.auraboot.framework.meta.service.CommandHandlerContext.builder()
+                                .commandCode(ctx.getCommandCode()).modelCode(ctx.getCommand().getModelCode())
+                                .targetRecordId(ctx.getRequest().getTargetRecordId())
+                                .payload(ctx.getRequest().getPayload())
+                                .tenantId(ctx.getTenantId()).userId(ctx.getUserId()).build());
+                if (revision < 1) throw new IllegalStateException("Target authorizer returned an invalid revision");
+                ctx.setTargetRecordVersion(revision);
+                ctx.setTargetRecordReadable(true);
+                ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
+                return;
+            } catch (org.springframework.security.access.AccessDeniedException denied) {
+                ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.deny(REASON_TARGET_NOT_READABLE, name()));
+                throw denied;
+            }
+        }
         // An authorization gate that cannot evaluate must fail closed. This includes lookup,
         // membership and permission-engine failures; none may degrade into an idempotent replay.
         Boolean readable = evaluateReadableInIsolatedTransaction(ctx);
@@ -153,6 +178,27 @@ public class CommandTargetScopePhase implements CommandPhase {
                 ctx.getRequest().getTargetRecordId());
         throw new BusinessException(ResponseCode.FORBIDDEN,
                 "Access denied: you do not have permission to view this record");
+    }
+
+    private com.auraboot.framework.meta.service.CommandTargetAuthorizer springTargetAuthorizer(
+            CommandPipelineContext ctx) {
+        if (ctx.getRulesByType() == null) return null;
+        com.auraboot.framework.meta.service.CommandTargetAuthorizer selected = null;
+        for (var rule : ctx.getRulesByType().getOrDefault("handler", java.util.List.of())) {
+            if (!StringUtils.hasText(rule.getHandlerClass())) continue;
+            var handlers = applicationContext.getBeansOfType(com.auraboot.framework.meta.service.CommandHandler.class);
+            var handler = handlers.get(rule.getHandlerClass());
+            if (handler == null) handler = handlers.values().stream()
+                    .filter(candidate -> rule.getHandlerClass().equals(candidate.getHandlerName()))
+                    .findFirst().orElse(null);
+            if (!(handler instanceof com.auraboot.framework.meta.service.CommandTargetAuthorizer authorizer)) continue;
+            if (handler.requiresDslPersistence(ctx.getCommandCode(), ctx.getExecConfig(), ctx.getRequest())
+                    || selected != null) {
+                throw new BusinessException(ResponseCode.FORBIDDEN, "Ambiguous target ownership policy");
+            }
+            selected = authorizer;
+        }
+        return selected;
     }
 
     /**
@@ -211,7 +257,9 @@ public class CommandTargetScopePhase implements CommandPhase {
                 && ctx.getAuthorizationVerdict().isAuthorized()
                 && ctx.getAuthorizationVerdict().permissionCode() != null
                 && ctx.getAuthorizationVerdict().permissionCode().startsWith("record-share:")) {
-            return true;
+            String requiredAction = targetRecordAction(ctx);
+            // The prior grant may name an aggregate root, but its action cannot be upgraded.
+            return requiredAction == null || ctx.getAuthorizationVerdict().permissionCode().endsWith(":" + requiredAction);
         }
 
         Long memberId = resolveMemberId(ctx);
@@ -258,16 +306,12 @@ public class CommandTargetScopePhase implements CommandPhase {
         if (!result.granted()) return false;
         String action = targetRecordAction(ctx);
         if (action == null || "read".equals(action)) return true;
-        // RBAC already authorizes this business command. Preserve ordinary row scope, but do
-        // not let a read-only ReBAC exception authorize a write on someone else's record.
-        var scope = applicationContext.getBean(
-                com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class)
-                .evaluate(memberId, modelCode, "read", record);
-        if (scope == null || scope.verdict() !=
-                com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY) return true;
-        return applicationContext.getBean(com.auraboot.framework.permission.service.RecordShareService.class)
-                .isSharedByPid(ctx.getTenantId(), modelCode, recordId, memberId,
-                        MetaContext.getCurrentUserPid(), action);
+        if (!MetaContext.exists()) return false;
+        // The command capability is already authorized. Apply the declared action's row
+        // restriction, not generic model-operation RBAC or the unrelated read scope.
+        return com.auraboot.framework.plugin.pf4j.CommandRecordActionScopePolicy.permits(
+                applicationContext, ctx.getTenantId(), memberId, MetaContext.getCurrentUserPid(),
+                modelCode, recordId, action, record);
     }
 
     private Long resolveRecordVersion(Map<String, Object> record) {

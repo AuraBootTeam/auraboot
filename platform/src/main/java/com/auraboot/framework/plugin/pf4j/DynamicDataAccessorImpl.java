@@ -1,5 +1,7 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.application.security.MachineDataAccessContext;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
@@ -48,14 +50,14 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     @Override
     public Map<String, Object> getById(String modelCode, String recordId) {
         log.debug("Plugin DataAccessor: getById({}, {})", modelCode, recordId);
-        return withCommandAuthority(() -> dynamicDataService.getById(modelCode, recordId));
+        return withReadCommandAuthority(modelCode, recordId);
     }
 
     @Override
     public Map<String, Object> getByIdOrNull(String modelCode, String recordId) {
         log.debug("Plugin DataAccessor: getByIdOrNull({}, {})", modelCode, recordId);
         try {
-            return withCommandAuthority(() -> dynamicDataService.getById(modelCode, recordId));
+            return withReadCommandAuthority(modelCode, recordId);
         } catch (com.auraboot.framework.meta.exception.MetaRecordNotFoundException e) {
             // Typed not-found (2026-10-24): never couple to the exception's
             // message text — MetaRecordNotFoundException is the platform's
@@ -166,15 +168,18 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     @Override
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: create({}, {} fields)", modelCode, data != null ? data.size() : 0);
-        return withCommandAuthority(() -> dynamicDataService.create(modelCode, mutableCopy(data)));
+        Map<String,Object> created = withCommandAuthority(() -> dynamicDataService.create(modelCode, mutableCopy(data)));
+        CommandTargetFileAccessorFactory.recordCreated(modelCode, created);
+        return created;
     }
 
     @Override
     public Optional<Map<String, Object>> tryCreate(String modelCode, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: tryCreate({}, {} fields)", modelCode, data != null ? data.size() : 0);
         try {
-            return Optional.of(withCommandAuthority(
-                    () -> dynamicDataService.create(modelCode, mutableCopy(data))));
+            Map<String,Object> created = withCommandAuthority(() -> dynamicDataService.create(modelCode, mutableCopy(data)));
+            CommandTargetFileAccessorFactory.recordCreated(modelCode, created);
+            return Optional.of(created);
         } catch (RuntimeException error) {
             if (!IdempotentCreateSupport.isUniqueViolation(error)) throw error;
             log.debug("Plugin DataAccessor: tryCreate hit unique violation for model={}", modelCode);
@@ -271,6 +276,18 @@ public class DynamicDataAccessorImpl implements DataAccessor {
                 modelCode, recordId, counterCode, delta);
         return withCommandAuthority(() -> dynamicDataService.incrementWithinCap(
                 modelCode, recordId, counterCode, delta, capCode));
+    }
+
+    private Map<String, Object> withReadCommandAuthority(String modelCode, String recordId) {
+        String root = MetaContext.getCommandPermitTargetFor(modelCode);
+        boolean relatedRead = !MachineDataAccessContext.isActive()
+                && "TARGET".equals(MetaContext.getCommandPermitScopeFor(modelCode)) && root != null && !root.isBlank()
+                && recordId != null && !recordId.isBlank() && !root.equals(recordId);
+        // Another record never inherits the root's mutation permit. Reuse the actor's
+        // ordinary read path, including current function/TEAM/required-reference checks.
+        return withCommandAuthority(() -> relatedRead
+                ? MetaContext.runWithoutCommandPermit(() -> dynamicDataService.getById(modelCode, recordId))
+                : dynamicDataService.getById(modelCode, recordId));
     }
 
     /** The authoritative permit context is installed outside this adapter. */

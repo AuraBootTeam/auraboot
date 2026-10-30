@@ -79,9 +79,35 @@ class AsyncTaskServiceImplTest {
 
     @AfterEach
     void tearDown() {
+        com.auraboot.framework.application.tenant.MetaContext.clear();
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    @Test
+    void domainExportQueueCannotBeDeletedDuringItsArtifactRetention() {
+        for (String status : List.of("completed", "failed", "cancelled")) {
+            AsyncTask task = new AsyncTask();task.setId(101L);task.setTaskCode(status);
+            task.setTaskType("domain-export");task.setStatus(status);task.setCreatedAt(java.time.Instant.now());
+            when(asyncTaskMapper.findByTaskCode(status)).thenReturn(task);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.deleteTask(status))
+                    .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                    .hasMessage("$i18n:export.domain_task_retained");
+        }
+        verify(asyncTaskMapper, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void domainExportQueueDeletionRequiresKnownExpiredRetention() {
+        AsyncTask task = new AsyncTask();task.setId(102L);task.setTaskCode("retained");
+        task.setTaskType("domain-export");task.setStatus("failed");
+        when(asyncTaskMapper.findByTaskCode("retained")).thenReturn(task);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.deleteTask("retained"))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        verify(asyncTaskMapper, never()).deleteById(anyLong());
+        task.setCreatedAt(java.time.Instant.now().minus(java.time.Duration.ofHours(25)));
+        service.deleteTask("retained");verify(asyncTaskMapper).deleteById(102L);
     }
 
     private AsyncTaskSubmitRequest request() {
@@ -227,6 +253,49 @@ class AsyncTaskServiceImplTest {
         }
     }
 
+    @Test void executorIdentityComesFromTheClaimedRowWithoutPropagatingRegistryBypass() {
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+        AsyncTask task=executableTask();task.setCreatedBy(45L);
+        task.setInputParams(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("tenantId",999).put("createdBy",999));
+        when(asyncTaskMapper.selectById(1L)).thenAnswer(invocation->{
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isTrue();return task;
+        });
+        when(asyncTaskMapper.updateOwnedProgress(eq(1L),eq(123L),any(),eq(50),eq("progress"))).thenAnswer(invocation->{
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isTrue();return 1;
+        });
+        when(executor.execute(any(),any())).thenAnswer(invocation->{
+            var claimed=AsyncTaskExecutionContext.require();
+            assertThat(claimed.taskId()).isEqualTo(1L);assertThat(claimed.taskCode()).isEqualTo("TASK-1");
+            assertThat(claimed.tenantId()).isEqualTo(123L);assertThat(claimed.createdBy()).isEqualTo(45L);
+            assertThat(claimed.token()).isEqualTo(task.getExecutionToken());
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isFalse();
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+            ((AsyncTaskExecutor.ProgressCallback)invocation.getArgument(1)).report(50,"progress");
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isFalse();
+            return AsyncTaskResult.ok(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("completed",true));
+        });
+        service.executeTaskAsync(1L,123L);
+        assertThat(task.getStatus()).isEqualTo(AsyncTask.STATUS_COMPLETED);
+        org.assertj.core.api.Assertions.assertThatThrownBy(AsyncTaskExecutionContext::require).isInstanceOf(IllegalStateException.class);
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.isTenantFilterBypassed()).isFalse();
+    }
+    @Test void dispatchCannotClaimARecordBelongingToADifferentPersistedTenant() {
+        AsyncTask task=executableTask();when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        service.executeTaskAsync(1L,999L);
+        verify(asyncTaskMapper,never()).claimPending(any(),any(),any());
+        verify(executor,never()).execute(any(),any());
+    }
+
+    @Test void saturatedCallerDispatchLeavesDurableWorkPendingUntilTheCallerTransactionIsGone() {
+        var task=executableTask();task.setInputParams(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("resumeOnRestart",true));
+        when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {service.executeTaskAsync(1L,123L);} finally {TransactionSynchronizationManager.setActualTransactionActive(false);}
+        verify(asyncTaskMapper,never()).claimPending(any(),any(),any());
+        verify(executor,never()).execute(any(),any());
+        assertThat(task.getStatus()).isEqualTo(AsyncTask.STATUS_PENDING);
+    }
+
     private AsyncTask executableTask() {
         AsyncTask task = new AsyncTask();
         task.setId(1L);
@@ -238,4 +307,42 @@ class AsyncTaskServiceImplTest {
         task.setMaxRetries(3);
         return task;
     }
+    @Test void publicSubmissionCannotDispatchHostCreatedCommandTasks() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(1L,2L,"user","User");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.submitPublicTask(request(),1L,2L))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(asyncTaskMapper,never()).insert(any(AsyncTask.class));
+    }
+    @Test void optedInPublicExecutorKeepsTheAuthenticatedPersistedOwner() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(1L,2L,"user","User");
+        when(executor.supportsPublicSubmission()).thenReturn(true);
+        service.submitPublicTask(request(),1L,2L);
+        var captor=org.mockito.ArgumentCaptor.forClass(AsyncTask.class);
+        verify(asyncTaskMapper).insert(captor.capture());
+        assertThat(captor.getValue().getTenantId()).isEqualTo(1L);
+        assertThat(captor.getValue().getCreatedBy()).isEqualTo(2L);
+        verify(selfProxy).executeTaskAsync(1L,1L);
+    }
+    @Test void executorOptInCannotChangePublicSubmissionIdentity() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(1L,2L,"user","User");
+        when(executor.supportsPublicSubmission()).thenReturn(true);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.submitPublicTask(request(),99L,2L))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(asyncTaskMapper,never()).insert(any(AsyncTask.class));
+    }
+    @Test void publicTaskLookupRequiresBothTenantAndOwnerAndDoesNotLeakMissingCodes() {
+        AsyncTask task=new AsyncTask();task.setTaskCode("owned");task.setTenantId(1L);task.setCreatedBy(2L);
+        when(asyncTaskMapper.findByTaskCode("owned")).thenReturn(task);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(1L,2L,"user","User");
+        assertThat(service.getOwnedTask("owned").getTaskCode()).isEqualTo("owned");
+        com.auraboot.framework.application.tenant.MetaContext.setContext(99L,2L,"user","User");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.getOwnedTask("owned"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(1L,3L,"other","Other");
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.requireCurrentOwner("owned"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.requireCurrentOwner("missing"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
 }

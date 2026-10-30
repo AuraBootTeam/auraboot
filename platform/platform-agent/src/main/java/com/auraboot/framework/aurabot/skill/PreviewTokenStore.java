@@ -60,10 +60,8 @@ public class PreviewTokenStore {
     public PreviewTokenStore(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
-        // Independent mapper so we don't mutate the application-wide one;
-        // ORDER_MAP_ENTRIES_BY_KEYS only affects POJO Map<>s, but mapper.writeValueAsString
-        // on a JsonNode also respects the field-ordering serializer; we additionally
-        // sort ObjectNode keys ourselves for determinism across Jackson versions.
+        // Map ordering does not sort ObjectNode properties. Canonicalize the
+        // tree recursively before serialization, including objects inside arrays.
         this.canonicalMapper = objectMapper.copy()
                 .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
     }
@@ -85,6 +83,7 @@ public class PreviewTokenStore {
         envelope.put("tenantId", tenantId);
         envelope.put("skillName", skillName);
         envelope.put("paramsHash", paramsHash);
+        envelope.put("paramsHashVersion", 2);
         envelope.set("payload", previewPayload == null ? objectMapper.nullNode() : previewPayload);
 
         String json;
@@ -145,7 +144,12 @@ public class PreviewTokenStore {
                     tokenFingerprint(token), storedSkill, expectedSkill);
             return Optional.empty();
         }
-        String expectedHash = hashParams(expectedParams);
+        int hashVersion = envelope.path("paramsHashVersion").asInt(1);
+        String expectedHash = switch (hashVersion) {
+            case 1 -> hashParams(expectedParams, false);
+            case 2 -> hashParams(expectedParams);
+            default -> null;
+        };
         if (storedHash == null || !storedHash.equals(expectedHash)) {
             log.debug("Preview token paramsHash mismatch tokenHash={} skill={}", tokenFingerprint(token), expectedSkill);
             return Optional.empty();
@@ -157,10 +161,14 @@ public class PreviewTokenStore {
 
     /** SHA-256 over canonicalized params JSON. */
     String hashParams(JsonNode params) {
+        return hashParams(params, true);
+    }
+
+    private String hashParams(JsonNode params, boolean canonicalize) {
         JsonNode normalized = params == null ? objectMapper.nullNode() : params;
         String canonical;
         try {
-            canonical = canonicalMapper.writeValueAsString(normalized);
+            canonical = canonicalMapper.writeValueAsString(canonicalize ? canonicalTree(normalized) : normalized);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to canonicalize params for hash", e);
         }
@@ -172,6 +180,22 @@ public class PreviewTokenStore {
             // SHA-256 is mandatory in every JRE — propagate as unchecked.
             throw new IllegalStateException("SHA-256 unavailable on this JVM", e);
         }
+    }
+
+    private JsonNode canonicalTree(JsonNode node) {
+        if (node.isObject()) {
+            java.util.Map<String, JsonNode> sorted = new java.util.TreeMap<>();
+            node.fields().forEachRemaining(field -> sorted.put(field.getKey(), canonicalTree(field.getValue())));
+            ObjectNode result = canonicalMapper.createObjectNode();
+            sorted.forEach(result::set);
+            return result;
+        }
+        if (node.isArray()) {
+            var result = canonicalMapper.createArrayNode();
+            node.forEach(item -> result.add(canonicalTree(item)));
+            return result;
+        }
+        return node;
     }
 
     private String tokenFingerprint(String token) {

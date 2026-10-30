@@ -21,7 +21,7 @@ dependencies {
     compileOnly project(':')
 
     // Tencent official COS Java SDK: https://cloud.tencent.com/document/product/436/10199
-    implementation 'com.qcloud:cos_api:5.6.227'
+    implementation 'com.qcloud:cos_api:5.6.283'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.48'
@@ -41,7 +41,7 @@ dependencies {
     }
     testImplementation 'org.springframework:spring-beans:6.2.19'
     testImplementation 'org.springframework.boot:spring-boot-autoconfigure:3.5.16'
-    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.19.4'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'

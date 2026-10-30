@@ -100,8 +100,24 @@ export function resolveTemporalFormat(
   formats?: Partial<DateTimeFormatPreferences>,
   explicitFormat?: string,
 ): string {
-  if (explicitFormat && /Y{2,4}|M{1,4}|D{1,4}|H{1,2}|m{1,2}|s{1,2}/.test(explicitFormat)) {
+  if (explicitFormat && !['date', 'datetime', 'time'].includes(explicitFormat.toLowerCase()) && /Y{2,4}|M{1,4}|D{1,4}|H{1,2}|m{1,2}|s{1,2}/.test(explicitFormat)) {
     return explicitFormat;
   }
   return formats?.[type] || DEFAULT_DATE_TIME_FORMATS[type];
+}
+
+/** Convert a minute-precision wall time in an explicit zone; gaps reject and folds choose the earlier instant. */
+export function parseDateTimeInTimezone(value: string, timeZone: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return '';
+  const wall = Date.parse(`${value}:00Z`);
+  if (!Number.isFinite(wall)) return '';
+  const offsets = new Set<number>();
+  for (let hour = -36; hour <= 36; hour += 6) {
+    const sample = wall + hour * 3_600_000;
+    const rendered = formatInTimezone(sample, 'YYYY-MM-DDTHH:mm', timeZone);
+    offsets.add(Date.parse(`${rendered}:00Z`) - sample);
+  }
+  const candidates = [...offsets].map((offset) => wall - offset)
+    .filter((instant) => formatInTimezone(instant, 'YYYY-MM-DDTHH:mm', timeZone) === value);
+  return candidates.length ? new Date(Math.min(...candidates)).toISOString() : '';
 }

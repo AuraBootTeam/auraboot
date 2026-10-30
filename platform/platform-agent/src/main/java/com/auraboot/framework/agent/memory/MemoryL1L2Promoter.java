@@ -413,13 +413,13 @@ public class MemoryL1L2Promoter {
         // sees a constant operand on the right side of `<=>` and can use the
         // hnsw index. A scalar subquery `(SELECT embedding FROM … WHERE pid=?)`
         // is not considered constant by the planner and defeats the index.
-        List<String> selfEmbRows = jdbc.queryForList(
-                "SELECT embedding::text FROM ab_agent_memory WHERE pid = ?",
-                String.class, selfPid);
+        List<Map<String, Object>> selfEmbRows = jdbc.queryForList(
+                "SELECT embedding::text AS embedding_text, embedding_space FROM ab_agent_memory WHERE pid = ? AND " + MemoryVectorPolicy.fresh(""), selfPid);
         if (selfEmbRows.isEmpty()) {
             return 0.0;
         }
-        String selfEmbedding = selfEmbRows.get(0);
+        String selfEmbedding = (String) selfEmbRows.get(0).get("embedding_text");
+        String selfSpace = (String) selfEmbRows.get(0).get("embedding_space");
         if (selfEmbedding == null) {
             // Row exists but embedding is NULL — no dedup possible.
             return 0.0;
@@ -431,27 +431,27 @@ public class MemoryL1L2Promoter {
                     "SELECT MIN(embedding <=> ?::vector) "
                             + "  FROM ab_agent_memory "
                             + " WHERE tenant_id = ? "
-                            + "   AND scope = ? "
+                            + "   AND scope = ? AND embedding_space = ? "
                             + "   AND scope_key IS NULL "
                             + "   AND category IN ('user','agent') "
-                            + "   AND embedding IS NOT NULL "
+                            + "   AND " + MemoryVectorPolicy.fresh("") + " "
                             + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                             + "   AND pid <> ?",
                     rs -> rs.next() ? (Double) rs.getObject(1) : null,
-                    selfEmbedding, tenantId, scope, selfPid);
+                    selfEmbedding, tenantId, scope, selfSpace, selfPid);
         } else {
             dist = jdbc.query(
                     "SELECT MIN(embedding <=> ?::vector) "
                             + "  FROM ab_agent_memory "
                             + " WHERE tenant_id = ? "
-                            + "   AND scope = ? "
+                            + "   AND scope = ? AND embedding_space = ? "
                             + "   AND scope_key = ? "
                             + "   AND category IN ('user','agent') "
-                            + "   AND embedding IS NOT NULL "
+                            + "   AND " + MemoryVectorPolicy.fresh("") + " "
                             + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                             + "   AND pid <> ?",
                     rs -> rs.next() ? (Double) rs.getObject(1) : null,
-                    selfEmbedding, tenantId, scope, scopeKey, selfPid);
+                    selfEmbedding, tenantId, scope, selfSpace, scopeKey, selfPid);
         }
         if (dist == null) return 0.0;
         double cos = 1.0 - dist;
@@ -478,13 +478,13 @@ public class MemoryL1L2Promoter {
         // `?::vector` — lets planner use hnsw index. Round-2 review #5:
         // queryForList + isEmpty check rather than queryForMap + catch
         // EmptyResultDataAccessException (exception-as-control-flow).
-        List<String> selfEmbRows = jdbc.queryForList(
-                "SELECT embedding::text FROM ab_agent_memory WHERE pid = ?",
-                String.class, selfPid);
+        List<Map<String, Object>> selfEmbRows = jdbc.queryForList(
+                "SELECT embedding::text AS embedding_text, embedding_space FROM ab_agent_memory WHERE pid = ? AND " + MemoryVectorPolicy.fresh(""), selfPid);
         if (selfEmbRows.isEmpty()) {
             return null;
         }
-        String selfEmbedding = selfEmbRows.get(0);
+        String selfEmbedding = (String) selfEmbRows.get(0).get("embedding_text");
+        String selfSpace = (String) selfEmbRows.get(0).get("embedding_space");
         if (selfEmbedding == null) {
             return null;
         }
@@ -495,29 +495,29 @@ public class MemoryL1L2Promoter {
                     "SELECT pid, (embedding <=> ?::vector) AS dist "
                             + "  FROM ab_agent_memory "
                             + " WHERE tenant_id = ? "
-                            + "   AND scope = ? "
+                            + "   AND scope = ? AND embedding_space = ? "
                             + "   AND scope_key IS NULL "
                             + "   AND category IN ('user','agent') "
-                            + "   AND embedding IS NOT NULL "
+                            + "   AND " + MemoryVectorPolicy.fresh("") + " "
                             + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                             + "   AND pid <> ? "
                             + " ORDER BY embedding <=> ?::vector ASC "
                             + " LIMIT 1",
-                    selfEmbedding, tenantId, scope, selfPid, selfEmbedding);
+                    selfEmbedding, tenantId, scope, selfSpace, selfPid, selfEmbedding);
         } else {
             hitRows = jdbc.queryForList(
                     "SELECT pid, (embedding <=> ?::vector) AS dist "
                             + "  FROM ab_agent_memory "
                             + " WHERE tenant_id = ? "
-                            + "   AND scope = ? "
+                            + "   AND scope = ? AND embedding_space = ? "
                             + "   AND scope_key = ? "
                             + "   AND category IN ('user','agent') "
-                            + "   AND embedding IS NOT NULL "
+                            + "   AND " + MemoryVectorPolicy.fresh("") + " "
                             + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
                             + "   AND pid <> ? "
                             + " ORDER BY embedding <=> ?::vector ASC "
                             + " LIMIT 1",
-                    selfEmbedding, tenantId, scope, scopeKey, selfPid, selfEmbedding);
+                    selfEmbedding, tenantId, scope, selfSpace, scopeKey, selfPid, selfEmbedding);
         }
         if (hitRows.isEmpty()) {
             return null;

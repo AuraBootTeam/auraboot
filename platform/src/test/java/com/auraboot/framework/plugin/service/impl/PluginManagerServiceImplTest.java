@@ -211,6 +211,19 @@ class PluginManagerServiceImplTest {
                 .isInstanceOf(PluginNotFoundException.class);
     }
 
+    @Test void aCompositionPreflightRejectionCannotDisableUninstallOrMarkTheApplicationFailed() {
+        var record=recordWithStatus(PluginStatus.ENABLED);
+        when(pluginRecordMapper.findByTenantAndPluginId("com.example.p")).thenReturn(record);
+        org.mockito.Mockito.doThrow(com.auraboot.framework.exception.BusinessException.i18n("plugin.error.composition_lifecycle"))
+                .when(auraPluginManager).requireTenantLifecycleChange(record);
+        assertThatThrownBy(()->service.disable("com.example.p")).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThatThrownBy(()->service.uninstall("com.example.p",true)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        verify(pluginRecordMapper,never()).markAsDisabled(anyString());
+        verify(pluginRecordMapper,never()).softDelete(anyString());
+        verify(pluginRecordMapper,never()).updateStatus(anyString(),anyString());
+        org.mockito.Mockito.verifyNoInteractions(backgroundComponentRegistry,applicationModuleRegistry,pluginResourceImporter);
+    }
+
     @Test
     @DisplayName("disable on already-disabled returns success without status change")
     void disableShouldShortCircuitWhenDisabled() {

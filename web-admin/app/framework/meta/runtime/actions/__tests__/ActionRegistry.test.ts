@@ -1,6 +1,43 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
+
+it('defers paged choices to the rendered dialog without eagerly downloading the full directory', async () => {
+  const fetchResult = vi.fn();
+  window.addEventListener(
+    'dialog:form',
+    (event) => {
+      const detail = (event as CustomEvent).detail;
+      expect(detail.fields[0].dataSource).toMatchObject({
+        pagination: true,
+        endpoint: '/api/choices/record',
+      });
+      expect(detail.fieldOptions).toEqual({});
+      detail.onSubmit({ people: ['chosen'] });
+    },
+    { once: true },
+  );
+  await expect(
+    promptInputForm(
+      [
+        {
+          field: 'people',
+          type: 'multiselect',
+          dataSource: {
+            type: 'api',
+            endpoint: '/api/choices/${record.pid}',
+            pagination: true,
+          },
+        },
+      ],
+      'Select people',
+      fetchResult,
+      undefined,
+      { record: { pid: 'record' } },
+    ),
+  ).resolves.toEqual({ people: ['chosen'] });
+  expect(fetchResult).not.toHaveBeenCalled();
+});
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { FlowRunner } from '~/framework/meta/runtime/schema-runtime/FlowRunner';
 import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
@@ -12,35 +49,61 @@ import { registerConfirmDialog, unregisterConfirmDialog } from '~/utils/confirmD
 
 describe('ActionRegistry command failure feedback', () => {
   it('carries the current page language through a flow to its command handler', async () => {
-    const context = createExpressionContext({global:{locale:'zh-CN',theme:'light'}});
-    const fetchResult = vi.fn().mockResolvedValue({code:'35000',message:'Bad parameter',
-      context:{detail:'Record not found: SECRET-PID in model: internal_model'}});
-    const flow = new FlowRunner({
-      evaluator:{evaluateCondition:()=>true, evaluateObject:(value:unknown)=>value} as any, actionRegistry,
-      stateManager:{getContext:()=>context} as any, scopeId:'feedback-test',
-      dataSourceManager:{} as any, schema:{} as any, getAllFormFields:()=>[],
+    const context = createExpressionContext({ global: { locale: 'zh-CN', theme: 'light' } });
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '35000',
+      message: 'Bad parameter',
+      context: { detail: 'Record not found: SECRET-PID in model: internal_model' },
     });
-    await expect(flow.run([{action:'command.execute',args:{command:'quote:create_version'}}],
-      {...context,fetchResult} as any)).rejects.toThrow('关联记录不存在或不可访问，请重新选择后再提交。');
+    const flow = new FlowRunner({
+      evaluator: {
+        evaluateCondition: () => true,
+        evaluateObject: (value: unknown) => value,
+      } as any,
+      actionRegistry,
+      stateManager: { getContext: () => context } as any,
+      scopeId: 'feedback-test',
+      dataSourceManager: {} as any,
+      schema: {} as any,
+      getAllFormFields: () => [],
+    });
+    await expect(
+      flow.run([{ action: 'command.execute', args: { command: 'quote:create_version' } }], {
+        ...context,
+        fetchResult,
+      } as any),
+    ).rejects.toThrow('关联记录不存在或不可访问，请重新选择后再提交。');
   });
   it('preserves the actionable reason from a failed flow command', async () => {
     const fetchResult = vi.fn().mockResolvedValue({
-      code: '35000', message: 'Bad parameter',
+      code: '35000',
+      message: 'Bad parameter',
       context: { detail: 'Plugin handler execution failed: Approval requires a decision note' },
     });
-    await expect(actionRegistry.execute('command.execute', {
-      fetchResult, args: { command: 'quote:approve' },
-    })).rejects.toThrow('Approval requires a decision note');
+    await expect(
+      actionRegistry.execute('command.execute', {
+        fetchResult,
+        args: { command: 'quote:approve' },
+      }),
+    ).rejects.toThrow('Approval requires a decision note');
   });
 
   it('explains unavailable referenced records without exposing internal identifiers', async () => {
     const fetchResult = vi.fn().mockResolvedValue({
-      code: '35000', message: 'Bad parameter',
-      context: { detail: 'Plugin handler execution failed: Record not found: SECRET-PID in model: internal_model' },
+      code: '35000',
+      message: 'Bad parameter',
+      context: {
+        detail:
+          'Plugin handler execution failed: Record not found: SECRET-PID in model: internal_model',
+      },
     });
-    await expect(actionRegistry.execute('command.execute', {
-      fetchResult, locale: 'zh-CN', args: { command: 'quote:create_version' },
-    })).rejects.toThrow('关联记录不存在或不可访问，请重新选择后再提交。');
+    await expect(
+      actionRegistry.execute('command.execute', {
+        fetchResult,
+        locale: 'zh-CN',
+        args: { command: 'quote:create_version' },
+      }),
+    ).rejects.toThrow('关联记录不存在或不可访问，请重新选择后再提交。');
   });
 });
 
@@ -549,14 +612,16 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
       once: true,
     });
 
-    await expect(actionRegistry.execute('command.execute', {
-      fetchResult,
-      args: {
-        command: 'cr_account:set_credential',
-        targetRecordPid: 'A1',
-        inputFields: [{ field: 'cookies_json', type: 'textarea', required: true }],
-      },
-    })).rejects.toBeInstanceOf(ActionCancelledError);
+    await expect(
+      actionRegistry.execute('command.execute', {
+        fetchResult,
+        args: {
+          command: 'cr_account:set_credential',
+          targetRecordPid: 'A1',
+          inputFields: [{ field: 'cookies_json', type: 'textarea', required: true }],
+        },
+      }),
+    ).rejects.toBeInstanceOf(ActionCancelledError);
 
     expect(fetchResult).not.toHaveBeenCalled();
   });
@@ -613,17 +678,27 @@ describe('ActionRegistry dialog.confirm', () => {
     const navigate = vi.fn();
     const context = createExpressionContext();
     const flow = new FlowRunner({
-      evaluator: new ExpressionEvaluator(), actionRegistry,
-      stateManager: { getContext: () => context } as any, scopeId: 'cancel-test',
-      dataSourceManager: {} as any, schema: {} as any, getAllFormFields: () => [], navigate,
+      evaluator: new ExpressionEvaluator(),
+      actionRegistry,
+      stateManager: { getContext: () => context } as any,
+      scopeId: 'cancel-test',
+      dataSourceManager: {} as any,
+      schema: {} as any,
+      getAllFormFields: () => [],
+      navigate,
     });
     registerConfirmDialog(async () => false);
     try {
-      await expect(flow.run([
-        { action: 'dialog.confirm', args: { message: 'Confirm?' } },
-        { action: 'command.execute', args: { command: 'purchase:allocate' } },
-        { action: 'router.back' },
-      ], { ...context, fetchResult } as any)).rejects.toBeInstanceOf(ActionCancelledError);
+      await expect(
+        flow.run(
+          [
+            { action: 'dialog.confirm', args: { message: 'Confirm?' } },
+            { action: 'command.execute', args: { command: 'purchase:allocate' } },
+            { action: 'router.back' },
+          ],
+          { ...context, fetchResult } as any,
+        ),
+      ).rejects.toBeInstanceOf(ActionCancelledError);
       expect(fetchResult).not.toHaveBeenCalled();
       expect(navigate).not.toHaveBeenCalled();
     } finally {
@@ -681,6 +756,47 @@ describe('ActionRegistry refresh', () => {
 });
 
 describe('ActionRegistry navigate / new / router.push handlers', () => {
+  it.each(['navigate', 'router.push'])(
+    'resolves %s from the accepted API result in the real flow',
+    async (action) => {
+      const context = createExpressionContext();
+      const navigate = vi.fn();
+      const fetchResult = vi
+        .fn()
+        .mockResolvedValue({ code: '0', data: { snapshotToken: 'sealed-capture' } });
+      const manager = {
+        getContext: () => context,
+        updateState: (_scope: string, key: string, value: unknown) => {
+          context.state[key] = value;
+        },
+      };
+      const flow = new FlowRunner({
+        evaluator: new ExpressionEvaluator(),
+        actionRegistry,
+        stateManager: manager as any,
+        scopeId: 'capture-route',
+        dataSourceManager: {} as any,
+        schema: {} as any,
+        getAllFormFields: () => [],
+        navigate,
+      });
+      await flow.run(
+        [
+          {
+            action: 'api.request',
+            method: 'post',
+            endpoint: '/api/statistics/captures',
+            body: { state: 'all' },
+            target: 'capture',
+          },
+          { action, args: { path: '/p/statistics/view/${state.capture.snapshotToken}' } },
+        ],
+        { ...context, fetchResult } as any,
+      );
+      expect(navigate).toHaveBeenCalledExactlyOnceWith('/p/statistics/view/sealed-capture');
+    },
+  );
+
   it('navigate jumps to args.path', async () => {
     const navigate = vi.fn();
     await actionRegistry.execute('navigate', { navigate, args: { path: '/p/orders' } });
@@ -837,7 +953,9 @@ describe('ActionRegistry dataSource handlers', () => {
   it('dataSource.fetch logs and no-ops without a manager or a target', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await actionRegistry.execute('dataSource.fetch', {});
-    await actionRegistry.execute('dataSource.fetch', { dataSourceManager: { fetch: vi.fn() } as unknown as DataSourceManager });
+    await actionRegistry.execute('dataSource.fetch', {
+      dataSourceManager: { fetch: vi.fn() } as unknown as DataSourceManager,
+    });
     expect(spy).toHaveBeenCalledTimes(2);
     spy.mockRestore();
   });
@@ -890,7 +1008,10 @@ describe('ActionRegistry toast handlers', () => {
     await actionRegistry.execute('toast.success', { showToast, args: {} });
     expect(showToast).toHaveBeenCalledWith('Operation successful', 'success');
 
-    await actionRegistry.execute('toast.error', { showToast, args: { content: { 'en-US': 'Oops' } } });
+    await actionRegistry.execute('toast.error', {
+      showToast,
+      args: { content: { 'en-US': 'Oops' } },
+    });
     expect(showToast).toHaveBeenCalledWith('Oops', 'error');
 
     await actionRegistry.execute('toast.success', { showToast, args: { message: {} } });
@@ -902,57 +1023,143 @@ describe('ActionRegistry toast handlers', () => {
       actionRegistry.execute('toast.show', { args: { message: 'hi' } }),
     ).resolves.toBeUndefined();
   });
+  it.each(['toast.show', 'toast.success', 'toast.error'])(
+    '%s honors the active locale and catalog messages',
+    async (action) => {
+      const showToast = vi.fn();
+      await actionRegistry.execute(action, {
+        showToast,
+        locale: 'en-US',
+        args: { message: { 'zh-CN': '管理操作已记录', 'en-US': 'Administration recorded' } },
+      });
+      expect(showToast).toHaveBeenLastCalledWith('Administration recorded', expect.any(String));
+      await actionRegistry.execute(action, {
+        showToast,
+        locale: 'zh-CN',
+        t: (key) => (key === 'recovery.recorded' ? '管理操作已记录' : key),
+        args: { message: '$i18n:recovery.recorded' },
+      });
+      expect(showToast).toHaveBeenLastCalledWith('管理操作已记录', expect.any(String));
+    },
+  );
 });
 
 describe('ActionRegistry dialog.form handler', () => {
-  it.each(['dialog.form', 'command.execute'])('stops downstream writes and success feedback after cancelling %s', async (action) => {
-    const manager = new ScopedStateManager({ locale: 'en', theme: 'light' } as any);
-    manager.createScope('cancel-input', { form: { category: 'previous selection' } });
-    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
-    const showToast = vi.fn();
-    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
-      stateManager: manager, scopeId: 'cancel-input', dataSourceManager: {} as any,
-      schema: {} as any, getAllFormFields: () => [] });
-    window.addEventListener('dialog:form', (event) => (event as CustomEvent).detail.onCancel(), { once: true });
-    const fields = [{ field: 'category', type: 'text' }];
-    await expect(flow.run([
-      { action, args: action === 'dialog.form' ? { fields } : { command: 'policy:create', inputFields: fields } },
-      { action: 'command.execute', args: { command: 'policy:save', payload: { category: '${form.category}' } } },
-      { action: 'toast.show', args: { message: 'Saved', level: 'success' } },
-    ], { ...manager.getContext('cancel-input'), fetchResult, showToast } as any)).rejects.toBeInstanceOf(ActionCancelledError);
-    expect(fetchResult).not.toHaveBeenCalled();
-    expect(showToast).not.toHaveBeenCalled();
-    expect(manager.getContext('cancel-input').form?.category).toBe('previous selection');
-  });
+  it.each(['dialog.form', 'command.execute'])(
+    'stops downstream writes and success feedback after cancelling %s',
+    async (action) => {
+      const manager = new ScopedStateManager({ locale: 'en', theme: 'light' } as any);
+      manager.createScope('cancel-input', { form: { category: 'previous selection' } });
+      const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+      const showToast = vi.fn();
+      const flow = new FlowRunner({
+        evaluator: new ExpressionEvaluator(),
+        actionRegistry,
+        stateManager: manager,
+        scopeId: 'cancel-input',
+        dataSourceManager: {} as any,
+        schema: {} as any,
+        getAllFormFields: () => [],
+      });
+      window.addEventListener('dialog:form', (event) => (event as CustomEvent).detail.onCancel(), {
+        once: true,
+      });
+      const fields = [{ field: 'category', type: 'text' }];
+      await expect(
+        flow.run(
+          [
+            {
+              action,
+              args:
+                action === 'dialog.form'
+                  ? { fields }
+                  : { command: 'policy:create', inputFields: fields },
+            },
+            {
+              action: 'command.execute',
+              args: { command: 'policy:save', payload: { category: '${form.category}' } },
+            },
+            { action: 'toast.show', args: { message: 'Saved', level: 'success' } },
+          ],
+          { ...manager.getContext('cancel-input'), fetchResult, showToast } as any,
+        ),
+      ).rejects.toBeInstanceOf(ActionCancelledError);
+      expect(fetchResult).not.toHaveBeenCalled();
+      expect(showToast).not.toHaveBeenCalled();
+      expect(manager.getContext('cancel-input').form?.category).toBe('previous selection');
+    },
+  );
 
   it('resolves choice endpoints and defaults from the current flow context', async () => {
-    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: [{ value: 'supplier-a', label: 'Supplier A' }] });
+    const fetchResult = vi
+      .fn()
+      .mockResolvedValue({ code: '0', data: [{ value: 'supplier-a', label: 'Supplier A' }] });
     const stateManager = { updateForm: vi.fn() };
     let detail: any;
-    window.addEventListener('dialog:form', (event) => { detail = (event as CustomEvent).detail;
-      detail.onSubmit({ suppliers: ['supplier-a'] }); }, { once: true });
-    await actionRegistry.execute('dialog.form', { fetchResult, stateManager, scopeId: 'current',
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        detail = (event as CustomEvent).detail;
+        detail.onSubmit({ suppliers: ['supplier-a'] });
+      },
+      { once: true },
+    );
+    await actionRegistry.execute('dialog.form', {
+      fetchResult,
+      stateManager,
+      scopeId: 'current',
       expressionContext: { form: { connection: 'connection-a', suppliers: ['supplier-a'] } } as any,
-      args: { fields: [{ field: 'suppliers', type: 'multiselect', defaultValue: '${form.suppliers}',
-        dataSource: { type: 'api', endpoint: '/api/connections/${form.connection}/suppliers' } }] } });
-    expect(fetchResult).toHaveBeenCalledWith('/api/connections/connection-a/suppliers', { method: 'get' });
+      args: {
+        fields: [
+          {
+            field: 'suppliers',
+            type: 'multiselect',
+            defaultValue: '${form.suppliers}',
+            dataSource: { type: 'api', endpoint: '/api/connections/${form.connection}/suppliers' },
+          },
+        ],
+      },
+    });
+    expect(fetchResult).toHaveBeenCalledWith('/api/connections/connection-a/suppliers', {
+      method: 'get',
+    });
     expect(detail.defaults.suppliers).toEqual(['supplier-a']);
     expect(stateManager.updateForm).toHaveBeenCalledWith('current', 'suppliers', ['supplier-a']);
   });
 
   it('propagates invalid provider defaults instead of treating them as user cancellation', async () => {
-    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: [{ value: 'group', label: 'Group', options: [], preferred: ['foreign'] }] });
-    await expect(actionRegistry.execute('command.execute', { fetchResult, args: { command: 'policy:save',
-      inputFields: [{ field: 'groups', type: 'grouped-multiselect', props: { defaultValuesField: 'preferred' },
-        dataSource: { type: 'api', endpoint: '/api/choices' } }] } })).rejects.toThrow('Invalid grouped defaults');
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: [{ value: 'group', label: 'Group', options: [], preferred: ['foreign'] }],
+    });
+    await expect(
+      actionRegistry.execute('command.execute', {
+        fetchResult,
+        args: {
+          command: 'policy:save',
+          inputFields: [
+            {
+              field: 'groups',
+              type: 'grouped-multiselect',
+              props: { defaultValuesField: 'preferred' },
+              dataSource: { type: 'api', endpoint: '/api/choices' },
+            },
+          ],
+        },
+      }),
+    ).rejects.toThrow('Invalid grouped defaults');
     expect(fetchResult).toHaveBeenCalledTimes(1);
     expect(fetchResult.mock.calls[0][0]).toBe('/api/choices');
   });
   it('stores submitted values into the scoped form state', async () => {
     const stateManager = { updateForm: vi.fn() };
-    window.addEventListener('dialog:form', (e) => {
-      (e as CustomEvent).detail.onSubmit({ name: 'a', qty: 2 });
-    }, { once: true });
+    window.addEventListener(
+      'dialog:form',
+      (e) => {
+        (e as CustomEvent).detail.onSubmit({ name: 'a', qty: 2 });
+      },
+      { once: true },
+    );
 
     await actionRegistry.execute('dialog.form', {
       stateManager,
@@ -966,15 +1173,21 @@ describe('ActionRegistry dialog.form handler', () => {
 
   it('signals deliberate cancellation without changing form values', async () => {
     const stateManager = { updateForm: vi.fn() };
-    window.addEventListener('dialog:form', (e) => {
-      (e as CustomEvent).detail.onCancel();
-    }, { once: true });
+    window.addEventListener(
+      'dialog:form',
+      (e) => {
+        (e as CustomEvent).detail.onCancel();
+      },
+      { once: true },
+    );
 
-    await expect(actionRegistry.execute('dialog.form', {
-      stateManager,
-      scopeId: 'scope-1',
-      args: { fields: [{ field: 'name' }] },
-    })).rejects.toBeInstanceOf(ActionCancelledError);
+    await expect(
+      actionRegistry.execute('dialog.form', {
+        stateManager,
+        scopeId: 'scope-1',
+        args: { fields: [{ field: 'name' }] },
+      }),
+    ).rejects.toBeInstanceOf(ActionCancelledError);
 
     expect(stateManager.updateForm).not.toHaveBeenCalled();
   });
@@ -1044,7 +1257,10 @@ describe('ActionRegistry form.reset / state.set handlers', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await actionRegistry.execute('state.set', {});
     await actionRegistry.execute('state.set', { stateManager: { updateState: vi.fn() } });
-    await actionRegistry.execute('state.set', { stateManager: { updateState: vi.fn() }, scopeId: 's1' });
+    await actionRegistry.execute('state.set', {
+      stateManager: { updateState: vi.fn() },
+      scopeId: 's1',
+    });
     expect(spy).toHaveBeenCalledTimes(3);
     spy.mockRestore();
   });
@@ -1074,7 +1290,11 @@ describe('ActionRegistry form.validate handler', () => {
         showToast,
         args: {
           fields: [
-            { field: 'name', label: 'Name', validation: [{ type: 'required', message: 'Name is required' }] },
+            {
+              field: 'name',
+              label: 'Name',
+              validation: [{ type: 'required', message: 'Name is required' }],
+            },
             { field: 'email', validation: [{ type: 'email', message: 'Bad email' }] },
           ],
         },
@@ -1204,115 +1424,198 @@ describe('ActionRegistry notify handler', () => {
 });
 
 describe('ActionRegistry API request failure boundaries', () => {
-  it.each(['35000', '403'])('stops the flow on business code %s before state or success feedback', async (code) => {
-    const context = createExpressionContext({ global: { locale: 'zh-CN', theme: 'light' } });
-    const updateState = vi.fn();
-    const showToast = vi.fn();
-    const flow = new FlowRunner({
-      evaluator: { evaluateCondition: () => true, evaluateTemplate: (value: string) => value, evaluateObject: (value: unknown) => value } as any,
-      actionRegistry,
-      stateManager: { getContext: () => context, updateState } as any,
-      scopeId: 'api-failure-boundary',
-      dataSourceManager: {} as any,
-      schema: {} as any,
-      getAllFormFields: () => [],
-      showToast,
-    });
-    const fetchResult = vi.fn().mockResolvedValue({
-      code, success: true, message: 'Request denied',
-      data: { valid: true }, context: { detail: 'The signing request was denied.' },
-    });
-    await expect(flow.run([
-      { action: 'api.request', endpoint: '/api/bpm/signatures/sign', method: 'post',
-        body: { documentId: 'LEAVE-ACCEPTANCE' }, target: 'signature' },
-      { action: 'toast.show', args: { message: 'Signed successfully', level: 'success' } },
-    ], { ...context, fetchResult, showToast } as any)).rejects.toThrow('The signing request was denied.');
-    expect(updateState).not.toHaveBeenCalled();
-    expect(showToast).not.toHaveBeenCalled();
-  });
+  it.each(['35000', '403'])(
+    'stops the flow on business code %s before state or success feedback',
+    async (code) => {
+      const context = createExpressionContext({ global: { locale: 'zh-CN', theme: 'light' } });
+      const updateState = vi.fn();
+      const showToast = vi.fn();
+      const flow = new FlowRunner({
+        evaluator: {
+          evaluateCondition: () => true,
+          evaluateTemplate: (value: string) => value,
+          evaluateObject: (value: unknown) => value,
+        } as any,
+        actionRegistry,
+        stateManager: { getContext: () => context, updateState } as any,
+        scopeId: 'api-failure-boundary',
+        dataSourceManager: {} as any,
+        schema: {} as any,
+        getAllFormFields: () => [],
+        showToast,
+      });
+      const fetchResult = vi.fn().mockResolvedValue({
+        code,
+        success: true,
+        message: 'Request denied',
+        data: { valid: true },
+        context: { detail: 'The signing request was denied.' },
+      });
+      await expect(
+        flow.run(
+          [
+            {
+              action: 'api.request',
+              endpoint: '/api/bpm/signatures/sign',
+              method: 'post',
+              body: { documentId: 'LEAVE-ACCEPTANCE' },
+              target: 'signature',
+            },
+            { action: 'toast.show', args: { message: 'Signed successfully', level: 'success' } },
+          ],
+          { ...context, fetchResult, showToast } as any,
+        ),
+      ).rejects.toThrow('The signing request was denied.');
+      expect(updateState).not.toHaveBeenCalled();
+      expect(showToast).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects a raw unwrapped response rather than continuing with empty data', async () => {
-    await expect(actionRegistry.execute('api.request', {
-      fetchResult: vi.fn().mockResolvedValue({ valid: true, signatureCount: 1 }),
-      args: { endpoint: '/api/bpm/signatures/verify/LEAVE-ACCEPTANCE' },
-    })).rejects.toThrow();
+    await expect(
+      actionRegistry.execute('api.request', {
+        fetchResult: vi.fn().mockResolvedValue({ valid: true, signatureCount: 1 }),
+        args: { endpoint: '/api/bpm/signatures/verify/LEAVE-ACCEPTANCE' },
+      }),
+    ).rejects.toThrow();
   });
 
   it('retains successful request payload and updates the declared state target', async () => {
     const data = { valid: true, signatureCount: 1 };
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data });
     const updateState = vi.fn();
-    await expect(actionRegistry.execute('api.request', {
-      fetchResult,
-      stateManager: { updateState } as any,
-      scopeId: 'api-success-boundary',
-      args: { endpoint: '/api/bpm/signatures/sign', method: 'post',
-        body: { documentId: 'LEAVE-ACCEPTANCE' }, target: 'signature' },
-    })).resolves.toBeUndefined();
+    await expect(
+      actionRegistry.execute('api.request', {
+        fetchResult,
+        stateManager: { updateState } as any,
+        scopeId: 'api-success-boundary',
+        args: {
+          endpoint: '/api/bpm/signatures/sign',
+          method: 'post',
+          body: { documentId: 'LEAVE-ACCEPTANCE' },
+          target: 'signature',
+        },
+      }),
+    ).resolves.toBeUndefined();
     expect(fetchResult).toHaveBeenCalledWith('/api/bpm/signatures/sign', {
-      method: 'post', params: { documentId: 'LEAVE-ACCEPTANCE' },
+      method: 'post',
+      params: { documentId: 'LEAVE-ACCEPTANCE' },
     });
     expect(updateState).toHaveBeenCalledWith('api-success-boundary', 'signature', data);
   });
 });
 
-
 describe('ActionRegistry command snapshot version', () => {
   it('retains the reviewed version across a form and sends only explicit payload fields', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
     const snapshot = { record: { pid: 'TASK-1', row_version: 7, secret: 'not-a-command-input' } };
-    const evaluator = { evaluateTemplate: (value: string) => value === '${record.row_version}'
-      ? String(snapshot.record.row_version) : snapshot.record.pid,
-      evaluateObject: (value: unknown) => value } as any;
-    window.addEventListener('dialog:form', (event) => {
-      snapshot.record.row_version = 8;
-      (event as CustomEvent).detail.onSubmit({ remark: 'Updated delivery plan' });
-    }, { once: true });
-    await actionRegistry.execute('command.execute', { fetchResult, expressionEvaluator: evaluator,
-      expressionContext: snapshot as any, args: { command: 'task:maintain_plan',
-        targetRecordPid: '${record.pid}', expectedVersion: '${record.row_version}', idempotent: true,
-        inputFields: [{ field: 'remark', type: 'textarea' }], payload: {} } });
+    const evaluator = {
+      evaluateTemplate: (value: string) =>
+        value === '${record.row_version}'
+          ? String(snapshot.record.row_version)
+          : snapshot.record.pid,
+      evaluateObject: (value: unknown) => value,
+    } as any;
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        snapshot.record.row_version = 8;
+        (event as CustomEvent).detail.onSubmit({ remark: 'Updated delivery plan' });
+      },
+      { once: true },
+    );
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      expressionEvaluator: evaluator,
+      expressionContext: snapshot as any,
+      args: {
+        command: 'task:maintain_plan',
+        targetRecordPid: '${record.pid}',
+        expectedVersion: '${record.row_version}',
+        idempotent: true,
+        inputFields: [{ field: 'remark', type: 'textarea' }],
+        payload: {},
+      },
+    });
     const body = fetchResult.mock.calls[0][1].params;
-    expect(body).toEqual({ targetRecordPid: 'TASK-1', expectedVersion: 7,
+    expect(body).toEqual({
+      targetRecordPid: 'TASK-1',
+      expectedVersion: 7,
       clientRequestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      payload: { remark: 'Updated delivery plan' } });
+      payload: { remark: 'Updated delivery plan' },
+    });
     expect(fetchResult).toHaveBeenCalledOnce();
   });
 
   it.each(['', ' ', '${record.row_version}', -1, 1.5, true, null, Number.MAX_SAFE_INTEGER + 1])(
-    'rejects an unavailable version before opening or submitting a form: %s', async (expectedVersion) => {
+    'rejects an unavailable version before opening or submitting a form: %s',
+    async (expectedVersion) => {
       const fetchResult = vi.fn();
       const opened = vi.fn();
       window.addEventListener('dialog:form', opened);
       try {
-        await expect(actionRegistry.execute('command.execute', { fetchResult,
-          args: { command: 'task:maintain_plan', expectedVersion,
-            inputFields: [{ field: 'remark', type: 'textarea' }] } })).rejects.toThrow();
+        await expect(
+          actionRegistry.execute('command.execute', {
+            fetchResult,
+            args: {
+              command: 'task:maintain_plan',
+              expectedVersion,
+              inputFields: [{ field: 'remark', type: 'textarea' }],
+            },
+          }),
+        ).rejects.toThrow();
         expect(opened).not.toHaveBeenCalled();
         expect(fetchResult).not.toHaveBeenCalled();
-      } finally { window.removeEventListener('dialog:form', opened); }
-    });
+      } finally {
+        window.removeEventListener('dialog:form', opened);
+      }
+    },
+  );
 });
 
-
 describe('ActionRegistry grouped API choices', () => {
-  const defaultField = { field: 'groups', type: 'grouped-multiselect',
+  const defaultField = {
+    field: 'groups',
+    type: 'grouped-multiselect',
     props: { groupField: 'category', valuesField: 'supplierPids', defaultValuesField: 'preferred' },
-    dataSource: { type: 'api', endpoint: '/api/group-options' } };
+    dataSource: { type: 'api', endpoint: '/api/group-options' },
+  };
 
   it('initializes independent configured defaults and returns the later manual selection', async () => {
     const groups = [
-      { value: 'a', label: 'A', preferred: ['s1'], options: [{ value: 's1', label: 'One' }, { value: 's2', label: 'Two' }] },
+      {
+        value: 'a',
+        label: 'A',
+        preferred: ['s1'],
+        options: [
+          { value: 's1', label: 'One' },
+          { value: 's2', label: 'Two' },
+        ],
+      },
       { value: 'b', label: 'B', preferred: [], options: [{ value: 's2', label: 'Two' }] },
     ];
-    const edited = [{ category: 'a', supplierPids: ['s2'] }, { category: 'b', supplierPids: ['s2'] }];
+    const edited = [
+      { category: 'a', supplierPids: ['s2'] },
+      { category: 'b', supplierPids: ['s2'] },
+    ];
     let detail: any;
-    window.addEventListener('dialog:form', (event) => {
-      detail = (event as CustomEvent).detail;
-      detail.onSubmit({ groups: edited });
-    }, { once: true });
-    const result = await promptInputForm([defaultField], 'Select', vi.fn().mockResolvedValue({ code: '0', data: { items: groups } }));
-    expect(detail.defaults.groups).toEqual([{ category: 'a', supplierPids: ['s1'] }, { category: 'b', supplierPids: [] }]);
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        detail = (event as CustomEvent).detail;
+        detail.onSubmit({ groups: edited });
+      },
+      { once: true },
+    );
+    const result = await promptInputForm(
+      [defaultField],
+      'Select',
+      vi.fn().mockResolvedValue({ code: '0', data: { items: groups } }),
+    );
+    expect(detail.defaults.groups).toEqual([
+      { category: 'a', supplierPids: ['s1'] },
+      { category: 'b', supplierPids: [] },
+    ]);
     expect(result.groups).toEqual(edited);
     expect(groups[0].preferred).toEqual(['s1']);
   });
@@ -1320,203 +1623,503 @@ describe('ActionRegistry grouped API choices', () => {
   it('preserves explicitly supplied form defaults ahead of provider suggestions', async () => {
     const saved = [{ category: 'a', supplierPids: ['s2'] }];
     let detail: any;
-    window.addEventListener('dialog:form', (event) => { detail = (event as CustomEvent).detail; detail.onCancel(); }, { once: true });
-    await expect(promptInputForm([{ ...defaultField, defaultValue: saved }], 'Select',
-      vi.fn().mockResolvedValue({ code: '0', data: [{ value: 'a', label: 'A', preferred: ['s1'], options: [] }] })))
-      .rejects.toThrow('User cancelled');
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        detail = (event as CustomEvent).detail;
+        detail.onCancel();
+      },
+      { once: true },
+    );
+    await expect(
+      promptInputForm(
+        [{ ...defaultField, defaultValue: saved }],
+        'Select',
+        vi.fn().mockResolvedValue({
+          code: '0',
+          data: [{ value: 'a', label: 'A', preferred: ['s1'], options: [] }],
+        }),
+      ),
+    ).rejects.toThrow('User cancelled');
     expect(detail.defaults.groups).toEqual(saved);
   });
 
   it.each([
-    { preferred: ['foreign'] }, { preferred: ['s1', 's1'] }, { preferred: 's1' }, {},
+    { preferred: ['foreign'] },
+    { preferred: ['s1', 's1'] },
+    { preferred: 's1' },
+    {},
     { preferred: ['s1'], disabled: true },
     { preferred: ['s1'], options: [{ value: 's1', label: 'One', disabled: true }] },
   ])('rejects invalid provider defaults before opening a form: %j', async (invalid) => {
     const listener = vi.fn();
     window.addEventListener('dialog:form', listener);
     try {
-      await expect(promptInputForm([defaultField], 'Select', vi.fn().mockResolvedValue({ code: '0', data: [
-        { value: 'a', label: 'A', options: [{ value: 's1', label: 'One' }], ...invalid },
-      ] }))).rejects.toThrow('Invalid grouped defaults');
+      await expect(
+        promptInputForm(
+          [defaultField],
+          'Select',
+          vi.fn().mockResolvedValue({
+            code: '0',
+            data: [
+              { value: 'a', label: 'A', options: [{ value: 's1', label: 'One' }], ...invalid },
+            ],
+          }),
+        ),
+      ).rejects.toThrow('Invalid grouped defaults');
       expect(listener).not.toHaveBeenCalled();
-    } finally { window.removeEventListener('dialog:form', listener); }
+    } finally {
+      window.removeEventListener('dialog:form', listener);
+    }
   });
 
   it('retains group-scoped choices and disabled flags without exposing unrelated provider fields', async () => {
-    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { items: [
-      { value: 'category-a', label: 'Resistors', secret: 'not-for-ui', options: [
-        { value: 'supplier-a', label: 'Supplier A', secret: 'not-for-ui' },
-        { value: 'supplier-b', label: 'Supplier B', disabled: true },
-        { label: 'No identity' },
-      ] },
-    ] } });
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: {
+        items: [
+          {
+            value: 'category-a',
+            label: 'Resistors',
+            secret: 'not-for-ui',
+            options: [
+              { value: 'supplier-a', label: 'Supplier A', secret: 'not-for-ui' },
+              { value: 'supplier-b', label: 'Supplier B', disabled: true },
+              { label: 'No identity' },
+            ],
+          },
+        ],
+      },
+    });
     let detail: any;
-    window.addEventListener('dialog:form', (event) => { detail = (event as CustomEvent).detail; detail.onCancel(); }, { once: true });
-    await expect(promptInputForm([{ field: 'groups', type: 'grouped-multiselect', dataSource: {
-      type: 'api', endpoint: '/api/group-options' } }], 'Select', fetchResult)).rejects.toThrow('User cancelled');
-    expect(detail.fieldOptions.groups).toEqual([{ value: 'category-a', label: 'Resistors', options: [
-      { value: 'supplier-a', label: 'Supplier A' }, { value: 'supplier-b', label: 'Supplier B', disabled: true },
-    ] }]);
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        detail = (event as CustomEvent).detail;
+        detail.onCancel();
+      },
+      { once: true },
+    );
+    await expect(
+      promptInputForm(
+        [
+          {
+            field: 'groups',
+            type: 'grouped-multiselect',
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/group-options',
+            },
+          },
+        ],
+        'Select',
+        fetchResult,
+      ),
+    ).rejects.toThrow('User cancelled');
+    expect(detail.fieldOptions.groups).toEqual([
+      {
+        value: 'category-a',
+        label: 'Resistors',
+        options: [
+          { value: 'supplier-a', label: 'Supplier A' },
+          { value: 'supplier-b', label: 'Supplier B', disabled: true },
+        ],
+      },
+    ]);
   });
 });
-
 
 describe('ActionRegistry explicit form replacement', () => {
   it('places an API result into the form through the real expression pipeline without changing unrelated edits', async () => {
     const manager = new ScopedStateManager({ locale: 'zh-CN', theme: 'light' } as any);
     manager.createScope('plan', { form: { note: 'Keep my edit', rows: [{ quantity: '2' }] } });
     const rows = [{ quantity: '12345678901234567890.000001' }, { quantity: '0' }];
-    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
-      stateManager: manager, scopeId: 'plan', dataSourceManager: {} as any,
-      schema: {} as any, getAllFormFields: () => [] });
-    await flow.run([
-      { action: 'api.request', endpoint: '/api/example/read-only-plan', method: 'post',
-        body: { rows: '${form.rows}' }, target: 'proposal' },
-      { action: 'form.set', args: { rows: '${state.proposal.rows}' } },
-    ], { ...manager.getContext('plan'), fetchResult: vi.fn().mockResolvedValue({ code: '0', data: { rows } }) } as any);
+    const flow = new FlowRunner({
+      evaluator: new ExpressionEvaluator(),
+      actionRegistry,
+      stateManager: manager,
+      scopeId: 'plan',
+      dataSourceManager: {} as any,
+      schema: {} as any,
+      getAllFormFields: () => [],
+    });
+    await flow.run(
+      [
+        {
+          action: 'api.request',
+          endpoint: '/api/example/read-only-plan',
+          method: 'post',
+          body: { rows: '${form.rows}' },
+          target: 'proposal',
+        },
+        { action: 'form.set', args: { rows: '${state.proposal.rows}' } },
+      ],
+      {
+        ...manager.getContext('plan'),
+        fetchResult: vi.fn().mockResolvedValue({ code: '0', data: { rows } }),
+      } as any,
+    );
     expect(manager.getContext('plan').form).toEqual({ note: 'Keep my edit', rows });
   });
   it('rejects unresolved expressions before replacing any field', async () => {
     const updateForm = vi.fn();
-    await expect(actionRegistry.execute('form.set', { stateManager: { updateForm } as any,
-      scopeId: 'plan', args: { note: 'Changed', rows: '${state.missing}' },
-      expressionEvaluator: new ExpressionEvaluator(), expressionContext: createExpressionContext() }))
-      .rejects.toThrow('unresolved field value');
+    await expect(
+      actionRegistry.execute('form.set', {
+        stateManager: { updateForm } as any,
+        scopeId: 'plan',
+        args: { note: 'Changed', rows: '${state.missing}' },
+        expressionEvaluator: new ExpressionEvaluator(),
+        expressionContext: createExpressionContext(),
+      }),
+    ).rejects.toThrow('unresolved field value');
     expect(updateForm).not.toHaveBeenCalled();
   });
   it('does not replace form edits when the preceding API request fails', async () => {
     const manager = new ScopedStateManager({ locale: 'en', theme: 'light' } as any);
     manager.createScope('failed-plan', { form: { rows: [{ quantity: '3.000001' }] } });
-    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
-      stateManager: manager, scopeId: 'failed-plan', dataSourceManager: {} as any,
-      schema: {} as any, getAllFormFields: () => [] });
-    await expect(flow.run([
-      { action: 'api.request', endpoint: '/api/example/read-only-plan', target: 'proposal' },
-      { action: 'form.set', args: { rows: '${state.proposal.rows}' } },
-    ], { ...manager.getContext('failed-plan'), fetchResult: vi.fn().mockResolvedValue({ code: '403', message: 'Denied' }) } as any)).rejects.toThrow();
+    const flow = new FlowRunner({
+      evaluator: new ExpressionEvaluator(),
+      actionRegistry,
+      stateManager: manager,
+      scopeId: 'failed-plan',
+      dataSourceManager: {} as any,
+      schema: {} as any,
+      getAllFormFields: () => [],
+    });
+    await expect(
+      flow.run(
+        [
+          { action: 'api.request', endpoint: '/api/example/read-only-plan', target: 'proposal' },
+          { action: 'form.set', args: { rows: '${state.proposal.rows}' } },
+        ],
+        {
+          ...manager.getContext('failed-plan'),
+          fetchResult: vi.fn().mockResolvedValue({ code: '403', message: 'Denied' }),
+        } as any,
+      ),
+    ).rejects.toThrow();
     expect(manager.getContext('failed-plan').form?.rows).toEqual([{ quantity: '3.000001' }]);
   });
 });
 
-
 describe('ActionRegistry dynamic choice load failure boundaries', () => {
-  const apiField = { field: 'selection', type: 'grouped-multiselect', required: true,
-    dataSource: { type: 'api', endpoint: '/api/example/choices' } };
+  const apiField = {
+    field: 'selection',
+    type: 'grouped-multiselect',
+    required: true,
+    dataSource: { type: 'api', endpoint: '/api/example/choices' },
+  };
   const dictField = { field: 'selection', type: 'select', dictCode: 'example_states' };
   it.each([
-    ['command.execute', apiField, '35000'], ['dialog.form', apiField, '40000'],
-    ['command.execute', dictField, '40000'], ['dialog.form', dictField, '35000'],
-  ])('aborts before the dialog for rejected %s choice results (%s / %s)', async (action, field, code) => {
-    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
-    window.addEventListener('dialog:form', dialog);
-    const fetchResult = vi.fn().mockResolvedValue({ code, success: true, httpStatus: 400,
-      data: null, context: { exception: 'BusinessException', detail: 'Classify the lines before dispatching.' } });
-    try {
-      await expect(actionRegistry.execute(action as string, { fetchResult, locale: 'en-US', t: key => key,
-        args: action === 'command.execute' ? { command: 'example:update', inputFields: [field] } : { fields: [field] },
-      })).rejects.toThrow('Classify the lines before dispatching.');
-      expect(dialog).not.toHaveBeenCalled();
-      expect(fetchResult).toHaveBeenCalledTimes(1);
-      expect(fetchResult.mock.calls[0][1]).toMatchObject({ method: 'get' });
-    } finally { window.removeEventListener('dialog:form', dialog); }
-  });
+    ['command.execute', apiField, '35000'],
+    ['dialog.form', apiField, '40000'],
+    ['command.execute', dictField, '40000'],
+    ['dialog.form', dictField, '35000'],
+  ])(
+    'aborts before the dialog for rejected %s choice results (%s / %s)',
+    async (action, field, code) => {
+      const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+      window.addEventListener('dialog:form', dialog);
+      const fetchResult = vi.fn().mockResolvedValue({
+        code,
+        success: true,
+        httpStatus: 400,
+        data: null,
+        context: {
+          exception: 'BusinessException',
+          detail: 'Classify the lines before dispatching.',
+        },
+      });
+      try {
+        await expect(
+          actionRegistry.execute(action as string, {
+            fetchResult,
+            locale: 'en-US',
+            t: (key) => key,
+            args:
+              action === 'command.execute'
+                ? { command: 'example:update', inputFields: [field] }
+                : { fields: [field] },
+          }),
+        ).rejects.toThrow('Classify the lines before dispatching.');
+        expect(dialog).not.toHaveBeenCalled();
+        expect(fetchResult).toHaveBeenCalledTimes(1);
+        expect(fetchResult.mock.calls[0][1]).toMatchObject({ method: 'get' });
+      } finally {
+        window.removeEventListener('dialog:form', dialog);
+      }
+    },
+  );
   it.each([
-    { code: '35000', httpStatus: 401 }, { code: '35000', httpStatus: 403 },
-    { code: '35000', httpStatus: 500 }, { code: 'NETWORK_ERROR' },
+    { code: '35000', httpStatus: 401 },
+    { code: '35000', httpStatus: 403 },
+    { code: '35000', httpStatus: 500 },
+    { code: 'NETWORK_ERROR' },
     { code: '35000', httpStatus: 400, exception: 'IllegalStateException' },
-  ])('uses localized fallback rather than untrusted diagnostics: %j', async ({ code, httpStatus, exception }) => {
-    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
-    window.addEventListener('dialog:form', dialog);
-    try {
-      await expect(actionRegistry.execute('command.execute', { locale: 'zh-CN',
-        t: key => key === 'error.data_load_failed' ? '无法读取选项，请重试。' : key,
-        fetchResult: vi.fn().mockResolvedValue({ code, httpStatus, data: null,
-          message: 'SECRET transport / internal_model', context: { detail: 'SECRET raw diagnostic', ...(exception ? { exception } : {}) } }),
-        args: { command: 'example:update', inputFields: [apiField] },
-      })).rejects.toThrow('无法读取选项，请重试。');
-      expect(dialog).not.toHaveBeenCalled();
-    } finally { window.removeEventListener('dialog:form', dialog); }
-  });
+  ])(
+    'uses localized fallback rather than untrusted diagnostics: %j',
+    async ({ code, httpStatus, exception }) => {
+      const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+      window.addEventListener('dialog:form', dialog);
+      try {
+        await expect(
+          actionRegistry.execute('command.execute', {
+            locale: 'zh-CN',
+            t: (key) => (key === 'error.data_load_failed' ? '无法读取选项，请重试。' : key),
+            fetchResult: vi.fn().mockResolvedValue({
+              code,
+              httpStatus,
+              data: null,
+              message: 'SECRET transport / internal_model',
+              context: { detail: 'SECRET raw diagnostic', ...(exception ? { exception } : {}) },
+            }),
+            args: { command: 'example:update', inputFields: [apiField] },
+          }),
+        ).rejects.toThrow('无法读取选项，请重试。');
+        expect(dialog).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener('dialog:form', dialog);
+      }
+    },
+  );
   it('uses localized fallback on thrown transport errors without opening or submitting', async () => {
     const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
     window.addEventListener('dialog:form', dialog);
     const fetchResult = vi.fn().mockRejectedValue(new Error('SECRET network host and token'));
     try {
-      await expect(actionRegistry.execute('dialog.form', { fetchResult, locale: 'en-US',
-        t: key => key === 'error.data_load_failed' ? 'Could not load choices. Try again.' : key,
-        args: { fields: [apiField] },
-      })).rejects.toThrow('Could not load choices. Try again.');
-      expect(dialog).not.toHaveBeenCalled();expect(fetchResult).toHaveBeenCalledTimes(1);
-    } finally { window.removeEventListener('dialog:form', dialog); }
+      await expect(
+        actionRegistry.execute('dialog.form', {
+          fetchResult,
+          locale: 'en-US',
+          t: (key) =>
+            key === 'error.data_load_failed' ? 'Could not load choices. Try again.' : key,
+          args: { fields: [apiField] },
+        }),
+      ).rejects.toThrow('Could not load choices. Try again.');
+      expect(dialog).not.toHaveBeenCalled();
+      expect(fetchResult).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener('dialog:form', dialog);
+    }
   });
   it('preserves actual HTTP200 raw plugin options through SDK normalization and the dialog', async () => {
     const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ quoteId: 'Q-1', items: [{ value: 'a', label: 'A' }] }), { status: 200 }));
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ quoteId: 'Q-1', items: [{ value: 'a', label: 'A' }] }), {
+        status: 200,
+      }),
+    );
     window.addEventListener('dialog:form', dialog);
     try {
-      await expect(actionRegistry.execute('dialog.form', { fetchResult: (url, options) => executeFetch(url, options),
-        args: { fields: [{ ...apiField, type: 'select' }] } })).rejects.toBeInstanceOf(ActionCancelledError);
-      expect((dialog.mock.calls[0][0] as CustomEvent).detail.fieldOptions.selection).toEqual([{ value: 'a', label: 'A' }]);
-    } finally { globalThis.fetch = originalFetch; window.removeEventListener('dialog:form', dialog); }
+      await expect(
+        actionRegistry.execute('dialog.form', {
+          fetchResult: (url, options) => executeFetch(url, options),
+          args: { fields: [{ ...apiField, type: 'select' }] },
+        }),
+      ).rejects.toBeInstanceOf(ActionCancelledError);
+      expect((dialog.mock.calls[0][0] as CustomEvent).detail.fieldOptions.selection).toEqual([
+        { value: 'a', label: 'A' },
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.removeEventListener('dialog:form', dialog);
+    }
   });
   it.each([
-    { code: '35000', httpStatus: 200 }, { code: '403', httpStatus: 403 },
-    { code: '', context: { detail: 'SECRET' } }, { code: '', message: 'SECRET unknown failure' },
-    { success: false }, { code: '0', success: false },
-    { code: '0', httpStatus: 403 }, { code: '0', httpStatus: 500 },
-  ])('never treats a rejected result containing options as legacy success: %j', async failure => {
+    { code: '35000', httpStatus: 200 },
+    { code: '403', httpStatus: 403 },
+    { code: '', context: { detail: 'SECRET' } },
+    { code: '', message: 'SECRET unknown failure' },
+    { success: false },
+    { code: '0', success: false },
+    { code: '0', httpStatus: 403 },
+    { code: '0', httpStatus: 500 },
+  ])('never treats a rejected result containing options as legacy success: %j', async (failure) => {
     const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
     window.addEventListener('dialog:form', dialog);
     try {
-      await expect(actionRegistry.execute('dialog.form', { locale: 'en-US',
-        t: key => key === 'error.data_load_failed' ? 'Could not load choices.' : key,
-        fetchResult: vi.fn().mockResolvedValue({ ...failure, items: [] }), args: { fields: [apiField] },
-      })).rejects.toThrow('Could not load choices.');
+      await expect(
+        actionRegistry.execute('dialog.form', {
+          locale: 'en-US',
+          t: (key) => (key === 'error.data_load_failed' ? 'Could not load choices.' : key),
+          fetchResult: vi.fn().mockResolvedValue({ ...failure, items: [] }),
+          args: { fields: [apiField] },
+        }),
+      ).rejects.toThrow('Could not load choices.');
       expect(dialog).not.toHaveBeenCalled();
-    } finally { window.removeEventListener('dialog:form', dialog); }
+    } finally {
+      window.removeEventListener('dialog:form', dialog);
+    }
   });
-  it.each([apiField, dictField])('keeps successful empty choice reads available to the existing dialog', async field => {
-    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
-    window.addEventListener('dialog:form', dialog);
-    try {
-      await expect(actionRegistry.execute('dialog.form', { fetchResult: vi.fn().mockResolvedValue({ code: '0', data: [] }),
-        args: { fields: [field] } })).rejects.toBeInstanceOf(ActionCancelledError);
-      expect(dialog).toHaveBeenCalledTimes(1);
-      expect((dialog.mock.calls[0][0] as CustomEvent).detail.fieldOptions.selection).toEqual([]);
-    } finally { window.removeEventListener('dialog:form', dialog); }
-  });
+  it.each([apiField, dictField])(
+    'keeps successful empty choice reads available to the existing dialog',
+    async (field) => {
+      const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+      window.addEventListener('dialog:form', dialog);
+      try {
+        await expect(
+          actionRegistry.execute('dialog.form', {
+            fetchResult: vi.fn().mockResolvedValue({ code: '0', data: [] }),
+            args: { fields: [field] },
+          }),
+        ).rejects.toBeInstanceOf(ActionCancelledError);
+        expect(dialog).toHaveBeenCalledTimes(1);
+        expect((dialog.mock.calls[0][0] as CustomEvent).detail.fieldOptions.selection).toEqual([]);
+      } finally {
+        window.removeEventListener('dialog:form', dialog);
+      }
+    },
+  );
 });
 
 describe('Scoped stable request-key action and real flow transport', () => {
   it('reuses the domain key after failed transport and refresh, clears only explicitly after success', async () => {
-    const manager = new ScopedStateManager({locale:'en',theme:'light'} as any);
-    manager.createScope('shipment', {form:{quantity:'250.0000'}});
-    const flow = new FlowRunner({evaluator:new ExpressionEvaluator(),actionRegistry,stateManager:manager,scopeId:'shipment',dataSourceManager:{} as any,schema:{} as any,getAllFormFields:()=>[]});
-    const fetchResult = vi.fn().mockResolvedValueOnce({code:'400',message:'Rejected'}).mockResolvedValue({code:'0',data:{ok:true}});
-    const steps = [{action:'state.ensureRequestKey',args:{field:'shipmentRequestKey'}},{action:'api.request',endpoint:'/api/example/ship',method:'post',body:{requestKey:'${state.shipmentRequestKey}',quantity:'${form.quantity}'}}];
-    await expect(flow.run(steps,{...manager.getContext('shipment'),fetchResult} as any)).rejects.toThrow();
+    const manager = new ScopedStateManager({ locale: 'en', theme: 'light' } as any);
+    manager.createScope('shipment', { form: { quantity: '250.0000' } });
+    const flow = new FlowRunner({
+      evaluator: new ExpressionEvaluator(),
+      actionRegistry,
+      stateManager: manager,
+      scopeId: 'shipment',
+      dataSourceManager: {} as any,
+      schema: {} as any,
+      getAllFormFields: () => [],
+    });
+    const fetchResult = vi
+      .fn()
+      .mockResolvedValueOnce({ code: '400', message: 'Rejected' })
+      .mockResolvedValue({ code: '0', data: { ok: true } });
+    const steps = [
+      { action: 'state.ensureRequestKey', args: { field: 'shipmentRequestKey' } },
+      {
+        action: 'api.request',
+        endpoint: '/api/example/ship',
+        method: 'post',
+        body: { requestKey: '${state.shipmentRequestKey}', quantity: '${form.quantity}' },
+      },
+    ];
+    await expect(
+      flow.run(steps, { ...manager.getContext('shipment'), fetchResult } as any),
+    ).rejects.toThrow();
     const first = manager.getContext('shipment').state.shipmentRequestKey;
     expect(first).toMatch(/^[a-f0-9-]{36}$/);
-    await actionRegistry.execute('refresh',{loadData:vi.fn().mockResolvedValue(undefined)});
-    await flow.run(steps,{...manager.getContext('shipment'),fetchResult} as any);
+    await actionRegistry.execute('refresh', { loadData: vi.fn().mockResolvedValue(undefined) });
+    await flow.run(steps, { ...manager.getContext('shipment'), fetchResult } as any);
     expect(fetchResult).toHaveBeenCalledTimes(2);
-    expect(fetchResult.mock.calls.map(call=>call[1].params)).toEqual([{requestKey:first,quantity:'250.0000'},{requestKey:first,quantity:'250.0000'}]);
-    await actionRegistry.execute('state.set',{stateManager:manager,scopeId:'shipment',args:{shipmentRequestKey:null}});
-    await flow.run(steps,{...manager.getContext('shipment'),fetchResult} as any);
+    expect(fetchResult.mock.calls.map((call) => call[1].params)).toEqual([
+      { requestKey: first, quantity: '250.0000' },
+      { requestKey: first, quantity: '250.0000' },
+    ]);
+    await actionRegistry.execute('state.set', {
+      stateManager: manager,
+      scopeId: 'shipment',
+      args: { shipmentRequestKey: null },
+    });
+    await flow.run(steps, { ...manager.getContext('shipment'), fetchResult } as any);
     expect(manager.getContext('shipment').state.shipmentRequestKey).not.toBe(first);
   });
   it('rejects invalid existing keys and missing scopes without replacing them or calling transport', async () => {
-    for (const value of ['',false,1,' bad ','a'.repeat(129),'bad\nkey']) {
-      const manager = new ScopedStateManager({} as any);manager.createScope('s',{state:{requestKey:value}});
-      await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'s',args:{field:'requestKey'}})).rejects.toThrow();
+    for (const value of ['', false, 1, ' bad ', 'a'.repeat(129), 'bad\nkey']) {
+      const manager = new ScopedStateManager({} as any);
+      manager.createScope('s', { state: { requestKey: value } });
+      await expect(
+        actionRegistry.execute('state.ensureRequestKey', {
+          stateManager: manager,
+          scopeId: 's',
+          args: { field: 'requestKey' },
+        }),
+      ).rejects.toThrow();
       expect(manager.getContext('s').state.requestKey).toBe(value);
     }
     const manager = new ScopedStateManager({} as any);
-    await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'missing',args:{field:'requestKey'}})).rejects.toThrow();
+    await expect(
+      actionRegistry.execute('state.ensureRequestKey', {
+        stateManager: manager,
+        scopeId: 'missing',
+        args: { field: 'requestKey' },
+      }),
+    ).rejects.toThrow();
     manager.createScope('s');
-    for (const args of [{field:'__proto__'}, {field:'state.key'}, {field:'requestKey',value:'forced'}, {}])
-      await expect(actionRegistry.execute('state.ensureRequestKey',{stateManager:manager,scopeId:'s',args})).rejects.toThrow();
+    for (const args of [
+      { field: '__proto__' },
+      { field: 'state.key' },
+      { field: 'requestKey', value: 'forced' },
+      {},
+    ])
+      await expect(
+        actionRegistry.execute('state.ensureRequestKey', {
+          stateManager: manager,
+          scopeId: 's',
+          args,
+        }),
+      ).rejects.toThrow();
+  });
+});
+
+describe('ActionRegistry resolved request key safety', () => {
+  it('rejects a dynamic prototype key', async () => {
+    const manager = new ScopedStateManager({} as any);
+    manager.createScope('s', {});
+    await expect(
+      actionRegistry.execute('state.ensureRequestKey', {
+        stateManager: manager,
+        scopeId: 's',
+        args: { field: '${record.field}' },
+        expressionEvaluator: new ExpressionEvaluator(),
+        expressionContext: { record: { field: '__proto__' } } as any,
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+describe('ActionRegistry grouped command inputs', () => {
+  it('groups exact text values while preserving captured command authority', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
+    window.addEventListener(
+      'dialog:form',
+      ((event: CustomEvent) =>
+        event.detail.onSubmit({
+          amount: '1234567890123456.79',
+          storePid: 'input-store',
+        })) as EventListener,
+      { once: true },
+    );
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: {
+        command: 'catalog:edit_attributes',
+        payload: { storePid: 'captured-store' },
+        inputFieldsPayloadKey: 'formInputs',
+        inputFields: [{ field: 'amount', type: 'text' }],
+      },
+    });
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/catalog:edit_attributes',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          payload: {
+            storePid: 'captured-store',
+            formInputs: { amount: '1234567890123456.79', storePid: 'input-store' },
+          },
+        }),
+      }),
+    );
+  });
+  it('rejects a colliding input group before the dialog and request', async () => {
+    const fetchResult = vi.fn();
+    await expect(
+      actionRegistry.execute('command.execute', {
+        fetchResult,
+        args: {
+          command: 'catalog:edit_attributes',
+          payload: { formInputs: 'captured' },
+          inputFieldsPayloadKey: 'formInputs',
+          inputFields: [{ field: 'value' }],
+        },
+      }),
+    ).rejects.toThrow('Invalid or conflicting command input payload key');
+    expect(fetchResult).not.toHaveBeenCalled();
   });
 });
 
