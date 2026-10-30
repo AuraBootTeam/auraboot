@@ -25,6 +25,7 @@ export interface ImportHistory {
   startedAt: string;
   completedAt?: string;
   errorMessage?: string;
+  result?: { warnings?: string[] };
 }
 
 interface Props {
@@ -104,6 +105,11 @@ export default function HistoryTab({ onCountChange, refreshToken }: Props) {
                 </td>
                 <td className="px-6 py-4">
                   <StatusBadge status={record.status} />
+                  {record.errorMessage && <p className="mt-2 max-w-md text-sm text-red-700">{record.errorMessage}</p>}
+                  {!!record.result?.warnings?.length && <details className="mt-2 max-w-md text-sm text-amber-900">
+                    <summary className="cursor-pointer">{t('plugin.preview.warnings')} ({record.result.warnings.length})</summary>
+                    <ul className="mt-2 space-y-2">{record.result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
+                  </details>}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {record.sourceType} - {record.sourceName}

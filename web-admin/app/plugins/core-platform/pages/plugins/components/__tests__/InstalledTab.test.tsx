@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import InstalledTab from '../InstalledTab';
-vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'zh-CN' }) }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showErrorToast: vi.fn() }) }));
 afterEach(() => vi.unstubAllGlobals());
 describe('InstalledTab public lifecycle contract', () => {
@@ -24,5 +24,29 @@ describe('InstalledTab public lifecycle contract', () => {
     await screen.findByText('plugin.status.enabled');
     expect(row.getByRole('button', { name: 'plugin.action.disable' })).toBeInTheDocument();
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith('/disable') || url.endsWith('/enable')).map(([url]) => url)).toEqual(['/api/plugins/plugin-one/disable', '/api/plugins/plugin-one/enable']);
+  });
+});
+
+describe('InstalledTab safe upgrade feedback', () => {
+  it.each([true, false])('uses safe import and renders the execution result (success=%s)', async (success) => {
+    const preview = { importId: 'upgrade-one', pluginId: 'customer.delivery', namespace: 'delivery', version: '1.1.0', displayName: 'Delivery', valid: true, isUpgrade: true, errors: [], warnings: [], actionCounts: {} };
+    const execute = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/upload')) return { ok: true, json: async () => ({ code: '0', data: preview }) };
+      if (url.endsWith('/execute')) {
+        execute(JSON.parse(options!.body as string));
+        return { ok: true, json: async () => success ? ({ code: '0', data: { success: true, warnings: ['Customer approval rule was preserved'] } }) : ({ code: '400', message: 'Rule validation failed' }) };
+      }
+      return { ok: true, json: async () => ({ code: '0', data: [] }) };
+    }));
+    const { container } = render(<InstalledTab />);
+    fireEvent.click(await screen.findByRole('button', { name: 'plugin.action.upload' }));
+    fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [new File(['{}'], 'delivery.json', { type: 'application/json' })] } });
+    expect(await screen.findByText('安全更新')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'plugin.import.confirmUpgrade' }));
+    expect(await screen.findByText(success ? '导入已完成' : '导入未完成')).toBeInTheDocument();
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ conflictStrategy: 'overwrite_safe' }));
+    expect(screen.getByText(success ? 'Customer approval rule was preserved' : 'Rule validation failed')).toBeInTheDocument();
+    if (!success) expect(screen.queryByText('导入已完成')).not.toBeInTheDocument();
   });
 });

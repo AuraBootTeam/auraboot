@@ -38,9 +38,9 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 ## 模块自有 seed 的重导入
 
-Automation、决策、条件片段和事件策略复用同一导入请求的 conflictStrategy，但保留各模块版本/发布机制，不并入另一套版本库。新定义正常创建；既有定义在 ERROR 下拒绝，SKIP/OVERWRITE_SAFE 保守跳过并在导入 warnings 说明，显式 OVERWRITE 才进入模块原有更新/新版本/校验/发布流程。OVERWRITE 不绕过不可变版本、冲突 draft 或其他模块校验。
+Automation、决策、条件片段和事件策略复用同一导入请求的 conflictStrategy，但保留各模块版本/发布机制，不并入另一套版本库。新定义正常创建；既有定义在 ERROR 下拒绝，SKIP 保留；OVERWRITE_SAFE 仅在当前模块状态与本插件上次成功导入基线一致时更新，否则保留并在 warnings 说明。显式 OVERWRITE 进入模块原有更新/新版本/校验/发布流程。OVERWRITE 不绕过不可变版本、冲突 draft 或其他模块校验。
 
-这些定义没有可信的客户修改基线，SAFE 因此不能自动更新“看似未改”的定义。完整共享升级与逐资源差异处理仍需单独验收，不从保护成功推导自动三方合并。条件片段查找仅明确 NOT_FOUND 可按不存在处理，其余异常中止导入。
+成功导入历史的 result.moduleSeedBaselines 保存实际模块状态（含定义和版本/草稿身份），不新增版本库或跟踪表。顶层审计时间、发布人和触发计数不参与比较，JSON 业务载荷不作递归删字段。基线缺失的历史定义仍保守保留；读取失败中止导入。SKIP/SAFE 冲突沿用旧基线，只有成功写入才更新基线；失败随原导入事务回滚。整包 OVERWRITE 不应作为单资源冲突的默认处理方式。元数据定义/版本表在导入事务中使用有界写锁串行化状态比较和更新（等待上限三秒，读取不阻塞），防止新 draft 插入绕过比较。这是保守配置更新边界，不承诺无写入停顿或自动三方合并。条件片段查找仅明确 NOT_FOUND 可按不存在处理，其余异常中止导入。
 
 Automation 的 pluginId/automationKey 身份保存在模块自有 ab_automation.seed_plugin_id/seed_key；用户可改显示名称，导入仍定位同 PID。来源字段不从公共 CRUD 请求接收，数据库约束其成对存在、租户内有效定义唯一，已建立的来源不可修改。显式覆盖可以接管唯一同名 legacy 定义；旧记录不自动猜测来源。若同模型有未知来源且无法唯一匹配，ERROR 拒绝，SKIP/SAFE 保留并警告，避免把改名后的旧定义当作新定义重复启用。跨模型移动和来源冲突需要单独迁移。
 

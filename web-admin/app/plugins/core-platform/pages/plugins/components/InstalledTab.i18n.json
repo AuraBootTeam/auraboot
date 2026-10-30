@@ -1,0 +1,30 @@
+{
+  "safeTitle": {
+    "zh-CN": "安全更新",
+    "en-US": "Safe update"
+  },
+  "safeHint": {
+    "zh-CN": "保留客户定制，仅更新有可信基线且未修改的定义。保留项将在执行结果中说明。",
+    "en-US": "Keep customer changes and update only unchanged definitions with a verified baseline. Preserved resources appear in the result."
+  },
+  "completed": {
+    "zh-CN": "导入已完成",
+    "en-US": "Import completed"
+  },
+  "preserved": {
+    "zh-CN": "部分资源已保留，请核对说明",
+    "en-US": "Some resources were preserved; review the details"
+  },
+  "failed": {
+    "zh-CN": "导入未完成",
+    "en-US": "Import did not complete"
+  },
+  "failureHint": {
+    "zh-CN": "原有配置是否保留，以本次失败原因和导入历史为准。修正问题后可重新导入。",
+    "en-US": "Review the failure and import history before retrying with a corrected package."
+  },
+  "close": {
+    "zh-CN": "关闭结果",
+    "en-US": "Dismiss result"
+  }
+}

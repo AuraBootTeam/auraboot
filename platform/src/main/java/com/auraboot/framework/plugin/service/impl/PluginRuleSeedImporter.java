@@ -41,6 +41,14 @@ final class PluginRuleSeedImporter {
     private final EventPolicyDefinitionService eventPolicyDefinitionService;
     private final EventPolicyVersionService eventPolicyVersionService;
 
+    private final PluginSeedUpgradeContext upgrade;
+
+    PluginRuleSeedImporter(DrtDefinitionService definitions, DecisionVersionService versions,
+            ConditionFragmentService fragments, EventPolicyDefinitionService policies,
+            EventPolicyVersionService policyVersions) {
+        this(definitions, versions, fragments, policies, policyVersions, PluginSeedUpgradeContext.untracked());
+    }
+
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
     }
@@ -72,9 +80,9 @@ final class PluginRuleSeedImporter {
         definitionRequest.setOwnerModule(dto.getOwnerModule());
         definitionRequest.setEnabled(dto.getEnabled());
 
+        upgrade.lock(PluginSeedUpgradeContext.Kind.DECISION);
         DrtDefinitionDTO existing = drtDefinitionService.findByCode(dto.getDecisionCode());
-        if (PluginImportSupport.preserveExistingSeed(existing != null, strategy,
-                "decision:" + dto.getDecisionCode(), result::addWarning)) return false;
+        if (upgrade.preserve(PluginSeedUpgradeContext.Kind.DECISION, dto.getDecisionCode(), existing != null, existing == null ? null : existing.getPid(), strategy, result)) return false;
         if (existing == null) {
             drtDefinitionService.create(definitionRequest);
         } else {
@@ -84,6 +92,7 @@ final class PluginRuleSeedImporter {
         if (hasMatchingPublishedDecisionVersion(dto)) {
             log.info("Decision seed unchanged; keeping existing published version: code={}",
                     logSafe(dto.getDecisionCode()));
+            if (upgrade.isTracked()) upgrade.record(PluginSeedUpgradeContext.Kind.DECISION, dto.getDecisionCode(), drtDefinitionService.findByCode(dto.getDecisionCode()).getPid());
             return true;
         }
 
@@ -108,7 +117,8 @@ final class PluginRuleSeedImporter {
         if (dto.isPublish()) {
             decisionVersionService.publish(draft.getPid(), true);
         }
-        return true;
+        if (upgrade.isTracked()) upgrade.record(PluginSeedUpgradeContext.Kind.DECISION, dto.getDecisionCode(), drtDefinitionService.findByCode(dto.getDecisionCode()).getPid());
+            return true;
     }
 
     private boolean hasMatchingPublishedDecisionVersion(DecisionDefinitionSeedDTO dto) {
@@ -144,12 +154,13 @@ final class PluginRuleSeedImporter {
     }
 
     private boolean importConditionFragment(ConditionFragmentSeedDTO dto, ImportRequest.ConflictStrategy strategy, ImportExecuteResult result) {
+        upgrade.lock(PluginSeedUpgradeContext.Kind.CONDITION);
         ConditionFragmentDTO existing = findConditionFragmentOrNull(dto.getFragmentCode());
-        if (PluginImportSupport.preserveExistingSeed(existing != null, strategy,
-                "condition-fragment:" + dto.getFragmentCode(), result::addWarning)) return false;
+        if (upgrade.preserve(PluginSeedUpgradeContext.Kind.CONDITION, dto.getFragmentCode(), existing != null, existing == null ? null : existing.getPid(), strategy, result)) return false;
         if (hasMatchingPublishedConditionFragment(dto)) {
             log.info("Condition fragment seed unchanged; keeping existing published version: code={}",
                     logSafe(dto.getFragmentCode()));
+            if (upgrade.isTracked()) upgrade.record(PluginSeedUpgradeContext.Kind.CONDITION, dto.getFragmentCode(), conditionFragmentService.findByCode(dto.getFragmentCode()).getPid());
             return true;
         }
 
@@ -166,7 +177,8 @@ final class PluginRuleSeedImporter {
         }
 
         publishConditionFragmentSeedIfRequested(dto, target);
-        return true;
+        if (upgrade.isTracked()) upgrade.record(PluginSeedUpgradeContext.Kind.CONDITION, dto.getFragmentCode(), conditionFragmentService.findByCode(dto.getFragmentCode()).getPid());
+            return true;
     }
 
     private ConditionFragmentDTO findConditionFragmentOrNull(String fragmentCode) {
@@ -253,9 +265,9 @@ final class PluginRuleSeedImporter {
     }
 
     private boolean importEventPolicy(EventPolicySeedDTO dto, ImportRequest.ConflictStrategy strategy, ImportExecuteResult result) {
+        upgrade.lock(PluginSeedUpgradeContext.Kind.EVENT_POLICY);
         DrtPolicyDefinitionEntity definition = eventPolicyDefinitionService.findByCode(dto.getPolicyCode());
-        if (PluginImportSupport.preserveExistingSeed(definition != null, strategy,
-                "event-policy:" + dto.getPolicyCode(), result::addWarning)) return false;
+        if (upgrade.preserve(PluginSeedUpgradeContext.Kind.EVENT_POLICY, dto.getPolicyCode(), definition != null, definition == null ? null : definition.getPid(), strategy, result)) return false;
         if (definition == null) {
             definition = eventPolicyDefinitionService.create(
                     dto.getPolicyCode(),
@@ -270,6 +282,7 @@ final class PluginRuleSeedImporter {
         if (hasMatchingPublishedEventPolicyVersion(dto)) {
             log.info("EventPolicy seed unchanged; keeping existing published version: code={}",
                     logSafe(dto.getPolicyCode()));
+            if (upgrade.isTracked()) upgrade.record(PluginSeedUpgradeContext.Kind.EVENT_POLICY, dto.getPolicyCode(), eventPolicyDefinitionService.findByCode(dto.getPolicyCode()).getPid());
             return true;
         }
 
@@ -286,7 +299,8 @@ final class PluginRuleSeedImporter {
         }
 
         publishEventPolicySeedIfRequested(dto, target);
-        return true;
+        if (upgrade.isTracked()) upgrade.record(PluginSeedUpgradeContext.Kind.EVENT_POLICY, dto.getPolicyCode(), eventPolicyDefinitionService.findByCode(dto.getPolicyCode()).getPid());
+            return true;
     }
 
     private DrtPolicyVersionEntity createEventPolicyDraft(EventPolicySeedDTO dto) {

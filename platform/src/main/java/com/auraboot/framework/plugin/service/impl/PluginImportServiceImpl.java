@@ -803,7 +803,12 @@ public class PluginImportServiceImpl implements PluginImportService {
             // V2 plans own only physical DDL deferral; logical required remains unchanged.
             try (var migration = modelFieldRenameMigrator.prepare(request.getIdentifierMappingPath(),
                     identifierMappingRoot(context, request), manifest, tenantId, pluginPid, importId)) {
-                importResources(context, request, result, pluginPid);
+                var seeds = seedUpgradeContext(tenantId, manifest.getPluginId());
+                importResources(context, request, result, pluginPid, seeds);
+                Map<String, Object> receipt = new LinkedHashMap<>();
+                receipt.put("moduleSeedBaselines", seeds.baselines());
+                receipt.put("warnings", new ArrayList<>(result.getWarnings()));
+                context.getHistory().setResult(receipt);
                 if (migration.isV2()) result.setFieldMigrations(migration.complete());
                 else applyIdentifierDataMigration(request, result, tenantId);
             }
@@ -824,7 +829,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             result.getResourceCounts().forEach((k, v) -> summary.put(k, v));
             history.setResourceSummary(summary);
             if (result.getFieldMigrations() != null && !result.getFieldMigrations().isEmpty()) {
-                history.setResult(Map.of("modelFieldRenames", result.getFieldMigrations()));
+                history.getResult().put("modelFieldRenames", result.getFieldMigrations());
             }
 
             // Compute plugin quality score
@@ -1037,7 +1042,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private void importResources(ImportContext context, ImportRequest request,
-                                  ImportExecuteResult result, String pluginPid) {
+                                  ImportExecuteResult result, String pluginPid, PluginSeedUpgradeContext seeds) {
         PluginManifestExtended manifest = context.getManifest();
         Long tenantId = MetaContext.getCurrentTenantId();
         String importId = context.getHistory().getImportId();
@@ -1087,10 +1092,14 @@ public class PluginImportServiceImpl implements PluginImportService {
         pageSchemaContributionImportService.replaceForPlugin(
                 pluginPid, manifest.getVersion(), tenantId, manifest.getPageContributions());
 
-        importDecisionDefinitions(manifest, request, result);
-        importConditionFragments(manifest, request, result);
-        importEventPolicies(manifest, request, result);
-        importAutomations(manifest, request, result);
+        var ruleSeeds = new PluginRuleSeedImporter(drtDefinitionService, decisionVersionService,
+                conditionFragmentService, eventPolicyDefinitionService, eventPolicyVersionService, seeds);
+        ruleSeeds.importDecisionDefinitions(manifest, request, result);
+        ruleSeeds.importConditionFragments(manifest, request, result);
+        ruleSeeds.importEventPolicies(manifest, request, result);
+        new PluginDefinitionResourceImporter(resourceImporter, documentCommandGenerator, automationService,
+                this::saveOrUpdatePluginResource, this::captureImportSnapshot, seeds)
+                .importAutomations(manifest, request, result);
         importFieldMasks(manifest);
         importCapabilities(manifest);
 
@@ -1393,6 +1402,21 @@ public class PluginImportServiceImpl implements PluginImportService {
     private void importAgentDefinitions(PluginManifestExtended manifest, ImportRequest request,
                                         ImportExecuteResult result, String pluginPid, String importId, Long tenantId) {
         pluginDefinitionResourceImporter().importAgentDefinitions(manifest,request,result,pluginPid,importId,tenantId);
+    }
+
+    private PluginSeedUpgradeContext seedUpgradeContext(Long tenantId, String pluginId) {
+        var histories = importHistoryMapper.selectList(new LambdaQueryWrapper<PluginImportHistory>()
+                .eq(PluginImportHistory::getTenantId, tenantId).eq(PluginImportHistory::getPluginId, pluginId)
+                .eq(PluginImportHistory::getStatus, ImportStatus.SUCCESS.code())
+                .orderByDesc(PluginImportHistory::getCompletedAt).orderByDesc(PluginImportHistory::getId)
+                .last("LIMIT 1"));
+        Map<String, Object> previous = Map.of();
+        if (!histories.isEmpty() && histories.getFirst().getResult() != null) {
+            Object value = histories.getFirst().getResult().get("moduleSeedBaselines");
+            if (value != null) previous = objectMapper.convertValue(value,
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        }
+        return new PluginSeedUpgradeContext(jdbcTemplate, objectMapper, previous);
     }
 
     private PluginRuleSeedImporter ruleSeedImporter() {

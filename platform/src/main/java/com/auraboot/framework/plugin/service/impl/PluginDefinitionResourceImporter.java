@@ -28,6 +28,15 @@ final class PluginDefinitionResourceImporter {
 
     private final CaptureImportSnapshotOperation captureImportSnapshotOperation;
 
+    private final PluginSeedUpgradeContext upgrade;
+
+    PluginDefinitionResourceImporter(PluginResourceImporter resources,
+            com.auraboot.framework.meta.template.generator.DocumentCommandGenerator generator,
+            AutomationService automations, SaveOrUpdatePluginResourceOperation save,
+            CaptureImportSnapshotOperation capture) {
+        this(resources, generator, automations, save, capture, PluginSeedUpgradeContext.untracked());
+    }
+
     @FunctionalInterface
     interface SaveOrUpdatePluginResourceOperation { void execute(PluginResource resource, Long tenantId); }
 
@@ -334,6 +343,7 @@ final class PluginDefinitionResourceImporter {
 
     boolean importAutomation(AutomationDefinitionDTO dto, String pluginId, ImportRequest.ConflictStrategy strategy, ImportExecuteResult result){
         if (pluginId == null || pluginId.isBlank()) throw new PluginException("Automation seeds require plugin identity");
+        upgrade.lock(PluginSeedUpgradeContext.Kind.AUTOMATION);
         AutomationDTO existing = automationService.findPluginSeed(pluginId, dto.getAutomationKey());
         if (existing == null) existing = findExistingAutomation(dto);
         if (existing != null && existing.getModelCode() != null && !dto.getModelCode().equals(existing.getModelCode())) {
@@ -345,10 +355,11 @@ final class PluginDefinitionResourceImporter {
                     "ambiguous legacy automation:" + dto.getAutomationKey(), result::addWarning);
             return false;
         }
-        if (PluginImportSupport.preserveExistingSeed(existing != null, strategy,
-                "automation:" + dto.getAutomationKey(), result::addWarning)) return false;
+        if (upgrade.preserve(PluginSeedUpgradeContext.Kind.AUTOMATION, dto.getAutomationKey(), existing != null,
+                existing == null ? null : existing.getPid(), strategy, result)) return false;
         if (existing == null) {
-            automationService.createPluginSeed(toAutomationCreateRequest(dto), pluginId, dto.getAutomationKey());
+            var created = automationService.createPluginSeed(toAutomationCreateRequest(dto), pluginId, dto.getAutomationKey());
+            upgrade.record(PluginSeedUpgradeContext.Kind.AUTOMATION, dto.getAutomationKey(), created == null ? null : created.getPid());
             return true;
         }
         AutomationUpdateRequest request = new AutomationUpdateRequest();
@@ -361,6 +372,7 @@ final class PluginDefinitionResourceImporter {
         request.setFlowConfig(dto.getFlowConfig());
         request.setEnabled(dto.getEnabled());
         automationService.updatePluginSeed(existing.getPid(), request, pluginId, dto.getAutomationKey());
+        upgrade.record(PluginSeedUpgradeContext.Kind.AUTOMATION, dto.getAutomationKey(), existing.getPid());
         return true;
     }
 

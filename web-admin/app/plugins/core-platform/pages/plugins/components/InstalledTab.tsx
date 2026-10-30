@@ -9,6 +9,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import IMPORT_TEXT from './InstalledTab.i18n.json';
 import {
   PuzzlePieceIcon,
   ArrowUpTrayIcon,
@@ -63,7 +65,8 @@ interface Props {
 
 export default function InstalledTab({ onCountChange, onImportSuccess }: Props) {
   const { showErrorToast } = useToastContext();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const text = (key: keyof typeof IMPORT_TEXT) => getLocalizedText(IMPORT_TEXT[key], locale);
 
   const [plugins, setPlugins] = useState<PluginRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,6 +76,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
+  const [outcome, setOutcome] = useState<{ success: boolean; warnings: string[]; error?: string } | null>(null);
   const [selectedPlugin, setSelectedPlugin] = useState<PluginRecord | null>(null);
 
   const fetchPlugins = useCallback(async () => {
@@ -127,19 +131,24 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
         method: 'post',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conflictStrategy: 'overwrite',
+          conflictStrategy: 'overwrite_safe',
           autoDeployProcesses: false,
           autoPublishPages: false,
         }),
       });
-      if (response.ok) {
+      const envelope = await response.json();
+      const result = envelope.data ?? envelope;
+      if (response.ok && (envelope.code === undefined || String(envelope.code) === '0') && result.success !== false) {
+        setOutcome({ success: true, warnings: result.warnings ?? [] });
         setShowPreviewModal(false);
         setPreviewResult(null);
         fetchPlugins();
         onImportSuccess?.();
       } else {
-        const error = await response.json();
-        showErrorToast(`Import failed: ${error.desc || error.message || 'Unknown error'}`);
+        const message = envelope.message || result.errorMessage || envelope.desc || text('failed');
+        setOutcome({ success: false, warnings: [], error: message });
+        setShowPreviewModal(false);
+        showErrorToast(message);
       }
     } finally {
       setUploading(false);
@@ -237,6 +246,20 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
   return (
     <div>
+      {outcome && (
+        <section role="status" className={`mb-5 rounded-xl border p-5 ${outcome.success ? 'border-blue-200 bg-blue-50/50' : 'border-red-200 bg-red-50/50'}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">{text(outcome.success ? 'completed' : 'failed')}</h3>
+              <p className="mt-1 text-sm text-gray-600">{text(outcome.success ? (outcome.warnings.length ? 'preserved' : 'safeHint') : 'failureHint')}</p>
+            </div>
+            <button type="button" onClick={() => setOutcome(null)} className="shrink-0 text-sm text-gray-600 hover:text-gray-900">{text('close')}</button>
+          </div>
+          {outcome.error && <p className="mt-3 text-sm text-red-700">{outcome.error}</p>}
+          {outcome.warnings.length > 0 && <ul className="mt-3 space-y-2 text-sm text-amber-900">{outcome.warnings.map((warning, index) => <li key={index} className="rounded-lg border border-amber-200 bg-white px-3 py-2">{warning}</li>)}</ul>}
+        </section>
+      )}
+
       {/* Action bar */}
       <div className="mb-4 flex justify-end gap-2">
         <button
@@ -468,6 +491,10 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                 </div>
               )}
 
+              <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <h4 className="text-sm font-semibold text-blue-900">{text('safeTitle')}</h4>
+                <p className="mt-1 text-sm text-blue-800">{text('safeHint')}</p>
+              </div>
               {Object.keys(previewResult.actionCounts).length > 0 && (
                 <div>
                   <h4 className="mb-2 text-sm font-medium text-gray-700">{t('plugin.preview.actionsToPlan')}</h4>
