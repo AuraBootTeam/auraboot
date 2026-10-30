@@ -171,6 +171,13 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         // 更新实体
         renderProfiles.validateUpdate(existingSchema, request);
         pageSchemaConverter.updateEntity(existingSchema, request);
+        // Once edited, a generated stub is customer content and must obey safe overwrite.
+        if (existingSchema.getExtension() != null) {
+            existingSchema.getExtension().getDynamicProperties().remove("auto_created");
+            if (existingSchema.getExtension().getExtension() != null) {
+                existingSchema.getExtension().getExtension().remove("auto_created");
+            }
+        }
         recordBoundModelVersion(existingSchema);
         existingSchema.setUpdatedAt(Instant.now());
         // Increment row_version for optimistic lock

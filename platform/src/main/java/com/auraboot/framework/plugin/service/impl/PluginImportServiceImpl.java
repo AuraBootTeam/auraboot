@@ -1070,12 +1070,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                 case BINDING_RULE -> importBindingRules(manifest, request, result, pluginPid, importId, tenantId);
                 case NAMED_QUERY -> importNamedQueries(manifest, request, result, pluginPid, importId, tenantId);
                 case AGENT_DEFINITION -> importAgentDefinitions(manifest, request, result, pluginPid, importId, tenantId);
-                case PAGE -> {
-                    importPages(manifest, request, result, pluginPid, importId, tenantId);
-                    // Also import first-class dashboards (config/dashboards/*.json, Plan #8).
-                    // These are keyed to the PAGE import stage so they run after models/queries are in place.
-                    importDashboards(manifest, request, result, pluginPid, importId, tenantId);
-                }
+                case PAGE -> importPages(manifest, request, result, pluginPid, importId, tenantId);
+                case DASHBOARD -> importDashboards(manifest, request, result, pluginPid, importId, tenantId);
                 case SAVED_VIEW -> importSavedViews(manifest, result, tenantId);
                 case NOTIFICATION_TEMPLATE -> importNotificationTemplates(manifest, result, tenantId);
                 case I18N -> importI18nResources(manifest, result, tenantId);
@@ -1804,6 +1800,11 @@ public class PluginImportServiceImpl implements PluginImportService {
      * Otherwise, insert a new record.
      */
     private void saveOrUpdatePluginResource(PluginResource resource, Long tenantId) {
+        // SKIP is an outcome, never a new baseline or an ownership transfer.
+        // Resetting user_modified here would make the next safe reimport overwrite customer work.
+        if (resource.getActionEnum() == ResourceAction.SKIP) {
+            return;
+        }
         PluginResource existing = pluginResourceMapper.findByTenantPluginAndResource(
                 tenantId, resource.getPluginPid(), resource.getResourceType(), resource.getResourceCode());
 

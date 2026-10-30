@@ -45,6 +45,9 @@ class ModelFieldBindingServiceTest {
     @Mock
     private MetaModelFieldBindingMapper bindingMapper;
 
+    @Mock
+    private MetaModelService metaModelService;
+
     @InjectMocks
     private ModelFieldBindingServiceImpl bindingService;
 
@@ -366,4 +369,13 @@ class ModelFieldBindingServiceTest {
             binding.getVisible() == true
         ));
     }
+    @Test
+    void pidUnbindUsesProtectedModelLifecycleRatherThanDeletingTheBindingDirectly() {
+        when(metaModelMapper.findByPid("model_pid_001")).thenReturn(testModel);
+        when(metaFieldMapper.findByPid("field_pid_001")).thenReturn(testField);
+        when(metaModelService.unbindFieldFromModel(100L,200L)).thenThrow(new IllegalStateException("deletion refused"));
+        assertThrows(IllegalStateException.class,() -> bindingService.unbindFieldFromModel("model_pid_001","field_pid_001"));
+        verify(bindingMapper,never()).deleteByModelAndField(anyLong(),anyLong());
+    }
+
 }

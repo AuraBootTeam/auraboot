@@ -450,4 +450,20 @@ public class MetaFieldServiceAddToModelIntegrationTest extends BaseIntegrationTe
         b.setFieldOrder(order);
         return b;
     }
+    @Test
+    @DisplayName("Data protection cannot be bypassed by refuseIfDataExists=false")
+    public void removeFromModel_falseProbeFlagStillRetainsDataAndBinding() {
+        String fieldCode="it_protected_"+UUID.randomUUID().toString().replace("-", "").substring(0,8);
+        AddFieldResult added=metaFieldService.addToModel(AddFieldRequest.builder().modelCode(testModelCode)
+                .code(fieldCode).dataType("string").displayName("Protected value").build());
+        String row=UniqueIdGenerator.generate();
+        jdbcTemplate.update("INSERT INTO "+tableName+" (pid,tenant_id,"+fieldCode+") VALUES (?,?,?)",row,getTestTenant().getId(),"preserve");
+        assertThatThrownBy(() -> metaFieldService.removeFromModel(RemoveFieldRequest.builder().modelCode(testModelCode)
+                .storageCode(added.getStorageCode()).refuseIfDataExists(false).build())).isInstanceOf(RuntimeException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT "+fieldCode+" FROM "+tableName+" WHERE pid=?",String.class,row)).isEqualTo("preserve");
+        Field current=metaFieldMapper.findCurrentByCode(fieldCode);
+        assertThat(current).isNotNull();
+        assertThat(bindingMapper.findByModelAndField(model.getId(),current.getId(),getTestTenant().getId())).isNotNull();
+    }
+
 }

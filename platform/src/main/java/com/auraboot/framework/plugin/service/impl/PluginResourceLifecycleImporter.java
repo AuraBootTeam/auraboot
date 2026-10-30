@@ -203,6 +203,12 @@ final class PluginResourceLifecycleImporter {
                     }
                 }
             }
+            case DASHBOARD -> {
+                if (resource.getResourcePid() != null) {
+                    jdbcTemplate.update("UPDATE ab_dashboard SET deleted_flag=true WHERE tenant_id=? AND pid=?",
+                            resource.getTenantId(), resource.getResourcePid());
+                }
+            }
             case PAGE -> {
                 if (resource.getResourcePid() != null) {
                     try {

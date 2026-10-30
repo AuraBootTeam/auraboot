@@ -23,7 +23,7 @@ class FieldDictionaryCacheTest {
     @Test void bindingAndUnbindingInvalidateAlreadyReadFieldMetadata() {
         var dictionary = mock(DictService.class);
         var mapper = mock(MetaFieldDictBindingMapper.class);
-        var target = spy(new MetaFieldServiceImpl(null, dictionary, null, null, null, null, mapper, null, null, null));
+        var target = spy(new MetaFieldServiceImpl(null, dictionary, null, null, null, null, mapper, null, null, null, null));
         var field = MetaFieldDTO.builder().pid("field-pid").code("delivery_state").dataType("enum").id(1L).build();
         doReturn(field).when(target).findByPid("field-pid");
         var dict = new DictDTO(); dict.setId(2L);

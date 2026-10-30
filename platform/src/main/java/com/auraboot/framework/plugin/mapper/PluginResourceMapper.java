@@ -63,7 +63,9 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
     PluginResource findByTypeAndCode(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
 
     /** Serialize publication import/rollback with user ownership changes. */
-    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode} FOR UPDATE")
+    // Require the protection column explicitly: SELECT * alone can silently use a Java default
+    // if a broken projection/schema omits user_modified.
+    @Select("SELECT r.*, r.user_modified AS protection_state FROM ab_plugin_resource r WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode} FOR UPDATE")
     @ResultMap("mybatis-plus_PluginResource")
     PluginResource lockByTypeAndCode(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
 

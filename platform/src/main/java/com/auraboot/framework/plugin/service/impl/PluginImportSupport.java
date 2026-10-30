@@ -40,25 +40,36 @@ final class PluginImportSupport {
      * Check if a resource has been modified by a user (for OVERWRITE_SAFE strategy).
      * Returns true if the resource is tracked in ab_plugin_resource and marked as user_modified.
      */
-    boolean isResourceUserModified(Long tenantId, ResourceType type, String resourceCode) {
+    private PluginResource lockProtectionState(Long tenantId, ResourceType type, String resourceCode) {
         try {
-            PluginResource pr = pluginResourceMapper.findByTypeAndCode(tenantId, type.code(), resourceCode);
-            return pr != null && Boolean.TRUE.equals(pr.getUserModified());
-        } catch (Exception e) {
-            log.debug("Failed to check user-modified status for {} {}: {}",
-                    type, logSafe(resourceCode), logSafe(e.getMessage()));
-            return false;
+            PluginResource resource = pluginResourceMapper.lockByTypeAndCode(tenantId, type.code(), resourceCode);
+            if (resource != null && resource.getUserModified() == null) {
+                throw new PluginException("Customization protection state is missing");
+            }
+            return resource;
+        } catch (Exception failure) {
+            throw new PluginException("Cannot verify customization protection for "
+                    + type.code() + ":" + resourceCode, failure);
         }
     }
 
-    /**
-     * Check if OVERWRITE_SAFE strategy should skip this resource.
-     * Returns true if the strategy is OVERWRITE_SAFE and the resource has been user-modified.
-     */
+    boolean isResourceUserModified(Long tenantId, ResourceType type, String resourceCode) {
+        PluginResource resource = lockProtectionState(tenantId, type, resourceCode);
+        return resource != null && Boolean.TRUE.equals(resource.getUserModified());
+    }
+
     boolean shouldSkipForOverwriteSafe(Long tenantId, ImportRequest.ConflictStrategy strategy,
-                                                ResourceType type, String resourceCode) {
+                                       ResourceType type, String resourceCode) {
         return strategy == ImportRequest.ConflictStrategy.OVERWRITE_SAFE
                 && isResourceUserModified(tenantId, type, resourceCode);
+    }
+
+    /** Existing untracked content is customer-owned until an explicit overwrite adopts it. */
+    boolean shouldSkipExistingForOverwriteSafe(Long tenantId, ImportRequest.ConflictStrategy strategy,
+                                               ResourceType type, String resourceCode) {
+        if (strategy != ImportRequest.ConflictStrategy.OVERWRITE_SAFE) return false;
+        PluginResource resource = lockProtectionState(tenantId, type, resourceCode);
+        return resource == null || Boolean.TRUE.equals(resource.getUserModified());
     }
 
     String toJson(Object obj) {

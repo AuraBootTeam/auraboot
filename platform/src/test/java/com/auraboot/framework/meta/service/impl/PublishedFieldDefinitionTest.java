@@ -31,7 +31,7 @@ class PublishedFieldDefinitionTest {
     private final MetaFieldServiceImpl service = new MetaFieldServiceImpl(mapper, mock(DictService.class),
             mock(ApplicationEventPublisher.class), mock(TransactionTemplate.class), new ExtensionConverter(),
             validator, mock(MetaFieldDictBindingMapper.class), bindings,
-            bindingService, new ObjectMapper());
+            bindingService, new ObjectMapper(), null);
 
     @BeforeEach void tenant() { MetaContext.setContext(101L, 1L, "test", "tester"); }
     @AfterEach void clear() { MetaContext.clear(); }

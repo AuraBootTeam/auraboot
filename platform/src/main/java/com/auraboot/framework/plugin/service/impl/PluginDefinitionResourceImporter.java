@@ -257,9 +257,9 @@ final class PluginDefinitionResourceImporter {
             if (resource != null) {
                 captureImportSnapshot(resource, dto);
                 saveOrUpdatePluginResource(resource, tenantId);
-                result.incrementResourceCount(ResourceType.PAGE, resource.getActionEnum());
+                result.incrementResourceCount(ResourceType.DASHBOARD, resource.getActionEnum());
                 if (resource.getResourcePid() != null) {
-                    result.addCreatedResource(ResourceType.PAGE, resource.getResourcePid());
+                    result.addCreatedResource(ResourceType.DASHBOARD, resource.getResourcePid());
                 }
             }
         }

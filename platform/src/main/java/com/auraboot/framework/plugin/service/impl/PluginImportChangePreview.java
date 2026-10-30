@@ -52,6 +52,19 @@ final class PluginImportChangePreview {
             }
         }
 
+        if (manifest.getDashboards() != null) {
+            for (DashboardDefinitionDTO dashboard : manifest.getDashboards()) {
+                PluginResource tracked = pluginResourceMapper.findByTypeAndCode(tenantId,
+                        ResourceType.DASHBOARD.code(), dashboard.getCode());
+                result.addChange(ResourceType.DASHBOARD, enrichWithUserModified(tenantId,
+                        ResourceType.DASHBOARD, dashboard.getCode(),
+                        ImportPreviewResult.ResourceChange.builder()
+                                .resourceType(ResourceType.DASHBOARD)
+                                .resourceCode(dashboard.getCode()).resourceName(dashboard.getTitle())
+                                .action(tracked == null ? ResourceAction.CREATE : ResourceAction.UPDATE).build()));
+            }
+        }
+
         // Preview fields
         if (manifest.getFields() != null) {
             for (FieldDefinitionDTO field : manifest.getFields()) {

@@ -48,7 +48,7 @@ class ModelFieldRenameColumnPolicyTest {
         var dialect = mock(DdlDialect.class);
         when(provider.getDialect()).thenReturn(dialect);
         when(dialect.mapDataType(any())).thenReturn("VARCHAR(50)");
-        var service = new SchemaManagementServiceImpl(null,null,provider,null,null,null,policy);
+        var service = new SchemaManagementServiceImpl(null,null,provider,null,null,null,policy,null);
         var field = FieldDefinition.builder().code("contact_name").columnName("contact_name").dataType("string").required(true).build();
         String deferred = ReflectionTestUtils.invokeMethod(service,"generateColumnDefinition","mt_contact",field);
         assertFalse(deferred.contains("NOT NULL"));
