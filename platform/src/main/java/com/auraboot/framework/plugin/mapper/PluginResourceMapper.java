@@ -73,6 +73,14 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
     ModificationState lockModificationState(@Param("tenantId") Long tenantId,
             @Param("resourceType") String resourceType,@Param("resourceCode") String resourceCode);
 
+    @org.apache.ibatis.annotations.ConstructorArgs({
+            @org.apache.ibatis.annotations.Arg(column="pid",javaType=String.class),
+            @org.apache.ibatis.annotations.Arg(column="user_modified",javaType=Boolean.class)
+    })
+    @Select("SELECT pid,user_modified FROM ab_plugin_resource WHERE tenant_id=#{tenantId} AND resource_type=#{resourceType} AND resource_code=#{resourceCode}")
+    ModificationState findModificationState(@Param("tenantId") Long tenantId,
+            @Param("resourceType") String resourceType,@Param("resourceCode") String resourceCode);
+
     /** Serialize publication import/rollback with user ownership changes. */
     @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode} FOR UPDATE")
     @ResultMap("mybatis-plus_PluginResource")

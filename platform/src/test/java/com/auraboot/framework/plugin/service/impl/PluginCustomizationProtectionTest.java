@@ -136,4 +136,29 @@ class PluginCustomizationProtectionTest {
                 .isInstanceOf(PluginException.class);
     }
 
+    @Test void dashboardPreviewUsesActualExistenceAndProtectsUntrackedContent() {
+        MetaContext.setContext(42L,7L,"reviewer","Reviewer");
+        var importer = mock(PluginResourceImporter.class);
+        when(importer.checkDashboardExists(42L,"invoice")).thenReturn(true);
+        var manifest = new PluginManifestExtended();
+        var dashboard = new DashboardDefinitionDTO();dashboard.setCode("invoice");dashboard.setTitle("Invoice");
+        manifest.setDashboards(List.of(dashboard));
+        var result = new ImportPreviewResult();
+        new PluginImportChangePreview(resources,importer,null,null,null).generateChangePreview(manifest,result,null);
+        var change=result.getChanges().get(ResourceType.DASHBOARD.name()).getFirst();
+        assertThat(change.getAction()).isEqualTo(ResourceAction.UPDATE);
+        assertThat(change.isUserModified()).isTrue();
+        verify(resources).findModificationState(42L,"dashboard","invoice");
+    }
+
+    @Test void previewCannotHideUnknownProtectionState() {
+        var failure=new IllegalStateException("preview unavailable");
+        when(resources.findModificationState(42L,"page","invoice")).thenThrow(failure);
+        var preview=new PluginImportChangePreview(resources,null,null,null,null);
+        var change=ImportPreviewResult.ResourceChange.builder().action(ResourceAction.UPDATE).build();
+        assertThatThrownBy(() -> preview.enrichWithUserModified(42L,ResourceType.PAGE,"invoice",change)).isSameAs(failure);
+        doReturn(new PluginResourceMapper.ModificationState("tracked",null)).when(resources).findModificationState(42L,"page","invoice");
+        assertThatThrownBy(() -> preview.enrichWithUserModified(42L,ResourceType.PAGE,"invoice",change)).isInstanceOf(PluginException.class);
+    }
+
 }

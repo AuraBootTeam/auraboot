@@ -23,6 +23,8 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 导入沿用现有程序化事务和资源行锁。`PluginImportSupport` 统一读取保护状态；不得把存储错误或未知标记解释成未修改。锁定查询使用独立的强类型状态投影，显式读取 `user_modified`，避免缺失列或 NULL 被实体的 Java 默认 false 掩盖。SKIP 不写入资源跟踪基线，尤其不能清空旧 `user_modified`，否则第二次安全导入会失去保护。
 
+预览按真实资源存在性判定 CREATE/UPDATE，并使用小写资源身份和强类型保护投影。既有未跟踪 Page/Dashboard 也按需保留的内容展示；查询故障/NULL 不可被静默显示为“未修改”。预览提供的是资源变化与保护提示，执行仍在导入事务内重新检查，不是锁定未来状态的承诺。
+
 自动 stub 是有限例外：只有 `auto_created=true` 且 `rowVersion=1` 的未编辑 stub 允许标准定义接替。通过页面 service 保存会移除 stub 标记；历史编辑后的 stub 不再仅凭标记绕过保护。
 
 ## 既有安装升级

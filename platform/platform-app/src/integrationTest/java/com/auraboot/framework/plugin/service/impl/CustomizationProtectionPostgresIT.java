@@ -321,4 +321,18 @@ class CustomizationProtectionPostgresIT {
         assertThat(remove().getSuccess()).isFalse();assertThat(columnExists()).isTrue();
     }
 
+    @Test void dashboardPreviewReadsActualExistenceAndProtectionState() {
+        seedDashboard();
+        jdbc.update("UPDATE ab_plugin_resource SET user_modified=true WHERE resource_pid=?",pid);
+        var facade=mock(PluginResourceImporterImpl.class,CALLS_REAL_METHODS);
+        org.springframework.test.util.ReflectionTestUtils.setField(facade,"dashboardService",dashboards);
+        var manifest=new PluginManifestExtended();manifest.setDashboards(List.of(incoming()));
+        var result=new ImportPreviewResult();
+        new PluginImportChangePreview(resources,facade,null,null,null).generateChangePreview(manifest,result,null);
+        var change=result.getChanges().get(ResourceType.DASHBOARD.name()).getFirst();
+        assertThat(change.getAction()).isEqualTo(ResourceAction.UPDATE);
+        assertThat(change.isUserModified()).isTrue();
+        assertThat(title()).isEqualTo("Customer layout");
+    }
+
 }
