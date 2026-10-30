@@ -71,6 +71,20 @@ final class PluginImportSupport {
         return resource == null || Boolean.TRUE.equals(resource.modified());
     }
 
+    /** Module-owned seeds have no reliable customization baseline; preserve existing state. */
+    static boolean preserveExistingSeed(boolean exists, ImportRequest.ConflictStrategy strategy,
+                                        String identity, java.util.function.Consumer<String> warning) {
+        java.util.Objects.requireNonNull(strategy, "Import conflict strategy is required");
+        if (!exists) return false;
+        if (strategy == ImportRequest.ConflictStrategy.ERROR) {
+            throw new PluginException("Module-owned seed already exists: " + logSafe(identity));
+        }
+        if (strategy == ImportRequest.ConflictStrategy.OVERWRITE) return false;
+        warning.accept("Preserved existing module-owned seed " + logSafe(identity) + " under " + strategy
+                + "; review the module definition before explicit overwrite");
+        return true;
+    }
+
     String toJson(Object obj) {
         try {
             return objectMapper.writeValueAsString(obj);

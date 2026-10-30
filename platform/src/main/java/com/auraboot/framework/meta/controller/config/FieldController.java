@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.controller.config;
 
+import org.springframework.transaction.annotation.Transactional;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -88,6 +89,7 @@ public class FieldController {
     @PutMapping("/{pid}")
     @Operation(summary = "更新字段", description = "更新指定字段的信息 ")
     @RequirePermission(MetaPermission.FIELD_MANAGE)
+    @Transactional
     public ApiResponse<MetaFieldDTO> updateField(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String pid,
             @Valid @RequestBody MetaFieldUpdateRequest request) {
@@ -110,6 +112,7 @@ public class FieldController {
     @DeleteMapping("/{pid}")
     @Operation(summary = "删除字段", description = "删除指定的字段定义 ")
     @RequirePermission(MetaPermission.FIELD_MANAGE)
+    @Transactional
     public ApiResponse<Void> deleteField(
             @Parameter(description = "字段PID") @PathVariable @NotBlank String pid) {
         log.info("删除字段: pid={}", logSafe(pid));

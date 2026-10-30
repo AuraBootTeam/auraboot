@@ -161,7 +161,7 @@ export function UserMenuWidget({
       {showUserDropdown && (
         <div
           data-testid="user-dropdown"
-          className={`absolute start-0 bottom-full z-[70] mb-2 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800 ${
+          className={`absolute start-0 bottom-full z-[70] mb-2 max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800 ${
             isSidebar ? (collapsed ? 'w-64' : 'w-full min-w-56') : 'w-64'
           }`}
         >

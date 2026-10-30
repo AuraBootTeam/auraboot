@@ -1,0 +1,82 @@
+{
+  "safeTitle": {
+    "zh-CN": "安全更新",
+    "en-US": "Safe update"
+  },
+  "safeHint": {
+    "zh-CN": "保留客户定制，仅更新有可信基线且未修改的定义。保留项将在执行结果中说明。",
+    "en-US": "Keep customer changes and update only unchanged definitions with a verified baseline. Preserved resources appear in the result."
+  },
+  "completed": {
+    "zh-CN": "导入已完成",
+    "en-US": "Import completed"
+  },
+  "preserved": {
+    "zh-CN": "部分资源已保留，请核对说明",
+    "en-US": "Some resources were preserved; review the details"
+  },
+  "failed": {
+    "zh-CN": "导入未完成",
+    "en-US": "Import did not complete"
+  },
+  "failureHint": {
+    "zh-CN": "原有配置是否保留，以本次失败原因和导入历史为准。修正问题后可重新导入。",
+    "en-US": "Review the failure and import history before retrying with a corrected package."
+  },
+  "close": {
+    "zh-CN": "关闭结果",
+    "en-US": "Dismiss result"
+  },
+  "preservedCountLabel": {
+    "zh-CN": "已保留配置",
+    "en-US": "Preserved configuration"
+  },
+  "diagnostics": {
+    "zh-CN": "查看保留原因与技术诊断",
+    "en-US": "Preservation reasons and diagnostics"
+  },
+  "preserveReason": {
+    "zh-CN": "已有客户修改，或缺少可信导入基线，本次保留原配置。",
+    "en-US": "Customer changes or an unknown baseline: the existing configuration was preserved."
+  },
+  "DECISION": {
+    "zh-CN": "业务决策",
+    "en-US": "Business decision"
+  },
+  "AUTOMATION": {
+    "zh-CN": "自动化",
+    "en-US": "Automation"
+  },
+  "CONDITION": {
+    "zh-CN": "条件片段",
+    "en-US": "Condition fragment"
+  },
+  "EVENT_POLICY": {
+    "zh-CN": "事件策略",
+    "en-US": "Event policy"
+  },
+  "changedResources": {
+    "zh-CN": "已修改的页面或看板",
+    "en-US": "Modified pages or dashboards"
+  },
+  "CREATE": {
+    "zh-CN": "新增",
+    "en-US": "Create"
+  },
+  "UPDATE": {
+    "zh-CN": "检查并更新",
+    "en-US": "Check and update"
+  },
+  "SKIP": {
+    "zh-CN": "保留",
+    "en-US": "Preserve"
+  },
+  "DELETE": {
+    "zh-CN": "删除",
+    "en-US": "Delete"
+  },
+  "plannedAction": {
+    "zh-CN": "计划操作",
+    "en-US": "Planned operation"
+  }
+}

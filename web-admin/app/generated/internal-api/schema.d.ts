@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 069b3ca1660ae41b6cd08d920f4f37f0b9f6cfacddcff4fb8037a8ca0d9f0aa7
+ * Contract SHA-256: 507b294c41121edd1e3bb28bed83e703f74d61a39809fcb8584808edc76bddfd
  */
 export interface paths {
     "/api/activities": {
@@ -33369,6 +33369,8 @@ export interface components {
             namespace?: string;
             pluginId?: string;
             pluginPid?: string;
+            /** Format: int32 */
+            preservedResourceCount?: number;
             resourceCounts?: {
                 [key: string]: number;
             };
@@ -33378,6 +33380,7 @@ export interface components {
             startedAt?: string;
             status?: string;
             version?: string;
+            warnings?: string[];
         };
         ImportOptions: {
             autoDeployProcesses?: boolean;

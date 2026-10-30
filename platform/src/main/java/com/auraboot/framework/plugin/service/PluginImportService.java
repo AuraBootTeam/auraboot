@@ -251,6 +251,8 @@ public interface PluginImportService {
             java.time.Instant startedAt,
             java.time.Instant completedAt,
             String errorMessage,
-            java.util.Map<String, Integer> resourceCounts
+            java.util.Map<String, Integer> resourceCounts,
+            java.util.List<String> warnings,
+            int preservedResourceCount
     ) {}
 }

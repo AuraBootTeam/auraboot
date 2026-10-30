@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.controller.config;
 
+import org.springframework.transaction.annotation.Transactional;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.BatchFieldBindingRequest;
 import com.auraboot.framework.meta.dto.FieldBindingRequest;
@@ -76,6 +77,7 @@ public class ModelFieldBindingController {
      */
     @DeleteMapping("/{modelPid}/fields/{fieldPid}")
     @RequirePermission(MetaPermission.MODEL_MANAGE)
+    @Transactional
     public ApiResponse<Boolean> unbindField(
             @PathVariable String modelPid,
             @PathVariable String fieldPid) {

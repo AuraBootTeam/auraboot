@@ -271,7 +271,7 @@ final class PluginImportChangePreview {
         }
         if (!modifiedResources.isEmpty()) {
             result.addWarning("The following " + modifiedResources.size() +
-                    " resource(s) have been manually modified and will be overwritten: " +
+                    " resource(s) have customer changes; the chosen strategy determines preservation or explicit replacement: " +
                     String.join(", ", modifiedResources));
         }
     }
