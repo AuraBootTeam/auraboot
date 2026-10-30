@@ -396,7 +396,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
           <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.upload.title')}</h3>
@@ -438,7 +438,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
       {/* Preview Modal */}
       {showPreviewModal && previewResult && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
           <div className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.preview.title')}</h3>
@@ -542,7 +542,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
       {/* Detail Modal */}
       {showDetailModal && selectedPlugin && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
           <div className="mx-4 w-full max-w-lg rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.detail.title')}</h3>
