@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.controller.config;
 
+import org.springframework.transaction.annotation.Transactional;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.CommandAuditLogService;
@@ -50,6 +51,7 @@ public class CommandController {
 
     @PutMapping("/{pid}")
     @RequirePermission(MetaPermission.COMMAND_MANAGE)
+    @Transactional
     public ApiResponse<CommandDefinitionDTO> update(
             @PathVariable String pid,
             @Valid @RequestBody CommandDefinitionCreateRequest request) {
@@ -60,6 +62,7 @@ public class CommandController {
 
     @DeleteMapping("/{pid}")
     @RequirePermission(MetaPermission.COMMAND_MANAGE)
+    @Transactional
     public ApiResponse<Void> delete(@PathVariable String pid) {
         CommandDefinitionDTO existing = commandService.findByPid(pid);
         if (existing != null) {

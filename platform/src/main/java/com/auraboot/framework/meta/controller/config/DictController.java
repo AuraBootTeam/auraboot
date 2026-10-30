@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.controller.config;
 
+import org.springframework.transaction.annotation.Transactional;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -89,6 +90,7 @@ public class DictController {
     @PutMapping("/{pid}")
     @Operation(summary = "更新字典", description = "更新字典信息 ")
     @RequirePermission(MetaPermission.DICT_MANAGE)
+    @Transactional
     public ApiResponse<DictDTO> updateDict(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
             @Valid @RequestBody DictUpdateRequest request) {
@@ -102,6 +104,7 @@ public class DictController {
     @PutMapping("/{pid}/items")
     @Operation(summary = "替换字典项", description = "一次性替换字典下的全部字典项")
     @RequirePermission(MetaPermission.DICT_MANAGE)
+    @Transactional
     public ApiResponse<DictDTO> replaceDictItems(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
             @Valid @RequestBody List<DictCreateRequest.DictItemCreateRequest> items) {
@@ -115,6 +118,7 @@ public class DictController {
     @DeleteMapping("/{pid}")
     @Operation(summary = "删除字典", description = "删除字典 ")
     @RequirePermission(MetaPermission.DICT_MANAGE)
+    @Transactional
     public ApiResponse<Void> deleteDict(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid) {
         log.info("删除字典: pid={}", logSafe(pid));

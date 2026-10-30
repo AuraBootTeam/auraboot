@@ -1,5 +1,6 @@
 package com.auraboot.framework.permission.controller;
 
+import org.springframework.transaction.annotation.Transactional;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -160,6 +161,7 @@ public class PermissionController {
      * @return Updated permission
      */
     @PutMapping("/{id}")
+    @Transactional
     public ApiResponse<PermissionDTO> update(
             @PathVariable @NotNull Long id,
             @Valid @RequestBody PermissionUpdateRequest request) {
@@ -184,6 +186,7 @@ public class PermissionController {
      * @return Success response
      */
     @DeleteMapping("/{id}")
+    @Transactional
     public ApiResponse<Void> delete(@PathVariable @NotNull Long id) {
         log.info("Deleting permission: id={}", id);
 

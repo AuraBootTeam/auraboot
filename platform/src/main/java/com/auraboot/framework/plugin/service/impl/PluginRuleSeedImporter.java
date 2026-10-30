@@ -45,7 +45,7 @@ final class PluginRuleSeedImporter {
         return LogSanitizer.safe(value);
     }
 
-    void importDecisionDefinitions(PluginManifestExtended manifest) {
+    void importDecisionDefinitions(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result) {
         if (manifest.getDecisionDefinitions() == null || manifest.getDecisionDefinitions().isEmpty()) return;
         int imported = 0;
         for (DecisionDefinitionSeedDTO dto : manifest.getDecisionDefinitions()) {
@@ -54,8 +54,7 @@ final class PluginRuleSeedImporter {
                         manifest.getDecisionDefinitions().indexOf(dto));
                 continue;
             }
-            importDecisionDefinition(dto);
-            imported++;
+            if (importDecisionDefinition(dto, request.getConflictStrategy(), result)) imported++;
         }
         if (imported > 0) {
             log.info("Imported {} Decision Runtime definition seed(s) for plugin {}",
@@ -63,7 +62,7 @@ final class PluginRuleSeedImporter {
         }
     }
 
-    private void importDecisionDefinition(DecisionDefinitionSeedDTO dto) {
+    private boolean importDecisionDefinition(DecisionDefinitionSeedDTO dto, ImportRequest.ConflictStrategy strategy, ImportExecuteResult result) {
         DrtDefinitionCreateRequest definitionRequest = new DrtDefinitionCreateRequest();
         definitionRequest.setDecisionCode(dto.getDecisionCode());
         definitionRequest.setDecisionName(dto.getDecisionName());
@@ -74,6 +73,8 @@ final class PluginRuleSeedImporter {
         definitionRequest.setEnabled(dto.getEnabled());
 
         DrtDefinitionDTO existing = drtDefinitionService.findByCode(dto.getDecisionCode());
+        if (PluginImportSupport.preserveExistingSeed(existing != null, strategy,
+                "decision:" + dto.getDecisionCode(), result::addWarning)) return false;
         if (existing == null) {
             drtDefinitionService.create(definitionRequest);
         } else {
@@ -83,7 +84,7 @@ final class PluginRuleSeedImporter {
         if (hasMatchingPublishedDecisionVersion(dto)) {
             log.info("Decision seed unchanged; keeping existing published version: code={}",
                     logSafe(dto.getDecisionCode()));
-            return;
+            return true;
         }
 
         DrtVersionCreateRequest versionRequest = new DrtVersionCreateRequest();
@@ -107,6 +108,7 @@ final class PluginRuleSeedImporter {
         if (dto.isPublish()) {
             decisionVersionService.publish(draft.getPid(), true);
         }
+        return true;
     }
 
     private boolean hasMatchingPublishedDecisionVersion(DecisionDefinitionSeedDTO dto) {
@@ -124,7 +126,7 @@ final class PluginRuleSeedImporter {
                         && Objects.equals(version.getContextSchemaJson(), dto.getContextSchemaJson()));
     }
 
-    void importConditionFragments(PluginManifestExtended manifest) {
+    void importConditionFragments(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result) {
         if (manifest.getConditionFragments() == null || manifest.getConditionFragments().isEmpty()) return;
         int imported = 0;
         for (ConditionFragmentSeedDTO dto : manifest.getConditionFragments()) {
@@ -133,8 +135,7 @@ final class PluginRuleSeedImporter {
                         manifest.getConditionFragments().indexOf(dto));
                 continue;
             }
-            importConditionFragment(dto);
-            imported++;
+            if (importConditionFragment(dto, request.getConflictStrategy(), result)) imported++;
         }
         if (imported > 0) {
             log.info("Imported {} condition fragment seed(s) for plugin {}",
@@ -142,14 +143,17 @@ final class PluginRuleSeedImporter {
         }
     }
 
-    private void importConditionFragment(ConditionFragmentSeedDTO dto) {
+    private boolean importConditionFragment(ConditionFragmentSeedDTO dto, ImportRequest.ConflictStrategy strategy, ImportExecuteResult result) {
+        ConditionFragmentDTO existing = findConditionFragmentOrNull(dto.getFragmentCode());
+        if (PluginImportSupport.preserveExistingSeed(existing != null, strategy,
+                "condition-fragment:" + dto.getFragmentCode(), result::addWarning)) return false;
         if (hasMatchingPublishedConditionFragment(dto)) {
             log.info("Condition fragment seed unchanged; keeping existing published version: code={}",
                     logSafe(dto.getFragmentCode()));
-            return;
+            return true;
         }
 
-        ConditionFragmentDTO target = findConditionFragmentOrNull(dto.getFragmentCode());
+        ConditionFragmentDTO target = existing;
         if (target == null) {
             target = conditionFragmentService.create(toConditionFragmentCreateRequest(dto));
         } else if (isImmutableConditionFragmentStatus(target.getStatus())) {
@@ -162,13 +166,15 @@ final class PluginRuleSeedImporter {
         }
 
         publishConditionFragmentSeedIfRequested(dto, target);
+        return true;
     }
 
     private ConditionFragmentDTO findConditionFragmentOrNull(String fragmentCode) {
         try {
             return conditionFragmentService.findByCode(fragmentCode);
         } catch (ValidationException e) {
-            return null;
+            if (e.getResponseCode() == com.auraboot.framework.common.constant.ResponseCode.NOT_FOUND) return null;
+            throw e;
         }
     }
 
@@ -230,7 +236,7 @@ final class PluginRuleSeedImporter {
         }
     }
 
-    void importEventPolicies(PluginManifestExtended manifest) {
+    void importEventPolicies(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result) {
         if (manifest.getEventPolicies() == null || manifest.getEventPolicies().isEmpty()) return;
         int imported = 0;
         for (EventPolicySeedDTO dto : manifest.getEventPolicies()) {
@@ -239,16 +245,17 @@ final class PluginRuleSeedImporter {
                         manifest.getEventPolicies().indexOf(dto));
                 continue;
             }
-            importEventPolicy(dto);
-            imported++;
+            if (importEventPolicy(dto, request.getConflictStrategy(), result)) imported++;
         }
         if (imported > 0) {
             log.info("Imported {} EventPolicy seed(s) for plugin {}", imported, logSafe(manifest.getPluginId()));
         }
     }
 
-    private void importEventPolicy(EventPolicySeedDTO dto) {
+    private boolean importEventPolicy(EventPolicySeedDTO dto, ImportRequest.ConflictStrategy strategy, ImportExecuteResult result) {
         DrtPolicyDefinitionEntity definition = eventPolicyDefinitionService.findByCode(dto.getPolicyCode());
+        if (PluginImportSupport.preserveExistingSeed(definition != null, strategy,
+                "event-policy:" + dto.getPolicyCode(), result::addWarning)) return false;
         if (definition == null) {
             definition = eventPolicyDefinitionService.create(
                     dto.getPolicyCode(),
@@ -263,7 +270,7 @@ final class PluginRuleSeedImporter {
         if (hasMatchingPublishedEventPolicyVersion(dto)) {
             log.info("EventPolicy seed unchanged; keeping existing published version: code={}",
                     logSafe(dto.getPolicyCode()));
-            return;
+            return true;
         }
 
         DrtPolicyVersionEntity latest = latestEventPolicyVersion(dto.getPolicyCode());
@@ -279,6 +286,7 @@ final class PluginRuleSeedImporter {
         }
 
         publishEventPolicySeedIfRequested(dto, target);
+        return true;
     }
 
     private DrtPolicyVersionEntity createEventPolicyDraft(EventPolicySeedDTO dto) {

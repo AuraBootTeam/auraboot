@@ -1087,10 +1087,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         pageSchemaContributionImportService.replaceForPlugin(
                 pluginPid, manifest.getVersion(), tenantId, manifest.getPageContributions());
 
-        importDecisionDefinitions(manifest);
-        importConditionFragments(manifest);
-        importEventPolicies(manifest);
-        importAutomations(manifest);
+        importDecisionDefinitions(manifest, request, result);
+        importConditionFragments(manifest, request, result);
+        importEventPolicies(manifest, request, result);
+        importAutomations(manifest, request, result);
         importFieldMasks(manifest);
         importCapabilities(manifest);
 
@@ -1400,32 +1400,20 @@ public class PluginImportServiceImpl implements PluginImportService {
                 conditionFragmentService, eventPolicyDefinitionService, eventPolicyVersionService);
     }
 
-    private void importDecisionDefinitions(PluginManifestExtended manifest) {
-        ruleSeedImporter().importDecisionDefinitions(manifest);
+    private void importDecisionDefinitions(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result) {
+        ruleSeedImporter().importDecisionDefinitions(manifest, request, result);
     }
 
-    private void importConditionFragments(PluginManifestExtended manifest) {
-        ruleSeedImporter().importConditionFragments(manifest);
+    private void importConditionFragments(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result) {
+        ruleSeedImporter().importConditionFragments(manifest, request, result);
     }
 
-    private void importEventPolicies(PluginManifestExtended manifest) {
-        ruleSeedImporter().importEventPolicies(manifest);
+    private void importEventPolicies(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result) {
+        ruleSeedImporter().importEventPolicies(manifest, request, result);
     }
 
-    private void importAutomations(PluginManifestExtended manifest) {
-        pluginDefinitionResourceImporter().importAutomations(manifest);
-    }
-
-    private void importAutomation(AutomationDefinitionDTO dto) {
-        pluginDefinitionResourceImporter().importAutomation(dto);
-    }
-
-    private AutomationDTO findExistingAutomation(AutomationDefinitionDTO dto) {
-        return pluginDefinitionResourceImporter().findExistingAutomation(dto);
-    }
-
-    private AutomationCreateRequest toAutomationCreateRequest(AutomationDefinitionDTO dto) {
-        return pluginDefinitionResourceImporter().toAutomationCreateRequest(dto);
+    private void importAutomations(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result) {
+        pluginDefinitionResourceImporter().importAutomations(manifest, request, result);
     }
 
     /**

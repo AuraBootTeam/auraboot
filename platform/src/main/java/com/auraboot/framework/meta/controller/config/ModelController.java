@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.controller.config;
 
+import org.springframework.transaction.annotation.Transactional;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -148,6 +149,7 @@ public class ModelController {
     @PutMapping("/{pid}")
     @Operation(summary = "更新模型", description = "更新指定模型的信息 ")
     @RequirePermission(MetaPermission.MODEL_MANAGE)
+    @Transactional
     public ApiResponse<MetaModelDTO> updateModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid,
             @Valid @RequestBody MetaModelUpdateRequest request) {
@@ -224,6 +226,7 @@ public class ModelController {
     @DeleteMapping("/{pid}")
     @Operation(summary = "删除模型", description = "删除指定的模型定义 ")
     @RequirePermission(MetaPermission.MODEL_MANAGE)
+    @Transactional
     public ApiResponse<Void> deleteModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid) {
         log.info("删除模型: pid={}", logSafe(pid));

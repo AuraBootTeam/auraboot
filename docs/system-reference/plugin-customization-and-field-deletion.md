@@ -36,6 +36,16 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 **升级影响**：旧页面和看板在安全导入下可能保留，即使实际上未修改；需检查差异后显式选择 OVERWRITE。新安装/新导入在此迁移后正常形成未修改基线，后续安全升级可更新。迁移不修改页面/看板内容，不自动发布，也不需要用户重新创建页面。
 
+## 模块自有 seed 的重导入
+
+Automation、决策、条件片段和事件策略复用同一导入请求的 conflictStrategy，但保留各模块版本/发布机制，不并入另一套版本库。新定义正常创建；既有定义在 ERROR 下拒绝，SKIP/OVERWRITE_SAFE 保守跳过并在导入 warnings 说明，显式 OVERWRITE 才进入模块原有更新/新版本/校验/发布流程。OVERWRITE 不绕过不可变版本、冲突 draft 或其他模块校验。
+
+这些定义没有可信的客户修改基线，SAFE 因此不能自动更新“看似未改”的定义。完整共享升级与逐资源差异处理仍需单独验收，不从保护成功推导自动三方合并。条件片段查找仅明确 NOT_FOUND 可按不存在处理，其余异常中止导入。
+
+Automation 的 pluginId/automationKey 身份保存在模块自有 ab_automation.seed_plugin_id/seed_key；用户可改显示名称，导入仍定位同 PID。来源字段不从公共 CRUD 请求接收，数据库约束其成对存在、租户内有效定义唯一，已建立的来源不可修改。显式覆盖可以接管唯一同名 legacy 定义；旧记录不自动猜测来源。若同模型有未知来源且无法唯一匹配，ERROR 拒绝，SKIP/SAFE 保留并警告，避免把改名后的旧定义当作新定义重复启用。跨模型移动和来源冲突需要单独迁移。
+
+所有现有调用修改 tracker 的控制面写入都在同一 Spring 事务中保存内容和标记。Command/Field 的真实 Spring 回归需证明标记故障时内容、字段版本与原标记一起回滚，正常保存仍可提交。
+
 ## 普通字段删除
 
 物理删除入口 `SchemaManagementServiceImpl.removeFieldFromModel` 复用 `FieldDeletionGuard`：

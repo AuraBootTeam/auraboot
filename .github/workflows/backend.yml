@@ -121,6 +121,8 @@ jobs:
           --tests '*SchemaManagementServiceMethodsTest'
           --tests '*ModelFieldRenameColumnPolicyTest'
           --tests '*PluginDefinitionResourceImporterTest'
+          --tests '*PluginRuleSeedImporterTest'
+          --tests '*PluginModuleSeedProtectionTest'
           --tests '*FieldVersionMetadataTest'
           --tests '*FieldDictionaryCacheTest'
           --tests '*PublishedFieldDefinitionTest'
