@@ -1677,7 +1677,13 @@ public class PluginImportServiceImpl implements PluginImportService {
                 history.getStartedAt(),
                 history.getCompletedAt(),
                 history.getErrorMessage(),
-                counts
+                counts,
+                history.getResult() != null && history.getResult().get("warnings") instanceof List<?> warnings
+                        ? warnings.stream().filter(String.class::isInstance).map(String.class::cast).toList() : List.of(),
+                history.getResourceSummary() == null ? 0 : history.getResourceSummary().values().stream()
+                        .filter(Map.class::isInstance).map(Map.class::cast)
+                        .map(value -> value.get("SKIP")).filter(Number.class::isInstance)
+                        .mapToInt(value -> ((Number) value).intValue()).sum()
         );
     }
 

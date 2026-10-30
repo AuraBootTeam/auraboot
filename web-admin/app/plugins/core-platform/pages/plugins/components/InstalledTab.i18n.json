@@ -26,5 +26,33 @@
   "close": {
     "zh-CN": "关闭结果",
     "en-US": "Dismiss result"
+  },
+  "preservedCountLabel": {
+    "zh-CN": "已保留配置",
+    "en-US": "Preserved configuration"
+  },
+  "diagnostics": {
+    "zh-CN": "查看保留原因与技术诊断",
+    "en-US": "Preservation reasons and diagnostics"
+  },
+  "preserveReason": {
+    "zh-CN": "已有客户修改，或缺少可信导入基线，本次保留原配置。",
+    "en-US": "Customer changes or an unknown baseline: the existing configuration was preserved."
+  },
+  "DECISION": {
+    "zh-CN": "业务决策",
+    "en-US": "Business decision"
+  },
+  "AUTOMATION": {
+    "zh-CN": "自动化",
+    "en-US": "Automation"
+  },
+  "CONDITION": {
+    "zh-CN": "条件片段",
+    "en-US": "Condition fragment"
+  },
+  "EVENT_POLICY": {
+    "zh-CN": "事件策略",
+    "en-US": "Event policy"
   }
 }

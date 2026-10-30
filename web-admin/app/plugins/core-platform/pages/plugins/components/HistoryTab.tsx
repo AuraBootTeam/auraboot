@@ -1,3 +1,4 @@
+import ImportWarnings from './ImportWarnings';
 /**
  * Import history tab — list of past plugin import attempts.
  *
@@ -6,6 +7,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import IMPORT_TEXT from './InstalledTab.i18n.json';
 import {
   DocumentTextIcon,
   ArrowPathIcon,
@@ -25,7 +28,8 @@ export interface ImportHistory {
   startedAt: string;
   completedAt?: string;
   errorMessage?: string;
-  result?: { warnings?: string[] };
+  warnings?: string[];
+  preservedResourceCount?: number;
 }
 
 interface Props {
@@ -34,7 +38,7 @@ interface Props {
 }
 
 export default function HistoryTab({ onCountChange, refreshToken }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([]);
 
   const fetchHistory = useCallback(async () => {
@@ -105,11 +109,9 @@ export default function HistoryTab({ onCountChange, refreshToken }: Props) {
                 </td>
                 <td className="px-6 py-4">
                   <StatusBadge status={record.status} />
+                  {!!record.preservedResourceCount && <p className="mt-2 text-sm text-amber-900">{getLocalizedText(IMPORT_TEXT.preservedCountLabel, locale)}：{record.preservedResourceCount}</p>}
                   {record.errorMessage && <p className="mt-2 max-w-md text-sm text-red-700">{record.errorMessage}</p>}
-                  {!!record.result?.warnings?.length && <details className="mt-2 max-w-md text-sm text-amber-900">
-                    <summary className="cursor-pointer">{t('plugin.preview.warnings')} ({record.result.warnings.length})</summary>
-                    <ul className="mt-2 space-y-2">{record.result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
-                  </details>}
+                  {!!record.warnings?.length && <ImportWarnings warnings={record.warnings} />}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {record.sourceType} - {record.sourceName}

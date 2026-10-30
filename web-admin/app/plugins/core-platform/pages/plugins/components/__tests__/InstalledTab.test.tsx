@@ -50,3 +50,16 @@ describe('InstalledTab safe upgrade feedback', () => {
     if (!success) expect(screen.queryByText('导入已完成')).not.toBeInTheDocument();
   });
 });
+
+it('does not present count-only preserved pages as an unconditional update', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => ({ code: '0', data: url.endsWith('/upload')
+    ? { importId: 'page-safe', valid: true, isUpgrade: true, errors: [], warnings: [], actionCounts: {} }
+    : url.endsWith('/execute') ? { success: true, warnings: [], resourceCounts: { PAGE: { SKIP: 2 } } } : [] }) })));
+  const { container } = render(<InstalledTab />);
+  fireEvent.click(await screen.findByRole('button', { name: 'plugin.action.upload' }));
+  fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [new File(['{}'], 'pages.json', { type: 'application/json' })] } });
+  await screen.findByText('安全更新');
+  fireEvent.click(screen.getByRole('button', { name: 'plugin.import.confirmUpgrade' }));
+  expect(await screen.findByText('部分资源已保留，请核对说明')).toBeInTheDocument();
+  expect(screen.getByText('已保留配置：2')).toBeInTheDocument();
+});

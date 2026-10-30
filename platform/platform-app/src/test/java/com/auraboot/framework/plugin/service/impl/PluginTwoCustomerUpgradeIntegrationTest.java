@@ -31,6 +31,8 @@ class PluginTwoCustomerUpgradeIntegrationTest extends BaseIntegrationTest {
     @Autowired DecisionEvaluationService evaluation;
     @Autowired ObjectMapper json;
     @Autowired JdbcTemplate jdbc;
+    @Autowired javax.sql.DataSource dataSource;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired ConditionFragmentService fragments;
     @Autowired com.auraboot.framework.eventpolicy.service.EventPolicyDefinitionService policies;
     @Autowired com.auraboot.framework.eventpolicy.service.EventPolicyVersionService policyVersions;
@@ -94,6 +96,9 @@ class PluginTwoCustomerUpgradeIntegrationTest extends BaseIntegrationTest {
             assertThat(latestThreshold(code)).isEqualTo(200000);
             assertThat(matches(code, 170000)).isFalse();
             assertThat(upgradeA.getWarnings()).anyMatch(w -> w.contains(code) && w.contains("customer changes"));
+            var receipt = imports.getImportStatus(upgradeA.getImportId());
+            assertThat(receipt.warnings()).isEqualTo(upgradeA.getWarnings());
+            assertThat(receipt.preservedResourceCount()).isPositive();
             install(code, "1.1.0", 150000);
             assertThat(latestThreshold(code)).isEqualTo(200000);
 
@@ -195,6 +200,36 @@ class PluginTwoCustomerUpgradeIntegrationTest extends BaseIntegrationTest {
         scopes.setScope(tenant, role.getId(), code, "read", "all", "MAX");
         scopes.setScope(tenant, role.getId(), code, "update", "all", "MAX");
         MetaContext.setMemberId(member.getId());
+    }
+
+    @Test
+    void upgradeLockAllowsReadersButBlocksConcurrentMetadataWritesUntilRelease() throws Exception {
+        String code = "lock_" + UniqueIdGenerator.generate().toLowerCase();
+        install(code, "1.0.0", 100000);
+        Long tenant = MetaContext.getCurrentTenantId();
+        new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(status -> {
+            var upgrade = new PluginSeedUpgradeContext(jdbc, json, Map.of());
+            upgrade.lock(PluginSeedUpgradeContext.Kind.DECISION);
+            try (var connection = dataSource.getConnection()) {
+                connection.setAutoCommit(false);
+                try {
+                    try (var read = connection.prepareStatement("SELECT enabled FROM ab_drt_definition WHERE tenant_id = ? AND decision_code = ?")) {
+                        read.setLong(1, tenant);read.setString(2, code);
+                        try (var rows = read.executeQuery()) { assertThat(rows.next()).isTrue();assertThat(rows.getBoolean(1)).isTrue(); }
+                    }
+                    try (var timeout = connection.createStatement()) { timeout.execute("SET LOCAL lock_timeout = '250ms'"); }
+                    try (var write = connection.prepareStatement("UPDATE ab_drt_definition SET enabled = false WHERE tenant_id = ? AND decision_code = ?")) {
+                        write.setLong(1, tenant);write.setString(2, code);
+                        assertThatThrownBy(write::executeUpdate).isInstanceOf(java.sql.SQLException.class)
+                                .satisfies(error -> assertThat(((java.sql.SQLException) error).getSQLState()).isEqualTo("55P03"));
+                    }
+                } finally { connection.rollback(); }
+            } catch (java.sql.SQLException error) { throw new IllegalStateException(error); }
+            assertThat(jdbc.queryForObject("SELECT enabled FROM ab_drt_definition WHERE tenant_id = ? AND decision_code = ?", Boolean.class, tenant, code)).isTrue();
+        });
+        // The ordinary module write succeeds once the import transaction releases its locks.
+        publishCustomerRule(code, 200000);
+        assertThat(latestThreshold(code)).isEqualTo(200000);
     }
 
     private ImportExecuteResult install(String code, String version, int threshold) throws Exception {
