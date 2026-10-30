@@ -233,7 +233,7 @@ class CustomizationProtectionPostgresIT {
     void retainedDefinitionFamiliesProtectTheirFieldReferences(String family) {
         emptyColumn();String ref="{\"fieldCode\":\""+field().getCode()+"\"}";
         switch(family) {
-            case "query" -> jdbc.update("INSERT INTO ab_named_query(id,pid,tenant_id,code,from_sql) VALUES (?,?,?,?,?)",tenant,UniqueIdGenerator.generate(),tenant,code,table+"."+field().getCode());
+            case "query" -> jdbc.update("INSERT INTO ab_named_query(id,pid,tenant_id,code,from_sql) VALUES (?,?,?,?,?)",tenant,UniqueIdGenerator.generate(),tenant,code,table+"."+field().getCode().toUpperCase(java.util.Locale.ROOT));
             case "query-field" -> {
                 jdbc.update("INSERT INTO ab_named_query(id,pid,tenant_id,code,from_sql) VALUES (?,?,?,?,?)",tenant,UniqueIdGenerator.generate(),tenant,code,table);
                 jdbc.update("INSERT INTO ab_named_query_field(id,tenant_id,query_code,field_code,column_expr,data_type) VALUES (?,?,?,?,?,'string')",tenant,tenant,code,field().getCode(),field().getCode());
@@ -254,7 +254,7 @@ class CustomizationProtectionPostgresIT {
             case "dashboard" -> jdbc.update("INSERT INTO ab_dashboard(id,pid,tenant_id,code,title,widgets) VALUES (?,?,?,?,?,?::jsonb)",tenant,UniqueIdGenerator.generate(),tenant,code,code,"["+ref+"]");
             case "report" -> jdbc.update("INSERT INTO ab_report(id,pid,tenant_id,code,dsl) VALUES (?,?,?,?,?::jsonb)",tenant,UniqueIdGenerator.generate(),tenant,code,ref);
             case "template" -> jdbc.update("INSERT INTO ab_report_template(id,pid,tenant_id,code,name,data_source_config) VALUES (?,?,?,?,?,?::jsonb)",tenant,UniqueIdGenerator.generate(),tenant,code,code,ref);
-            case "reference-index" -> jdbc.update("INSERT INTO ab_resource_reference(id,tenant_id,source_type,source_id,target_type,target_code) VALUES (?,?,'PAGE_SCHEMA',?,'FIELD',?)",tenant,tenant,pid,field().getCode());
+            case "reference-index" -> jdbc.update("INSERT INTO ab_resource_reference(id,pid,tenant_id,source_type,source_id,target_type,target_code) VALUES (?,?,?,'PAGE_SCHEMA',?,'FIELD',?)",tenant,UniqueIdGenerator.generate(),tenant,pid,field().getCode());
             case "field-formula" -> jdbc.update("INSERT INTO ab_meta_field(id,pid,tenant_id,code,version,data_type,feature) VALUES (?,?,?,?,1,'computed',?::jsonb)",tenant,UniqueIdGenerator.generate(),tenant,code+"_derived",ref);
             default -> throw new IllegalArgumentException(family);
         }
@@ -287,6 +287,38 @@ class CustomizationProtectionPostgresIT {
         assertThat(title()).isEqualTo("Customer layout");
         assertThat(jdbc.queryForObject("SELECT blocks::text FROM ab_page_schema WHERE pid=?",String.class,page)).isEqualTo("[]");
         assertThat(resources.findByTypeAndCode(tenant,"dashboard",code).getImportSnapshot()).containsEntry("title","Vendor original");
+    }
+
+    @Test void aNullProtectionColumnCannotFallBackToTheEntityFalseDefault() {
+        seedDashboard();
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            jdbc.execute("ALTER TABLE ab_plugin_resource ALTER COLUMN user_modified DROP NOT NULL");
+            jdbc.update("UPDATE ab_plugin_resource SET user_modified=NULL WHERE resource_pid=?",pid);
+            importer.importDashboard(incoming(),plugin,"test",tenant,ImportRequest.ConflictStrategy.OVERWRITE_SAFE);
+        })).isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class);
+        assertThat(title()).isEqualTo("Customer layout");
+        assertThat(resources.findByTypeAndCode(tenant,"dashboard",code).getUserModified()).isFalse();
+    }
+
+    @Test void aPreparedApplicationBindingPreventsOrdinaryPluginModelDdl() {
+        emptyColumn();
+        tx.executeWithoutResult(status -> {
+            jdbc.update("INSERT INTO ab_meta_model(id,pid,tenant_id,code,version,table_name,plugin_pid) VALUES (?,?,?,?,1,?,?)",tenant,UniqueIdGenerator.generate(),tenant,code,table,plugin);
+            Long application=jdbc.queryForObject("INSERT INTO ab_application(code,name,created_by) VALUES (?,?,'test:field-protection') RETURNING id",Long.class,code.replace('_','-'),code);
+            String release=UniqueIdGenerator.generate();
+            String manifest = """
+                    {"schemaVersion":1,"application":"%s","releaseId":"%s","releaseSequence":1,
+                    "compatibilityEpoch":1,"sourceLockIdentity":"sha256:%s",
+                    "platformCompatibility":{"runtimeContract":"1"},
+                    "components":[{"key":"%s","type":"definition","version":"1.0.0","digest":"sha256:%s"}]}
+                    """.formatted(code.replace('_','-'), release, "a".repeat(64), code, "b".repeat(64));
+            jdbc.update("INSERT INTO ab_application_release(release_id,application_id,release_sequence,compatibility_epoch,source_lock_identity,manifest_text,digest,registration_key,registration_request_digest,registered_by) VALUES (?,?,1,1,'sha256:'||repeat('a',64),?,'sha256:'||encode(sha256(convert_to(?,'UTF8')),'hex'),?,'sha256:'||repeat('b',64),'test:field-protection')",release,application,manifest,manifest,release);
+            jdbc.queryForObject("SELECT set_config('aura.binding.actor','test:field-protection',true)",String.class);
+            jdbc.queryForObject("SELECT set_config('aura.binding.operation',?,true)",String.class,UniqueIdGenerator.generate());
+            jdbc.update("INSERT INTO ab_tenant_application_binding(tenant_id,application_id,current_release_id) VALUES (?,?,?)",tenant,application,release);
+        });
+        assertThat(remove().getSuccess()).isFalse();assertThat(columnExists()).isTrue();
     }
 
 }

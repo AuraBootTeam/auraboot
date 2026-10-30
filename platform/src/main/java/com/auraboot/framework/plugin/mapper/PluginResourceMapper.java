@@ -62,10 +62,19 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
     @ResultMap("mybatis-plus_PluginResource")
     PluginResource findByTypeAndCode(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
 
+    /** A projection with no Java false default: unknown state remains unknown. */
+    record ModificationState(String pid, Boolean modified) {}
+
+    @org.apache.ibatis.annotations.ConstructorArgs({
+            @org.apache.ibatis.annotations.Arg(column="pid",javaType=String.class),
+            @org.apache.ibatis.annotations.Arg(column="user_modified",javaType=Boolean.class)
+    })
+    @Select("SELECT pid,user_modified FROM ab_plugin_resource WHERE tenant_id=#{tenantId} AND resource_type=#{resourceType} AND resource_code=#{resourceCode} FOR UPDATE")
+    ModificationState lockModificationState(@Param("tenantId") Long tenantId,
+            @Param("resourceType") String resourceType,@Param("resourceCode") String resourceCode);
+
     /** Serialize publication import/rollback with user ownership changes. */
-    // Require the protection column explicitly: SELECT * alone can silently use a Java default
-    // if a broken projection/schema omits user_modified.
-    @Select("SELECT r.*, r.user_modified AS protection_state FROM ab_plugin_resource r WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode} FOR UPDATE")
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode} FOR UPDATE")
     @ResultMap("mybatis-plus_PluginResource")
     PluginResource lockByTypeAndCode(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
 

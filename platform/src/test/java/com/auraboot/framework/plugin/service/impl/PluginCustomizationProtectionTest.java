@@ -31,7 +31,7 @@ class PluginCustomizationProtectionTest {
 
     @Test void unknownModificationStateCannotBecomeAnUnmodifiedResource() {
         var failure = new IllegalStateException("lookup unavailable");
-        when(resources.lockByTypeAndCode(42L, "page", "invoice")).thenThrow(failure);
+        when(resources.lockModificationState(42L, "page", "invoice")).thenThrow(failure);
         assertThatThrownBy(() -> support.shouldSkipForOverwriteSafe(42L,
                 ImportRequest.ConflictStrategy.OVERWRITE_SAFE, ResourceType.PAGE, "invoice"))
                 .isInstanceOf(PluginException.class).hasCause(failure);
@@ -40,9 +40,9 @@ class PluginCustomizationProtectionTest {
     @ParameterizedTest @EnumSource(value=ResourceType.class, names={"PAGE","DASHBOARD"})
     void safeOverwriteLocksAndPreservesCustomerChanges(ResourceType type) {
         var resource = new PluginResource(); resource.setUserModified(true);
-        when(resources.lockByTypeAndCode(42L,type.code(),"invoice")).thenReturn(resource);
+        when(resources.lockModificationState(42L,type.code(),"invoice")).thenReturn(new PluginResourceMapper.ModificationState("tracked",true));
         assertThat(support.shouldSkipForOverwriteSafe(42L,ImportRequest.ConflictStrategy.OVERWRITE_SAFE,type,"invoice")).isTrue();
-        verify(resources).lockByTypeAndCode(42L,type.code(),"invoice");
+        verify(resources).lockModificationState(42L,type.code(),"invoice");
     }
 
     @Test void explicitOverwriteDoesNotPretendToReadProtection() {
@@ -67,7 +67,7 @@ class PluginCustomizationProtectionTest {
         var existing = new DashboardDTO(); existing.setPid("board-pid"); existing.setCode("invoice");
         when(dashboards.findByCode("invoice")).thenReturn(existing);
         var tracked = new PluginResource(); tracked.setUserModified(true);
-        when(resources.lockByTypeAndCode(42L,"dashboard","invoice")).thenReturn(tracked);
+        when(resources.lockModificationState(42L,"dashboard","invoice")).thenReturn(new PluginResourceMapper.ModificationState("tracked",true));
         var importer = new PluginPageNavigationImporter(null,null,null,null,dashboards,null,null,
                 new ObjectMapper(),null,null,new HashMap<>(),LoggerFactory.getLogger(getClass()),support);
         if (strategy == ImportRequest.ConflictStrategy.ERROR) {
@@ -100,7 +100,7 @@ class PluginCustomizationProtectionTest {
         var existing=new com.auraboot.framework.meta.dto.PageSchemaDTO();existing.setPid("page-pid");existing.setPageKey("invoice_form");
         when(pageService.findAnyByPageKey("invoice_form")).thenReturn(existing);
         var tracked=new PluginResource();tracked.setUserModified(true);
-        when(resources.lockByTypeAndCode(42L,"page","invoice_form")).thenReturn(tracked);
+        when(resources.lockModificationState(42L,"page","invoice_form")).thenReturn(new PluginResourceMapper.ModificationState("tracked",true));
         var importer=new PluginPageNavigationImporter(facade,null,null,pageService,null,null,null,new ObjectMapper(),pageMapper,null,new HashMap<>(),LoggerFactory.getLogger(getClass()),support);
         var dto=new PageSchemaDTO();dto.setPageKey("invoice_form");dto.setKind("form");dto.setBlocks(List.of());
         if(strategy==ImportRequest.ConflictStrategy.ERROR) {
@@ -115,7 +115,7 @@ class PluginCustomizationProtectionTest {
         var facade=mock(PluginResourceImporterImpl.class);when(facade.checkPageExists(42L,"invoice_form")).thenReturn(true);
         var existing=new com.auraboot.framework.meta.dto.PageSchemaDTO();existing.setPid("page-pid");existing.setPageKey("invoice_form");existing.setRowVersion(2);existing.setExtension(Map.of("auto_created",true));
         when(pageService.findAnyByPageKey("invoice_form")).thenReturn(existing);
-        var tracked=new PluginResource();tracked.setUserModified(true);when(resources.lockByTypeAndCode(42L,"page","invoice_form")).thenReturn(tracked);
+        var tracked=new PluginResource();tracked.setUserModified(true);when(resources.lockModificationState(42L,"page","invoice_form")).thenReturn(new PluginResourceMapper.ModificationState("tracked",true));
         var importer=new PluginPageNavigationImporter(facade,null,null,pageService,null,null,null,new ObjectMapper(),null,null,new HashMap<>(),LoggerFactory.getLogger(getClass()),support);
         var dto=new PageSchemaDTO();dto.setPageKey("invoice_form");dto.setKind("form");
         assertThat(importer.importPage(dto,"plugin","import",42L,ImportRequest.ConflictStrategy.OVERWRITE_SAFE,false).getAction()).isEqualTo("skip");
@@ -127,6 +127,12 @@ class PluginCustomizationProtectionTest {
         when(resources.lockByTypeAndCode(42L,"page","invoice")).thenReturn(tracked);
         when(resources.updateById(tracked)).thenReturn(0);
         assertThatThrownBy(() -> new PluginResourceTracker(resources).markAsUserModified(ResourceType.PAGE,"invoice"))
+                .isInstanceOf(PluginException.class);
+    }
+
+    @Test void aSuccessfulReadWithAnUnknownMarkerStillCannotAuthorizeOverwrite() {
+        when(resources.lockModificationState(42L,"page","invoice")).thenReturn(new PluginResourceMapper.ModificationState("tracked",null));
+        assertThatThrownBy(() -> support.shouldSkipExistingForOverwriteSafe(42L,ImportRequest.ConflictStrategy.OVERWRITE_SAFE,ResourceType.PAGE,"invoice"))
                 .isInstanceOf(PluginException.class);
     }
 

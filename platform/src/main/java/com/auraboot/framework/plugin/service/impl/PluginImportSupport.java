@@ -3,7 +3,6 @@ package com.auraboot.framework.plugin.service.impl;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
-import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,10 +39,10 @@ final class PluginImportSupport {
      * Check if a resource has been modified by a user (for OVERWRITE_SAFE strategy).
      * Returns true if the resource is tracked in ab_plugin_resource and marked as user_modified.
      */
-    private PluginResource lockProtectionState(Long tenantId, ResourceType type, String resourceCode) {
+    private PluginResourceMapper.ModificationState lockProtectionState(Long tenantId, ResourceType type, String resourceCode) {
         try {
-            PluginResource resource = pluginResourceMapper.lockByTypeAndCode(tenantId, type.code(), resourceCode);
-            if (resource != null && resource.getUserModified() == null) {
+            PluginResourceMapper.ModificationState resource = pluginResourceMapper.lockModificationState(tenantId, type.code(), resourceCode);
+            if (resource != null && resource.modified() == null) {
                 throw new PluginException("Customization protection state is missing");
             }
             return resource;
@@ -54,8 +53,8 @@ final class PluginImportSupport {
     }
 
     boolean isResourceUserModified(Long tenantId, ResourceType type, String resourceCode) {
-        PluginResource resource = lockProtectionState(tenantId, type, resourceCode);
-        return resource != null && Boolean.TRUE.equals(resource.getUserModified());
+        PluginResourceMapper.ModificationState resource = lockProtectionState(tenantId, type, resourceCode);
+        return resource != null && Boolean.TRUE.equals(resource.modified());
     }
 
     boolean shouldSkipForOverwriteSafe(Long tenantId, ImportRequest.ConflictStrategy strategy,
@@ -68,8 +67,8 @@ final class PluginImportSupport {
     boolean shouldSkipExistingForOverwriteSafe(Long tenantId, ImportRequest.ConflictStrategy strategy,
                                                ResourceType type, String resourceCode) {
         if (strategy != ImportRequest.ConflictStrategy.OVERWRITE_SAFE) return false;
-        PluginResource resource = lockProtectionState(tenantId, type, resourceCode);
-        return resource == null || Boolean.TRUE.equals(resource.getUserModified());
+        PluginResourceMapper.ModificationState resource = lockProtectionState(tenantId, type, resourceCode);
+        return resource == null || Boolean.TRUE.equals(resource.modified());
     }
 
     String toJson(Object obj) {

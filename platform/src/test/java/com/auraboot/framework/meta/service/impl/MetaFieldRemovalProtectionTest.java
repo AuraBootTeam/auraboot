@@ -24,7 +24,7 @@ class MetaFieldRemovalProtectionTest {
         ReflectionTestUtils.setField(service,"metaModelService",models);ReflectionTestUtils.setField(service,"metaFieldMapper",fields);
         ReflectionTestUtils.setField(service,"fieldBindingMapper",bindings);ReflectionTestUtils.setField(service,"jdbcTemplate",jdbc);
         ReflectionTestUtils.setField(service,"fieldDeletionGuard",guard);
-        var model=new MetaModelDTO();model.setId(10L);model.setCode("invoice");
+        var model=MetaModelDTO.builder().id(10L).code("invoice").build();
         when(models.findByCode("invoice")).thenReturn(model);when(models.getTableName("invoice")).thenReturn("mt_invoice");
         when(models.getFieldDefinition("invoice","amount")).thenReturn(FieldDefinition.builder().code("amount").columnName("amount").build());
         var field=new Field();field.setId(20L);field.setCode("amount");when(fields.findCurrentByCode("amount")).thenReturn(field);

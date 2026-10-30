@@ -55,6 +55,16 @@ public class FieldDeletionGuard {
         jdbc.execute("SET LOCAL lock_timeout = '3s'");
         jdbc.execute("LOCK TABLE " + table + " IN ACCESS EXCLUSIVE MODE");
         lockReferenceSources();
+        Boolean releaseOwned = jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM ab_meta_model m
+                JOIN ab_tenant_application_binding b ON b.tenant_id=m.tenant_id
+                WHERE coalesce(nullif(m.table_name,''),'mt_' || m.code)=?
+                  AND m.deleted_flag IS NOT TRUE AND m.plugin_pid IS NOT NULL
+                  AND b.status IN ('active','shadow'))
+                """, Boolean.class, table);
+        if (!Boolean.FALSE.equals(releaseOwned)) {
+            throw new BusinessException("Bound application models require a reviewed release migration");
+        }
         Boolean shared = jdbc.queryForObject("""
                 SELECT EXISTS(SELECT 1 FROM ab_meta_model_field_binding b
                 JOIN ab_meta_model m ON m.id=b.model_id
@@ -86,7 +96,7 @@ public class FieldDeletionGuard {
 
     private void lockReferenceSources() {
         // Serialize binding changes and declared-reference writes until this transaction ends.
-        jdbc.execute("LOCK TABLE ab_meta_model_field_binding, ab_meta_model, ab_meta_field IN SHARE MODE");
+        jdbc.execute("LOCK TABLE ab_meta_model_field_binding, ab_meta_model, ab_meta_field, ab_tenant_application_binding IN SHARE MODE");
         for (ReferenceSource source : SOURCES) {
             jdbc.execute("LOCK TABLE " + source.table() + " IN SHARE MODE");
         }
@@ -113,7 +123,7 @@ public class FieldDeletionGuard {
         String token = "(^|[^A-Za-z0-9_])(" + String.join("|", names) + ")([^A-Za-z0-9_]|$)";
         for (ReferenceSource source : SOURCES) {
             Boolean referenced = jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM " + source.table()
-                    + " r WHERE " + source.active() + " AND to_jsonb(r)::text ~ ?)", Boolean.class, token);
+                    + " r WHERE " + source.active() + " AND to_jsonb(r)::text ~* ?)", Boolean.class, token);
             if (!Boolean.FALSE.equals(referenced)) {
                 // Do not disclose names or tenant identities from a shared physical schema.
                 throw new BusinessException("Field is referenced by retained application definitions");
@@ -121,7 +131,7 @@ public class FieldDeletionGuard {
         }
         Boolean computedReference = jdbc.queryForObject("""
                 SELECT EXISTS(SELECT 1 FROM ab_meta_field f WHERE deleted_flag IS NOT TRUE
-                AND code<>? AND to_jsonb(f)::text ~ ?)
+                AND code<>? AND to_jsonb(f)::text ~* ?)
                 """, Boolean.class, code, token);
         if (!Boolean.FALSE.equals(computedReference)) {
             throw new BusinessException("Field is referenced by another field definition");

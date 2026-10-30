@@ -21,7 +21,7 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 用户保存 Page、更新/发布/取消发布 Dashboard 时，Controller 事务包含修改标记与内容操作。`PluginResourceTracker` 使用小写数据库 code、行锁和精确一行写入判定；标记查询/写入失败会中止该事务。插件导入调用 service，不经过这些用户 Controller。
 
-导入沿用现有程序化事务和资源行锁。`PluginImportSupport` 统一读取保护状态；不得把存储错误或未知标记解释成未修改。锁定查询显式要求 `user_modified` 列，避免缺失列被 Java 默认值掩盖。SKIP 不写入资源跟踪基线，尤其不能清空旧 `user_modified`，否则第二次安全导入会失去保护。
+导入沿用现有程序化事务和资源行锁。`PluginImportSupport` 统一读取保护状态；不得把存储错误或未知标记解释成未修改。锁定查询使用独立的强类型状态投影，显式读取 `user_modified`，避免缺失列或 NULL 被实体的 Java 默认 false 掩盖。SKIP 不写入资源跟踪基线，尤其不能清空旧 `user_modified`，否则第二次安全导入会失去保护。
 
 自动 stub 是有限例外：只有 `auto_created=true` 且 `rowVersion=1` 的未编辑 stub 允许标准定义接替。通过页面 service 保存会移除 stub 标记；历史编辑后的 stub 不再仅凭标记绕过保护。
 
@@ -44,7 +44,7 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 4. 检查失败、结果未知或有依赖时拒绝；全部满足后才 DROP。物理表锁持有到事务结束，阻止检查与删除之间插入数据。锁等待上限为三秒，超时走失败结果。
 5. PID 与数字 ID 的解绑入口复用同一链路；`ModelFieldBindingSupport` 必须核对 SchemaOperationResult 成功后才删绑定。失败结果不会被当作解绑成功。
 
-`refuseIfDataExists=false` 不是破坏性销毁授权，不能绕过公共入口的非空数据保护。跨租户共享物理列存在其他有效绑定时，即使表为空也拒绝删除。字段库删除还需检查有效绑定和定义引用，防止删除元数据后留下失效配置。按模型移除字段时，若其他模型仍在复用该字段定义，则保留定义；解绑失败不得继续删除字段定义。平台/引擎拥有的 `ab_*`、`se_*` 表及 metadata-only 模型不允许通过普通模型字段操作执行物理删除。
+`refuseIfDataExists=false` 不是破坏性销毁授权，不能绕过公共入口的非空数据保护。跨租户共享物理列存在其他有效绑定时，即使表为空也拒绝删除。若同一物理表由已进入 active/shadow 应用绑定租户的插件模型持有，普通删除同样拒绝，避免绕过现有不可变应用与受控迁移机制；这一保护按插件模型保守裁决，不尝试推断文件 bundle 内的任意引用。字段库删除还需检查有效绑定和定义引用，防止删除元数据后留下失效配置。按模型移除字段时，若其他模型仍在复用该字段定义，则保留定义；解绑失败不得继续删除字段定义。平台/引擎拥有的 `ab_*`、`se_*` 表及 metadata-only 模型不允许通过普通模型字段操作执行物理删除。
 
 ### 引用检查的边界
 

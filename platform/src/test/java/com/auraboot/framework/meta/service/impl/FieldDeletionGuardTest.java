@@ -15,7 +15,10 @@ class FieldDeletionGuardTest {
     final FieldDeletionGuard guard = new FieldDeletionGuard(jdbc);
     final ModelDefinition model = ModelDefinition.builder().code("invoice").tableName("mt_invoice").build();
     final FieldDefinition field = FieldDefinition.builder().code("amount").columnName("amount").build();
-    @BeforeEach void context() { MetaContext.setSystemTenantContext(42L); TransactionSynchronizationManager.setActualTransactionActive(true); }
+    @BeforeEach void context() {
+        MetaContext.setSystemTenantContext(42L); TransactionSynchronizationManager.setActualTransactionActive(true);
+        when(jdbc.queryForObject(contains("ab_tenant_application_binding"),eq(Boolean.class),eq("mt_invoice"))).thenReturn(false);
+    }
     @AfterEach void clear() { MetaContext.clear(); TransactionSynchronizationManager.clear(); }
     @Test void missingTransactionNeverProbesOrMutates() {
         TransactionSynchronizationManager.setActualTransactionActive(false);
