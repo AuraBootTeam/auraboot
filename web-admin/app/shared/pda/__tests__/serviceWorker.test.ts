@@ -30,6 +30,38 @@ function worker() {
 }
 
 describe('service worker document navigation boundary', () => {
+  it.each([
+    ['/api/auth/me', 'GET'],
+    ['/api/commerce/merchant/stores/store/product-types', 'GET'],
+    ['/api/meta/commands/execute/cmc:create_product', 'POST'],
+  ])('leaves session-bound %s %s requests to the browser with a warm cache', (path, method) => {
+    const { listeners, caches, fetch } = worker();
+    const respondWith = vi.fn();
+    listeners.get('fetch')!({
+      request: { url: `https://example.test${path}`, mode: 'cors', method },
+      respondWith,
+    });
+    expect(respondWith).not.toHaveBeenCalled();
+    expect(caches.match).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves network delivery of inventory offline commands', async () => {
+    const { listeners, fetch } = worker();
+    const request = new Request(
+      'https://example.test/api/meta/commands/execute/inv:pda_queue_offline',
+      { method: 'POST', body: '{}' },
+    );
+    let response: Promise<Response> | undefined;
+    listeners.get('fetch')!({
+      request,
+      respondWith: (promise: Promise<Response>) => {
+        response = promise;
+      },
+    });
+    expect(await (await response)!.text()).toBe('fresh document');
+    expect(fetch).toHaveBeenCalledWith(request);
+  });
   it('does not pre-cache the authenticated root redirect', async () => {
     const { listeners, cache } = worker();
     let installed: Promise<unknown> | undefined;

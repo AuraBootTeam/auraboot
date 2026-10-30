@@ -1,7 +1,7 @@
 /**
  * AuraBoot Service Worker — Offline Cache (GAP-026)
  *
- * Strategy: Network-first for API calls, Cache-first for static assets.
+ * Strategy: Browser-owned authenticated APIs, cache-first static assets.
  * Provides basic offline capability for previously visited pages.
  *
  * PDA offline shell (WMS D3, feat/pda-offline-shell):
@@ -83,7 +83,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Offline capture: command POST that failed at the network level.
-  if (request.method === 'POST' && url.pathname.startsWith(PDA_COMMAND_EXECUTE_PREFIX)) {
+  if (
+    request.method === 'POST' &&
+    url.pathname.startsWith(PDA_COMMAND_EXECUTE_PREFIX) &&
+    decodeURIComponent(url.pathname.slice(PDA_COMMAND_EXECUTE_PREFIX.length)).startsWith('inv:')
+  ) {
     const snapshot = request.clone();
     const commandCode = decodeURIComponent(url.pathname.slice(PDA_COMMAND_EXECUTE_PREFIX.length));
     event.respondWith(
@@ -111,22 +115,9 @@ self.addEventListener('fetch', (event) => {
   // Only the explicit PDA shells above opt in to offline document caching.
   if (request.mode === 'navigate') return;
 
-  // API calls: network-first with cache fallback
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful GET API responses
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request).then((cached) => cached || offlineResponse())),
-    );
-    return;
-  }
+  // API results depend on the current user and tenant. Never serve responses
+  // cached by another session, or proxy unrelated products through PDA replay.
+  if (url.pathname.startsWith('/api/')) return;
 
   // Static assets: cache-first with network fallback
   event.respondWith(
