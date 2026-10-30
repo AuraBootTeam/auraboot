@@ -36,7 +36,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@hono/node-server": "1.19.15",
+      "@hono/node-server": "2.1.5",
       "brace-expansion": "1.1.21",
       "dompurify": "3.4.17",
       "esbuild": "0.28.1",
