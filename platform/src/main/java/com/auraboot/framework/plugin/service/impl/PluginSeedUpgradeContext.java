@@ -59,13 +59,16 @@ final class PluginSeedUpgradeContext {
                      ImportExecuteResult result) {
         if (!exists) return false;
         if (strategy != ImportRequest.ConflictStrategy.OVERWRITE_SAFE || jdbc == null) {
-            return PluginImportSupport.preserveExistingSeed(true, strategy, kind + ":" + code, result::addWarning);
+            boolean preserved = PluginImportSupport.preserveExistingSeed(true, strategy, kind + ":" + code, result::addWarning);
+            if (preserved) result.incrementResourceCount(kind.name(), com.auraboot.framework.plugin.dto.imports.ResourceAction.SKIP);
+            return preserved;
         }
         if (pid == null) throw new PluginException("Existing seed has no stable resource identity");
         Object baseline = baselines.get(key(kind, code));
         if (baseline != null && json.valueToTree(baseline).equals(json.valueToTree(snapshot(kind, code, pid)))) {
             return false;
         }
+        result.incrementResourceCount(kind.name(), com.auraboot.framework.plugin.dto.imports.ResourceAction.SKIP);
         result.addWarning("Preserved " + kind + ":" + PluginImportSupport.logSafe(code)
                 + ": customer changes or an unknown import baseline; review this definition before replacing it.");
         return true;

@@ -30,6 +30,7 @@ class PluginSeedUpgradeContextTest {
                 ImportRequest.ConflictStrategy.OVERWRITE_SAFE, result)).isTrue();
         assertThat(result.getWarnings()).singleElement().asString().contains("unknown import baseline");
         assertThat(upgrade.baselines()).isEmpty();
+        assertThat(result.getResourceCounts().get("DECISION")).containsEntry("SKIP", 1);
         verifyNoInteractions(jdbc);
     }
 

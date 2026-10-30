@@ -353,6 +353,7 @@ final class PluginDefinitionResourceImporter {
                 && automationService.hasUnidentifiedAutomations(dto.getModelCode())) {
             PluginImportSupport.preserveExistingSeed(true, strategy,
                     "ambiguous legacy automation:" + dto.getAutomationKey(), result::addWarning);
+            result.incrementResourceCount("AUTOMATION", ResourceAction.SKIP);
             return false;
         }
         if (upgrade.preserve(PluginSeedUpgradeContext.Kind.AUTOMATION, dto.getAutomationKey(), existing != null,

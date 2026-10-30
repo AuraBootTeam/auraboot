@@ -98,7 +98,7 @@ class PluginTwoCustomerUpgradeIntegrationTest extends BaseIntegrationTest {
             assertThat(upgradeA.getWarnings()).anyMatch(w -> w.contains(code) && w.contains("customer changes"));
             var receipt = imports.getImportStatus(upgradeA.getImportId());
             assertThat(receipt.warnings()).isEqualTo(upgradeA.getWarnings());
-            assertThat(receipt.preservedResourceCount()).isPositive();
+            assertThat(receipt.preservedResourceCount()).isEqualTo(2);
             install(code, "1.1.0", 150000);
             assertThat(latestThreshold(code)).isEqualTo(200000);
 

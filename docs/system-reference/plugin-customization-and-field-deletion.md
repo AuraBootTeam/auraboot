@@ -46,6 +46,16 @@ Automation 的 pluginId/automationKey 身份保存在模块自有 ab_automation.
 
 所有现有调用修改 tracker 的控制面写入都在同一 Spring 事务中保存内容和标记。Command/Field 的真实 Spring 回归需证明标记故障时内容、字段版本与原标记一起回滚，正常保存仍可提交。
 
+## 双客户升级的操作口径
+
+插件管理的上传确认默认使用 OVERWRITE_SAFE。页面默认导入为草稿，不自动发布流程；导入完成不等于全部资源均已替换，也不等于草稿已进入运行态。客户 A 的页面和规则已修改时保留当前配置，客户 B 的同源未改定义可吸收共享更新；插件包版本可以前进，而被保留资源继续沿用原内容和基线。
+
+执行结果显示保留配置数与业务说明，原始资源标识和诊断可展开。历史接口仅投影 warnings 与 preservedResourceCount，不能把内部 moduleSeedBaselines 原样暴露给客户端；刷新后保留说明和失败原因仍可查询。四类模块的保留也计入资源 SKIP 数量，不能只统计 Page/Dashboard。未知基线与可证实的客户修改都会保守保留，当前提示不承诺自动辨别或三方合并。
+
+晚阶段定义校验失败时，复用原导入事务回滚本次数据库修改；已有页面、有效规则和业务记录仍可使用，修正包后可再次导入。这不覆盖任意破坏性 DDL、外部消息撤回、运行中自动化补偿、卸载及删除后重装。
+
+双客户实栈入口为 PluginTwoCustomerUpgradeIntegrationTest，覆盖重复升级、失败后业务读写、隔离、历史回显以及独立连接下的配置读写锁边界。浏览器入口为 web-admin/playwright.plugin-upgrade.config.ts（two-customer-upgrade.spec.ts）：使用新建的 A/B 测试空间，从插件管理上传/预览/确认，再验证失败后的标准 CRUD 修改、重开、修正包与无权导入。空间、定制和测试记录通过现有 API 布置，不将其冒充设计器的全操作验收。PW_UPGRADE_ACCOUNT_FILE 指向本地私有账号 JSON（email/password）；凭据须置于独立的私有证据目录，不能只存于换代时会清除的 runtime 目录。
+
 ## 普通字段删除
 
 物理删除入口 `SchemaManagementServiceImpl.removeFieldFromModel` 复用 `FieldDeletionGuard`：

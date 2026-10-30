@@ -39,7 +39,9 @@ async function selectSpace(page: Page, tenantId: string) {
 }
 async function openImports(page: Page) {
   await page.getByRole('link', { name: '插件管理', exact: true }).click();
+  await expect(page.getByTestId('plugins-page')).toHaveAttribute('data-hydrated', 'true');
   await page.getByRole('tab', { name: /已安装/ }).click();
+  await expect(page.getByRole('tab', { name: /已安装/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: /上传插件|上传安装/ })).toBeVisible();
 }
 async function upload(page: Page, value: ReturnType<typeof manifest>, failure = false, previewShot?: string) {
@@ -75,13 +77,15 @@ test('customer A preserves customization, B upgrades, and failed import leaves b
   await page.screenshot({ path: path.join(shots, '01-installed.png'), fullPage: true });
   // Arrange an actual customer customization through the existing configuration APIs.
   const original = await configurationPage(page, code);
-  await api(page, 'PUT', `/api/pages/${original.pid}`, { name: '华辰制造专属交付工作台', title: { 'zh-CN': '华辰制造专属交付工作台' }, rowVersion: original.rowVersion });
+  await api(page, 'PUT', `/api/pages/${original.pid}`, { name: '华辰制造专属交付工作台', title: { 'zh-CN': '华辰制造专属交付工作台' }, blocks: [{ id: 'summary', blockType: 'rich-text', content: '<h2>华辰制造 · 客户交付要求</h2><p>本客户采用专属验收审批配置，交付金额超过 200,000 元时进入加强审核。</p><p>共享应用安全更新时，保留客户维护的页面与审批规则。</p>' }], rowVersion: original.rowVersion });
   const draft = await api(page, 'POST', `/api/decision/definitions/${code}_approval/versions`, { kind: 'SIMPLE_CONDITION', runtimeAdapter: 'AST_EVALUATOR', contentJson: ast(200000) });
   const validation = await api(page, 'POST', `/api/decision/versions/${draft.pid}/validate`);
   expect(validation.valid).toBeTruthy();
   await api(page, 'POST', `/api/decision/versions/${draft.pid}/publish`, { impactAcknowledged: true });
-  await page.goto(`/page-designer/${original.pid}`);
-  await expect(page.getByText('华辰制造专属交付工作台', { exact: true }).first()).toBeVisible();
+  // Publishing this fixture is explicit; plugin upload itself leaves pages as drafts.
+  await api(page, 'POST', `/api/pages/${original.pid}/publish`);
+  await page.goto(`/p/c/${code}_overview`);
+  await expect(page.getByText('华辰制造 · 客户交付要求', { exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(shots, '02-a-custom.png'), fullPage: true });
   await openImports(page);
   await upload(page, manifest(code, '1.1.0', 150000), false, path.join(shots, '03-safe-preview.png'));
@@ -101,7 +105,7 @@ test('customer A preserves customization, B upgrades, and failed import leaves b
   await upload(page, manifest(code, '1.0.0', 100000));
   await upload(page, manifest(code, '1.1.0', 150000));
   expect((await configurationPage(page, code)).name).toBe('项目交付概览 1.1.0');
-  await api(page, 'POST', '/api/templates/crud/generate', { modelCode: code, config: {} });
+  await api(page, 'POST', '/api/templates/crud/generate', { modelCode: code, config: { menuName: '客户项目' } });
   const record = await api(page, 'POST', `/api/dynamic/${code}/create`, { [`${code}_name`]: '启明设备 · 产线交付', [`${code}_amount`]: 170000 });
   let evaluated = await api(page, 'POST', '/api/decision/evaluate', { decisionCode: `${code}_approval`, binding: 'LATEST', context: { record: { data: { amount: 170000 } } } });
   expect(evaluated.matched).toBe(true);
@@ -111,7 +115,8 @@ test('customer A preserves customization, B upgrades, and failed import leaves b
   evaluated = await api(page, 'POST', '/api/decision/evaluate', { decisionCode: `${code}_approval`, binding: 'LATEST', context: { record: { data: { amount: 170000 } } } });
   expect(evaluated.matched).toBe(true);
   // A normal business edit remains available while the failed package is unresolved.
-  await page.getByRole('link', { name: '客户项目', exact: true }).click();
+  await page.reload();
+  await page.locator(`nav a[href="/p/${code}"]`).click();
   await expect(page.getByText('启明设备 · 产线交付', { exact: true }).first()).toBeVisible();
   await page.goto(`/p/${code}/edit/${record.pid}`);
   const nameInput = page.getByTestId(`form-field-${code}_name`).locator('input');
