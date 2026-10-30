@@ -1,3 +1,4 @@
+import type { components } from '~/generated/internal-api/schema';
 import ImportWarnings from './ImportWarnings';
 /**
  * Import history tab — list of past plugin import attempts.
@@ -16,21 +17,9 @@ import {
   XCircleIcon,
 } from '@heroicons/react/24/outline';
 
-export interface ImportHistory {
-  importId: string;
-  pluginId: string;
-  namespace: string;
-  version: string;
-  status: 'success' | 'failed' | 'rolled_back';
-  importType: 'install' | 'upgrade';
-  sourceType: 'json' | 'zip';
-  sourceName: string;
-  startedAt: string;
-  completedAt?: string;
-  errorMessage?: string;
-  warnings?: string[];
-  preservedResourceCount?: number;
-}
+export type ImportHistory = Required<Pick<components['schemas']['ImportHistoryDTO'],
+  'importId' | 'pluginId' | 'namespace' | 'version' | 'status' | 'importType' | 'sourceType' | 'sourceName' | 'startedAt'
+>> & Pick<components['schemas']['ImportHistoryDTO'], 'completedAt' | 'errorMessage' | 'warnings' | 'preservedResourceCount'>;
 
 interface Props {
   onCountChange?: (count: number) => void;

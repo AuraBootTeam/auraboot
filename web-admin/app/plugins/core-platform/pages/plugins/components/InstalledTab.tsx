@@ -1,3 +1,4 @@
+import type { components } from '~/generated/internal-api/schema';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import ImportWarnings from './ImportWarnings';
 /**
@@ -46,19 +47,9 @@ export interface PluginRecord {
   compatibilityMessage?: string;
 }
 
-interface ImportPreviewResult {
-  importId: string;
-  pluginId: string;
-  namespace: string;
-  version: string;
-  displayName: string;
-  valid: boolean;
-  upgrade: boolean;
-  previousVersion?: string;
-  errors: string[];
-  warnings: string[];
-  actionCounts: Record<string, number>;
-}
+type ImportPreviewResult = Required<Pick<components['schemas']['ImportPreviewResult'],
+  'importId' | 'pluginId' | 'namespace' | 'version' | 'displayName' | 'valid' | 'upgrade' | 'errors' | 'warnings' | 'actionCounts'
+>> & Pick<components['schemas']['ImportPreviewResult'], 'previousVersion'>;
 
 interface Props {
   onCountChange?: (count: number) => void;

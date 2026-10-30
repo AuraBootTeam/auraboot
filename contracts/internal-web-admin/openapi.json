@@ -30748,6 +30748,10 @@
           "pluginPid": {
             "type": "string"
           },
+          "preservedResourceCount": {
+            "format": "int32",
+            "type": "integer"
+          },
           "resourceCounts": {
             "additionalProperties": {
               "format": "int32",
@@ -30770,6 +30774,12 @@
           },
           "version": {
             "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
