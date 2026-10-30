@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { customerBudgetFixture } from '../../helpers/customer-budget-fixture';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -49,7 +50,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   const showcaseFixture = process.env.PW_REPORT_SHOWCASE_FIXTURE === '1';
   const customer =
     process.env.PW_REPORT_CUSTOMER_NAME ||
-    (showcaseFixture ? '华辰制造（经营分析案例）' : '华辰制造');
+    (showcaseFixture ? customerBudgetFixture.customerName : '华辰制造');
 
   page.setDefaultTimeout(20000);
   await liveShowcaseLogin(page);
@@ -94,11 +95,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
       customers = await list('tpm_customer', 'tpm_cu_name', customer);
     }
     expect(customers).toHaveLength(1);
-    const fixtureProjects = [
-      { name: '供应链协同平台', budget: 128000, code: 'REPORT-SUPPLY' },
-      { name: '服务交付二期', budget: 286000, code: 'REPORT-SERVICE' },
-      { name: '供应商对账升级', budget: 132000.5, code: 'REPORT-RECONCILE' },
-    ];
+    const fixtureProjects = customerBudgetFixture.projects;
     for (const project of fixtureProjects) {
       const existing = await list('tpm_project', 'tpm_pj_code', project.code);
       if (existing.length === 0)
@@ -180,7 +177,7 @@ test('SC06 real customer analysis persists a report and exports matching Markdow
   await panel.getByTestId('aurabot-history-trigger').click();
   await panel.getByTestId('aurabot-new-session').click();
   await expect(panel.getByTestId('aurabot-history-dropdown')).toHaveCount(0);
-  const question = `${customer}名下每个项目的预算是多少？重新核对客户记录，按所属客户关联查询。用不超过300字的简洁纯文本列预算合计并给两条仅基于预算的管理建议，预算不是收入；不要推测进度、日期和收入。正文只用业务名称，不要展示数据库字段名、模型编码、查询语句和任何内部标识。金额使用千分位和两位小数。第一行写客户全称，只依据本轮查询结果，不引用历史会话或历史项目数量。`;
+  const question = `${customer}名下每个项目的预算是多少？请生成可以点击“存为报表”并刷新数据的预算分析表，不要只回复文字或静态表格。先重新核对客户记录，按所属客户精确关联查询，再按项目分组对项目预算求和，每个项目一行。分析表之外，用不超过300字的简洁纯文本列预算合计并给两条仅基于预算的管理建议，预算不是收入；不要推测进度、日期和收入。正文只用业务名称，不要展示数据库字段名、模型编码、查询语句和任何内部标识。金额使用千分位和两位小数。第一行写客户全称，只依据本轮查询结果，不引用历史会话或历史项目数量。`;
   const streamPromise = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === '/api/ai/aurabot/chat/stream' &&

@@ -63,6 +63,7 @@ export function useListKeywordSearch(
   const rememberSubmittedFilters = useCallback((filters: Record<string, any>) => {
     appliedFiltersRef.current = structuredClone(filters);
   }, []);
+  const getSubmittedFilters = useCallback(() => structuredClone(appliedFiltersRef.current), []);
   const search = () => {
     if (!enabled) return;
     load({ page: 0, size: pageSize, filters: structuredClone(appliedFiltersRef.current) });
@@ -72,7 +73,7 @@ export function useListKeywordSearch(
     debouncedSearch.cancel();
     search();
   };
-  return { debouncedSearch, commitSearch, rememberSubmittedFilters };
+  return { debouncedSearch, commitSearch, rememberSubmittedFilters, getSubmittedFilters };
 }
 
 export interface BulkFieldCommandState {

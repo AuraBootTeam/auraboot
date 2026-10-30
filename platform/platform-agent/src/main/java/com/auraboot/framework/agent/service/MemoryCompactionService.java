@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.auraboot.framework.agent.memory.MemoryReadPolicy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,11 +55,13 @@ public class MemoryCompactionService {
      * L3 decay (02:30) so we don't compress rows that would have been
      * decay-purged.
      */
+    @Transactional
     @Scheduled(cron = "${acp.memory.compaction.cron:0 0 3 * * *}")
     public CompactionResult compactOversizedBuckets() {
         return compactOversizedBuckets(null);
     }
 
+    @Transactional
     public CompactionResult compactOversizedBucketsForTenant(Long tenantId) {
         if (tenantId == null) {
             throw new IllegalArgumentException("tenantId must not be null");
@@ -77,12 +81,12 @@ public class MemoryCompactionService {
         args.add(threshold);
 
         List<Map<String, Object>> oversized = jdbcTemplate.queryForList(
-                "SELECT tenant_id, memory_agent_id, COUNT(*) AS n " +
+                "SELECT tenant_id, memory_agent_id, scope, COUNT(*) AS n " +
                         "FROM ab_agent_memory " +
-                        "WHERE (deleted_flag IS NULL OR deleted_flag = FALSE) " +
+                        "WHERE " + MemoryReadPolicy.LIVE + " " +
                         "  AND scope IN ('tenant', 'global') " +
                         tenantClause +
-                        "GROUP BY tenant_id, memory_agent_id " +
+                        "GROUP BY tenant_id, memory_agent_id, scope " +
                         "HAVING COUNT(*) >= ?",
                 args.toArray());
 
@@ -92,7 +96,7 @@ public class MemoryCompactionService {
         for (Map<String, Object> b : oversized) {
             Long tenantId = ((Number) b.get("tenant_id")).longValue();
             String agent = (String) b.get("memory_agent_id");
-            int r = compactBucket(tenantId, agent);
+            int r = compactScope(tenantId, agent, (String) b.get("scope"));
             if (r > 0) {
                 buckets++;
                 compressed++;
@@ -111,17 +115,22 @@ public class MemoryCompactionService {
      * bucket. Returns the number of source rows replaced (0 if the bucket
      * didn't have enough rows to compress).
      */
+    @Transactional
     public int compactBucket(Long tenantId, String agentCode) {
+        return compactScope(tenantId, agentCode, "tenant") + compactScope(tenantId, agentCode, "global");
+    }
+
+    private int compactScope(Long tenantId, String agentCode, String scope) {
         List<Map<String, Object>> batch = jdbcTemplate.queryForList(
-                "SELECT pid, memory_type, memory_title, memory_content, importance, scope " +
+                "SELECT pid, memory_type, memory_title, memory_content, importance, scope, valid_until, shadow_mode " +
                         "FROM ab_agent_memory " +
                         "WHERE tenant_id = ? AND memory_agent_id = ? " +
-                        "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) " +
-                        "  AND scope IN ('tenant', 'global') " +
+                        "  AND " + MemoryReadPolicy.LIVE + " " +
+                        "  AND scope = ? " +
                         "ORDER BY importance ASC NULLS FIRST, " +
                         "         last_accessed ASC NULLS FIRST " +
-                        "LIMIT ?",
-                tenantId, agentCode, flushBatchSize);
+                        "LIMIT ? FOR UPDATE SKIP LOCKED",
+                tenantId, agentCode, scope, flushBatchSize);
         if (batch.size() < flushBatchSize) {
             // Don't compress under-sized batches — the bucket must be solidly
             // above threshold to justify a summary.
@@ -132,17 +141,21 @@ public class MemoryCompactionService {
         String summaryTitle = "Compressed " + batch.size() + " memories";
         String summaryContent = buildSummary(batch);
         int medianImportance = medianImportance(batch);
-        String dominantScope = dominantScope(batch);
+        java.sql.Timestamp validUntil = batch.stream().map(row -> (java.sql.Timestamp) row.get("valid_until"))
+                .filter(java.util.Objects::nonNull).min(java.util.Comparator.naturalOrder()).orElse(null);
+        boolean shadow = batch.stream().anyMatch(row -> Boolean.TRUE.equals(row.get("shadow_mode")));
+        String sourceIds = batch.stream().map(row -> String.valueOf(row.get("pid")))
+                .collect(java.util.stream.Collectors.joining(","));
 
         jdbcTemplate.update(
                 "INSERT INTO ab_agent_memory " +
                         "(pid, tenant_id, memory_agent_id, memory_type, category, " +
                         " memory_title, memory_content, importance, shareable, scope, " +
-                        " metadata, created_at, updated_at, deleted_flag) " +
+                        " metadata, valid_until, shadow_mode, created_at, updated_at, deleted_flag) " +
                         "VALUES (?, ?, ?, 'fact', 'compressed', ?, ?, ?, FALSE, ?, " +
-                        " 'source_count=' || ?, NOW(), NOW(), FALSE)",
+                        " ?, ?, ?, NOW(), NOW(), FALSE)",
                 summaryPid, tenantId, agentCode, summaryTitle, summaryContent,
-                medianImportance, dominantScope, batch.size());
+                medianImportance, scope, "source_count=" + batch.size() + ";source_pids=" + sourceIds, validUntil, shadow);
 
         List<String> pids = new ArrayList<>(batch.size());
         for (Map<String, Object> r : batch) pids.add((String) r.get("pid"));
@@ -188,17 +201,6 @@ public class MemoryCompactionService {
                 .sorted()
                 .toArray();
         return vals.length == 0 ? 0 : vals[vals.length / 2];
-    }
-
-    /** Majority scope in the batch; tie → 'tenant'. */
-    private String dominantScope(List<Map<String, Object>> batch) {
-        int tenantN = 0, globalN = 0;
-        for (Map<String, Object> r : batch) {
-            String s = (String) r.get("scope");
-            if ("global".equals(s)) globalN++;
-            else tenantN++;
-        }
-        return globalN > tenantN ? "global" : "tenant";
     }
 
     // Test setters

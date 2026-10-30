@@ -794,6 +794,12 @@ describe('attachment sharing serialization contract', () => {
     expect(collectAttachmentRelationIds(files)).toEqual(['public-file-1']);
     expect(collectAttachmentRelationIds(JSON.stringify(files))).toEqual(['public-file-1']);
   });
+  it('preserves identifiers supplied directly by an uploaded attachment through command serialization and relation sharing', () => {
+    const files = [{ name: '政策附件.txt', fileId: 'public-file-1', url: '/api/file/download/public-file-1', size: 56, type: 'text/plain' }];
+    const normalized = normalizeCommandPayloadValue(files, 'file');
+    expect(JSON.parse(normalized)).toEqual(files);
+    expect(collectAttachmentRelationIds(normalized)).toEqual(['public-file-1']);
+  });
   it('allows an explicit empty collection to clear record relations', () => {
     expect(collectAttachmentRelationIds('[]')).toEqual([]);
   });

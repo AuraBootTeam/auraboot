@@ -1,0 +1,2702 @@
+{
+  "scope": "Fresh post-merge screenshots for existing approved announcement and BPM journeys; supporting non-selected captures do not imply a visual verdict",
+  "rows": [
+    {
+      "id": "lifecycle:create-form-guidance",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:create-form-guidance",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Empty native form has title/body guidance, grouped fields and a visible fixed save/cancel footer.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-create-form-guidance",
+      "expectedFileName": "create-form-guidance.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-create-form-guidance.png",
+      "sha256": "d506a4d1ffd1779e6360f3c98c3ca2181dc77c0061dfa251d736fbf18e4739bc",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.304335+00:00",
+      "observation": "标题示例、草稿保存后的通知设置指引和富文本工具栏清楚；底部保存/取消固定可达。本帧为表单上半屏，不外推未入镜的附件区域。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "标题示例、草稿保存后的通知设置指引和富文本工具栏清楚；底部保存/取消固定可达。本帧为表单上半屏，不外推未入镜的附件区域。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--c4b06-nnouncement-in-draft-status-oss/create-form-guidance.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:edit-form-values",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:edit-form-values",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Important priority, pin toggle, expiry and edited rich-text value remain visible with the save footer.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-edit-form-values",
+      "expectedFileName": "edit-form-values.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-edit-form-values.png",
+      "sha256": "db1f4596cd2b2456451db9746c48b30a24723b686afec79cfa8bd0ff655bf575",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.305525+00:00",
+      "observation": "已编辑标题和正文、重要优先级、置顶开关及到期时间均清楚回显；保存/取消仍可达。原生日期格式属于浏览器控件表现。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "已编辑标题和正文、重要优先级、置顶开关及到期时间均清楚回显；保存/取消仍可达。原生日期格式属于浏览器控件表现。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--15156-etain-the-observed-revision-oss/edit-form-values.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:draft-detail",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:draft-detail",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Saved draft values and status are readable; management actions are separate from content.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-draft-detail",
+      "expectedFileName": "draft-detail.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-draft-detail.png",
+      "sha256": "319e4a91a7e410b1fbab78d6e871c6565f43d819d4a8d56412dcc5b906506207",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.306264+00:00",
+      "observation": "草稿和重要状态有文字标识；标题、正文、置顶、到期时间分组可读，右上通知设置/免审发布/统计入口可辨。未发布占位不伪装为已发布。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "草稿和重要状态有文字标识；标题、正文、置顶、到期时间分组可读，右上通知设置/免审发布/统计入口可辨。未发布占位不伪装为已发布。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--15156-etain-the-observed-revision-oss/draft-detail.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:permission-denied",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:permission-denied",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Read-only manager has view actions and no create/edit menu; persisted API denial is asserted by the test.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-permission-denied",
+      "expectedFileName": "permission-denied.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-permission-denied.png",
+      "sha256": "6f632c913f6f0ce16cfaa9b396cd400db8a380aa10dc683fa315773fbfa54df0",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.307144+00:00",
+      "observation": "只读身份可见实际列表与查看入口，新建和编辑动作缺席；长标题在列内省略，未破坏列对齐。此图只裁决只读列表状态。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "只读身份可见实际列表与查看入口，新建和编辑动作缺席；长标题在列内省略，未破坏列对齐。此图只裁决只读列表状态。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--df931-ot-create-or-modify-notices-oss/permission-denied.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "仅有公告读取权限的观察者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:legacy-revision",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:legacy-revision",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "The revised draft has draft-specific menu actions; previous publication time remains history.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-legacy-revision",
+      "expectedFileName": "legacy-revision.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-legacy-revision.png",
+      "sha256": "4499ecc4fd96da213c4a3ddc06e9792753148781a0080bc2fb67845ac465c5c8",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.307839+00:00",
+      "observation": "历史公告修订后显示草稿，行内更多菜单清楚提供通知设置、编辑和免审发布；没有出现旧冻结版本被改写的视觉信号。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "历史公告修订后显示草稿，行内更多菜单清楚提供通知设置、编辑和免审发布；没有出现旧冻结版本被改写的视觉信号。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--46257-mutating-its-frozen-version-oss/legacy-revision.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:notification-settings-audience",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:notification-settings-audience",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "This scroll position shows unavailable approval reason, scheduled local time, exemption reason and acknowledgement default; it does not show the lower audience picker.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-notification-settings-audience",
+      "expectedFileName": "notification-settings-audience.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-notification-settings-audience.png",
+      "sha256": "8b98b3e02151bf18c10c542775d4ee76be3e9e63d8855622ee89484b9fc9aacb",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.308535+00:00",
+      "observation": "免审方式、不可用审批的原因、预约时刻、独立免审原因和默认知悉要求清晰；固定保存/取消可见。本滚动位置未展示受众控件，不外推该区域视觉结论。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "免审方式、不可用审批的原因、预约时刻、独立免审原因和默认知悉要求清晰；固定保存/取消可见。本滚动位置未展示受众控件，不外推该区域视觉结论。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/notification-settings-audience.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:scheduled-publication",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:scheduled-publication",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "The newly scheduled row has a human scheduled status, without a publication time.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-scheduled-publication",
+      "expectedFileName": "scheduled-publication.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-scheduled-publication.png",
+      "sha256": "1644e77e8366df06a546ca1fae33c5d1bd6fc9b9a45a9b6ede3f541d665c1d89",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.309263+00:00",
+      "observation": "受控公告行清楚显示重要与定时待发布，实际发布时间保持空值；查看入口仍可达。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "受控公告行清楚显示重要与定时待发布，实际发布时间保持空值；查看入口仍可达。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/scheduled-publication.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:canceled-publication",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:canceled-publication",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "The same top row now shows withdrawn; no false published timestamp is displayed.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-canceled-publication",
+      "expectedFileName": "canceled-publication.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-canceled-publication.png",
+      "sha256": "352d9539a043e701edb63de182b5bc624f929fe46311d1c891ccd85076e18ae5",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.310110+00:00",
+      "observation": "同一受控公告行转为已撤回，未显示虚假实际发布时间；状态变化具有文字而非仅颜色。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "同一受控公告行转为已撤回，未显示虚假实际发布时间；状态变化具有文字而非仅颜色。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--db72b-on-never-creates-recipients-oss/canceled-publication.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:published-and-projected",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:published-and-projected",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "The newly published row has a publication time and the separate bell/inbox badges are visible.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-published-and-projected",
+      "expectedFileName": "published-and-projected.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-published-and-projected.png",
+      "sha256": "1677c86eb3df1e3bd530ddba5d60a3d9c8cfec751dada9f1c34d0d3fafef5229",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.310908+00:00",
+      "observation": "受控公告显示已发布，发布时间和重要状态清晰，顶部铃铛与收件箱均显示真实的 1；未与已撤回行混淆。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "受控公告显示已发布，发布时间和重要状态清晰，顶部铃铛与收件箱均显示真实的 1；未与已撤回行混淆。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--8051a-hes-independent-projections-oss/published-and-projected.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:confirm-announcement-delete_announcement",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:confirm-announcement-delete_announcement",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Destructive confirmation is open with a visible cancel and focused confirm action.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-confirm-announcement-delete_announcement",
+      "expectedFileName": "confirm-announcement-delete_announcement.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-confirm-announcement-delete_announcement.png",
+      "sha256": "2373fe4868f014e20407f3e0a0d10495d460f088a26756c99e9608a167ef77a7",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.311706+00:00",
+      "observation": "删除确认框在打开状态捕获，不可恢复提示和红色确认、普通取消按钮明确，键盘焦点可见；背景为已筛出的单条草稿。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "删除确认框在打开状态捕获，不可恢复提示和红色确认、普通取消按钮明确，键盘焦点可见；背景为已筛出的单条草稿。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--44047-rough-its-protected-command-oss/confirm-announcement-delete_announcement.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "lifecycle:deleted-draft",
+      "feature": "announcement management",
+      "actionPoint": "lifecycle:deleted-draft",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "The filtered empty result explains clearing filters or creating a draft; it is not a loading skeleton.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "lifecycle-deleted-draft",
+      "expectedFileName": "deleted-draft.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "lifecycle-deleted-draft.png",
+      "sha256": "04d3ed30894236a23ee42d968f035ab4d820666a70f4e7ee33a70f02559753d6",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.312593+00:00",
+      "observation": "删除后的筛选结果为空，页面说明可新建或清除筛选，不是空白或错误页；原查询条件仍可见。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "删除后的筛选结果为空，页面说明可新建或清除筛选，不是空白或错误页；原查询条件仍可见。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--44047-rough-its-protected-command-oss/deleted-draft.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:any-submitted",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:any-submitted",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Native submission returns to the filtered announcement list with pending approval and no publication timestamp.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-any-submitted",
+      "expectedFileName": "any-submitted.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-any-submitted.png",
+      "sha256": "cd912e5cc66762dc6419a87bd1c930bff72b5f84347ebc6ab65b1d471c617c17",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.573230+00:00",
+      "observation": "仅显示当前夹具公告为审批中，实际发布时间为空；查看入口与筛选行清楚，无提前发布信号。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "仅显示当前夹具公告为审批中，实际发布时间为空；查看入口与筛选行清楚，无提前发布信号。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-submitted.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "公告发布者/申请人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:any-frozen-readonly-attachment",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:any-frozen-readonly-attachment",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Readonly body and retained attachment name/size are readable; no decision actions appear in view mode.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-any-frozen-readonly-attachment",
+      "expectedFileName": "any-frozen-readonly-attachment.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-any-frozen-readonly-attachment.png",
+      "sha256": "599ab84413e679b3e042ea45d170b5525246ffefd36b204d7ca9469146933043",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.573877+00:00",
+      "observation": "冻结正文、预计接收 3 人、知悉 7 天与 46 B 附件可读；只读抽屉仅有取消，无编辑或决策按钮。英文任务标题与正文为流程夹具内容。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "冻结正文、预计接收 3 人、知悉 7 天与 46 B 附件可读；只读抽屉仅有取消，无编辑或决策按钮。英文任务标题与正文为流程夹具内容。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-frozen-readonly-attachment.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:any-decision",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:any-decision",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Explicit decision mode shows frozen body, attachment, opinion controls and fixed approve/reject actions; the scroll area keeps the footer visible.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-any-decision",
+      "expectedFileName": "any-decision.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-any-decision.png",
+      "sha256": "c67e5ad600dd4d2914b720c2a1288a8d99c2773bdb8c5ec12ede9a28da05c8d3",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.574318+00:00",
+      "observation": "同一冻结送审块上方信息保留，审批决定为通过且填写意见；底部取消、驳回、通过可达，意见区可继续滚动。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "同一冻结送审块上方信息保留，审批决定为通过且填写意见；底部取消、驳回、通过可达，意见区可继续滚动。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:any-completed-frozen-history",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:any-completed-frozen-history",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Completed task is readonly, with original submitted body/file and a cancel-only footer.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-any-completed-frozen-history",
+      "expectedFileName": "any-completed-frozen-history.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-any-completed-frozen-history.png",
+      "sha256": "1c69d9b76b2dba19c7eac2bb1ce44d9c166947880bca105612e72a6aaeb63148",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.574658+00:00",
+      "observation": "已办任务计数 1、待办 0，仍显示原送审正文及 46 B 附件，仅有取消；本帧不单独证明附件字节，字节断言来自旅程。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "已办任务计数 1、待办 0，仍显示原送审正文及 46 B 附件，仅有取消；本帧不单独证明附件字节，字节断言来自旅程。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-completed-frozen-history.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-submitted",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-submitted",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Named ALL request is pending; no premature published status appears.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-submitted",
+      "expectedFileName": "all-submitted.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-submitted.png",
+      "sha256": "997f0e5735f28db9bda1ec4b7f38292985977d5b0860713fcf834e6dde32b2f6",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.575045+00:00",
+      "observation": "ALL 原申请在列表显示审批中，发布时间为空；此图来自拒绝旅程，未使用恢复旅程同名截图。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "ALL 原申请在列表显示审批中，发布时间为空；此图来自拒绝旅程，未使用恢复旅程同名截图。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-submitted.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "公告发布者/申请人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-first-decision",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-first-decision",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "First named approver sees the original snapshot and explicit decision controls; backend assertions keep the ALL request non-terminal.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-first-decision",
+      "expectedFileName": "all-first-decision.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-first-decision.png",
+      "sha256": "624b5761fe243ac05fd2c42ec5a823946f0dafdbc6c38eba31f098b2b47d1b81",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.575395+00:00",
+      "observation": "第一位审批人看到原送审正文、知悉规则和附件，已选通过且填写意见；尚未终结由旅程断言证明，未把这一帧当作最终批准。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "第一位审批人看到原送审正文、知悉规则和附件，已选通过且填写意见；尚未终结由旅程断言证明，未把这一帧当作最终批准。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-first-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-reject-decision",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-reject-decision",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Reject mode and nonempty reason are visible together; the footer remains reachable.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-reject-decision",
+      "expectedFileName": "all-reject-decision.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-reject-decision.png",
+      "sha256": "b769d4119da04b58f73be7fbcbcb46d4ef486ec4cee9d4f19be37bf98884a7a1",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.575867+00:00",
+      "observation": "另一位审批人的决定明确为驳回，填写非空意见；原送审正文及附件仍可读，红色驳回动作可辨。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "另一位审批人的决定明确为驳回，填写非空意见；原送审正文及附件仍可读，红色驳回动作可辨。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-reject-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-rejected-history-after-revision",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-rejected-history-after-revision",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Completed original task still shows its submitted body and file after a later revision; no edit/approval action is exposed.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-rejected-history-after-revision",
+      "expectedFileName": "all-rejected-history-after-revision.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-rejected-history-after-revision.png",
+      "sha256": "2fa4ad7ca4c6d8bf38d734cddf0e1beee5f56ea3b118eb2d5afbe7e47e06e79a",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.576348+00:00",
+      "observation": "后续修订后在已办页仍能查看原正文、送审时刻和附件，仅显示取消；没有重新决策入口。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "后续修订后在已办页仍能查看原正文、送审时刻和附件，仅显示取消；没有重新决策入口。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-rejected-history-after-revision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-blocked-node-resolution",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-blocked-node-resolution",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Member picker is open with two selected reviewer chips and a checked searched option. The normal popup partly covers the reason field; this is a picker-open state, not a fully visible final confirmation.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-blocked-node-resolution",
+      "expectedFileName": "all-blocked-node-resolution.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-blocked-node-resolution.png",
+      "sha256": "274041ccda7f93bd364c7890adca5fccad221b03085e97e53ff4e14934b4dddf",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.576811+00:00",
+      "observation": "人员选择器已打开，两个审批人标签与已选结果可见；弹出层正常覆盖原因区，不能据此认定最终确认内容全部入镜。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "人员选择器已打开，两个审批人标签与已选结果可见；弹出层正常覆盖原因区，不能据此认定最终确认内容全部入镜。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-blocked-node-resolution.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-blocked-original-resume",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-blocked-original-resume",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Original-task recovery dialog clearly requires a reason and exposes cancel/record-and-execute actions.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-blocked-original-resume",
+      "expectedFileName": "all-blocked-original-resume.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-blocked-original-resume.png",
+      "sha256": "1a0ab8b88232ceceea20ef412f16d6c9e5c1d457abe79b12f5f4a978409aca47",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.577227+00:00",
+      "observation": "已阻断背景上显示恢复原任务的必填原因与记录并执行；取消、确认与焦点均清楚，无默认以管理员代办的提示。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "已阻断背景上显示恢复原任务的必填原因与记录并执行；取消、确认与焦点均清楚，无默认以管理员代办的提示。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-blocked-original-resume.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-recovery-replacement-confirm",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-recovery-replacement-confirm",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Pending reviewer, selected replacement, nonempty reason and confirmation actions fit the modal.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-recovery-replacement-confirm",
+      "expectedFileName": "all-recovery-replacement-confirm.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-recovery-replacement-confirm.png",
+      "sha256": "d9b487908b9445ebfd56aac48e9d4576056f877b1af60356547ec828209caeb3",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.577635+00:00",
+      "observation": "待替换审批人、选中的新审批人和非空原因分组清楚，弹窗上下文与取消/记录并执行均完整入镜。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "待替换审批人、选中的新审批人和非空原因分组清楚，弹窗上下文与取消/记录并执行均完整入镜。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-recovery-replacement-confirm.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:recovery-final-decision",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:recovery-final-decision",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "The new non-recipient approver sees the same frozen body/file and can submit a qualified decision.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-recovery-final-decision",
+      "expectedFileName": "recovery-final-decision.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-recovery-final-decision.png",
+      "sha256": "85f3f3549f9914ddf5b472ca846360ed123c6fa1d08e815d40f87da318a5b99d",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.578222+00:00",
+      "observation": "新审批人看到同一原送审时刻、正文、3 人预计接收与 46 B 附件；审批意见和底部决策可达，实际替换身份由旅程核验。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "新审批人看到同一原送审时刻、正文、3 人预计接收与 46 B 附件；审批意见和底部决策可达，实际替换身份由旅程核验。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/recovery-final-decision.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "有权审批的当前任务处理人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-recovery-preserved-quorum",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-recovery-preserved-quorum",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Reloaded recovery page shows approved, one-line ALL label, the two retained/current approvers and no replacement action.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-recovery-preserved-quorum",
+      "expectedFileName": "all-recovery-preserved-quorum.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-recovery-preserved-quorum.png",
+      "sha256": "6d094ac23df810a9a80fbe226d95685061df530674c4658f1667ac15cb183fdd",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.578826+00:00",
+      "observation": "恢复页重载后显示已通过，所有人通过标签保持单行，原已投票人与替换人均列明且不再显示替换入口；底层票数事实由旅程核验。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "恢复页重载后显示已通过，所有人通过标签保持单行，原已投票人与替换人均列明且不再显示替换入口；底层票数事实由旅程核验。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--00dab-remaining-approver-finishes/all-recovery-preserved-quorum.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户流程管理员（恢复页）",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:any-default-definition-selected",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:any-default-definition-selected",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Native policy modal shows a human definition name selected, readiness guidance, daily 09:00, quota 3 and shared 60-minute spacing; fixed save/cancel footer remains visible.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-any-default-definition-selected",
+      "expectedFileName": "any-default-definition-selected.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-any-default-definition-selected.png",
+      "sha256": "325cac62e046120a18b48be7b996a4f760690c34937850ace3f68ee402058b9f",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.579383+00:00",
+      "observation": "租户默认流程选中当前 ANY 定义，自动催办 09:00、最多 3 次及 60 分钟间隔清楚；表单可滚动且底部保存/取消固定，未外推未入镜字段。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "租户默认流程选中当前 ANY 定义，自动催办 09:00、最多 3 次及 60 分钟间隔清楚；表单可滚动且底部保存/取消固定，未外推未入镜字段。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--adf8f-s-the-original-version-once/any-default-definition-selected.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "租户公告政策管理员",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "bpm:all-withdrawal-reason",
+      "feature": "embedded approval",
+      "actionPoint": "bpm:all-withdrawal-reason",
+      "stateBranch": "Existing approved scenario; same business assertion and state as the registered browser journey",
+      "expectation": "Reasoned withdrawal dialog is open with required reason, cancel/submit actions and an explicit notice that acceptance still requires actual process reconciliation.",
+      "driver": "playwright.announcements.config.ts",
+      "screenshotId": "bpm-all-withdrawal-reason",
+      "expectedFileName": "all-withdrawal-reason.png",
+      "kind": "bpm",
+      "status": "captured",
+      "existingJointMatrix": "docs/system-reference/evidence/announcement-s2-s8-2026-10-25/manifest.json: currentVisualReviews + sourceDerivedActions + supplementalActions",
+      "frozenSource": "1b4b702285dc26afb416fc600174a2efc0244542",
+      "path": "bpm-all-withdrawal-reason.png",
+      "sha256": "a0eb7d2b68287d23bd8fb57ca49d6d24454696c8eebd3cbe6b0592bff2978779",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:59:54.579822+00:00",
+      "observation": "撤销审批申请弹窗要求原因且已填写，说明受理后核对实际流程结果，取消与提交撤销请求清楚；截图捕获提交前。",
+      "issues": [],
+      "functionalVerdict": "pass for registered native journey; reconciliation separate",
+      "interactionVerdict": "pass for executed journey; not inferred from pixels",
+      "evidenceTrustVerdict": "fresh merged Core+BPM artifact; actual Java path and lock checked before browser",
+      "platformSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "撤销审批申请弹窗要求原因且已填写，说明受理后核对实际流程结果，取消与提交撤销请求清楚；截图捕获提交前。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Shared BPM task drawer/list and platform confirmation/picker components; no new visual language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Fresh exact original individually viewed; correct new artifact root, lock and producer identities checked before browser."
+        }
+      },
+      "privateOriginalPath": "bpm/attempt-2/artifacts/composition-announcements--12883-eleases-or-rewrites-history/all-withdrawal-reason.png",
+      "captureContext": {
+        "runtime": "announcement-management-bpm",
+        "role": "公告发布者/申请人",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in bpm-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "reader:frozen-attachment",
+      "feature": "announcement management",
+      "actionPoint": "reader:frozen-attachment",
+      "stateBranch": "approved existing journey: happy/edge",
+      "expectation": "Frozen recipient body, named retained file and distinct acknowledgement below content.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "reader-frozen-attachment",
+      "expectedFileName": "recipient-frozen-attachment.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "same sourceDerivedActions/supplementalActions assertion; current design §16/§18.28",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "reader-frozen-attachment.png",
+      "sha256": "1ff4f8cae4ca3f9d764493dd25c2ce5637f64e138ad57da3b0d5a969ce5d1a1d",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.313681+00:00",
+      "observation": "正文与图片、附件名及 56 B 大小清晰，知悉状态与首次时间独立呈现；确认知悉位于内容下方，返回我的公告可见。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "正文与图片、附件名及 56 B 大小清晰，知悉状态与首次时间独立呈现；确认知悉位于内容下方，返回我的公告可见。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-frozen-attachment.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "该冻结版本的有权接收者",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "reader:pending-inbox",
+      "feature": "announcement management",
+      "actionPoint": "reader:pending-inbox",
+      "stateBranch": "approved existing journey: happy/edge",
+      "expectation": "Narrow inbox exposes the pending acknowledgement and an accessible all-todos action.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "reader-pending-inbox",
+      "expectedFileName": "recipient-narrow-inbox-pending.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "same sourceDerivedActions/supplementalActions assertion; current design §16/§18.28",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "reader-pending-inbox.png",
+      "sha256": "d6656148b05c9628c892535ff8090f3974a776f3b121c9ded1929d4a0b8ace20",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 390,
+        "height": 844
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.314387+00:00",
+      "observation": "390px 收件箱浮层完整入镜，待知悉事项、公告待知悉标签及查看全部待办均可读；未把通知阅读当作已知悉。本帧不单独证明 Header 徽标刷新时序。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "390px 收件箱浮层完整入镜，待知悉事项、公告待知悉标签及查看全部待办均可读；未把通知阅读当作已知悉。本帧不单独证明 Header 徽标刷新时序。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-narrow-inbox-pending.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "该冻结版本的有权接收者",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "reader:ack-confirm",
+      "feature": "announcement management",
+      "actionPoint": "reader:ack-confirm",
+      "stateBranch": "approved existing journey: happy/edge",
+      "expectation": "Keyboard-opened acknowledgement confirmation fits 390px and cancellation preserves the unread acknowledgement fact.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "reader-ack-confirm",
+      "expectedFileName": "recipient-narrow-confirmation.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "same sourceDerivedActions/supplementalActions assertion; current design §16/§18.28",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "reader-ack-confirm.png",
+      "sha256": "be8575fbe791577ca5323a2f881032bea23bc15fb757f62398a187452d60437e",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 390,
+        "height": 844
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.315070+00:00",
+      "observation": "390px 知悉确认框完整显示首次确认说明，取消与确认未被遮挡且焦点可见；背景加载态属于等待该确认的命令交互，取消结果由原旅程断言。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "390px 知悉确认框完整显示首次确认说明，取消与确认未被遮挡且焦点可见；背景加载态属于等待该确认的命令交互，取消结果由原旅程断言。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--68fc6-the-controlled-version-link-oss/recipient-narrow-confirmation.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "该冻结版本的有权接收者",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "statistics:overview",
+      "feature": "announcement management",
+      "actionPoint": "statistics:overview",
+      "stateBranch": "approved existing journey: happy/edge",
+      "expectation": "Captured real recipient counts and snapshot-backed statistics render with an authorized export entry.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "statistics-overview",
+      "expectedFileName": "statistics-overview.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "same sourceDerivedActions/supplementalActions assertion; current design §16/§18.28",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "statistics-overview.png",
+      "sha256": "a2d50bf7a990be7e65e25db7a6a306a339e8284e7cd3a68a51a025c33598ff65",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.316124+00:00",
+      "observation": "固定版本和统计时刻、授权范围与知悉截止分组清楚；接收 1、已读 1、知悉 0 与 100%/0% 分离，导出主动作可辨。下方明细未全部在本帧入镜。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "固定版本和统计时刻、授权范围与知悉截止分组清楚；接收 1、已读 1、知悉 0 与 100%/0% 分离，导出主动作可辨。下方明细未全部在本帧入镜。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--9525e-certain-response-and-reload-oss/statistics-overview.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    },
+    {
+      "id": "reminders:preview",
+      "feature": "announcement management",
+      "actionPoint": "reminders:preview",
+      "stateBranch": "approved existing journey: happy/edge",
+      "expectation": "Actual recipient preview, cooldown and confirmation are clear; preview alone consumes no quota.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "reminders-preview",
+      "expectedFileName": "reminder-preview-ready.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "same sourceDerivedActions/supplementalActions assertion; current design §16/§18.28",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "capture-error/reminders-preview.png",
+      "sha256": "4b658564d5ce183e8909a1d1b2af40fd6c1c1042dfee04dd5d70feb758167bf8",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "visualVerdict": "invalid-capture-superseded",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.317045+00:00",
+      "observation": "后续证实该图在说明和催办信息的懒加载尚未完成时抓取，不能裁决就绪态；原字节已隔离，替代图见 ../fix-preview-stop-2026-10-26/manifest.md。",
+      "issues": [
+        "R-UI-01"
+      ],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "Source identity remains valid, but the named ready state was not fully captured; excluded from ready-scene acceptance.",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "实际可催办人数 1、当前限流 0、预览与有效时间以及确认/重新预览可读。摘要与计数表之间留白较大，记录为非阻断版式意见 R-UI-01，不在本次验证中重设计。"
+        },
+        "layoutDensity": {
+          "verdict": "pass-with-note",
+          "observation": "R-UI-01: preview has avoidable vertical whitespace; data/actions remain readable and reachable."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "capture-error",
+          "observation": "Named ready scene was captured before lazy business content completed."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "invalid-for-ready-scene",
+          "observation": "Original bytes retained in capture-error; acceptance corrected with a current guarded replacement."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--aebfd-sisted-batch-and-plan-facts-oss/reminder-preview-ready.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      },
+      "initialVisualVerdict": "accepted-with-note",
+      "initialObservation": "实际可催办人数 1、当前限流 0、预览与有效时间以及确认/重新预览可读。摘要与计数表之间留白较大，记录为非阻断版式意见 R-UI-01，不在本次验证中重设计。",
+      "excludedFromAcceptance": true,
+      "reclassifiedAt": "2026-10-26T07:25:15.885432+00:00",
+      "replacement": "../fix-preview-stop-2026-10-26/manifest.md"
+    },
+    {
+      "id": "reminders:resume-original",
+      "feature": "announcement management",
+      "actionPoint": "reminders:resume-original",
+      "stateBranch": "approved existing journey: happy/edge",
+      "expectation": "Original plan resumes after member authority recovery without a new publication or reset quota.",
+      "driver": "playwright.oss.config.ts tests/e2e/announcement",
+      "screenshotId": "reminders-resume-original",
+      "expectedFileName": "reminder-original-plan-resumed.png",
+      "kind": "core",
+      "status": "captured",
+      "existingJointMatrix": "same sourceDerivedActions/supplementalActions assertion; current design §16/§18.28",
+      "frozenSource": "7c5c1a4951b9d44a5282a0273b939762cd999d3a",
+      "path": "reminders-resume-original.png",
+      "sha256": "0c69cae122d2bad6c8787ddffc8833326e7568cb486dac90d58c3f0125bece05",
+      "locale": "zh-CN",
+      "screenshotDimensions": {
+        "width": 1440,
+        "height": 1100
+      },
+      "visualVerdict": "accepted",
+      "reviewer": "agent-vision",
+      "reviewedAt": "2026-10-26T01:40:07.318223+00:00",
+      "observation": "恢复后计划显示运行中、已用额度 0/上限 3、每日 09:00 和去重 60 分钟；无历史批次有解释。该普通公告未要求知悉，截止为空符合夹具。",
+      "issues": [],
+      "functionalVerdict": "pass; registered native journey executed; final identity reconciliation attached separately",
+      "interactionVerdict": "pass for the captured registered journey; screenshot alone is not the assertion",
+      "evidenceTrustVerdict": "current post-merge source and owned runtime; excluded first startup had no browser capture",
+      "reviewDimensions": {
+        "informationHierarchy": {
+          "verdict": "pass",
+          "observation": "恢复后计划显示运行中、已用额度 0/上限 3、每日 09:00 和去重 60 分钟；无历史批次有解释。该普通公告未要求知悉，截止为空符合夹具。"
+        },
+        "layoutDensity": {
+          "verdict": "pass",
+          "observation": "Captured grouping and action placement remain readable; no key content overlap observed."
+        },
+        "typographyAlignment": {
+          "verdict": "pass",
+          "observation": "Captured labels, values and buttons are readable at the recorded image dimensions; no overlapping text observed."
+        },
+        "actionClarity": {
+          "verdict": "pass",
+          "observation": "Primary/secondary or row-view actions are distinguishable where applicable; hidden write actions are assessed in the read-only scene."
+        },
+        "contentData": {
+          "verdict": "pass",
+          "observation": "Only current controlled fixture/business facts are shown; synthetic title identifiers are fixture content, not exposed platform keys."
+        },
+        "stateQuality": {
+          "verdict": "pass",
+          "observation": "The named scene is explicit in text or controls; this does not certify uncaptured loading/error/permission branches."
+        },
+        "responsiveAccessibility": {
+          "verdict": "pass-for-captured-viewport",
+          "observation": "No key clipping in this frame; keyboard and cancellation claims come from the native journey, not pixels. Screen-reader usability was not evaluated."
+        },
+        "consistency": {
+          "verdict": "pass",
+          "observation": "Uses the existing list/form/detail/dialog family and shared header; no unsolicited redesign or new component language."
+        },
+        "evidenceIntegrity": {
+          "verdict": "pass",
+          "observation": "Exact new image bytes, frozen merged source, locale and execution round recorded; no old screenshot was relabeled."
+        }
+      },
+      "privateOriginalPath": "attempt-2/postmerge-core-artifacts/announcement-announcement--94ba0-plan-through-native-actions-oss/reminder-original-plan-resumed.png",
+      "captureContext": {
+        "runtime": "announcement-management",
+        "role": "公告管理员/发布者",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        },
+        "viewportSource": "Frozen browser spec/use configuration, including explicit per-scene setViewportSize; screenshotDimensions may differ for full-page/element captures.",
+        "device": "Desktop Chromium; narrow receiver scenes use responsive viewport emulation, not a physical mobile device.",
+        "os": "macOS",
+        "locale": "zh-CN",
+        "fixture": "Fresh owned task database with unique scenario fixtures; exact journey identities in core-reconciliation.json",
+        "fontEnvironment": "Runtime CSS/browser fonts as rendered; no cross-machine pixel-baseline or font-fingerprint claim."
+      }
+    }
+  ],
+  "coreRun": "attempt-2",
+  "excludedRuns": [
+    {
+      "run": "initial Core startup",
+      "verdict": "environment-invalid; no browser capture",
+      "reason": "Dependency view unreadable after main upgrade; locked pnpm9 install restored it",
+      "evidence": "postmerge-core-start.log"
+    }
+  ],
+  "issues": [
+    {
+      "id": "R-UI-01",
+      "severity": "capture-error",
+      "scope": "reminders:preview",
+      "observation": "Large vertical whitespace between summary and count row.",
+      "disposition": "Original ready-state verdict withdrawn; exact bytes quarantined and replaced by guarded captures in the follow-up.",
+      "owner": "announcement UI/platform page layout",
+      "status": "resolved-as-capture-error",
+      "resolution": "../fix-preview-stop-2026-10-26/manifest.md"
+    }
+  ],
+  "excludedBpmRun": {
+    "path": "bpm",
+    "reason": "lifecycle adapter retained old artifact path; browser and captures excluded; fresh build remains valid"
+  },
+  "bpmRun": "bpm/attempt-2",
+  "scopeLimits": [
+    "32 selected post-merge frames; no exhaustive state permutation claim",
+    "Screen-reader usability not evaluated",
+    "No mini-program actual delivery, remote BPM, 50000 recipients, standalone 340-case corpus, OCI/Linux/Jenkins or production acceptance"
+  ],
+  "invalidAttempts": [
+    {
+      "path": "postmerge-core-start.log",
+      "reason": "startup dependencies unreadable; no business browser executed"
+    },
+    {
+      "path": "bpm",
+      "reason": "first browser round used old artifact; excluded; second startup also failed before browser due explicit Web dependency transition; some first-round lifecycle logs subsequently overwritten by this failed startup, so those original lifecycle diagnostics are incomplete",
+      "preservedFirstBrowserEvidence": [
+        "bpm/postmerge-browser.log",
+        "bpm/artifacts",
+        "bpm/collection.json",
+        "bpm/results.json",
+        "bpm/reconciliation.json"
+      ]
+    }
+  ],
+  "captureEnvironmentLimits": "Screenshots record the local Chromium/macOS render, not physical mobile or screen-reader acceptance. No cross-platform pixel diff was performed.",
+  "acceptedOriginalsAfterCorrection": 31,
+  "invalidReadyCaptures": 1
+}

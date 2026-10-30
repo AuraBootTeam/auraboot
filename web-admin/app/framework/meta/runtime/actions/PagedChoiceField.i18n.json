@@ -1,0 +1,12 @@
+{
+  "search": { "zh-CN": "搜索可选项", "en-US": "Search available choices" },
+  "selected": { "zh-CN": "已选", "en-US": "Selected" },
+  "empty": { "zh-CN": "没有匹配的可选项", "en-US": "No matching choices" },
+  "loading": { "zh-CN": "加载中…", "en-US": "Loading…" },
+  "failed": { "zh-CN": "无法加载当前授权范围内的选项，请重试。", "en-US": "Unable to load authorized choices. Try again." },
+  "unavailable": { "zh-CN": "部分已选项当前不可用，请重新选择。", "en-US": "Some selected choices are no longer available. Choose again." },
+  "retry": { "zh-CN": "重试", "en-US": "Retry" },
+  "clear": { "zh-CN": "清空选择", "en-US": "Clear selection" },
+  "previous": { "zh-CN": "上一页", "en-US": "Previous page" },
+  "next": { "zh-CN": "下一页", "en-US": "Next page" }
+}

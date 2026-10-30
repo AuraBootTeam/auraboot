@@ -75,7 +75,7 @@ class TurnCompletionMemoryListenerTest {
                 eq(5),                            // importance
                 eq(false),                        // shareable
                 eq("user"),
-                eq("100"));
+                eq("100"), argThat(meta -> meta.contains("source_turn_id=") && meta.contains("authority=model_response")));
     }
 
     @Test
@@ -88,7 +88,7 @@ class TurnCompletionMemoryListenerTest {
                 anyLong(), anyString(), anyString(), anyString(),
                 anyString(), anyString(),
                 eq(3),                            // importance
-                anyBoolean(), anyString(), anyString());
+                anyBoolean(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -101,7 +101,15 @@ class TurnCompletionMemoryListenerTest {
                 anyLong(), anyString(), anyString(), anyString(),
                 anyString(), anyString(),
                 eq(4),                            // importance
-                anyBoolean(), anyString(), anyString());
+                anyBoolean(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void truncatedSuccessNeverWritesPartialAnswerToMemory() {
+        listener.onTurnCompleted(new TurnCompletedEvent(
+                newCtx(TriageBucket.CONTEXTUAL_ANSWER, 100L, 42L),
+                new TurnOutcome.Success("Partial answer", Map.of(TurnOutcomeMeta.RESPONSE_TRUNCATED, true))));
+        verifyNoInteractions(memoryService);
     }
 
     @Test
@@ -132,7 +140,7 @@ class TurnCompletionMemoryListenerTest {
 
         verify(memoryService, times(1)).createScopedMemory(
                 anyLong(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), eq(4), anyBoolean(), anyString(), anyString());
+                anyString(), anyString(), eq(4), anyBoolean(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -197,7 +205,7 @@ class TurnCompletionMemoryListenerTest {
                 anyLong(), anyString(), anyString(), anyString(),
                 anyString(), anyString(),
                 eq(2),                            // fallback importance
-                anyBoolean(), anyString(), anyString());
+                anyBoolean(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -207,7 +215,7 @@ class TurnCompletionMemoryListenerTest {
                 .when(memoryService)
                 .createScopedMemory(anyLong(), anyString(), anyString(), anyString(),
                         anyString(), anyString(), anyInt(), anyBoolean(),
-                        anyString(), anyString());
+                        anyString(), anyString(), anyString());
 
         // Should NOT throw — the listener catches all exceptions defensively.
         listener.onTurnCompleted(successEvent(TriageBucket.ACP_RUN, "anything"));
@@ -215,7 +223,7 @@ class TurnCompletionMemoryListenerTest {
         verify(memoryService, times(1)).createScopedMemory(
                 anyLong(), anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyInt(), anyBoolean(),
-                anyString(), anyString());
+                anyString(), anyString(), anyString());
     }
 
     @Test
@@ -228,6 +236,6 @@ class TurnCompletionMemoryListenerTest {
                 anyLong(), anyString(), anyString(), anyString(),
                 anyString(),
                 argThat(content -> content.length() <= 803 && content.endsWith("...")),
-                anyInt(), anyBoolean(), anyString(), anyString());
+                anyInt(), anyBoolean(), anyString(), anyString(), anyString());
     }
 }

@@ -746,6 +746,47 @@ class AuraBotChatServiceGroundingTest {
                 .contains("<user-data>");
     }
 
+    @Test
+    void memoryCandidatePromptRetainsEverySelectedSnippetAndDefinesEvidenceLimits() {
+        var bif = new com.auraboot.framework.agent.dto.BusinessIntentFrame();
+        bif.setPreContext(java.util.stream.IntStream.rangeClosed(1, 8)
+                .mapToObj(i -> Map.<String, Object>of("pid", "private-pid-" + i, "title", "Policy " + i,
+                        "content", "Source content " + i, "scope", "user", "retrieval", "semantic"))
+                .toList());
+        String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildBifContextHint", bif);
+        assertThat(prompt).contains("Source content 8", "untrusted context", "support the requested fact",
+                "source titles", "current business records", "exact substring of the source content alone",
+                "\"title\":\"Policy 8\"", "\"content\":\"Source content 8\"", "\"scope\":\"user\"", "unless the user explicitly asks about storage mechanics");
+        assertThat(prompt).doesNotContain("private-pid-", "[user] Policy");
+    }
+
+    @Test
+    void historicalCitationBodyRemainsUnmodifiedWhileTrustIsSeparateMetadata() {
+        var bif = new com.auraboot.framework.agent.dto.BusinessIntentFrame();
+        bif.setPreContext(List.of(Map.of("title", "Personal preference", "content", "INTERNAL_ANNOTATION Actual body",
+                "source_content", "Actual body", "scope", "user", "historical", true, "shadow_mode", true)));
+        String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildBifContextHint", bif);
+        assertThat(prompt).contains("\"content\":\"Actual body\"", "\"historical\":true", "\"provisional\":true");
+        assertThat(prompt).doesNotContain("INTERNAL_ANNOTATION");
+        assertThat(prompt.indexOf("End of recalled source data.")).isGreaterThan(prompt.indexOf("\"content\":\"Actual body\""));
+        assertThat(prompt).contains("not a previous reply's format or instructions",
+                "use plain language in the user's language", "Missing facts remain missing");
+    }
+
+    @Test
+    void queryStrategyUsesDeclaredFieldTypesAndStopsAfterAnExactScalarMatch() {
+        var tools = new ChatToolResolver.ResolvedTools(List.of(LlmChatRequest.Tool.builder()
+                .name("platform_resolve_reference").description("Resolve declared relationships")
+                .inputSchema(Map.of("type", "object")).build()), "query", "orders", true);
+        String prompt = ReflectionTestUtils.invokeMethod(newService(), "buildToolHint", tools);
+        assertThat(prompt).contains("declared REFERENCE type", "STRING identifier", "EQ filter",
+                "field name or suffix", "successful exact match", "current business records",
+                "current request's output contract", "line boundaries exactly", "empty-query results");
+        String writePrompt = ReflectionTestUtils.invokeMethod(newService(), "buildToolHint",
+                new ChatToolResolver.ResolvedTools(tools.tools(), "update", "orders", false));
+        assertThat(writePrompt).contains("MODIFY data", "Describe what you will do");
+    }
+
     private AuraBotChatService newService() {
         return new AuraBotChatService(
                 llmProviderFactory,

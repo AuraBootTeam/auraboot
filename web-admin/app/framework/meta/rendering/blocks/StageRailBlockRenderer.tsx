@@ -41,11 +41,10 @@ export const StageRailBlockRenderer: React.FC<StageRailBlockRendererProps> = ({
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
-  const record =
-    (block as any).record ||
-    resolveRuntimeValue(runtime, (block as any).context) ||
-    context.record ||
-    {};
+  const record = (block as any).record ??
+    ((block as any).context !== undefined
+      ? resolveRuntimeValue(runtime, (block as any).context)
+      : context.record) ?? {};
   const stageField = String((block as any).stageField || 'status');
   const currentValue = String(readPath(record, stageField) || '');
   const stages = (

@@ -221,9 +221,26 @@ public class AuraBotConversationService {
                 .thinkingContent(message.getThinkingContent())
                 .thinkingSignature(message.getThinkingSignature())
                 .retrievalEvidence(readRetrievalEvidence(metadata))
-                .resultContracts(analyticsHistory.restore(metadata.path("analyticsReferences")))
+                .resultContracts(restoreResultContracts(metadata))
                 .createdAt(message.getCreatedAt())
                 .build();
+    }
+
+    /** Historical snapshots share transcript membership checks; restoring them never dispatches tools. */
+    private List<com.auraboot.framework.agent.dto.ResultContract> restoreResultContracts(
+            com.fasterxml.jackson.databind.JsonNode metadata) {
+        List<com.auraboot.framework.agent.dto.ResultContract> result = new ArrayList<>(
+                analyticsHistory.restore(metadata.path("analyticsReferences")));
+        var snapshots = metadata.path("resultContracts");
+        if (snapshots.isMissingNode() || snapshots.isNull()) return result;
+        if (metadata.path("resultContractsVersion").asInt() != 1 || !snapshots.isArray()) {
+            return result;
+        }
+        for (var snapshot : snapshots) {
+            var contract = objectMapper.convertValue(snapshot, com.auraboot.framework.agent.dto.ResultContract.class);
+            if (contract != null && !"aurabot:chat-bi".equals(contract.getSkillCode())) result.add(contract);
+        }
+        return List.copyOf(result);
     }
 
     private com.fasterxml.jackson.databind.JsonNode readMessageMetadata(String rawMetadata) {

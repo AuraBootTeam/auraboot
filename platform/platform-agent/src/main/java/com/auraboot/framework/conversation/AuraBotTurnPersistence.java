@@ -174,14 +174,20 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
         long agentId = agentResolver.resolve(ctx.tenantId(), resolveCode);
         String persistedPayload = cardPayload;
         var analyticsReferences = com.auraboot.framework.agent.integration.behavior.AnalyticsResultHistory.references(artifacts.resultContracts());
-        if (!analyticsReferences.isEmpty() || !artifacts.retrievalEvidence().isEmpty()) {
+        var resultSnapshots = artifacts.resultContracts().stream()
+                .filter(contract -> contract != null && !"aurabot:chat-bi".equals(contract.getSkillCode()))
+                .toList();
+        String traceId = artifacts.traceId() != null ? artifacts.traceId() : ctx.traceId();
+        if (traceId != null || !analyticsReferences.isEmpty() || !resultSnapshots.isEmpty() || !artifacts.retrievalEvidence().isEmpty()) {
             try {
                 java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();
-                if (ctx.traceId() != null) {
-                    metadata.put("traceId", ctx.traceId());
+                if (traceId != null) {
+                    metadata.put("traceId", traceId);
                 }
                 metadata.put("retrievalEvidence", artifacts.retrievalEvidence());
                 metadata.put("analyticsReferences", analyticsReferences);
+                metadata.put("resultContractsVersion", 1);
+                metadata.put("resultContracts", resultSnapshots);
                 persistedPayload = objectMapper.writeValueAsString(metadata);
             } catch (Exception e) {
                 throw new IllegalStateException("Could not serialize retrieval evidence", e);

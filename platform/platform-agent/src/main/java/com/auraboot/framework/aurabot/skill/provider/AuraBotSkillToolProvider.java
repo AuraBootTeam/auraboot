@@ -107,6 +107,12 @@ public class AuraBotSkillToolProvider implements ToolProvider {
         String display = resolveI18n(meta.getDisplayName(), meta.getDisplayName());
         String descKey = "aurabot.skill." + meta.getName().replace(":", ".") + ".description";
         String description = resolveI18n(descKey, display);
+        if (requiresConfirm) {
+            description += " " + resolveI18n("aurabot.skill.confirmation.description",
+                    "Invoke this tool to obtain the server-side preview and confirmation card. "
+                            + "The initial call does not perform the write; execution follows explicit human approval. "
+                            + "Do not simulate a preview card in text or ask for approval before invoking this tool.");
+        }
 
         Map<String, Object> schemaMap = jsonNodeToMap(meta.getParamsSchema());
 

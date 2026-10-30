@@ -86,7 +86,7 @@ function buildUiIndex(specRoots) {
   for (const root of specRoots) {
     for (const file of walk(root, SPEC_EXTS)) {
       const text = fs.readFileSync(file, 'utf8');
-      for (const m of text.matchAll(/["'`]([a-z0-9_-]+:[a-z0-9_]+)["'`]/gi)) {
+      for (const m of text.matchAll(/(?:["'`]|\/commands\/execute\/)([a-z0-9_-]+:[a-z0-9_]+)["'`]/gi)) {
         const rel = path.relative(process.cwd(), file);
         if (!index.has(m[1])) index.set(m[1], []);
         if (!index.get(m[1]).includes(rel)) index.get(m[1]).push(rel);
@@ -327,8 +327,10 @@ export function buildManifest({
     const pageRows = pages.map((p) => {
       pageTotal += 1;
       const evidence = new Set(pageIndex.get(p.pageKey) ?? []);
-      if (p.modelCode && p.pageKey === `${p.modelCode}_${p.kind}`) {
-        for (const file of modelRouteIndex.get(`${p.modelCode}:${p.kind}`) ?? []) {
+      const routeAlias = p.pageKey.endsWith(`_${p.kind}`)
+        ? p.pageKey.slice(0, -p.kind.length - 1) : null;
+      if (routeAlias) {
+        for (const file of modelRouteIndex.get(`${routeAlias}:${p.kind}`) ?? []) {
           evidence.add(file);
         }
       }

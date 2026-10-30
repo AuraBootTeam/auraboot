@@ -21,6 +21,11 @@ public interface DataScopeService {
      */
     DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode);
 
+    /** Resolve current member-group scope without requiring a business-row team column. */
+    default DataScopeCondition resolveAudienceScope(Long memberId, String resourceCode, String actionCode) {
+        return resolveHistoricalScope(memberId, resourceCode, actionCode);
+    }
+
     /** Resolve current historical scope without legacy ownership approximations. */
     default DataScopeCondition resolveHistoricalScope(Long memberId, String resourceCode, String actionCode) {
         return DataScopeCondition.none();

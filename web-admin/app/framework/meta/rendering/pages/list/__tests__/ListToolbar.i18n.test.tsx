@@ -76,6 +76,15 @@ function renderToolbar(extraProps: Partial<React.ComponentProps<typeof ListToolb
 }
 
 describe('ListToolbar i18n', () => {
+  it.each([true, false])('opens field settings only after persisted preferences finish loading (%s)', loading => {
+    const open = vi.fn();
+    renderToolbar({ columnSettingsLoading: loading, onColumnSettingsOpen: open });
+    const button = screen.getByTestId('column-settings-btn');
+    if (loading) expect(button).toBeDisabled();
+    else expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(open).toHaveBeenCalledTimes(loading ? 0 : 1);
+  });
   it('hides unsupported keyword search while keeping the configured filter entry usable', () => {
     const onFilterFormToggle = vi.fn();
     renderToolbar({ hideSearch: true, onFilterFormToggle, hideQuickFilters: true,

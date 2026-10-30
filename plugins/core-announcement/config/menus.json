@@ -8,7 +8,7 @@
     "component": null,
     "icon": "IconSpeakerphone",
     "type": 0,
-    "permissionCode": "announcement.announcement.read",
+    "permissionCode": null,
     "orderNo": 920,
     "visible": true,
     "extension": {
@@ -30,6 +30,42 @@
     "permissionCode": "announcement.announcement.read",
     "orderNo": 10,
     "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "my_announcements",
+    "parentCode": "announcement_root",
+    "name:zh-CN": "我的公告",
+    "name:en": "My announcements",
+    "path": "/p/announcement_reader",
+    "pageKey": "announcement_reader_list",
+    "type": 1,
+    "permissionCode": null,
+    "orderNo": 5,
+    "visible": true,
+    "icon": "IconSpeakerphone",
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "announcement_policy",
+    "parentCode": "announcement_root",
+    "name:zh-CN": "公告政策",
+    "name:en": "Announcement policy",
+    "path": "/p/announcement_policy/view/current",
+    "pageKey": "announcement_policy_detail",
+    "type": 1,
+    "permissionCode": "announcement.announcement.policy_manage",
+    "orderNo": 20,
+    "visible": true,
+    "icon": "IconSettings",
     "extension": {
       "platforms": [
         "web"

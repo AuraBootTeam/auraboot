@@ -56,6 +56,19 @@ class ToolbarActionValidatorBoundaryTest {
     }
 
     @ParameterizedTest
+    @MethodSource("nativeDialogs")
+    void nativeInputDialogSuppliesRequiredUpdateForm(Object fields, boolean valid) {
+        var action = new HashMap<String, Object>(Map.of("type", "command", "command", "test:update_item"));
+        action.put("inputFields", fields);
+        assertCodes(manifest(button(action)), valid ? new String[0] : new String[]{"SEM-TB-002"});
+    }
+    static Stream<Arguments> nativeDialogs() {
+        return Stream.of(Arguments.of(null, false), Arguments.of(List.of(), false),
+            Arguments.of(List.of(Map.of()), false), Arguments.of(List.of(Map.of("field", " ")), false),
+            Arguments.of(List.of(Map.of("field", "title")), true));
+    }
+
+    @ParameterizedTest
     @MethodSource("navigation")
     void navigationChecksMissingTargetsAndRespectsPlatformRoutes(Object target, String expected) {
         var action = new HashMap<String, Object>(); action.put("type", "navigate"); action.put("to", target);

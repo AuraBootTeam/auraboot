@@ -12,14 +12,21 @@ package com.auraboot.framework.conversation;
  * red line).
  *
  * <p>Result contracts are captured for persistence of authorized analytics query
- * references. Result rows are not stored in the history metadata.
+ * references and non-analytics historical snapshots. Analytics rows remain reference-only.
  */
 public record TurnArtifacts(
         String thinkingContent,
         String thinkingSignature,
         java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
                 retrievalEvidence,
-        java.util.List<com.auraboot.framework.agent.dto.ResultContract> resultContracts) {
+        java.util.List<com.auraboot.framework.agent.dto.ResultContract> resultContracts,
+        String traceId) {
+
+    public TurnArtifacts(String content, String signature,
+            java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence,
+            java.util.List<com.auraboot.framework.agent.dto.ResultContract> contracts) {
+        this(content, signature, evidence, contracts, null);
+    }
 
     /** Sentinel for turns that produced no artifacts. */
     public static final TurnArtifacts EMPTY = new TurnArtifacts(null, null, java.util.List.of());
@@ -63,5 +70,10 @@ public record TurnArtifacts(
             java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence,
             java.util.List<com.auraboot.framework.agent.dto.ResultContract> contracts) {
         return new TurnArtifacts(content, signature, evidence, contracts);
+    }
+    public static TurnArtifacts of(String content, String signature,
+            java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence,
+            java.util.List<com.auraboot.framework.agent.dto.ResultContract> contracts, String traceId) {
+        return new TurnArtifacts(content, signature, evidence, contracts, traceId);
     }
 }

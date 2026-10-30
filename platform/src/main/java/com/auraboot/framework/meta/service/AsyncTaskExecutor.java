@@ -17,6 +17,13 @@ public interface AsyncTaskExecutor {
     String getTaskType();
 
     /**
+     * Public submission is opt-in. SQL exports, command handlers and other host-created jobs
+     * must use an authorized business entry point instead of accepting client execution identity.
+     * An opted-in executor must authorize typed input against its persisted task owner.
+     */
+    default boolean supportsPublicSubmission() { return false; }
+
+    /**
      * Execute the task.
      *
      * @param inputParams task input parameters from the submission

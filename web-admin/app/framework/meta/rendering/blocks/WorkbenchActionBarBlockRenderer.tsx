@@ -1,3 +1,4 @@
+import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import React, { useState } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -56,7 +57,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   useDataSourceSubscription(runtime, typeof block.dataSource === 'string' ? block.dataSource : undefined);
 
   const visibleActions = actions.filter((actionConfig: any) => {
-    if (actionConfig?.permissionCode && !hasPermission(actionConfig.permissionCode)) return false;
+    if (actionConfig && !hasButtonPermissions(actionConfig, hasPermission)) return false;
     if (!actionConfig?.visibleWhen) return true;
     return evaluator.evaluateCondition(actionConfig.visibleWhen, context);
   });

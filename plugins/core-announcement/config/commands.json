@@ -5,9 +5,11 @@
     "displayName:en": "Create Announcement",
     "type": "create",
     "modelCode": "ab_announcement",
-    "inputFields": ["title", "content", "announcement_priority", "pinned", "expires_at"],
-    "autoSetFields": {
-      "status": { "strategy": "fixed_value", "value": "draft" }
+    "permissions": [
+      "announcement.announcement.edit"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
     }
   },
   {
@@ -16,7 +18,12 @@
     "displayName:en": "Update Announcement",
     "type": "update",
     "modelCode": "ab_announcement",
-    "inputFields": ["title", "content", "announcement_priority", "pinned", "expires_at"]
+    "permissions": [
+      "announcement.announcement.edit"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
   },
   {
     "code": "announcement:delete_announcement",
@@ -27,56 +34,189 @@
     "extension": {
       "confirmMessage:zh-CN": "确认删除此公告？",
       "confirmMessage:en": "Confirm delete this announcement?"
+    },
+    "permissions": [
+      "announcement.announcement.delete"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
     }
   },
   {
     "code": "announcement:publish",
     "displayName:zh-CN": "发布",
     "displayName:en": "Publish",
-    "type": "state_transition",
+    "type": "custom",
     "modelCode": "ab_announcement",
-    "stateField": "status",
-    "fromStates": ["draft"],
-    "toState": "published",
-    "autoSetFields": {
-      "published_at": { "strategy": "current_datetime" },
-      "published_by": { "strategy": "current_user" }
-    },
-    "extension": {
-      "confirmMessage:zh-CN": "确认发布此公告？发布后将对所有用户可见。",
-      "confirmMessage:en": "Confirm publish? It will be visible to all users."
+    "extension": {},
+    "permissions": [
+      "announcement.announcement.publish"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
     }
   },
   {
     "code": "announcement:archive",
     "displayName:zh-CN": "撤回",
     "displayName:en": "Archive",
-    "type": "state_transition",
+    "type": "custom",
     "modelCode": "ab_announcement",
-    "stateField": "status",
-    "fromStates": ["published"],
-    "toState": "archived",
     "extension": {
       "confirmMessage:zh-CN": "确认撤回此公告？撤回后将不再展示。",
       "confirmMessage:en": "Confirm archive? It will no longer be displayed."
+    },
+    "permissions": [
+      "announcement.announcement.withdraw"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
     }
   },
   {
     "code": "announcement:republish",
-    "displayName:zh-CN": "重新发布",
-    "displayName:en": "Republish",
-    "type": "state_transition",
+    "displayName:zh-CN": "建立修订草稿",
+    "displayName:en": "Create revision draft",
+    "type": "custom",
     "modelCode": "ab_announcement",
-    "stateField": "status",
-    "fromStates": ["archived"],
-    "toState": "published",
-    "autoSetFields": {
-      "published_at": { "strategy": "current_datetime" },
-      "published_by": { "strategy": "current_user" }
-    },
-    "extension": {
-      "confirmMessage:zh-CN": "确认重新发布此公告？",
-      "confirmMessage:en": "Confirm republish this announcement?"
+    "extension": {},
+    "permissions": [
+      "announcement.announcement.edit"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:cancel_schedule",
+    "displayName:zh-CN": "取消发布安排",
+    "displayName:en": "Cancel release",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.publish"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:submit_approval",
+    "displayName:zh-CN": "提交审批",
+    "displayName:en": "Submit for approval",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.submit",
+      "announcement.announcement.publish"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:withdraw_approval",
+    "displayName:zh-CN": "撤销审批申请",
+    "displayName:en": "Withdraw approval",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.withdraw"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:update_policy",
+    "displayName:zh-CN": "保存公告政策",
+    "displayName:en": "Save announcement policy",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.policy_manage"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:export_statistics",
+    "displayName:zh-CN": "导出接收明细",
+    "displayName:en": "Export recipient statistics",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.stats",
+      "announcement.announcement.export"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:remind",
+    "displayName:zh-CN": "提交催办",
+    "displayName:en": "Submit reminder",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.remind"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:resume_reminders",
+    "displayName:zh-CN": "恢复自动催办",
+    "displayName:en": "Resume automatic reminders",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.remind"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:set_pinned",
+    "displayName:zh-CN": "置顶",
+    "displayName:en": "Pin announcement",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.edit"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:reconcile_approval",
+    "displayName:zh-CN": "核对审批结果",
+    "displayName:en": "Reconcile approval",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.manage"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
+    }
+  },
+  {
+    "code": "announcement:retry_publication",
+    "displayName:zh-CN": "恢复发布任务",
+    "displayName:en": "Retry publication",
+    "type": "custom",
+    "modelCode": "ab_announcement",
+    "permissions": [
+      "announcement.announcement.publish"
+    ],
+    "executionConfig": {
+      "requireIdempotencyKey": true
     }
   }
 ]

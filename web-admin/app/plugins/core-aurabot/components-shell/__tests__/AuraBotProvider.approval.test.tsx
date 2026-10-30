@@ -34,6 +34,19 @@ async function propose() {
   await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('confirm_card'));
 }
 describe('approval decision feedback', () => {
+  it('renders the resumed structured result before any history reload', async () => {
+    await propose(); fireEvent.click(screen.getByText('Approve'));
+    await waitFor(() => expect(auraBotApi.executeStream).toHaveBeenCalled());
+    await act(async () => {
+      callbacks.onResultContract?.({ outputType: 'structured_result', actionability: 'write', status: 'success',
+        skillCode: 'aurabot:model:create', renderHint: 'card', data: { data: { displayName: 'Ledger', modelCode: 'ledger' } } });
+      callbacks.onDone('', 'trace-result'); finish();
+    });
+    const messages = JSON.parse(screen.getByTestId('state').textContent || '{}').messages;
+    expect(messages.filter((message: any) => message.type === 'result_contract')).toHaveLength(1);
+    expect(messages.find((message: any) => message.type === 'result_contract').resultContract.data.data.displayName).toBe('Ledger');
+  });
+
   it('replaces the same pending tool instead of duplicating its decision feedback', async () => {
     vi.mocked(auraBotApi.chatStream).mockImplementation(async (_request, c) => {
       c.onToolStart?.('decision', 'aurabot_model_create', { code: 'approval_visual_case' });
@@ -48,6 +61,22 @@ describe('approval decision feedback', () => {
     const pending = JSON.parse(screen.getByTestId('state').textContent || '{}').messages.filter((m: any) => m.toolId === 'decision');
     expect(pending).toHaveLength(1);
     expect(pending[0].riskLevel).toBe('HIGH');
+  });
+
+  it.each(['TOOL_ACCESS_DENIED', 'generic failure'])('does not turn a failed tool result into success on stream completion: %s', async errorCode => {
+    await propose(); fireEvent.click(screen.getByText('Approve'));
+    await waitFor(() => expect(auraBotApi.executeStream).toHaveBeenCalled());
+    await act(async () => {
+      callbacks.onToolResult?.('decision', { success: false, errorCode, retryable: false }, false);
+      callbacks.onDone('The action failed.', 'trace-denied'); finish();
+    });
+    const messages = JSON.parse(screen.getByTestId('state').textContent || '{}').messages;
+    expect(messages.find((message: any) => message.toolId === 'decision')?.type).toBe('error');
+    expect(messages.some((message: any) => message.type === 'tool_executed')).toBe(false);
+    expect(screen.getByTestId('state')).toHaveTextContent(errorCode === 'TOOL_ACCESS_DENIED'
+      ? '当前操作未获授权，未执行。请联系管理员授权后再试；确认审批不会补授权限。'
+      : '操作未完成，请查看结果或联系管理员。');
+    expect(screen.getByTestId('state')).toHaveTextContent('"isLoading":false');
   });
 
   it('keeps unknown server diagnostics out of the approval UI', async () => {

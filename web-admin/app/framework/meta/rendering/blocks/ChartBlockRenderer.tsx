@@ -12,6 +12,8 @@
  */
 
 import React, { Suspense, useMemo, useSyncExternalStore } from 'react';
+import { AuthoritativeSourceBlock } from './AuthoritativeSourceBlock';
+import { useDetailSourceRefreshVersion } from '../pages/detail/DetailSourceRefreshContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
@@ -109,8 +111,9 @@ export function resolveStateParams(
   return out;
 }
 
-export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
+const LegacyChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, runtime }) => {
   const { locale } = useI18n();
+  const sourceRefreshVersion = useDetailSourceRefreshVersion();
   const props = (block as any).props || {};
   const chartType = (block.chartType as string) || props.chartType || 'bar';
   const ChartComponent = getChartComponent(chartType);
@@ -159,7 +162,10 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       resolvedDataSource = withState;
     }
     if (dataSource && (dataSource as any).params && !(resolvedDataSource as any).parameters) {
-      resolvedDataSource = { ...resolvedDataSource, parameters: (resolvedDataSource as any).params };
+      resolvedDataSource = {
+        ...resolvedDataSource,
+        parameters: (resolvedDataSource as any).params,
+      };
     }
 
     if (paramsStateKey && windowParams && resolvedDataSource) {
@@ -170,8 +176,9 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
     }
     // Explicit block height becomes the container style: Smart charts size to 100% of
     // their parent, so an unconfigured height collapses ECharts to its fallback height.
-    const blockHeight = (props.height as number | undefined)
-      ?? ((block as any).chartConfig?.height as number | undefined);
+    const blockHeight =
+      (props.height as number | undefined) ??
+      ((block as any).chartConfig?.height as number | undefined);
     return {
       title: block.title ? getLocalizedText(block.title, locale) : undefined,
       // Visualization props (new unified format)
@@ -181,7 +188,9 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       // Resolved dataSource MUST come after ...config, which otherwise re-injects the raw
       // (unresolved) config.dataSource and drops the per-record parameters.
       dataSource: resolvedDataSource || { type: 'static' as const, staticData: [] },
-      ...(blockHeight ? { style: { ...((visualization as any).style ?? {}), height: blockHeight } } : {}),
+      ...(blockHeight
+        ? { style: { ...((visualization as any).style ?? {}), height: blockHeight } }
+        : {}),
       // Advanced features (previously Dashboard-only, now available in DSL)
       linkage: (block as any).linkage,
       drillDown: (block as any).drillDown,
@@ -222,9 +231,16 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
 
   return (
     <Suspense fallback={<ChartLoadingFallback />}>
-      <ChartComponent {...chartProps} />
+      <ChartComponent key={sourceRefreshVersion} {...chartProps} />
     </Suspense>
   );
 };
+
+export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = (props) =>
+  Object.prototype.hasOwnProperty.call(props.block.props ?? {}, 'sourceState') ? (
+    <AuthoritativeSourceBlock {...props} kind="chart" />
+  ) : (
+    <LegacyChartBlockRenderer {...props} />
+  );
 
 export default ChartBlockRenderer;

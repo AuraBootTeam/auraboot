@@ -1,3 +1,4 @@
+import { useDetailPresentation } from './detail/DetailPresentationContext';
 /**
  * DynamicPageRenderer — Profile-aware unified entry point for dynamic pages
  *
@@ -50,6 +51,7 @@ export function DynamicPageRenderer({
   token,
   pageKey,
 }: DynamicPageRendererProps) {
+  const presentation = useDetailPresentation();
   // 1. Validate pageType matches DB kind values
   const VALID_KINDS = ['list', 'form', 'detail', 'kanban'] as const;
   const isValidPageType = VALID_KINDS.includes(pageType);
@@ -63,7 +65,15 @@ export function DynamicPageRenderer({
 
   // 2. Load schema
   const { schema, loading, error } = useSchemaLoader(schemaRequest);
-  useSchemaPresentation(schema, schema?.kind === 'form' ? (recordPid ? schema.extension?.editTitle : schema.extension?.createTitle) : undefined);
+  useSchemaPresentation(
+    schema,
+    schema?.kind === 'form'
+      ? recordPid
+        ? schema.extension?.editTitle
+        : schema.extension?.createTitle
+      : undefined,
+    !presentation,
+  );
 
   if (!VALID_KINDS.includes(pageType)) {
     return (
@@ -125,25 +135,34 @@ export function DynamicPageRenderer({
         <ProfileProvider value={profile}>
           <div data-testid={`dynamic-page-${pageType}`}>
             <Suspense fallback={fallback}>
-              <ContextualAuthoringSurface
-                schema={schema}
-                recordPid={recordPid}
-                renderRuntime={(runtimeSchema) => (
-                  <PageContent
-                    schema={runtimeSchema}
-                    tableName={tableName}
-                    recordPid={recordPid}
-                    token={token}
-                  />
-                )}
-              >
+              {presentation ? (
                 <PageContent
                   schema={schema}
                   tableName={tableName}
                   recordPid={recordPid}
                   token={token}
                 />
-              </ContextualAuthoringSurface>
+              ) : (
+                <ContextualAuthoringSurface
+                  schema={schema}
+                  recordPid={recordPid}
+                  renderRuntime={(runtimeSchema) => (
+                    <PageContent
+                      schema={runtimeSchema}
+                      tableName={tableName}
+                      recordPid={recordPid}
+                      token={token}
+                    />
+                  )}
+                >
+                  <PageContent
+                    schema={schema}
+                    tableName={tableName}
+                    recordPid={recordPid}
+                    token={token}
+                  />
+                </ContextualAuthoringSurface>
+              )}
             </Suspense>
           </div>
         </ProfileProvider>

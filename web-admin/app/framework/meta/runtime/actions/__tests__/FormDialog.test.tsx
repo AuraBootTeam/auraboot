@@ -127,6 +127,25 @@ describe('FormDialog choice fields', () => {
     expect(onSubmit).toHaveBeenCalledWith({ crm_lpi_claimed_by: 'user-sales-1' });
   });
 
+  it.each(['select', 'segmented'])('accepts an optional null %s choice when no workflow is configured', (type) => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [{ field: 'workflow', label: '审批流程', type }],
+      fieldOptions: { workflow: [] }, defaults: { workflow: null }, onSubmit });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({ workflow: null });
+  });
+
+  it.each([['select', null], ['segmented', null], ['select', 'missing'], ['segmented', 'missing']])(
+    'rejects a required or unknown %s choice: %s', (type, value) => {
+      const onSubmit = vi.fn();
+      renderDialog({ fields: [{ field: 'workflow', label: '审批流程', type, required: true }],
+        fieldOptions: { workflow: [{ value: 'known', label: '可用流程' }] }, defaults: { workflow: value }, onSubmit });
+      fireEvent.click(screen.getByTestId('form-dialog-submit'));
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText(type === 'segmented' ? '请填写审批流程' : '请选择审批流程', { exact: true })).toBeInTheDocument();
+    },
+  );
+
   it('uses localized fallbacks instead of leaking missing i18n keys', () => {
     renderDialog({
       fields: [{ field: 'strategy', label: '处理策略', type: 'select' }],

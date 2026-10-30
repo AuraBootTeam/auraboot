@@ -58,6 +58,16 @@ public class AuditTrailService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AuditTrail recordAudit(AuditTrailEvent event) {
+        return appendUnderTenantLock(event);
+    }
+
+    /** Join an explicit caller transaction when a data mutation and its before-image must commit atomically. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AuditTrail recordInCurrentTransaction(AuditTrailEvent event) {
+        return appendUnderTenantLock(event);
+    }
+
+    private AuditTrail appendUnderTenantLock(AuditTrailEvent event) {
         Long tenantId = event.getTenantId();
         if (tenantId == null) {
             throw new IllegalArgumentException("Audit event tenantId is required");

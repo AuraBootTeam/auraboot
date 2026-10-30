@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
+import { reloadDetailForReview } from './reloadDetailForReview';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -72,6 +73,34 @@ export function useDetailRuntime({
     setDetailRefreshVersion((version) => version + 1);
   }, [reloadRecord, schema?.dataSources, permissionHiddenDataSourceIds, dataSourceManager]);
 
+  const pendingReviews = useRef(new Set<AbortController>());
+  useEffect(() => {
+    const pending = pendingReviews.current;
+    return () => {
+      pending.forEach((controller) => controller.abort());
+      pending.clear();
+    };
+  }, [dataSourceManager, recordPid, tableName, token]);
+
+  const refreshDetailForReview = useCallback(async () => {
+    const sourceIds = Object.keys(schema?.dataSources || {}).filter(
+      (id) => !permissionHiddenDataSourceIds.has(id),
+    );
+    const controller = new AbortController();
+    pendingReviews.current.add(controller);
+    try {
+      await reloadDetailForReview(
+        reloadRecordStrict,
+        dataSourceManager,
+        sourceIds,
+        controller.signal,
+      );
+      setDetailRefreshVersion((version) => version + 1);
+    } finally {
+      pendingReviews.current.delete(controller);
+    }
+  }, [reloadRecordStrict, schema?.dataSources, permissionHiddenDataSourceIds, dataSourceManager]);
+
   // Use unified action handler for toolbar buttons (commandCode, navigateTo)
   const {
     handleAction,
@@ -82,9 +111,13 @@ export function useDetailRuntime({
     runtime,
     navigate,
     tableName,
+    // Route segments are page keys on custom pages; record reads authorize by
+    // model, so pin the command snapshot against the schema's model.
+    recordReadModel: schema?.modelCode,
     context: {
       record: recordData,
       loadData: refreshDetailAfterChildChange,
+      loadDataForReview: refreshDetailForReview,
     },
     dataSourceManager,
     locale,

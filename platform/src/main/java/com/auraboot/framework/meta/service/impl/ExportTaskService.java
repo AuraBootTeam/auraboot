@@ -53,6 +53,9 @@ public class ExportTaskService {
     @Qualifier("exportTaskExecutor")
     private Executor exportTaskExecutor;
 
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<DomainExportTaskService> domainExports;
+
     public record ExportArtifactDownload(java.io.InputStream content, long size, String extension) {}
 
     /**
@@ -187,6 +190,7 @@ public class ExportTaskService {
         if (task == null || !belongsToCurrentOwner(task)) {
             throw new MetaServiceException("Export task not found: " + taskPid);
         }
+        if(DomainExportTaskService.isDomain(task)) return domainExports.getObject().baseStatus(taskPid);
         return toDTO(task);
     }
 
@@ -195,6 +199,8 @@ public class ExportTaskService {
      */
     public String getFileKey(String taskPid) {
         ExportTask task = exportTaskMapper.findByPid(taskPid);
+        if(DomainExportTaskService.isDomain(task))
+            throw new org.springframework.security.access.AccessDeniedException("Domain artifacts require the verified content resolver");
         if (task == null || !belongsToCurrentOwner(task) || !isDownloadable(task)) {
             return null;
         }
@@ -210,6 +216,13 @@ public class ExportTaskService {
 
     /** Resolve private artifact content only after the same owner and source re-authorization. */
     public ExportArtifactDownload openArtifact(String taskPid) {
+        ExportTask candidate=exportTaskMapper.findByPid(taskPid);
+        if(DomainExportTaskService.isDomain(candidate)) {
+            try {
+                var artifact=domainExports.getObject().download(taskPid);
+                return new ExportArtifactDownload(artifact.content(),artifact.size(),".csv");
+            } catch(java.io.IOException failure) {throw new java.io.UncheckedIOException("Unable to verify private export content",failure);}
+        }
         String key = getFileKey(taskPid);
         if (key == null || !storageProvider.exists(key)) return null;
         ExportTask task = exportTaskMapper.findByPid(taskPid);
@@ -270,6 +283,7 @@ public class ExportTaskService {
             throw new MetaServiceException("Authenticated export owner is required");
         }
         return exportTaskMapper.findByQueryCode(queryCode, tenantId, userId, limit).stream()
+                .filter(task->!DomainExportTaskService.isDomain(task) || domainExports.getObject().visible(task))
                 .map(this::toDTO)
                 .toList();
     }
@@ -447,6 +461,7 @@ public class ExportTaskService {
     }
 
     private ExportTaskDTO toDTO(ExportTask entity) {
+        if(DomainExportTaskService.isDomain(entity)) return domainExports.getObject().baseStatus(entity.getPid());
         ExportTaskDTO dto = new ExportTaskDTO();
         dto.setPid(entity.getPid());
         dto.setQueryCode(entity.getQueryCode());

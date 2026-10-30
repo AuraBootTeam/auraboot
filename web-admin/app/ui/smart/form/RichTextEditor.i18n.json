@@ -1,0 +1,14 @@
+{
+  "bold": {"zh-CN":"加粗","en-US":"Bold"},
+  "italic": {"zh-CN":"斜体","en-US":"Italic"},
+  "strike": {"zh-CN":"删除线","en-US":"Strikethrough"},
+  "heading1": {"zh-CN":"一级标题","en-US":"Heading 1"},
+  "heading2": {"zh-CN":"二级标题","en-US":"Heading 2"},
+  "heading3": {"zh-CN":"三级标题","en-US":"Heading 3"},
+  "bulletList": {"zh-CN":"无序列表","en-US":"Bullet list"},
+  "orderedList": {"zh-CN":"有序列表","en-US":"Ordered list"},
+  "blockquote": {"zh-CN":"引用","en-US":"Blockquote"},
+  "codeBlock": {"zh-CN":"代码块","en-US":"Code block"},
+  "link": {"zh-CN":"链接","en-US":"Link"},
+  "linkAddress": {"zh-CN":"链接地址：","en-US":"Link address:"}
+}

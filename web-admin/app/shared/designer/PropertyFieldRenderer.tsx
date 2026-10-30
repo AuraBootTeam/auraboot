@@ -32,7 +32,7 @@ import { ModelFieldMapEditor } from './ModelFieldMapEditor';
 import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
-import { ColorPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/ColorPicker';
+import { registerColorPropertyEditor } from './ColorPropertyEditor';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 import { ArrayItemEditor } from './ArrayItemEditor';
 import { createDecisionApi } from '~/shared/decision/api/decisionApi';
@@ -53,13 +53,8 @@ import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-ren
 import { getLocalizedText, useSmartText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 
-function ColorPropertyEditor({schema,adapter}: PropertyFieldRendererProps) {
-  const {locale} = useI18n();
-  return <ColorPicker value={typeof adapter.value==='string'?adapter.value:''}
-    label={getLocalizedText(schema.label,locale)} disabled={adapter.disabled || adapter.readOnly}
-    onChange={value=>adapter.setValue(value)} />;
-}
-const disposeColorEditor = propertyEditorRegistry.register('designer.color', ColorPropertyEditor);
+// Keep the built-in editor identity stable when this large renderer is re-evaluated by SSR/HMR.
+const disposeColorEditor = registerColorPropertyEditor();
 import.meta.hot?.dispose(disposeColorEditor);
 
 // ---------------------------------------------------------------------------

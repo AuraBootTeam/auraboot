@@ -24,6 +24,7 @@ import {
   isFormButtonDisabled,
   canRenderFormButton,
   isFormAuthoringDenied,
+  isPureCrudFormAuthoringDenied,
   resolveFormBackLink,
   resolveCreateSubTableEmptyState,
 } from './formActions';
@@ -42,6 +43,7 @@ type RenderFormPageViewArgs = Pick<
   | 'isEditMode'
   | 'onCancelOverride'
   | 'onSubmitOverride'
+  | 'urlCommandCode'
   | 'summaryErrors'
   | 'fieldErrors'
   | 'fieldPermissions'
@@ -100,6 +102,7 @@ export function renderFormPageView({
   t,
   onCancelOverride,
   onSubmitOverride,
+  urlCommandCode,
   summaryErrors,
   error,
   restorableDraft,
@@ -169,14 +172,33 @@ export function renderFormPageView({
   );
   const workspace = schema.extension?.presentation === 'workspace';
   const embedded = Boolean(onCancelOverride || onSubmitOverride);
-  const presentation = resolveFormPresentation(schema.extension, embedded);
+  const presentation = resolveFormPresentation(schema.extension, embedded, {
+    fieldCount: formBlocks.reduce(
+      (count: number, block: any) => count + (block.fields?.length || 0),
+      0,
+    ),
+    hasWideContent:
+      subTableBlocks.length > 0 ||
+      layoutBlocks.length > 0 ||
+      miscFormBlocks.length > 0 ||
+      customBlocks.length > 0,
+  });
   const hasGuidance = presentation.guidance === 'aside' && Boolean(schema.extension?.formGuidance);
   const fixedActions = presentation.actions === 'fixed';
   const backLink = resolveFormBackLink(schema, tableName);
   const activeButtons = (effectiveButtonBlock?.buttons || []).filter(
     (button: any) => !button.visibleWhen || evaluateCondition(button.visibleWhen, pageContext),
   );
-  if (isFormAuthoringDenied(activeButtons, hasPermission)) {
+  if (
+    isFormAuthoringDenied(activeButtons, hasPermission) ||
+    isPureCrudFormAuthoringDenied(
+      schema,
+      effectiveButtonBlock?.buttons || [],
+      isEditMode,
+      embedded || Boolean(urlCommandCode),
+      hasPermission,
+    )
+  ) {
     return <DynamicPageUnavailable message="Access denied" />;
   }
 
@@ -683,8 +705,9 @@ export function renderFormPageView({
                           </p>
                         )}
                         {[...effectiveButtonBlock.buttons]
-                          .sort((a: any, b: any) =>
-                            workspace ? Number(Boolean(a.primary)) - Number(Boolean(b.primary)) : 0,
+                          .sort(
+                            (a: any, b: any) =>
+                              Number(Boolean(a.primary)) - Number(Boolean(b.primary)),
                           )
                           .map((button: any) => {
                             if (!canRenderFormButton(button, hasPermission)) return null;

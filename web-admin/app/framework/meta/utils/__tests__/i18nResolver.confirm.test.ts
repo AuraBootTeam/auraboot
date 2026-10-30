@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { resolveColumnLabel, resolveConfirmDialog, resolveFieldLabel } from '../i18nResolver';
 
 const missingTranslation = (key: string) => key;
@@ -77,4 +79,46 @@ describe('resolveColumnLabel', () => {
       resolveColumnLabel({ field: 'page_key' }, 'page_schema', translateWithPageSchemaLabels),
     ).toBe('页面标识');
   });
+});
+
+describe('canonical announcement submission confirmation', () => {
+  type ConfirmButton = { code: string; confirm?: string };
+  type ConfirmPage = {
+    pageKey: string;
+    blocks: Array<{ buttons?: ConfirmButton[]; rowActions?: ConfirmButton[] }>;
+  };
+  const pages: ConfirmPage[] = JSON.parse(readFileSync(
+    resolve(import.meta.dirname, '../../../../../../plugins/core-announcement/config/pages.json'),
+    'utf8',
+  ));
+  const resources: Array<Record<string, string>> = JSON.parse(readFileSync(
+    resolve(import.meta.dirname, '../../../../../../plugins/core-announcement/config/i18n.json'),
+    'utf8',
+  ));
+  const expected = {
+    'zh-CN': {
+      title: '提交公告审批',
+      content: '提交后将冻结正文、附件和通知设置；审批通过后按发布安排执行。确定提交吗？',
+    },
+    'en-US': {
+      title: 'Submit announcement approval',
+      content: 'Content, attachments and notification settings will be frozen. Approval will authorize the configured release. Submit now?',
+    },
+  };
+
+  for (const pageKey of ['ab_announcement_list', 'ab_announcement_detail']) {
+    for (const locale of ['zh-CN', 'en-US'] as const) {
+      it(`resolves the ${pageKey} submission title and content in ${locale}`, () => {
+        const page = pages.find(candidate => candidate.pageKey === pageKey);
+        expect(page).toBeDefined();
+        const buttons = page!.blocks.flatMap(block => [
+          ...(block.rowActions ?? []), ...(block.buttons ?? []),
+        ]).filter(button => button.code === 'submit_approval');
+        expect(buttons).toHaveLength(1);
+        expect(typeof buttons[0].confirm).toBe('string');
+        const translate = (key: string) => resources.find(resource => resource.key === key)?.[locale] ?? key;
+        expect(resolveConfirmDialog(buttons[0].confirm!, translate)).toEqual(expected[locale]);
+      });
+    }
+  }
 });

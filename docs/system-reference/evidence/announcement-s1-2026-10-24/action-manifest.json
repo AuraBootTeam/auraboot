@@ -1,0 +1,472 @@
+{
+  "run": {
+    "id": "2026-10-24T12-13-40-542Z-79a0bbf5-3751-4ecc-9015-f762b65d89ad",
+    "target": "S1 controlled announcement lifecycle only",
+    "sot": "docs/system-reference/announcement-management.md §17",
+    "runtime": "announcement-management / OSS base + core-announcement",
+    "commit": "bc5a0818ec107325eb18925c0dc0a9e735ce79db"
+  },
+  "groups": [
+    {
+      "id": "S1-executed",
+      "title": "S1 real-stack browser and API actions",
+      "requirement_ref": "announcement-management.md §17",
+      "rows": [
+        {
+          "id": "RUN-1",
+          "action": "create announcement in draft status",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "playwright:announcement-lifecycle.spec.ts::create announcement in draft status"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-2",
+          "action": "list page shows created announcement with draft status",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "playwright:announcement-lifecycle.spec.ts::list page shows created announcement with draft status"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-3",
+          "action": "edit draft through the menu and retain the observed revision",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "playwright:announcement-lifecycle.spec.ts::edit draft through the menu and retain the observed revision"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-4",
+          "action": "publication reports unavailable and leaves the draft intact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "playwright:announcement-lifecycle.spec.ts::publication reports unavailable and leaves the draft intact"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-5",
+          "action": "delete draft through its protected command",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "playwright:announcement-lifecycle.spec.ts::delete draft through its protected command"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-6",
+          "action": "withdraw legacy content and create a revision without mutating its frozen version",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "playwright:announcement-lifecycle.spec.ts::withdraw legacy content and create a revision without mutating its frozen version"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-7",
+          "action": "read-only manager cannot create or modify notices",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [
+            "playwright:announcement-lifecycle.spec.ts::read-only manager cannot create or modify notices"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-8",
+          "action": "draft commands enforce replay, revision, protected fields and audit atomicity",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "http",
+          "evidence": [
+            "playwright:announcement-controlled-writes.spec.ts::draft commands enforce replay, revision, protected fields and audit atomicity"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-9",
+          "action": "concurrent edits admit one observed revision and preserve the winner",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "http",
+          "evidence": [
+            "playwright:announcement-controlled-writes.spec.ts::concurrent edits admit one observed revision and preserve the winner"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "RUN-10",
+          "action": "REST compatibility writes delegate to the same operation and revision contract",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "http",
+          "evidence": [
+            "playwright:announcement-controlled-writes.spec.ts::REST compatibility writes delegate to the same operation and revision contract"
+          ],
+          "assertion": "Exact passing runner result; business and network assertions are in the linked committed spec.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        }
+      ]
+    },
+    {
+      "id": "S1-visual",
+      "title": "Final original screenshot review",
+      "rows": [
+        {
+          "id": "IMG-1",
+          "action": "标题条件保留、结果为空，清除筛选及新建草稿的恢复提示可见。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/filtered-empty-recovery.png"
+          ],
+          "assertion": "标题条件保留、结果为空，清除筛选及新建草稿的恢复提示可见。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/filtered-empty-recovery.png"
+        },
+        {
+          "id": "IMG-2",
+          "action": "标题筛选辅助说明指向关键词搜索与清除恢复；标签、输入框和按钮对齐。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/title-filter-guidance.png"
+          ],
+          "assertion": "标题筛选辅助说明指向关键词搜索与清除恢复；标签、输入框和按钮对齐。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/title-filter-guidance.png"
+        },
+        {
+          "id": "IMG-3",
+          "action": "草稿状态、重要标记及置顶显示清楚；上次发布字段为空，不误示已发布。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/draft-detail.png"
+          ],
+          "assertion": "草稿状态、重要标记及置顶显示清楚；上次发布字段为空，不误示已发布。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/draft-detail.png"
+        },
+        {
+          "id": "IMG-4",
+          "action": "重要优先级与蓝色右侧置顶开关一致；正文编辑值和到期时间完整可读。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/edit-form-values.png"
+          ],
+          "assertion": "重要优先级与蓝色右侧置顶开关一致；正文编辑值和到期时间完整可读。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/edit-form-values.png"
+        },
+        {
+          "id": "IMG-5",
+          "action": "删除对话框显示不可恢复说明，红色确认与白色取消区分明确。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/confirm-announcement-delete_announcement.png"
+          ],
+          "assertion": "删除对话框显示不可恢复说明，红色确认与白色取消区分明确。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/confirm-announcement-delete_announcement.png"
+        },
+        {
+          "id": "IMG-6",
+          "action": "删除终态无原记录；空态保留新建与清除条件两种恢复方向。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/deleted-draft.png"
+          ],
+          "assertion": "删除终态无原记录；空态保留新建与清除条件两种恢复方向。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/deleted-draft.png"
+        },
+        {
+          "id": "IMG-7",
+          "action": "行菜单包含编辑、发布暂未启用和删除，文案完整可辨。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/menu-删除.png"
+          ],
+          "assertion": "行菜单包含编辑、发布暂未启用和删除，文案完整可辨。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/menu-删除.png"
+        },
+        {
+          "id": "IMG-8",
+          "action": "撤回说明读者不再可见，取消与确认清楚；弹窗无溢出。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/confirm-announcement-archive.png"
+          ],
+          "assertion": "撤回说明读者不再可见，取消与确认清楚；弹窗无溢出。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/confirm-announcement-archive.png"
+        },
+        {
+          "id": "IMG-9",
+          "action": "建立修订草稿说明保存不会直接发布，名称与本次动作一致。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/confirm-announcement-republish.png"
+          ],
+          "assertion": "建立修订草稿说明保存不会直接发布，名称与本次动作一致。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/confirm-announcement-republish.png"
+        },
+        {
+          "id": "IMG-10",
+          "action": "历史公告已回到草稿，列名明确上次发布时间；行菜单无删除，仅编辑和未启用发布。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/legacy-revision.png"
+          ],
+          "assertion": "历史公告已回到草稿，列名明确上次发布时间；行菜单无删除，仅编辑和未启用发布。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/legacy-revision.png"
+        },
+        {
+          "id": "IMG-11",
+          "action": "撤回后菜单显示建立修订草稿，区别于直接发布。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/menu-建立修订草稿.png"
+          ],
+          "assertion": "撤回后菜单显示建立修订草稿，区别于直接发布。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/menu-建立修订草稿.png"
+        },
+        {
+          "id": "IMG-12",
+          "action": "历史已发布状态只显示适用的撤回操作，文字无裁切。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/menu-撤回.png"
+          ],
+          "assertion": "历史已发布状态只显示适用的撤回操作，文字无裁切。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/menu-撤回.png"
+        },
+        {
+          "id": "IMG-13",
+          "action": "新建表单显示普通优先级、关闭置顶及允许未完成草稿的提示；保存和取消位于页底。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/create-form-guidance.png"
+          ],
+          "assertion": "新建表单显示普通优先级、关闭置顶及允许未完成草稿的提示；保存和取消位于页底。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/create-form-guidance.png"
+        },
+        {
+          "id": "IMG-14",
+          "action": "红色页内错误说明发布尚未启用；列表仍为草稿，错误没有覆盖当前记录。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/publication-unavailable.png"
+          ],
+          "assertion": "红色页内错误说明发布尚未启用；列表仍为草稿，错误没有覆盖当前记录。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/publication-unavailable.png"
+        },
+        {
+          "id": "IMG-15",
+          "action": "普通观察者页面保留查看入口，新建和行修改菜单消失；左下身份与权限场景对应。",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "authority": "recorded",
+          "evidence": [
+            "shots/permission-denied.png"
+          ],
+          "assertion": "普通观察者页面保留查看入口，新建和行修改菜单消失；左下身份与权限场景对应。",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "screenshot-review.json: shots/permission-denied.png"
+        }
+      ]
+    },
+    {
+      "id": "future",
+      "title": "Future announcement slices — excluded from S1 acceptance, retained as untested",
+      "rows": [
+        {
+          "id": "S2",
+          "action": "Audience and policy editing",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not implemented or executed in S1; see canonical design.",
+          "verdict": "untested",
+          "verdict_by": null
+        },
+        {
+          "id": "S3",
+          "action": "Publication, scheduling and reliable distribution",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not implemented or executed in S1; see canonical design.",
+          "verdict": "untested",
+          "verdict_by": null
+        },
+        {
+          "id": "S4",
+          "action": "BPM public contract and provider binding",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not implemented or executed in S1; see canonical design.",
+          "verdict": "untested",
+          "verdict_by": null
+        },
+        {
+          "id": "S5",
+          "action": "BPM application approval integration",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not implemented or executed in S1; see canonical design.",
+          "verdict": "untested",
+          "verdict_by": null
+        },
+        {
+          "id": "S6",
+          "action": "Embedded BPM experiences",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not implemented or executed in S1; see canonical design.",
+          "verdict": "untested",
+          "verdict_by": null
+        },
+        {
+          "id": "S7",
+          "action": "Read acknowledgement and reminders",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not implemented or executed in S1; see canonical design.",
+          "verdict": "untested",
+          "verdict_by": null
+        },
+        {
+          "id": "S8",
+          "action": "Statistics and export",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Not implemented or executed in S1; see canonical design.",
+          "verdict": "untested",
+          "verdict_by": null
+        }
+      ]
+    }
+  ]
+}

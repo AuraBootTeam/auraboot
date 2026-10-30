@@ -42,6 +42,7 @@ import { cn } from '~/utils/cn';
 const TABS = [
   { key: '', i18nKey: 'all', fallback: 'All', icon: InboxIcon },
   { key: 'approval', i18nKey: 'approval', fallback: 'Approval', icon: CheckCircleIcon },
+  { key: 'announcement_ack', i18nKey: 'announcement_ack', fallback: 'Acknowledgements', icon: BellIcon },
   { key: 'task', i18nKey: 'task', fallback: 'Task', icon: EnvelopeOpenIcon },
   { key: 'mention', i18nKey: 'mention', fallback: 'Mention', icon: BellIcon },
   { key: 'alert', i18nKey: 'alert', fallback: 'Alert', icon: ExclamationTriangleIcon },
@@ -60,6 +61,11 @@ const TYPE_COPY: Record<string, { key: string; title: string; description: strin
     key: 'All',
     title: 'All inbox items',
     description: 'Review every approval, alert, and assignment from one place.',
+  },
+  announcement_ack: {
+    key: 'Acknowledgements',
+    title: 'Announcement acknowledgements',
+    description: 'Open the frozen announcement and acknowledge it explicitly.',
   },
   approval: {
     key: 'Approval',
@@ -89,6 +95,7 @@ const TYPE_COPY: Record<string, { key: string; title: string; description: strin
 };
 
 const SOURCE_COPY: Record<string, { key: string; fallback: string }> = {
+  announcement: { key: 'sourceAnnouncement', fallback: 'Announcement' },
   workflow: { key: 'sourceWorkflow', fallback: 'Workflow' },
   bpm: { key: 'sourceWorkflow', fallback: 'Workflow' },
   command: { key: 'sourceCommand', fallback: 'Business action' },
@@ -147,6 +154,7 @@ function modelLabel(modelCode?: string | null): string {
 
 function resolveWebDeepLink(item: InboxItem, payload: InboxCardPayload | null): string | null {
   if (item.itemType === 'approval' && item.sourceId) return null;
+  if (item.itemType === 'announcement_ack' && item.sourceId) return `/p/announcement_reader/view/${encodeURIComponent(item.sourceId)}`;
   if (item.deepLink?.startsWith('/')) return item.deepLink;
   if (item.deepLink?.startsWith('auraboot://object/')) {
     const parts = item.deepLink.replace('auraboot://object/', '').split('/');
@@ -852,7 +860,7 @@ export default function UnifiedInboxPage() {
                       >
                         {display.actionLabel}
                       </button>
-                      {item.status === 'pending' && (
+                      {item.status === 'pending' && item.itemType !== 'announcement_ack' && (
                         <button
                           type="button"
                           onClick={() => handleDismiss(item)}

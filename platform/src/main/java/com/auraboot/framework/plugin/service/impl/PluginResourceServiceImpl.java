@@ -48,6 +48,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
 
     private final PluginResourceMapper resourceMapper;
     private final PluginRecordMapper pluginRecordMapper;
+    private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
     private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
     private final MetaModelFieldBindingMapper bindingMapper;
     private final NamedQueryMapper namedQueryMapper;
@@ -293,6 +294,7 @@ public class PluginResourceServiceImpl implements PluginResourceService {
         if (plugin == null) {
             throw new IllegalArgumentException("Plugin not found: " + pluginPid);
         }
+        auraPluginManager.requireTenantLifecycleChange(plugin);
 
         List<PluginResource> resources = findByPluginPid(pluginPid);
         PluginAgentResourceGuard.requireResources(resources, agentDefinitionResources);

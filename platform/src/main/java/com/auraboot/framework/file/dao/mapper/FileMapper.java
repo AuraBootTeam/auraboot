@@ -17,6 +17,11 @@ import java.util.List;
 @Mapper
 public interface FileMapper extends BaseMapper<FileEntity> {
 
+    /** Fresh physical PostgreSQL transaction identity; never reuse a session-cache value across boundaries. */
+    @org.apache.ibatis.annotations.Options(useCache = false, flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
+    @Select("SELECT pg_current_xact_id()::text")
+    String currentPhysicalTransactionIdentity();
+
     /**
      * Lock one tenant-owned public file row before retention/deletion arbitration.
      * Tenant interception is bypassed only because the SQL carries the mandatory tenant predicate.

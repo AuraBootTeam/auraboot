@@ -1,8 +1,12 @@
 import { useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import Header from '~/routes/Header';
-import { PagePresentationProvider, usePagePresentation } from '~/shared/layout/PagePresentationContext';
+import {
+  PagePresentationProvider,
+  usePagePresentation,
+  usePresentationNavigation,
+} from '~/shared/layout/PagePresentationContext';
 import LeftSidebar from '~/routes/LeftSidebar';
 import PageContent from '~/routes/PageContent';
 import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
@@ -33,16 +37,38 @@ function inferModelCodeFromPath(pathname: string): string | undefined {
 }
 
 export default function AdminLayout() {
-  return <PagePresentationProvider><AdminLayoutContent /></PagePresentationProvider>;
+  return (
+    <PagePresentationProvider>
+      <AdminLayoutContent />
+    </PagePresentationProvider>
+  );
 }
 
 function AdminLayoutContent() {
   const workspace = usePagePresentation()?.mode === 'workspace';
+  const { shell, isOverlay, headerHeight = 56, sidebarWidth } = usePresentationNavigation();
+  const themedShell = shell?.useThemeTokens === true;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { state } = useAuraBot();
   const { agent, loading: agentLoading } = useApplicationCapabilities();
   const aiPanelOpen = agent === 'installed' && state.panelState === 'expanded';
   const location = useLocation();
+  const wasOverlayOpen = useRef(false);
+  useEffect(() => {
+    if (shell && !isOverlay) setSidebarOpen(false);
+    if (shell && isOverlay && wasOverlayOpen.current && !sidebarOpen) {
+      document.querySelector<HTMLButtonElement>('[data-testid="header-sidebar-toggle"]')?.focus();
+    }
+    wasOverlayOpen.current = Boolean(shell && isOverlay && sidebarOpen);
+  }, [shell, isOverlay, sidebarOpen]);
+  useEffect(() => {
+    if (!shell || !isOverlay || !sidebarOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebarOpen(false);
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [shell, isOverlay, sidebarOpen]);
 
   // One-time tracker init: register click-capture and flush-on-hide/pagehide listeners.
   useEffect(() => {
@@ -71,18 +97,46 @@ function AdminLayoutContent() {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div
+      className={`min-h-screen ${themedShell ? 'bg-bg' : 'bg-gray-50 dark:bg-gray-900'}`}
+      data-workspace-shell={shell ? 'configured' : undefined}
+      style={
+        shell
+          ? ({
+              '--workspace-header-height': `${headerHeight}px`,
+              '--workspace-sidebar-width': `${sidebarWidth}px`,
+            } as React.CSSProperties)
+          : undefined
+      }
+    >
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       <div className={`flex h-screen ${workspace ? '' : 'pt-14'}`}>
         <LeftSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-        <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${workspace ? 'pt-14' : ''}`} data-print="content">
+        <div
+          className={`flex min-w-0 flex-1 flex-col overflow-hidden ${workspace ? 'pt-14' : ''}`}
+          style={
+            shell && workspace
+              ? { paddingTop: `var(--workspace-header-height, ${headerHeight}px)` }
+              : undefined
+          }
+          data-print="content"
+        >
           <ImpersonationBanner />
           <PageContent />
         </div>
 
-        <div className={aiPanelOpen ? `flex min-h-0 shrink-0 ${workspace ? 'pt-14' : ''}` : 'hidden'} data-testid="ai-panel-dock" inert={agentLoading || undefined}>
+        <div
+          className={aiPanelOpen ? `flex min-h-0 shrink-0 ${workspace ? 'pt-14' : ''}` : 'hidden'}
+          data-testid="ai-panel-dock"
+          style={
+            shell && workspace && aiPanelOpen
+              ? { paddingTop: `var(--workspace-header-height, ${headerHeight}px)` }
+              : undefined
+          }
+          inert={agentLoading || undefined}
+        >
           {agent === 'installed' && <AuraBotPanel />}
         </div>
       </div>
@@ -90,9 +144,9 @@ function AdminLayoutContent() {
       {/* Feedback floating button — temporarily hidden */}
       {/* <FeedbackFab /> */}
 
-      {sidebarOpen && (
+      {sidebarOpen && (!shell || isOverlay) && (
         <div
-          className="bg-opacity-75 print-hide fixed inset-0 z-40 bg-gray-600 lg:hidden"
+          className={`bg-opacity-75 print-hide fixed inset-0 z-40 bg-gray-600 ${shell ? '' : 'lg:hidden'}`}
           data-testid="sidebar-mobile-backdrop"
           onClick={() => setSidebarOpen(false)}
         />

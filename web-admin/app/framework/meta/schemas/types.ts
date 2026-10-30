@@ -1,4 +1,11 @@
 import type { CardRowSelection } from '../runtime/expression/row-selection';
+import type { AuthoritativeSourceConfig } from './source-state';
+export type {
+  AuthoritativeSourceConfig,
+  SourceStateField,
+  SourceStateIndicator,
+  SourceStateTone,
+} from './source-state';
 import type { RowProjection } from '../runtime/expression/row-projection';
 import type { WorkspaceCellPresentation } from '../runtime/renderers/WorkspaceCells';
 import type { CrossFieldRule, RuleOverride } from '../validation/crossFieldRuleTypes';
@@ -19,10 +26,37 @@ export interface LocalizedText {
   [locale: string]: string | undefined; // 支持动态 locale
 }
 
+/** Optional shared workspace shell. Omission preserves the existing shell. */
+export interface WorkspaceShellConfig {
+  useThemeTokens?: boolean;
+  headerHeight?: number;
+  /** Optional height at the declared mobile sidebar breakpoint. */
+  mobileHeaderHeight?: number;
+  sidebar?: {
+    expandedWidth?: number;
+    compactWidth?: number;
+    compactBreakpoint?: number;
+    collapsedWidth?: number;
+    mobileBreakpoint?: number;
+    brandHeight?: number;
+  };
+}
+
+/** Open page extensions with typed shared presentation options. */
+export interface PageExtensionConfig {
+  [key: string]: any;
+  workspaceShell?: WorkspaceShellConfig;
+  detailHeaderLayout?: LayoutConfig;
+  detailBodyOrder?: 'schema';
+}
+
 // Layout 配置
 export interface LayoutConfig {
   type?: 'grid' | 'stack'; // Layout mode: 'grid' (12-col) or 'stack' (vertical). Default: 'stack'
   cols?: number; // Grid column count (default 12, only for type='grid')
+  /** Optional compact grid; existing grids are unchanged when omitted. */
+  compactCols?: number;
+  compactBreakpoint?: number;
   columnTemplate?: string; // Optional CSS grid-template-columns override
   gridTemplateColumns?: string; // Alias for columnTemplate
   colGap?: number; // Column gap in px (default 16)
@@ -37,6 +71,40 @@ export interface CardImageViewport {
   viewBox: [number, number, number, number];
 }
 
+/** Optional legacy business activity query; named sources use the owning runtime DMS. */
+export interface BusinessActivityDataSource {
+  endpoint?: string;
+  url?: string;
+  method?: 'get' | 'post';
+  queryCode?: string;
+  params?: Record<string, unknown>;
+}
+
+export interface BusinessActivityRecordMapping {
+  pid?: string;
+  occurredAt?: string;
+  status?: string;
+  priority?: string;
+  role?: string;
+  objectModel?: string;
+  objectRecord?: string;
+  activityType?: string;
+  subject?: string;
+  content?: string;
+  actorName?: string;
+  fromState?: string;
+  toState?: string;
+}
+
+/** An actual nullable field of each business history row, displayed read-only when present. */
+export interface BusinessActivityDetailField {
+  field: string;
+  label: string | LocalizedText;
+  dictCode?: string;
+}
+
+export interface BusinessActivitySnapshotField extends BusinessActivityDetailField {}
+
 // Block 配置 (新 DSL)
 export interface BlockConfig {
   id: string;
@@ -44,7 +112,10 @@ export interface BlockConfig {
   title?: string | LocalizedText;
   layout?: BlockLayoutConfig;
   visibleWhen?: string;
+  /** Existing block visibility and named-source permission gate. */
+  permissionCode?: string;
   className?: string;
+  props?: Record<string, any> & { sourceState?: AuthoritativeSourceConfig };
   imageField?: string;
   imageViewports?: Record<string, CardImageViewport>;
 
@@ -65,6 +136,15 @@ export interface BlockConfig {
   columns?: number | ColumnConfig[];
   rowActions?: ButtonConfig[];
   dataSource?: string | DataSourceConfig;
+  /** Business-only history reads an existing named source and never requests audit activities. */
+  businessOnly?: boolean;
+  businessDataSource?: string | BusinessActivityDataSource;
+  businessRecordMapping?: BusinessActivityRecordMapping;
+  businessStateDictCode?: string;
+  businessDetailFields?: BusinessActivityDetailField[];
+  businessSnapshotFields?: BusinessActivitySnapshotField[];
+  compact?: boolean;
+  previewLimit?: number;
 
   // List tabs
   tabs?: ListTabConfig[] | DetailTabConfig[];
@@ -99,6 +179,16 @@ export interface BlockLayoutConfig {
 }
 
 // DataSource 配置
+export interface PaginationRequestConfig {
+  /**
+   * Nonempty object-key paths; unsafe, overlapping and identity paths are rejected.
+   * @maxItems 8
+   */
+  pageNumPath: [string, ...string[]];
+  /** @maxItems 8 */
+  pageSizePath: [string, ...string[]];
+}
+
 export interface DataSourceConfig {
   id?: string;
   type?: 'api' | 'static' | 'namedQuery'; // 'namedQuery' delegates to nq:{queryCode} format
@@ -110,7 +200,10 @@ export interface DataSourceConfig {
   body?: string | Record<string, any>;
   autoFetch?: boolean; // Default: true
   pagination?: boolean;
-  adaptor?: string; // Default: 'optionList'; 'raw' preserves the full response and collection metadata.
+  /** Explicit placement of runtime pageNum/pageSize, without changing other request inputs. */
+  paginationRequest?: PaginationRequestConfig;
+  /** Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata. */
+  adaptor?: string;
   /** Explicit path inside completed command data; no fallback. */
   dataPath?: string;
   /** Optional safe projection before commandArray rows seed a scoped form. */
@@ -169,6 +262,12 @@ export interface FlowStep {
 // Field 配置（用于表单）
 export interface FieldConfig {
   field: string;
+  /** Read-only inspector path and presentation; values stay in the parent record. */
+  path?: string;
+  valueType?: string;
+  dataType?: string;
+  format?: string;
+  valueMap?: Record<string, string | LocalizedText>;
   label?: string | LocalizedText;
   /** Business input guidance localized by the controlled renderer. */
   placeholder?: string | LocalizedText;
@@ -233,6 +332,8 @@ export interface EventConfig {
 
 // Column 配置（用于列表）
 export interface ColumnConfig {
+  /** Localized placeholder for explicitly empty values, including empty arrays. */
+  emptyText?: string | LocalizedText;
   /** Structured, reusable business cell presentation. */
   presentation?: WorkspaceCellPresentation;
   field: string;
@@ -337,6 +438,20 @@ export interface ColumnConfig {
   tagConfig?: Record<string, unknown>;
 }
 
+export interface UploadedFilesInputConfig {
+  /** @minimum 1
+   * @maximum 10
+   * @multipleOf 1
+   */
+  maxCount: number;
+  /** File chooser/type hint; server byte validation remains authoritative. */
+  accept: string;
+  /** @minimum 1
+   * @multipleOf 1
+   */
+  maxBytes?: number;
+}
+
 export interface CommandInputFieldConfig {
   field: string;
   label?: string | LocalizedText;
@@ -345,16 +460,33 @@ export interface CommandInputFieldConfig {
   helpText?: string | LocalizedText;
   placeholder?: string | LocalizedText;
   type?: string;
+  /** Configuration for type: uploaded-files; its submitted value is public file PID[]. */
+  uploadedFiles?: UploadedFilesInputConfig;
   /** Static dictionary used to populate select/segmented choice fields. */
   dictCode?: string;
   required?: boolean;
   [key: string]: unknown;
 }
 
+export interface CommandInputPresentation {
+  /** Keep this command input draft until the native executor reports its result. */
+  waitForResult?: boolean;
+  /** Maximum pixel width, clamped to the viewport by the shared dialog. */
+  width?: number;
+  showClose?: boolean;
+  /** Omission preserves backdrop cancellation for existing prompts. */
+  closeOnBackdrop?: boolean;
+  summary?: {
+    columns?: 1 | 2;
+    fields: Array<{ field: string; label?: string | LocalizedText; dictCode?: string }>;
+  };
+}
+
 export interface CommandInputFormConfig {
   inputFields?: CommandInputFieldConfig[];
   inputFieldsTitle?: string | LocalizedText;
   inputFieldsSubmitLabel?: string | LocalizedText;
+  inputFieldsPresentation?: CommandInputPresentation;
 }
 
 /** Existing-record command options shared by toolbar and sub-table actions. */
@@ -390,7 +522,13 @@ export type ActionDef =
       input: FieldConfig;
       operationType?: 'UPDATE' | 'DELETE';
     }
-  | { type: 'navigate'; to: string; command?: string; hardReload?: boolean }
+  | {
+      type: 'navigate';
+      to: string;
+      command?: string;
+      hardReload?: boolean;
+      presentation?: { mode: 'modal'; width?: number };
+    }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
   | { type: 'flow'; handler: string }
@@ -454,6 +592,8 @@ export interface ButtonConfig {
   /** @deprecated Use `confirm` instead. */
   confirmMessageKey?: string;
   permissionCode?: string; // Permission control
+  /** Every listed permission is required in addition to permissionCode. */
+  permissionCodes?: string[];
   /** Custom report code (for report generation buttons) */
   reportCode?: string;
 
@@ -496,6 +636,10 @@ export interface TableConfig {
 }
 
 export interface PaginationConfig {
+  /** Explicit opt-in for paged API data sources on a table block. */
+  mode?: 'server';
+  /** Use the declared response field; request parameters remain pageNum/pageSize. */
+  pageField?: 'pageNum' | 'current' | 'page';
   pageSize?: number;
   pageSizeOptions?: number[];
   showTotal?: boolean;
@@ -831,7 +975,7 @@ export interface UnifiedSchema {
   options?: Record<string, unknown>;
 
   // Page-level extension properties (e.g., showShare, showReport for detail pages)
-  extension?: Record<string, any>;
+  extension?: PageExtensionConfig;
 
   /**
    * Optional override for the edit-mode record-prefill fetch. When set, the form

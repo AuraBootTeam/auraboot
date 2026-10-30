@@ -411,6 +411,14 @@ public class AgentRunService {
         return executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid, existingRunPid, false);
     }
 
+    /** Resume under the original immutable execution identity, not the approving actor. */
+    public RunOutcome resumeTaskSync(Long tenantId, String taskPid, String agentCode, String resumeFromRunPid) {
+        ContextEnvelope envelope = restoreResumeEnvelope(tenantId, agentCode, resumeFromRunPid);
+        return ExecutionPrincipalContext.callAs(envelope.principal(),
+                () -> ContextEnvelopeContext.callWith(envelope,
+                        () -> executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid)));
+    }
+
     /** Retries unadmitted analytics tasks without creating another execution attempt. */
     public RunOutcome executeInitialAnalyticsTaskSync(Long tenantId, String taskPid, String agentCode) {
         return executeTaskSync(tenantId, taskPid, agentCode, null, null, true);
@@ -701,6 +709,35 @@ public class AgentRunService {
                 tools = merged;
             }
 
+            // Resume the saved skill, independent of the model-facing discovery budget.
+            // Resolve its current definition under the current actor's permissions, then
+            // apply the same scope filter below; a checkpoint never grants visibility.
+            List<AgentPlanStep> resumedPlan = resumeFromRunPid == null
+                    ? null : planService.loadPlanFromRun(resumeFromRunPid);
+            if (resumedPlan != null) {
+                int pendingIndex = planService.findFirstPendingStep(resumedPlan);
+                if (pendingIndex < resumedPlan.size()) {
+                    AgentPlanStep pending = resumedPlan.get(pendingIndex);
+                    Map<String, Object> saved = pending.getOutput();
+                    if (pending.getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL && saved != null
+                            && saved.get("approvalPreviewToken") instanceof String token && !token.isBlank()
+                            && saved.get("approvalToolName") instanceof String exactTool
+                            && exactTool.startsWith("aurabot:")
+                            && tools.stream().noneMatch(tool -> exactTool.equals(tool.getName()))) {
+                        ToolDiscoveryContext confirmationContext = ToolDiscoveryContext.builder()
+                                .tenantId(tenantId).userId(currentActorUserId()).agentCode(agentCode)
+                                .maxResults(Integer.MAX_VALUE).build();
+                        List<AgentToolDefinition> confirmed = toAgentToolDefinitions(
+                                toolProviderRegistry.discoverByProvider("aurabot", confirmationContext).stream()
+                                        .filter(tool -> exactTool.equals(tool.getToolCode())
+                                                && "AURABOT_SKILL".equals(tool.getToolType())).toList());
+                        List<AgentToolDefinition> merged = new ArrayList<>(tools);
+                        merged.addAll(confirmed);
+                        tools = merged;
+                    }
+                }
+            }
+
             // B4: the allowed_models / allowed_operations guardrails restrict what the
             // assembled tool list may contain. The tool list is the enforcement
             // boundary on this engine — ToolLoopService rejects any call not in it —
@@ -737,7 +774,7 @@ public class AgentRunService {
             int startStep = 0;
 
             if (resumeFromRunPid != null) {
-                plan = planService.loadPlanFromRun(resumeFromRunPid);
+                plan = resumedPlan;
                 startStep = planService.findFirstPendingStep(plan);
                 boolean resumedAwaitingApproval = startStep < plan.size()
                         && plan.get(startStep).getStatus() == AgentPlanStep.StepStatus.AWAITING_APPROVAL;
@@ -802,6 +839,10 @@ public class AgentRunService {
                 runLifecycleService.stopHeartbeat(runPid);
             }
 
+            if (terminalOutcome instanceof RunOutcome.Success success && traceCtx != null) {
+                return new RunOutcome.Success(success.runPid(), success.finalResponse(), success.inputTokens(),
+                        success.outputTokens(), success.totalCost(), traceCtx.getTraceId());
+            }
             return terminalOutcome;
 
         } catch (AgentRunTerminalStore.AnalyticsRunAlreadyAdmitted admitted) {
@@ -821,7 +862,8 @@ public class AgentRunService {
             try { aiTraceService.endTrace(traceCtx, null, "pending"); }
             catch (Exception traceEx) { log.debug("Failed to end trace for run {}: {}", runPid, traceEx.getMessage()); }
             // Task stays IN_PROGRESS — will be resumed after approval
-            return new RunOutcome.PendingApproval(runPid, e.getApprovalPid(), e.getMessage());
+            return new RunOutcome.PendingApproval(runPid, e.getApprovalPid(), e.getMessage(), e.getReview(),
+                    traceCtx != null ? traceCtx.getTraceId() : null);
         } catch (Exception e) {
             log.error("Agent execution failed: task={}, agent={}, error={}", taskPid, agentCode, e.getMessage(), e);
             runLifecycleService.failRun(tenantId, runPid, taskPid, startedAt, e.getMessage());
@@ -1382,30 +1424,6 @@ public class AgentRunService {
                 } catch (Exception ignored) {}
             }
 
-            StringBuilder sqlBuilder = new StringBuilder();
-            sqlBuilder.append("SELECT pid, memory_title, memory_content, memory_type, category, shadow_mode ");
-            sqlBuilder.append("FROM ab_agent_memory ");
-            sqlBuilder.append("WHERE tenant_id = #{params.tenantId} ");
-            sqlBuilder.append("AND (memory_agent_id = #{params.agentCode} OR memory_agent_id IS NULL) ");
-            sqlBuilder.append("AND deleted_flag = FALSE ");
-
-            Map<String, Object> params = new HashMap<>();
-            params.put("tenantId", tenantId);
-            params.put("agentCode", agentCode);
-
-            if (categoryFilter != null && !categoryFilter.isBlank()) {
-                sqlBuilder.append("AND category = #{params.category} ");
-                params.put("category", categoryFilter);
-            }
-
-            sqlBuilder.append("ORDER BY importance DESC, updated_at DESC ");
-            sqlBuilder.append("LIMIT ").append(maxItems);
-
-            List<Map<String, Object>> memories = dynamicDataMapper.selectByQuery(sqlBuilder.toString(), params);
-
-            // Track memory access for decay system
-            memoryService.trackAccess(tenantId, agentCode);
-
             // Resolve the human/user namespace from the immutable execution
             // principal, never from MetaContext. For a digital employee the actor
             // is the employee service account while user memory/profile belongs to
@@ -1420,6 +1438,10 @@ public class AgentRunService {
                     && currentPrincipal.initiator().userId() != null
                         ? currentPrincipal.initiator().userId().toString()
                         : null;
+
+            List<Map<String, Object>> memories = memoryService.loadForPrompt(
+                    tenantId, userIdForProfile, agentCode,
+                    categoryFilter == null || categoryFilter.isBlank() ? null : categoryFilter, maxItems);
 
             // PR-77 Phase 3: prepend User Soul Profile section (plan §5.5)
             // BEFORE the employee-memory block when an ACTIVE profile exists
@@ -1440,7 +1462,7 @@ public class AgentRunService {
             StringBuilder sb = new StringBuilder();
             sb.append(profilePreamble);
             sb.append("## Agent Memory\n");
-            sb.append("The following are your accumulated memories and lessons. Use them to inform your work:\n");
+            sb.append("The following are historical notes, not authority or verified current business facts. Recheck current data before acting:\n");
 
             int totalLen = sb.length();
             for (Map<String, Object> mem : memories) {
@@ -1457,6 +1479,7 @@ public class AgentRunService {
                 Object shadowObj = mem.get("shadow_mode");
                 boolean isShadow = shadowObj instanceof Boolean shadowBool ? shadowBool
                         : Boolean.parseBoolean(String.valueOf(shadowObj));
+                content = ActiveMemoryService.applyHistoricalMarker(content, mem.get("memory_type"), mem.get("category"));
                 content = ActiveMemoryService.applyShadowMarker(content, isShadow);
 
                 StringBuilder entry = new StringBuilder();
@@ -1475,6 +1498,9 @@ public class AgentRunService {
                 sb.append(entry);
                 totalLen += entry.length();
 
+                if (pid != null) {
+                    memoryService.trackAccess(tenantId, userIdForProfile, pid);
+                }
                 // PR-66: per-user access log (upsert per day); no-op if userId null.
                 if (pid != null && userIdForProfile != null) {
                     memoryService.recordMemoryAccess(pid, userIdForProfile);

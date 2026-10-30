@@ -1,3 +1,4 @@
+import { findListFilterTabsBlock } from './listSchemaPolicy';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSavedViews } from '~/framework/smart/hooks/useSavedViews';
 import {
@@ -40,7 +41,6 @@ export function useListSavedViewState({
   modelCode,
   pageKey,
   schema,
-  hideSavedViews,
   skipListData,
   hideQuickFilters,
   hasPermission,
@@ -72,7 +72,8 @@ export function useListSavedViewState({
     modelCode,
     pageKey,
     scopeFilter: 'all',
-    autoLoad: !!schema && !hideSavedViews && !skipListData,
+    // Hiding switcher chrome does not disable persisted personal settings.
+    autoLoad: !!schema && !skipListData && hasPermission('dashboard.saved_view.read'),
   });
 
   const availableViewTypes = useMemo<ViewType[]>(() => {
@@ -175,7 +176,7 @@ export function useListSavedViewState({
     [accessibleViews, activeViewType],
   );
   const activeTabViewFilter = useMemo<ViewFilterConfig | null>(() => {
-    const tabsBlock = schema?.blocks?.find((block: any) => block.blockType === 'tabs');
+    const tabsBlock = findListFilterTabsBlock(schema?.blocks);
     const tab = (tabsBlock?.tabs as any[] | undefined)?.find(
       (candidate) => candidate.key === activeTab,
     );

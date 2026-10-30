@@ -17,6 +17,9 @@ public class PostgresDdlDialect implements DdlDialect {
             throw new IllegalArgumentException("Missing data type for field: " + field.getCode());
         }
 
+        if (com.auraboot.framework.meta.util.JsonbFieldHelper.isMultipleFile(field)) {
+            return "jsonb";
+        }
         switch (dataType.toLowerCase(Locale.ROOT)) {
             case "string":
             case "enum":

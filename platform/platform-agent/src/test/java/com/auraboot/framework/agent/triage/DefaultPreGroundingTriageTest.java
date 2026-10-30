@@ -185,4 +185,18 @@ class DefaultPreGroundingTriageTest {
         TriageVerdict b = triage.triage(r);
         assertThat(b).isEqualTo(a);
     }
+    @Test
+    void businessValuesAndIdentifiersDoNotBecomeDurableIntent() {
+        for (String text : List.of("新建一个模型，名称为「审批台账」，编码 approve_log",
+                "Create a model named \"Batch Export\" with code preapproved_items",
+                "查询模型 approve_log", "新建业务模型，名称为审批记录，编码为sync_log")) {
+            assertThat(triage.triage(req("web", null, text, false, false)).bucket())
+                    .as(text).isNotEqualTo(TriageBucket.ACP_RUN);
+        }
+        for (String text : List.of("批量创建名称为「审批台账」的模型", "请审批这些记录",
+                "delete records named \"Export log\"", "batch create models", "创建名称为台账并删除旧记录", "请执行「批量删除记录」")) {
+            assertThat(triage.triage(req("web", null, text, false, false)).bucket())
+                    .as(text).isEqualTo(TriageBucket.ACP_RUN);
+        }
+    }
 }

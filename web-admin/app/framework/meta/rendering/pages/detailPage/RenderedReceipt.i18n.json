@@ -1,0 +1,6 @@
+{
+  "bodyUnavailable": {
+    "zh-CN": "正文图片未能完整加载，尚未记录已读，暂不能确认知悉。请检查网络后重试。",
+    "en-US": "A body image could not load. Reading has not been recorded and acknowledgement is unavailable. Check your connection and retry."
+  }
+}

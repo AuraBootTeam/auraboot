@@ -50,12 +50,26 @@ class PluginResourceServiceImplTest {
 
     @Mock private PluginResourceMapper resourceMapper;
     @Mock private PluginRecordMapper pluginRecordMapper;
+    @Mock private com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
     @Mock private MetaModelFieldBindingMapper bindingMapper;
     @Mock private ObjectMapper objectMapper;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentDefinitionResources;
 
     @InjectMocks private PluginResourceServiceImpl service;
+
+    @Test void compositionPreflightRejectsBothResourcePreviewAndExecutionBeforeAnyResourceAccess() {
+        var record=new PluginRecord();record.setPid("composition");record.setPluginId("shared-application");
+        when(pluginRecordMapper.findByPid("composition")).thenReturn(record);
+        org.mockito.Mockito.doThrow(com.auraboot.framework.exception.BusinessException.i18n("plugin.error.composition_lifecycle"))
+                .when(auraPluginManager).requireTenantLifecycleChange(record);
+        assertThatThrownBy(()->service.generateUninstallPreview("composition",1L))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThatThrownBy(()->service.executeUninstall("composition",1L,new UninstallRequest()))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(resourceMapper,bindingMapper,jdbcTemplate);
+        verify(pluginRecordMapper,never()).softDelete(anyString());
+    }
 
     private PluginResource buildResource(ResourceType type, String code, OwnershipType ownership) {
         PluginResource r = new PluginResource();

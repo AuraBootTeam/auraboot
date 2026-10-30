@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * §2.2): a principal identified by (tenantId, userId) may only see a memory when
  *   scope='global'
  *   OR (scope='tenant' AND tenant_id matches)
- *   OR (scope='user'   AND scope_key matches)
+ *   OR (scope='user' AND tenant_id matches AND scope_key matches)
  *
  * Also covers GDPR forgetUser and scope validation on create.
  */

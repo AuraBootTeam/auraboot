@@ -208,6 +208,8 @@ export interface DslFieldOverride {
   visible?: string; // SpEL expression
   disabled?: string; // SpEL expression
   required?: boolean;
+  validation?: Array<{ type: string; [key: string]: unknown }>;
+  layout?: { colSpan?: number; rowSpan?: number };
   /**
    * Render the field as read-only inside the form. The reference DSL spells
    * this `readonly` (camelCase shorthand). The `parseFieldShorthand` decoder
@@ -281,7 +283,9 @@ export function serializeFieldOverride(field: DslFieldOverride): DslFieldRef {
     'minValue',
     'maxValue',
   ];
-  const hasComplexProps = complexProps.some((key) => {
+  const shorthandKeys = new Set(['field', ...boolFlags, ...kvPairs]);
+  const hasComplexProps = keys.some(key => !shorthandKeys.has(key) ||
+    (boolFlags.includes(key) && (field as any)[key] === false)) || complexProps.some((key) => {
     const val = (field as any)[key];
     return val !== undefined && val !== null && val !== '';
   });

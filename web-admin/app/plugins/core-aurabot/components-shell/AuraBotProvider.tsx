@@ -1041,12 +1041,14 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   // Confirm a tool execution (user approved)
   const confirmTool = useCallback(
     async (toolId: string) => {
-      const failDecision = (error: string, traceId?: string) => {
+      let decisionFailed = false;
+      const failDecision = (error: string, traceId?: string, terminal = true) => {
+        decisionFailed = true;
         const feedback = approvalDecisionFeedback(error);
         dispatch({ type: 'update_tool_message', payload: { toolId, updates: {
           type: 'error', content: t(feedback.key, undefined, locale.startsWith('zh') ? feedback.zh : feedback.en), traceId,
         } } });
-        dispatch({ type: 'set_loading', payload: false });
+        if (terminal) dispatch({ type: 'set_loading', payload: false });
       };
       // Update confirm card to show "executing"
       dispatch({
@@ -1106,8 +1108,22 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   updates: { type: 'tool_result', content: '', toolResult: result },
                 },
               });
-              const data = result?.data || result;
+              if (_success === false && result?.approvalRequired !== true
+                  && result?._aurabot_skill_pending !== true) {
+                failDecision(result?.errorCode === 'TOOL_ACCESS_DENIED'
+                  ? 'TOOL_ACCESS_DENIED' : 'TOOL_EXECUTION_FAILED', undefined, false);
+              }
               // Form filling is draft-only and never resumes through business approval.
+            },
+            onResultContract: (contract) => {
+              dispatch({
+                type: 'add_tool_message',
+                payload: {
+                  id: `rc-${generateUniqueSuffix()}`,
+                  type: 'result_contract', sender: 'bot', timestamp: Date.now(),
+                  content: contract.textSummary ?? '', resultContract: contract,
+                },
+              });
             },
             onConfirmRequired: (
               tid: string,
@@ -1160,7 +1176,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               dispatch({ type: 'set_loading', payload: false });
             },
             onDone: (full: string, traceId?: string) => {
+              if (!decisionFailed) {
               dispatch({ type: 'update_tool_message', payload: { toolId, updates: { type: 'tool_executed', content: t('ai.approval.completed', undefined, locale.startsWith('zh') ? '已完成' : 'Completed') } } });
+              }
               // Phase B.1 + Q-B1.3=β: /execute (resume) outbound persistence is
               // deferred to B.6, where /execute will go through
               // turnService.resumeTurn and AuraBotTurnPersistence will handle

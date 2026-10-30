@@ -287,6 +287,34 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
                 argThat(sql -> sql.contains("AND created_by = 2")), anyMap());
     }
 
+    @Test void requiredReferenceDisplayUsesEachExactSetAndNeverTheGlobalPredicate() {
+        String sourceCode="fixture_display_source",targetCode="fixture_bundle";
+        String a=RequiredReadReferencesTest.id(9),b=RequiredReadReferencesTest.id(10);
+        var ref=field("target_ref","reference",Map.of("refTarget",Map.of("targetEntity",targetCode,"valueField","pid","displayField","title")));
+        ref.setColumnName("target_ref");
+        var source=ModelDefinition.builder().code(sourceCode).tableName("mt_fixture_display_source").fields(List.of(ref)).build();
+        var target=RequiredReadReferencesTest.model(10);var targetFields=new ArrayList<>(target.getFields());
+        targetFields.add(FieldDefinition.builder().code("title").columnName("title").dataType("string").build());target.setFields(targetFields);
+        when(metadataService.getModelDefinition(sourceCode)).thenReturn(Optional.of(source));
+        when(metadataService.getModelDefinition(targetCode)).thenReturn(Optional.of(target));
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canAction(99L,targetCode,"read")).thenReturn(true);
+        when(dataPermissionEngine.buildRowFilterForRecords(1L,targetCode,2L,java.util.Set.of(a))).thenReturn("AND pid IN ('"+a+"')");
+        when(dataPermissionEngine.buildRowFilterForRecords(1L,targetCode,2L,java.util.Set.of(b))).thenReturn("AND 1 = 0");
+        when(dataPermissionEngine.getFieldMaskRules(1L,targetCode,2L)).thenReturn(List.of());
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql.contains("FROM mt_fixture_bundle")),anyMap()))
+                .thenAnswer(call -> ((String)call.getArgument(0)).contains("AND 1 = 0") ? List.of() : List.of(Map.of("pid",a,"title","Authorized target")));
+        var first=new HashMap<String,Object>();first.put("target_ref",a);var second=new HashMap<String,Object>();second.put("target_ref",b);
+        try(var ignored=DynamicDataQueryScope.open()) {
+            ReflectionTestUtils.invokeMethod(service,"enrichReferenceDisplayFields",sourceCode,new ArrayList<>(List.of(first)));
+            ReflectionTestUtils.invokeMethod(service,"enrichReferenceDisplayFields",sourceCode,new ArrayList<>(List.of(second)));
+        }
+        assertEquals("Authorized target",first.get("target_ref_display"));assertNull(second.get("target_ref_display"));
+        verify(dataPermissionEngine).buildRowFilterForRecords(1L,targetCode,2L,java.util.Set.of(a));
+        verify(dataPermissionEngine).buildRowFilterForRecords(1L,targetCode,2L,java.util.Set.of(b));
+        verify(dataPermissionEngine,never()).buildRowFilter(1L,targetCode,2L);
+    }
+
     @Test
     @DisplayName("field options fail with 403 before SQL when target model read is denied")
     void fieldOptionsDenyBeforeQueryWithoutTargetModelRead() {

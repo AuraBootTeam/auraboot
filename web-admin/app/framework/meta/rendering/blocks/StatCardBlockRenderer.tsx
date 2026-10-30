@@ -23,13 +23,14 @@ import React, { useEffect } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { AuthoritativeSourceBlock } from './AuthoritativeSourceBlock';
 
 export interface StatCardBlockRendererProps {
   block: BlockConfig;
   runtime: SchemaRuntime;
 }
 
-export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ block, runtime }) => {
+const LegacyStatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ block, runtime }) => {
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
@@ -80,7 +81,7 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
 
   return (
     <div
-      className={`stat-card-block rounded-card border-border bg-panel border p-4 shadow-card ${block.className || ''}`}
+      className={`stat-card-block rounded-card border-border bg-panel shadow-card border p-4 ${block.className || ''}`}
       data-testid="stat-card-block"
       data-block-type="stat-card"
     >
@@ -101,5 +102,12 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
     </div>
   );
 };
+
+export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = (props) =>
+  Object.prototype.hasOwnProperty.call(props.block.props ?? {}, 'sourceState') ? (
+    <AuthoritativeSourceBlock {...props} kind="metric" />
+  ) : (
+    <LegacyStatCardBlockRenderer {...props} />
+  );
 
 export default StatCardBlockRenderer;

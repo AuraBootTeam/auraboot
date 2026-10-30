@@ -51,6 +51,7 @@ public class FileServiceImpl implements FileService {
     private final FileMapper fileMapper;
     private final FileRelationMapper fileRelationMapper;
     private final StorageProvider storageProvider;
+    private final FileRelationMutationGuard relationMutationGuard;
 
     /**
      * Provided by MultipartAutoConfiguration in servlet web hosts. Optional so a
@@ -290,6 +291,9 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional
     public boolean createFileRelation(FileRelationRequestDTO request, Long userId) {
+        if (userId == null || !userId.equals(MetaContext.getCurrentUserId()))
+            throw new org.springframework.security.access.AccessDeniedException("File relations require the current actor");
+        assertFileRelationMutationAllowed(request.getEntityType(),request.getEntityId(),request.getFieldName());
         // The controller authorizes the exact target record. A later editor may
         // retain its existing attachments, but may not copy another user's file
         // to a different record or field. Resolve before replacing any relations.
@@ -337,6 +341,7 @@ public class FileServiceImpl implements FileService {
                 || request.getFileIds() == null || request.getFileIds().length == 0) {
             throw new BusinessException("An authenticated business file relation is required");
         }
+        assertFileRelationMutationAllowed(request.getEntityType(),request.getEntityId(),request.getFieldName());
         int order = 0;
         for (String publicFileId : request.getFileIds()) {
             if (!StringUtils.hasText(publicFileId)) throw new BusinessException("A public file id is required");
@@ -359,6 +364,12 @@ public class FileServiceImpl implements FileService {
             }
         }
         return true;
+    }
+
+    @Override
+    @Transactional
+    public void assertFileRelationMutationAllowed(String entityType, String entityId, String fieldName) {
+        relationMutationGuard.authorize(entityType,entityId,fieldName);
     }
 
     @Override
@@ -390,8 +401,9 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional
     public boolean removeFileRelation(String entityType, String entityId, String fieldName) {
+        assertFileRelationMutationAllowed(entityType,entityId,fieldName);
         QueryWrapper<FileRelationEntity> wrapper = new QueryWrapper<>();
-        wrapper.eq("entity_type", entityType)
+        wrapper.eq("tenant_id", requireTenantId()).eq("entity_type", entityType)
                .eq("entity_id", entityId)
                .eq("field_name", fieldName);
         return fileRelationMapper.delete(wrapper) >= 0;

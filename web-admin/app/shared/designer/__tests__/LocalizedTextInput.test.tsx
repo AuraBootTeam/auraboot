@@ -66,12 +66,20 @@ describe('LocalizedTextInput', () => {
     expect(onChange).toHaveBeenLastCalledWith({ 'zh-CN': '新标题', 'en-US': 'Title' });
   });
 
-  it('keeps the legacy string shape when collapsing a Chinese-only value', () => {
+  it('retains valid localized DSL when collapsing a Chinese-only value', () => {
     const onChange = vi.fn();
     render(<LocalizedTextInput value={{ 'zh-CN': '标题' }} onChange={onChange} testId="title" />);
     fireEvent.click(screen.getByTestId('title-toggle'));
     fireEvent.click(screen.getByTestId('title-toggle'));
-    expect(onChange).toHaveBeenLastCalledWith('标题');
+    expect(onChange).toHaveBeenLastCalledWith({ 'zh-CN': '标题' });
   });
 
+});
+
+
+it('stores non-ASCII edits as localized text without requiring the user to expand languages', () => {
+  const onChange = vi.fn();
+  render(<LocalizedTextInput value={undefined} onChange={onChange} testId="title" />);
+  fireEvent.change(screen.getByTestId('title-zh'), { target: { value: '项目交付信息' } });
+  expect(onChange).toHaveBeenLastCalledWith({ 'zh-CN': '项目交付信息' });
 });

@@ -90,6 +90,40 @@ class ToolLoopServiceSafetyTest {
     }
 
     @Test
+    @DisplayName("ACL denial stays nonretryable and actionable through result normalization")
+    void aclDenialStaysNonretryableAndActionable() throws Exception {
+        var tool = AgentToolDefinition.builder().name("platform_create_model")
+                .toolType("platform").sourceCode("platform.create_model").riskLevel("L3").build();
+        when(toolAclChecker.check(anyLong(), nullable(String.class), nullable(String.class), anyString(), anyString()))
+                .thenReturn(ToolAclChecker.Decision.builder().allowed(false).reason("secret-policy-detail").build());
+        String raw = service.executeToolCall(1L, "run-denied", "task-denied", "agent",
+                tool.getName(), Map.of("description", "private model input"), List.of(tool), null);
+        Map<String, Object> result = com.auraboot.framework.agent.runtime.ToolLoopResultNormalizer.normalize(
+                new ObjectMapper(), raw, tool.getName(), Map.of());
+        assertThat(result).containsEntry("success", false).containsEntry("retryable", false)
+                .containsEntry("errorCode", "TOOL_ACCESS_DENIED");
+        assertThat(String.valueOf(result)).contains("Ask an administrator", "Human approval does not grant")
+                .doesNotContain("secret-policy-detail", "private model input");
+        assertThat((Map<String, Object>) result.get("errorFrame")).containsEntry("errorClass", "ToolAccessDenied")
+                .containsEntry("retryable", false);
+        verifyNoInteractions(approvalGate, toolProviderRegistry, commandExecutor, namedQueryService);
+    }
+
+    @Test
+    @DisplayName("skill confirmation preserves the same safe ACL denial without dispatch")
+    void skillConfirmationPreservesSafeAclDenial() {
+        var tool = AgentToolDefinition.builder().name("aurabot:model:create")
+                .toolType("AURABOT_SKILL").sourceCode("model:create").riskLevel("high").build();
+        when(toolAclChecker.check(anyLong(), nullable(String.class), nullable(String.class), anyString(), anyString()))
+                .thenReturn(ToolAclChecker.Decision.builder().allowed(false).reason("no_matching_rule").build());
+        String raw = service.confirmAuraBotSkill(1L, "run-denied", "task-denied", "agent",
+                tool.getName(), Map.of(), List.of(tool), "preview-1", null);
+        assertThat(raw).contains("TOOL_ACCESS_DENIED", "\"retryable\":false")
+                .doesNotContain("no_matching_rule");
+        verifyNoInteractions(skillToolExecutor, toolProviderRegistry, approvalGate);
+    }
+
+    @Test
     @DisplayName("unsupported discovered tool type returns structured fail-fast signal")
     void unsupportedToolTypeReturnsStructuredFailFastSignal() {
         AgentToolDefinition tool = AgentToolDefinition.builder()

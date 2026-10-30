@@ -1,4 +1,20 @@
+import { currentFormDialogScope } from '~/framework/meta/runtime/actions/formDialogLifecycle';
+import {
+  commandBusinessRejectionError,
+  createPromptSubmissionFeedback,
+} from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
+import {
+  CommandExecutionError,
+  commandExecutionError,
+} from '~/framework/meta/utils/commandExecutionError';
+import {
+  commandRequestMetadata,
+  commandPolicyFor,
+  projectCommandPayload,
+  type CommandRequestIdentity,
+} from '~/framework/meta/utils/commandRequestPolicy';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
+import { useActionTriggerFocus } from '~/hooks/useActionTriggerFocus';
 import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
 /**
  * useActionHandler - 统一的 Action 处理 Hook (重构版本)
@@ -51,7 +67,9 @@ import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCan
  * ```
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useDetailModal } from '~/framework/meta/rendering/pages/detail/DetailModalProvider';
+import { resolveDetailModalTarget } from '~/framework/meta/rendering/pages/detail/detailModalTarget';
 import {
   downloadWithAuth,
   resolveCommandFileDownload,
@@ -63,6 +81,8 @@ import { executeSchemaHandler } from '~/framework/meta/hooks/executeSchemaHandle
 import { executeRegistryAction } from '~/framework/meta/hooks/executeRegistryAction';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { ExpressionParser } from '~/framework/meta/runtime/expression/parser';
+import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -93,7 +113,6 @@ import {
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
 type NavigateFunction = RouterNavigateFunction;
 
-
 function toNonBlankString(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
   const text = String(value).trim();
@@ -123,6 +142,22 @@ function resolveTargetExpectedVersion(
  * (e.g. confirming a quote line from a price-evidence row) it fetches the
  * target record so strict UPDATE/DELETE mutations always send a version.
  */
+/**
+ * Resolve the model that backs this page's records for a direct record read
+ * (the pin-GET snapshot before command inputs). Callers holding a page schema
+ * pass `recordReadModel` (route segments are page keys on custom pages and may
+ * differ from the model, while /api/dynamic record reads authorize
+ * `model.{pageKey}.read` against the raw URL segment). Block renderers already
+ * resolve their row model into `tableName` (resolveRowActionModel), so the
+ * default keeps that contract.
+ */
+function resolveRecordReadModel(
+  recordReadModel: string | undefined,
+  tableName: string,
+): string {
+  return toNonBlankString(recordReadModel) || tableName;
+}
+
 async function resolveCommandExpectedVersion(
   targetRecordPid: string | undefined,
   operationType: string | undefined,
@@ -190,10 +225,14 @@ function resolveNavigationRecord(
   // Static card rows carry route fields rather than entity identifiers.
   // Preserve those fields before falling back to a surrounding detail record.
   const routeFields = [...target.matchAll(/\{(\w+)\}/g)]
-    .map((match) => match[1]).filter((field) => field !== 'pid' && field !== 'id');
-  const templateRecord = routeFields.length > 0
-    ? candidates.find((candidate) => candidate && routeFields.every((field) => field in candidate))
-    : undefined;
+    .map((match) => match[1])
+    .filter((field) => field !== 'pid' && field !== 'id');
+  const templateRecord =
+    routeFields.length > 0
+      ? candidates.find(
+          (candidate) => candidate && routeFields.every((field) => field in candidate),
+        )
+      : undefined;
   if (templateRecord) return templateRecord;
 
   const recordWithPublicPid = candidates.find((candidate) =>
@@ -226,11 +265,28 @@ function resolveCommandPayload(
   if (!configured || typeof configured !== 'object' || Array.isArray(configured)) {
     return {};
   }
-  const out: Record<string, any> = {};
-  for (const [key, value] of Object.entries(configured as Record<string, unknown>)) {
-    out[key] = resolveRuntimeTemplate(value, runtimeContext);
+  const context = createExpressionContext(runtimeContext);
+  // Evaluate only configured DSL values, never strings returned by a record or
+  // projection. Use the canonical sandbox directly so bad payload expressions
+  // cannot turn into undefined fields and reach the command transport.
+  const resolve = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(resolve);
+    if (value && typeof value === 'object' &&
+        [Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item)]));
+    }
+    return typeof value === 'string' && value.includes('${')
+      ? ExpressionParser.parse(/^\s*\$\{[\s\S]+\}\s*$/.test(value) ? value.trim() : value, context)
+      : value;
+  };
+  try {
+    return resolve(configured) as Record<string, any>;
+  } catch {
+    throw new Error(getLocalizedText({
+      'zh-CN': '无法解析当前操作的输入，请检查选择后重试。',
+      en: 'Unable to resolve the action inputs. Check your selections and try again.',
+    }, String(runtimeContext.locale || 'en-US'), runtimeContext.t as any));
   }
-  return out;
 }
 
 function formatMessage(params: Record<string, any>, fallback: string): string {
@@ -295,6 +351,7 @@ interface ExecuteCommandOptions {
   suppressAsyncSubmitToast?: boolean;
   asyncTaskLabel?: string;
   expectedVersion?: number;
+  clientRequestId?: string;
 }
 
 function notifyActionToast(
@@ -329,11 +386,22 @@ export interface UseActionHandlerOptions {
   // 路由相关
   navigate: NavigateFunction;
   tableName: string;
+  /**
+   * Model used for direct record reads (the pin-GET snapshot before command
+   * inputs). Route segments are page keys on custom pages (e.g. wg_my_wage)
+   * and may differ from the model, while /api/dynamic reads authorize
+   * `model.{pageKey}.read` against the raw segment — page-level callers pass
+   * `schema.modelCode` here. Defaults to tableName, which block renderers
+   * already resolve to the row model (resolveRowActionModel).
+   */
+  recordReadModel?: string;
 
   // 业务上下文 (可选 - 根据页面类型提供不同的上下文)
   context?: {
     // 列表页上下文
     loadData?: (...args: any[]) => void | Promise<void>;
+    /** Explicit strict read capability; a best-effort loadData promise is insufficient. */
+    loadDataForReview?: () => Promise<void>;
     filters?: Record<string, any>;
     setFilters?: (filters: Record<string, any>) => void;
     pagination?: {
@@ -413,6 +481,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     runtime,
     navigate,
     tableName,
+    recordReadModel,
     context = {},
     dataSourceManager,
     locale,
@@ -429,7 +498,16 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     [effectiveShowToast],
   );
 
+  const openDetailModal = useDetailModal();
+  const promptLifecycle = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    promptLifecycle.current = controller;
+    return () => controller.abort();
+  }, [token]);
+  const commandIdentity = useRef<CommandRequestIdentity | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const captureTriggerFocus = useActionTriggerFocus(loading);
   const [error, setError] = useState<string | null>(null);
   // Live async task backing the progress modal (running → terminal). Kept after
   // terminal so the modal can show the final summary until the host dismisses.
@@ -458,8 +536,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           token,
         });
         if (!ResultHelper.isSuccess(res)) {
-          throw new Error(
+          throw new CommandExecutionError(
             (res as any).desc || (res as any).message || 'Async task status unavailable',
+            res,
           );
         }
         const task = (res as any).data || {};
@@ -530,6 +609,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       if (commandOptions.expectedVersion != null) {
         body.expectedVersion = commandOptions.expectedVersion;
       }
+      if (commandOptions.clientRequestId) body.clientRequestId = commandOptions.clientRequestId;
       const sendCommand = () =>
         fetchResult(`/api/meta/commands/execute/${commandCode}`, {
           method: 'post',
@@ -564,7 +644,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       }
 
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(resolveCommandErrorMessage(result, commandCode, t, locale));
+        throw commandExecutionError(result, commandCode, t, locale);
       }
 
       // Async dispatch: handlerParams.async commands return immediately with a
@@ -623,7 +703,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    * Show confirmation dialog and return user's choice
    */
   const showConfirmDialog = useCallback(
-    async (messageKey: string | Record<string, string>, variant: 'default' | 'danger'): Promise<boolean> => {
+    async (
+      messageKey: string | Record<string, string>,
+      variant: 'default' | 'danger',
+    ): Promise<boolean> => {
       const { title, content } = resolveConfirmDialog(messageKey, t);
       return confirmDialog({ title, content, variant });
     },
@@ -696,19 +779,36 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
   const handleAction = useCallback(
     async (button: ButtonConfig, record?: Record<string, any>) => {
+      captureTriggerFocus();
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
-      const confirmVariant = normalizedButton.confirmVariant
-        ?? (normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default');
+      const confirmVariant =
+        normalizedButton.confirmVariant ??
+        (normalizedButton.danger || normalizedButton.variant === 'danger' ? 'danger' : 'default');
       const confirmKey = (normalizedButton as any).confirm || normalizedButton.confirmMessageKey;
+      const actionSignal = promptLifecycle.current?.signal;
+      const actionScope = currentFormDialogScope();
+      const submissionFeedback = createPromptSubmissionFeedback({
+        t,
+        locale,
+        refresh: context.loadDataForReview,
+      });
 
       try {
         setLoading(true);
         setError(null);
-        if (normalizedButton.confirmVariant !== undefined
-          && normalizedButton.confirmVariant !== 'default' && normalizedButton.confirmVariant !== 'danger') {
-          throw new Error(t('message.operation.failed', undefined,
-            locale.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed'));
+        if (
+          normalizedButton.confirmVariant !== undefined &&
+          normalizedButton.confirmVariant !== 'default' &&
+          normalizedButton.confirmVariant !== 'danger'
+        ) {
+          throw new Error(
+            t(
+              'message.operation.failed',
+              undefined,
+              locale.toLowerCase().startsWith('zh') ? '操作失败' : 'Operation failed',
+            ),
+          );
         }
 
         switch (actionDef.type) {
@@ -740,7 +840,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               throw new Error('Command includeRecordPayload must be boolean');
             }
             let payload = {
-              ...(includeRecordPayload === false ? {} : (record || context.data || {})),
+              ...(includeRecordPayload === false ? {} : record || context.data || {}),
               ...resolveCommandPayload(
                 actionDef as unknown as Record<string, unknown>,
                 actionRuntimeContext,
@@ -760,15 +860,16 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // the page snapshot after background writes causes false CAS conflicts;
             // fetching at submit would instead hide edits made while the dialog is open.
             // Explicit row actions and confirmations retain the snapshot the user reviewed.
+            const resolvedRecordModel = resolveRecordReadModel(recordReadModel, tableName);
             if (
               (inputFields.length > 0 || (!record && !confirmKey)) &&
               targetRecordPid &&
-              tableName &&
+              resolvedRecordModel &&
               !offboardingAction &&
               resolveTargetExpectedVersion(targetRecordPid, actionRecord) != null
             ) {
               const freshResult = await fetchResult(
-                `/api/dynamic/${encodeURIComponent(tableName)}/${encodeURIComponent(targetRecordPid)}`,
+                `/api/dynamic/${encodeURIComponent(resolvedRecordModel)}/${encodeURIComponent(targetRecordPid)}`,
                 { method: 'get', token },
               );
               if (!ResultHelper.isSuccess(freshResult)) {
@@ -836,8 +937,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               const confirmed = await showConfirmDialog(confirmKey, confirmVariant);
               if (!confirmed) return;
             }
+            let collectedInputs: Record<string, any> | undefined;
             if (inputFields.length > 0) {
-              let collectedInputs: Record<string, any>;
               try {
                 collectedInputs = await promptInputForm(
                   inputFields,
@@ -846,6 +947,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   inputFieldsSubmitLabel,
                   actionRuntimeContext,
                   { t, locale },
+                  (actionDef as any).inputFieldsPresentation ??
+                    (normalizedButton as any).inputFieldsPresentation,
+                  actionSignal,
+                  submissionFeedback,
                 );
               } catch (error) {
                 if (error instanceof ActionCancelledError) return;
@@ -934,12 +1039,33 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   `no explicit command and no convention "${operationType}" command on the model`,
               );
             }
+            const requestExtension = runtime?.getSchema?.()?.extension;
+            const policy = commandPolicyFor(
+              requestExtension?.commandRequest,
+              requestExtension?.commandRequestByCommand,
+              effectiveCommand,
+            );
+            payload = projectCommandPayload(payload, policy, collectedInputs);
+            const request = commandRequestMetadata(
+              policy,
+              actionRecord,
+              {
+                command: effectiveCommand,
+                targetRecordPid,
+                payload,
+                version: actionRecord?.row_version,
+              },
+              commandIdentity.current,
+            );
+            commandIdentity.current = request.identity;
+            const requestMetadata = request.metadata;
             const commandResult = await executeCommand(
               effectiveCommand,
               targetRecordPid,
               payload,
               operationType,
               {
+                ...requestMetadata,
                 suppressAsyncSubmitToast: promptUploadUsesPanelFeedback,
                 asyncTaskLabel: getLocalizedText(
                   normalizedButton.label || normalizedButton.content || normalizedButton.code,
@@ -955,6 +1081,13 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 ),
               },
             );
+            if (actionSignal?.aborted || actionScope?.aborted) return;
+            submissionFeedback.completeResult(commandResult, true);
+            if (
+              submissionFeedback.getState().phase === 'failed' &&
+              commandBusinessRejectionError(commandResult)
+            )
+              return;
             surfaceTemporaryPassword(commandResult);
             const downloadedInline = downloadBase64CommandArtifact(commandResult);
             if (!downloadedInline && !(commandResult as any)?.__asyncFailed && actionDef.download) {
@@ -1029,6 +1162,51 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               actionDef.to,
               isContextualCreate && !target.startsWith('/') ? undefined : navigationRecord,
             );
+            if (actionDef.presentation !== undefined) {
+              if (
+                actionDef.presentation.mode !== 'modal' ||
+                actionDef.command ||
+                actionDef.hardReload
+              ) {
+                throw new Error('Modal presentation supports ordinary detail navigation only');
+              }
+              if (!openDetailModal) throw new Error('Detail modal host is unavailable');
+              const target = resolveDetailModalTarget(path, actionDef.presentation.width ?? 900);
+              const sourceIds = Object.keys(runtime?.getSchema?.()?.dataSources ?? {}).filter(
+                (id) => dataSourceManager?.has(id),
+              );
+              const refreshSource =
+                context.loadData || (dataSourceManager && sourceIds.length > 0)
+                  ? () => {
+                      const refresh = async () => {
+                        if (context.loadData) await context.loadData();
+                        else if (dataSourceManager && sourceIds.length > 0) {
+                          await dataSourceManager.reload(sourceIds);
+                          // DMS records a failed read in state while its reload promise resolves.
+                          const failure = sourceIds
+                            .map((id) => dataSourceManager.getState?.(id)?.error)
+                            .find(Boolean);
+                          if (failure) throw failure;
+                        }
+                      };
+                      return refresh().catch((failure) => {
+                        notifyToast(
+                          t(
+                            'error.data_load_failed',
+                            undefined,
+                            locale.startsWith('zh')
+                              ? '数据刷新失败，请重试。'
+                              : 'Unable to refresh data. Try again.',
+                          ),
+                          'error',
+                        );
+                        throw failure;
+                      });
+                    }
+                  : undefined;
+              openDetailModal(target, refreshSource);
+              return;
+            }
             // Absolute backend/external URLs (e.g. a file-download endpoint) are
             // real browser navigations, not client-side routes — open them so the
             // browser handles the Content-Disposition download.
@@ -1081,13 +1259,29 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                     record: record || context.data,
                   },
                   { t, locale },
+                  (actionDef as any).inputFieldsPresentation ??
+                    (normalizedButton as any).inputFieldsPresentation,
+                  actionSignal,
+                  submissionFeedback,
                 );
               } catch (error) {
                 if (error instanceof ActionCancelledError) return;
                 throw error;
               }
             }
-            await executeCommand(actionDef.command, targetRecordPid, payload, 'update');
+            const transitionResult = await executeCommand(
+              actionDef.command,
+              targetRecordPid,
+              payload,
+              'update',
+            );
+            if (actionSignal?.aborted || actionScope?.aborted) return;
+            submissionFeedback.completeResult(transitionResult, true);
+            if (
+              submissionFeedback.getState().phase === 'failed' &&
+              commandBusinessRejectionError(transitionResult)
+            )
+              return;
             if (context.loadData) {
               await context.loadData();
             } else {
@@ -1172,11 +1366,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               }
             }
             const { getKernel } = await import('~/framework/bootstrap');
-            const result = await getKernel().pluginLoader.invoke('workflow.start', {
+            const result = (await getKernel().pluginLoader.invoke('workflow.start', {
               workflowKey,
               businessKey: String(businessKeyRaw),
               variables: Object.keys(resolvedVars).length > 0 ? resolvedVars : undefined,
-            }) as { deduped?: boolean };
+            })) as { deduped?: boolean };
             const toastMessage = result.deduped
               ? t('workflow.action.start.deduped', undefined, '该记录已有工作流在运行')
               : t('workflow.action.start.success', undefined, '工作流已启动');
@@ -1255,12 +1449,36 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             }
             return;
           }
+
+          default: {
+            // Unknown action.type (e.g. "command.execute", which is only valid
+            // as an ActionRegistry flow step) used to fall through this switch
+            // silently, leaving the button a no-op with no diagnostic
+            // (plugins#771). Surface the misconfiguration loudly instead:
+            // always log with the page identifier; throw in development so the
+            // catch block turns it into a visible error surface.
+            const supportedTypes =
+              'command, navigate, state_transition, builtin, workflow, flow';
+            const detail =
+              `Unknown action.type "${actionDef.type}" on button "${normalizedButton.code}" ` +
+              `(page: ${tableName}). Supported types: ${supportedTypes}. ` +
+              `Note: "command.execute" is a flow-step action, not a button action type.`;
+            console.error(`[useActionHandler] ${detail}`);
+            if (process.env.NODE_ENV === 'development') {
+              throw new Error(detail);
+            }
+            return;
+          }
         }
       } catch (err) {
+        if (actionSignal?.aborted || actionScope?.aborted) return;
+        submissionFeedback.fail(err);
         if (err instanceof ActionCancelledError) return;
         const errorMessage = resolveCommandErrorMessage(
           { context: { detail: err instanceof Error ? err.message : 'Action execution failed' } },
-          button.code, t, locale,
+          button.code,
+          t,
+          locale,
         );
         const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
@@ -1268,6 +1486,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         notifyToast(errorMessage, 'error');
         if (onError) onError(errorObject);
       } finally {
+        submissionFeedback.finalize();
         setLoading(false);
       }
     },
@@ -1286,6 +1505,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       resolveNavigateTo,
       showConfirmDialog,
       surfaceTemporaryPassword,
+      captureTriggerFocus,
+      openDetailModal,
     ],
   );
 

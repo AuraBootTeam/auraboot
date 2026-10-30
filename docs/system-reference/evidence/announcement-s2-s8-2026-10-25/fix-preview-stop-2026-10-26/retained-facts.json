@@ -1,0 +1,18 @@
+{
+  "before": {
+    "database": "aura_bpm_1",
+    "announcements": 3,
+    "versions": 4
+  },
+  "after-first": {
+    "database": "aura_bpm_1",
+    "announcements": 3,
+    "versions": 4
+  },
+  "after-second": {
+    "database": "aura_bpm_1",
+    "announcements": 3,
+    "versions": 4
+  },
+  "beforeCaptureMoment": "After the native-workload stop, before the two clean resume/verify/stop rounds; not a pre-stop snapshot from the failed harness."
+}

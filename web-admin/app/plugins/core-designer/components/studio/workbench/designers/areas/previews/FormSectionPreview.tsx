@@ -110,7 +110,7 @@ export const FormSectionPreview: React.FC<FormSectionPreviewProps> = ({
                       l(`字段${index + 1}`, `Field ${index + 1}`)
                     }
                     placeholder={resolveLocalizedText(field.placeholder, locale) || undefined}
-                    required={field.required}
+                    required={field.required ?? field.validation?.some(rule => rule.type === 'required')}
                     isDetailSection={isDetailSection}
                     isSelected={selectedFieldIndex === index}
                     span={Number((field as any).layout?.colSpan ?? (field as any).colSpan ?? ((field.span ?? 1) * 6))}

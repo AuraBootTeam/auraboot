@@ -44,4 +44,10 @@ public class WorkflowCapabilityRegistry {
         return providers.values().stream().anyMatch(provider -> provider.operations().contains(operation))
                 || localProviders.orderedStream().anyMatch(provider -> provider.operations().contains(operation));
     }
+    public synchronized String providerId(String operation) {
+        var provider=providers.values().stream().findFirst().or(()->localProviders.orderedStream().findFirst())
+            .orElseThrow(()->new IllegalStateException("Workflow provider is unavailable"));
+        if(!provider.operations().contains(operation)) throw new IllegalStateException("Workflow operation is unavailable");
+        return provider.capabilityId();
+    }
 }

@@ -13,7 +13,7 @@ import {
 } from '~/plugins/core-designer/components/unified-designer/canvas/CanvasHost';
 import { ResourcePanel } from '~/plugins/core-designer/components/unified-designer/workbench/ResourcePanel';
 import { InboxBadge } from '../inbox/InboxBadge';
-vi.mock('~/shared/services/inboxService', () => ({ getUnreadCount: vi.fn(async () => 3) }));
+vi.mock('~/shared/services/inboxService', () => ({ getPendingCount: vi.fn(async () => 3) }));
 const seed = JSON.parse(
   fs.readFileSync(
     path.resolve(process.cwd(), '../platform/src/main/resources/seed/i18n-base.json'),
@@ -39,9 +39,9 @@ describe('Chinese and English chrome use bundled translation copy', () => {
     view(<RowHeightSelector onChange={vi.fn()} />, 'en-US');
     expect(screen.getByTitle('Row height')).toBeVisible();
   });
-  it('inbox unread count interpolates the real count', async () => {
+  it('inbox pending count interpolates the real count', async () => {
     view(<InboxBadge />);
-    await waitFor(() => expect(screen.getByTitle('3 条未读')).toBeVisible());
+    await waitFor(() => expect(screen.getByTitle('3 项待处理')).toBeVisible());
   });
   it('column drag control translates its accessible name', () => {
     view(

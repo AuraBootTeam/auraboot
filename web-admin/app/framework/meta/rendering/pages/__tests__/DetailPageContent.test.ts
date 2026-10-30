@@ -645,6 +645,11 @@ describe('resolveVisibleDetailTabsFromBlocks', () => {
 });
 
 describe('resolveVisibleTopLevelDetailBlocks', () => {
+  it('preserves an explicit body toolbar after the detail content without rendering the header toolbar twice', () => {
+    const blocks = [{ id: 'header', blockType: 'toolbar' },{ id: 'body', blockType: 'detail-section' },
+      { id: 'after-reading', blockType: 'toolbar', detailPlacement: 'body' }] as any;
+    expect(resolveVisibleTopLevelDetailBlocks(blocks, () => true).map(block => block.id)).toEqual(['body','after-reading']);
+  });
   it('keeps visible content blocks that sit beside tabs in source order', () => {
     const blocks = [
       { id: 'toolbar', blockType: 'toolbar' },
@@ -710,6 +715,23 @@ describe('evaluateDetailVisibleWhen', () => {
       }),
     ).toBe(false);
     expect(evaluateDetailVisibleWhen("form.status == 'completed'", record)).toBe(true);
+  });
+
+  it('keeps interactive form inputs visible while loaded record values remain authoritative', () => {
+    const record = { pid: 'loaded-record', status: 'draft', row_version: 7 };
+    const runtimeContext = {
+      record: { pid: 'stale-record', status: 'closed', row_version: 99 },
+      row: { pid: 'stale-record' },
+      form: { status: 'closed', row_version: 99, picker: 'source', selectedInput: { name: 'Retained input' } },
+      state: { selectedRows: [] },
+    };
+    expect(evaluateDetailVisibleWhen("form.picker === 'source' && form.selectedInput.name === 'Retained input'", record, runtimeContext)).toBe(true);
+    expect(evaluateDetailVisibleWhen("form.status === 'draft' && form.row_version === 7 && record.pid === 'loaded-record' && row.pid === 'loaded-record'", record, runtimeContext)).toBe(true);
+    expect(evaluateDetailVisibleWhen("form.status === 'closed' || form.row_version === 99 || record.pid === 'stale-record'", record, runtimeContext)).toBe(false);
+    for (const cleared of [null, undefined]) {
+      expect(evaluateDetailVisibleWhen("form.picker === 'source'", record, { form: { picker: cleared } })).toBe(false);
+    }
+    expect(evaluateDetailVisibleWhen("form.picker === 'source'", record)).toBe(false);
   });
 
   it('preserves runtime user permissions for top-level detail visibility', () => {

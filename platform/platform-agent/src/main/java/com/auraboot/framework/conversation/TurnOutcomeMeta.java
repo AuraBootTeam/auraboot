@@ -25,6 +25,9 @@ public final class TurnOutcomeMeta {
      */
     public static final String TOOL_FAILURE = "toolFailure";
 
+    /** Boolean.TRUE when the provider stopped at its output token limit. */
+    public static final String RESPONSE_TRUNCATED = "responseTruncated";
+
     private TurnOutcomeMeta() {
     }
 }

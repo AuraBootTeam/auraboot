@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { useAuth } from '~/contexts/AuthContext';
 import type { BlockConfig, DetailTabConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { BlockRenderer } from '@auraboot/runtime-kernel';
@@ -18,8 +19,12 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
 
-  const tabs = (block.tabs || []) as DetailTabConfig[];
-  const [activeTab, setActiveTab] = useState(0);
+  const { hasPermission } = useAuth();
+  const tabs = ((block.tabs || []) as DetailTabConfig[]).filter(
+    (tab) => !tab.permissionCode || hasPermission(tab.permissionCode),
+  );
+  const [selectedKey, setSelectedKey] = useState<string | undefined>();
+  const activeTab = Math.max(0, tabs.findIndex((tab) => tab.key === selectedKey));
 
   return (
     <div className="tabs-block">
@@ -37,7 +42,7 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
                 key={tab.key || index}
                 role="tab"
                 aria-selected={activeTab === index}
-                onClick={() => setActiveTab(index)}
+                onClick={() => setSelectedKey(tab.key)}
                 className={`min-h-11 shrink-0 touch-manipulation whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium ${
                   activeTab === index
                     ? 'border-accent text-accent'
@@ -55,7 +60,7 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
       <div className="mt-4">
         {tabs[activeTab]?.blocks?.map((nestedBlock: BlockConfig, index: number) => (
           <BlockRenderer
-            key={index}
+            key={nestedBlock.id || index}
             block={nestedBlock}
             runtime={runtime}
             areaId={`tab-${activeTab}`}

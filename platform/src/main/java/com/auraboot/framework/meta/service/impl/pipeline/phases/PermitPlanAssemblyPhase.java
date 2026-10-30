@@ -154,6 +154,13 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         }
         try {
             String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+            // A scalar SELF grade cannot represent TEAM, department or custom predicates.
+            // Synchronous, explicitly read-only handlers keep the ordinary record/query policy
+            // instead of substituting creator ownership. Write and async permit metadata stays
+            // on its established path, including writer authorization and optimistic versions.
+            if (StringUtils.hasText(rowFilter) && requiresReadonlyPolicyFallback(ctx)) {
+                return null;
+            }
             return StringUtils.hasText(rowFilter) ? ScopeGrade.SELF : ScopeGrade.ALL;
         } catch (RuntimeException e) {
             // An unresolved scope is never published. The legacy data-layer path therefore remains
@@ -164,6 +171,21 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         }
     }
 
+    private boolean requiresReadonlyPolicyFallback(CommandPipelineContext ctx) {
+        if (!ctx.isHasPluginHandler() || ctx.isPluginRequiresDslPersistence()
+                || ctx.getRequest() == null || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+                || !Boolean.TRUE.equals(ctx.getTargetRecordReadable())
+                || ctx.getAuthorizationVerdict() == null || !ctx.getAuthorizationVerdict().isAuthorized()) {
+            return false;
+        }
+        Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
+        if (!(params instanceof java.util.Map<?, ?> values) || !"read".equals(values.get("targetRecordAction"))) {
+            return false;
+        }
+        Object async = values.get("async");
+        return !Boolean.TRUE.equals(async) && !"true".equalsIgnoreCase(String.valueOf(async));
+    }
+
     private boolean hasAuthorizedHandlerTarget(CommandPipelineContext ctx) {
         if (ctx == null || ctx.getCommand() == null || ctx.getRequest() == null
                 || !StringUtils.hasText(ctx.getCommand().getModelCode())
@@ -172,10 +194,18 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
                 || ctx.getAuthorizationVerdict() == null
                 || !ctx.getAuthorizationVerdict().isAuthorized()) return false;
         Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
-        if (!(params instanceof java.util.Map<?, ?> values)
-                || !"handler".equals(values.get("targetRecordAuthorization"))) return false;
+        if (!(params instanceof java.util.Map<?, ?> values)) return false;
         Object action = values.get("targetRecordAction");
-        return "update".equals(action) || "delete".equals(action);
+        if (!"update".equals(action) && !"delete".equals(action)) return false;
+        if ("handler".equals(values.get("targetRecordAuthorization"))) return true;
+        // A declaration alone is not a completed callback. Bind its host-only witness to
+        // the exact current root/action; generic READ SQL must not replace this decision.
+        var invocation = ctx.getHandlerInvocationAuthorization();
+        return ("handler".equals(values.get("invocationAuthorization")) || "handler-with-result-reads".equals(values.get("invocationAuthorization"))) && invocation != null
+                && java.util.Objects.equals(invocation.commandCode(), ctx.getCommandCode())
+                && java.util.Objects.equals(invocation.modelCode(), ctx.getCommand().getModelCode())
+                && java.util.Objects.equals(invocation.targetRecordId(), ctx.getRequest().getTargetRecordId())
+                && java.util.Objects.equals(invocation.action(), action);
     }
 
     /**

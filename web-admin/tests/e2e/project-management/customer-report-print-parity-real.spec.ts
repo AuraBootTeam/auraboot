@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { navigateToMenuByClick } from '../helpers';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { requireRuntimeUrl } from '../../helpers/environments';
+import { customerBudgetFixture } from '../../helpers/customer-budget-fixture';
 
 test.use({
   locale: 'zh-CN',
@@ -73,7 +74,7 @@ test('SC06-PRINT canonical designer layout survives real HTML and multi-page PDF
     expect(String(body.code)).toBe('0');
     expect(body.data.phaseReached).toBe('completed');
   };
-  const customer = '华辰制造（经营分析案例）';
+  const customer = customerBudgetFixture.customerName;
   let customers = await list('tpm_customer', 'tpm_cu_name', customer);
   if (!customers.length) {
     await create('tpm:create_customer', {
@@ -84,11 +85,7 @@ test('SC06-PRINT canonical designer layout survives real HTML and multi-page PDF
   }
   expect(customers).toHaveLength(1);
   const customerPid = customers[0].pid;
-  for (const project of [
-    { code: 'REPORT-SUPPLY', name: '供应链协同平台', budget: 128000 },
-    { code: 'REPORT-SERVICE', name: '服务交付二期', budget: 286000 },
-    { code: 'REPORT-RECONCILE', name: '供应商对账升级', budget: 132000.5 },
-  ]) {
+  for (const project of customerBudgetFixture.projects) {
     if (!(await list('tpm_project', 'tpm_pj_code', project.code)).length)
       await create('tpm:create_project', {
         tpm_pj_code: project.code,

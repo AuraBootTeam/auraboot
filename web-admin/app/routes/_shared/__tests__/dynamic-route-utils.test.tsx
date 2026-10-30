@@ -1,6 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DynamicField, resolveLocalMenuRedirect } from '../dynamic-route-utils';
+const fileMocks = vi.hoisted(() => ({ fetchResult: vi.fn() }));
+vi.mock('~/shared/services/http-client', () => ({ fetchResult: fileMocks.fetchResult }));
 
 describe('resolveLocalMenuRedirect', () => {
   it('resolves app-local menu redirects and preserves current query/hash when target omits them', () => {
@@ -57,6 +59,96 @@ describe('resolveLocalMenuRedirect', () => {
 });
 
 describe('DynamicField', () => {
+  it('uses a safe same-page download for controlled file attachments', () => {
+    render(<DynamicField field={{ field: 'files', component: 'fileattachment' } as any}
+      value={JSON.stringify([{ name: 'Policy.txt', url: '/api/announcements/versions/v1/attachments/f1', size: 12 },
+        { name: 'Unsafe.txt', url: 'javascript:alert(1)' }])} onChange={vi.fn()} readOnly locale="en-US" />);
+    const safe = screen.getByRole('link', { name: 'Policy.txt (12 B)' });
+    expect(safe).toHaveAttribute('href', '/api/announcements/versions/v1/attachments/f1');
+    expect(safe).toHaveAttribute('download', 'Policy.txt');
+    expect(safe).toHaveAttribute('target', '_self');
+    expect(screen.getByText('Unsafe.txt')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Unsafe.txt')).not.toHaveAttribute('href');
+  });
+
+  it('resolves a scalar file reference to authorized metadata and a controlled download', async () => {
+    fileMocks.fetchResult.mockResolvedValue({ code: '0', data: {
+      fileId: '01J4P1X4S5R6T7V8W9X0Y1Z2A3', originalName: 'environment.yaml', fileSize: 768,
+      url: 'https://untrusted.example/ignored',
+    } });
+    render(<DynamicField field={{ field: 'original', component: 'fileattachment' } as any}
+      value="01J4P1X4S5R6T7V8W9X0Y1Z2A3" onChange={vi.fn()} readOnly locale="en-US" />);
+    const link = await screen.findByRole('link', { name: 'environment.yaml 768 B' });
+    expect(fileMocks.fetchResult).toHaveBeenCalledWith('/api/file/01J4P1X4S5R6T7V8W9X0Y1Z2A3', { method: 'get' });
+    expect(link).toHaveAttribute('href', '/api/file/download/01J4P1X4S5R6T7V8W9X0Y1Z2A3');
+    expect(link).toHaveAttribute('download', 'environment.yaml');
+    expect(link).toHaveAttribute('target', '_self');
+  });
+
+  it.each(['403', '404'])('shows unavailable rather than empty for a denied or missing scalar file (%s)', async (code) => {
+    fileMocks.fetchResult.mockResolvedValue({ code });
+    render(<DynamicField field={{ field: 'original', component: 'fileattachment' } as any}
+      value="01J4P1X4S5R6T7V8W9X0Y1Z2A4" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('File unavailable');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByText('01J4P1X4S5R6T7V8W9X0Y1Z2A4')).not.toBeInTheDocument();
+  });
+
+  it('does not display a previous file or accept its late metadata after the scalar reference changes', async () => {
+    let finishOld!: (result: unknown) => void;
+    fileMocks.fetchResult.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }))
+      .mockResolvedValueOnce({ code: '0', data: { fileId: '01J4P1X4S5R6T7V8W9X0Y1Z2A5', originalName: 'new.yaml', fileSize: 0 } });
+    const field = { field: 'original', component: 'fileattachment' } as any;
+    const { rerender } = render(<DynamicField field={field} value="01J4P1X4S5R6T7V8W9X0Y1Z2A6" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading file');
+    rerender(<DynamicField field={field} value="01J4P1X4S5R6T7V8W9X0Y1Z2A5" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(await screen.findByRole('link', { name: 'new.yaml 0 B' })).toHaveAttribute('href', '/api/file/download/01J4P1X4S5R6T7V8W9X0Y1Z2A5');
+    await act(async () => { finishOld({ code: '0', data: { fileId: '01J4P1X4S5R6T7V8W9X0Y1Z2A6', originalName: 'old.yaml', fileSize: 1 } }); });
+    await waitFor(() => expect(screen.queryByText('old.yaml')).not.toBeInTheDocument());
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it.each([
+    { fileId: 'different-file', originalName: 'wrong.yaml', fileSize: 1 },
+    { fileId: '01J4P1X4S5R6T7V8W9X0Y1Z2A3', originalName: '', fileSize: 1 },
+    { fileId: '01J4P1X4S5R6T7V8W9X0Y1Z2A3', originalName: 'invalid-size.yaml', fileSize: -1 },
+  ])('rejects success envelopes with missing or mismatched metadata ($originalName)', async data => {
+    fileMocks.fetchResult.mockResolvedValue({ code: '0', data });
+    render(<DynamicField field={{ field: 'original', component: 'fileattachment' } as any}
+      value="01J4P1X4S5R6T7V8W9X0Y1Z2A3" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('File unavailable');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('uses the real stored filename only when originalName is unavailable', async () => {
+    fileMocks.fetchResult.mockResolvedValue({ code: '0', data: {
+      fileId: '01J4P1X4S5R6T7V8W9X0Y1Z2A3', originalName: null, fileName: 'stored.yaml', fileSize: 1024,
+    } });
+    render(<DynamicField field={{ field: 'original', component: 'fileattachment' } as any}
+      value="01J4P1X4S5R6T7V8W9X0Y1Z2A3" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(await screen.findByRole('link', { name: 'stored.yaml 1.0 KB' })).toHaveAttribute('download', 'stored.yaml');
+  });
+
+  it('reports a transport failure without retrying or exposing a scalar identity', async () => {
+    fileMocks.fetchResult.mockReset().mockRejectedValue(new Error('offline'));
+    render(<DynamicField field={{ field: 'original', component: 'fileattachment' } as any}
+      value="01J4P1X4S5R6T7V8W9X0Y1Z2A3" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('File unavailable');
+    expect(fileMocks.fetchResult).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('01J4P1X4S5R6T7V8W9X0Y1Z2A3')).not.toBeInTheDocument();
+  });
+
+  it('does not query file metadata for empty or malformed scalar references', () => {
+    fileMocks.fetchResult.mockClear();
+    const field = { field: 'original', component: 'fileattachment' } as any;
+    const { rerender } = render(<DynamicField field={field} value="" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(screen.getByText('—')).toBeVisible();
+    rerender(<DynamicField field={field} value="../secret" onChange={vi.fn()} readOnly locale="en-US" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('File unavailable');
+    expect(fileMocks.fetchResult).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('formats read-only numeric and money controls with locale grouping', () => {
     const { rerender } = render(
       <DynamicField

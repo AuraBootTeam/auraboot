@@ -35,6 +35,73 @@ class DynamicDataAccessorCommandAuthorityTest {
     }
 
     @Test
+    void relatedRecordReadUsesCurrentActorAndRestoresTheExactMutationRoot() {
+        MetaContext.setContext(7L, 42L, "actor", "Actor"); MetaContext.setMemberId(43L);
+        var accessor = new DynamicDataAccessorImpl(dynamicDataService);
+        when(dynamicDataService.getById("m", "other")).thenAnswer(call -> {
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(43L);
+            return Map.of("pid", "other");
+        });
+        when(dynamicDataService.getById("m", "root")).thenAnswer(call -> {
+            assertThat(MetaContext.getCommandPermitScopeFor("m")).isEqualTo("TARGET");
+            assertThat(MetaContext.getCommandExpectedVersion("m", "root")).isEqualTo(9L);
+            return Map.of("pid", "root");
+        });
+        MetaContext.runWithCommandPermitPlan("TARGET", 9L, "m", "root", () -> {
+            assertThat(accessor.getById("m", "other")).containsEntry("pid", "other");
+            assertThat(accessor.getById("m", "root")).containsEntry("pid", "root");
+            assertThat(MetaContext.getCommandExpectedVersion("m", "root")).isEqualTo(9L);
+        });
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+    }
+
+    @Test
+    void relatedReadDenialAndTypedAbsenceNeverRelaxTheOuterWritePermit() {
+        var accessor = new DynamicDataAccessorImpl(dynamicDataService);
+        when(dynamicDataService.getById("m", "denied")).thenAnswer(call -> {
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            throw new org.springframework.security.access.AccessDeniedException("current actor denied");
+        });
+        when(dynamicDataService.getById("m", "absent")).thenAnswer(call -> {
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException("m", "absent");
+        });
+        when(dynamicDataService.update(anyString(), anyString(), any())).thenAnswer(call -> {
+            assertThat(MetaContext.getCommandPermitScopeFor("m")).isEqualTo("TARGET");
+            assertThat(MetaContext.getCommandPermitTargetFor("m")).isEqualTo("root");
+            assertThat(MetaContext.getCommandExpectedVersion("m", "root")).isEqualTo(9L);
+            throw new org.springframework.security.access.AccessDeniedException("write remains root-bound");
+        });
+        MetaContext.runWithCommandPermitPlan("TARGET", 9L, "m", "root", () -> {
+            assertThatThrownBy(() -> accessor.getByIdOrNull("m", "denied"))
+                    .isInstanceOf(com.auraboot.framework.plugin.extension.DataAccessorException.class);
+            assertThat(accessor.getByIdOrNull("m", "absent")).isNull();
+            assertThatThrownBy(() -> accessor.update("m", "other", Map.of()))
+                    .isInstanceOf(com.auraboot.framework.plugin.extension.DataAccessorException.class);
+            assertThat(MetaContext.getCommandExpectedVersion("m", "root")).isEqualTo(9L);
+        });
+    }
+
+    @Test
+    void unrelatedGradesAndTheLegacyGlobalBridgeKeepTheirExistingSemantics() {
+        var accessor = new DynamicDataAccessorImpl(dynamicDataService);
+        for (String grade : java.util.List.of("ALL", "SELF")) {
+            org.mockito.Mockito.doAnswer(call -> {
+                assertThat(MetaContext.getCommandPermitScopeFor("m")).isEqualTo(grade);
+                return Map.of("pid", "other");
+            }).when(dynamicDataService).getById("m", "other");
+            MetaContext.runWithCommandPermitPlan(grade, 9L, "m", "root", () -> accessor.getById("m", "other"));
+        }
+        org.mockito.Mockito.doAnswer(call -> {
+            assertThat(MetaContext.getCommandPermitScopeFor("m")).isEqualTo("ALL");
+            return Map.of("pid", "other");
+        }).when(dynamicDataService).getById("m", "other");
+        MetaContext.runWithCommandPermitScope("ALL", () -> accessor.getById("m", "other"));
+    }
+
+    @Test
     void boundedQueryKeepsTheExistingPermitPlanAndDoesNotLeakIt() {
         java.util.concurrent.atomic.AtomicReference<String> scope = new java.util.concurrent.atomic.AtomicReference<>();
         when(dynamicDataService.list(anyString(), any())).thenAnswer(i -> {

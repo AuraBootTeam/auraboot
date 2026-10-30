@@ -82,6 +82,7 @@ public class PluginHotloadController {
                     ? uploadedPluginId
                     : findLoadedPluginByPath(targetPath).orElse(null);
             if (existingPluginId != null && pluginManager.isPluginLoaded(existingPluginId)) {
+                pluginManager.requireTenantLifecycleChange(existingPluginId);
                 backgroundComponentRegistry.unregister(existingPluginId);
                 extensionRegistry.removePluginFromCache(existingPluginId);
                 boolean unloaded = pluginManager.hotUnloadPlugin(existingPluginId);
@@ -133,6 +134,7 @@ public class PluginHotloadController {
      */
     @PostMapping("/{pluginId}/reload")
     public ResponseEntity<HotloadResult> reloadPlugin(@PathVariable String pluginId) {
+        pluginManager.requireTenantLifecycleChange(pluginId);
         log.info("Reloading plugin: {}", pluginId);
 
         if (!pluginManager.isPluginLoaded(pluginId)) {
@@ -163,6 +165,7 @@ public class PluginHotloadController {
     public ResponseEntity<HotloadResult> unloadPlugin(
             @PathVariable String pluginId,
             @RequestParam(defaultValue = "false") boolean deleteJar) {
+        pluginManager.requireTenantLifecycleChange(pluginId);
         log.info("Unloading plugin: {} (deleteJar: {})", pluginId, deleteJar);
 
         PluginWrapper wrapper = pluginManager.getPluginWrapper(pluginId);
@@ -255,6 +258,7 @@ public class PluginHotloadController {
      */
     @PostMapping("/{pluginId}/stop")
     public ResponseEntity<HotloadResult> stopPlugin(@PathVariable String pluginId) {
+        pluginManager.requireTenantLifecycleChange(pluginId);
         log.info("Stopping plugin: {}", pluginId);
 
         PluginWrapper wrapper = pluginManager.getPluginWrapper(pluginId);

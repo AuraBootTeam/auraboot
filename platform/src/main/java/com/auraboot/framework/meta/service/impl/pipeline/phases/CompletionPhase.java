@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.constant.CommandResultCachePolicy;
 import com.auraboot.framework.connector.service.ApiConnectorService;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.service.IdempotencyService;
@@ -44,6 +45,7 @@ public class CompletionPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        boolean cacheResult = CommandResultCachePolicy.enabled(ctx.getExecConfig());
         boolean dryRun = ctx.getRequest() != null && ctx.getRequest().isDryRun();
 
         // EFFECT phase (PR-62 R2-N2): effectExecutor.executeEffectPhase writes
@@ -123,7 +125,7 @@ public class CompletionPhase implements CommandPhase {
         analyticsOutcomes.record(ctx);
 
         // Save idempotency record
-        if (StringUtils.hasText(ctx.getRequest().getClientRequestId())) {
+        if (cacheResult && StringUtils.hasText(ctx.getRequest().getClientRequestId())) {
             var resultData = ctx.resultData();
             if (ctx.getIdempotencyIntent() == null) {
                 throw new IllegalStateException("Command idempotency intent was not claimed");

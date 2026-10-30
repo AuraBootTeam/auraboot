@@ -1,4 +1,9 @@
-import { ApplicationCapabilitiesProvider, useApplicationCapabilities } from '~/contexts/ApplicationCapabilitiesContext';
+import { FormDialogProvider } from '~/framework/meta/runtime/actions/FormDialog';
+import { DetailModalProvider } from '~/framework/meta/rendering/pages/detail/DetailModalProvider';
+import {
+  ApplicationCapabilitiesProvider,
+  useApplicationCapabilities,
+} from '~/contexts/ApplicationCapabilitiesContext';
 import {
   Outlet,
   Links,
@@ -485,7 +490,6 @@ export default function App() {
     });
   }, [authenticated]);
 
-
   useEffect(() => {
     setFederationRuntimeProfile(data.runtimeProfile);
   }, [data.runtimeProfile, setFederationRuntimeProfile]);
@@ -550,7 +554,11 @@ export default function App() {
           <TenantThemeProvider>
             <ToastProvider closeLabel={data.i18n?.['notification.close']}>
               <ConfirmDialogProvider>
-                {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
+                <FormDialogProvider>
+                  <DetailModalProvider>
+                    {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}
+                  </DetailModalProvider>
+                </FormDialogProvider>
               </ConfirmDialogProvider>
               {/* sonner-based feedback (designer saves, export failures) previously had no
                   mounted Toaster and was invisible; render it once at the app root. */}
@@ -576,10 +584,12 @@ export default function App() {
                 onRejected={onRejected}
                 onError={onError}
               />
-              <ApplicationCapabilitiesProvider><EntitlementProvider>
-                <CorePluginBootstrap enabled={bootCoreRuntime} />
-                <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
-              </EntitlementProvider></ApplicationCapabilitiesProvider>
+              <ApplicationCapabilitiesProvider>
+                <EntitlementProvider>
+                  <CorePluginBootstrap enabled={bootCoreRuntime} />
+                  <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
+                </EntitlementProvider>
+              </ApplicationCapabilitiesProvider>
             </AuthProvider>
           ) : (
             sharedProviders

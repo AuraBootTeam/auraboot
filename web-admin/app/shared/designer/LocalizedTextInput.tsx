@@ -10,7 +10,7 @@
  * UX:
  *   - Collapsed (default): single input bound to zh-CN. "+ 多语言" button expands.
  *   - Expanded: zh-CN + en-US inputs stacked. "- 折叠" button hides en-US (keeps
- *     value as object if en-US has content, otherwise collapses to string).
+ *     value as object for localized content; ASCII-only text may remain a string).
  *   - `$i18n:` prefix auto-detected: the component stays in single-string mode and
  *     no expansion is offered (the key is the authoritative value).
  *
@@ -68,15 +68,15 @@ function readLocale(v: LocalizedTextValue, locale: string): string {
 /**
  * Decide the output shape:
  *   - Both empty → undefined
- *   - Only zh-CN filled and component not expanded → plain string
+ *   - Collapsed ASCII-only content → plain string; localized text → object
  *   - Otherwise → object form with whichever locales have content
  */
 function buildOutput(zh: string, en: string, expanded: boolean): LocalizedTextValue {
   const zhTrim = zh;
   const enTrim = en;
   if (!zhTrim && !enTrim) return undefined;
-  if (!expanded && !enTrim) {
-    // A collapsed single-locale value may stay a string; existing translations survive.
+  if (!expanded && !enTrim && !/[^\x00-\x7F]/.test(zhTrim)) {
+    // ASCII strings and i18n keys remain compatible; localized text must pass server i18n validation.
     return zhTrim || undefined;
   }
   // Expanded: emit object form so i18n resolver can pick the right locale.
@@ -135,7 +135,7 @@ export const LocalizedTextInput: React.FC<LocalizedTextInputProps> = ({
   const toggleExpanded = useCallback(() => {
     setExpanded((prev) => {
       const next = !prev;
-      // On collapse: preserve string form if en was empty, otherwise keep obj.
+      // Collapsing the controls must retain a server-valid localized value.
       if (!next) {
         onChange(buildOutput(zh, en, false));
       } else {

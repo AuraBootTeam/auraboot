@@ -1373,6 +1373,10 @@ describe('useListKeywordSearch submitted filter contract', () => {
       );
       act(() => result.current.rememberSubmittedFilters(form));
       form.s2p_se_status = 'bidding'; // Edited form has not been submitted.
+      const submitted=result.current.getSubmittedFilters();
+      expect(submitted).toEqual({s2p_se_status:'draft'});
+      submitted.s2p_se_status='mutated copy';
+      expect(result.current.getSubmittedFilters()).toEqual({s2p_se_status:'draft'});
       act(() => result.current.debouncedSearch());
       act(() => vi.advanceTimersByTime(299));
       expect(load).not.toHaveBeenCalled();

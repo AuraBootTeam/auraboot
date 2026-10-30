@@ -38,11 +38,11 @@ public interface AsyncTaskMapper extends BaseMapper<AsyncTask> {
     @Update("""
             UPDATE ab_async_task SET status='pending', started_at=NULL, execution_token=NULL, lease_until=NULL
             WHERE status='running' AND execution_token IS NOT NULL AND lease_until <= clock_timestamp()
-              AND task_type='command-handler' AND input_params->>'resumeOnRestart'='true'
+              AND task_type IN ('command-handler','domain-export') AND input_params->>'resumeOnRestart'='true'
             """)
     int requeueExpiredResumableTasks();
 
-    @Select("SELECT * FROM ab_async_task WHERE status='pending' AND task_type='command-handler' AND input_params->>'resumeOnRestart'='true' ORDER BY priority, created_at LIMIT #{limit}")
+    @Select("SELECT * FROM ab_async_task WHERE status='pending' AND task_type IN ('command-handler','domain-export') AND input_params->>'resumeOnRestart'='true' ORDER BY priority, created_at LIMIT #{limit}")
     List<AsyncTask> findResumablePendingTasks(@Param("limit") int limit);
 
     @Update("""
@@ -53,6 +53,12 @@ public interface AsyncTaskMapper extends BaseMapper<AsyncTask> {
     int updateOwnedProgress(@Param("id") Long id, @Param("tenantId") Long tenantId,
                             @Param("token") String token, @Param("progress") int progress,
                             @Param("message") String message);
+
+    @Select("""
+            SELECT id FROM ab_async_task WHERE id=#{id} AND tenant_id=#{tenantId} AND execution_token=#{token}
+                AND status='running' AND lease_until>clock_timestamp() FOR UPDATE
+            """)
+    Long lockOwnedExecution(@Param("id") Long id,@Param("tenantId") Long tenantId,@Param("token") String token);
 
     @Update("""
             UPDATE ab_async_task SET status=#{task.status}, progress=#{task.progress},
@@ -76,7 +82,7 @@ public interface AsyncTaskMapper extends BaseMapper<AsyncTask> {
             UPDATE ab_async_task SET status='failed', completed_at=clock_timestamp(),
               error_message='Execution lease expired; explicit retry required', execution_token=NULL, lease_until=NULL
             WHERE status='running' AND execution_token IS NOT NULL AND lease_until <= clock_timestamp()
-              AND NOT (task_type='command-handler' AND COALESCE(input_params->>'resumeOnRestart','false')='true')
+              AND NOT (task_type IN ('command-handler','domain-export') AND COALESCE(input_params->>'resumeOnRestart','false')='true')
             """)
     int failExpiredTasks();
 }

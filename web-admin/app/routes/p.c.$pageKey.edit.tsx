@@ -11,6 +11,8 @@ import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPag
 import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { DynamicPageUnavailable } from '~/framework/meta/rendering/pages/DynamicPageUnavailable';
+import { resolveDynamicPageAccessError } from '~/shared/services/dynamic-page-access.server';
 
 interface PageInfo {
   modelCode?: string;
@@ -26,6 +28,13 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   try {
     const token = await getTokenFromRequest(request);
+    const accessError = await resolveDynamicPageAccessError(
+      request,
+      token,
+      pageKey,
+      `/p/c/${pageKey}`,
+    );
+    if (accessError) return { pageKey, recordPid, tableName: pageKey, accessError };
     const pageResult = await fetchResult<PageInfo>(
       `/api/pages/key/${pageKey}`,
       { method: 'get', token },
@@ -40,7 +49,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     }
 
     const tableName = pageResult.data.modelCode || pageKey;
-    return { pageKey, recordPid, tableName };
+    return { pageKey, recordPid, tableName, accessError: null };
   } catch (error) {
     if (error instanceof Response) {
       throw error;
@@ -51,7 +60,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function CustomFormEditPage() {
-  const { pageKey, recordPid, tableName } = useLoaderData<typeof loader>();
+  const { pageKey, recordPid, tableName, accessError } = useLoaderData<typeof loader>();
+  if (accessError) return <DynamicPageUnavailable message={accessError} />;
   return (
     <DynamicPageRenderer
       tableName={tableName}

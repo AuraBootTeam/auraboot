@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 
 const { fetchResultMock } = vi.hoisted(() => ({
   fetchResultMock: vi.fn(),
@@ -386,6 +387,47 @@ describe('workbenchBlockUtils action runner', () => {
     } finally {
       click.mockRestore();
     }
+  });
+
+  it('clears the active form before reloading explicit sources and preserves other scopes', async () => {
+    const stateManager = new ScopedStateManager(
+      {} as ConstructorParameters<typeof ScopedStateManager>[0],
+    );
+    stateManager.createScope('filters', {
+      form: { keyword: 'Selected vessel', status: 'new' },
+      state: { selectedRecord: 'CASE-A' },
+    });
+    stateManager.createScope('other', { form: { note: 'Keep this draft' } });
+    const reload = vi.fn(async (ids: string[]) => {
+      expect(ids).toEqual(['events']);
+      expect(stateManager.getScope('filters')?.form).toEqual({});
+    });
+    const runtime = makeRuntime({
+      getScopeId: () => 'filters',
+      getStateManager: () => stateManager,
+      getDataSourceManager: () => ({ reload }),
+      getContext: () => stateManager.getContext('filters'),
+    });
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'form.reset',
+      args: { ids: ['events'] },
+    });
+
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(stateManager.getScope('filters')?.state).toEqual({ selectedRecord: 'CASE-A' });
+    expect(stateManager.getScope('other')?.form).toEqual({ note: 'Keep this draft' });
+  });
+
+  it('rejects form reset without an active scope before loading any data', async () => {
+    const runtime = makeRuntime({ getScopeId: () => '' }) as any;
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: 'form.reset',
+        args: { ids: ['events'] },
+      }),
+    ).rejects.toThrow(/scoped form/);
+    expect(runtime.__reload).not.toHaveBeenCalled();
   });
 
   it('navigates workbench actions to an explicit path or custom page key', async () => {

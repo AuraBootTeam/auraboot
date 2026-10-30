@@ -146,12 +146,15 @@ public class NamedQueryFieldProtection {
                 scope = modelScopes.computeIfAbsent(source.getValue(), model -> {
                     String permit = CommandPermitDataAccess.rowFilter(model, MetaContext.getCurrentUserId());
                     String row = permit != null ? permit : policies.buildRowFilter(MetaContext.getCurrentTenantId(), model, "read", MetaContext.getCurrentUserId());
+                    if (permit != null) row = appendRequiredReadScope(row, model);
                     String domain = domains.buildDomainFilter(model, MetaContext.getCurrentUserId());
                     return java.util.stream.Stream.of("tenant_id = " + MetaContext.getCurrentTenantId(), row, domain).filter(value -> value != null && !value.isBlank())
                             .map(value -> "(" + value.trim().replaceFirst("(?i)^(AND|WHERE)\\s+", "") + ")")
                             .collect(java.util.stream.Collectors.joining(" AND "));
                 });
             }
+            if (selfAnchoredModels.contains(source.getValue())) scope = combineRequiredReadScope(scope, policies.buildRequiredReadFilter(
+                    MetaContext.getCurrentTenantId(), source.getValue(), MetaContext.getCurrentUserId(), "AND created_by = " + anchorUser, false));
             sourceScopes.put(source.getKey(), scope);
         }
         evidence.set("sourceScopes", JSON.valueToTree(sourceScopes));
@@ -223,7 +226,7 @@ public class NamedQueryFieldProtection {
             String predicate = MachineDataAccessGuards.predicate(source.getValue(), "read", parameters, prefix);
             String tenantKey = prefix + "_tenant";
             parameters.put(tenantKey, decision.tenantId());
-            scopes.put(source.getKey(), "tenant_id = #{params." + tenantKey + "} AND (" + predicate + ")");
+            scopes.put(source.getKey(), appendRequiredReadScope("tenant_id = #{params." + tenantKey + "} AND (" + predicate + ")", source.getValue()));
             Set<String> columns = new HashSet<>();
             for (String field : decision.readableFields()) {
                 columns.add(com.auraboot.framework.meta.security.SqlSafetyUtils.requireIdentifier(
@@ -243,6 +246,18 @@ public class NamedQueryFieldProtection {
         evidence.set("sourceModels", JSON.valueToTree(resolved.models()));
         return new Plan(evidence, List.of(), Map.copyOf(scopes), resolved.views(),
                 Set.copyOf(resolved.models().values()), Map.copyOf(parameters));
+    }
+
+    private String appendRequiredReadScope(String scope, String model) {
+        String required = policies.buildRequiredReadFilter(MetaContext.getCurrentTenantId(), model, MetaContext.getCurrentUserId());
+        return combineRequiredReadScope(scope, required);
+    }
+
+    private static String combineRequiredReadScope(String scope, String required) {
+        if (required == null || required.isBlank()) return scope;
+        String condition = required.trim().replaceFirst("(?i)^(AND|WHERE)\\s+", "");
+        String base = scope == null ? "" : scope.trim().replaceFirst("(?i)^(AND|WHERE)\\s+", "");
+        return base.isBlank() ? condition : "(" + base + ") AND (" + condition + ")";
     }
 
     public String rewrite(Plan plan, String sql) {

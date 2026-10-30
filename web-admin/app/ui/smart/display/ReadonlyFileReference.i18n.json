@@ -1,0 +1,7 @@
+{
+  "loading": { "zh-CN": "正在读取文件…", "en-US": "Loading file…" },
+  "unavailable": {
+    "zh-CN": "文件不可用或无权查看，请刷新后重试。",
+    "en-US": "File unavailable or access denied. Refresh and try again."
+  }
+}

@@ -71,6 +71,7 @@ export const DATA_TYPE_COMPONENT_MAP: Record<
   TEXT: { type: 'textarea', defaultProps: {} },
   INTEGER: { type: 'input', defaultProps: { inputType: 'number' } },
   DECIMAL: { type: 'input', defaultProps: { inputType: 'number' } },
+  MONEY: { type: 'moneyinput', defaultProps: {} },
   BOOLEAN: { type: 'checkbox', defaultProps: {} },
   DATE: { type: 'date-picker', defaultProps: {} },
   DATETIME: { type: 'date-picker', defaultProps: { showTime: true } },

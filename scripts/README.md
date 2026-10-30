@@ -91,6 +91,8 @@ the original review behavior; pause idle services through their product owner.
 | `check-scripts-index.mjs` | 2 | — | Falsifiable freshness gate for scripts/README.md (the scripts index). |
 | `check-test-system.sh` | 0 | 2026-07-23 | Umbrella gate for the test system's own integrity. exit code = result. |
 | `check-version-sync.sh` | 1 | 2026-06-18 | Gate: VERSION (release version, single source of truth) must equal |
+| `application/run-product-release-archive-stage.sh` | 1 | 2026-10-25 | Run the product release archive stage and preserve its release evidence. |
+| `project-delivery-demo.sh` | 1 | 2026-10-25 | Drive the project delivery walkthrough against an explicitly selected runtime. |
 | `application/deployment-target-attestation.it.mjs` | 0 | 2026-09-25 | Verify target reservation and signed deployment observation through the protected executor. |
 | `application/run-migrator-image-gate.mjs` | 0 | 2026-09-25 | Run the retained-container Linux migrator lifecycle gate and emit digest-bound evidence. |
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
@@ -170,6 +172,8 @@ the original review behavior; pause idle services through their product owner.
 | `run-renderer-release-image-gate.sh` | 1 | 2026-09-14 | Build and verify the immutable renderer release image. |
 | `suspended-tenant-login-ui-golden.sh` | 0 | 2026-07-17 | suspended-tenant-login-ui-golden.sh — E5, at the glass: what a user sees when their org is |
 | `test-acp-runtime.sh` | 0 | 2026-05-09 |  |
+| `application/local-embedding.mjs` | 1 | 2026-10-27 | Manage an owned retained local Qwen embedding service without downloading or deleting model data. |
+| `application/memory-embedding-maintenance.mjs` | 1 | 2026-10-27 | Inspect and rebuild an explicit authenticated memory-vector manifest with a resumable private checkpoint. |
 | `application/application-cli.mjs` | 1 | 2026-09-27 | Validate application artifacts and publish an exact release through register, publication, and stable-channel CAS with a durable receipt. |
 | `application/application-release-control.mjs` | 1 | 2026-09-27 | Publish a registered application release and move stable through replay-safe API operations backed by a durable local receipt. |
 | `application/application-graph-adapters.mjs` | 1 | 2026-09-12 | Resolve typed Web contributions from local source roots or checksum-verified npm tarballs. |
@@ -404,6 +408,7 @@ The independent published-library consumer in [fixtures/agent-artifact-consumer]
 | `dev/plugin-assembly.mjs` | Shared plugin profile assembly decision: accept only verified v1 agent installation, omit declared optional AI resources from base profiles, and reject explicit/unknown required-module imports before any selected plugin writes. |
 
 | `application/verify-agent-im-history.mjs` | Real-backend retained mixed IM fixture: create under full, verify under base, then restore full against the same database. Checks member identities, nullable legacy availability, all prior human messages and a new persisted human message in each phase. Requires bootstrap credentials and a known owned-tenant agent ID for creation. |
+| `application/verify-agent-base-business.mjs` | Owned no-AI business acceptance: explicit origin, fresh evidence directory, bootstrap credentials and `core` or `workflow` mode. Verifies capability absence, department create/update/read and human IM persistence. Workflow mode additionally requires an installed BPM product and proves an ordinary update succeeds while a mixed LLM flow is refused before its first write. Retains all uniquely marked fixtures; no model or vendor calls, resets or retries. |
 
 The targeted `web-admin/tests/e2e/platform/agent-assembly.spec.ts` suite uses the
 isolated bootstrap with no enabled tenant or platform LLM provider. Pin

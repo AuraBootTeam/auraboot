@@ -1635,6 +1635,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             if (!permitFilter.isBlank()) {
                 whereClauses.add(stripSqlConditionPrefix(permitFilter));
             }
+            if (resourceCode != null) {
+                String required = dataPermissionEngine.buildRequiredReadFilter(tenantId, resourceCode, userId);
+                if (required != null && !required.isBlank()) whereClauses.add(stripSqlConditionPrefix(required));
+            }
             return;
         }
         String actionCode = trimToNull(query.getActionCode());

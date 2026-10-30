@@ -20,6 +20,16 @@ public final class LlmResponseGuard {
         return response;
     }
 
+    /** Machine consumers must not act on a syntactically complete prefix of a truncated reply. */
+    public static LlmChatResponse requireCompleteContent(LlmChatResponse response, String operation) {
+        requireContent(response, operation);
+        if ("max_tokens".equals(response.getStopReason())) {
+            throw new IllegalStateException("Incomplete response from LLM"
+                    + (operation == null || operation.isBlank() ? "" : " during " + operation));
+        }
+        return response;
+    }
+
     private static boolean isActionableBlock(LlmChatResponse.ContentBlock block) {
         if (block == null || block.getType() == null) {
             return false;

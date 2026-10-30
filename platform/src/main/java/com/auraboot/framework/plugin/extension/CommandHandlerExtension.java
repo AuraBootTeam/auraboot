@@ -368,6 +368,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
          * Get the host file byte bridge from the settings map.
          * Returns null if the host application has no file service bridge.
          */
+        /** Exact published content proof, available only from a supporting original command host. */
+        public AnnouncementSealedContentAccessor announcementSealedContentAccessor() {
+            Object value = settings != null ? settings.get(AnnouncementSealedContentAccessor.SETTINGS_KEY) : null;
+            return value instanceof AnnouncementSealedContentAccessor accessor ? accessor : null;
+        }
+
         public FileAccessor fileAccessor() {
             Object accessor = settings != null ? settings.get(FILE_ACCESSOR_KEY) : null;
             return accessor instanceof FileAccessor ? (FileAccessor) accessor : null;
@@ -405,6 +411,30 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public RecordShareAccessor recordShareAccessor() {
             Object accessor = settings != null ? settings.get(RecordShareAccessor.SETTINGS_KEY) : null;
             return accessor instanceof RecordShareAccessor value ? value : null;
+        }
+
+        /** Current actor record-action scopes; no generic data or mutation permission is granted. */
+        public RecordActionScopeAccessor recordActionScopes() {
+            Object value = settings != null ? settings.get(RecordActionScopeAccessor.SETTINGS_KEY) : null;
+            return value instanceof RecordActionScopeAccessor accessor ? accessor : null;
+        }
+
+        /** Exact identity locks in the caller's Core transaction, or null if no host bridge is installed. */
+        public CommandMembershipLockAccessor commandMembershipLockAccessor() {
+            Object value = settings != null ? settings.get(CommandMembershipLockAccessor.SETTINGS_KEY) : null;
+            return value instanceof CommandMembershipLockAccessor accessor ? accessor : null;
+        }
+
+        /** Exact-version recipient proof, available only on supporting hosts. */
+        public AnnouncementAcknowledgementAccessor announcementAcknowledgementAccessor() {
+            Object value = settings != null ? settings.get(AnnouncementAcknowledgementAccessor.SETTINGS_KEY) : null;
+            return value instanceof AnnouncementAcknowledgementAccessor accessor ? accessor : null;
+        }
+
+        /** Current server-resolved subject proof, or null on a host without the original command scope. */
+        public AnnouncementSubjectAcknowledgementAccessor announcementSubjectAcknowledgementAccessor() {
+            Object value = settings != null ? settings.get(AnnouncementSubjectAcknowledgementAccessor.SETTINGS_KEY) : null;
+            return value instanceof AnnouncementSubjectAcknowledgementAccessor accessor ? accessor : null;
         }
 
         /** Returns the authenticated user's stable public PID. */

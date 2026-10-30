@@ -11,7 +11,95 @@
     "code": "announcement.announcement.manage",
     "name:zh-CN": "公告管理",
     "name:en": "Announcement Management",
-    "description": "Create, update and delete system announcements",
+    "description": "Manage all announcement records in this tenant; each write additionally requires its explicit action permission",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.edit",
+    "name:zh-CN": "编辑公告",
+    "name:en": "Edit announcements",
+    "description": "Edit announcements",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.publish",
+    "name:zh-CN": "发布公告",
+    "name:en": "Publish announcements",
+    "description": "Publish announcements",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.publish_all",
+    "name:zh-CN": "租户全员公告范围",
+    "name:en": "Tenant-wide announcement audience",
+    "description": "Tenant-wide announcement audience",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.exempt",
+    "name:zh-CN": "公告免审发布",
+    "name:en": "Publish without approval",
+    "description": "Publish without approval",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.withdraw",
+    "name:zh-CN": "撤回公告",
+    "name:en": "Withdraw announcements",
+    "description": "Withdraw announcements",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.stats",
+    "name:zh-CN": "公告接收统计",
+    "name:en": "Announcement statistics",
+    "description": "Announcement statistics",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.remind",
+    "name:zh-CN": "公告催办",
+    "name:en": "Announcement reminders",
+    "description": "Announcement reminders",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.export",
+    "name:zh-CN": "导出公告统计",
+    "name:en": "Export announcement statistics",
+    "description": "Export announcement statistics",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.delete",
+    "name:zh-CN": "删除公告草稿",
+    "name:en": "Delete announcement drafts",
+    "description": "Delete announcement drafts",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.policy_manage",
+    "name:zh-CN": "公告政策管理",
+    "name:en": "Manage announcement policy",
+    "description": "Manage announcement policy",
+    "resourceType": "operation",
+    "module": "system"
+  },
+  {
+    "code": "announcement.announcement.submit",
+    "name:zh-CN": "提交公告审批",
+    "name:en": "Submit announcement approval",
+    "description": "Submit frozen announcement versions for approval; publication permission is also required",
     "resourceType": "operation",
     "module": "system"
   }

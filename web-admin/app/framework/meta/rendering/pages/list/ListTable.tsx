@@ -28,6 +28,7 @@ import {
   type RowHeight,
 } from '~/framework/smart/types/savedView';
 import { DraggableColumnHeader } from './DraggableColumnHeader';
+import { fitDefaultColumnWidths } from './responsiveColumnWidths';
 import { RowActionButtons } from './RowActionButtons';
 import { estimateActionColumnWidth, partitionRowActions } from './actionColumnWidth';
 import { SummaryRow, hasAnyAggregate } from './SummaryRow';
@@ -159,7 +160,9 @@ export const ListTable = React.memo(function ListTable({
   treeConfig,
 }: ListTableProps) {
   const effectiveRowHeight = normalizeRowHeight(rowHeight);
-  const rowHeightCfg = workspace ? { ...ROW_HEIGHT_CONFIG[effectiveRowHeight], px: 64, pyClass: 'py-3' } : ROW_HEIGHT_CONFIG[effectiveRowHeight];
+  const rowHeightCfg = workspace
+    ? { ...ROW_HEIGHT_CONFIG[effectiveRowHeight], px: 64, pyClass: 'py-3' }
+    : ROW_HEIGHT_CONFIG[effectiveRowHeight];
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -170,7 +173,9 @@ export const ListTable = React.memo(function ListTable({
         typeof configuredWidth === 'number' ? configuredWidth : Number(configuredWidth);
       return Number.isFinite(numericWidth) && numericWidth > 0
         ? numericWidth
-        : DEFAULT_COLUMN_WIDTH;
+        : column.presentation?.kind === 'object'
+          ? 280
+          : DEFAULT_COLUMN_WIDTH;
     },
     [columnWidths],
   );
@@ -181,8 +186,12 @@ export const ListTable = React.memo(function ListTable({
       const title =
         typeof rawValue === 'string' || typeof rawValue === 'number' ? String(rawValue) : undefined;
       return (
-        <div className={`max-w-full min-w-0 ${column.ellipsis === false
-          ? 'whitespace-normal break-words' : 'truncate'}`} title={title}>
+        <div
+          className={`max-w-full min-w-0 ${
+            column.ellipsis === false ? 'break-words whitespace-normal' : 'truncate'
+          }`}
+          title={title}
+        >
           {renderCellContent(record, column, rowIndex)}
         </div>
       );
@@ -244,11 +253,18 @@ export const ListTable = React.memo(function ListTable({
     const baseWidths = Object.fromEntries(
       orderedDataColumns.map((column) => [column.field, getColumnWidth(column)]),
     );
+    if (!workspace && containerWidth > 0 && containerWidth < baseTableWidth) {
+      return fitDefaultColumnWidths(orderedDataColumns, baseWidths, columnWidths,
+        containerWidth - (enableSelection ? SELECTION_COLUMN_WIDTH : 0) - actionColumnWidth);
+    }
     const extraWidth = Math.max(0, containerWidth - baseTableWidth);
     if (extraWidth <= 0 || orderedDataColumns.length === 0) return baseWidths;
 
-    const fillColumns = orderedDataColumns.filter(isAutoFillColumn);
-    const targets = fillColumns.length > 0 ? fillColumns : orderedDataColumns;
+    // Personal widths are explicit user choices, not defaults to stretch.
+    const flexibleColumns = orderedDataColumns.filter(column => !Object.hasOwn(columnWidths, column.field));
+    if (flexibleColumns.length === 0) return baseWidths;
+    const fillColumns = flexibleColumns.filter(isAutoFillColumn);
+    const targets = fillColumns.length > 0 ? fillColumns : flexibleColumns;
     const targetBaseWidth = targets.reduce((sum, column) => sum + baseWidths[column.field], 0);
     const equalShare = extraWidth / targets.length;
 
@@ -260,7 +276,10 @@ export const ListTable = React.memo(function ListTable({
     }
 
     return baseWidths;
-  }, [baseTableWidth, containerWidth, getColumnWidth, orderedDataColumns]);
+  }, [actionColumnWidth, baseTableWidth, columnWidths, containerWidth, enableSelection, getColumnWidth, orderedDataColumns, workspace]);
+
+  const compactSpacing = orderedDataColumns.some(column =>
+    renderedColumnWidths[column.field] < getColumnWidth(column));
 
   const getRenderedColumnWidth = useCallback(
     (column: ColumnConfig) => renderedColumnWidths[column.field] ?? getColumnWidth(column),
@@ -543,6 +562,7 @@ export const ListTable = React.memo(function ListTable({
 
                   return (
                     <DraggableColumnHeader
+                      compact={compactSpacing}
                       key={column.field}
                       column={column}
                       label={resolveColumnLabel(column)}
@@ -572,6 +592,7 @@ export const ListTable = React.memo(function ListTable({
                 {/* Action column — not draggable */}
                 {actionColumn && (
                   <DraggableColumnHeader
+                      compact={compactSpacing}
                     column={actionColumn}
                     label={t('table.actions')}
                     sortable={false}
@@ -693,6 +714,7 @@ export const ListTable = React.memo(function ListTable({
                       <tr
                         key={rowId || index}
                         data-testid={`table-row-${index}`}
+                        data-record-pid={rowId || undefined}
                         data-tree-depth={node.depth}
                         className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
@@ -743,7 +765,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap overflow-hidden ${
+                              className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'
@@ -821,6 +843,7 @@ export const ListTable = React.memo(function ListTable({
                       <tr
                         key={rowId || index}
                         data-testid={`table-row-${index}`}
+                        data-record-pid={rowId || undefined}
                         data-index={virtualRow.index}
                         className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
@@ -850,7 +873,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap overflow-hidden ${
+                              className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'
@@ -935,6 +958,7 @@ export const ListTable = React.memo(function ListTable({
                     <tr
                       key={rowId || index}
                       data-testid={`table-row-${index}`}
+                      data-record-pid={rowId || undefined}
                       className={getRowClassName(rowId)}
                       style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                       onClick={() => onRowClick(record)}
@@ -965,7 +989,7 @@ export const ListTable = React.memo(function ListTable({
                             key={column.field}
                             style={getCellStyle(column)}
                             data-testid={`table-cell-${index}-${column.field}`}
-                            className={`px-6 ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
+                            className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
                               column.align === 'right'
                                 ? 'text-right'
                                 : column.align === 'center'
@@ -1033,6 +1057,7 @@ export const ListTable = React.memo(function ListTable({
             {renderSummaryRow && !loading && visibleData.length > 0 && (
               <SummaryRow
                 columns={orderedDataColumns}
+                compact={compactSpacing}
                 rows={visibleData}
                 enableSelection={enableSelection}
                 hasActionColumn={!!actionColumn}

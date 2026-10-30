@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, realpathSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { collectPrivateRedis, privateRedisPort, verifyBackendRedisConnection } from './golden-private-redis.mjs';
 
 const environmentKeys = ['SESSION_SECRET_FILE', 'NODE_ENV', 'AURA_WEB_MODE', 'AURA_RUNTIME_NAME', 'AURA_RUNTIME_OWNERSHIP_TOKEN',
@@ -9,11 +9,11 @@ const environmentKeys = ['SESSION_SECRET_FILE', 'NODE_ENV', 'AURA_WEB_MODE', 'AU
   'SERVER_PORT', 'SPRING_DATASOURCE_URL', 'SPRING_DATA_REDIS_DATABASE', 'SPRING_DATA_REDIS_HOST', 'SPRING_DATA_REDIS_PORT',
   'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'MANAGEMENT_TRACING_ENABLED', 'MANAGEMENT_TRACING_SAMPLING_PROBABILITY',
   'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG', 'VITE_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'VITE_OTEL_TRACES_SAMPLE_RATE',
-  'VITE_PORT', 'BFF_PORT', 'SPRING_BOOT_URL', 'BFF_INTERNAL_URL', 'AGENT_LLM_STUB_MODE'];
+  'VITE_PORT', 'BFF_PORT', 'SPRING_BOOT_URL', 'BFF_INTERNAL_URL', 'AGENT_LLM_STUB_MODE', 'AURA_FILE_STORAGE_PATH'];
 const requireIdentity = (condition, message) => { if (!condition) throw new Error(message); };
 
 // Compare independent live observations. Never include credentials or raw commands in evidence.
-export function verifyGoldenProduct({ report, repo, environments, commands, token, database, health, redisEndpoint = null }) {
+export function verifyGoldenProduct({ report, repo, environments, commands, token, database, health, redisEndpoint = null, fileStorage }) {
   requireIdentity(report.verdict === 'ok', 'Workspace identity verification failed');
   const source = report.sources.find(item => ['auraboot', 'core'].includes(item.key));
   requireIdentity(source?.status === 'ok' && source.expected.root === repo, 'OSS source identity mismatch');
@@ -38,6 +38,10 @@ export function verifyGoldenProduct({ report, repo, environments, commands, toke
       environments.bff.AURA_WEB_MODE === webMode, 'Production frontend mode drift');
   }
   const backend = environments.backend;
+  requireIdentity(fileStorage?.runtime === report.runtime && fileStorage.repo === repo &&
+    fileStorage.directory === join(report.stateDir, 'runtime-data', report.runtime, 'files') &&
+    backend.AURA_FILE_STORAGE_PATH === fileStorage.alias,
+  'Persistent file storage identity mismatch');
   const jarIndex = commands.backend.indexOf('-jar');
   requireIdentity(jarIndex >= 0 && commands.backend[jarIndex + 1] === artifact.path,
     'Live JVM does not use the registered artifact');
@@ -72,7 +76,7 @@ export function verifyGoldenProduct({ report, repo, environments, commands, toke
     backendArtifact: { path: artifact.path, hash: artifact.expected.hash },
     processes: report.processes.map(item => ({ key: item.key, ...item.expected,
       tokenFile: undefined, tokenHash: undefined })),
-    ports, database, redisDatabase: report.environment.REDIS_DATABASE,
+    ports, database, fileStorage, redisDatabase: report.environment.REDIS_DATABASE,
     redisEndpoint: redisEndpoint ?? { isolated: false, host: backend.SPRING_DATA_REDIS_HOST ?? '127.0.0.1',
       port: Number(backend.SPRING_DATA_REDIS_PORT ?? 6379), database: report.environment.REDIS_DATABASE },
     backendUrl: `http://127.0.0.1:${ports.backend.port}`,
@@ -117,7 +121,9 @@ export function collectGoldenProduct(name, repo, cli) {
       `http://127.0.0.1:${report.ports[key].port}/${key === 'backend' ? 'actuator/health' : 'health'}`]))]));
   const redisEndpoint = collectPrivateRedis(report, realpathSync(repo));
   if (redisEndpoint) verifyBackendRedisConnection(report.processes.find(item => item.key === 'backend').expected.pid, redisEndpoint);
-  const manifest = verifyGoldenProduct({ report, repo: realpathSync(repo), environments, commands, token, database, health, redisEndpoint });
+  const fileStorage = JSON.parse(run(process.execPath, [join(dirname(fileURLToPath(import.meta.url)),
+    'golden-file-storage.mjs'), 'verify', name, repo, cli]));
+  const manifest = verifyGoldenProduct({ report, repo: realpathSync(repo), environments, commands, token, database, health, redisEndpoint, fileStorage });
   const file = join(report.stateDir, 'runtimes', name, 'oss-golden-stack', 'manifest.json');
   mkdirSync(dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;

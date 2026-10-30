@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.authorization.BlastRadius;
 import com.auraboot.framework.agent.authorization.EffectClass;
 import com.auraboot.framework.agent.authorization.RuntimeAuthorizationService;
@@ -51,6 +52,7 @@ import java.util.stream.Collectors;
  * dsl_command, dsl_query, api_call, llm_native.
  *
  * Entry adapters must call {@link #executeToolCall(Long, String, String, String, String, Map, List, TraceContext)}
+ * (saved approved provider steps use {@link #executeApprovedToolCall})
  * or {@link #confirmAuraBotSkill(Long, String, String, String, String, Map, List, String, TraceContext)}
  * so authorization, effects, actions, result contracts, and traces stay in one
  * runtime path.
@@ -121,10 +123,45 @@ public class ToolLoopService {
     public String executeToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
                                    String toolName, Map<String, Object> input,
                                    List<AgentToolDefinition> tools, TraceContext traceCtx) {
+        BusinessIntentFrame bif = BifContext.getCurrentBif();
+        return executeToolCall(tenantId, runPid, taskPid, agentCode, toolName, input, tools, traceCtx,
+                bif != null ? bif.getProfileId() : null, bif != null ? bif.getChannel() : null);
+    }
+
+    /** Execute under the caller's resolved ACL scope; intent inference cannot replace it. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public String executeToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
+                                   String toolName, Map<String, Object> input,
+                                   List<AgentToolDefinition> tools, TraceContext traceCtx,
+                                   String profileId, String channel) {
+        return executeScopedToolCall(tenantId, runPid, taskPid, agentCode, toolName, input,
+                tools, traceCtx, profileId, channel, null);
+    }
+
+    /** Recheck current authority before consuming one exact persisted tool approval. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public String executeApprovedToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
+                                          String toolName, Map<String, Object> input,
+                                          List<AgentToolDefinition> tools, TraceContext traceCtx,
+                                          String approvalPid) {
+        if (approvalPid == null || approvalPid.isBlank()) {
+            throw new IllegalArgumentException("An exact approval PID is required for a resumed tool");
+        }
+        BusinessIntentFrame bif = BifContext.getCurrentBif();
+        return executeScopedToolCall(tenantId, runPid, taskPid, agentCode, toolName, input, tools,
+                traceCtx, bif != null ? bif.getProfileId() : null,
+                bif != null ? bif.getChannel() : null, approvalPid);
+    }
+
+    private String executeScopedToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
+                                         String toolName, Map<String, Object> input,
+                                         List<AgentToolDefinition> tools, TraceContext traceCtx,
+                                         String profileId, String channel, String expectedApprovalPid) {
         StepContext.setRunPid(runPid);
         StepContext.setAgentCode(agentCode);
         try {
-            return executeToolCallInternal(tenantId, runPid, taskPid, agentCode, toolName, input, tools, traceCtx);
+            return executeToolCallInternal(tenantId, runPid, taskPid, agentCode, toolName, input,
+                    tools, traceCtx, profileId, channel, expectedApprovalPid);
         } finally {
             StepContext.clearRunPid();
             StepContext.clearAgentCode();
@@ -174,7 +211,8 @@ public class ToolLoopService {
 
     private String executeToolCallInternal(Long tenantId, String runPid, String taskPid, String agentCode,
                                             String toolName, Map<String, Object> input,
-                                            List<AgentToolDefinition> tools, TraceContext traceCtx) {
+                                            List<AgentToolDefinition> tools, TraceContext traceCtx,
+                                            String profileId, String channel, String expectedApprovalPid) {
         AgentToolDefinition toolDef = tools.stream()
                 .filter(t -> t.getName().equals(toolName))
                 .findFirst().orElse(null);
@@ -196,20 +234,17 @@ public class ToolLoopService {
         // ACP §5.5 — Tool ACL 5-dim pre-check. Runs BEFORE approval gate
         // because ACL is about "may this tuple invoke this tool at all"; if
         // ACL denies, there's nothing for a human to approve. Fail-secure:
-        // no rule match → deny. BIF's profile_id/channel flow in naturally;
+        // no rule match → deny. The caller supplies the resolved profile/channel;
         // run_kind defaults to 'interactive' for the tool-loop path.
         noteGoalDrift(tenantId, runPid, agentCode, toolDef, toolName);
 
-        com.auraboot.framework.agent.dto.BusinessIntentFrame bifForAcl = BifContext.getCurrentBif();
-        String profileId = bifForAcl != null ? bifForAcl.getProfileId() : null;
-        String channel   = bifForAcl != null ? bifForAcl.getChannel()   : null;
         String runKind   = "interactive";
         ToolAclChecker.Decision acl = toolAclChecker.check(tenantId, profileId, channel, runKind, toolName);
         if (!acl.isAllowed()) {
             String reason = acl.getReason() == null ? "denied_by_tool_acl" : acl.getReason();
             log.info("Tool ACL deny: tenant={} profile={} channel={} run_kind={} tool={} → {}",
                     tenantId, profileId, channel, runKind, toolName, reason);
-            return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
+            return toolAccessDenied(toolName, input);
         }
 
         RuntimeAuthorizationService.IncrementalAuthorization authorization =
@@ -224,6 +259,7 @@ public class ToolLoopService {
             return "Error: Runtime authorization denied for tool '" + toolName + "': " + reason;
         }
         if (authorization.requireApproval()
+                && expectedApprovalPid == null
                 && authorization.approvalRequestId() != null
                 && !authorization.approvalRequestId().isBlank()) {
             String approvalPid = authorization.approvalRequestId() == null
@@ -241,7 +277,7 @@ public class ToolLoopService {
         // D1 Grounding → Approval Gate loop (spec §5.1 RiskEvaluator quality gate).
         boolean auraBotSkill = isAuraBotSkill(toolDef);
         boolean requiresApproval =
-                toolDef.isRequiresApproval() || authorization.requireApproval();
+                expectedApprovalPid != null || toolDef.isRequiresApproval() || authorization.requireApproval();
         if (!requiresApproval) {
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
             if (bif != null && isHighRisk(bif.getRiskLevel()) && isWriteTool(toolName, toolDef)) {
@@ -251,8 +287,11 @@ public class ToolLoopService {
             }
         }
         if (requiresApproval && !auraBotSkill) {
-            String approvalPid = approvalGate.checkAndRequestApproval(
-                    tenantId, runPid, taskPid, toolName, toolDef.getDescription(), input, true);
+            String approvalPid = expectedApprovalPid != null
+                    ? approvalGate.checkAndRequestApproval(tenantId, runPid, taskPid,
+                        toolName, toolDef.getDescription(), input, true, expectedApprovalPid)
+                    : approvalGate.checkAndRequestApproval(tenantId, runPid, taskPid,
+                        toolName, toolDef.getDescription(), input, true);
             if (approvalPid != null) {
                 return toJsonResult(Map.of(
                         "success", false,
@@ -501,7 +540,7 @@ public class ToolLoopService {
                 tenantId, null, null, "interactive", toolName);
         if (!acl.isAllowed()) {
             String reason = acl.getReason() == null ? "denied_by_tool_acl" : acl.getReason();
-            return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
+            return toolAccessDenied(toolName, input);
         }
 
         RuntimeAuthorizationService.IncrementalAuthorization authorization =
@@ -1150,6 +1189,18 @@ public class ToolLoopService {
         if (observabilityService != null) {
             observabilityService.recordUnsupportedToolType(toolType);
         }
+    }
+
+    private String toolAccessDenied(String toolName, Map<String, Object> input) {
+        String message = "Tool access denied. Ask an administrator to grant access before trying again. "
+                + "Human approval does not grant tool access.";
+        AgentErrorFrame frame = AgentErrorFrame.of(
+                AgentErrorFrame.CATEGORY_TOOL, toolName, input, "ToolAccessDenied", false,
+                message, "Do not retry or switch to another write tool. Explain the permission denial "
+                        + "in the user's language and offer an allowed read-only action.");
+        return toJsonResult(Map.of("success", false, "error", message,
+                "errorCode", "TOOL_ACCESS_DENIED", "retryable", false,
+                "errorFrame", frame.toSnapshotMap()));
     }
 
     private String toJsonResult(Map<String, Object> result) {

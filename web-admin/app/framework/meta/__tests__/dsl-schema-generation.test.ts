@@ -16,8 +16,71 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes card, workspace presentation and rule types in the 48-definition contract', () => {
-    expect(Object.keys(defs).length).toBe(48);
+  it('includes card, workspace presentation and rule types in the 62-definition combined contract', () => {
+    expect(Object.keys(defs).sort()).toEqual([
+      'ActionDef',
+      'AuthoritativeSourceConfig',
+      'BlockConfig',
+      'BlockLayoutConfig',
+      'BusinessActivityDataSource',
+      'BusinessActivityDetailField',
+      'BusinessActivityRecordMapping',
+      'BusinessActivitySnapshotField',
+      'ButtonConfig',
+      'CardImageViewport',
+      'CardRowSelection',
+      'ColumnConfig',
+      'CommandInputFieldConfig',
+      'CommandInputPresentation',
+      'CrossFieldRule',
+      'CrossRowValidationRule',
+      'DataSourceConfig',
+      'DefaultSortConfig',
+      'DetailTabConfig',
+      'DslSchema',
+      'EventConfig',
+      'FieldConfig',
+      'FlowStep',
+      'HandlerConfig',
+      'LayoutConfig',
+      'LinkageAction',
+      'LinkageDataSourceConfig',
+      'LinkageRule',
+      'LinkageTrigger',
+      'LinkageTriggerEvent',
+      'LinkageValidationRule',
+      'ListTabConfig',
+      'LocalizedText',
+      'MonthlyGridConfig',
+      'MonthlyGridMetricConfig',
+      'OmissionState',
+      'PageDataSourceConfig',
+      'PageExtensionConfig',
+      'PaginationConfig',
+      'PaginationRequestConfig',
+      'ResolveViaConfig',
+      'RowProjection',
+      'RowProjectionDescriptor',
+      'RuleAssert',
+      'RuleCondition',
+      'RuleOverride',
+      'SelectionConfig',
+      'SourceStateField',
+      'SourceStateIndicator',
+      'SourceStateText',
+      'SourceStateTone',
+      'SubTableConfig',
+      'SummaryConfig',
+      'SummaryFieldConfig',
+      'TabFilterExpression',
+      'TableConfig',
+      'ThemeConfig',
+      'TreeConfig',
+      'UploadedFilesInputConfig',
+      'ValidationRule',
+      'WorkspaceCellPresentation',
+      'WorkspaceShellConfig',
+    ]);
     expect(defs).toHaveProperty('CardImageViewport');
     expect(defs).toHaveProperty('WorkspaceCellPresentation');
     expect(defs).toHaveProperty('RuleOverride');
@@ -116,11 +179,145 @@ describe('DSL Generated Schema', () => {
   // --- DslSchema.extension open for extensibility ---
 
   it('DslSchema.extension should allow additional properties', () => {
-    const ext = defs.DslSchema.properties?.extension;
+    const extension = defs.DslSchema.properties?.extension;
+    const ext = extension?.$ref ? defs[extension.$ref.replace('#/definitions/', '')] : extension;
     expect(ext).toBeDefined();
     expect(ext?.type).toBe('object');
     // extension uses open additionalProperties: {} (not false)
     expect(ext?.additionalProperties).not.toBe(false);
+  });
+
+  it('publishes typed workspace geometry while preserving product extension properties', () => {
+    const validate = new Ajv({ strict: false }).compile({
+      ...defs.PageExtensionConfig,
+      definitions: defs,
+    });
+    expect(
+      validate({
+        workspaceShell: {
+          useThemeTokens: true,
+          headerHeight: 64,
+          mobileHeaderHeight: 55,
+          sidebar: { expandedWidth: 218, compactWidth: 190, mobileBreakpoint: 700 },
+        },
+        detailHeaderLayout: { type: 'grid', cols: 4, compactCols: 2, compactBreakpoint: 700 },
+        detailBodyOrder: 'schema',
+        productOwnedProperty: 'retained',
+      }),
+    ).toBe(true);
+    expect(validate({ workspaceShell: { headerHeight: '64' } })).toBe(false);
+    expect(validate({ detailBodyOrder: 'reorder-by-type' })).toBe(false);
+  });
+
+  it('publishes native modal navigation and retained command prompts as separate actions', () => {
+    const validate = new Ajv({ strict: false }).compile({ ...defs.ActionDef, definitions: defs });
+    expect(
+      validate({
+        type: 'navigate',
+        to: '/p/case/view/PID',
+        presentation: { mode: 'modal', width: 900 },
+      }),
+    ).toBe(true);
+    expect(
+      validate({ type: 'navigate', to: '/p/case/view/PID', presentation: { mode: 'drawer' } }),
+    ).toBe(false);
+    expect(
+      validate({
+        type: 'command',
+        command: 'case:close',
+        inputFieldsPresentation: {
+          width: 600,
+          showClose: true,
+          closeOnBackdrop: false,
+          waitForResult: true,
+          summary: {
+            columns: 2,
+            fields: [
+              { field: 'subject', label: 'Event' },
+              { field: 'status', dictCode: 'case_status' },
+            ],
+          },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      validate({
+        type: 'command',
+        command: 'case:close',
+        inputFieldsPresentation: { summary: { columns: 3, fields: [] } },
+      }),
+    ).toBe(false);
+    expect(
+      validate({
+        type: 'command',
+        command: 'case:close',
+        inputFieldsPresentation: { waitForResult: 'true' },
+      }),
+    ).toBe(false);
+  });
+
+  it('publishes explicit nested paging paths and rejects malformed declarations', () => {
+    const validate = new Ajv({ strict: false }).compile({
+      ...defs.DataSourceConfig,
+      definitions: defs,
+    });
+    const source = {
+      type: 'api',
+      method: 'post',
+      paginationRequest: {
+        pageNumPath: ['payload', 'pageNum'],
+        pageSizePath: ['payload', 'pageSize'],
+      },
+    };
+    expect(validate(source)).toBe(true);
+    for (const paginationRequest of [
+      { pageNumPath: [], pageSizePath: ['size'] },
+      { pageNumPath: ['page'], pageSizePath: 'size' },
+      { pageNumPath: ['page'], pageSizePath: ['size'], unknown: true },
+      { pageNumPath: Array(9).fill('deep'), pageSizePath: ['size'] },
+    ])
+      expect(validate({ ...source, paginationRequest })).toBe(false);
+  });
+
+  it('publishes the real page key in server pagination without changing the response', () => {
+    const validate = new Ajv({ strict: false }).compile({
+      ...defs.PaginationConfig,
+      definitions: defs,
+    });
+    expect(validate({ mode: 'server', pageField: 'page', pageSize: 20 })).toBe(true);
+    expect(validate({ mode: 'server', pageField: 'inventedPage', pageSize: 20 })).toBe(false);
+    expect(validate({ mode: 'all-records' })).toBe(false);
+  });
+
+  it('publishes business timeline mappings and distinguishes current values from snapshots', () => {
+    const validate = new Ajv({ strict: false }).compile({ ...defs.BlockConfig, definitions: defs });
+    const timeline = {
+      id: 'history',
+      blockType: 'activity-timeline',
+      permissionCode: 'model.case_action.read',
+      businessOnly: true,
+      businessDataSource: 'caseHistory',
+      businessRecordMapping: {
+        objectRecord: 'case_ref',
+        occurredAt: 'created_at',
+        subject: 'action_name',
+        content: 'note',
+        actorName: 'actor_name',
+        fromState: 'from_status',
+        toState: 'to_status',
+      },
+      businessStateDictCode: 'case_status',
+      businessDetailFields: [{ field: 'outcome', label: 'Current outcome', dictCode: 'outcome' }],
+      businessSnapshotFields: [{ field: 'previous_note', label: 'Previous note' }],
+      compact: true,
+      previewLimit: 100,
+    };
+    expect(validate(timeline)).toBe(true);
+    expect(validate({ ...timeline, permissionCode: ['model.case_action.read'] })).toBe(false);
+    expect(validate({ ...timeline, businessDataSource: 12 })).toBe(false);
+    expect(validate({ ...timeline, businessSnapshotFields: [{ field: 'previous_note' }] })).toBe(
+      false,
+    );
   });
 
   // --- ColumnConfig property types ---
@@ -205,6 +402,30 @@ describe('DSL Generated Schema', () => {
           },
         ],
       }),
+    ).toBe(true);
+  });
+
+  it('publishes strict uploaded-files configuration without changing legacy file hints', () => {
+    const validate = new Ajv({ strict: false }).compile({
+      ...defs.CommandInputFieldConfig,
+      definitions: defs,
+    });
+    const field = {
+      field: 'filePids',
+      type: 'uploaded-files',
+      uploadedFiles: { maxCount: 10, accept: 'image/*,.pdf', maxBytes: 10485760 },
+    };
+    expect(validate(field)).toBe(true);
+    for (const uploadedFiles of [
+      { maxCount: 11, accept: '.pdf' },
+      { maxCount: 0, accept: '.pdf' },
+      { maxCount: 1.5, accept: '.pdf' },
+      { maxCount: 1 },
+      { maxCount: 1, accept: '.pdf', link: true },
+    ])
+      expect(validate({ ...field, uploadedFiles })).toBe(false);
+    expect(
+      validate({ field: 'csvText', type: 'file', fileValueMode: 'text', accept: '.csv' }),
     ).toBe(true);
   });
 
@@ -308,6 +529,37 @@ describe('DSL Generated Schema', () => {
   it('BlockConfig should require id and blockType', () => {
     expect(defs.BlockConfig.required).toContain('id');
     expect(defs.BlockConfig.required).toContain('blockType');
+  });
+
+  it('validates authoritative source bindings while preserving legacy block props', () => {
+    const validate = new Ajv({ strict: false }).compile({ ...defs.BlockConfig, definitions: defs });
+    const base = { id: 'reading', blockType: 'stat-card' };
+    const binding = {
+      mode: 'authoritative',
+      identity: [{ responsePath: 'source', contextPath: 'state.source' }],
+      valuePath: 'value',
+      states: [
+        {
+          path: 'quality',
+          label: 'Quality',
+          values: { MISSING: { label: 'Missing', hideValue: true } },
+        },
+      ],
+    };
+    expect(validate({ ...base, props: { sourceState: binding } })).toBe(true);
+    expect(validate({ ...base, props: { sourceState: { ...binding, mode: 'fallback' } } })).toBe(
+      false,
+    );
+    expect(
+      validate({
+        ...base,
+        props: { sourceState: { ...binding, identity: [{ responsePath: 1 }] } },
+      }),
+    ).toBe(false);
+    expect(validate({ ...base, props: { sourceState: { ...binding, inlineValue: 99 } } })).toBe(
+      false,
+    );
+    expect(validate({ ...base, props: { legacyLayout: 'compact' } })).toBe(true);
   });
 
   it('BlockConfig.subTable should reference SubTableConfig', () => {

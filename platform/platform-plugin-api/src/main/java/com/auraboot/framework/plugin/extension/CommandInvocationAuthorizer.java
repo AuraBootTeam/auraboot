@@ -13,7 +13,13 @@ public interface CommandInvocationAuthorizer {
 
     /** Trusted host identity and immutable input snapshot. This contract grants no generic model access. */
     record InvocationContext(Long tenantId, Long memberId, String currentUserPid, String commandCode,
-            String handlerCode, String modelCode, String targetRecordPid, Map<String, Object> payload) {
+            String handlerCode, String modelCode, String targetRecordPid, Map<String, Object> payload,
+            RecordActionScopeAccessor recordScopes) {
+        /** Compatibility constructor: an uninstalled host capability is absent, never an allow. */
+        public InvocationContext(Long tenantId, Long memberId, String currentUserPid, String commandCode,
+                String handlerCode, String modelCode, String targetRecordPid, Map<String,Object> payload) {
+            this(tenantId, memberId, currentUserPid, commandCode, handlerCode, modelCode, targetRecordPid, payload, null);
+        }
         public InvocationContext {
             payload = immutableMap(payload == null ? Map.of() : payload);
         }

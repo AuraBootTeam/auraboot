@@ -76,6 +76,7 @@ class FieldMapPhaseTest {
 
         verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
         assertThat(ctx.getFieldMapResults()).isEmpty();
+        assertThat(ctx.isHandlerOwnedMutation()).isTrue();
     }
 
     @Test
@@ -89,6 +90,7 @@ class FieldMapPhaseTest {
 
         verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor, applicationContext);
         assertThat(ctx.getFieldMapResults()).isEmpty();
+        assertThat(ctx.isHandlerOwnedMutation()).isTrue();
     }
 
     @Test
@@ -119,6 +121,7 @@ class FieldMapPhaseTest {
 
         verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
         assertThat(ctx.getFieldMapResults()).isEmpty();
+        assertThat(ctx.isHandlerOwnedMutation()).isTrue();
     }
 
     @Test
@@ -239,6 +242,7 @@ class FieldMapPhaseTest {
         assertThat(ctx.isHasPluginHandler()).isTrue();
         assertThat(ctx.isPluginRequiresDslPersistence()).isFalse();
         assertThat(ctx.getFieldMapResults()).isEmpty();
+        assertThat(ctx.isHandlerOwnedMutation()).isTrue();
     }
 
     /**

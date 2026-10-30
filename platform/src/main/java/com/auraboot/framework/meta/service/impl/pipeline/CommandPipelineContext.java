@@ -103,6 +103,13 @@ public class CommandPipelineContext {
      */
     private Boolean targetRecordReadable;
 
+    /** Host-only evidence from a completed domain invocation callback; never a request flag. */
+    private HandlerInvocationAuthorization handlerInvocationAuthorization;
+
+    public record HandlerInvocationAuthorization(String commandCode, String modelCode,
+                                                  String targetRecordId, String action) {}
+
+
     /**
      * Server-loaded optimistic version of the user-named command target. Captured by the boundary
      * read that already resolves the target, then copied into the permit plan (D5).
@@ -120,6 +127,9 @@ public class CommandPipelineContext {
 
     /** Whether plugin handler still needs DSL persistence */
     private boolean pluginRequiresDslPersistence;
+
+    /** The handler owns writes; its result is response metadata, never a second DSL write. */
+    private boolean handlerOwnedMutation;
 
     // ==================== Concurrency ====================
 

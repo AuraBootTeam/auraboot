@@ -44,14 +44,25 @@ class AsyncTaskServiceImplCoverageIT {
     @org.springframework.boot.test.context.TestConfiguration
     static class ExecutorFixture {
         @org.springframework.context.annotation.Bean
-        com.auraboot.framework.meta.service.AsyncTaskExecutor leaseFixtureExecutor() {
+        com.auraboot.framework.meta.service.AsyncTaskExecutor leaseFixtureExecutor(JdbcTemplate jdbc) {
             return new com.auraboot.framework.meta.service.AsyncTaskExecutor() {
                 public String getTaskType() { return "lease-fixture"; }
                 public com.auraboot.framework.meta.service.AsyncTaskResult execute(
                         com.fasterxml.jackson.databind.JsonNode input, ProgressCallback callback) {
                     callback.report(50, "fixture progress");
-                    return com.auraboot.framework.meta.service.AsyncTaskResult.ok(
+                    var result=com.auraboot.framework.meta.service.AsyncTaskResult.ok(
                             com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("value", 42));
+                    if(input!=null && input.has("commitMarker")) {
+                        var claimed=AsyncTaskExecutionContext.require();
+                        result.withTransactionalCompletion(()->{
+                            assertTrue(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+                            assertEquals(claimed,AsyncTaskExecutionContext.require());
+                            assertTrue(!MetaContext.isTenantFilterBypassed());
+                            assertEquals(1,jdbc.update("UPDATE ab_async_task SET task_name=? WHERE tenant_id=? AND id=?",input.path("commitMarker").asText(),claimed.tenantId(),claimed.taskId()));
+                            if(input.path("failCommit").asBoolean(false)) throw new IllegalArgumentException("fixture completion rejected");
+                        });
+                    }
+                    return result;
                 }
             };
         }
@@ -72,6 +83,47 @@ class AsyncTaskServiceImplCoverageIT {
             org.junit.jupiter.api.Assertions.assertNull(task.getExecutionToken());
             org.junit.jupiter.api.Assertions.assertNull(task.getLeaseUntil());
         }));
+    }
+
+    @Test
+    void persistedTaskCanBeDispatchedWithoutACallerTenantContext() {
+        String expected=System.getenv("TEST_EXPECTED_DATABASE");
+        org.assertj.core.api.Assertions.assertThat(expected).isNotBlank().isEqualTo(System.getenv("POSTGRES_DB"));
+        assertEquals(expected,jdbcTemplate.queryForObject("SELECT current_database()",String.class));
+        AsyncTask task=seedTask("lease-fixture");
+        MetaContext.Snapshot identity=MetaContext.snapshot();
+        try {
+            MetaContext.clear();
+            asyncTaskService.executeTaskAsync(task.getId(),TENANT_ID);
+        } finally {MetaContext.restore(identity);}
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(5)).untilAsserted(()->MetaContext.runWithSnapshot(identity,()->{
+            var persisted=asyncTaskMapper.findByTaskCode(task.getTaskCode());
+            assertEquals(AsyncTask.STATUS_COMPLETED,persisted.getStatus());
+            assertEquals(100,persisted.getProgress());
+            assertEquals(42,persisted.getResultData().path("value").asInt());
+            org.junit.jupiter.api.Assertions.assertNull(persisted.getExecutionToken());
+        }));
+    }
+
+    @Test
+    void domainPublicationAndQueueCompletionCommitTogetherOrRollbackTogether() {
+        String expected=System.getenv("TEST_EXPECTED_DATABASE");
+        org.assertj.core.api.Assertions.assertThat(expected).isNotBlank().isEqualTo(System.getenv("POSTGRES_DB"));
+        assertEquals(expected,jdbcTemplate.queryForObject("SELECT current_database()",String.class));
+        for(boolean reject:new boolean[]{false,true}) {
+            AsyncTask task=seedTask("lease-fixture");String originalName=task.getTaskName(),marker="commit-"+UniqueIdGenerator.generate();
+            task.setInputParams(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("commitMarker",marker).put("failCommit",reject));
+            asyncTaskMapper.updateById(task);
+            var identity=MetaContext.snapshot();
+            try {MetaContext.clear();asyncTaskService.executeTaskAsync(task.getId(),TENANT_ID);} finally {MetaContext.restore(identity);}
+            org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(5)).untilAsserted(()->MetaContext.runWithSnapshot(identity,()->{
+                var persisted=asyncTaskMapper.findByTaskCode(task.getTaskCode());
+                assertEquals(reject ? AsyncTask.STATUS_FAILED : AsyncTask.STATUS_COMPLETED,persisted.getStatus());
+                assertEquals(reject ? originalName : marker,persisted.getTaskName());
+                if(reject) assertTrue(persisted.getErrorMessage().contains("fixture completion rejected"));
+                else assertEquals(42,persisted.getResultData().path("value").asInt());
+            }));
+        }
     }
 
     private static final long TENANT_ID = 991_000_001L;

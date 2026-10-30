@@ -55,6 +55,9 @@ import static org.mockito.ArgumentCaptor.forClass;
 class FileServiceImplTest {
 
     @Mock
+    private FileRelationMutationGuard relationMutationGuard;
+
+    @Mock
     private FileMapper fileMapper;
 
     @Mock
@@ -754,6 +757,18 @@ class FileServiceImplTest {
 
         boolean ok = fileService.removeFileRelation("user", "1", "avatar");
         assertThat(ok).isTrue();
+    }
+
+    @Test
+    void relationWriterDenialPrecedesReplacementRemovalAndLegacyAppend() {
+        var denied = new org.springframework.security.access.AccessDeniedException("FIELD_WRITER_DENIED");
+        org.mockito.Mockito.doThrow(denied).when(relationMutationGuard).authorize("order","parent","photos");
+        var request = new FileRelationRequestDTO(); request.setEntityType("order"); request.setEntityId("parent");
+        request.setFieldName("photos"); request.setFileIds(new String[]{"file-pid"});
+        assertThatThrownBy(()->fileService.createFileRelation(request,42L)).isSameAs(denied);
+        assertThatThrownBy(()->fileService.removeFileRelation("order","parent","photos")).isSameAs(denied);
+        assertThatThrownBy(()->fileService.appendFileRelation(request,42L)).isSameAs(denied);
+        org.mockito.Mockito.verifyNoInteractions(fileMapper,fileRelationMapper,storageProvider);
     }
 
     // ----- getFileDownloadUrl -----
