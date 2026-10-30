@@ -1,5 +1,7 @@
 package com.auraboot.framework.meta.controller;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.PageSchemaCreateRequest;
@@ -172,6 +174,7 @@ public class PageSchemaController {
      * @param userId 当前用户ID
      * @return 更新后的页面配置
      */
+    @Transactional
     @PutMapping("/{pid}")
     @Operation(summary = "更新页面配置", description = "根据PID更新页面配置信息（草稿状态）")
     @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
@@ -180,8 +183,11 @@ public class PageSchemaController {
             @Parameter(description = "更新请求参数") @Valid @RequestBody PageSchemaUpdateRequest request,
             @Parameter(hidden = true) @CurrentUserId Long userId) {
         log.info("更新页面配置，PID：{}，参数：{}，用户ID：{}", logSafe(pid), logSafe(request), userId);
+        PageSchemaDTO current = pageSchemaService.findByPid(pid);
+        if (current != null) {
+            pluginResourceTracker.markAsUserModified(ResourceType.PAGE, current.getPageKey());
+        }
         PageSchemaDTO result = pageSchemaService.update(pid, request);
-        pluginResourceTracker.markAsUserModified(ResourceType.PAGE, result.getPageKey());
         return ApiResponse.success(result);
     }
 

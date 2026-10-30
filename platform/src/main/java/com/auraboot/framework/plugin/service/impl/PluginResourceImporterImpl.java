@@ -154,6 +154,11 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     @Override
+    public boolean checkDashboardExists(Long tenantId, String code) {
+        return dashboardService.findByCode(code) != null;
+    }
+
+    @Override
     public boolean checkPageExists(Long tenantId, String pageKey) {
         return pageNavigationResources().checkPageExists(tenantId, pageKey);
     }

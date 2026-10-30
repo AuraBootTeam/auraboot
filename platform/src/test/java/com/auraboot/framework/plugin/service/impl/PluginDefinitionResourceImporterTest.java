@@ -75,8 +75,10 @@ class PluginDefinitionResourceImporterTest {
         verify(save,times("NULL".equals(action) ? 0 : 10)).execute(resource,42L);
         verify(snapshot,times("NULL".equals(action) ? 0 : 10)).execute(eq(resource),any());
         if (!"NULL".equals(action)) {
-            assertThat(result.getResourceCounts().get("PAGE")).containsEntry(action,2);
-            assertThat(result.getCreatedResources().get("PAGE")).containsExactly("r-42","r-42");
+            assertThat(result.getResourceCounts().get("PAGE")).containsEntry(action,1);
+            assertThat(result.getResourceCounts().get("DASHBOARD")).containsEntry(action,1);
+            assertThat(result.getCreatedResources().get("PAGE")).containsExactly("r-42");
+            assertThat(result.getCreatedResources().get("DASHBOARD")).containsExactly("r-42");
             assertThat(result.getResourceCounts().get("MODEL_FIELD_BINDING")).containsEntry(action,1);
         }
         assertThat(manifest.getNamedQueries().get(0).getStatus()).isEqualTo("published");

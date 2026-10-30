@@ -70,6 +70,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     private final MetaModelFieldBindingMapper fieldBindingMapper;
     private final com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;  // ✅ 新增: 模型-字段绑定服务
     private final ObjectMapper objectMapper;
+    private final FieldDeletionGuard fieldDeletionGuard;
 
     @Autowired
     @Lazy
@@ -996,11 +997,17 @@ public class MetaFieldServiceImpl implements MetaFieldService {
      */
     private void validateCanDelete(Field entity) {
         if (StatusConstants.PUBLISHED.equals(entity.getStatus())) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed, 
-                "已发布的字段不能删除，请先取消发布");
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "已发布的字段不能删除，请先取消发布");
+        }
+        fieldDeletionGuard.requireDefinitionDeletion(entity.getCode());
+        if (!fieldBindingMapper.findByFieldId(entity.getId()).isEmpty()) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Field has active model bindings; remove bindings through the protected model operation first");
         }
     }
     
+
     /**
      * Bind field to model after field creation
      * This method is called after field is successfully created via Git-First flow
@@ -1281,27 +1288,17 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 "removeFromModel tableName");
         columnName = SqlSafetyUtils.requireIdentifier(columnName, "removeFromModel columnName");
 
-        // 3) Optional data probe (refuseIfDataExists)
+        // An explicitly requested probe must succeed; uncertainty is never an empty column.
         if (request.isRefuseIfDataExists()) {
-            boolean hasData = false;
-            try {
-                // Note: dynamic mt_* tables don't carry deleted_flag (no soft-delete on
-                // dynamic data) — see AGENTS.md "动态表 mt_* 加 deleted_flag 条件".
-                Integer cnt = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM " + tableName
-                                + " WHERE " + columnName + " IS NOT NULL",
-                        Integer.class);
-                hasData = cnt != null && cnt > 0;
-            } catch (DataAccessException dae) {
-                // F-7 mitigation: if table or column is missing (race / partial state),
-                // treat as empty and continue with cleanup. Log for diagnostics.
-                log.warn("removeFromModel data probe skipped (table/column may not exist): "
-                        + "table={}, column={}, error={}", logSafe(tableName), logSafe(columnName), logSafe(dae.getMessage()));
+            Boolean hasData = jdbcTemplate.queryForObject("SELECT EXISTS(SELECT 1 FROM " + tableName
+                    + " WHERE " + columnName + " IS NOT NULL)", Boolean.class);
+            if (hasData == null) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Column data state cannot be verified; deletion refused");
             }
             if (hasData) {
-                throw new ColumnHasDataException(
-                        "column has non-null rows; refuseIfDataExists=true: table="
-                                + tableName + ", column=" + columnName);
+                throw new ColumnHasDataException("column has non-null rows; refuseIfDataExists=true: table="
+                        + tableName + ", column=" + columnName);
             }
         }
 
@@ -1327,28 +1324,20 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                     "could not resolve numeric field id for: " + fieldCode);
         }
 
-        // 5) Unbind: this triggers DDL DROP COLUMN inside MetaModelServiceImpl
-        //    when model.isPublished() (verified at MetaModelServiceImpl line ~1604).
-        //    No need to call schemaManagementService.removeFieldFromModel ourselves.
-        try {
-            metaModelService.unbindFieldFromModel(modelId, fieldId);
-        } catch (RuntimeException re) {
+        // One protected lifecycle owns physical removal and binding changes.
+        if (!metaModelService.unbindFieldFromModel(modelId, fieldId)) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
-                    "unbind failed for " + modelCode + "." + fieldCode + ": " + re.getMessage());
+                    "Field unbind did not remove a binding; field definition retained");
         }
 
-        // 6) Hard-delete ab_meta_field row (F-3/F-5 mitigation: same code can be re-added).
-        //    BaseMapper.deleteById may be wired to logical-delete via @TableLogic; we need a
-        //    true physical DELETE so the (tenant_id, code, version) unique index is freed.
-        try {
-            int rows = jdbcTemplate.update("DELETE FROM ab_meta_field WHERE id = ?", fieldId);
-            if (rows == 0) {
-                log.warn("hard-delete affected 0 rows for fieldId={}", fieldId);
+        // A field definition is reusable across models. Do not delete it (or cascade its
+        // other bindings) merely because one model stopped using it.
+        if (fieldBindingMapper.findByFieldId(fieldId).isEmpty()) {
+            fieldDeletionGuard.requireDefinitionDeletion(fieldCode);
+            if (jdbcTemplate.update("DELETE FROM ab_meta_field WHERE id = ?", fieldId) != 1) {
+                throw new ValidationException(ResponseCode.CommonValidationFailed,
+                        "Field definition deletion did not affect exactly one row");
             }
-        } catch (RuntimeException re) {
-            throw new ValidationException(ResponseCode.CommonValidationFailed,
-                    "hard-delete of ab_meta_field row failed for fieldId=" + fieldId
-                            + ": " + re.getMessage());
         }
 
         log.info("removeFromModel done: model={}, field={}, table={}, column={}",

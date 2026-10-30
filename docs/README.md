@@ -16,6 +16,8 @@ This directory holds engineering-facing material that ships with the repository.
 
 ## Feature requirements and target contracts
 
+- [插件定制保护与字段删除准入](system-reference/plugin-customization-and-field-deletion.md)：Page/Dashboard 安全覆盖、旧标记迁移及普通字段删除的数据/引用保护。
+
 | Topic | Reference | Status |
 | --- | --- | --- |
 | Announcement management | [Requirements, UX, permissions, BPM composition and implementation status](./system-reference/announcement-management.md) | S1–S8 merged; preview readiness and 60-second BPM graceful stop validated; current Core17/BPM4 regression and 8 reviewed originals, with the premature historical capture excluded; contracts, identities and limits in §18.30 and the [acceptance record](./system-reference/2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md). Related PRs merged; no production release. [Historical S1 evidence](./system-reference/2026-10-24-announcement-s1-testing-gate-acceptance-report.md) |
