@@ -1383,10 +1383,43 @@ describe('TableBlockRenderer', () => {
     });
   });
 
-  it('refreshes the bound selected row when the data source returns a newer snapshot', async () => {
-    const rows = {
-      current: [{ id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'draft' }],
-    };
+  it.each([true, false])(
+    'refreshes the bound selected row with defaultFirst=%s',
+    async (defaultFirst) => {
+      const rows = {
+        current: [{ id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'draft' }],
+      };
+      const runtime = makeRuntime({
+        getDataSourceManager: () => ({
+          getData: () => rows.current,
+          has: () => true,
+          register: vi.fn(),
+        }),
+      }) as any;
+      runtime.getContext().state.selectedLine = rows.current[0];
+      const block = {
+        type: 'table',
+        dataSource: 'list',
+        table: {
+          rowKey: 'pid',
+          selection: { mode: 'single', bind: 'selectedLine', defaultFirst },
+          columns: baseColumns,
+        },
+      };
+
+      const { rerender } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+      const refreshedRow = { id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'released' };
+      rows.current = [refreshedRow];
+      rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+      await waitFor(() => {
+        expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', refreshedRow);
+      });
+    },
+  );
+
+  it('clears a removed explicit selection without choosing another visible row', async () => {
+    const rows = { current: [{ pid: 'selected', name: 'Selected' }] };
     const runtime = makeRuntime({
       getDataSourceManager: () => ({
         getData: () => rows.current,
@@ -1400,19 +1433,19 @@ describe('TableBlockRenderer', () => {
       dataSource: 'list',
       table: {
         rowKey: 'pid',
-        selection: { mode: 'single', bind: 'selectedLine', defaultFirst: true },
+        selection: { mode: 'single', bind: 'selectedLine' },
         columns: baseColumns,
       },
     };
-
     const { rerender } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
-    const refreshedRow = { id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'released' };
-    rows.current = [refreshedRow];
+    rows.current = [{ pid: 'other', name: 'Other' }];
     rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
-
-    await waitFor(() => {
-      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', refreshedRow);
-    });
+    await waitFor(() => expect(runtime.getContext().state.selectedLine).toBeNull());
+    expect(runtime.__updateState).not.toHaveBeenCalledWith(
+      'scope-1',
+      'selectedLine',
+      rows.current[0],
+    );
   });
 
   it('uses compact table density when configured', () => {

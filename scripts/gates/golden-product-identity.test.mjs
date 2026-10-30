@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { verifyGoldenProduct } from '../lib/golden-product-identity.mjs';
+import { verifyGoldenProduct, liveEnvironment } from '../lib/golden-product-identity.mjs';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 
 // Hermetic identity controls. These do not replace native process/environment probes.
 function fixture() {
@@ -112,4 +114,18 @@ for (const [label, mutate] of Object.entries({
 })) test(`rejects ${label} before publishing evidence`, () => {
   const f = isolatedRedisFixture(); mutate(f);
   assert.throws(() => verifyGoldenProduct(f));
+});
+
+test('live environment captures local storage configuration without unrelated storage or database secrets', async () => {
+  const child=spawn(process.execPath,['-e',"process.stdout.write('ready');setInterval(()=>{},1000)"],{
+    env:{PATH:process.env.PATH,AURA_STORAGE_TYPE:'local',AURA_STORAGE_LOCAL_BASE_PATH:'/owned/run/files',AURA_STORAGE_ACCESS_KEY:'synthetic-hidden-value',POSTGRES_PASSWORD:'synthetic-hidden-value'},stdio:['ignore','pipe','ignore']});
+  try {
+    await once(child.stdout,'data');
+    const observed=liveEnvironment(child.pid);
+    assert.equal(observed.AURA_STORAGE_TYPE,'local');
+    assert.equal(observed.AURA_STORAGE_LOCAL_BASE_PATH,'/owned/run/files');
+    assert.equal(observed.AURA_STORAGE_ACCESS_KEY,undefined);
+    assert.equal(observed.POSTGRES_PASSWORD,undefined);
+    assert.doesNotMatch(JSON.stringify(observed),/synthetic-hidden-value/);
+  } finally { const exited=once(child,'exit');child.kill('SIGTERM');await exited; }
 });

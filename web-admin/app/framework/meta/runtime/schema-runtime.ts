@@ -120,7 +120,9 @@ export class SchemaRuntime {
 
     this.flowRunner = new FlowRunner({
       loadData: config.loadData,
-      requestKeySession: config.getRequestKeyIdentity ? createRequestKeySession(config.getRequestKeyIdentity) : undefined,
+      requestKeySession: config.getRequestKeyIdentity
+        ? createRequestKeySession(config.getRequestKeyIdentity)
+        : undefined,
       evaluator: expressionEvaluator,
       actionRegistry,
       navigate: this.navigate,
@@ -335,7 +337,9 @@ export class SchemaRuntime {
    * 获取上下文
    */
   getContext(): ExpressionContext {
-    const ctx = this.stateManager.getContext(this.scopeId);
+    const ctx = this.dataSourceManager.getBindingContext(
+      this.stateManager.getContext(this.scopeId),
+    );
     (ctx as any).__dataSourceManager = this.dataSourceManager;
     return this.dataSourceManager.getRuntimeContext?.(ctx, this.stateManager, this.scopeId) ?? ctx;
   }
@@ -344,7 +348,10 @@ export class SchemaRuntime {
   subscribeContext(listener: () => void): () => void {
     const stopState = this.stateManager.getStore(this.scopeId)?.subscribe(listener);
     const stopSources = this.dataSourceManager.subscribeContext?.(listener);
-    return () => { stopState?.(); stopSources?.(); };
+    return () => {
+      stopState?.();
+      stopSources?.();
+    };
   }
 
   /**
@@ -409,7 +416,12 @@ export class SchemaRuntime {
       ...((context as any).record !== undefined ? { record: (context as any).record } : {}),
       ...((context as any).$page !== undefined ? { $page: (context as any).$page } : {}),
       ...(context.state
-        ? { state: { ...((current.state as Record<string, any> | undefined) || {}), ...context.state } }
+        ? {
+            state: {
+              ...((current.state as Record<string, any> | undefined) || {}),
+              ...context.state,
+            },
+          }
         : {}),
     });
   }
@@ -443,7 +455,10 @@ export class SchemaRuntime {
     this.linkageEngine?.dispose();
     this.linkageEngine = null;
     this.registeredDataSources.forEach((id) => {
-      if (this.dataSourceManager.isBoundTo(this.stateManager, this.scopeId) && this.dataSourceManager.has(id)) {
+      if (
+        this.dataSourceManager.isBoundTo(this.stateManager, this.scopeId) &&
+        this.dataSourceManager.has(id)
+      ) {
         this.dataSourceManager.unregister(id);
       }
     });

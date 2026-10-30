@@ -12,6 +12,7 @@ import type { PromptSubmissionFeedback, PromptSubmissionState } from './promptSu
  * - On cancel, calls onCancel() which rejects the action promise
  */
 
+import RecordListField, { validRecordList, type RecordListConfig } from './RecordListField';
 import {
   createContext,
   useContext,
@@ -66,6 +67,8 @@ interface FormFieldConfig {
   helpText?: string | Record<string, string>;
   type?:
     | 'text'
+    | 'string-map'
+    | 'record-list'
     | 'select'
     | 'number'
     | 'textarea'
@@ -118,6 +121,7 @@ interface FormDialogState {
   title?: string | Record<string, string>;
   fields: FormFieldConfig[];
   fieldOptions: Record<string, FormOptionConfig[]>;
+  fetchResult?: (url: string, options: any) => Promise<any>;
   defaults: Record<string, any>;
   submitLabel?: string | Record<string, string>;
   onSubmit?: (formData: Record<string, any>) => void;
@@ -168,6 +172,17 @@ function visibleOptions(
 function translatedOrFallback(t: (key: string) => string, key: string, fallback: string): string {
   const translated = t(key);
   return translated && translated !== key ? translated : fallback;
+}
+
+/** Fixed-key string maps are edited structurally; malformed values never become an empty map. */
+function isStringMap(value: unknown): value is Record<string, string> {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
+    Object.values(value).every((item) => typeof item === 'string')
+  );
 }
 
 function isMissing(value: any) {
@@ -256,6 +271,22 @@ function FormDialogHost() {
       stateRef.current.submission?.dispose();
       stateRef.current.onCancel?.();
       const defaults = detail.defaults || {};
+      // Share only concurrent reads within this dialog, never across actors or revisions.
+      const reads = new Map<string, Promise<any>>();
+      const fetchReference = detail.fetchResult
+        ? (url: string, options: any) => {
+            if (String(options?.method).toLowerCase() !== 'get')
+              return detail.fetchResult(url, options);
+            const key = JSON.stringify([url, options]);
+            const current = reads.get(key);
+            if (current) return current;
+            const pending = Promise.resolve()
+              .then(() => detail.fetchResult(url, options))
+              .finally(() => reads.delete(key));
+            reads.set(key, pending);
+            return pending;
+          }
+        : undefined;
       const next: FormDialogState = {
         open: true,
         inputSession: ++inputSession.current,
@@ -266,6 +297,7 @@ function FormDialogHost() {
         title: detail.title,
         fields: detail.fields || [],
         fieldOptions: detail.fieldOptions || {},
+        fetchResult: fetchReference,
         defaults,
         submitLabel: detail.submitLabel,
         onSubmit: detail.onSubmit,
@@ -426,6 +458,28 @@ function FormDialogHost() {
             locale,
             t,
           });
+        }
+      }
+      if (
+        field.type === 'record-list' &&
+        !validRecordList(value, field.props as RecordListConfig)
+      ) {
+        const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+        newErrors[field.field] = buildRequiredFieldMessage(label, { dataType: 'text', locale, t });
+      }
+      if (field.type === 'string-map') {
+        const maximum = field.props?.maxValueLength;
+        if (
+          !isStringMap(value) ||
+          Object.values(value).some(
+            (entry) =>
+              !entry.trim() || (Number.isInteger(maximum) && maximum > 0 && entry.length > maximum),
+          )
+        ) {
+          const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+          newErrors[field.field] = field.props?.invalidMessage
+            ? getLocalizedText(field.props.invalidMessage, locale, t)
+            : buildRequiredFieldMessage(label, { dataType: 'text', locale, t });
         }
       }
       if (field.type === 'grouped-multiselect') {
@@ -813,6 +867,94 @@ function FormDialogHost() {
                         multiple={field.props?.multiple === true}
                         placeholder={placeholder || undefined}
                       />
+                    ) : fieldType === 'record-list' ? (
+                      <RecordListField
+                        name={field.field}
+                        autoFocus={isFirst}
+                        label={label}
+                        value={formData[field.field]}
+                        config={field.props as RecordListConfig}
+                        fetchResult={state.fetchResult}
+                        submitted={Boolean(error)}
+                        onChange={(value) => updateField(field.field, value)}
+                      />
+                    ) : fieldType === 'string-map' ? (
+                      <fieldset
+                        aria-label={label}
+                        data-testid={`form-dialog-field-${field.field}`}
+                        className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-600"
+                      >
+                        {!isStringMap(formData[field.field]) ? (
+                          <p role="alert" className="text-sm text-red-600">
+                            {getLocalizedText(field.props?.invalidMessage, locale, t) ||
+                              buildRequiredFieldMessage(label, { dataType: 'text', locale, t })}
+                          </p>
+                        ) : Object.entries(formData[field.field]).length === 0 ? (
+                          <p className="text-sm text-gray-500 dark:text-gray-300">
+                            {getLocalizedText(field.props?.emptyMessage, locale, t) ||
+                              translatedOrFallback(t, 'common.noData', 'No options')}
+                          </p>
+                        ) : field.props?.readOnly === true ? (
+                          <dl className="space-y-3">
+                            {Object.entries(formData[field.field] as Record<string, string>).map(
+                              ([key, value]) => (
+                                <div key={key}>
+                                  <dt className="text-sm text-gray-500 dark:text-gray-300">
+                                    {getLocalizedText(field.props?.keyLabels?.[key], locale, t) ||
+                                      key}
+                                  </dt>
+                                  <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+                                    {getLocalizedText(
+                                      field.props?.displayValues?.[key],
+                                      locale,
+                                      t,
+                                    ) || value}
+                                  </dd>
+                                </div>
+                              ),
+                            )}
+                          </dl>
+                        ) : (
+                          Object.entries(formData[field.field] as Record<string, string>).map(
+                            ([key, value], index) => (
+                              <div key={key}>
+                                <label
+                                  htmlFor={`form-dialog-${field.field}-${sourceIndex}-${index}`}
+                                  className="mb-1 block text-sm text-gray-700 dark:text-gray-300"
+                                >
+                                  {getLocalizedText(field.props?.keyLabels?.[key], locale, t) ||
+                                    key}
+                                </label>
+                                <input
+                                  id={`form-dialog-${field.field}-${sourceIndex}-${index}`}
+                                  type="text"
+                                  value={value}
+                                  ref={
+                                    isFirst && index === 0
+                                      ? (firstInputRef as React.RefObject<HTMLInputElement>)
+                                      : undefined
+                                  }
+                                  maxLength={
+                                    Number.isInteger(field.props?.maxValueLength) &&
+                                    field.props?.maxValueLength > 0
+                                      ? field.props?.maxValueLength
+                                      : undefined
+                                  }
+                                  placeholder={placeholder}
+                                  aria-invalid={Boolean(error)}
+                                  onChange={(event) =>
+                                    updateField(field.field, {
+                                      ...formData[field.field],
+                                      [key]: event.target.value,
+                                    })
+                                  }
+                                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                />
+                              </div>
+                            ),
+                          )
+                        )}
+                      </fieldset>
                     ) : fieldType === 'select' ? (
                       <select
                         id={`form-dialog-${field.field}-${sourceIndex}`}

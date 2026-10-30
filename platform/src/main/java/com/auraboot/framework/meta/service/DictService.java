@@ -71,6 +71,9 @@ public interface DictService {
      */
     Page<DictDTO> findPage(DictQueryRequest request);
 
+    /** One latest published representative per family; callers still choose an explicit version. */
+    Page<DictDTO> findPublishedFamilies(String businessName, int page, int pageSize);
+
     /**
      * 查询租户下的所有字典
      * @param tenantId 租户ID

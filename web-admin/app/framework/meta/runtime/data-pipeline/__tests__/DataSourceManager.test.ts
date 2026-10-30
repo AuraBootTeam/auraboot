@@ -17,6 +17,36 @@ vi.mock('~/shared/services/http-client', () => ({
 const mockedFetchResult = vi.mocked(fetchResult);
 
 describe('DataSourceManager', () => {
+  it.each([{ records: [] }, { records: [{ mediaPid: 'media-1', altText: 'Front view' }] }])(
+    'preserves raw page rows and metadata instead of projecting option labels: %j',
+    async ({ records }) => {
+      const manager = new DataSourceManager(createExpressionContext());
+      manager.register('media', {
+        type: 'api',
+        method: 'get',
+        endpoint: '/api/media',
+        adaptor: 'raw',
+        autoFetch: false,
+      });
+      const page = {
+        records,
+        total: records.length,
+        current: 1,
+        pageSize: 10,
+        revision: 'revision-1',
+        storePid: 'store-1',
+        productPid: 'product-1',
+      };
+      mockedFetchResult.mockResolvedValueOnce({ code: '0', data: page } as any);
+      expect(await manager.fetch('media')).toEqual(page);
+      expect(manager.getData('media')).toEqual(page);
+      expect(manager.getBindingContext(createExpressionContext()).dataSource.media.revision).toBe(
+        'revision-1',
+      );
+      expect(manager.getBindingContext(createExpressionContext()).data.media).toEqual(records[0]);
+      expect(manager.getConfig('media')?.adaptor).toBe('raw');
+    },
+  );
   it('reloads automatic reads in the new scope and discards the previous scope response', async () => {
     const pending: Array<(result: any) => void> = [];
     mockedFetchResult.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
@@ -51,22 +81,43 @@ describe('DataSourceManager', () => {
     manager.clear();
   });
   it('preserves real paging metadata through the native statistics configuration and manager defaults', async () => {
-    const pages = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../../../plugins/core-announcement/config/pages.json'), 'utf8'));
-    const page = canonicalizePageSchemaDto(pages.find((candidate: any) => candidate.pageKey === 'announcement_statistics_detail'));
+    const pages = JSON.parse(
+      readFileSync(
+        resolve(
+          import.meta.dirname,
+          '../../../../../../../plugins/core-announcement/config/pages.json',
+        ),
+        'utf8',
+      ),
+    );
+    const page = canonicalizePageSchemaDto(
+      pages.find((candidate: any) => candidate.pageKey === 'announcement_statistics_detail'),
+    );
     const config = mergeDataSources(page).recipients;
     const context = createExpressionContext({} as any);
     (context as any).$page = { recordPid: 'capture-fixture' };
     const manager = new DataSourceManager(context);
-    const records = Array.from({ length: 3 }, (_, i) => ({ pid: `recipient-${i}`, displayName: `Person ${i}` }));
+    const records = Array.from({ length: 3 }, (_, i) => ({
+      pid: `recipient-${i}`,
+      displayName: `Person ${i}`,
+    }));
     const wire = { records, total: 3, pageNum: 1, pageSize: 20, asOf: '2026-10-25T00:00:00Z' };
     mockedFetchResult.mockResolvedValueOnce({ code: '0', data: wire } as any);
     manager.register('recipients', { ...config, autoFetch: false });
     await manager.fetch('recipients');
-    expect(mockedFetchResult).toHaveBeenCalledExactlyOnceWith('/api/announcements/statistics/snapshots/capture-fixture/recipients', {
-      method: 'get', params: { pageNum: 1, pageSize: 20 },
-    });
+    expect(mockedFetchResult).toHaveBeenCalledExactlyOnceWith(
+      '/api/announcements/statistics/snapshots/capture-fixture/recipients',
+      {
+        method: 'get',
+        params: { pageNum: 1, pageSize: 20 },
+      },
+    );
     expect(manager.getData('recipients')).toEqual(wire);
-    expect(readServerTablePage(manager.getData('recipients'))).toEqual({ current: 1, pageSize: 20, total: 3 });
+    expect(readServerTablePage(manager.getData('recipients'))).toEqual({
+      current: 1,
+      pageSize: 20,
+      total: 3,
+    });
     manager.clear();
   });
 
@@ -271,7 +322,7 @@ describe('DataSourceManager', () => {
       message: 'Forbidden',
     } as any);
     await manager.reload('options');
-    expect(manager.getState('options')?.data).toEqual([{value:'p',label:'P',disabled:true}]);
+    expect(manager.getState('options')?.data).toEqual([{ value: 'p', label: 'P', disabled: true }]);
     expect((manager.getState('options')?.error as any)?.code).toBe('403');
     expect(mockedFetchResult).toHaveBeenCalledTimes(2);
   });
@@ -282,9 +333,7 @@ describe('DataSourceManager', () => {
       data: { records: [], total: 0, current: 1, pageSize: 500 },
     } as any);
 
-    const manager = new DataSourceManager(
-      createExpressionContext({ form: {}, state: {} } as any),
-    );
+    const manager = new DataSourceManager(createExpressionContext({ form: {}, state: {} } as any));
     manager.register('standardLines', {
       type: 'api',
       endpoint: '/api/dynamic/bom_standard_line_pcba/list',
@@ -308,9 +357,7 @@ describe('DataSourceManager', () => {
     await manager.fetch('standardLines');
     expect(mockedFetchResult).not.toHaveBeenCalled();
 
-    manager.updateContext(
-      createExpressionContext({ form: { pid: 'task-1' }, state: {} } as any),
-    );
+    manager.updateContext(createExpressionContext({ form: { pid: 'task-1' }, state: {} } as any));
     await manager.fetch('standardLines');
 
     expect(mockedFetchResult).toHaveBeenCalledTimes(1);
@@ -764,17 +811,34 @@ describe('DataSourceManager', () => {
 
   it('retains human error detail and actual HTTP status separately from business code', async () => {
     for (const httpStatus of [400, 403]) {
-      for (const context of ['分页参数无效', { detail: '分页参数无效', messageKey: 'private-key', cause: 'private-cause' }]) {
+      for (const context of [
+        '分页参数无效',
+        { detail: '分页参数无效', messageKey: 'private-key', cause: 'private-cause' },
+      ]) {
         mockedFetchResult.mockResolvedValueOnce({
-          code: '35000', httpStatus, status: 500, statusCode: 502,
-          desc: 'Bad parameter', message: 'Bad parameter', context, success: false, data: null,
+          code: '35000',
+          httpStatus,
+          status: 500,
+          statusCode: 502,
+          desc: 'Bad parameter',
+          message: 'Bad parameter',
+          context,
+          success: false,
+          data: null,
         } as any);
         const manager = new DataSourceManager(createExpressionContext({} as any));
-        manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
-          method: 'get', autoFetch: false });
+        manager.register('offers', {
+          type: 'api',
+          endpoint: '/api/ext/qoe/procurement/quote-lines',
+          method: 'get',
+          autoFetch: false,
+        });
         await manager.fetch('offers');
         expect(manager.getState('offers')?.error).toMatchObject({
-          message: httpStatus === 403 ? 'Bad parameter' : '分页参数无效', status: httpStatus, statusCode: httpStatus, code: '35000',
+          message: httpStatus === 403 ? 'Bad parameter' : '分页参数无效',
+          status: httpStatus,
+          statusCode: httpStatus,
+          code: '35000',
         });
         expect(manager.getState('offers')?.data).toBeNull();
         expect(manager.getState('offers')?.loading).toBe(false);
@@ -783,12 +847,25 @@ describe('DataSourceManager', () => {
   });
 
   it('does not turn diagnostic objects into user-visible data-source text', async () => {
-    for (const context of [{ detail: { private: 'secret' } }, { detail: '  ', messageKey: 'private-key' }]) {
-      mockedFetchResult.mockResolvedValueOnce({ code: '35000', httpStatus: 400,
-        desc: 'Original failure', context, success: false, data: null } as any);
+    for (const context of [
+      { detail: { private: 'secret' } },
+      { detail: '  ', messageKey: 'private-key' },
+    ]) {
+      mockedFetchResult.mockResolvedValueOnce({
+        code: '35000',
+        httpStatus: 400,
+        desc: 'Original failure',
+        context,
+        success: false,
+        data: null,
+      } as any);
       const manager = new DataSourceManager(createExpressionContext({} as any));
-      manager.register('offers', { type: 'api', endpoint: '/api/ext/qoe/procurement/quote-lines',
-        method: 'get', autoFetch: false });
+      manager.register('offers', {
+        type: 'api',
+        endpoint: '/api/ext/qoe/procurement/quote-lines',
+        method: 'get',
+        autoFetch: false,
+      });
       await manager.fetch('offers');
       expect(manager.getState('offers')?.error?.message).toBe('Original failure');
     }
@@ -796,18 +873,41 @@ describe('DataSourceManager', () => {
 
   it('does not promote generic Core diagnostics but retains actual status and business identity', async () => {
     for (const result of [
-      { code: '1', httpStatus: 500, desc: 'Internal system error', context: {
-        exception: 'IllegalStateException', detail: 'SELECT secret FROM private_model; PID secret', cause: 'private-cause' } },
+      {
+        code: '1',
+        httpStatus: 500,
+        desc: 'Internal system error',
+        context: {
+          exception: 'IllegalStateException',
+          detail: 'SELECT secret FROM private_model; PID secret',
+          cause: 'private-cause',
+        },
+      },
       { code: '403', httpStatus: 403, desc: 'Access forbidden', context: 'private permission' },
-      { code: '35000', httpStatus: 400, desc: 'Bad parameter', context: {
-        exception: 'IllegalStateException', detail: 'private stored snapshot' } },
+      {
+        code: '35000',
+        httpStatus: 400,
+        desc: 'Bad parameter',
+        context: {
+          exception: 'IllegalStateException',
+          detail: 'private stored snapshot',
+        },
+      },
     ]) {
       mockedFetchResult.mockResolvedValueOnce({ ...result, success: false, data: null } as any);
       const manager = new DataSourceManager(createExpressionContext({} as any));
-      manager.register('read', { type: 'api', endpoint: '/api/meta/command-phases', method: 'get', autoFetch: false });
+      manager.register('read', {
+        type: 'api',
+        endpoint: '/api/meta/command-phases',
+        method: 'get',
+        autoFetch: false,
+      });
       await manager.fetch('read');
       expect(manager.getState('read')?.error).toMatchObject({
-        message: result.desc, status: result.httpStatus, statusCode: result.httpStatus, code: result.code,
+        message: result.desc,
+        status: result.httpStatus,
+        statusCode: result.httpStatus,
+        code: result.code,
       });
       expect(manager.getState('read')?.data).toBeNull();
     }
@@ -1302,7 +1402,10 @@ describe('rebind re-issues invalidated initial fetches', () => {
   it('still discards in-flight responses captured before the rebind', async () => {
     let releaseOldScopeResponse: (value: any) => void = () => {};
     mockedFetchResult.mockImplementationOnce(
-      () => new Promise((resolve) => { releaseOldScopeResponse = resolve; }),
+      () =>
+        new Promise((resolve) => {
+          releaseOldScopeResponse = resolve;
+        }),
     );
     const newRow = { ...reworkRow, pid: 'new-scope-pid', mfg_rwo_code: 'RW-NEW-SCOPE' };
     mockedFetchResult.mockResolvedValue({
@@ -1317,19 +1420,26 @@ describe('rebind re-issues invalidated initial fetches', () => {
     manager.bindStateManager(createStateManager(), 'scope-wb');
     manager.bindStateManager(createStateManager(), 'scope-wb'); // rebind → refetch resolves
 
-    await waitFor(() => expect(manager.getData('reworkQueue')).toEqual({
-      records: [newRow],
-      total: 1,
-      current: 1,
-      pageSize: 50,
-    }));
+    await waitFor(() =>
+      expect(manager.getData('reworkQueue')).toEqual({
+        records: [newRow],
+        total: 1,
+        current: 1,
+        pageSize: 50,
+      }),
+    );
 
     expect(mockedFetchResult).toHaveBeenCalledTimes(2);
 
     // The old-scope response lands late; it must not overwrite the new scope.
     releaseOldScopeResponse({
       code: '0',
-      data: { records: [{ ...reworkRow, pid: 'old-scope-pid' }], total: 9, current: 1, pageSize: 50 },
+      data: {
+        records: [{ ...reworkRow, pid: 'old-scope-pid' }],
+        total: 9,
+        current: 1,
+        pageSize: 50,
+      },
     });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(manager.getData('reworkQueue')).toEqual({
@@ -1431,24 +1541,35 @@ describe('dependOn gates re-fetches, not the initial fetch', () => {
     manager.clear();
   });
 
-
-  it.each([false, true])('coalesces a pending dependOn registration across scope rebinds (pagination=%s)', async (pagination) => {
-    const manager = new DataSourceManager(createExpressionContext({ state: { searchKeyword: 'old' } } as any));
-    manager.register('queue', {
-      type: 'api', endpoint: '/api/dynamic/faq_candidate_list/list', adaptor: 'table', pagination,
-      params: { keyword: '${state.searchKeyword}', pageNum: 1, pageSize: 20 },
-      dependOn: ['state.searchKeyword'],
-    });
-    for (const keyword of ['middle', 'final']) {
-      const state = new ScopedStateManager({} as any);
-      state.createScope('queue-scope', { state: { searchKeyword: keyword } });
-      manager.bindStateManager(state, 'queue-scope');
-    }
-    await waitFor(() => expect(manager.getState('queue')?.lastFetch).not.toBeNull());
-    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
-    expect(mockedFetchResult.mock.calls[0][1]?.params).toMatchObject({ keyword: 'final', pageNum: 1, pageSize: 20 });
-    manager.clear();
-  });
+  it.each([false, true])(
+    'coalesces a pending dependOn registration across scope rebinds (pagination=%s)',
+    async (pagination) => {
+      const manager = new DataSourceManager(
+        createExpressionContext({ state: { searchKeyword: 'old' } } as any),
+      );
+      manager.register('queue', {
+        type: 'api',
+        endpoint: '/api/dynamic/faq_candidate_list/list',
+        adaptor: 'table',
+        pagination,
+        params: { keyword: '${state.searchKeyword}', pageNum: 1, pageSize: 20 },
+        dependOn: ['state.searchKeyword'],
+      });
+      for (const keyword of ['middle', 'final']) {
+        const state = new ScopedStateManager({} as any);
+        state.createScope('queue-scope', { state: { searchKeyword: keyword } });
+        manager.bindStateManager(state, 'queue-scope');
+      }
+      await waitFor(() => expect(manager.getState('queue')?.lastFetch).not.toBeNull());
+      expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+      expect(mockedFetchResult.mock.calls[0][1]?.params).toMatchObject({
+        keyword: 'final',
+        pageNum: 1,
+        pageSize: 20,
+      });
+      manager.clear();
+    },
+  );
 
   it('still defers the initial fetch while a dependency parent object is unresolved', async () => {
     const manager = new DataSourceManager(createExpressionContext({ state: {} } as any));
@@ -1462,7 +1583,11 @@ describe('dependOn gates re-fetches, not the initial fetch', () => {
         pageNum: 1,
         pageSize: 1,
         filters: [
-          { fieldName: 'mfg_rwo_code', operator: 'EQ', value: '${state.selectedOrder.mfg_rwo_code}' },
+          {
+            fieldName: 'mfg_rwo_code',
+            operator: 'EQ',
+            value: '${state.selectedOrder.mfg_rwo_code}',
+          },
         ],
       },
       dependOn: ['state.selectedOrder.mfg_rwo_code'],

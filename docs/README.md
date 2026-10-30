@@ -27,6 +27,7 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 - Notification source delivery: [deployment descriptors and configuration boundaries](./system-reference/notification-source-bindings.md).
 - Module-owned command validation: [live module registration and import metadata](./system-reference/application-module-command-lifecycle.md).
 - Command consistency: [explicit transaction isolation admission](./system-reference/command-transaction-isolation.md).
+- Plugin command errors: [structured rejections and localization boundaries](./system-reference/plugin-command-rejections.md).
 - Original command files: [target-bound append and combined verification](./system-reference/2026-10-27-maritime-combined-files-testing-gate-acceptance-report.md).
 - Query result reuse: [strict opt-out and root component verification](./system-reference/2026-10-27-maritime-query-cache-integration-report.md).
 - Target scope: [successful invocation witness and scoped verification](./system-reference/2026-10-27-invocation-target-plan-integration-report.md).
@@ -35,6 +36,9 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 - Internal process documents (session handovers, plans, retrospectives) are intentionally **not tracked in this public repository** — `scripts/check-oss-no-internal-docs.sh` enforces this; they live in the team's private documentation repos.
 - Documentation changes are gated by `docs.yml` / `docs-quality.yml` (markdown lint, link check, frontmatter governance via `scripts/check-docs-governance.mjs`).
 
+## Shared web identity primitives
+
+[WeChat code exchange and trusted client addresses](system-reference/wechat-code-exchange-and-client-address.md) documents the server-only contracts and caller-owned state, business authorization and ingress obligations.
 CRUD runtime reference: [Generated CRUD default presentation](./system-reference/crud-default-presentation.md).
 
 Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md), including responsive lists and the real Page Designer save/publish/runtime roundtrip.

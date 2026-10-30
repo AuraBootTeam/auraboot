@@ -100,7 +100,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`rounded border px-3 py-1 ${
+            className={`min-h-11 rounded border px-3 py-1 whitespace-nowrap sm:min-h-0 ${
               i === current
                 ? 'border-accent bg-accent text-white'
                 : 'border-border-strong bg-panel text-text-2 hover:bg-subtle'
@@ -121,7 +121,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             key={1}
             onClick={() => handlePageChange(1)}
-            className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1"
+            className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap sm:min-h-0"
           >
             1
           </button>,
@@ -141,7 +141,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`rounded border px-3 py-1 ${
+            className={`min-h-11 rounded border px-3 py-1 whitespace-nowrap sm:min-h-0 ${
               i === current
                 ? 'border-accent bg-accent text-white'
                 : 'border-border-strong bg-panel text-text-2 hover:bg-subtle'
@@ -165,7 +165,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <button
             key={totalPages}
             onClick={() => handlePageChange(totalPages)}
-            className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1"
+            className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap sm:min-h-0"
           >
             {totalPages}
           </button>,
@@ -181,9 +181,9 @@ export const Pagination: React.FC<PaginationProps> = ({
   }
 
   return (
-    <div className="border-border flex items-center justify-between border-t px-6 py-4">
+    <div className="border-border flex flex-col items-center justify-between gap-3 border-t px-3 py-4 sm:flex-row sm:flex-wrap sm:px-6">
       {/* 左侧：统计信息 */}
-      <div className="text-text-2 text-sm">
+      <div className="text-text-2 shrink-0 text-sm whitespace-nowrap">
         {(() => {
           const pageText = t('common.page_of');
           return pageText && pageText !== 'common.page_of'
@@ -200,26 +200,28 @@ export const Pagination: React.FC<PaginationProps> = ({
       </div>
 
       {/* 中间：页码按钮 */}
-      <div className="flex items-center space-x-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
         {/* First page */}
-        {!compact && <button
-          data-testid="pagination-first"
-          onClick={() => handlePageChange(1)}
-          disabled={current === 1}
-          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {(() => {
-            const v = t('common.first_page');
-            return v !== 'common.first_page' ? v : '首页';
-          })()}
-        </button>}
+        {!compact && (
+          <button
+            data-testid="pagination-first"
+            onClick={() => handlePageChange(1)}
+            disabled={current === 1}
+            className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
+          >
+            {(() => {
+              const v = t('common.first_page');
+              return v !== 'common.first_page' ? v : '首页';
+            })()}
+          </button>
+        )}
 
         {/* 上一页 */}
         <button
           data-testid="pagination-prev"
           onClick={() => handlePageChange(current - 1)}
           disabled={current === 1}
-          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
         >
           {(() => {
             const v = t('common.previous_page');
@@ -235,7 +237,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           data-testid="pagination-next"
           onClick={() => handlePageChange(current + 1)}
           disabled={current === totalPages}
-          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
         >
           {(() => {
             const v = t('common.next_page');
@@ -244,17 +246,19 @@ export const Pagination: React.FC<PaginationProps> = ({
         </button>
 
         {/* Last page */}
-        {!compact && <button
-          data-testid="pagination-last"
-          onClick={() => handlePageChange(totalPages)}
-          disabled={current === totalPages}
-          className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {(() => {
-            const v = t('common.last_page');
-            return v !== 'common.last_page' ? v : '末页';
-          })()}
-        </button>}
+        {!compact && (
+          <button
+            data-testid="pagination-last"
+            onClick={() => handlePageChange(totalPages)}
+            disabled={current === totalPages}
+            className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
+          >
+            {(() => {
+              const v = t('common.last_page');
+              return v !== 'common.last_page' ? v : '末页';
+            })()}
+          </button>
+        )}
       </div>
 
       {/* 右侧：每页条数选择 */}
@@ -271,7 +275,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             data-testid="pagination-page-size"
             value={pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="border-border-strong rounded border px-2 py-1 text-sm"
+            className="border-border-strong min-h-11 rounded border px-2 py-1 text-sm sm:min-h-0"
           >
             {pageSizeOptions.map((option) => (
               <option key={option} value={option}>

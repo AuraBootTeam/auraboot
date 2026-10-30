@@ -19,6 +19,7 @@ public class CommandExecuteRequest {
     /**
      * Command payload data
      */
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using=ExactCommandPayloadDeserializer.class)
     private Map<String, Object> payload;
 
     /**

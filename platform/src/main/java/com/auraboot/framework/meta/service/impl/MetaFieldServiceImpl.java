@@ -13,6 +13,9 @@ import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.entity.payload.FieldUiSchemaBean;
+import com.auraboot.framework.meta.entity.payload.FieldIndexHintBean;
+import com.auraboot.framework.meta.entity.payload.FieldQuerySchemaBean;
+import com.auraboot.framework.meta.entity.payload.FieldRuleSchemaBean;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
@@ -91,6 +94,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     // ==================== 基础CRUD操作 ====================
 
     @Override
+    @Transactional
     public MetaFieldDTO create(MetaFieldCreateRequest request) {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "创建请求不能为空");
@@ -128,6 +132,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setFeature(mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
         entity.setRefTarget(mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
         entity.setUiSchema(mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
+        entity.setIndexHint(mapToBean(request.getIndexHint(), FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(mapToBean(request.getQuerySchema(), FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(mapToBean(request.getRuleSchema(), FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
         entity.setStatus(Boolean.TRUE.equals(request.getAutoPublish()) ? "published"
@@ -264,8 +271,19 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 : mapToBean(request.getRuleSchema(), com.auraboot.framework.meta.entity.payload.FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
+        entity.setFeature(request.getFeature() == null ? existingEntity.getFeature()
+                : mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
+        entity.setRefTarget(request.getRefTarget() == null ? existingEntity.getRefTarget()
+                : mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
+        entity.setIndexHint(request.getIndexHint() == null ? existingEntity.getIndexHint()
+                : mapToBean(request.getIndexHint(), FieldIndexHintBean.class, "indexHint"));
+        entity.setQuerySchema(request.getQuerySchema() == null ? existingEntity.getQuerySchema()
+                : mapToBean(request.getQuerySchema(), FieldQuerySchemaBean.class, "querySchema"));
+        entity.setRuleSchema(request.getRuleSchema() == null ? existingEntity.getRuleSchema()
+                : mapToBean(request.getRuleSchema(), FieldRuleSchemaBean.class, "ruleSchema"));
         entity.setUiSchema(request.getUiSchema() == null ? existingEntity.getUiSchema()
                 : mapToBean(request.getUiSchema(), FieldUiSchemaBean.class, "uiSchema"));
+        entity.setPluginPid(existingEntity.getPluginPid());
         entity.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : StatusConstants.DRAFT);
         entity.setTenantId(MetaContext.getCurrentTenantId());
         entity.setCreatedAt(Instant.now());
@@ -349,12 +367,18 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Override
     public PageResult<MetaFieldDTO> listFields(Integer page, Integer size, String code, 
                                               String dataType, String status,   Boolean currentOnly) {
+        return listFieldsByBusinessName(page, size, code, null, dataType, status, currentOnly);
+    }
+
+    @Override
+    public PageResult<MetaFieldDTO> listFieldsByBusinessName(Integer page, Integer size, String code,
+            String businessName, String dataType, String status, Boolean currentOnly) {
         log.debug("分页查询字段列表: page={}, size={}, code={}, dataType={}, status={}", 
                  page, size, logSafe(code), logSafe(dataType), logSafe(status));
         
         Page<Field> pageRequest = new Page<>(page, size);
         IPage<Field> pageResult = metaFieldMapper.selectPageList(
-            pageRequest, code, dataType, status, currentOnly
+            pageRequest, code, dataType, status, currentOnly, businessName
         );
         List<Field> entities = pageResult.getRecords();
         long total = pageResult.getTotal();
@@ -373,6 +397,28 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     }
 
     // ==================== 字段查询 ====================
+
+    @Override
+    public Optional<PublishedFieldDefinition> resolvePublishedDefinition(String code, Integer version) {
+        Long tenant = MetaContext.getCurrentTenantId();
+        if (tenant == null || tenant <= 0) throw new IllegalStateException("A trusted tenant is required");
+        if (code == null || code.isBlank() || version == null || version < 1) {
+            throw new IllegalArgumentException("An exact field code and positive version are required");
+        }
+        Field field = metaFieldMapper.findByCodeAndVersion(code, version);
+        if (field == null || Boolean.TRUE.equals(field.getDeletedFlag())
+                || !tenant.equals(field.getTenantId()) || !code.equals(field.getCode())
+                || !version.equals(field.getVersion()) || !"published".equals(field.getStatus())) {
+            return Optional.empty();
+        }
+        // The canonical assembler does not yet translate rule_schema. Never silently discard it.
+        if (field.getRuleSchema() != null && !objectMapper.valueToTree(field.getRuleSchema()).isEmpty()) {
+            throw new UnsupportedOperationException("Published rule_schema requires an explicit rule adapter");
+        }
+        FieldDefinition definition = new ModelFieldDefinitionAssembler(
+                fieldBindingMapper, metaFieldMapper, objectMapper).convertToFieldDefinition(field, null);
+        return Optional.of(new PublishedFieldDefinition(tenant, field.getPid(), code, version, definition));
+    }
 
     @Override
     public Optional<MetaFieldDTO> findCurrentByCode(String code) {
@@ -773,6 +819,9 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .feature(beanToMap(entity.getFeature()))
                 .refTarget(beanToMap(entity.getRefTarget()))
                 .uiSchema(beanToMap(entity.getUiSchema()))
+                .indexHint(beanToMap(entity.getIndexHint()))
+                .querySchema(beanToMap(entity.getQuerySchema()))
+                .ruleSchema(beanToMap(entity.getRuleSchema()))
                 .extension(extensionConverter.toMap(entity.getExtension())) // ✅ 使用ExtensionConverter将ExtensionBean转换为Map
                 .createdAt(DateUtil.toUtcLocalDateTime(entity.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(entity.getUpdatedAt()))

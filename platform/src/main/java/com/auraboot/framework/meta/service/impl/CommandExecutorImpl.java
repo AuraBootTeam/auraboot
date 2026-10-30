@@ -205,6 +205,14 @@ public class CommandExecutorImpl implements CommandExecutor {
                         null, false, auditError, executionTimeMs, phaseReached, phaseTimings);
             }
 
+            // Invocation authorization can reject before HandlerPhase translates the SPI error.
+            if (e instanceof com.auraboot.framework.plugin.extension.PluginCommandRejectionException rejection) {
+                ResponseCode responseCode = switch (rejection.code()) {
+                    case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
+                };
+                throw new BusinessException(responseCode, "$i18n:" + rejection.messageKey(), rejection,
+                        rejection.messageArgs());
+            }
             if (e instanceof org.springframework.web.server.ResponseStatusException status
                     && status.getStatusCode().is4xxClientError()) {
                 throw status;

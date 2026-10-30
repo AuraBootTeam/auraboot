@@ -39,6 +39,7 @@ import { useMediaQuery } from '~/framework/meta/rendering/components/ResponsiveB
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { RowActionButtons } from '~/framework/meta/rendering/pages/list/RowActionButtons';
 import { useTimezone } from '~/contexts/TimezoneContext';
+import { useTableBlockPagination } from './useTableBlockPagination';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -308,10 +309,21 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   );
   const rawData = dataSourceId ? readDataSourceRows(runtime, dataSourceId) : [];
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
+  const statePagination = useTableBlockPagination(
+    runtime,
+    block.table?.pagination,
+    dataSourceId,
+    dataSourceState,
+  );
   const paging = block.table?.pagination;
   const serverPaging = paging?.mode === 'server';
-  const pagingAttempt = useRef<{ pageNum: number; pageSize: number; parentPid: string | undefined } | null>(null);
-  const parentPid = getLegacyCompatibleRecordPid((context as any).record) || (context as any).$page?.recordPid;
+  const pagingAttempt = useRef<{
+    pageNum: number;
+    pageSize: number;
+    parentPid: string | undefined;
+  } | null>(null);
+  const parentPid =
+    getLegacyCompatibleRecordPid((context as any).record) || (context as any).$page?.recordPid;
   useEffect(() => {
     pagingAttempt.current = null;
   }, [runtime, dataSourceId, parentPid]);
@@ -323,10 +335,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       try {
         serverPage = readServerTablePage(page, paging?.pageField);
         const localAttempt = pagingAttempt.current;
-        const attempt = dataSourceState?.requestedPage ??
+        const attempt =
+          dataSourceState?.requestedPage ??
           (localAttempt?.parentPid === parentPid ? localAttempt : undefined);
-        if (attempt && !dataSourceState?.loading && !dataSourceState?.error &&
-          (serverPage.current !== attempt.pageNum || serverPage.pageSize !== attempt.pageSize)) {
+        if (
+          attempt &&
+          !dataSourceState?.loading &&
+          !dataSourceState?.error &&
+          (serverPage.current !== attempt.pageNum || serverPage.pageSize !== attempt.pageSize)
+        ) {
           pagingInvalid = true;
         }
       } catch (failure) {
@@ -347,8 +364,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     if (!dataSourceId) return;
     if (serverPaging && dataSourceState?.requestedPage) {
       runPageRequest(dataSourceState.requestedPage, true);
-    } else if (serverPaging && pagingAttempt.current?.parentPid === parentPid && pagingAttempt.current) {
-      runPageRequest({ pageNum: pagingAttempt.current.pageNum, pageSize: pagingAttempt.current.pageSize }, true);
+    } else if (
+      serverPaging &&
+      pagingAttempt.current?.parentPid === parentPid &&
+      pagingAttempt.current
+    ) {
+      runPageRequest(
+        { pageNum: pagingAttempt.current.pageNum, pageSize: pagingAttempt.current.pageSize },
+        true,
+      );
     } else void dataSourceManager.reload(dataSourceId);
   };
   const acceptedPage = serverPage;
@@ -373,7 +397,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         onPageSizeChange={(pageSize) => runPageRequest({ pageNum: 1, pageSize })}
       />
     </fieldset>
-  ) : null;
+  ) : (
+    statePagination
+  );
   const dataSourceError = dataSourceState?.error as any;
   const errorStatus = Number(
     dataSourceError?.status ?? dataSourceError?.statusCode ?? dataSourceError?.response?.status,
@@ -474,7 +500,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 渲染列头
   useEffect(() => {
-    if (!selectionConfig?.bind || isMultipleSelection || !defaultFirstSelection) return;
+    if (!selectionConfig?.bind || isMultipleSelection) return;
     const current = (runtime.getContext().state as Record<string, any> | undefined)?.[
       selectionConfig.bind
     ];
@@ -497,14 +523,14 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       return;
     }
 
-    if (data.length > 0) {
+    if (defaultFirstSelection && data.length > 0) {
       const firstRow = data[0];
       writeRuntimeState(runtime, selectionConfig.bind, firstRow);
       setLocalSelectedRowKey(getRowIdentity(firstRow, 0));
       return;
     }
 
-    if (data.length === 0 && current) {
+    if (current) {
       writeRuntimeState(runtime, selectionConfig.bind, null);
       setLocalSelectedRowKey('');
     }
@@ -521,12 +547,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   // action clears/replaces the selection without clicking this table.
   useEffect(() => {
     const idsBind = (selectionConfig as any)?.idsBind;
-    if (
-      !isMultipleSelection ||
-      !selectionConfig?.bind ||
-      !idsBind
-    )
-      return;
+    if (!isMultipleSelection || !selectionConfig?.bind || !idsBind) return;
     const ids = (Array.isArray(selectedStateValue) ? selectedStateValue : [])
       .map((row: any) => row?.[selectionIdField])
       .filter((value: unknown) => value !== undefined && value !== null);
@@ -589,8 +610,13 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         // A page is not the complete candidate set. Keep choices from other
         // pages; a visible replacement still removes the full exclusive group.
         const value = row?.[exclusiveBy];
-        if (value !== undefined && value !== null && String(value).trim() &&
-            !selectedByGroup.has(String(value))) selectedByGroup.set(String(value), row);
+        if (
+          value !== undefined &&
+          value !== null &&
+          String(value).trim() &&
+          !selectedByGroup.has(String(value))
+        )
+          selectedByGroup.set(String(value), row);
       }
     });
 
@@ -699,25 +725,27 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       groupItems.map((item) => getRowIdentity(item.row, item.dataIndex)),
     );
     const nextRows = [
-      ...currentRows.filter(
-        (candidate: any, candidateIndex: number) =>
-          row?.[exclusiveBy] !== undefined && row?.[exclusiveBy] !== null && String(row[exclusiveBy]).trim()
-            ? String(candidate?.[exclusiveBy]) !== String(row[exclusiveBy])
-            : !groupIdentities.has(getRowIdentity(candidate, candidateIndex)),
+      ...currentRows.filter((candidate: any, candidateIndex: number) =>
+        row?.[exclusiveBy] !== undefined &&
+        row?.[exclusiveBy] !== null &&
+        String(row[exclusiveBy]).trim()
+          ? String(candidate?.[exclusiveBy]) !== String(row[exclusiveBy])
+          : !groupIdentities.has(getRowIdentity(candidate, candidateIndex)),
       ),
       row,
     ];
-    if (!serverPaging) nextRows.sort((left, right) => {
-      const leftIndex = data.findIndex(
-        (candidate: any, candidateIndex: number) =>
-          getRowIdentity(candidate, candidateIndex) === getRowIdentity(left),
-      );
-      const rightIndex = data.findIndex(
-        (candidate: any, candidateIndex: number) =>
-          getRowIdentity(candidate, candidateIndex) === getRowIdentity(right),
-      );
-      return leftIndex - rightIndex;
-    });
+    if (!serverPaging)
+      nextRows.sort((left, right) => {
+        const leftIndex = data.findIndex(
+          (candidate: any, candidateIndex: number) =>
+            getRowIdentity(candidate, candidateIndex) === getRowIdentity(left),
+        );
+        const rightIndex = data.findIndex(
+          (candidate: any, candidateIndex: number) =>
+            getRowIdentity(candidate, candidateIndex) === getRowIdentity(right),
+        );
+        return leftIndex - rightIndex;
+      });
     // Radio choices are not toggleable: re-choosing the current option keeps it
     // selected, while another option replaces only the row from this group.
     writeMultipleSelection(nextRows);
@@ -1423,7 +1451,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             stateTitle('error', errorStatus ? `Request failed (${errorStatus})` : 'Request failed'),
           )}
         </div>
-        <div className="text-text-2 mt-1 text-sm">{String(dataSourceError?.message || '')}</div>
+        <div className="text-text-2 mt-1 text-sm">
+          {stateConfig[errorStateKey]?.description || stateConfig.error?.description
+            ? getLocalizedText(
+                stateConfig[errorStateKey]?.description ?? stateConfig.error.description,
+                locale,
+                t,
+              )
+            : String(dataSourceError?.message || '')}
+        </div>
         {dataSourceId && (
           <button
             type="button"
@@ -1638,6 +1674,14 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                             {row._hasChildren ? (
                               <button
                                 type="button"
+                                aria-expanded={Boolean(row._expanded)}
+                                aria-label={getLocalizedText(
+                                  row._expanded
+                                    ? { 'zh-CN': '收起子项', en: 'Collapse child rows' }
+                                    : { 'zh-CN': '展开子项', en: 'Expand child rows' },
+                                  locale,
+                                  t,
+                                )}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleExpand(getLegacyCompatibleRecordPid(row) || '');

@@ -16,9 +16,89 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes shared presentation types in the 62-definition contract', () => {
-    expect(Object.keys(defs).length).toBe(62);
+  it('includes card, workspace presentation and rule types in the 62-definition combined contract', () => {
+    expect(Object.keys(defs).sort()).toEqual([
+      'ActionDef',
+      'AuthoritativeSourceConfig',
+      'BlockConfig',
+      'BlockLayoutConfig',
+      'BusinessActivityDataSource',
+      'BusinessActivityDetailField',
+      'BusinessActivityRecordMapping',
+      'BusinessActivitySnapshotField',
+      'ButtonConfig',
+      'CardImageViewport',
+      'CardRowSelection',
+      'ColumnConfig',
+      'CommandInputFieldConfig',
+      'CommandInputPresentation',
+      'CrossFieldRule',
+      'CrossRowValidationRule',
+      'DataSourceConfig',
+      'DefaultSortConfig',
+      'DetailTabConfig',
+      'DslSchema',
+      'EventConfig',
+      'FieldConfig',
+      'FlowStep',
+      'HandlerConfig',
+      'LayoutConfig',
+      'LinkageAction',
+      'LinkageDataSourceConfig',
+      'LinkageRule',
+      'LinkageTrigger',
+      'LinkageTriggerEvent',
+      'LinkageValidationRule',
+      'ListTabConfig',
+      'LocalizedText',
+      'MonthlyGridConfig',
+      'MonthlyGridMetricConfig',
+      'OmissionState',
+      'PageDataSourceConfig',
+      'PageExtensionConfig',
+      'PaginationConfig',
+      'PaginationRequestConfig',
+      'ResolveViaConfig',
+      'RowProjection',
+      'RowProjectionDescriptor',
+      'RuleAssert',
+      'RuleCondition',
+      'RuleOverride',
+      'SelectionConfig',
+      'SourceStateField',
+      'SourceStateIndicator',
+      'SourceStateText',
+      'SourceStateTone',
+      'SubTableConfig',
+      'SummaryConfig',
+      'SummaryFieldConfig',
+      'TabFilterExpression',
+      'TableConfig',
+      'ThemeConfig',
+      'TreeConfig',
+      'UploadedFilesInputConfig',
+      'ValidationRule',
+      'WorkspaceCellPresentation',
+      'WorkspaceShellConfig',
+    ]);
     expect(defs).toHaveProperty('CardImageViewport');
+    expect(defs).toHaveProperty('WorkspaceCellPresentation');
+    expect(defs).toHaveProperty('RuleOverride');
+  });
+
+  it('accepts explicit server page bindings and rejects incomplete or unknown pagination properties', () => {
+    const ajv = new Ajv({ strict: false });
+    const validate = ajv.compile({ ...schema, $ref: '#/definitions/PaginationConfig' });
+    expect(
+      validate({
+        pageSize: 20,
+        server: { pageState: 'page', pageSizeState: 'size', resetOn: ['state.store'] },
+      }),
+    ).toBe(true);
+    expect(validate({ server: { pageState: 'page' } })).toBe(false);
+    expect(validate({ server: { pageState: 'page', pageSizeState: 'size', offset: 20 } })).toBe(
+      false,
+    );
   });
 
   it('should have DslSchema definition', () => {
@@ -176,17 +256,27 @@ describe('DSL Generated Schema', () => {
     ).toBe(false);
   });
 
-
   it('publishes explicit nested paging paths and rejects malformed declarations', () => {
-    const validate = new Ajv({ strict:false }).compile({ ...defs.DataSourceConfig, definitions:defs });
-    const source = { type:'api',method:'post',paginationRequest:{pageNumPath:['payload','pageNum'],pageSizePath:['payload','pageSize']} };
+    const validate = new Ajv({ strict: false }).compile({
+      ...defs.DataSourceConfig,
+      definitions: defs,
+    });
+    const source = {
+      type: 'api',
+      method: 'post',
+      paginationRequest: {
+        pageNumPath: ['payload', 'pageNum'],
+        pageSizePath: ['payload', 'pageSize'],
+      },
+    };
     expect(validate(source)).toBe(true);
     for (const paginationRequest of [
-      {pageNumPath:[],pageSizePath:['size']},
-      {pageNumPath:['page'],pageSizePath:'size'},
-      {pageNumPath:['page'],pageSizePath:['size'],unknown:true},
-      {pageNumPath:Array(9).fill('deep'),pageSizePath:['size']},
-    ]) expect(validate({...source,paginationRequest})).toBe(false);
+      { pageNumPath: [], pageSizePath: ['size'] },
+      { pageNumPath: ['page'], pageSizePath: 'size' },
+      { pageNumPath: ['page'], pageSizePath: ['size'], unknown: true },
+      { pageNumPath: Array(9).fill('deep'), pageSizePath: ['size'] },
+    ])
+      expect(validate({ ...source, paginationRequest })).toBe(false);
   });
 
   it('publishes the real page key in server pagination without changing the response', () => {

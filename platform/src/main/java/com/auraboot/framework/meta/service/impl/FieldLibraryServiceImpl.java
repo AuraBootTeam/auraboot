@@ -76,7 +76,8 @@ public class FieldLibraryServiceImpl implements FieldLibraryService {
             request.getKeyword(),
             request.getBaseType(),
             null, // status
-            true  // currentOnly
+            true, // currentOnly
+            null  // businessName
         );
         List<Field> baseFields = pageResult.getRecords();
 

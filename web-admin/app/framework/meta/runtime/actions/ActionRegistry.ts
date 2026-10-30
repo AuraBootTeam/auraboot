@@ -1,3 +1,4 @@
+import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
 import {
   createPromptSubmissionFeedback,
   type PromptSubmissionFeedback,
@@ -828,6 +829,7 @@ export async function promptInputForm(
   presentation?: CommandInputPresentation,
   signal?: AbortSignal,
   submissionFeedback?: PromptSubmissionFeedback,
+  options: { bindingsResolved?: boolean } = {},
 ): Promise<Record<string, any>> {
   // Capture lifecycle and display values before any async choices request.
   const signals = [
@@ -918,9 +920,11 @@ export async function promptInputForm(
     if (field.dictCode && fetchResult) {
       fieldOptions[field.field] = await loadDictionary(String(field.dictCode));
     } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
-      const endpoint = String(field.dataSource.endpoint).replace(/\$\{([^}]+)\}/g, (_match, path) =>
-        String(readInputPath(runtimeContext, path) ?? ''),
-      );
+      const endpoint = options.bindingsResolved
+        ? String(field.dataSource.endpoint)
+        : String(field.dataSource.endpoint).replace(/\$\{([^}]+)\}/g, (_match, path) =>
+            String(readInputPath(runtimeContext, path) ?? ''),
+          );
       const result = await fetchPromptChoices(
         fetchResult,
         endpoint,
@@ -1023,7 +1027,9 @@ export async function promptInputForm(
   const defaults: Record<string, any> = {};
   for (const field of normalizedFields) {
     if (field.defaultValue !== undefined) {
-      const resolvedDefaultValue = resolveInputDefaultValue(field.defaultValue, runtimeContext);
+      const resolvedDefaultValue = options.bindingsResolved
+        ? field.defaultValue
+        : resolveInputDefaultValue(field.defaultValue, runtimeContext);
       if (field.type === 'multiselect') {
         const raw = resolvedDefaultValue;
         if (Array.isArray(raw)) {
@@ -1106,6 +1112,7 @@ export async function promptInputForm(
           presentation: snapshot.presentation,
           fields: normalizedFields,
           fieldOptions,
+          fetchResult,
           defaults,
           submitLabel,
           onSubmit: (formData: Record<string, any>) => finish(true, formData),
@@ -1669,8 +1676,6 @@ actionRegistry.register(
         operationType = expressionEvaluator.evaluateTemplate(operationType, expressionContext);
       }
     }
-    targetRecordPid = targetRecordPid ?? targetRecordPid;
-    targetRecordPid = targetRecordPid ?? targetRecordPid;
 
     let validatedVersion: number | undefined;
     if (args?.expectedVersion !== undefined) {
@@ -1688,6 +1693,7 @@ actionRegistry.register(
       validatedVersion = version;
     }
 
+    mergeCommandInputPayload(payload, {}, args?.inputFieldsPayloadKey);
     const submissionFeedback = createPromptSubmissionFeedback({ t, locale });
     try {
       // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
@@ -1706,7 +1712,7 @@ actionRegistry.register(
           undefined,
           submissionFeedback,
         );
-        payload = { ...payload, ...collected };
+        payload = mergeCommandInputPayload(payload, collected, args?.inputFieldsPayloadKey);
       }
 
       const body: Record<string, any> = {

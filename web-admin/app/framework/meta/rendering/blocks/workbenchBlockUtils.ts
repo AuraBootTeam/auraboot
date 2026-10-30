@@ -1,8 +1,19 @@
+import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
 import { createPromptSubmissionFeedback } from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
 import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { downloadWithAuth } from '~/framework/meta/utils/commandDownload';
+import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
+import {
+  pickFile,
+  resolvePromptUploadAccept,
+  resolvePromptUploadFile,
+  resolvePromptUploadFilenameKey,
+  resolvePromptUploadKey,
+  resolvePromptUploadReviewPayload,
+  uploadCommandFile,
+} from '~/framework/meta/utils/promptUpload';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
@@ -411,10 +422,48 @@ const KNOWN_WORKBENCH_ACTIONS = [
   'command.execute',
 ];
 
+/** Capture a single invocation before a confirmation or other asynchronous UI. */
+export function prepareSimpleWorkbenchAction(
+  runtime: SchemaRuntime,
+  config: any,
+): () => Promise<any> {
+  const resolved = config
+    ? { ...config, args: snapshotActionValue(resolveRuntimeValue(runtime, config.args)) }
+    : config;
+  return () => executePreparedWorkbenchAction(runtime, resolved);
+}
+
+function snapshotActionValue(value: any, seen = new WeakMap<object, any>()): any {
+  if (!value || typeof value !== 'object') return value;
+  // Preserve native File/Date handles while isolating mutable state records.
+  if (
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) !== Object.prototype &&
+    Object.getPrototypeOf(value) !== null
+  )
+    return value;
+  if (seen.has(value)) return seen.get(value);
+  const copy: any = Array.isArray(value) ? [] : {};
+  seen.set(value, copy);
+  for (const [key, item] of Object.entries(value)) {
+    Object.defineProperty(copy, key, {
+      value: snapshotActionValue(item, seen),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return copy;
+}
+
 export async function executeSimpleWorkbenchAction(
   runtime: SchemaRuntime,
   config: any,
 ): Promise<any> {
+  return prepareSimpleWorkbenchAction(runtime, config)();
+}
+
+async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: any): Promise<any> {
   if (!config) return;
   if (!KNOWN_WORKBENCH_ACTIONS.includes(config.action)) {
     // An unrecognized action used to fall through every branch below and return
@@ -439,7 +488,7 @@ export async function executeSimpleWorkbenchAction(
     throw new Error(message);
   }
   if (config.action === 'state.set' && config.args && typeof config.args === 'object') {
-    Object.entries(resolveRuntimeValue(runtime, config.args)).forEach(([key, value]) => {
+    Object.entries(config.args).forEach(([key, value]) => {
       writeRuntimeState(runtime, key, value);
     });
     return;
@@ -459,13 +508,13 @@ export async function executeSimpleWorkbenchAction(
   }
 
   if (config.action === 'dataSource.reload') {
-    const args = resolveRuntimeValue(runtime, config.args);
+    const args = config.args;
     await reloadDataSources(runtime, resolveReloadIds(args));
     return;
   }
 
   if (config.action === 'navigate') {
-    const args = resolveRuntimeValue(runtime, config.args || {});
+    const args = config.args || {};
     const path = resolveWorkbenchNavigatePath(args);
     if (!path) {
       throw new Error('[workbench] navigate requires args.path or args.to');
@@ -475,7 +524,7 @@ export async function executeSimpleWorkbenchAction(
   }
 
   if (config.action === 'command.execute') {
-    const args = resolveRuntimeValue(runtime, config.args || {});
+    const args = config.args || {};
     const command = args.command ?? args.commandCode;
     if (!command) {
       throw new Error('[workbench] command.execute requires args.command');
@@ -487,6 +536,7 @@ export async function executeSimpleWorkbenchAction(
     // THIS path (not ActionRegistry), so the platform inputFields feature must be wired here
     // too — otherwise a detail-page action with inputFields silently skips the form and fails
     // (the cr_account "导入凭据" gate-gap, caught by the credential golden).
+    mergeCommandInputPayload(args.payload || {}, {}, args.inputFieldsPayloadKey);
     // Existing DMS reload may resolve after retaining an error/cache; no strict read capability here.
     const submissionFeedback = createPromptSubmissionFeedback({
       t: runtime.getContext().t,
@@ -506,10 +556,12 @@ export async function executeSimpleWorkbenchAction(
           args.inputFieldsPresentation,
           undefined,
           submissionFeedback,
+          { bindingsResolved: true },
         );
-      } catch {
+      } catch (error) {
         submissionFeedback.dispose();
-        return; // user cancelled the form — abort without executing the command
+        if (error instanceof ActionCancelledError) return;
+        throw error;
       }
     }
 
@@ -538,8 +590,41 @@ export async function executeSimpleWorkbenchAction(
         expectedVersion,
         targetRecordPid,
         operationType,
-        payload: { ...(args.payload || {}), ...collectedInputs },
+        payload: mergeCommandInputPayload(
+          args.payload || {},
+          collectedInputs,
+          args.inputFieldsPayloadKey,
+        ),
       };
+      if (args.idempotent === true) params.clientRequestId = crypto.randomUUID();
+      // Upload only after the form and command preflight succeed. Reuse the platform
+      // multipart bridge; browser authentication stays in the same-origin BFF session.
+      // Neither File bytes nor a DSL-supplied upload URL belong in command JSON.
+      if (args.promptUpload) {
+        const promptUpload = args.promptUpload;
+        const file =
+          resolvePromptUploadFile(promptUpload, params.payload) ??
+          (await pickFile(resolvePromptUploadAccept(promptUpload)));
+        if (!file) return;
+        try {
+          const fileId = await uploadCommandFile(file);
+          params.payload = {
+            ...params.payload,
+            ...resolvePromptUploadReviewPayload(promptUpload, params.payload),
+            [resolvePromptUploadKey(promptUpload)]: fileId,
+            [resolvePromptUploadFilenameKey(promptUpload)]: file.name,
+          };
+        } catch (error) {
+          showCommandFeedback(
+            runtime,
+            feedback,
+            'errorMessage',
+            'error',
+            error instanceof Error ? error.message : `${command} failed`,
+          );
+          throw error;
+        }
+      }
       if (targetRecordPid) {
         params.targetRecordPid = targetRecordPid;
       }
