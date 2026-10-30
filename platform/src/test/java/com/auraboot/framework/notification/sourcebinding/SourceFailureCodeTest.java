@@ -9,7 +9,8 @@ class SourceFailureCodeTest {
     @Test void knownHostCodesRemainActionableWithoutReturningMessageText() {
         var expected=Map.of("NOTIFICATION_SOURCE_BINDING_INVALID",SourceFailureCode.BINDING_INVALID,
                 "RELIABLE_ENVELOPE_CONFLICT",SourceFailureCode.ENVELOPE_CONFLICT,
-                "NOTIFICATION_SOURCE_DELIVERY_BLOCKED",SourceFailureCode.DELIVERY_BLOCKED);
+                "NOTIFICATION_SOURCE_DELIVERY_BLOCKED",SourceFailureCode.DELIVERY_BLOCKED,
+                "NOTIFICATION_SOURCE_WECHAT_DELIVERY_BLOCKED",SourceFailureCode.WECHAT_DELIVERY_BLOCKED);
         expected.forEach((message,code)->assertThat(SourceFailureCode.classify(new IllegalArgumentException(message))).isEqualTo(code));
     }
     @Test void concurrencyFailureHasItsOwnBoundedDiagnostic() {

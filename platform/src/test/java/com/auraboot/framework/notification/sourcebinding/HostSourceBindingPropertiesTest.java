@@ -84,6 +84,15 @@ class HostSourceBindingPropertiesTest {
     }
 
     @Test
+    void wechatChannelOptInBindsExplicitlyAndRemainsOffByDefault() {
+        runner.run(context -> assertThat(context.getBean(HostSourceBindingProperties.class).getWorker().isWechatSubscriptionEnabled()).isFalse());
+        runner.withPropertyValues("aura.notification.source-bindings.worker.wechat-subscription-enabled=true")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(HostSourceBindingProperties.class).getWorker().isWechatSubscriptionEnabled()).isTrue();
+                });
+    }
+    @Test
     void invalidTypedScalarAndUnknownDeploymentFlagStillRejectStartup() {
         var invalid = properties(binding(false, false));
         invalid.replaceAll(value -> value.replace(".value.type=BOOLEAN", ".value.type=UNTRUSTED"));

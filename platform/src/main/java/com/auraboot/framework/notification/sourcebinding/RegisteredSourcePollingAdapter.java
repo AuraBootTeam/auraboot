@@ -35,7 +35,7 @@ public final class RegisteredSourcePollingAdapter {
     private List<SourceBindingTypes.Binding> scope = List.of();
     private ScheduledFuture<?> scheduled;
 
-    public enum Status { DISABLED, BUSY, SUCCEEDED, FAILED }
+    public enum Status { DISABLED, BUSY, SUCCEEDED, PARTIAL, FAILED }
     public record Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType, SourceFailureCode code) {
         public Failure(long tenantId, String bindingCode, String sourcePid, String exceptionType) {
             this(tenantId, bindingCode, sourcePid, exceptionType, SourceFailureCode.PROCESSING_FAILED);
@@ -138,7 +138,10 @@ public final class RegisteredSourcePollingAdapter {
                     failures.add(new Failure(binding.tenantId(), binding.code(), null, failure.getClass().getName(), SourceFailureCode.classify(failure)));
                 }
             }
-            return new TickResult(failures.isEmpty() ? Status.SUCCEEDED : Status.FAILED,
+            Status status = failures.isEmpty() ? Status.SUCCEEDED
+                    : failures.stream().allMatch(failure -> failure.code() == SourceFailureCode.WECHAT_DELIVERY_BLOCKED)
+                        ? Status.PARTIAL : Status.FAILED;
+            return new TickResult(status,
                     attempted, plans, matched, selected, failures);
         } finally {
             polling.set(false);
@@ -146,7 +149,7 @@ public final class RegisteredSourcePollingAdapter {
     }
 
     boolean shouldReportProgress(TickResult result,long nowNanos) {
-        if(result.status()!=Status.SUCCEEDED || result.selectedSources()==0)return false;
+        if((result.status()!=Status.SUCCEEDED && result.status()!=Status.PARTIAL) || result.selectedSources()==0)return false;
         Long previous=progressAt.get();
         if(previous!=null && nowNanos-previous<java.util.concurrent.TimeUnit.MINUTES.toNanos(1))return false;
         return progressAt.compareAndSet(previous,nowNanos);
@@ -154,9 +157,14 @@ public final class RegisteredSourcePollingAdapter {
 
     void poll() {
         TickResult result = tick();
-        if(shouldReportProgress(result,System.nanoTime()))
-            LOG.info("Registered notification source progress: bindings={}, selected={}, matched={}, plans={}",
-                    result.bindingsAttempted(),result.selectedSources(),result.matchedSources(),result.processedPlans());
+        if(shouldReportProgress(result,System.nanoTime())) {
+            if(result.status()==Status.PARTIAL)
+                LOG.warn("Registered notification source has unavailable WeChat deliveries: bindings={}, selected={}, plans={}, failures={}",
+                        result.bindingsAttempted(),result.selectedSources(),result.processedPlans(),result.failures());
+            else
+                LOG.info("Registered notification source progress: bindings={}, selected={}, matched={}, plans={}",
+                        result.bindingsAttempted(),result.selectedSources(),result.matchedSources(),result.processedPlans());
+        }
         if (result.status() == Status.FAILED) {
             LOG.error("Registered notification source poll failed: {}", result.failures());
             throw new IllegalStateException("NOTIFICATION_SOURCE_POLL_FAILED");

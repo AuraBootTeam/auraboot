@@ -1,5 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { ReactNode } from 'react';
+import { I18nProvider } from '~/contexts/I18nContext';
 
 const showSuccessToast = vi.fn();
 const showErrorToast = vi.fn();
@@ -28,6 +30,55 @@ const err = (desc = 'error') => ({ code: '1', data: null, desc });
 
 describe('useNotificationList', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ['zh-CN', '已标记为已读'],
+    ['en-US', 'Notification marked as read'],
+    ['zh-TW', '已標記為已讀'],
+    ['ja', '通知を既読にしました'],
+  ])('uses the current %s locale for the read receipt', async (locale, expected) => {
+    mockFetch.mockResolvedValue(ok(null));
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <I18nProvider initialLocale={locale} initialData={{ ready: 'ready' }}>{children}</I18nProvider>
+    );
+    const { result } = renderHook(() => useNotificationList(), { wrapper });
+    await act(async () => { await result.current.markAsRead(7); });
+    expect(mockFetch).toHaveBeenCalledWith('/api/notifications/7/read', { method: 'put' });
+    expect(showSuccessToast).toHaveBeenCalledWith(expected);
+  });
+
+  it.each([
+    ['zh-CN', '标记已读失败'],
+    ['en-US', 'Failed to mark notification as read'],
+  ])('localizes fallback read failures in %s and preserves server explanations', async (locale, expected) => {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <I18nProvider initialLocale={locale} initialData={{ ready: 'ready' }}>{children}</I18nProvider>
+    );
+    const { result } = renderHook(() => useNotificationList(), { wrapper });
+    mockFetch.mockResolvedValue(err(''));
+    await act(async () => { await result.current.markAsRead(7); });
+    expect(showErrorToast).toHaveBeenLastCalledWith(expected);
+    mockFetch.mockResolvedValue(err('Access is restricted'));
+    await act(async () => { await result.current.markAsRead(7); });
+    expect(showErrorToast).toHaveBeenLastCalledWith('Access is restricted');
+    expect(showSuccessToast).not.toHaveBeenCalled();
+  });
+
+  it('localizes bulk read and deletion counts without changing their requests', async () => {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <I18nProvider initialLocale="en-US" initialData={{ ready: 'ready' }}>{children}</I18nProvider>
+    );
+    const { result } = renderHook(() => useNotificationList(), { wrapper });
+    mockFetch.mockResolvedValue(ok(null));
+    await act(async () => { await result.current.markAllAsRead(); });
+    expect(showSuccessToast).toHaveBeenLastCalledWith('All notifications marked as read');
+    expect(mockFetch).toHaveBeenCalledWith('/api/notifications/read-all', { method: 'put' });
+    await act(async () => { await result.current.deleteNotifications([7, 8]); });
+    expect(showSuccessToast).toHaveBeenLastCalledWith('Deleted 2 notifications');
+    expect(mockFetch).toHaveBeenCalledWith('/api/notifications/batch', {
+      method: 'delete', params: { ids: [7, 8] },
+    });
+  });
 
   it('initial state', () => {
     const { result } = renderHook(() => useNotificationList());
@@ -153,7 +204,7 @@ describe('useNotificationList', () => {
 
     expect(result.current.notifications.find((n: { id: number; isRead: boolean }) => n.id === 1)?.isRead).toBe(true);
     expect(result.current.unreadCount).toBe(1);
-    expect(showSuccessToast).toHaveBeenCalledWith('Notification marked as read');
+    expect(showSuccessToast).toHaveBeenCalledWith('已标记为已读');
   });
 
   it('markAllAsRead sets all notifications to read and zeroes unread count', async () => {

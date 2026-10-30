@@ -429,6 +429,124 @@ class RegisteredSourcePlanResolverTest {
         verify(tx).rollback(any());
     }
     @Test
+    void workerExplicitWechatOptInQueuesBothChannelsForTheSameAuthorizedUsers() {
+        var delivery = mock(NotificationDeliveryAccessor.class);
+        var tx = mock(PlatformTransactionManager.class);
+        when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(delivery.enqueue(any())).thenReturn(new NotificationDeliveryAccessor.Result(NotificationDeliveryAccessor.Status.QUEUED, null, "k"));
+        var properties = new HostSourceBindingProperties(); properties.setEnabled(true);
+        properties.getWorker().setWechatSubscriptionEnabled(true);
+        var reservations = new com.auraboot.framework.notification.wechat.WechatSubscriptionReservationProperties();
+        reservations.setEnabled(true); reservations.setSourceTypes(Set.of("notice"));
+        var worker = new RegisteredSourceWorker(f.resolver, f, delivery, tx, properties, reservations);
+        assertThat(worker.process(1, "notice", "src")).isEqualTo(2);
+        var requests = org.mockito.ArgumentCaptor.forClass(NotificationDeliveryAccessor.Request.class);
+        verify(delivery, org.mockito.Mockito.times(4)).enqueue(requests.capture());
+        assertThat(requests.getAllValues().stream().map(NotificationDeliveryAccessor.Request::channel)).containsExactly(
+                NotificationDeliveryAccessor.Channel.IN_APP, NotificationDeliveryAccessor.Channel.IN_APP,
+                NotificationDeliveryAccessor.Channel.WECHAT_SUBSCRIPTION, NotificationDeliveryAccessor.Channel.WECHAT_SUBSCRIPTION);
+        assertThat(requests.getAllValues().subList(0,2).stream().map(NotificationDeliveryAccessor.Request::resolutionReference))
+                .containsExactlyElementsOf(requests.getAllValues().subList(2,4).stream().map(NotificationDeliveryAccessor.Request::resolutionReference).toList());
+        verify(tx).commit(any()); verify(tx, never()).rollback(any());
+    }
+    @Test
+    void workerBlockedWechatRetainsInAppCommitAndReportsPartialChannelToPolling() {
+        var delivery = mock(NotificationDeliveryAccessor.class);
+        var tx = mock(PlatformTransactionManager.class);
+        when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(delivery.enqueue(any())).thenAnswer(call -> {
+            NotificationDeliveryAccessor.Request request = call.getArgument(0);
+            return request.channel() == NotificationDeliveryAccessor.Channel.IN_APP
+                    ? new NotificationDeliveryAccessor.Result(NotificationDeliveryAccessor.Status.QUEUED, null, "k")
+                    : NotificationDeliveryAccessor.Result.blocked(NotificationDeliveryAccessor.Reason.WECHAT_NOT_CONFIGURED);
+        });
+        f.scanPage = new DataPage(List.of(f.records.get("source/src")), 1, 1, 10);
+        MetaContext.setContext(9L, 10L, "prior", "prior");
+        var result = wechatWorker(delivery, tx).runPage(1, "notice", 1, 10);
+        assertThat(result.processedPlans()).isEqualTo(2);
+        assertThat(result.selectedSources()).isEqualTo(1);
+        assertThat(result.failures()).containsExactly(new RegisteredSourceWorker.SourceFailure("src", null, SourceFailureCode.WECHAT_DELIVERY_BLOCKED));
+        verify(tx, org.mockito.Mockito.times(2)).commit(any()); verify(tx, never()).rollback(any());
+        verify(delivery, org.mockito.Mockito.times(4)).enqueue(any());
+        assertThat(MetaContext.getCurrentTenantId()).isEqualTo(9);
+        assertThat(MetaContext.getCurrentUserPid()).isEqualTo("prior");
+    }
+    @Test
+    void directWorkerCallCannotPresentBlockedWechatAsCompleteAndDoesNotUndoInApp() {
+        var delivery = mock(NotificationDeliveryAccessor.class);
+        var tx = mock(PlatformTransactionManager.class);
+        when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(delivery.enqueue(any())).thenAnswer(call -> {
+            NotificationDeliveryAccessor.Request request = call.getArgument(0);
+            return request.channel() == NotificationDeliveryAccessor.Channel.WECHAT_SUBSCRIPTION
+                    ? NotificationDeliveryAccessor.Result.blocked(NotificationDeliveryAccessor.Reason.WECHAT_NOT_CONFIGURED)
+                    : new NotificationDeliveryAccessor.Result(NotificationDeliveryAccessor.Status.REPLAYED, null, "k");
+        });
+        assertThatThrownBy(() -> wechatWorker(delivery,tx).process(1,"notice","src"))
+                .hasMessage("NOTIFICATION_SOURCE_WECHAT_DELIVERY_BLOCKED");
+        verify(tx).commit(any()); verify(tx, never()).rollback(any());
+    }
+    @Test
+    void actualWechatEnqueueFailureRollsBackSourceTransactionWithoutSwallowingIt() {
+        var delivery = mock(NotificationDeliveryAccessor.class);
+        var tx = mock(PlatformTransactionManager.class);
+        when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(delivery.enqueue(any())).thenAnswer(call -> {
+            NotificationDeliveryAccessor.Request request = call.getArgument(0);
+            if (request.channel() == NotificationDeliveryAccessor.Channel.WECHAT_SUBSCRIPTION)
+                throw new IllegalStateException("RELIABLE_ENVELOPE_CONFLICT");
+            return new NotificationDeliveryAccessor.Result(NotificationDeliveryAccessor.Status.QUEUED,null,"k");
+        });
+        assertThatThrownBy(() -> wechatWorker(delivery,tx).processChannels(1,"notice","src"))
+                .hasMessage("RELIABLE_ENVELOPE_CONFLICT");
+        verify(tx).rollback(any()); verify(tx,never()).commit(any());
+        verify(delivery,org.mockito.Mockito.times(3)).enqueue(any());
+    }
+    @Test
+    void configuredReservationResolverDoesNotImplicitlyEnableAutomaticWechat() {
+        var delivery = mock(NotificationDeliveryAccessor.class);
+        var tx = mock(PlatformTransactionManager.class);
+        when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(delivery.enqueue(any())).thenReturn(new NotificationDeliveryAccessor.Result(NotificationDeliveryAccessor.Status.QUEUED,null,"k"));
+        var policy = new com.auraboot.framework.notification.wechat.WechatSubscriptionReservationProperties();
+        policy.setEnabled(true); policy.setSourceTypes(Set.of("notice"));
+        assertThat(new RegisteredSourceWorker(f.resolver,f,delivery,tx,new HostSourceBindingProperties(),policy).process(1,"notice","src")).isEqualTo(2);
+        var requests=org.mockito.ArgumentCaptor.forClass(NotificationDeliveryAccessor.Request.class);
+        verify(delivery,org.mockito.Mockito.times(2)).enqueue(requests.capture());
+        assertThat(requests.getAllValues()).allMatch(request -> request.channel()==NotificationDeliveryAccessor.Channel.IN_APP);
+    }
+    @Test
+    void automaticWechatRequiresEnabledReservationsAndRegisteredSourceTypes() {
+        var p=new HostSourceBindingProperties();p.setEnabled(true);p.getWorker().setWechatSubscriptionEnabled(true);
+        var policy=new com.auraboot.framework.notification.wechat.WechatSubscriptionReservationProperties();
+        var delivery=mock(NotificationDeliveryAccessor.class);var tx=mock(PlatformTransactionManager.class);
+        assertThatThrownBy(() -> new RegisteredSourceWorker(f.resolver,f,delivery,tx,p,policy)).hasMessage("NOTIFICATION_SOURCE_BINDING_INVALID");
+        policy.setEnabled(true);
+        assertThatThrownBy(() -> new RegisteredSourceWorker(f.resolver,f,delivery,tx,p,policy)).hasMessage("NOTIFICATION_SOURCE_BINDING_INVALID");
+        policy.setSourceTypes(Set.of("unregistered"));
+        assertThatThrownBy(() -> new RegisteredSourceWorker(f.resolver,f,delivery,tx,p,policy)).hasMessage("NOTIFICATION_SOURCE_BINDING_INVALID");
+        verifyNoInteractions(delivery,tx);
+    }
+    @Test
+    void optedInWechatCannotBypassCompleteRecipientValidationOrInAppFailure() {
+        var delivery=mock(NotificationDeliveryAccessor.class);var tx=mock(PlatformTransactionManager.class);
+        when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        var worker=wechatWorker(delivery,tx);
+        f.records.get("link/l2").put("owner","foreign");
+        assertThatThrownBy(() -> worker.processChannels(1,"notice","src")).hasMessage("NOTIFICATION_SOURCE_BINDING_INVALID");
+        verifyNoInteractions(delivery);
+        f.records.get("link/l2").put("owner","o1");
+        when(delivery.enqueue(any())).thenReturn(NotificationDeliveryAccessor.Result.blocked(NotificationDeliveryAccessor.Reason.DISABLED));
+        assertThatThrownBy(() -> worker.processChannels(1,"notice","src")).hasMessage("NOTIFICATION_SOURCE_DELIVERY_BLOCKED");
+        verify(delivery).enqueue(any());verify(tx,org.mockito.Mockito.times(2)).rollback(any());verify(tx,never()).commit(any());
+    }
+    private RegisteredSourceWorker wechatWorker(NotificationDeliveryAccessor delivery,PlatformTransactionManager tx) {
+        var p=new HostSourceBindingProperties();p.setEnabled(true);p.getWorker().setWechatSubscriptionEnabled(true);
+        var policy=new com.auraboot.framework.notification.wechat.WechatSubscriptionReservationProperties();
+        policy.setEnabled(true);policy.setSourceTypes(Set.of("notice"));
+        return new RegisteredSourceWorker(f.resolver,f,delivery,tx,p,policy);
+    }
+    @Test
     void trustedHashStillCannotAuthorizeDanglingDuplicateOrComputedBinding() {
         var graph =(com.fasterxml.jackson.databind.node.ObjectNode) f.graphs.get("source");
         var fields =(com.fasterxml.jackson.databind.node.ArrayNode) graph.path("fields");
@@ -848,6 +966,8 @@ class RegisteredSourcePlanResolverTest {
             return queued.getLast();
         }
         void deliver(IntegrationEventEnvelope envelope, ReliableEventConsumerExtension consumer) {
+            when(receipts.lockActiveDeliveryLease(envelope.tenantId(), envelope.eventId(), "test-lease")).thenReturn(1L);
+            when(receipts.countActiveDeliveryLease(envelope.tenantId(), envelope.eventId(), "test-lease")).thenReturn(1);
             executor.deliver(envelope, consumer, "test-lease");
         }
         IntegrationEventEnvelope event(IntegrationEventEnvelope input, String type, String reference) {

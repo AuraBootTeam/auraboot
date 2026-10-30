@@ -100,6 +100,114 @@ class InstalledIntegrationServiceTest {
         });
     }
     @AfterEach void clear() { MetaContext.clear(); }
+
+    void synchronousResults(String state) {
+        when(executor.execute(eq(process), any())).thenReturn(CommandExecuteResult.builder()
+                .phaseReached("completed").data(Map.of("recordPid", "request-pid", "state", "completed")).build());
+        when(executor.execute(eq(result), any())).thenReturn(CommandExecuteResult.builder()
+                .phaseReached("completed").data(Map.of("recordPid", "request-pid", "state", state,
+                        "items", List.of(Map.of("sourcePid", "source-pid", "taskPid", "task-pid", "status", "added")))).build());
+    }
+
+    @Test void synchronousExecutionRunsAllCommandsBeforeCompletingReceiptWithoutDeliveryPolling() {
+        synchronousResults("completed");
+        var response = service.executeSynchronously(principal, source, event());
+        assertEquals("completed", response.get("state"));
+        assertEquals(List.of(Map.of("sourcePid", "source-pid", "taskPid", "task-pid", "status", "added")), response.get("items"));
+        assertFalse(response.containsKey("deliveryStatus"));
+        var order = inOrder(executor, receipts);
+        order.verify(executor).execute(eq(accept), any());
+        order.verify(receipts).accepted(42L, "inst", source, "evt-1", "request-pid");
+        order.verify(executor).execute(eq(process), any());
+        order.verify(executor).execute(eq(result), any());
+        order.verify(receipts).completed(42L, "inst", source, "evt-1", "request-pid");
+        verify(receipts, never()).deliveryStatus(anyLong(), anyString());
+    }
+
+    @Test void synchronousProcessingFailureDoesNotRecordCompletionOrReadAResult() {
+        when(executor.execute(eq(process), any())).thenThrow(new IllegalStateException("source read failed"));
+        assertThrows(IllegalStateException.class, () -> service.executeSynchronously(principal, source, event()));
+        verify(executor, never()).execute(eq(result), any());
+        verify(receipts, never()).completed(anyLong(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test void synchronousResultMustBeBusinessCompletedBeforeReceiptCompletion() {
+        synchronousResults("accepted");
+        assertThrows(IllegalStateException.class, () -> service.executeSynchronously(principal, source, event()));
+        verify(receipts, never()).completed(anyLong(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test void synchronousCompletedReplayReadsResultWithoutRepeatingBusinessWrites() {
+        synchronousResults("completed");
+        service.executeSynchronously(principal, source, event());
+        var original = acceptedReceipt();
+        when(receipts.claim(any())).thenReturn(0);
+        when(receipts.find(42L, "inst", source, "evt-1")).thenReturn(receiptWith(original,
+                "completed", "request-pid", original.bindingSha256(), original.commandSha256()));
+        clearInvocations(executor);
+        assertEquals("completed", service.executeSynchronously(principal, source, event()).get("state"));
+        verify(executor, never()).execute(eq(accept), any());
+        verify(executor, never()).execute(eq(process), any());
+        verify(executor).execute(eq(result), any());
+        verify(receipts, never()).deliveryStatus(anyLong(), anyString());
+    }
+
+    @Test void synchronousCallCannotTakeOverAnAcceptedAsynchronousRequest() {
+        service.accept(principal, source, event());
+        var original = acceptedReceipt();
+        when(receipts.claim(any())).thenReturn(0);
+        when(receipts.find(42L, "inst", source, "evt-1")).thenReturn(original);
+        clearInvocations(executor);
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
+                () -> service.executeSynchronously(principal, source, event()));
+        verifyNoInteractions(executor);
+    }
+
+    @Test void synchronousCallStillEnforcesCurrentInstallationScopeAndHostOwnedFields() {
+        when(scopes.findScopes(42L, 9L)).thenReturn(Set.of());
+        assertThrows(SecurityException.class, () -> service.executeSynchronously(principal, source, event()));
+        verifyNoInteractions(executor, receipts);
+        when(scopes.findScopes(42L, 9L)).thenReturn(Set.of(registration.requiredScope()));
+        var forged = new HashMap<>(event().payload());
+        forged.put("externalSubject", Map.of("type", "purchase-requisition", "pid", "other"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.executeSynchronously(principal, source, event(forged)));
+        verifyNoInteractions(executor);
+    }
+
+    @Test void synchronousProcessingUsesMachineIdentityAndRestoresItAfterFailure() {
+        assertFalse(com.auraboot.framework.application.security.MachineDataAccessContext.isActive());
+        when(executor.execute(eq(process), any())).thenAnswer(invocation -> {
+            assertEquals(principal, com.auraboot.framework.application.security.MachineDataAccessContext.principal());
+            throw new IllegalStateException("source read failed");
+        });
+        assertThrows(IllegalStateException.class, () -> service.executeSynchronously(principal, source, event()));
+        assertFalse(com.auraboot.framework.application.security.MachineDataAccessContext.isActive());
+        verify(receipts, never()).completed(anyLong(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test void synchronousResultCannotSubstituteAnotherBusinessRecord() {
+        synchronousResults("completed");
+        when(executor.execute(eq(result), any())).thenReturn(CommandExecuteResult.builder()
+                .phaseReached("completed").data(Map.of("recordPid", "foreign-record", "state", "completed")).build());
+        assertThrows(IllegalStateException.class, () -> service.executeSynchronously(principal, source, event()));
+        verify(receipts, never()).completed(anyLong(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test void synchronousReplayRejectsChangedInputBeforeReadingOrWritingBusinessData() {
+        synchronousResults("completed");
+        service.executeSynchronously(principal, source, event());
+        var original = acceptedReceipt();
+        when(receipts.claim(any())).thenReturn(0);
+        when(receipts.find(42L, "inst", source, "evt-1")).thenReturn(receiptWith(original,
+                "completed", "request-pid", original.bindingSha256(), original.commandSha256()));
+        clearInvocations(executor);
+        var changed = new HashMap<>(event().payload());
+        changed.put("title", "Different inquiry");
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
+                () -> service.executeSynchronously(principal, source, event(changed)));
+        verifyNoInteractions(executor);
+    }
     IntegrationEventEnvelope event() { return event(Map.of("title","Inquiry","selected",List.of(Map.of("requisitionId","10","entryId","11")))); }
     IntegrationEventEnvelope event(Map<String,Object> payload) {
         return new IntegrationEventEnvelope("1.0","ext:inst:"+source+":evt-1","external."+source+".inquiry.requested.v1",

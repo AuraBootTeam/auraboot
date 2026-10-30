@@ -2122,3 +2122,63 @@ describe('ActionRegistry grouped command inputs', () => {
     expect(fetchResult).not.toHaveBeenCalled();
   });
 });
+
+describe('ActionRegistry governed command choices', () => {
+  const field = { field: 'connectionPid', type: 'select', required: true,
+    dataSource: { type: 'command', commandCode: 'example:connection_options' } };
+  const items = [{ value: 'connection-a', label: 'Sandbox' }];
+  it('loads complete command choices before a cancellable form without submitting a mutation', async () => {
+    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {
+      phaseReached: 'completed', data: { items, total: 1 },
+    } });
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await expect(actionRegistry.execute('command.execute', { fetchResult,
+        args: { command: 'example:create', inputFields: [field] } })).rejects.toBeInstanceOf(ActionCancelledError);
+      expect(fetchResult).toHaveBeenCalledExactlyOnceWith('/api/meta/commands/execute/example%3Aconnection_options',
+        { method: 'post', params: { payload: {} } });
+      expect((dialog.mock.calls[0][0] as CustomEvent).detail.fieldOptions.connectionPid).toEqual(items);
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+  it.each([
+    { phaseReached: 'handler', data: { items, total: 1 } },
+    { phaseReached: 'completed', data: { items, total: 2 } },
+    { phaseReached: 'completed', data: { items } },
+    { phaseReached: 'completed', data: { items: [...items, ...items], total: 2 } },
+    { phaseReached: 'completed', data: { items: [{ value: '', label: 'Broken' }], total: 1 } },
+  ])('rejects incomplete or malformed command options before opening or mutating: %j', async (data) => {
+    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data });
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await expect(actionRegistry.execute('command.execute', { fetchResult,
+        t: key => key === 'error.data_load_failed' ? 'Choices unavailable.' : key,
+        args: { command: 'example:create', inputFields: [field] } })).rejects.toThrow('Choices unavailable.');
+      expect(dialog).not.toHaveBeenCalled();expect(fetchResult).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+  it('submits only the confirmed choice to the separate business command', async () => {
+    const fetchResult = vi.fn().mockResolvedValueOnce({ code: '0', data: {
+      phaseReached: 'completed', data: { items, total: 1 },
+    } }).mockResolvedValueOnce({ code: '0', data: { phaseReached: 'completed', data: { recordPid: 'draft-a' } } });
+    const dialog = (event: Event) => (event as CustomEvent).detail.onSubmit({ connectionPid: 'connection-a' });
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await actionRegistry.execute('command.execute', { fetchResult,
+        args: { command: 'example:create', inputFields: [field], payload: { title: 'Draft' } } });
+      expect(fetchResult).toHaveBeenCalledTimes(2);
+      expect(fetchResult).toHaveBeenNthCalledWith(2, '/api/meta/commands/execute/example:create',
+        expect.objectContaining({ method: 'post', params: { payload: { title: 'Draft', connectionPid: 'connection-a' } } }));
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+  it('fails closed when no choice-command transport is available', async () => {
+    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await expect(promptInputForm([field], 'Choose', undefined)).rejects.toThrow('Could not load choices. Try again.');
+      expect(dialog).not.toHaveBeenCalled();
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+
+});
