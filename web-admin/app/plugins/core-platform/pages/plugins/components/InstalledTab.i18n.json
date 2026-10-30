@@ -54,5 +54,29 @@
   "EVENT_POLICY": {
     "zh-CN": "事件策略",
     "en-US": "Event policy"
+  },
+  "changedResources": {
+    "zh-CN": "已修改的页面或看板",
+    "en-US": "Modified pages or dashboards"
+  },
+  "CREATE": {
+    "zh-CN": "新增",
+    "en-US": "Create"
+  },
+  "UPDATE": {
+    "zh-CN": "检查并更新",
+    "en-US": "Check and update"
+  },
+  "SKIP": {
+    "zh-CN": "保留",
+    "en-US": "Preserve"
+  },
+  "DELETE": {
+    "zh-CN": "删除",
+    "en-US": "Delete"
+  },
+  "plannedAction": {
+    "zh-CN": "计划操作",
+    "en-US": "Planned operation"
   }
 }

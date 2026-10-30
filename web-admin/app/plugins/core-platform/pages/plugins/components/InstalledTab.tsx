@@ -1,3 +1,4 @@
+import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import ImportWarnings from './ImportWarnings';
 /**
  * Installed tab — manage locally installed plugins.
@@ -52,11 +53,11 @@ interface ImportPreviewResult {
   version: string;
   displayName: string;
   valid: boolean;
-  isUpgrade: boolean;
+  upgrade: boolean;
   previousVersion?: string;
   errors: string[];
   warnings: string[];
-  actionCounts: Record<string, Record<string, number>>;
+  actionCounts: Record<string, number>;
 }
 
 interface Props {
@@ -152,7 +153,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
         fetchPlugins();
         onImportSuccess?.();
       } else {
-        const message = envelope.message || result.errorMessage || envelope.desc || text('failed');
+        const message = result.errorMessage || resolveCommandErrorMessage(envelope, 'plugin.import', undefined, locale, text('failed'));
         setOutcome({ success: false, warnings: [], error: message });
         setShowPreviewModal(false);
         showErrorToast(message);
@@ -462,7 +463,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                     <span className="text-gray-500">{t('plugin.column.namespace')}</span>
                     <span className="font-mono text-sm">{previewResult.namespace}</span>
                   </div>
-                  {previewResult.isUpgrade && (
+                  {previewResult.upgrade && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">{t('plugin.preview.upgradeFrom')}</span>
                       <span>{previewResult.previousVersion}</span>
@@ -491,11 +492,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                     <ExclamationTriangleIcon className="h-4 w-4" />
                     {t('plugin.preview.warnings')}
                   </h4>
-                  <ul className="space-y-1 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-700">
-                    {previewResult.warnings.map((warning, i) => (
-                      <li key={i}>• {warning}</li>
-                    ))}
-                  </ul>
+                  <ImportWarnings warnings={previewResult.warnings} />
                 </div>
               )}
 
@@ -507,16 +504,10 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                 <div>
                   <h4 className="mb-2 text-sm font-medium text-gray-700">{t('plugin.preview.actionsToPlan')}</h4>
                   <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-4 text-sm">
-                    {Object.entries(previewResult.actionCounts).map(([type, actions]) => (
-                      <div key={type} className="flex justify-between">
-                        <span className="text-gray-500">{type}</span>
-                        <span className="font-medium">
-                          {Object.entries(actions).map(([action, count]) => (
-                            <span key={action} className="ml-2">
-                              {action}: {count}
-                            </span>
-                          ))}
-                        </span>
+                    {Object.entries(previewResult.actionCounts).map(([action, count]) => (
+                      <div key={action} className="flex justify-between gap-4">
+                        <span className="text-gray-500">{text(action in IMPORT_TEXT ? action as keyof typeof IMPORT_TEXT : 'plannedAction')}</span>
+                        <span className="font-medium">{count}</span>
                       </div>
                     ))}
                   </div>
@@ -540,7 +531,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
               >
                 {uploading
                   ? t('plugin.import.importing')
-                  : previewResult.isUpgrade
+                  : previewResult.upgrade
                     ? t('plugin.import.confirmUpgrade')
                     : t('plugin.import.confirmInstall')}
               </button>

@@ -6,7 +6,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const ast = (amount: number) => ({ type: 'compare', operator: 'GT', left: { type: 'path', scope: 'record', path: 'data.amount', dataType: 'integer' }, right: { type: 'literal', value: amount, dataType: 'integer' } });
 function manifest(code: string, version: string, amount: number, invalid = false) {
-  return { pluginId: code, namespace: code, version, displayName: '客户项目交付应用',
+  return { pluginId: code, namespace: 'upgrade', version, displayName: '客户项目交付应用',
     models: [{ code, displayName: '客户项目', modelType: 'entity' }],
     fields: [{ code: `${code}_name`, displayName: '项目名称', dataType: 'string' }, { code: `${code}_amount`, displayName: '交付金额', dataType: 'decimal' }],
     modelFieldBindings: [{ modelCode: code, fieldCode: `${code}_name`, aliasCode: 'name' }, { modelCode: code, fieldCode: `${code}_amount`, aliasCode: 'amount' }],
@@ -49,11 +49,14 @@ async function upload(page: Page, value: ReturnType<typeof manifest>, failure = 
   await page.locator('#plugin-file').setInputFiles({ name: `delivery-${value.version}.json`, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(value)) });
   await expect(page.getByText('安全更新', { exact: true })).toBeVisible();
   if (previewShot) await page.screenshot({ path: previewShot, fullPage: true });
+  await expect(page.getByText(/will be overwritten/)).toHaveCount(0);
+  await expect(page.getByText(value.version === '1.0.0' ? '新增' : '检查并更新', { exact: true })).toBeVisible();
   const execution = page.waitForResponse(r => /\/api\/plugins\/import\/[^/]+\/execute$/.test(r.url()) && r.request().method() === 'POST');
   await page.getByRole('button', { name: /确认安装|确认升级/ }).click();
   const response = await execution;
   expect(response.request().postDataJSON().conflictStrategy).toBe('overwrite_safe');
   await expect(page.getByRole('heading', { name: failure ? '导入未完成' : '导入已完成', exact: true })).toBeVisible();
+  if (!failure) await expect(page.getByRole('row').filter({ hasText: value.pluginId }).getByText(value.version, { exact: true })).toBeVisible();
   return response.json();
 }
 

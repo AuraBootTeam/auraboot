@@ -6,7 +6,7 @@ import TEXT from './InstalledTab.i18n.json';
 export default function ImportWarnings({ warnings }: { warnings: string[] }) {
   const { locale } = useI18n();
   const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale);
-  const kinds = warnings.map(warning => /^Preserved (AUTOMATION|DECISION|CONDITION|EVENT_POLICY):/.exec(warning)?.[1]);
+  const kinds = warnings.map(warning => /^Preserved (AUTOMATION|DECISION|CONDITION|EVENT_POLICY):/.exec(warning)?.[1] || (/^The following \d+ resource\(s\) have customer changes/.test(warning) ? 'changedResources' : undefined));
   return <div className="mt-3 space-y-2 text-sm text-amber-900">
     {warnings.map((warning, index) => <p key={index} className="rounded-lg border border-amber-200 bg-white px-3 py-2">
       {kinds[index] ? `${text(kinds[index] as keyof typeof TEXT)}：${text('preserveReason')}` : warning}
