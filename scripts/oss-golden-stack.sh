@@ -689,6 +689,8 @@ PYLOG
 </configuration>
 XML
   log "5/9 start backend (java -jar) on $server_port"
+  node "$SCRIPT_DIR/lib/golden-file-storage.mjs" prepare "$name" "$REPO_ROOT" "$DEV" >/dev/null \
+    || die "cannot retain runtime file storage"
   mkdir -p "$sd/pf4j-plugins"
   # MANAGEMENT_HEALTH_RELIABLEINTEGRATION_ENABLED: the reliable-integration outbox
   # indicator (expired leases / open DLQ / backlog older than 300s) reflects business
@@ -1091,6 +1093,8 @@ cmd_lifecycle_resume() {
 cmd_resume_retained() {
   local name="$1" sd recipe run_jar llm_stub_mode logging_config runtime_token server_port vite_port bff_port pg_db redis_db redis_host redis_port isolated_redis_port
   sd="$(state_dir "$name")"
+  node "$SCRIPT_DIR/lib/golden-file-storage.mjs" prepare "$name" "$REPO_ROOT" "$DEV" >/dev/null \
+    || die "cannot retain runtime file storage"
   recipe="$(node "$SCRIPT_DIR/lib/golden-resume-state.mjs" load "$name" "$REPO_ROOT" "$DEV")" \
     || die "retained launch inputs changed; resume refused"
   run_jar="$(printf '%s\n' "$recipe" | sed -n '1p')"
@@ -1196,7 +1200,9 @@ assert_stack_stopped() {
 cmd_down() {
   node "$SCRIPT_DIR/lib/golden-process-stop.mjs" stop "$1" "$REPO_ROOT" "$DEV" \
     || die "owned process stop refused; runtime/DB retained"
-  log "stopped '$1' verified processes (runtime/DB retained)"
+  node "$SCRIPT_DIR/lib/golden-file-storage.mjs" prepare "$1" "$REPO_ROOT" "$DEV" >/dev/null \
+    || die "processes stopped but persistent file storage verification failed; source refresh must not proceed"
+  log "stopped '$1' verified processes (runtime/DB/files retained)"
 }
 
 # ---- destroy (down + infra cleanup + runtime destroy) --------------------------------

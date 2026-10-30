@@ -31,6 +31,7 @@ import {
   readDataSourceRows,
   readDataSourceState,
   useDataSourceSubscription,
+  useRuntimeStateSubscription,
   writeRuntimeState,
 } from './workbenchBlockUtils';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
@@ -169,6 +170,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const t = context.t || ((key: string) => key);
   const { timezone, formats: dateTimeFormats } = useTimezone();
 
+  useRuntimeStateSubscription(runtime);
   const evaluator = runtime.getEvaluator();
   const dataSourceManager = runtime.getDataSourceManager();
 
@@ -422,10 +424,12 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const selectedRow = !Array.isArray(selectedStateValue) ? selectedStateValue : undefined;
   const selectedRowKey =
     selectedRow && typeof selectedRow === 'object' ? getRowIdentity(selectedRow) : '';
-  const effectiveSelectedRowKey = localSelectedRowKey || selectedRowKey;
-  const effectiveSelectedRowKeys = localSelectedRowKeys.length
-    ? localSelectedRowKeys
-    : selectedRowsFromState.map((row: any, index: number) => getRowIdentity(row, index));
+  // An explicit binding owns selection, including empty/reset values. Local
+  // keys only trigger rendering; they must never revive a previous selection.
+  const effectiveSelectedRowKey = selectionConfig?.bind ? selectedRowKey : localSelectedRowKey;
+  const effectiveSelectedRowKeys = selectionConfig?.bind
+    ? selectedRowsFromState.map((row: any, index: number) => getRowIdentity(row, index))
+    : localSelectedRowKeys;
   const effectiveSelectedRowKeySet = new Set(effectiveSelectedRowKeys);
 
   // Use tree-processed rows when treeConfig is set, otherwise flat data
@@ -513,6 +517,36 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     rowKeyField,
   ]);
 
+  // idsBind is a derived projection of the bound rows, even when a sibling
+  // action clears/replaces the selection without clicking this table.
+  useEffect(() => {
+    const idsBind = (selectionConfig as any)?.idsBind;
+    if (
+      !isMultipleSelection ||
+      !selectionConfig?.bind ||
+      !idsBind
+    )
+      return;
+    const ids = (Array.isArray(selectedStateValue) ? selectedStateValue : [])
+      .map((row: any) => row?.[selectionIdField])
+      .filter((value: unknown) => value !== undefined && value !== null);
+    const current = (runtime.getContext().state as Record<string, any> | undefined)?.[idsBind];
+    if (
+      !Array.isArray(current) ||
+      current.length !== ids.length ||
+      current.some((value: unknown, index: number) => !Object.is(value, ids[index]))
+    ) {
+      writeRuntimeState(runtime, idsBind, ids);
+    }
+  }, [
+    runtime,
+    isMultipleSelection,
+    selectionConfig?.bind,
+    (selectionConfig as any)?.idsBind,
+    selectedStateValue,
+    selectionIdField,
+  ]);
+
   const writeMultipleSelection = (rows: any[]) => {
     if (!selectionConfig?.bind) return;
     writeRuntimeState(runtime, selectionConfig.bind, rows);
@@ -551,17 +585,24 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       const groupKey = groupKeyByIdentity.get(identity);
       if (item && groupKey && !selectedByGroup.has(groupKey)) {
         selectedByGroup.set(groupKey, item.row);
+      } else if (serverPaging) {
+        // A page is not the complete candidate set. Keep choices from other
+        // pages; a visible replacement still removes the full exclusive group.
+        const value = row?.[exclusiveBy];
+        if (value !== undefined && value !== null && String(value).trim() &&
+            !selectedByGroup.has(String(value))) selectedByGroup.set(String(value), row);
       }
     });
 
-    const nextRows: any[] = [];
+    const nextRows: any[] = serverPaging ? Array.from(selectedByGroup.values()) : [];
     selectionGroups.forEach((group) => {
       const existing = selectedByGroup.get(group.key);
       if (existing) {
-        nextRows.push(existing);
+        if (!serverPaging) nextRows.push(existing);
         return;
       }
-      if (!hasSafeRecommendationContract || !group.hasExplicitKey) return;
+      // Uniqueness of recommendations cannot be established from one page.
+      if (serverPaging || !hasSafeRecommendationContract || !group.hasExplicitKey) return;
 
       const safeRecommendations = group.items.filter(
         (item) => item.row?.[recommendedField] === true && item.row?.[safeField] === true,
@@ -602,6 +643,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     if (!localSelectionUnchanged) setLocalSelectedRowKeys(nextRowKeys);
   }, [
     data,
+    serverPaging,
+    exclusiveBy,
     groupedRadioPresentation,
     hasSafeRecommendationContract,
     localSelectedRowKeys,
@@ -620,11 +663,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       writeRuntimeState(runtime, (selectionConfig as any).detailBind, row);
     }
     const identity = getRowIdentity(row, index);
-    const currentRows = selectedRowsFromState.length
-      ? selectedRowsFromState
-      : data.filter((candidate: any, candidateIndex: number) =>
-          effectiveSelectedRowKeySet.has(getRowIdentity(candidate, candidateIndex)),
-        );
+    const currentRows = selectedRowsFromState;
     const exclusiveValue = exclusiveBy ? row?.[exclusiveBy] : undefined;
     const rowsOutsideExclusiveGroup =
       exclusiveBy &&
@@ -662,10 +701,13 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     const nextRows = [
       ...currentRows.filter(
         (candidate: any, candidateIndex: number) =>
-          !groupIdentities.has(getRowIdentity(candidate, candidateIndex)),
+          row?.[exclusiveBy] !== undefined && row?.[exclusiveBy] !== null && String(row[exclusiveBy]).trim()
+            ? String(candidate?.[exclusiveBy]) !== String(row[exclusiveBy])
+            : !groupIdentities.has(getRowIdentity(candidate, candidateIndex)),
       ),
       row,
-    ].sort((left, right) => {
+    ];
+    if (!serverPaging) nextRows.sort((left, right) => {
       const leftIndex = data.findIndex(
         (candidate: any, candidateIndex: number) =>
           getRowIdentity(candidate, candidateIndex) === getRowIdentity(left),

@@ -91,4 +91,59 @@ class DynamicDataListingSupportTest {
         var query=physicalListing(builder).applyStableListSort(builder.buildConditionQuery(model,List.of()),model,requested);
         assertThat(query.getSql()).endsWith("ORDER BY public_ref DESC");
     }
+    @Test void requiredMemberPredicateIsSharedByDataCountAndCursorUnderAnAllPermit() {
+        var mapper=mock(DynamicDataMapper.class);var policies=mock(DataPermissionEngine.class);
+        var builder=new QueryBuilderServiceImpl(mapper);var model=RequiredReadReferencesTest.model(10);
+        String allowed=RequiredReadReferencesTest.id(9),predicate="pid IN ('"+allowed+"')";
+        when(policies.buildRequiredReadFilterForQuery(42L,"fixture_bundle",43L,null,null)).thenReturn("AND "+predicate);
+        var listing=new DynamicDataListingSupport(builder,queries,new SecureSqlRewriter(),mapper,policies,
+                mock(FieldMaskService.class),mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m->model);
+        when(mapper.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).contains(predicate);
+            return new ArrayList<>(List.of(new LinkedHashMap<>(Map.<String,Object>of("pid",allowed)))); });
+        when(mapper.countByQuery(anyString(),anyMap())).thenAnswer(call->{assertThat((String)call.getArgument(0)).contains(predicate);return 1L;});
+        MetaContext.runWithCommandPermitScope("ALL",()->{
+            var offset=listing.list("fixture_bundle",DynamicQueryRequest.builder().pageNum(1).pageSize(2).build());
+            assertThat(offset.getTotal()).isEqualTo(1L);assertThat(offset.getRecords()).hasSize(1);
+            var cursor=listing.list("fixture_bundle",DynamicQueryRequest.builder().pageNum(1).pageSize(2).cursor(RequiredReadReferencesTest.id(1)).build());
+            assertThat(cursor.getTotal()).isEqualTo(1L);assertThat(cursor.getNextCursor()).isEqualTo(allowed);
+        });
+        verify(policies,never()).buildRowFilter(any(),anyString(),any());
+        verify(policies,times(2)).buildRequiredReadFilterForQuery(42L,"fixture_bundle",43L,null,null);
+    }
+    @Test void differentQueriesNeverReuseARequiredSubsetAndCountExcludesCursorContinuation() {
+        var mapper=mock(DynamicDataMapper.class);var policies=mock(DataPermissionEngine.class);
+        var builder=new QueryBuilderServiceImpl(mapper);var model=RequiredReadReferencesTest.model(10);
+        var fields=new ArrayList<>(model.getFields());fields.add(FieldDefinition.builder().code("name").columnName("name").dataType("string").searchable(true).build());model.setFields(fields);
+        var masks=mock(FieldMaskService.class);when(masks.applyMaskingForList(anyString(),anyList(),any()))
+                .thenAnswer(call->call.getArgument(1));
+        var listing=new DynamicDataListingSupport(builder,queries,new SecureSqlRewriter(),mapper,policies,
+                masks,mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m->model);
+        var expected=new java.util.concurrent.atomic.AtomicReference<String>();
+        when(policies.buildRowFilterForQuery(eq(42L),eq("fixture_bundle"),eq(43L),anyList(),anyString())).thenAnswer(call->{
+            List<QueryCondition> conditions=call.getArgument(3);String pid=(String)conditions.get(0).getValue();
+            expected.set(pid);assertThat((String)call.getArgument(4)).isEqualTo(pid.equals(RequiredReadReferencesTest.id(9))?"first":"second");
+            return "AND pid IN ('"+pid+"')";
+        });
+        when(mapper.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).contains("pid IN ('"+expected.get()+"')","ILIKE");
+            return new ArrayList<>(List.of(new LinkedHashMap<>(Map.<String,Object>of("pid",expected.get()))));
+        });
+        when(mapper.countByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).contains("pid IN ('"+expected.get()+"')","ILIKE").doesNotContain("pid >","LIMIT","OFFSET");
+            return 1L;
+        });
+        try(var ignored=DynamicDataQueryScope.open()) {
+            for(int n:List.of(9,10)) {
+                String pid=RequiredReadReferencesTest.id(n);
+                var condition=QueryCondition.builder().fieldName("pid").operator(QueryCondition.Operator.EQ).value(pid).build();
+                var page=listing.list("fixture_bundle",DynamicQueryRequest.builder().conditions(List.of(condition))
+                        .keyword(n==9?"first":"second").pageNum(1).pageSize(1).cursor(RequiredReadReferencesTest.id(1)).build());
+                assertThat(page.getTotal()).isEqualTo(1L);assertThat(page.getRecords()).extracting(r->r.get("pid")).containsExactly(pid);
+                assertThat(page.getNextCursor()).isEqualTo(pid);
+            }
+        }
+        verify(policies,times(2)).buildRowFilterForQuery(eq(42L),eq("fixture_bundle"),eq(43L),anyList(),anyString());
+        verify(policies,never()).buildRowFilter(any(),anyString(),any());
+    }
 }

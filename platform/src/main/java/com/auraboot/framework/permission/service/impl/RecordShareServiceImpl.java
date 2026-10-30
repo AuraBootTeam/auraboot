@@ -135,6 +135,16 @@ public class RecordShareServiceImpl implements RecordShareService {
         String normalizedMemberPid = normalizePid(memberPid);
         String normalizedAction = normalizeAction(action);
 
+        if (memberId == null && !StringUtils.hasText(normalizedMemberPid)) {
+            return false;
+        }
+        // Absence is a necessary-condition rejection, never an authorization grant.
+        // Recheck on every invocation and retain the original subject/action checks below.
+        if (!recordShareMapper.hasActiveSharesByRecordPid(
+                tenantId, resourceCode, normalizedRecordPid, now)) {
+            return false;
+        }
+
         if (StringUtils.hasText(normalizedMemberPid)) {
             int directPidCount = recordShareMapper.countByRecordPidAndSubjectPid(
                     tenantId, resourceCode, normalizedRecordPid, "member", normalizedMemberPid,

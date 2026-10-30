@@ -81,6 +81,8 @@ import { executeSchemaHandler } from '~/framework/meta/hooks/executeSchemaHandle
 import { executeRegistryAction } from '~/framework/meta/hooks/executeRegistryAction';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { ExpressionParser } from '~/framework/meta/runtime/expression/parser';
+import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -263,11 +265,28 @@ function resolveCommandPayload(
   if (!configured || typeof configured !== 'object' || Array.isArray(configured)) {
     return {};
   }
-  const out: Record<string, any> = {};
-  for (const [key, value] of Object.entries(configured as Record<string, unknown>)) {
-    out[key] = resolveRuntimeTemplate(value, runtimeContext);
+  const context = createExpressionContext(runtimeContext);
+  // Evaluate only configured DSL values, never strings returned by a record or
+  // projection. Use the canonical sandbox directly so bad payload expressions
+  // cannot turn into undefined fields and reach the command transport.
+  const resolve = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(resolve);
+    if (value && typeof value === 'object' &&
+        [Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item)]));
+    }
+    return typeof value === 'string' && value.includes('${')
+      ? ExpressionParser.parse(/^\s*\$\{[\s\S]+\}\s*$/.test(value) ? value.trim() : value, context)
+      : value;
+  };
+  try {
+    return resolve(configured) as Record<string, any>;
+  } catch {
+    throw new Error(getLocalizedText({
+      'zh-CN': '无法解析当前操作的输入，请检查选择后重试。',
+      en: 'Unable to resolve the action inputs. Check your selections and try again.',
+    }, String(runtimeContext.locale || 'en-US'), runtimeContext.t as any));
   }
-  return out;
 }
 
 function formatMessage(params: Record<string, any>, fallback: string): string {

@@ -95,6 +95,22 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("recordPid") String recordPid,
             @Param("now") Instant now);
 
+    /** Necessary existence check only; a positive result does not authorize any subject or action. */
+    @Select("""
+        SELECT EXISTS (
+          SELECT 1 FROM ab_record_share
+          WHERE tenant_id = #{tenantId}
+            AND resource_code = #{resourceCode}
+            AND record_pid = #{recordPid}
+            AND (expires_at IS NULL OR expires_at > #{now})
+        )
+        """)
+    boolean hasActiveSharesByRecordPid(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("recordPid") String recordPid,
+            @Param("now") Instant now);
+
     /**
      * Management projection keeps expired relationships visible. Access queries must
      * continue to use {@link #findByRecordPid(Long, String, String, Instant)} or the

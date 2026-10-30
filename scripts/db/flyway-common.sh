@@ -110,3 +110,52 @@ run_flyway() {
   echo "[flyway] locations=$locations" >&2
   FLYWAY_PASSWORD="$PG_PASSWORD" flyway "${args[@]}" "$cmd"
 }
+
+# Explicit control-plane migration boundary, separate from the Core/enterprise
+# public history. The caller owns artifact admission and target authorization.
+# This is not a route for ordinary product entities (use dynamic models).
+# run_product_flyway <migrate|validate|info> <private-schema> <absolute-payload-dir>
+run_product_flyway() {
+  if [[ "$#" != 3 ]]; then
+    echo "[flyway-common] product mode requires command, schema and payload directory" >&2; return 2
+  fi
+  local cmd="$1" schema="$2" payload="$3" variable
+  case "$cmd" in
+    migrate|validate|info) ;;
+    *) echo "[flyway-common] only migrate, validate and info are permitted" >&2; return 2 ;;
+  esac
+  if [[ ! "$schema" =~ ^[a-z][a-z0-9_]{0,62}$ || "$schema" == public || "$schema" == information_schema || "$schema" == pg_* ]]; then
+    echo "[flyway-common] an explicit non-system private schema is required" >&2; return 2
+  fi
+  if [[ "${AURA_FLYWAY_OUT_OF_ORDER:-0}" != 0 || "${AURA_FLYWAY_PRE1900_CORE_COMPAT:-0}" != 0 || -n "${AURA_FLYWAY_EXTRA_LOCATIONS:-}" ]]; then
+    echo "[flyway-common] product mode rejects history overrides and extra locations" >&2; return 2
+  fi
+  # Do not inherit a developer's URL, callbacks, init SQL, target or validation
+  # exceptions. Password comes only from the already resolved PG connection.
+  while IFS= read -r variable; do
+    if [[ "$variable" == FLYWAY_* ]]; then
+      echo "[flyway-common] product mode rejects ambient Flyway configuration" >&2; return 2
+    fi
+  done < <(compgen -e)
+  if [[ "$payload" != /* || "$payload" == *','* || "$payload" == *':'* || ! -d "$payload" ||
+        "$(cd "$payload" && pwd -P)" != "$payload" || -n "$(find "$payload" -type l -print -quit)" ]]; then
+    echo "[flyway-common] product payload must be an absolute regular directory without symlinks or location separators" >&2; return 2
+  fi
+  _require_db
+  local config="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/flyway-product.conf"
+  local -a args=(
+    "-configFiles=$config"
+    "-url=jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB"
+    "-user=$PG_USER"
+    "-locations=filesystem:$payload"
+    "-schemas=$schema" "-defaultSchema=$schema"
+    "-table=ab_flyway_schema_history"
+    "-baselineOnMigrate=false" "-outOfOrder=false"
+    "-validateMigrationNaming=true" "-validateOnMigrate=true"
+    "-ignoreMigrationPatterns=" "-cleanDisabled=true"
+    "-failOnMissingLocations=true" "-placeholderReplacement=false"
+    "-skipDefaultCallbacks=true" "-callbacks=" "-resolvers="
+  )
+  echo "[flyway] $cmd db=$PG_DB private-schema=$schema product-only" >&2
+  FLYWAY_PASSWORD="$PG_PASSWORD" flyway "${args[@]}" "$cmd"
+}

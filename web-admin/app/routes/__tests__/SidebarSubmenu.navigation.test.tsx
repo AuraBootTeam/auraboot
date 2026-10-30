@@ -13,7 +13,7 @@ vi.mock('~/contexts/I18nContext', () => ({
 }));
 
 vi.mock('~/utils/icon-resolver', () => ({
-  resolveIcon: () => null,
+  resolveIcon: (_icon: string | null, label: string) => <span>{label.charAt(0)}</span>,
 }));
 
 describe('SidebarSubmenu navigation', () => {
@@ -32,6 +32,23 @@ describe('SidebarSubmenu navigation', () => {
     expect(parent).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(parent);
     expect(parent).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('keeps decorative fallback letters out of menu accessible names', () => {
+    render(
+      <MemoryRouter>
+        <SidebarSubmenu
+          name="Delivery"
+          icon="UnknownIcon"
+          submenu={[{ path: '/p/plan', name: 'Frozen plans', icon: 'UnknownIcon' }]}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: 'Delivery' })).toBeVisible();
+    const link = screen.getByRole('link', { name: 'Frozen plans' });
+    expect(link).toHaveAttribute('href', '/p/plan');
+    expect(link).toHaveTextContent('FFrozen plans');
+    expect(link).toHaveAccessibleName('Frozen plans');
   });
 
   it('notifies the mobile drawer when a nested leaf navigates', () => {

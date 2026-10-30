@@ -115,6 +115,85 @@ describe('useActionHandler - explicit command payload', () => {
     fetchResultMock.mockReset();
   });
 
+  it('projects rich selected rows through the canonical sandbox without leaking display fields', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: {} });
+    const selected = [{ applicationPid: 'app-A', revisionPid: 'rev-A', sourceSnapshotPid: 'source-A', templatePid: 'template-A', applicationName: 'Private display', tupleKey: 'row-key' }];
+    const runtime = makeRuntime({ state: { selected }, form: { enabled: false, quantity: '0.000000000000001' } });
+    const { result } = renderHook(() => useActionHandler({ runtime, navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: ((key: string) => key) as any }));
+    await act(async () => result.current.handleAction({ code: 'freeze', action: {
+      type: 'command', command: 'example:freeze', operationType: 'update', includeRecordPayload: false,
+      payload: {
+        selections: '${fn.PROJECT_ROWS(state.selected, {applicationPid:"applicationPid", revisionPid:"revisionPid", sourceSnapshotPid:"sourceSnapshotPid", templatePid:"templatePid"}, "applicationPid")}',
+        nested: { enabled: '${form.enabled}', quantities: ['${form.quantity}'] },
+      },
+    } } as unknown as ButtonConfig, { pid: 'root', row_version: 7 }));
+    expect(result.current.error).toBeNull();
+    expect(fetchResultMock).toHaveBeenCalledOnce();
+    expect(fetchResultMock.mock.calls[0][1].params).toEqual({ targetRecordPid: 'root', operationType: 'UPDATE', expectedVersion: 7,
+      payload: { selections: [{ applicationPid: 'app-A', revisionPid: 'rev-A', sourceSnapshotPid: 'source-A', templatePid: 'template-A' }],
+        nested: { enabled: false, quantities: ['0.000000000000001'] } } });
+    expect(selected[0].applicationName).toBe('Private display');
+  });
+
+  it('keeps optional paths, typed literals and record text without evaluating returned strings', async () => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: {} });
+    const when = new Date('2026-10-29T00:00:00Z');
+    const runtime = makeRuntime({ form: { zero: 0, enabled: false, name: 'Name', userText: '${window.location}' } });
+    const { result } = renderHook(() => useActionHandler({ runtime, navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: ((key: string) => key) as any }));
+    await act(async () => result.current.handleAction({ code: 'save', action: {
+      type: 'command', command: 'example:save', operationType: 'update', includeRecordPayload: false,
+      payload: { zero: '${form.zero}', enabled: '${form.enabled}', optional: '${form.optional}',
+        text: '${form.userText}', caption: '  Before ${form.name} After  ', when },
+    } } as unknown as ButtonConfig, { pid: 'root', row_version: 7 }));
+    expect(result.current.error).toBeNull();
+    expect(fetchResultMock).toHaveBeenCalledOnce();
+    expect(fetchResultMock.mock.calls[0][1].params.payload).toEqual({ zero: 0, enabled: false,
+      optional: undefined, text: '${window.location}', caption: '  Before Name After  ', when });
+  });
+
+  it.each([
+    '${fn.PROJECT_ROWS(state.selected, {applicationPid:"missing"}, "applicationPid")}',
+    '${fn.PROJECT_ROWS(state.selected, {applicationPid:"constructor.name"}, "applicationPid")}',
+    '${window.location}',
+  ])('rejects invalid or forbidden computed payloads before transport: %s', async (expression) => {
+    const runtime = makeRuntime({ state: { selected: [{ applicationPid: 'app-A' }] } });
+    const { result } = renderHook(() => useActionHandler({ runtime, navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: ((key: string) => key) as any }));
+    await act(async () => result.current.handleAction({ code: 'freeze', action: {
+      type: 'command', command: 'example:freeze', operationType: 'update', includeRecordPayload: false,
+      payload: { selections: expression },
+    } } as unknown as ButtonConfig, { pid: 'root', row_version: 7 }));
+    expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.error).not.toContain('PROJECT_ROWS');
+    expect(result.current.error).not.toContain('window.location');
+  });
+
+  it('retains the reviewed version and exact request identity after an uncertain reply', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: 'NETWORK_ERROR', message: 'Reply lost' });
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: {} });
+    const runtime = makeRuntime({ state: { selected: [{ applicationPid: 'a' }] } });
+    runtime.getSchema = () => ({ modelCode: 'example', extension: { commandRequestByCommand: {
+      'example:freeze': { idempotent: true, versionField: 'row_version', payloadFields: ['selections'] },
+    } } }) as any;
+    const { result } = renderHook(() => useActionHandler({ runtime, navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: ((key: string) => key) as any }));
+    const action = { code: 'freeze', action: { type: 'command', command: 'example:freeze', operationType: 'update', includeRecordPayload: false,
+      payload: { selections: '${fn.PROJECT_ROWS(state.selected, {applicationPid:"applicationPid"}, "applicationPid")}' } } } as unknown as ButtonConfig;
+    const reviewed = { pid: 'root', row_version: 7 };
+    await act(async () => result.current.handleAction(action, reviewed));
+    await act(async () => result.current.handleAction(action, reviewed));
+    expect(fetchResultMock).toHaveBeenCalledTimes(2);
+    const first = fetchResultMock.mock.calls[0][1].params, second = fetchResultMock.mock.calls[1][1].params;
+    expect(first.expectedVersion).toBe(7); expect(second.expectedVersion).toBe(7);
+    expect(first.clientRequestId).toEqual(expect.any(String));
+    expect(second.clientRequestId).toBe(first.clientRequestId);
+    expect(second.payload).toEqual({ selections: [{ applicationPid: 'a' }] });
+    expect(fetchResultMock.mock.calls.every(([url]) => url === '/api/meta/commands/execute/example:freeze')).toBe(true);
+  });
+
   it.each([{}, { includeRecordPayload: true }, { includeRecordPayload: false }])(
     'separates configured payload from ambient records: %j',
     async (option) => {
