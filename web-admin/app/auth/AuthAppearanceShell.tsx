@@ -61,7 +61,7 @@ export default function AuthAppearanceShell({ branding, appearance, children, di
         {(appearance.template === 'split' || appearance.template === 'background') && <section className="auth-brand-story">
           <BrandMark logo={logo} name={displayName ?? branding.productName} />
           {badge && <p className="auth-brand-badge">{badge}</p>}
-          {(headline || emphasis) && <h1 className="auth-brand-headline">{headline}{emphasis && <span>{emphasis}</span>}</h1>}
+          {(headline || emphasis) && <h1 className="auth-brand-headline">{headline && <HighlightedHeadline text={headline} />}{emphasis && <span>{emphasis}</span>}</h1>}
           {lead && <p className="auth-brand-lead">{lead}</p>}
           {images?.mode === 'illustration' && hero && <DecorativeImage className="auth-brand-hero" src={hero} />}
           {features && <ul className="auth-brand-features">{features.map(feature => <li key={feature}>{feature}</li>)}</ul>}
@@ -76,6 +76,13 @@ export default function AuthAppearanceShell({ branding, appearance, children, di
       </div>
     </div>
   );
+}
+
+/** Brand stories commonly lead with the AI token; the platform highlights it in the headline. */
+function HighlightedHeadline({ text }: { text: string }) {
+  const parts = text.split(/(AI)/);
+  if (parts.length === 1) return <>{text}</>;
+  return <>{parts.map((part, index) => part === 'AI' ? <b key={index}>AI</b> : part)}</>;
 }
 
 function BrandMark({ logo, name }: { logo: string; name: string }) {

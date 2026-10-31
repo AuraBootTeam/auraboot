@@ -69,6 +69,10 @@ describe('authentication appearance presentation', () => {
     const aurora = show({ ...base, effects: { mode: 'aurora' } }).container;
     expect(aurora.querySelectorAll('.auth-fx-aurora span')).toHaveLength(3);
   });
+  it('highlights the AI token inside the story headline', () => {
+    show({ ...base, content: { headline: { mode: 'custom', values: { 'zh-CN': '以 AI 数智之力' } } } });
+    expect(screen.getByText('AI', { selector: '.auth-brand-headline b' })).toBeVisible();
+  });
   it('renders no effect layer by default or for none', () => {
     show(base);
     expect(document.querySelector('.auth-fx')).toBeNull();
