@@ -113,6 +113,29 @@ class RequiredRecordReadGuardTest {
             assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
         }
     }
+    @Test void nativePermissionEngineRoutesExplicitMachineReadsToBoundConstraintsWithoutHumanDenyAll() {
+        var principal=machine();
+        var engine=new DataPermissionEngineImpl(mock(com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.class),
+                mock(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class),
+                mock(com.auraboot.framework.permission.engine.evaluator.RecordShareEvaluator.class),new com.fasterxml.jackson.databind.ObjectMapper(),guard);
+        when(rows.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).doesNotContain("1 = 0");
+            assertThat((Map<String,Object>)call.getArgument(1)).containsValue(id(9));return List.of(root(9,id(1)));
+        });when(data.getById("fixture_member",id(1))).thenReturn(root(1));
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(machineReads(true,true))) {
+            assertThat(engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).contains(id(9));
+            doReturn(List.of(root(10,id(1)))).when(rows).selectByQuery(anyString(),anyMap());
+            assertThat(engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).isEqualTo("AND 1 = 0");
+            verify(data,times(1)).getById("fixture_member",id(1));
+            try(var missing=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(Map.of())) {
+                assertThatThrownBy(()->engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).isInstanceOf(AccessDeniedException.class);
+            }
+            try(var legacy=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeWithoutRequiredReferenceReads(machineReads(true,true))) {
+                assertThatThrownBy(()->engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).isInstanceOf(AccessDeniedException.class);
+            }
+        }
+    }
     void diamond(boolean immutable, String sourceType) {
         var branch=RequiredReadReferencesTest.model(10); branch.setCode("fixture_member");
         branch.setExtension(Map.of(RequiredReadReferences.KEY,Map.of("version",1,"maxCandidateRecords",10,"minimumReferences",1,

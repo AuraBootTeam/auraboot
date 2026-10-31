@@ -297,3 +297,10 @@ in force, and the same bounded root predicate governs data/count/cursor reads.
 Component evidence does not establish a native provider workflow: actual OAuth,
 installed configuration, SDK predicates, outbox delivery and revocation need their
 original real-stack runner evidence at the exact frozen source/artifact version.
+
+The required-read query adapter recognizes only the explicit machine closure scope:
+it delegates to the bounded guard with machine constraints rather than adding the
+human fallback deny-all predicate. Other unadapted SQL entry points and
+`baseRowFilter` retain machine deny-all behavior. Missing decisions, nonmatching
+root rows and legacy scopes remain denied; this adapter is not a general machine
+query permission grant.
