@@ -21,7 +21,7 @@ function number(value, min, max, path) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) fail(path, `must be between ${min} and ${max}`);
 }
 export function validateAuthAppearance(value) {
-  object(value, ['version', 'template', 'defaultLocale', 'brandPosition', 'cardPosition', 'content', 'images', 'theme', 'helpUrl'], '');
+  object(value, ['version', 'template', 'defaultLocale', 'brandPosition', 'cardPosition', 'content', 'images', 'theme', 'helpUrl', 'effects'], '');
   if (value.version !== 1) fail('version', 'must be 1');
   choice(value.template, ['split', 'centered', 'background'], 'template');
   choice(value.defaultLocale, AUTH_LOCALES, 'defaultLocale');
@@ -62,6 +62,10 @@ export function validateAuthAppearance(value) {
     for (const key of ['accent', 'background']) if (value.theme[key] !== undefined && (typeof value.theme[key] !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(value.theme[key]))) fail(`theme.${key}`, 'must be a six-digit hex color');
     if (value.theme.radius !== undefined) choice(value.theme.radius, ['square', 'soft', 'rounded'], 'theme.radius');
     if (value.theme.mode !== undefined) choice(value.theme.mode, ['light', 'dark', 'auto'], 'theme.mode');
+  }
+  if (value.effects !== undefined) {
+    object(value.effects, ['mode'], 'effects');
+    if (value.effects.mode !== undefined) choice(value.effects.mode, ['none', 'beams', 'aurora'], 'effects.mode');
   }
   return value;
 }

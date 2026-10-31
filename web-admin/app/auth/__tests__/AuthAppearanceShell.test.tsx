@@ -62,5 +62,17 @@ describe('authentication appearance presentation', () => {
       expect(applicationTheme.isDark).toBe(true);
     } finally { applicationTheme.isDark = false; }
   });
+  it('renders the configured decorative effect layer', () => {
+    const beams = show({ ...base, effects: { mode: 'beams' } }).container;
+    expect(beams.querySelectorAll('.auth-fx-beams span')).toHaveLength(5);
+    const aurora = show({ ...base, effects: { mode: 'aurora' } }).container;
+    expect(aurora.querySelectorAll('.auth-fx-aurora span')).toHaveLength(3);
+  });
+  it('renders no effect layer by default or for none', () => {
+    show(base);
+    expect(document.querySelector('.auth-fx')).toBeNull();
+    show({ ...base, effects: { mode: 'none' } });
+    expect(document.querySelector('.auth-fx')).toBeNull();
+  });
 
 });
