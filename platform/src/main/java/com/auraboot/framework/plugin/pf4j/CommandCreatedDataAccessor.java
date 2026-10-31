@@ -22,6 +22,8 @@ public final class CommandCreatedDataAccessor extends DynamicDataAccessorImpl im
     private final MetaModelService models;
     private final Set<String> allowed;
     private final CommandPipelineContext.HandlerInvocationAuthorization invocation;
+    private final com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict authorization;
+    private final com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan plan;
     private final Long tenant, user, member;
     private final String actor;
     private final Thread thread = Thread.currentThread();
@@ -33,6 +35,7 @@ public final class CommandCreatedDataAccessor extends DynamicDataAccessorImpl im
         super(data);
         this.models=models; this.context=context; this.allowed=Set.copyOf(allowed);
         invocation=context.getHandlerInvocationAuthorization();
+        authorization=context.getAuthorizationVerdict(); plan=context.getPermitPlan();
         tenant=MetaContext.getCurrentTenantId(); user=MetaContext.getCurrentUserId();
         member=MetaContext.getCurrentMemberId(); actor=MetaContext.getCurrentUserPid();
         resources=Map.copyOf(TransactionSynchronizationManager.getResourceMap());
@@ -99,6 +102,26 @@ public final class CommandCreatedDataAccessor extends DynamicDataAccessorImpl im
                 || (MetaContext.getAuthorizedCommandCode()!=null
                     && !context.getCommandCode().equals(MetaContext.getAuthorizedCommandCode()))
                 || resources.entrySet().stream().anyMatch(e->TransactionSynchronizationManager.getResource(e.getKey())!=e.getValue())) throw denied();
+    }
+
+    boolean attestsAttachmentFrame(CommandPipelineContext expected) {
+        requireFrame();
+        return context == expected && context.getAuthorizationVerdict() == authorization && authorization.isAuthorized()
+                && context.getPermitPlan() == plan && plan.isPermitted()
+                && Boolean.TRUE.equals(context.getTargetRecordReadable()) && !context.getRequest().isDryRun()
+                && !MetaContext.hasCommandPermitScope()
+                && MetaContext.getAuthorizedCommandCode() == null;
+    }
+
+    void withAttachmentCreateWriter(String model, Runnable action) {
+        if (!attestsAttachmentFrame(context) || !allowed.contains(model) || model.equals(invocation.modelCode())) throw denied();
+        var definition=models.getModelDefinition(model).orElseThrow(CommandCreatedDataAccessor::denied);
+        if (!definition.isCommandOnlyCreate() || definition.getExtension()==null
+                || !(definition.getExtension().get("commandWriters") instanceof Map<?,?> writers)
+                || !(writers.get("create") instanceof List<?> codes)
+                || !codes.contains(context.getCommandCode())) throw denied();
+        MetaContext.runWithCommandCreateWriter(model, context.getCommandCode(),
+                () -> { requireFrame(); return true; }, () -> { action.run(); return null; });
     }
 
     @Override public Map<String,Object> create(String model,Map<String,Object> input) {

@@ -658,7 +658,8 @@ public class HandlerPhase implements CommandPhase {
         try (DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
              var commandCreates = com.auraboot.framework.plugin.pf4j.CommandCreatedDataAccessor.open(
                      dynamicDataService, metaModelService, pipelineContext, objectMapper)) {
-            var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext);
+            var fileScope = commandTargetFiles == null ? null : commandCreates == null ? commandTargetFiles.forCommand(pipelineContext)
+                    : commandTargetFiles.forCommand(pipelineContext, commandCreates);
             try (fileScope;
                  var sealedContentScope = sealedContentFactory == null ? null : sealedContentFactory.forCommand(pipelineContext);
                  var subjectScope = subjectAcknowledgements == null ? null : subjectAcknowledgements.forCommand(pipelineContext)) {
