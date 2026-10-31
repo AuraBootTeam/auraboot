@@ -4,11 +4,14 @@ export interface CommandRequestPolicy {
   versionField?: string;
   payloadFields?: string[];
   inputFieldsOnly?: boolean;
+  /** Explicit later actions start new intents only after a confirmed completed command. */
+  newIntentAfterSuccess?: boolean;
 }
 
 export interface CommandRequestIdentity {
   intent: string;
   clientRequestId: string;
+  completed?: boolean;
 }
 
 export function projectCommandPayload(
@@ -36,10 +39,13 @@ export function commandRequestMetadata(
   if (typeof version === 'number' && Number.isInteger(version) && version > 0) {
     metadata.expectedVersion = version;
   }
+  if (policy?.newIntentAfterSuccess === true && policy.idempotent !== true) {
+    throw new Error('A new-intent lifecycle requires an idempotent command request policy');
+  }
   if (!policy?.idempotent) return { metadata };
   const fingerprint = JSON.stringify(intent);
   const identity =
-    previous?.intent === fingerprint
+    previous?.intent === fingerprint && !(policy.newIntentAfterSuccess === true && previous.completed)
       ? previous
       : {
           intent: fingerprint,
@@ -47,6 +53,17 @@ export function commandRequestMetadata(
         };
   metadata.clientRequestId = identity.clientRequestId;
   return { metadata, identity };
+}
+
+/** Uncertain replies and ordinary policies keep the same identity; no transport is performed. */
+export function completeCommandRequestIdentity(
+  policy: CommandRequestPolicy | undefined,
+  identity: CommandRequestIdentity | undefined,
+  confirmedSuccess: boolean,
+): CommandRequestIdentity | undefined {
+  return policy?.newIntentAfterSuccess === true && confirmedSuccess === true && identity
+    ? { ...identity, completed: true }
+    : identity;
 }
 
 /** Dialog commands may declare their own payload contract without broadening sibling actions. */
