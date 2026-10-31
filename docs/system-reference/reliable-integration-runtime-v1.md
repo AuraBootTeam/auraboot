@@ -265,3 +265,35 @@ Each related or root operation reloads the authorized record version before the 
 supports multiple operations in one transaction without reusing the first operation's old version.
 The reliable consumer reconstructs the same machine principal after verifying the original durable
 receipt and envelope. Neither path clears machine context or impersonates a human member.
+
+## Managed installation binding lookup
+
+An installed provider may choose `handlerParams.installedIntegration.bindingLookup`
+instead of inline `bindings`; the two modes are mutually exclusive. Existing inline
+configuration, command hashes and receipt comparisons retain their previous behavior.
+The lookup declaration has version `1`, `modelCode`, `applicationField`,
+`installationField`, `revisionField`, `statusField`, a finite `allowedStatuses` array,
+`recordPidParameter`, and a `referenceReadFields` map. It is server-owned metadata,
+never an inbound payload resolver. Delegated human actor registrations cannot use it.
+
+The provider-owned current published physical command-managed model must expose
+immutable controlled application, installation and independent binding-revision
+fields. Selected storage must be fixed, nonvirtual, nonsystem and unaliased by any
+physical field or JSON host column. A readonly SDK query is constrained to the
+verified application, installation and allowed status, and must return exactly one
+current tenant record with a valid public PID and positive physical/binding versions.
+Missing retained projections are rejected; lookup never repairs or backfills data.
+
+`referenceReadFields` grants only validated canonical required-reference edges and
+target identity fields on current published models owned by the same provider.
+Managed invocation explicitly enables machine required-reference closure; ordinary
+and inline machine invocations remain disabled, including under an outer enabled
+scope. Every dependency still needs its own model, field and row decision through
+the original read path. Returned PID, tenant and original constraints are rechecked;
+missing/masked constraint fields fail closed. Temporary widened authority cannot
+prove the original restricted read. Existing cycle, depth and candidate budgets stay
+in force, and the same bounded root predicate governs data/count/cursor reads.
+
+Component evidence does not establish a native provider workflow: actual OAuth,
+installed configuration, SDK predicates, outbox delivery and revocation need their
+original real-stack runner evidence at the exact frozen source/artifact version.

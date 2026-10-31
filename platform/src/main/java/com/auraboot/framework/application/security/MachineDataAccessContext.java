@@ -63,16 +63,34 @@ public final class MachineDataAccessContext {
 
     private record ExpectedVersion(String modelCode, String recordPid, long version) { }
     private record State(ExternalMachineAuthenticator.MachinePrincipal principal, Map<String, Decision> decisions,
-                         ExpectedVersion expectedVersion) { }
+                         ExpectedVersion expectedVersion, boolean requiredReferenceReads,Object authorityIdentity) {
+        State(ExternalMachineAuthenticator.MachinePrincipal principal,Map<String,Decision> decisions,ExpectedVersion expectedVersion,boolean requiredReferenceReads) {
+            this(principal,decisions,expectedVersion,requiredReferenceReads,new Object());
+        }
+    }
 
     public static Scope begin(ExternalMachineAuthenticator.MachinePrincipal principal) {
         if (principal == null || principal.tenantId() == null || principal.subjectPid() == null) {
             throw new AccessDeniedException("Machine principal required");
         }
-        return enter(new State(principal, Map.of(), null));
+        return enter(new State(principal, Map.of(), null, false));
     }
 
     public static Scope authorize(Map<String, Decision> decisions) {
+        State state=CURRENT.get();
+        return authorize(decisions,state!=null && state.requiredReferenceReads());
+    }
+
+    /** Host-only opt-in: every required record still needs its own explicit model/field/row decision. */
+    public static Scope authorizeRequiredReferenceReads(Map<String, Decision> decisions) {
+        return authorize(decisions,true);
+    }
+    /** Legacy authority never inherits another invocation's optional reference-read mode. */
+    public static Scope authorizeWithoutRequiredReferenceReads(Map<String, Decision> decisions) {
+        return authorize(decisions,false);
+    }
+
+    private static Scope authorize(Map<String, Decision> decisions,boolean requiredReferenceReads) {
         State state = CURRENT.get();
         if (state == null) throw new AccessDeniedException("Machine request context required");
         decisions.forEach((model, decision) -> {
@@ -81,7 +99,12 @@ public final class MachineDataAccessContext {
                 throw new AccessDeniedException("Machine authority identity mismatch");
             }
         });
-        return enter(new State(state.principal(), Map.copyOf(decisions), null));
+        return enter(new State(state.principal(), Map.copyOf(decisions), null, requiredReferenceReads));
+    }
+
+    /** Opaque, invocation-local authority identity; never persisted or obtained from request data. */
+    public static Object requiredReferenceReadScope() {
+        State state=CURRENT.get();return state!=null && state.requiredReferenceReads()?state.authorityIdentity():null;
     }
 
     public static boolean isActive() { return CURRENT.get() != null; }
@@ -101,7 +124,7 @@ public final class MachineDataAccessContext {
         requireDecision(modelCode);
         if (recordPid == null || recordPid.isBlank() || version < 1) throw new IllegalArgumentException("Public CAS target/version required");
         State state = CURRENT.get();
-        return enter(new State(state.principal(), state.decisions(), new ExpectedVersion(modelCode, recordPid, version)));
+        return enter(new State(state.principal(), state.decisions(), new ExpectedVersion(modelCode, recordPid, version),state.requiredReferenceReads()));
     }
 
     public static Long expectedVersion(String modelCode, String recordPid) {

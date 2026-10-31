@@ -100,6 +100,53 @@ class InstalledIntegrationServiceTest {
         });
     }
     @AfterEach void clear() { MetaContext.clear(); }
+    void managedLookupConfig() throws Exception {
+        for(var command:metadata.values()) {
+            var config=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(command.getExecutionConfig());
+            var declaration=(com.fasterxml.jackson.databind.node.ObjectNode)config.path("handlerParams").path("installedIntegration");
+            declaration.remove("bindings");declaration.set("bindingLookup",json.valueToTree(Map.of("version",1,"modelCode","managed_registry",
+                    "applicationField","reg_application","installationField","reg_installation","revisionField","reg_revision","statusField","reg_status",
+                    "allowedStatuses",List.of("active"),"recordPidParameter","connectionPid","referenceReadFields",Map.of())));
+            command.setExecutionConfig(json.writeValueAsString(config));
+        }
+    }
+    void installationActorRegistration() {
+        var current=new Registration(source,registration.capability(),registration.eventTypes(),registration.requiredScope(),registration.commandPermission(),
+                registration.providerPluginId(),registration.commandOwnerPluginId(),accept,process,result);
+        when(registry.registration(source)).thenReturn(Optional.of(Map.entry(current,"sha256:"+"a".repeat(64))));
+    }
+    @Test void managedLookupUsesVerifiedPrincipalOwnerAndInjectsItsSelection() throws Exception {
+        installationActorRegistration();managedLookupConfig();var lookup=mock(InstalledIntegrationBindingLookup.class);service.setBindingLookup(lookup);
+        String record="00000000000000000000000003";
+        when(lookup.resolve(eq(principal),eq(registration.commandOwnerPluginId()),any())).thenReturn(new InstalledIntegrationBindingLookup.Selection(4,Map.of("connectionPid",record)));
+        when(executor.execute(eq(accept),any())).thenAnswer(call->{
+            var settings=new HashMap<String,Object>();InstalledIntegrationExecution.install(accept,42L,settings);
+            var installed=(InstalledIntegrationBinding)settings.get(InstalledIntegrationBinding.SETTINGS_KEY);
+            assertEquals(4,installed.bindingRevision());assertEquals(Map.of("connectionPid",record),installed.parameters());
+            assertEquals("inst",installed.installationPid());assertEquals("app",installed.applicationPid());
+            return CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","accepted")).build();
+        });
+        assertFalse(service.accept(principal,source,event()).duplicate());verify(lookup).resolve(eq(principal),eq(registration.commandOwnerPluginId()),any());
+    }
+    @Test void managedLookupCannotFallBackWhenReaderIsMissingOrHumanDelegationIsRequired() throws Exception {
+        managedLookupConfig();assertThrows(SecurityException.class,()->service.accept(principal,source,event()));
+        var lookup=mock(InstalledIntegrationBindingLookup.class);service.setBindingLookup(lookup);
+        assertThrows(SecurityException.class,()->service.accept(principal,source,event()));verifyNoInteractions(lookup);verify(receipts,never()).claim(any());
+        installationActorRegistration();assertThrows(SecurityException.class,()->service.accept(principal,source,event()));
+    }
+    @Test void inlineBindingKeepsItsExistingPathEvenWhenLookupReaderIsInstalled() {
+        var lookup=mock(InstalledIntegrationBindingLookup.class);service.setBindingLookup(lookup);
+        assertFalse(service.accept(principal,source,event()).duplicate());verifyNoInteractions(lookup);
+    }
+    @Test void inlineAndLookupDeclarationsCannotBeCombined() throws Exception {
+        var lookup=mock(InstalledIntegrationBindingLookup.class);service.setBindingLookup(lookup);
+        for(var command:metadata.values()) {
+            var config=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(command.getExecutionConfig());
+            ((com.fasterxml.jackson.databind.node.ObjectNode)config.path("handlerParams").path("installedIntegration")).set("bindingLookup",json.createObjectNode());
+            command.setExecutionConfig(json.writeValueAsString(config));
+        }
+        assertThrows(SecurityException.class,()->service.accept(principal,source,event()));verifyNoInteractions(lookup);verify(receipts,never()).claim(any());
+    }
     IntegrationEventEnvelope event() { return event(Map.of("title","Inquiry","selected",List.of(Map.of("requisitionId","10","entryId","11")))); }
     IntegrationEventEnvelope event(Map<String,Object> payload) {
         return new IntegrationEventEnvelope("1.0","ext:inst:"+source+":evt-1","external."+source+".inquiry.requested.v1",
