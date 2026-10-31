@@ -382,4 +382,11 @@ class RequiredRecordReadGuardTest {
         assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("budget");
         verifyNoInteractions(data);
     }
+    @Test void v2MutableOwnerRetainsEveryCurrentPermissionCheckAndNeverCarriesTerminalProofAcrossReads() {
+        when(models.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(RequiredReadReferencesTest.mutableDocument()));
+        allow();guard.require("fixture_bundle",root(9,id(1)));
+        doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(1));
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+        verify(data,times(2)).getById("fixture_member",id(1));
+    }
 }

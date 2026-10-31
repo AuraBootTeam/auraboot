@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.StreamReadConstraints;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Host-owned reference declarations, never client SQL or an alternative permission evaluator. */
+/** Host-owned reference declarations: V1 immutable rows, V2 fixed edges on governed documents. */
 final class RequiredReadReferences {
     static final String KEY = "requiredReadReferences";
     static final int MAX_REFERENCES = 4096;
@@ -62,7 +63,7 @@ final class RequiredReadReferences {
         if (model == null || model.getExtension() == null || !model.getExtension().containsKey(KEY)) return null;
         Object raw = model.getExtension().get(KEY);
         if (!(raw instanceof Map<?,?> map) || !map.keySet().equals(Set.of("version","references","maxCandidateRecords","minimumReferences"))
-                || integer(map.get("version")) != 1 || !model.isImmutable()
+                || !supportedOwner(model,integer(map.get("version")))
                 || model.getSourceType() != null && !"physical".equals(model.getSourceType())
                 || "view".equals(model.getModelType()) || model.getPrimaryKey() != null && !"pid".equals(model.getPrimaryKey())) throw invalid();
         int budget = integer(map.get("maxCandidateRecords"));
@@ -79,8 +80,38 @@ final class RequiredReadReferences {
                     || !(item.get("model") instanceof String target) || !identifier(target)
                     || !(item.get("many") instanceof Boolean many) || !(item.get("allowEmpty") instanceof Boolean empty)) throw invalid();
             fields.add(new Field(field,target,many,empty));
+            if(integer(map.get("version"))==2)requireFixedStorage(model,field,many);
         }
         return new Policy(budget,minimum,fields);
+    }
+    /** V1 is unchanged. V2 permits state changes while its authorization edges cannot change. */
+    private static boolean supportedOwner(ModelDefinition model,int version) {
+        if(version==1)return model.isImmutable();
+        if(version!=2 || !"document".equals(model.getModelCategory()) || !model.isCommandOnlyCreate())return false;
+        Object raw=model.getExtension().get("commandWriters");
+        if(!(raw instanceof Map<?,?> writers) || !writers.keySet().equals(Set.of("create","update","delete")))return false;
+        for(Object value:writers.values()) {
+            if(!(value instanceof List<?> codes) || codes.size()>32 || codes.stream().anyMatch(code->!(code instanceof String s)
+                    || s.isBlank() || s.length()>128) || new LinkedHashSet<>(codes).size()!=codes.size())return false;
+        }
+        return !((List<?>)writers.get("create")).isEmpty() && ((List<?>)writers.get("delete")).isEmpty();
+    }
+    private static void requireFixedStorage(ModelDefinition model,String code,boolean many) {
+        FieldDefinition field=model.getFields().stream().filter(f->code.equals(f.getCode())).findFirst().orElseThrow(RequiredReadReferences::invalid);
+        if(!field.isImmutable() || field.isVirtual() || field.isJsonbVirtual() || field.getDataType()==null
+                || !(many?Set.of("json","jsonb"):Set.of("string","reference")).contains(field.getDataType()))throw invalid();
+        String column=physicalColumn(field);
+        if(column==null || !identifier(column))throw invalid();
+        // An alternate writable name for the same storage would bypass the immutable edge.
+        for(FieldDefinition other:model.getFields()) {
+            if(other==field)continue;
+            String otherColumn=physicalColumn(other),jsonHost=other.getJsonbColumn();
+            if(otherColumn!=null && column.equalsIgnoreCase(otherColumn)
+                    || jsonHost!=null && column.equalsIgnoreCase(jsonHost))throw invalid();
+        }
+    }
+    private static String physicalColumn(FieldDefinition field) {
+        return field.getColumnName()==null || field.getColumnName().isBlank()?field.getCode():field.getColumnName();
     }
     private static int integer(Object value) {
         if (!(value instanceof Number number)) throw invalid();
