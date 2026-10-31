@@ -106,11 +106,19 @@ public final class CommandCreatedDataAccessor extends DynamicDataAccessorImpl im
 
     boolean attestsAttachmentFrame(CommandPipelineContext expected) {
         requireFrame();
-        return context == expected && context.getAuthorizationVerdict() == authorization && authorization.isAuthorized()
-                && context.getPermitPlan() == plan && plan.isPermitted()
-                && Boolean.TRUE.equals(context.getTargetRecordReadable()) && !context.getRequest().isDryRun()
-                && !MetaContext.hasCommandPermitScope()
+        return context == expected && attachmentWitnessValid() && !MetaContext.hasCommandPermitScope()
                 && MetaContext.getAuthorizedCommandCode() == null;
+    }
+
+    private boolean attachmentWitnessValid() {
+        return context.getAuthorizationVerdict() == authorization && authorization.isAuthorized()
+                && context.getPermitPlan() == plan && plan.isPermitted()
+                && Boolean.TRUE.equals(context.getTargetRecordReadable()) && !context.getRequest().isDryRun();
+    }
+
+    private void requireAttachmentFrame() {
+        requireFrame();
+        if (!attachmentWitnessValid()) throw denied();
     }
 
     void withAttachmentCreateWriter(String model, Runnable action) {
@@ -121,7 +129,9 @@ public final class CommandCreatedDataAccessor extends DynamicDataAccessorImpl im
                 || !(writers.get("create") instanceof List<?> codes)
                 || !codes.contains(context.getCommandCode())) throw denied();
         MetaContext.runWithCommandCreateWriter(model, context.getCommandCode(),
-                () -> { requireFrame(); return true; }, () -> { action.run(); return null; });
+                () -> { requireAttachmentFrame(); return true; }, () -> {
+                    action.run(); requireAttachmentFrame(); return null;
+                });
     }
 
     @Override public Map<String,Object> create(String model,Map<String,Object> input) {

@@ -164,6 +164,20 @@ class CommandTargetFileAccessorFactoryTest {
         verifyNoInteractions(files,relations);
     }
 
+    @Test void attachmentAuthorityInvalidatedDuringTheInternalReadRollsBackTheInvocation() {
+        try(var creates=readOnlyCreates();var scope=factory.forCommand(ctx,creates)) {
+            creates.create("child",Map.of("proof","file-pid"));
+            when(data.getById("child","new-child")).thenAnswer(i -> {
+                ctx.setTargetRecordReadable(false);
+                return Map.of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+            });
+            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
+                    .isInstanceOf(AccessDeniedException.class);
+            assertThat(((ConnectionHolder)TransactionSynchronizationManager.getResource(source)).isRollbackOnly()).isTrue();
+        }
+        verifyNoInteractions(files,relations);
+    }
+
     @Test void unreadableParentCannotInstallACreationAttachmentScope() {
         try(var creates=readOnlyCreates()) {
             ctx.setTargetRecordReadable(false);
