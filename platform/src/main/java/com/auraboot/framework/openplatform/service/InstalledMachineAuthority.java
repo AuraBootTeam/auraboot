@@ -27,8 +27,17 @@ final class InstalledMachineAuthority implements AutoCloseable {
                 || !Objects.equals(principal.applicationPid(),binding.applicationPid()))
             throw denied("Installed machine identity mismatch");
         Map<String,Fields> fields=new LinkedHashMap<>();
+        boolean managedReferences=false;
         try {
-            JsonNode contract=new ObjectMapper().readTree(config).path("handlerParams").path("installedMachineData");
+            JsonNode parameters=new ObjectMapper().readTree(config).path("handlerParams");
+            JsonNode declared=parameters.path("installedIntegration");
+            managedReferences=declared.has("bindingLookup");
+            if(managedReferences && (declared.has("bindings") || !declared.path("bindingLookup").isObject()
+                    || !declared.path("bindingLookup").path("version").isIntegralNumber()
+                    || !declared.path("bindingLookup").path("version").canConvertToInt()
+                    || declared.path("bindingLookup").path("version").intValue()!=1
+                    || !binding.sourceCode().equals(declared.path("sourceCode").asText())))throw denied("Invalid managed binding authority");
+            JsonNode contract=parameters.path("installedMachineData");
             if(!contract.isMissingNode()) {
                 if(!contract.isObject() || contract.size()>64) throw denied("Finite installed machine data contract required");
                 contract.fields().forEachRemaining(entry->{
@@ -48,15 +57,16 @@ final class InstalledMachineAuthority implements AutoCloseable {
         } catch(com.fasterxml.jackson.core.JsonProcessingException invalid) {
             throw new AccessDeniedException("Invalid installed machine data contract",invalid);
         }
-        return new InstalledMachineAuthority(fields,query);
+        return new InstalledMachineAuthority(fields,query,managedReferences);
     }
 
-    private InstalledMachineAuthority(Map<String,Fields> fields,boolean query) {
+    private InstalledMachineAuthority(Map<String,Fields> fields,boolean query,boolean managedReferences) {
         this.fields=Map.copyOf(fields); this.query=query;
         Map<String,MachineDataAccessContext.Decision> decisions=new LinkedHashMap<>();
         fields.forEach((model,policy)->decisions.put(model,decision(model,"read",policy.read(),Set.of(),List.of())));
         reads=Map.copyOf(decisions);
-        scope=MachineDataAccessContext.authorize(reads);
+        scope=managedReferences?MachineDataAccessContext.authorizeRequiredReferenceReads(reads)
+                :MachineDataAccessContext.authorizeWithoutRequiredReferenceReads(reads);
         CURRENT.set(this);
     }
 

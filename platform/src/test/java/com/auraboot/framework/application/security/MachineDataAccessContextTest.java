@@ -49,4 +49,28 @@ class MachineDataAccessContextTest {
         assertThat(MachineDataAccessContext.isActive()).isFalse();
         assertThat(MachineDataAccessContext.principal()).isNull();
     }
+    @Test void requiredReferenceReadsAreExplicitInvocationLocalAndRestoreLegacyAuthority() {
+        var decisions=Map.of("crm_customer",decision(7L,"installation"));
+        try(var request=MachineDataAccessContext.begin(principal())) {
+            assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isNull();
+            try(var legacy=MachineDataAccessContext.authorize(decisions)) {
+                assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isNull();
+                try(var approved=MachineDataAccessContext.authorizeRequiredReferenceReads(decisions)) {
+                    Object original=MachineDataAccessContext.requiredReferenceReadScope();
+                    assertThat(original).isNotNull();
+                    try(var same=MachineDataAccessContext.authorize(decisions)) {
+                        assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isNotSameAs(original).isNotNull();
+                    }
+                    assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isSameAs(original);
+                    try(var oldInvocation=MachineDataAccessContext.authorizeWithoutRequiredReferenceReads(decisions)) {
+                        assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isNull();
+                    }
+                    assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isSameAs(original);
+                }
+                assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isNull();
+            }
+        }
+        assertThat(MachineDataAccessContext.isActive()).isFalse();
+    }
+
 }

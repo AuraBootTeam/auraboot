@@ -97,6 +97,106 @@ class CommandTargetFileAccessorFactoryTest {
         }return null;});
         verify(files).lockRetention("file-pid");verify(relations).insert(any(FileRelationEntity.class));
     }
+    private CommandCreatedDataAccessor readOnlyCreates() {
+        ctx.getRequest().setTargetRecordId("order-pid");
+        ctx.getCommand().setTargetModels("[\"order\",\"child\"]");
+        ctx.setExecConfig(Map.of("handlerParams",Map.of("commandCreatedModels",List.of("child"),
+                "dslPersistence",false,"invocationAuthorization","handler-with-result-reads","targetRecordAction","read")));
+        ctx.setHandlerInvocationAuthorization(new CommandPipelineContext.HandlerInvocationAuthorization(
+                "order:repair","order","order-pid","read"));
+        field = FieldDefinition.builder().code("proof").columnName("proof").dataType("file").immutable(true)
+                .allowedWriterCommands(List.of("order:repair")).build();
+        model = ModelDefinition.builder().code("child").status("published").tableName("mt_child")
+                .commandOnlyCreate(true).immutable(true).fields(List.of(field))
+                .extension(Map.of("commandWriters",Map.of("create",List.of("order:repair"),
+                        "update",List.of("other:update"),"delete",List.of("other:delete")))).build();
+        when(models.getModelDefinition("child")).thenReturn(Optional.of(model));
+        var row=Map.<String,Object>of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+        when(data.create(eq("child"),anyMap())).thenReturn(row);
+        when(data.getById("child","new-child")).thenReturn(row);
+        when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("physical-tx");
+        return CommandCreatedDataAccessor.open(data,models,ctx,new com.fasterxml.jackson.databind.ObjectMapper());
+    }
+
+    @Test void readonlyCommandRetainsOnlyItsAttestedNewRecordWithoutRootWriteAuthority() {
+        try(var creates=readOnlyCreates();var scope=factory.forCommand(ctx,creates)) {
+            assertThat(scope).isNotNull();
+            creates.create("child",Map.of("proof","file-pid"));
+            when(data.getById("child","new-child")).thenAnswer(i -> {
+                assertThat(MetaContext.getCommandPermitScopeFor("unrelated")).isNull();
+                assertThat(MetaContext.getCommandPermitTargetFor("child")).isEqualTo("new-child");
+                assertThat(MetaContext.getAuthorizedCommandCode()).isNull();
+                return Map.of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+            });
+            scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof");
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            assertThat(MetaContext.getAuthorizedCommandCode()).isNull();
+            assertThat(MetaContext.isCommandCreateWriter("child","order:repair")).isFalse();
+            assertThatThrownBy(()->scope.accessor().appendAndRetainExistingToTarget("file-pid","photos"))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        verify(files).lockRetention("file-pid");verify(relations).insert(any(FileRelationEntity.class));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"uncreated","wrongFile","unlisted","changedWriter","closedCreates","actor","transaction","invocation","unreadable","verdict","plan","dryRun"})
+    void readonlyCreationAttachmentRefusesEscapedOrUnattestedAuthority(String boundary) {
+        try(var creates=readOnlyCreates();var scope=factory.forCommand(ctx,creates)) {
+            if (!boundary.equals("uncreated")) creates.create("child",Map.of("proof","file-pid"));
+            String requestedFile=boundary.equals("wrongFile")?"other-file":"file-pid";
+            String requestedModel=boundary.equals("unlisted")?"other":"child";
+            switch(boundary) {
+                case "changedWriter" -> model.setExtension(Map.of("commandWriters",Map.of("create",List.of("other:create"))));
+                case "closedCreates" -> creates.close();
+                case "actor" -> MetaContext.setMemberId(99L);
+                case "transaction" -> when(fileMapper.currentPhysicalTransactionIdentity()).thenReturn("other-tx");
+                case "invocation" -> ctx.setHandlerInvocationAuthorization(null);
+                case "unreadable" -> ctx.setTargetRecordReadable(false);
+                case "verdict" -> ctx.setAuthorizationVerdict(null);
+                case "plan" -> ctx.setPermitPlan(null);
+                case "dryRun" -> ctx.getRequest().setDryRun(true);
+                default -> { }
+            }
+            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord(requestedFile,requestedModel,"new-child","proof"))
+                    .isInstanceOf(AccessDeniedException.class);
+            assertThat(((ConnectionHolder)TransactionSynchronizationManager.getResource(source)).isRollbackOnly()).isTrue();
+        }
+        verifyNoInteractions(files,relations);
+    }
+
+    @Test void attachmentAuthorityInvalidatedDuringTheInternalReadRollsBackTheInvocation() {
+        try(var creates=readOnlyCreates();var scope=factory.forCommand(ctx,creates)) {
+            creates.create("child",Map.of("proof","file-pid"));
+            when(data.getById("child","new-child")).thenAnswer(i -> {
+                ctx.setTargetRecordReadable(false);
+                return Map.of("pid","new-child","tenant_id",1L,"created_by",42L,"row_version",1L,"proof","file-pid");
+            });
+            assertThatThrownBy(()->scope.accessor().linkAndRetainExistingToCreatedRecord("file-pid","child","new-child","proof"))
+                    .isInstanceOf(AccessDeniedException.class);
+            assertThat(((ConnectionHolder)TransactionSynchronizationManager.getResource(source)).isRollbackOnly()).isTrue();
+        }
+        verifyNoInteractions(files,relations);
+    }
+
+    @Test void unreadableParentCannotInstallACreationAttachmentScope() {
+        try(var creates=readOnlyCreates()) {
+            ctx.setTargetRecordReadable(false);
+            assertThat(factory.forCommand(ctx,creates)).isNull();
+        }
+        verifyNoInteractions(files,relations);
+    }
+
+    @Test void readonlyCreationAttachmentRequiresTheSameContextAndCannotBorrowAnotherWriter() {
+        try(var creates=readOnlyCreates()) {
+            assertThat(factory.forCommand(CommandPipelineContext.builder().build(),creates)).isNull();
+            MetaContext.runWithCommandPermitPlan("TARGET",2L,"order","order-pid",()-> {
+                MetaContext.runWithAuthorizedCommandCode("other:write",()->assertThat(factory.forCommand(ctx,creates)).isNull());
+            });
+            assertThat(factory.forCommand(ctx)).isNull();
+        }
+        verifyNoInteractions(files,relations);
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"physicalTx","rollbackOnly","closedConnection","readOnlyConnection","autoCommit","closedScope","thread","actor","tenant","nested","otherCommand"})
     void createdReceiptCannotOutliveItsOriginalAuthority(String invalidation) throws Exception {

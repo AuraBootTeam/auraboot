@@ -118,7 +118,10 @@ public class RequiredRecordReadGuard {
             else REFERENCE_READ_DEPTH.set(previous);
         }
     }
-    private record Actor(Long tenant, Long user, Long member) { }
+    private record Actor(Long tenant, Long user, Long member,
+                         com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal machine,Object machineScope) {
+        Actor(Long tenant,Long user,Long member) {this(tenant,user,member,null,null);}
+    }
     private static final class Traversal {
         final Actor actor; final Set<RequiredReadReferences.Reference> path = new HashSet<>(); int reads;
         final Set<RequiredReadReferences.Reference> terminals = new HashSet<>();
@@ -140,6 +143,11 @@ public class RequiredRecordReadGuard {
         try {return RequiredReadReferences.policy(models.getModelDefinition(modelCode).orElse(null)) != null;}
         catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
     }
+    /** Exact fixed-edge fields from the same validated policy used by physical record reads. */
+    public static Set<String> requiredReferenceFields(com.auraboot.framework.meta.dto.ModelDefinition model) {
+        var policy=RequiredReadReferences.policy(model);
+        return policy==null?Set.of():policy.fields().stream().map(RequiredReadReferences.Field::field).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
     public void require(String modelCode, Map<String,Object> record) {
         try {requireInternal(modelCode,record);}
         catch(RuntimeException | Error failure) {invalidateCanonicalRead();throw failure;}
@@ -150,6 +158,10 @@ public class RequiredRecordReadGuard {
         var model=models.getModelDefinition(modelCode).orElse(null);
         var policy=RequiredReadReferences.policy(model); if(policy==null) return;
         var actor=actor(); var traversal=current.get(); boolean owner=traversal==null;
+        if(actor.machine()!=null) {
+            var decision=MachineDataAccessContext.requireDecision(modelCode);decision.requireAction("read");
+            if(!decision.permits(record) || !decision.readableFields().containsAll(policy.fields().stream().map(RequiredReadReferences.Field::field).toList()))throw denied();
+        }
         if(owner) { traversal=new Traversal(actor); current.set(traversal); }
         // SQL scans share the work budget, but never a completed read between root candidates.
         boolean root=traversal.path.isEmpty();
@@ -170,7 +182,10 @@ public class RequiredRecordReadGuard {
                 for(var reference:references) {
                     if(++traversal.reads>RequiredReadReferences.MAX_REFERENCES) throw new MetaServiceException("Required-read reference budget exceeded");
                     if(!actor.equals(actor())) throw denied();
-                    if(!permissions.canAction(actor.member(),reference.model(),"read")) throw denied();
+                    MachineDataAccessContext.Decision referenceDecision=null;
+                    if(actor.machine()!=null) {
+                        referenceDecision=MachineDataAccessContext.requireDecision(reference.model());referenceDecision.requireAction("read");
+                    } else if(!permissions.canAction(actor.member(),reference.model(),"read")) throw denied();
                     // Only leaf nodes have no omitted descendant work/depth. Mutable or virtual
                     // records and every nonterminal still use the ordinary read on every edge.
                     boolean terminal=immutablePhysicalTerminal(reference);
@@ -178,6 +193,9 @@ public class RequiredRecordReadGuard {
                     // Remove only the outer row permit. Identity and the exact writer/version plan are restored by Core.
                     var loaded=readReference(reference);
                     if(loaded==null) throw denied();
+                    if(actor.machine()!=null && (!actor.equals(actor()) || !reference.pid().equals(loaded.get("pid"))
+                            || !actor.tenant().toString().equals(String.valueOf(loaded.get("tenant_id")))
+                            || !referenceDecision.permits(loaded)))throw denied();
                     // A nested guard alone is not success: masking and the rest of getById must finish.
                     if(terminal) traversal.terminals.add(reference);
                 }
@@ -211,11 +229,16 @@ public class RequiredRecordReadGuard {
         var policy=RequiredReadReferences.policy(model); if(policy==null) return "";
         var actor=actor();
         if(!actor.tenant().equals(tenantId) || !actor.user().equals(userId)) throw denied();
+        if(actor.machine()!=null) {
+            var request=com.auraboot.framework.meta.dto.DynamicQueryRequest.builder().conditions(conditions).keyword(keyword).build();
+            MachineDataAccessGuards.requireQueryFields(modelCode,request);
+        }
         var query=queries.buildConditionQuery(model,conditions);
         if(keyword!=null && !keyword.isBlank()) query=queries.buildKeywordSearch(query,keyword,model);
         query.addCondition("tenant_id",QueryCondition.Operator.EQ.name(),tenantId);
+        if(actor.machine()!=null)MachineDataAccessGuards.constrain(modelCode,query);
         if(baseRowFilter!=null && !baseRowFilter.isBlank()) query.addRawCondition(baseRowFilter);
-        String domain=applyDomain ? domains.buildDomainFilter(modelCode,userId) : null;
+        String domain=applyDomain && actor.machine()==null ? domains.buildDomainFilter(modelCode,userId) : null;
         if(domain!=null && !domain.isBlank()) query.addRawCondition(domain);
         query.setLimit(policy.maxCandidates()+1).setOffset(0);
         var validation=queries.validateQuery(query);
@@ -250,7 +273,14 @@ public class RequiredRecordReadGuard {
         return "AND pid IN ("+permitted.stream().map(pid->"'"+pid+"'").collect(java.util.stream.Collectors.joining(","))+")";
     }
     private static Actor actor() {
-        if(!MetaContext.exists() || MachineDataAccessContext.isActive()) throw denied();
+        if(!MetaContext.exists()) throw denied();
+        if(MachineDataAccessContext.isActive()) {
+            var principal=MachineDataAccessContext.principal();var scope=MachineDataAccessContext.requiredReferenceReadScope();
+            if(scope==null || principal==null || principal.tenantId()==null || principal.tenantId()<=0
+                    || !principal.tenantId().equals(MetaContext.getCurrentTenantId())
+                    || !Long.valueOf(0L).equals(MetaContext.getCurrentUserId()) || MetaContext.getCurrentMemberId()!=null)throw denied();
+            return new Actor(principal.tenantId(),0L,null,principal,scope);
+        }
         var actor=new Actor(MetaContext.getCurrentTenantId(),MetaContext.getCurrentUserId(),MetaContext.getCurrentMemberId());
         if(actor.tenant()==null || actor.tenant()<=0 || actor.user()==null || actor.user()<=0 || actor.member()==null || actor.member()<=0) throw denied();
         return actor;

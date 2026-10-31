@@ -58,4 +58,68 @@ class RequiredReadReferencesTest {
         declaration.put("minimumReferences",0);
         assertThatThrownBy(()->RequiredReadReferences.policy(model)).isInstanceOf(MetaServiceException.class);
     }
+    static ModelDefinition mutableDocument() {
+        var result=model(10);result.setImmutable(false);result.setModelCategory("document");result.setCommandOnlyCreate(true);
+        result.getFields().get(2).setImmutable(true);
+        var policy=new LinkedHashMap<String,Object>();
+        ((Map<?,?>)result.getExtension().get(RequiredReadReferences.KEY)).forEach((k,v)->policy.put((String)k,v));policy.put("version",2);
+        result.setExtension(Map.of(RequiredReadReferences.KEY,policy,"commandWriters",Map.of("create",List.of("fixture:create"),"update",List.of("fixture:advance"),"delete",List.of())));
+        return result;
+    }
+    @Test void explicitV2AllowsMutableStateButOnlyFixedStoredReferenceClosure() {
+        var model=mutableDocument();
+        assertThat(RequiredReadReferences.policy(model).references(Map.of("members",List.of(id(1))))).containsExactly(new RequiredReadReferences.Reference("fixture_member",id(1)));
+        assertThat(model.isImmutable()).isFalse();
+    }
+    @Test void v2RejectsMutableConditionalNumericAndVirtualReferenceFields() {
+        for(String variant:List.of("mutable","conditional","numeric","transient","computed","materialized","jsonb","unknown")) {
+            var model=mutableDocument();var field=model.getFields().get(2);
+            switch(variant) {
+                case "mutable" -> field.setImmutable(false);
+                case "conditional" -> {field.setImmutable(false);field.setImmutableWhen(new FieldDefinition.ImmutableWhen());}
+                case "numeric" -> field.setDataType("long");
+                case "unknown" -> field.setDataType(null);
+                case "jsonb" -> {field.setJsonbColumn("extension");field.setJsonbPath("members");}
+                default -> field.setVirtualType(variant.equals("computed")?"computed_readonly":variant);
+            }
+            assertThatThrownBy(()->RequiredReadReferences.policy(model)).as(variant).isInstanceOf(MetaServiceException.class);
+        }
+    }
+    @Test void v2RejectsUncontrolledCreationDeletionAndNonDocumentOwners() {
+        for(String variant:List.of("create","delete","generic","category")) {
+            var model=mutableDocument();var ext=new LinkedHashMap<>(model.getExtension());
+            if(variant.equals("generic"))model.setCommandOnlyCreate(false);
+            else if(variant.equals("category"))model.setModelCategory("master");
+            else ext.put("commandWriters",Map.of("create",variant.equals("create")?List.of():List.of("fixture:create"),"update",List.of(),"delete",variant.equals("delete")?List.of("fixture:delete"):List.of()));
+            model.setExtension(ext);assertThatThrownBy(()->RequiredReadReferences.policy(model)).as(variant).isInstanceOf(MetaServiceException.class);
+        }
+    }
+    @Test void v2RejectsWritableAliasesOfReferenceStorageAndRetainsMissingRecordDenial() {
+        for(boolean jsonAlias:List.of(false,true)) {
+            var model=mutableDocument();var fields=new java.util.ArrayList<>(model.getFields());
+            var alias=FieldDefinition.builder().code("alias").columnName(jsonAlias?"alias":"members").dataType("string").build();
+            if(jsonAlias){alias.setJsonbColumn("members");alias.setJsonbPath("nested");}
+            fields.add(alias);model.setFields(fields);
+            assertThatThrownBy(()->RequiredReadReferences.policy(model)).isInstanceOf(MetaServiceException.class);
+        }
+        var policy=RequiredReadReferences.policy(mutableDocument());
+        assertThatThrownBy(()->policy.references(Map.of())).isInstanceOf(MetaServiceException.class);
+        var hidden=new java.util.HashMap<String,Object>();hidden.put("members",null);
+        assertThatThrownBy(()->policy.references(hidden)).isInstanceOf(MetaServiceException.class);
+    }
+    @Test void v2ScalarPidEdgesSupportStringAndReferenceButNeverAlternateSourcesOrPrimaryKeys() {
+        for(String kind:List.of("string","reference")) {
+            var model=mutableDocument();model.getFields().get(2).setDataType(kind);
+            var ext=new LinkedHashMap<>(model.getExtension());var declaration=new LinkedHashMap<String,Object>();
+            ((Map<?,?>)ext.get(RequiredReadReferences.KEY)).forEach((k,v)->declaration.put((String)k,v));
+            declaration.put("references",List.of(Map.of("field","members","model","fixture_member","many",false,"allowEmpty",false)));
+            ext.put(RequiredReadReferences.KEY,declaration);model.setExtension(ext);
+            assertThat(RequiredReadReferences.policy(model).references(Map.of("members",id(1)))).hasSize(1);
+        }
+        for(String variant:List.of("source","key","view")) {
+            var model=mutableDocument();
+            switch(variant){case "source" -> model.setSourceType("remote");case "key" -> model.setPrimaryKey("external_key");default -> model.setModelType("view");}
+            assertThatThrownBy(()->RequiredReadReferences.policy(model)).isInstanceOf(MetaServiceException.class);
+        }
+    }
 }

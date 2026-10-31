@@ -35,6 +35,12 @@ public class InstalledIntegrationService {
     private final com.auraboot.framework.tenant.service.TenantMemberService members;
     private final ObjectMapper json;
     private final OpenPlatformSecretCodec codec;
+    private InstalledIntegrationBindingLookup bindingLookup;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setBindingLookup(InstalledIntegrationBindingLookup bindingLookup) {
+        this.bindingLookup=Objects.requireNonNull(bindingLookup);
+    }
 
     record Resolved(Registration registration, String artifact, InstalledIntegrationBinding binding,
                     Map<String,String> configs, Map<String,Object> handlers, String bindingHash, String commandHash, Set<String> completedCommandHashes, String conflictMessageKey) {}
@@ -82,11 +88,9 @@ public class InstalledIntegrationService {
                     || !config.path("handler").asText().equals(code)
                     || config.path("handlerParams").path("async").asBoolean(false)) throw denied();
             JsonNode declared = config.path("handlerParams").path("installedIntegration");
-            if (!declared.isObject() || !(keys(declared).equals(Set.of("sourceCode","capability","bindings"))
-                        || keys(declared).equals(Set.of("sourceCode","capability","bindings","conflictMessageKey")))
+            if (!declared.isObject() || !bindingDeclaration(declared)
                     || !source.equals(declared.path("sourceCode").asText())
-                    || !registration.capability().equals(declared.path("capability").asText())
-                    || !declared.path("bindings").isArray() || declared.path("bindings").size() > 1000) throw denied();
+                    || !registration.capability().equals(declared.path("capability").asText())) throw denied();
             if (declared.has("conflictMessageKey") && (!declared.get("conflictMessageKey").isTextual()
                     || !declared.get("conflictMessageKey").asText().matches("[a-z][a-zA-Z0-9_.-]{2,159}"))) throw denied();
             if (common != null && !common.equals(declared)) throw denied();
@@ -98,18 +102,28 @@ public class InstalledIntegrationService {
             approvedHandlers.put(code,handler);
             configs.put(code, command.getExecutionConfig());
         }
-        JsonNode selected = null;
-        Set<String> unique = new HashSet<>();
-        for (JsonNode binding : common.path("bindings")) {
-            if (!keys(binding).equals(Set.of("installationPid","revision","parameters"))
-                    || !binding.path("installationPid").isTextual()
-                    || !unique.add(binding.path("installationPid").asText())
-                    || !binding.path("revision").isIntegralNumber() || !binding.path("revision").canConvertToLong()
-                    || binding.path("revision").asLong() <= 0 || !binding.path("parameters").isObject()) throw denied();
-            if (principal.installationPid().equals(binding.path("installationPid").asText())) selected = binding;
+        long bindingRevision;
+        Map<String,Object> parameters;
+        if(common.has("bindingLookup")) {
+            if(bindingLookup==null || registration.serverActorParameter()!=null)throw denied();
+            var selected=bindingLookup.resolve(principal,registration.commandOwnerPluginId(),common.get("bindingLookup"));
+            if(selected==null)throw denied();
+            bindingRevision=selected.revision();parameters=selected.parameters();
+        } else {
+            JsonNode selected = null;
+            Set<String> unique = new HashSet<>();
+            for (JsonNode binding : common.path("bindings")) {
+                if (!keys(binding).equals(Set.of("installationPid","revision","parameters"))
+                        || !binding.path("installationPid").isTextual()
+                        || !unique.add(binding.path("installationPid").asText())
+                        || !binding.path("revision").isIntegralNumber() || !binding.path("revision").canConvertToLong()
+                        || binding.path("revision").asLong() <= 0 || !binding.path("parameters").isObject()) throw denied();
+                if (principal.installationPid().equals(binding.path("installationPid").asText())) selected = binding;
+            }
+            if (selected == null) throw denied();
+            @SuppressWarnings("unchecked") Map<String,Object> converted = json.convertValue(selected.get("parameters"), Map.class);
+            bindingRevision=selected.get("revision").asLong();parameters=converted;
         }
-        if (selected == null) throw denied();
-        @SuppressWarnings("unchecked") Map<String,Object> parameters = json.convertValue(selected.get("parameters"), Map.class);
         if (registration.serverActorParameter() != null) {
             Object actor = parameters.get(registration.serverActorParameter());
             if (!(actor instanceof String pid) || pid.isBlank()) throw denied();
@@ -123,7 +137,7 @@ public class InstalledIntegrationService {
                     || !Boolean.FALSE.equals(member.getDeletedFlag())) throw denied();
         }
         InstalledIntegrationBinding binding = new InstalledIntegrationBinding(principal.tenantId(), principal.applicationPid(),
-                principal.installationPid(), source, eventId, durableId, selected.get("revision").asLong(), parameters);
+                principal.installationPid(), source, eventId, durableId, bindingRevision, parameters);
         return new Resolved(registration, entry.getValue(), binding, Map.copyOf(configs), Map.copyOf(approvedHandlers), hash(binding),
                 commandHash(registration,configs),
                 registry.completedReceiptRegistrations(source).stream()
@@ -309,6 +323,13 @@ public class InstalledIntegrationService {
         // Sets have no stable JVM iteration order; preserve legacy record layout and sort only this set.
         declaration.set("eventTypes",json.valueToTree(registration.eventTypes().stream().sorted().toList()));
         return hash(Map.of("registration",declaration,"configs",configs));
+    }
+    private boolean bindingDeclaration(JsonNode declaration) {
+        Set<String> fields=keys(declaration);
+        boolean inline=fields.equals(Set.of("sourceCode","capability","bindings")) || fields.equals(Set.of("sourceCode","capability","bindings","conflictMessageKey"));
+        if(inline)return declaration.path("bindings").isArray() && declaration.path("bindings").size()<=1000;
+        boolean lookup=fields.equals(Set.of("sourceCode","capability","bindingLookup")) || fields.equals(Set.of("sourceCode","capability","bindingLookup","conflictMessageKey"));
+        return lookup && declaration.path("bindingLookup").isObject();
     }
     String hash(Object value) {
         try { return codec.sha256(json.copy().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS,true).writeValueAsString(value)); }
