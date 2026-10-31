@@ -334,7 +334,7 @@ export function renderSubTableView({
             }
           >
             {col.label ? getLocalizedText(col.label, locale, t) : resolveColumnLabel(col.field)}
-            {col.required && <span className="text-status-red ml-0.5">*</span>}
+            {isEditable && col.required && <span className="text-status-red ml-0.5">*</span>}
           </th>
         ))}
         {hasActions && (

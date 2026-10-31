@@ -90,6 +90,13 @@ function buildConfig(overrides?: Partial<SubTableConfig>): SubTableConfig {
 }
 
 describe('SubTableViewer', () => {
+  it.each([false, true])('shows required header markers only when the table is editable (%s)', async (isEditable) => {
+    fetchResultMock.mockResolvedValue({code: '0', data: {records: []}});
+    render(<SubTableViewer config={buildConfig({readOnly: !isEditable, columns: [{field: 'name', label: 'Name', required: true}]})}
+      parentRecordPid="record-1" isEditable={isEditable} />);
+    const header = await screen.findByRole('columnheader', {name: /Name/});
+    expect(header.textContent?.includes('*')).toBe(isEditable);
+  });
   beforeEach(() => {
     fetchResultMock.mockReset();
     navigateMock.mockReset();
