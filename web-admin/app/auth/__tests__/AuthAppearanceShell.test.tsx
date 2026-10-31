@@ -45,7 +45,8 @@ describe('authentication appearance presentation', () => {
     const img = container.querySelector('.auth-background img')!;
     fireEvent.error(img);
     expect(container.querySelector('.auth-background img')).toBeNull();
-    expect(screen.getByText('School')).toBeVisible();
+    // The background template renders the brand story and the compact card brand.
+    expect(screen.getAllByText('School').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
   });
   it('does not render the story in centered mode', () => {

@@ -18,8 +18,8 @@
 .auth-brand-headline span { display: inline; margin-inline-start: 0.35em; text-decoration: underline; text-decoration-color: var(--auth-accent); text-underline-offset: 0.15em; }
 .auth-brand-lead { margin-top: 1rem; max-width: 34rem; line-height: 1.7; overflow-wrap: anywhere; }
 .auth-brand-hero { margin-top: 1.5rem; max-width: 100%; max-height: 12rem; object-fit: contain; align-self: flex-start; }
-.auth-brand-features { margin-top: 1.5rem; padding: 0; list-style: none; }
-.auth-brand-features li { padding-block: 0.75rem; border-bottom: 1px solid var(--auth-border); overflow-wrap: anywhere; }
+.auth-brand-features { margin-top: 1.5rem; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; max-width: 34rem; }
+.auth-brand-features li { padding: 0.375rem 0.875rem; border: 1px solid var(--auth-border); border-radius: 999px; font-size: 0.875rem; background: color-mix(in srgb, var(--auth-bg-text) 7%, transparent); }
 .auth-form-region { display: flex; justify-content: center; align-items: center; min-width: 0; padding: 2rem; }
 .auth-card { width: 100%; max-width: 28rem; padding: 2rem; background: var(--auth-panel); color: var(--auth-text); border: 1px solid var(--auth-border); border-radius: var(--auth-radius, var(--radius-card, 10px)); box-shadow: var(--shadow-card); }
 .auth-compact-brand { margin-bottom: 1.5rem; }
