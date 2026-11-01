@@ -292,7 +292,7 @@ configurations {
 
 }
 
-def jacocoToolVersion = '0.8.14'
+def jacocoToolVersion = '0.8.16'
 
 dependencies {
     testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
