@@ -37,7 +37,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.3.1'
     implementation 'com.networknt:json-schema-validator:1.5.9'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.10.0'
     implementation 'org.apache.poi:poi:5.5.1'
     implementation 'org.apache.poi:poi-ooxml:5.5.1'
     implementation 'org.apache.poi:poi-scratchpad:5.5.1'
