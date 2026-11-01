@@ -177,6 +177,15 @@ check {
 
 apply from: rootProject.file('gradle/platform-testing.gradle')
 apply from: rootProject.file('gradle/platform-app-test-dependencies.gradle')
+
+// Native E2E identity preparation explicitly opts into test-only HTTP fixtures.
+// Keep this artifact out of normal tests, application runtime and publication.
+if (providers.gradleProperty('includeE2eFixtureSupport').map { it.toBoolean() }.getOrElse(false)) {
+    dependencies {
+        testRuntimeOnly files(rootProject.tasks.named('e2eFixtureSupportJar'))
+    }
+}
+
 dependencies {
     testImplementation project(':platform-agent')
     testImplementation testFixtures(project(':'))

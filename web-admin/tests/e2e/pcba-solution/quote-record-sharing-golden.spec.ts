@@ -36,7 +36,8 @@ test.beforeAll(async ({}, testInfo) => {
       // Force only the seed test to execute. Recompiling every dependency inside
       // beforeAll consumes its bounded browser budget; Gradle still rebuilds changed inputs.
       const child = spawn(process.execPath, [path.join(workspace, 'aura'), 'gradle', runtime,
-        '--project', project, '--', ':test', '--rerun', '--tests',
+        '--project', project, '--', ':platform-app:test', '--rerun',
+        '-PincludeE2eFixtureSupport=true', '--tests',
         'com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.seed_createsTestTenantAndUser',
         '--no-daemon', '--no-build-cache'], {
         cwd: project,
@@ -54,7 +55,7 @@ test.beforeAll(async ({}, testInfo) => {
         `Managed foreign identity preparation failed (${code}); evidence: ${logPath}`)));
     });
   } finally { log.end(); }
-  const receipt = path.join(project, 'build/test-results/test/TEST-com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.xml');
+  const receipt = path.join(project, 'platform-app/build/test-results/test/TEST-com.auraboot.framework.integration.test.TestSeedControllerIntegrationTest.xml');
   expect(statSync(receipt).mtimeMs).toBeGreaterThanOrEqual(started);
   const xml = readFileSync(receipt, 'utf8');
   const header = xml.match(/<testsuite\b[^>]*>/)?.[0] ?? '';

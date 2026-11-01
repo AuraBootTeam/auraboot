@@ -184,12 +184,12 @@ test.describe('PCBA quote minimal create regression', () => {
       await waitForFormReady(page, 20_000);
       await page.getByTestId('select-trigger-qo_quote_crm_account_id').click();
       await page.getByTestId('select-create-new-qo_quote_crm_account_id').click();
-      const customerDialog = page.getByRole('dialog', { name: '新建', exact: true });
+      const customerDialog = page.getByRole('dialog', { name: '新建客户表单', exact: true });
       await expect(customerDialog).toBeVisible();
-      await customerDialog.getByTestId('form-field-crm_acc_name').locator('input').fill(accountName);
+      await customerDialog.getByRole('textbox', { name: '客户名称', exact: true }).fill(accountName);
       const customerResponse = page.waitForResponse((response) =>
         response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/crm:create_account'));
-      await customerDialog.getByTestId('form-btn-submit').click();
+      await customerDialog.getByRole('button', { name: '保存', exact: true }).click();
       const customerCreated = await customerResponse;
       expect(customerCreated.ok()).toBe(true);
       const customerBody = await customerCreated.json();
@@ -204,13 +204,13 @@ test.describe('PCBA quote minimal create regression', () => {
 
       await page.getByTestId('select-trigger-qo_quote_project_id').click();
       await page.getByTestId('select-create-new-qo_quote_project_id').click();
-      const projectDialog = page.getByRole('dialog', { name: '新建', exact: true });
+      const projectDialog = page.getByRole('dialog', { name: '新建BOM 项目', exact: true });
       await expect(projectDialog).toBeVisible();
-      await expect(projectDialog.getByTestId('select-trigger-bom_project_customer_id')).toContainText(accountName);
-      await projectDialog.getByTestId('form-field-bom_project_name').locator('input').fill(projectName);
+      await expect(projectDialog.getByRole('combobox', { name: '客户', exact: true })).toContainText(accountName);
+      await projectDialog.getByRole('textbox', { name: '项目名称', exact: true }).fill(projectName);
       const projectResponse = page.waitForResponse((response) =>
         response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/bom:create_project'));
-      await projectDialog.getByTestId('form-btn-create').click();
+      await projectDialog.getByRole('button', { name: '保存', exact: true }).click();
       const projectCreated = await projectResponse;
       expect(projectCreated.ok()).toBe(true);
       const projectPayload = projectCreated.request().postDataJSON();
@@ -534,7 +534,7 @@ test.describe('PCBA quote minimal create regression', () => {
       const materialRow = page.getByRole('row').filter({ hasText: path.basename(cplFixture) });
       await expect(materialRow).toBeVisible();
       const uploadedAt = materialRow.getByRole('cell').nth(4);
-      await expect(uploadedAt).toHaveText(/\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}:\d{2}/);
+      await expect(uploadedAt).toHaveText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
       await expect(uploadedAt).not.toContainText(/\d{4}-\d{2}-\d{2}T/);
       const fileLink = materialRow.getByRole('link', { name: '下载文件', exact: true });
       const fileHref = await fileLink.getAttribute('href');
