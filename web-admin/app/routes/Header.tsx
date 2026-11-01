@@ -292,12 +292,14 @@ export default function Header({
             )}
 
             {/* Unified inbox entry point */}
-            {!simplified && showNotifications && <InboxHeaderWidget key={notificationScope} />}
+            {!simplified && showNotifications && (
+              <InboxHeaderWidget key={`inbox:${notificationScope}`} />
+            )}
 
             {/* Notification centre bell (unread badge + SSE live updates) */}
             {!simplified && showNotifications && (
               <NotificationHeaderWidget
-                key={notificationScope}
+                key={`notifications:${notificationScope}`}
                 streamCount={
                   notificationCount?.scope === notificationScope
                     ? notificationCount.count
