@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { test, expect } from '../../fixtures';
-import { uniqueId, ensureSidebarExpanded, clickRowActionByLocator, executeCommandViaApi, waitForFormReady } from '../helpers';
+import { uniqueId, ensureSidebarExpanded, navigateToMenuByClick, clickRowActionByLocator, executeCommandViaApi, waitForFormReady } from '../helpers';
 import {
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
@@ -368,7 +368,8 @@ test('a standalone model-service capability manages tenant LLM settings without 
     await ensureSidebarExpanded(member.page);
     const sidebar = member.page.getByTestId('sidebar');
     const entry = sidebar.locator('a[href="/aurabot/providers"]');
-    if (!(await entry.isVisible())) await sidebar.getByRole('button', { name: '系统管理', exact: true }).click();
+    await navigateToMenuByClick(member.page, ['系统管理']);
+    await expect(entry).toBeVisible();
     const listed = member.page.waitForResponse(response => new URL(response.url()).pathname === '/api/llm-config' && response.request().method() === 'GET');
     await entry.click();
     const initial = await listed;
@@ -2528,7 +2529,7 @@ test('declared page capabilities generate linked CRUD pages and revoke without c
     }
     await openModel();
     await member.getByTestId('model-primary-page-action').click();
-    await expect(member.getByRole('heading', { name: '生成基础 CRUD 页面', exact: true })).toBeVisible();
+    await expect(member.getByRole('heading', { name: '生成 CRUD 页面', exact: true })).toBeVisible();
     await member.getByTestId('crud-open-designer').uncheck();
     const generation = member.waitForResponse(response =>
       new URL(response.url()).origin === origin && new URL(response.url()).pathname === '/api/templates/crud/generate'

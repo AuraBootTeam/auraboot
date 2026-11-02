@@ -232,7 +232,10 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   const pollIntervalMs = Number(polling.intervalMs || 3000);
   const manager = runtime.getDataSourceManager?.();
   const shouldPoll = Boolean(status && pollStatuses.has(status) && reloadDataSources.length > 0);
-  const previousStatusRef = useRef(status);
+  // The summary may finish before its first response while the detail parent
+  // still contains the earlier phase. Retain that phase until a summary arrives.
+  const parentStatus = String(readPath(context.record ?? context.form, statusField) || '').trim();
+  const previousStatusRef = useRef(parentStatus || status);
   const previousRevisionRef = useRef(revisionKey);
 
   useEffect(() => {
@@ -280,6 +283,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   }, [manager, reloadOnRevisionChange.join('|'), revisionKey]);
 
   useEffect(() => {
+    if (!status) return;
     const previousStatus = previousStatusRef.current;
     previousStatusRef.current = status;
 

@@ -1336,6 +1336,71 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 });
 
 describe('StatusBannerBlockRenderer', () => {
+  it.each([false, true])(
+    'detects a completed first summary after an older parent record (delayed=%s)',
+    async (delayed) => {
+      let record: Record<string, unknown> | undefined = delayed
+        ? undefined
+        : { bom_task_status: 'completed' };
+      const reload = vi.fn().mockResolvedValue(undefined);
+      const runtime = makeRuntime({
+        getDataSourceManager: () => ({
+          getData: () => record,
+          getState: () => ({ data: record, loading: !record, error: null }),
+          subscribe: vi.fn(() => () => undefined),
+          reload,
+        }),
+      }) as any;
+      runtime.getContext().form.bom_task_status = 'parsing';
+      const block: BlockConfig = {
+        id: 'task_status',
+        blockType: 'status-banner',
+        dataSource: 'summary',
+        statusField: 'bom_task_status',
+        titleMap: { completed: 'Completed' },
+        poll: { enabledWhenStatuses: ['parsing'], reloadOnStatusChange: ['statistics', 'exports'] },
+      };
+      const view = render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+      if (delayed) {
+        expect(reload).not.toHaveBeenCalled();
+        record = { bom_task_status: 'completed' };
+        view.rerender(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+      }
+      await waitFor(() => expect(reload).toHaveBeenCalledWith(['statistics', 'exports']));
+      view.rerender(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+      expect(reload).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('does not refresh an already completed parent and first summary', () => {
+    const record = { bom_task_status: 'completed' };
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => record,
+        getState: () => ({ data: record, loading: false }),
+        reload,
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    runtime.getContext().form.bom_task_status = 'completed';
+    render(
+      <StatusBannerBlockRenderer
+        block={
+          {
+            id: 'settled',
+            blockType: 'status-banner',
+            dataSource: 'summary',
+            statusField: 'bom_task_status',
+            poll: { enabledWhenStatuses: ['parsing'], reloadOnStatusChange: ['statistics'] },
+          } as BlockConfig
+        }
+        runtime={runtime}
+      />,
+    );
+    expect(reload).not.toHaveBeenCalled();
+  });
+
   it('localizes an i18n-backed failure message from the task record', () => {
     const runtime = makeRuntime() as any;
     runtime.getContext().locale = 'zh-CN';
