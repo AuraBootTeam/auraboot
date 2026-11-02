@@ -33,6 +33,8 @@ public final class ModelMutationGuard {
         }
         java.util.List<?> allowed = (java.util.List<?>) policy.get(operation);
         String commandCode = MetaContext.getAuthorizedCommandCode();
+        if ("create".equals(operation) && allowed != null && allowed.stream()
+                .anyMatch(code -> MetaContext.isCommandCreateWriter(model.getCode(), (String) code))) return;
         if (allowed == null || !MetaContext.hasCommandPermitScope()
                 || commandCode == null || !allowed.contains(commandCode)) {
             throw new MetaServiceException("Model mutation requires its exact authorized command");
@@ -97,6 +99,10 @@ public final class ModelMutationGuard {
                 || MetaContext.hasCommandPermitScope()) {
             return;
         }
+        Object raw = model.getExtension() == null ? null : model.getExtension().get("commandWriters");
+        if (raw instanceof Map<?,?> writers && writers.get("create") instanceof java.util.List<?> commands
+                && commands.stream().anyMatch(code -> code instanceof String text
+                    && MetaContext.isCommandCreateWriter(model.getCode(),text))) return;
         String modelCode = model.getCode() != null ? model.getCode() : "<unknown>";
         throw new MetaServiceException(
                 "Model '" + modelCode + "' can only be created through an authorized command");

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { commandRequestMetadata, projectCommandPayload, commandPolicyFor } from '../commandRequestPolicy';
+import { commandRequestMetadata, projectCommandPayload, commandPolicyFor, completeCommandRequestIdentity } from '../commandRequestPolicy';
 
 describe('command-owned request policy', () => {
   it('retains the identity of an uncertain request and changes it with the intent', () => {
@@ -56,4 +56,26 @@ it('does not resend hidden record selections when a dialog owns the input contra
   expect(projectCommandPayload(record, policy, { audience_kind: 'all' })).toEqual({ audience_kind: 'all' });
   expect(projectCommandPayload(record, policy, { audience_kind: 'selected', audience_users: [] }))
     .toEqual({ audience_kind: 'selected', audience_users: [] });
+});
+
+it('starts a new explicit intent only after opted-in confirmed success', () => {
+  const policy = { idempotent: true, newIntentAfterSuccess: true };
+  const first = commandRequestMetadata(policy, { pid: 'same' }, { command: 'example:start', reason: 'Same reason' });
+  const unknown = commandRequestMetadata(policy, { pid: 'same' }, { command: 'example:start', reason: 'Same reason' }, first.identity);
+  expect(unknown.metadata.clientRequestId).toBe(first.metadata.clientRequestId);
+  const completed = { ...first.identity!, completed: true };
+  const next = commandRequestMetadata(policy, { pid: 'same' }, { command: 'example:start', reason: 'Same reason' }, completed);
+  expect(next.metadata.clientRequestId).not.toBe(first.metadata.clientRequestId);
+  expect(commandRequestMetadata({ idempotent: true }, {}, { command: 'example:start', reason: 'Same reason' }, completed).metadata.clientRequestId)
+    .toBe(first.metadata.clientRequestId);
+});
+
+it('never marks an uncertain or legacy request completed and rejects a lifecycle without identity', () => {
+  const policy = { idempotent: true, newIntentAfterSuccess: true };
+  const original = { intent: 'same', clientRequestId: 'same-request' };
+  expect(completeCommandRequestIdentity(policy, original, false)).toBe(original);
+  expect(completeCommandRequestIdentity({ idempotent: true }, original, true)).toBe(original);
+  expect(completeCommandRequestIdentity(policy, undefined, true)).toBeUndefined();
+  expect(completeCommandRequestIdentity(policy, original, true)).toEqual({ ...original, completed: true });
+  expect(() => commandRequestMetadata({ newIntentAfterSuccess: true }, {}, {})).toThrow(/idempotent/);
 });

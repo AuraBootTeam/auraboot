@@ -2273,4 +2273,43 @@ describe('useActionHandler dynamic choices fail before submission', () => {
       }
     },
   );
+
+  it('opens a new opted-in intent after a confirmed completed reply while retaining an uncertain attempt', async () => {
+    fetchResultMock.mockReset();
+    fetchResultMock.mockResolvedValueOnce({ code: 'NETWORK_ERROR', message: 'Reply lost' });
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { phaseReached: 'completed', data: { runPid: 'original' } } });
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { phaseReached: 'completed', data: { runPid: 'next' } } });
+    const runtime = makeRuntime({ state: {} });
+    runtime.getSchema = () => ({ modelCode: 'example', extension: { commandRequestByCommand: {
+      'example:start': { idempotent: true, payloadFields: ['reason'], newIntentAfterSuccess: true },
+    } } }) as any;
+    const { result } = renderHook(() => useActionHandler({ runtime, navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: ((key: string) => key) as any }));
+    const action = { code: 'start', action: { type: 'command', command: 'example:start', includeRecordPayload: false,
+      payload: { reason: 'Same reason' } } } as unknown as ButtonConfig;
+    for (let index = 0; index < 3; index++) await act(async () => result.current.handleAction(action, { pid: 'same-plan', row_version: 1 }));
+    expect(fetchResultMock).toHaveBeenCalledTimes(3);
+    const requests = fetchResultMock.mock.calls.map(call => call[1].params);
+    expect(requests[1].clientRequestId).toBe(requests[0].clientRequestId);
+    expect(requests[2].clientRequestId).not.toBe(requests[1].clientRequestId);
+    expect(requests.every(request => request.targetRecordPid === 'same-plan')).toBe(true);
+  });
+
+  it.each([
+    { phaseReached: 'accepted' },
+    { phaseReached: 'completed', data: { applied: false, reason: 'Not applied' } },
+  ])('retains the opted-in key when completion is not successful: %j', async (reply) => {
+    fetchResultMock.mockReset();
+    fetchResultMock.mockResolvedValue({ code: '0', data: reply });
+    const runtime = makeRuntime({ state: {} });
+    runtime.getSchema = () => ({ modelCode: 'example', extension: { commandRequestByCommand: {
+      'example:start': { idempotent: true, payloadFields: ['reason'], newIntentAfterSuccess: true },
+    } } }) as any;
+    const { result } = renderHook(() => useActionHandler({ runtime, navigate: vi.fn() as any,
+      tableName: 'example', locale: 'en-US', t: ((key: string) => key) as any }));
+    const action = { code: 'start', action: { type: 'command', command: 'example:start', includeRecordPayload: false,
+      payload: { reason: 'Same reason' } } } as unknown as ButtonConfig;
+    for (let index = 0; index < 2; index++) await act(async () => result.current.handleAction(action, { pid: 'same-plan', row_version: 1 }));
+    expect(fetchResultMock.mock.calls[1][1].params.clientRequestId).toBe(fetchResultMock.mock.calls[0][1].params.clientRequestId);
+  });
 });

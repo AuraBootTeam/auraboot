@@ -46,6 +46,8 @@ public class MetaContext {
     /** Exact command code whose permit plan authorized the current mutation stages. */
     private static final ThreadLocal<String> AUTHORIZED_COMMAND_CODE = new ThreadLocal<>();
     private static final ThreadLocal<Integer> AUTHORIZED_COMMAND_DEPTH = new ThreadLocal<>();
+    private record CommandCreateWriter(String model, String command, java.util.function.BooleanSupplier valid) {}
+    private static final ThreadLocal<CommandCreateWriter> COMMAND_CREATE_WRITER = new ThreadLocal<>();
     /** Aggregate root (master document) the current command was authorized against. */
     private static final ThreadLocal<String> COMMAND_AGGREGATE = new ThreadLocal<>();
     /**
@@ -141,6 +143,7 @@ public class MetaContext {
         PLUGIN_UPGRADE_PERMIT.remove();
         AUTHORIZED_COMMAND_CODE.remove();
         AUTHORIZED_COMMAND_DEPTH.remove();
+        COMMAND_CREATE_WRITER.remove();
         COMMAND_AGGREGATE.remove();
         COMMAND_PERMIT.remove();
     }
@@ -207,7 +210,7 @@ public class MetaContext {
         ThreadLocal<?>[] locals = { HOLDER, MEMBER_ID, ENV_ID, SESSION_CONTEXT, OTEL_TRACE_ID,
                 ENV_FILTER_BYPASSED, TENANT_FILTER_BYPASSED, LOCK_GUARD_BYPASSED,
                 COMMAND_AUTHORITY, EXTERNAL_COMMAND_PERMISSION, AUTHORIZED_COMMAND_CODE, AUTHORIZED_COMMAND_DEPTH,
-                COMMAND_AGGREGATE, COMMAND_PERMIT };
+                COMMAND_AGGREGATE, COMMAND_PERMIT, COMMAND_CREATE_WRITER };
         Object[] previous = new Object[locals.length];
         for (int i = 0; i < locals.length; i++) {
             previous[i] = locals[i].get();
@@ -572,6 +575,27 @@ public class MetaContext {
     /** Exact command code trusted for current mutation stages, or null outside a permit plan. */
     public static String getAuthorizedCommandCode() {
         return AUTHORIZED_COMMAND_CODE.get();
+    }
+
+    /** Exact insert provenance only. It grants no row, read, update or delete permission. */
+    public static <T> T runWithCommandCreateWriter(String model, String command,
+            java.util.function.BooleanSupplier valid, java.util.function.Supplier<T> action) {
+        if (model == null || model.isBlank() || command == null || command.isBlank())
+            throw new IllegalArgumentException("An exact model and command are required");
+        java.util.Objects.requireNonNull(valid,"valid");
+        if (!valid.getAsBoolean()) throw new IllegalStateException("Command create frame is unavailable");
+        var previous=COMMAND_CREATE_WRITER.get();
+        COMMAND_CREATE_WRITER.set(new CommandCreateWriter(model,command,valid));
+        try { return action.get(); }
+        finally {
+            if (previous == null) COMMAND_CREATE_WRITER.remove(); else COMMAND_CREATE_WRITER.set(previous);
+        }
+    }
+
+    public static boolean isCommandCreateWriter(String model, String command) {
+        var writer=COMMAND_CREATE_WRITER.get();
+        return writer != null && writer.model().equals(model) && writer.command().equals(command)
+                && writer.valid().getAsBoolean();
     }
 
     /**

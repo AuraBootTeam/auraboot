@@ -9,6 +9,7 @@ import {
 } from '~/framework/meta/utils/commandExecutionError';
 import {
   commandRequestMetadata,
+  completeCommandRequestIdentity,
   commandPolicyFor,
   projectCommandPayload,
   type CommandRequestIdentity,
@@ -1088,6 +1089,15 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               commandBusinessRejectionError(commandResult)
             )
               return;
+            if (commandIdentity.current?.clientRequestId === request.identity?.clientRequestId) {
+              commandIdentity.current = completeCommandRequestIdentity(
+                policy,
+                commandIdentity.current,
+                (commandResult as any)?.phaseReached === 'completed' &&
+                  !(commandResult as any)?.__asyncFailed &&
+                  !commandBusinessRejectionError(commandResult),
+              );
+            }
             surfaceTemporaryPassword(commandResult);
             const downloadedInline = downloadBase64CommandArtifact(commandResult);
             if (!downloadedInline && !(commandResult as any)?.__asyncFailed && actionDef.download) {

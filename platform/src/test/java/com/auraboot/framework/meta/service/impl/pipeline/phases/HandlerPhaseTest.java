@@ -49,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -1310,7 +1311,7 @@ class HandlerPhaseTest {
             when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE))
                     .thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
             when(files.forCommand(ctx)).thenReturn(fileScope);
-            when(factory.forCommand(ctx)).thenThrow(failure);
+            doThrow(failure).when(factory).forCommand(ctx);
             var callerScope = outerScope
                     ? com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open() : null;
             try {
