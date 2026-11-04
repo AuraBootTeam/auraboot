@@ -32,7 +32,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
  *
  * <ul>
  *   <li><b>§P4 wrap-and-rethrow</b> on mutation methods (assignPermission,
- *       removePermission, removeAll, syncPermissions, copyPermissions): any
+ *       removePermission, removeAll, syncPermissions): any
  *       failure is logged with the cause and re-thrown as
  *       {@link BusinessException} so the surrounding {@code @Transactional}
  *       rolls back and {@code GlobalExceptionHandler} surfaces a clean
@@ -66,6 +66,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     private final ApplicationEventPublisher eventPublisher;
     private final RoleMapper roleMapper;
     private final DataScopeService dataScopeService;
+    private final com.auraboot.framework.permission.service.RoleAuthorizationCopyService authorizationCopies;
     
     @Override
     @Transactional
@@ -431,23 +432,6 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             }
         }
 
-        
-        try {
-            // 获取源角色的所有Permission IDs
-            Set<Long> permissionIds = getPermissionIdsByRoleId(sourceRoleId);
-            
-            if (permissionIds.isEmpty()) {
-                log.info("源角色没有Permission,跳过复制: sourceRoleId={}", sourceRoleId);
-                return true;
-            }
-            
-            // 分配到目标角色
-            return assignPermissionsToRole(targetRoleId, new ArrayList<>(permissionIds));
-            
-        } catch (Exception e) {
-            log.error("复制角色Permission失败: sourceRoleId={}, targetRoleId={}", 
-                sourceRoleId, targetRoleId, e);
-            throw BusinessException.i18nWrap(e, "permission.copy_failed");
-        }
+        return authorizationCopies.copy(sourceRoleId,targetRoleId);
     }
 }

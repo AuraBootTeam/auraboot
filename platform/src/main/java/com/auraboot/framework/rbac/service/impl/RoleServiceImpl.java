@@ -43,6 +43,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     private RoleMapper roleMapper;
 
     @Autowired
+    private com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
+
+    @Autowired
     private RolePermissionService rolePermissionService;
 
     @Autowired
@@ -411,6 +414,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     public Role copyRole(Long roleId, String newName, String newCode) {
         authorizationWriteLock.mutate();
         log.info("Copying role: {} to new role: {}", roleId, newName);
+        authoringAccess.requireWrite();
         
         Role originalRole = getById(roleId);
         if (originalRole == null) {
@@ -418,6 +422,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         }
         
         requireOwnedRole(originalRole);
+        if (RoleConstants.isPlatformOnly(originalRole.getCode()) || "platform".equalsIgnoreCase(originalRole.getRoleScope()))
+            throw new org.springframework.security.access.AccessDeniedException("Platform roles cannot be copied through business role authoring");
         if (RoleConstants.isPlatformOnly(newCode)) {
             throw new org.springframework.security.access.AccessDeniedException("Copying cannot create a platform role");
         }
@@ -435,22 +441,24 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         newRole.setName(newName);
         newRole.setDescription("复制自: " + originalRole.getName());
         newRole.setType(originalRole.getType());
+        newRole.setRoleScope(originalRole.getRoleScope());
+        newRole.setScopeType(originalRole.getScopeType());
+        newRole.setScopeContent(originalRole.getScopeContent());
+        newRole.setDefaultDataScopeType(originalRole.getDefaultDataScopeType());
 
         newRole.setPriority(originalRole.getPriority());
-        newRole.setStatus(StatusConstants.ACTIVE);
+        newRole.setStatus(originalRole.getStatus());
         newRole.setIsDefault(false);
         newRole.setIsSystem(false);
         newRole.setCreatedAt(Instant.now());
         newRole.setUpdatedAt(Instant.now());
         newRole.setDeletedFlag(false);
         
-        save(newRole);
+        if (!save(newRole)) throw new IllegalStateException("Copied role was not persisted");
         
-        // Copy permissions
-        List<Long> permissionIds = getRolePermissionIds(roleId);
-        if (!permissionIds.isEmpty()) {
-            assignPermissions(newRole.getId(), permissionIds);
-        }
+        // Copy complete bindings and shared role constraints in this same transaction.
+        if (!rolePermissionService.copyRolePermissions(roleId,newRole.getId()))
+            throw new IllegalStateException("Role authorization copy did not complete");
         
         return newRole;
     }

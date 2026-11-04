@@ -49,7 +49,7 @@ class RolePermissionServiceImplEvictEventTest {
     @BeforeEach
     void setUp() {
         service = new RolePermissionServiceImpl(
-            authorizationWriteLock, rolePermissionMapper, permissionMapper, eventPublisher, roleMapper, dataScopeService);
+            authorizationWriteLock, rolePermissionMapper, permissionMapper, eventPublisher, roleMapper, dataScopeService, org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RoleAuthorizationCopyService.class));
         MetaContext.setCurrentTenantId(1L);
     }
 

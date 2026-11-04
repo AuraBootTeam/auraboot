@@ -56,6 +56,7 @@ class RoleServiceImplTest {
         org.mockito.Mockito.verifyNoInteractions(roleMapper);
     }
 
+    @Mock private com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
     @Mock private RoleMapper roleMapper;
     @Mock private RolePermissionService rolePermissionService;
     @Mock private UserRoleService userRoleService;
@@ -69,6 +70,7 @@ class RoleServiceImplTest {
     void setUp() throws Exception {
         service = new RoleServiceImpl();
         injectField(service, "authorizationWriteLock", authorizationWriteLock);
+        injectField(service, "authoringAccess", authoringAccess);
         injectField(service, "baseMapper", roleMapper);
         injectField(service, "roleMapper", roleMapper);
         injectField(service, "rolePermissionService", rolePermissionService);
@@ -458,19 +460,25 @@ class RoleServiceImplTest {
         Role src = role(1L, "src");
         src.setType("business");
         src.setPriority(5);
+        src.setRoleScope("tenant");src.setScopeType("TENANT");src.setScopeContent("{}");
+        src.setDefaultDataScopeType("self");src.setStatus("inactive");
         doReturn(src).when(spyService).getById(1L);
         doReturn(0L).when(spyService).count(any(QueryWrapper.class));
         doAnswer(inv -> {
             Role saved = inv.getArgument(0);
-            saved.setId(1L);
+            saved.setId(2L);
             return true;
         }).when(spyService).save(any(Role.class));
-        when(rolePermissionService.getPermissionIdsByRoleId(1L)).thenReturn(Set.of());
+        when(rolePermissionService.copyRolePermissions(1L,2L)).thenReturn(true);
 
         Role copied = spyService.copyRole(1L, "newName", "newCode");
         assertEquals("newName", copied.getName());
         assertEquals("newCode", copied.getCode());
         assertEquals("business", copied.getType());
+        assertEquals("tenant",copied.getRoleScope());assertEquals("TENANT",copied.getScopeType());
+        assertEquals("{}",copied.getScopeContent());assertEquals("self",copied.getDefaultDataScopeType());
+        assertEquals("inactive",copied.getStatus());assertFalse(copied.getIsDefault());assertFalse(copied.getIsSystem());
+        verify(rolePermissionService).copyRolePermissions(1L,2L);
     }
 
     @Test

@@ -473,3 +473,6 @@ aurabot:
 "permission.capability.preset.admin": "관리자"
 
 "about.menuLabel": "{productName} 정보"
+
+role:
+  authorization_copy_conflict: "대상 역할의 권한 제약이 다릅니다. 범위와 정책을 맞춘 후 복사하세요."

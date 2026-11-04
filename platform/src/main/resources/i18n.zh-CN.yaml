@@ -1819,6 +1819,7 @@ tenant:
   name_exists: "租户名称已存在: {0}"
 
 role:
+  authorization_copy_conflict: "目标角色的授权约束与来源不一致，请先调整范围或策略后再复制。"
   not_found: "角色不存在: {0}"
   original_not_found: "原角色不存在: {0}"
   system_no_disable: 系统角色不允许禁用

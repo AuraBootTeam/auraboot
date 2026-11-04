@@ -1628,6 +1628,7 @@ tenant:
   name_exists: "Tenant name already exists: {0}"
 
 role:
+  authorization_copy_conflict: "The target role has different authorization constraints. Align its scopes and policies before copying."
   not_found: "Role not found: {0}"
   original_not_found: "Original role not found: {0}"
   system_no_disable: System roles cannot be disabled

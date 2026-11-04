@@ -264,7 +264,13 @@ public class RoleController {
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Not found by the param: " + pid);
         }
-        boolean result = rolePermissionService.copyRolePermissions(role.getId(), request.targetRoleId());
+        Long targetId=request.targetRoleId();
+        if(request.targetRolePid()!=null) {
+            Role target=resolveRoleForCurrentTenant(request.targetRolePid());
+            if(target==null)throw new RootUnCheckedException(BadParam,"Copy target role is unavailable");
+            targetId=target.getId();
+        }
+        boolean result = rolePermissionService.copyRolePermissions(role.getId(),targetId);
         return ApiResponse.success(result);
     }
 

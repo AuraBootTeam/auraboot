@@ -60,6 +60,8 @@ class RolePermissionServiceImplTest {
     @Mock
     private DataScopeService dataScopeService;
 
+    @Mock private com.auraboot.framework.permission.service.RoleAuthorizationCopyService authorizationCopies;
+
     @InjectMocks
     private RolePermissionServiceImpl service;
 
@@ -393,25 +395,10 @@ class RolePermissionServiceImplTest {
     }
 
     @Test
-    void copyRolePermissionsSkipsWhenSourceEmpty() {
-        copyRoles();
-        when(rolePermissionMapper.findByRoleId(7L, 100L)).thenReturn(List.of());
-
-        assertThat(service.copyRolePermissions(7L, 8L)).isTrue();
-        verify(rolePermissionMapper, never()).batchInsert(anyList());
-    }
-
-    @Test
-    void copyRolePermissionsAssignsToTarget() {
-        copyRoles();
-        RolePermission rp = new RolePermission();
-        rp.setPermissionId(50L);
-        when(rolePermissionMapper.findByRoleId(7L, 100L)).thenReturn(List.of(rp));
-
-        assertThat(service.copyRolePermissions(7L, 8L)).isTrue();
-
-        ArgumentCaptor<List<RolePermission>> captor = ArgumentCaptor.forClass(List.class);
-        verify(rolePermissionMapper).batchInsert(captor.capture());
-        assertThat(captor.getValue().get(0).getRoleId()).isEqualTo(8L);
+    void copyRolePermissionsDelegatesCompleteStateInsteadOfFlatteningIds() {
+        copyRoles();when(authorizationCopies.copy(7L,8L)).thenReturn(true);
+        assertThat(service.copyRolePermissions(7L,8L)).isTrue();
+        verify(authorizationCopies).copy(7L,8L);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionMapper,eventPublisher);
     }
 }
