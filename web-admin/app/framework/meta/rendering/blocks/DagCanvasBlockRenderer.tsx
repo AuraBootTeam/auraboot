@@ -115,7 +115,9 @@ function FlowCanvasCard({
   }, [importData, nodes, edges])
   return (
     <NodeRuntimeStatusProvider statuses={statusMap}>
-      <FlowCanvas readOnly showMinimap={false} showControls={false} fitExistingGraph className={className} />
+      <div className={`flex flex-col ${className || ''}`}>
+        <FlowCanvas readOnly showMinimap={false} showControls={false} fitExistingGraph className="flex-1 min-h-0" />
+      </div>
     </NodeRuntimeStatusProvider>
   )
 }
