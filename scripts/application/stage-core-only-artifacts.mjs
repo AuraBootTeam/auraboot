@@ -479,6 +479,8 @@ async function main() {
 
   mkdirSync(output, { recursive: false });
   copyFileSync(manifestPath, resolve(output, 'app.yaml'));
+  copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(output, 'LICENSE.txt'));
+  copyFileSync(resolve(repoRoot, 'NOTICE'), resolve(output, 'NOTICE'));
 
   const runtime = copyArtifact(
     resolve(repoRoot, `platform/build/libs/AuraBoot-${version}-boot.jar`),
@@ -565,6 +567,8 @@ async function main() {
     runtimeImage = resolve(output, 'oci/auraboot-runtime');
     const runtimeRootfs = prepareRootfs([
       { source: runtime, destination: '/opt/auraboot/runtime/application.jar' },
+      { source: resolve(output, 'LICENSE.txt'), destination: '/opt/auraboot/LICENSE.txt' },
+      { source: resolve(output, 'NOTICE'), destination: '/opt/auraboot/NOTICE' },
       { source: coreMigrations, destination: '/opt/auraboot/migrations/core' },
       { source: coreMeta, destination: '/opt/auraboot/config/core-meta' },
       { source: platformAdmin, destination: '/opt/auraboot/config/platform-admin' },
