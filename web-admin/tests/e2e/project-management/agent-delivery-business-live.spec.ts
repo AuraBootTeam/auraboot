@@ -253,11 +253,17 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(confirmation).not.toContainText(/tpm_|Tpm Ts/);
   expect(await taskRows(page.request, title)).toHaveLength(0);
   await page.screenshot({ path: join(shots, 'D04-before-confirmation.png'), fullPage: true });
-  const continuation = page.waitForResponse((response) => response.url().includes('/api/ai/aurabot/execute') && response.request().method() === 'POST');
+  const continuation = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/ai/aurabot/execute') && response.request().method() === 'POST',
+  );
   await confirmation.getByTestId('aurabot-confirm-approve').click();
   expect((await continuation).ok()).toBe(true);
   expect(await (await continuation).finished()).toBeNull();
-  await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(/已创建|已保存|创建成功/, { timeout: 90_000 });
+  await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(
+    /已创建|已保存|创建成功/,
+    { timeout: 90_000 },
+  );
   await expect
     .poll(async () => (await taskRows(page.request, title)).length, { timeout: 90_000 })
     .toBe(1);
@@ -269,19 +275,32 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await page.screenshot({ path: join(shots, 'D05-confirmed-task.png'), fullPage: true });
   await page.reload();
   await expect(chat).toBeVisible();
-  await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(/已创建|已保存|创建成功/, { timeout: 30_000 });
+  await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(
+    /已创建|已保存|创建成功/,
+    { timeout: 30_000 },
+  );
   await expect(chat.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
   expect(await taskRows(page.request, title)).toHaveLength(1);
+  await chat.getByTestId('chat-msg-agent').filter({ hasText: title }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(shots, 'D06-history-restored.png'), fullPage: true });
 
   const revokedTitle = `撤权后不应创建-${fixture.suffix}`;
   const beforeRevoke = await businessSnapshot(page.request, fixture.project);
-  await send(page, `请为项目“${fixture.projectName}”创建任务“${revokedTitle}”，负责人林晓。实际调用创建工具，等待我确认。`);
+  await send(
+    page,
+    `请为项目“${fixture.projectName}”创建任务“${revokedTitle}”，负责人林晓。实际调用创建工具，等待我确认。`,
+  );
   const pending = chat.getByTestId('aurabot-confirm-card').last();
   await expect(pending).toContainText(revokedTitle, { timeout: 90_000 });
-  await body(await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids: [] } }));
+  await body(
+    await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids: [] } }),
+  );
   try {
-    const decision = page.waitForResponse((response) => response.url().includes('/api/ai/aurabot/execute') && response.request().method() === 'POST');
+    const decision = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/ai/aurabot/execute') &&
+        response.request().method() === 'POST',
+    );
     await pending.getByTestId('aurabot-confirm-approve').click();
     const receipt = await decision;
     expect(receipt.ok()).toBe(true);
@@ -289,11 +308,15 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     await expect(chat).toContainText(/权限|无权/);
     expect(await taskRows(page.request, revokedTitle)).toHaveLength(0);
     expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
-    await page.screenshot({ path: join(shots, 'D10-revoked-before-confirmation.png'), fullPage: true });
+    await page.screenshot({
+      path: join(shots, 'D10-revoked-before-confirmation.png'),
+      fullPage: true,
+    });
   } finally {
-    await body(await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }));
+    await body(
+      await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }),
+    );
   }
-
 });
 
 test('D2: customer notes create a reviewed task draft without saving or replacing the selected project', async ({
@@ -323,6 +346,8 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
   );
   expect(await taskRows(page.request, title)).toHaveLength(0);
   await page.screenshot({ path: join(shots, 'D07-reviewed-task-draft.png'), fullPage: true });
+  await page.locator('#tpm_ts_description').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(shots, 'D07b-draft-scope-and-date.png'), fullPage: true });
   const persisted = page.waitForResponse(
     (r) => r.url().includes('/execute/tpm:create_task') && r.request().method() === 'POST',
   );

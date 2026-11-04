@@ -277,6 +277,8 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
     ? { displayName: modelQuery.model.displayName, modelCode: modelQuery.model.code } : null;
   const businessModel = createdModel ?? queriedModel;
 
+  // Command/read envelopes are diagnostic; business facts remain in the assistant's readback.
+  const diagnosticPayload = !businessModel && !modelQuery && /^(cmd|get)[:_]/.test(contract.skillCode || '');
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
   const { color, Icon } = statusStyle;
   const metric = contractMetric(contract);
@@ -349,9 +351,10 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
       </div>
 
       {(createdModel || modelQuery) && <div className="mt-2"><CardView contract={contract} /></div>}
+      {diagnosticPayload && <div className="mt-2">{contract.renderHint === "summary" ? <SummaryView contract={contract} /> : <CardView contract={contract} />}</div>}
       </details>
 
-      {businessModel ? (
+      {!diagnosticPayload && (businessModel ? (
         <dl className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm" data-testid={createdModel ? "rc-created-model" : "rc-queried-model"}>
           <dt className="text-gray-600">{text({ 'zh-CN': '模型名称', 'en-US': 'Model name' })}</dt>
           <dd className="min-w-0 break-words font-medium">{String(businessModel.displayName)}</dd>
@@ -376,7 +379,7 @@ export function ResultContractView({ contract }: ResultContractViewProps) {
         <SummaryView contract={contract} />
       ) : (
         <JsonFallback contract={contract} />
-      )}
+      ))}
 
       {contract.suggestedActions && contract.suggestedActions.length > 0 && (
         <div className="flex flex-wrap gap-1 pt-1" data-testid="rc-suggested-actions">
