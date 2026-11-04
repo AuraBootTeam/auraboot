@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 507b294c41121edd1e3bb28bed83e703f74d61a39809fcb8584808edc76bddfd
+ * Contract SHA-256: 6956a0465747c85012b531ff2cc27c5261efe2a3c2ce8f967e61bd2b18e43b06
  */
 export interface paths {
     "/api/activities": {
@@ -163,6 +163,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/agent-runs/conversation-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["conversationTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/agent-runs/conversation-tasks/{taskPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["conversationTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/agent-runs/runtime-ops": {
         parameters: {
             query?: never;
@@ -220,7 +252,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["publish_12"];
+        post: operations["publish_13"];
         delete?: never;
         options?: never;
         head?: never;
@@ -364,7 +396,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["publish_11"];
+        post: operations["publish_12"];
         delete?: never;
         options?: never;
         head?: never;
@@ -380,7 +412,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["rollback_5"];
+        post: operations["rollback_6"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1322,7 +1354,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["inspect"];
+        get: operations["inspect_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2624,6 +2656,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agent/skill-definitions/{pid}/governance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["inspect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/skill-definitions/{pid}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_11"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/skill-definitions/{pid}/versions/{versionPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["version_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/skill-definitions/{pid}/versions/{versionPid}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rollback_5"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agent/skills": {
         parameters: {
             query?: never;
@@ -2680,6 +2776,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["resolveSkillTools"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/skills/{skillCode}/trial-definition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["skillTrialDefinition"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3002,6 +3114,22 @@ export interface paths {
         get: operations["listConversations_1"];
         put?: never;
         post: operations["ensureConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/aurabot/conversations/{conversationId}/execution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["execution"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -30584,6 +30712,11 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        Decision: {
+            description?: string;
+            expectedDraftHash?: string;
+            expectedPublishedVersion?: string;
+        };
         DecisionActionCatalogDTO: {
             actions?: components["schemas"]["DecisionActionDTO"][];
         };
@@ -41213,6 +41346,52 @@ export interface operations {
             };
         };
     };
+    conversationTasks: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    conversationTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
     runtimeOps: {
         parameters: {
             query?: {
@@ -41286,7 +41465,7 @@ export interface operations {
             };
         };
     };
-    publish_12: {
+    publish_13: {
         parameters: {
             query?: never;
             header?: never;
@@ -41515,7 +41694,7 @@ export interface operations {
             };
         };
     };
-    publish_11: {
+    publish_12: {
         parameters: {
             query?: never;
             header?: never;
@@ -41539,7 +41718,7 @@ export interface operations {
             };
         };
     };
-    rollback_5: {
+    rollback_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -43235,7 +43414,7 @@ export interface operations {
             };
         };
     };
-    inspect: {
+    inspect_1: {
         parameters: {
             query: {
                 agentCode: string;
@@ -45277,6 +45456,104 @@ export interface operations {
             };
         };
     };
+    inspect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    publish_11: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    version_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+                versionPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseDesignVersionDTO"];
+                };
+            };
+        };
+    };
+    rollback_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+                versionPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
     listSkills_1: {
         parameters: {
             query?: {
@@ -45368,6 +45645,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListAgentToolDefinition"];
+                };
+            };
+        };
+    };
+    skillTrialDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
                 };
             };
         };
@@ -45807,7 +46106,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/event-stream": components["schemas"]["SseEmitter"];
+                    "text/event-stream;charset=UTF-8": components["schemas"]["SseEmitter"];
                 };
             };
         };
@@ -45856,6 +46155,28 @@ export interface operations {
             };
         };
     };
+    execution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
     getMessages_1: {
         parameters: {
             query?: {
@@ -45899,7 +46220,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/event-stream": components["schemas"]["SseEmitter"];
+                    "text/event-stream;charset=UTF-8": components["schemas"]["SseEmitter"];
                 };
             };
         };
