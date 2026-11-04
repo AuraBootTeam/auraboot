@@ -34,6 +34,7 @@ describe('BlockRegistry bootstrap', () => {
       'selection-info',
       'metric-strip',
       'stage-rail',
+      'dag-canvas',
       'record-inspector',
       'candidate-list',
       'workbench-action-bar',
