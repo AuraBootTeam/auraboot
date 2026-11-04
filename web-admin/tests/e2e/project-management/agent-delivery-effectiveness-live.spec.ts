@@ -77,9 +77,11 @@ test('32 paired project-delivery observations retain real traces and independent
   );
   console.log(`DELIVERY_EFFECT_EVIDENCE ${out}`);
   mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, 'attempt-status.json'), JSON.stringify({ stage: 'setup', expectedSamples: 32, actualSamples: 0, sourceCommit, semanticVerdict: 'untested' }, null, 2));
   const api = await playwright.request.newContext({
     baseURL,
     extraHTTPHeaders: { Origin: baseURL! },
+    storageState: { cookies: [], origins: [] },
   });
   try {
     const identity = await authenticateBffSession(
@@ -386,6 +388,7 @@ test('32 paired project-delivery observations retain real traces and independent
           } finally {
             sample.elapsedMs = Date.now() - started;
             samples.push(sample);
+          writeFileSync(join(out, 'attempt-status.json'), JSON.stringify({ stage: 'measuring', expectedSamples: 32, actualSamples: samples.length, failures, sourceCommit, semanticVerdict: 'pending-independent-review' }, null, 2));
             appendFileSync(join(out, 'observations.jsonl'), JSON.stringify(sample) + '\n');
             console.log(`DELIVERY_EFFECT ${id}: ${sample.protocolVerdict}; semantic grade pending`);
           }
@@ -399,6 +402,7 @@ test('32 paired project-delivery observations retain real traces and independent
         2,
       ),
     );
+    writeFileSync(join(out, 'attempt-status.json'), JSON.stringify({ stage: 'measured', expectedSamples: 32, actualSamples: samples.length, failures, sourceCommit, semanticVerdict: 'pending-independent-review' }, null, 2));
     expect(samples).toHaveLength(32);
     expect(
       failures,
