@@ -43,6 +43,9 @@ dependencyManagement {
         dependency 'at.yawk.lz4:lz4-java:1.11.4'
         dependency 'org.xerial.snappy:snappy-java:1.1.10.9'
         dependency 'org.bouncycastle:bcprov-jdk18on:1.85'
+        dependency "org.apache.commons:commons-configuration2:${commonsConfigurationVersion}"
+        dependency "org.apache.commons:commons-lang3:${commonsLangVersion}"
+        dependency "org.apache.commons:commons-text:${commonsTextVersion}"
         // Stay on the compatible SDK line whose credential parser replaced
         // vulnerable ini4j; preserve COS/KMS functionality rather than exclude it.
         dependencySet(group: 'com.tencentcloudapi', version: tencentCloudSdkVersion) {

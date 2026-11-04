@@ -29,6 +29,11 @@ dependencies {
     runtimeOnly 'org.bouncycastle:bcprov-jdk18on:1.85'
     // Align the adapter tests and published runtime with the app SDK policy.
     implementation "com.tencentcloudapi:tencentcloud-sdk-java-kms:${rootProject.tencentCloudSdkVersion}"
+    constraints {
+        implementation "org.apache.commons:commons-configuration2:${rootProject.commonsConfigurationVersion}"
+        implementation "org.apache.commons:commons-lang3:${rootProject.commonsLangVersion}"
+        implementation "org.apache.commons:commons-text:${rootProject.commonsTextVersion}"
+    }
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.48'
