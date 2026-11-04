@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 96736d4485add82888fa84737d477c5b16b93e4dad9cfeddeb585469a99c9485
+ * Contract SHA-256: 51144291757de2834f3a1a326affe26ec54a2760637183a3a3dfd8a104f37743
  */
 export interface paths {
     "/api/activities": {
@@ -30133,9 +30133,14 @@ export interface components {
             toCurrency?: string;
             triangulated?: boolean;
         };
+        /** @description Provide exactly one target role identity; public PID is preferred. */
         CopyPermissionsRequest: {
-            /** Format: int64 */
-            targetRoleId: number;
+            /**
+             * Format: int64
+             * @deprecated
+             */
+            targetRoleId?: number | null;
+            targetRolePid?: string | null;
         };
         CopySavedViewToPersonalRequest: {
             name?: string | null;

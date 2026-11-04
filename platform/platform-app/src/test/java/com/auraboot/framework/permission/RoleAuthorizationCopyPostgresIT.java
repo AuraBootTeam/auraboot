@@ -104,6 +104,36 @@ class RoleAuthorizationCopyPostgresIT extends BaseIntegrationTest {
         assertThat(contracts(target)).isEqualTo(original);assertThat(contracts(source)).isEqualTo(original);
         assertThat(jdbc.queryForObject("SELECT enabled FROM ab_data_permission_policy WHERE tenant_id=? AND pid=?",Boolean.class,tenant(),policy)).isFalse();
     }
+    @Test void compatibleCopyAddsDisjointGrantsWithoutChangingExistingConstraints() {
+        long inspection=permission("inspect");
+        jdbc.update("""
+                INSERT INTO ab_role_permission (pid,tenant_id,role_id,permission_id,grant_type,priority,conditions,status,deleted_flag)
+                VALUES (?,?,?,?,'grant',19,'{"target":"retained"}'::jsonb,'active',FALSE)
+                """,UniqueIdGenerator.generate(),tenant(),target,inspection);
+        jdbc.update("INSERT INTO ab_data_permission_role_binding (tenant_id,policy_pid,role_pid) VALUES (?,?,?)",tenant(),policy,targetPid);
+        var prior=contracts(target).getFirst();
+        permissions.copyRolePermissions(source,target);
+        assertThat(contracts(target)).hasSize(3);
+        assertThat(contracts(target).stream().filter(row->((Number)row.get("permission_id")).longValue()==inspection).toList()).containsExactly(prior);
+        assertThat(contracts(target).stream().filter(row->((Number)row.get("permission_id")).longValue()!=inspection).toList()).isEqualTo(contracts(source));
+    }
+    @Test void emptySourcePreservesItsFutureConstraintsWhenCreatingANewRole() {
+        jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?",tenant(),source);
+        var copied=roles.copyRole(source,"Empty constrained role",resource+"_empty");ownedRoles.add(copied.getId());
+        assertThat(contracts(copied.getId())).isEmpty();
+        assertThat(scopeContract(copied.getId())).isEqualTo(scopeContract(source));
+        assertThat(copied.getDefaultDataScopeType()).isEqualTo("all");
+        assertThat(jdbc.queryForList("SELECT policy_pid FROM ab_data_permission_role_binding WHERE tenant_id=? AND role_pid=?",String.class,tenant(),copied.getPid())).containsExactly(policy);
+    }
+    @Test void emptyPermissionSourceDoesNotRewriteAnExistingTarget() {
+        seedTargetGrant();scope(target,"none");
+        jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?",tenant(),source);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type='self' WHERE tenant_id=? AND id=?",tenant(),target);
+        var prior=contracts(target);var priorScope=scopeContract(target);
+        assertThat(permissions.copyRolePermissions(source,target)).isTrue();
+        assertThat(contracts(target)).isEqualTo(prior);assertThat(scopeContract(target)).isEqualTo(priorScope);
+        assertThat(jdbc.queryForObject("SELECT default_data_scope_type FROM ab_role WHERE tenant_id=? AND id=?",String.class,tenant(),target)).isEqualTo("self");
+    }
     @Test void copiedRoleKeepsScopeAndInactiveStatusWithoutCopyingMembers() {
         jdbc.update("UPDATE ab_role SET status='inactive' WHERE tenant_id=? AND id=?",tenant(),source);
         var copied=roles.copyRole(source,"Copied role",resource+"_cloned");ownedRoles.add(copied.getId());

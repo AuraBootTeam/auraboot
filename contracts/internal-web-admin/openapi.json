@@ -21174,15 +21174,26 @@
         "type": "object"
       },
       "CopyPermissionsRequest": {
+        "description": "Provide exactly one target role identity; public PID is preferred.",
         "properties": {
           "targetRoleId": {
+            "deprecated": true,
+            "exclusiveMinimum": 0,
             "format": "int64",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "targetRolePid": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
-        "required": [
-          "targetRoleId"
-        ],
         "type": "object"
       },
       "CopySavedViewToPersonalRequest": {
