@@ -286,6 +286,7 @@ public final class DslRegistry {
         WORKFLOW_PANEL("workflow-panel", "Workflow panel block", "1.3"),
         METRIC_STRIP("metric-strip", "Metric strip block", "1.4"),
         STAGE_RAIL("stage-rail", "Ordered business stage rail block", "1.8"),
+        DAG_CANVAS("dag-canvas", "Delivery DAG canvas block (ordered nodes with conditional gates)", "1.9"),
         RECORD_INSPECTOR("record-inspector", "Record inspector block", "1.4"),
         CANDIDATE_LIST("candidate-list", "Candidate list block", "1.4"),
         WORKBENCH_ACTION_BAR("workbench-action-bar", "Workbench action bar block", "1.4"),
