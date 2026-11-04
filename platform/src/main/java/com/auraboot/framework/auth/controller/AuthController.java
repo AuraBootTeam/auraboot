@@ -210,15 +210,7 @@ public class AuthController {
     }
 
     private String extractIp(HttpServletRequest httpRequest) {
-        String ip = httpRequest.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank()) {
-            // X-Forwarded-For may contain multiple IPs; take the first one
-            return ip.split(",")[0].trim();
-        }
-        ip = httpRequest.getHeader("X-Real-IP");
-        if (ip != null && !ip.isBlank()) {
-            return ip;
-        }
+        // The servlet container may resolve explicitly trusted proxies. Never trust raw headers here.
         return httpRequest.getRemoteAddr();
     }
     
