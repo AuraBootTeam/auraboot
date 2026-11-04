@@ -42,6 +42,7 @@ import {
 function makeRuntime(
   overrides: {
     record?: Record<string, unknown>;
+    locale?: string;
     dsData?: unknown;
     loading?: boolean;
     error?: Error | null;
@@ -51,7 +52,7 @@ function makeRuntime(
 
   const stub = {
     getContext: () => ({
-      locale: 'en-US',
+      locale: overrides.locale ?? 'en-US',
       t: (k: string) => k,
       state: {},
       form: {},
@@ -239,6 +240,24 @@ describe('CodeSnippetBlockRenderer', () => {
     await waitFor(() =>
       expect(screen.getByTestId('code-snippet-copy-label').textContent).toBe('Copy failed'),
     );
+  });
+
+  it('localizes copy success when Chinese translations are not installed', async () => {
+    const runtime = makeRuntime({ record: { pid: 'FORM-42' }, locale: 'zh-CN' });
+    render(<CodeSnippetBlockRenderer block={baseBlock} runtime={runtime} />);
+    expect(screen.getByTestId('code-snippet-copy')).toHaveAccessibleName('复制');
+    fireEvent.click(screen.getByTestId('code-snippet-copy'));
+    await waitFor(() => expect(screen.getByTestId('code-snippet-copy')).toHaveAccessibleName('已复制'));
+    expect(writeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('localizes clipboard denial without claiming a successful copy', async () => {
+    writeText.mockRejectedValueOnce(new Error('denied'));
+    const runtime = makeRuntime({ record: { pid: 'FORM-42' }, locale: 'zh-CN' });
+    render(<CodeSnippetBlockRenderer block={baseBlock} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('code-snippet-copy'));
+    await waitFor(() => expect(screen.getByTestId('code-snippet-copy')).toHaveAccessibleName('复制失败'));
+    expect(screen.queryByText('已复制')).not.toBeInTheDocument();
   });
 
   it('missing record fields render blank, not the raw token', () => {
