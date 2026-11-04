@@ -76,9 +76,11 @@ function AgentAvatar({ agent }: { agent: AgentInfo }) {
 export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) {
   const [searchParams] = useSearchParams();
   const agentPid = searchParams.get('agentPid') || undefined;
+  const requestedConversation = searchParams.get('conversationId');
   const navigate = useNavigate();
   const { t } = useI18n();
-  const { state, setSelectedAgent, newSession, restoreAgentSession } = useAuraBot();
+  const { state, setSelectedAgent, newSession, restoreAgentSession, openConversation } =
+    useAuraBot();
 
   const [agent, setAgent] = useState<AgentInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,9 +120,37 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
 
   useEffect(() => {
     if (agent?.agent_code && state.selectedAgentCode === agent.agent_code) {
-      void restoreAgentSession(agent.agent_code);
+      if (requestedConversation !== null) {
+        const id = Number(requestedConversation);
+        if (!Number.isSafeInteger(id) || id <= 0) {
+          setError(
+            t(
+              'ai.chat.error.conversationUnavailable',
+              undefined,
+              'This conversation is not available to your account.',
+            ),
+          );
+          return;
+        }
+        void openConversation(agent.agent_code, id).catch(() =>
+          setError(
+            t(
+              'ai.chat.error.conversationUnavailable',
+              undefined,
+              'This conversation is not available to your account.',
+            ),
+          ),
+        );
+      } else void restoreAgentSession(agent.agent_code);
     }
-  }, [agent?.agent_code, state.selectedAgentCode, restoreAgentSession]);
+  }, [
+    agent?.agent_code,
+    state.selectedAgentCode,
+    restoreAgentSession,
+    openConversation,
+    requestedConversation,
+    t,
+  ]);
 
   const handleNewSession = useCallback(() => {
     newSession();

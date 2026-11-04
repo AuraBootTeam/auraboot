@@ -144,7 +144,11 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await navigateToMenuByClick(page, ['AI 中心', 'AI 同事']);
   await page.getByTestId('create-agent-btn').click();
   await expect(page.getByTestId('wizard-template-project_delivery')).toBeVisible();
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D01-delivery-template.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D01-delivery-template.png'),
+    fullPage: true,
+  });
   await page.getByTestId('wizard-template-project_delivery').click();
   const name = `交付助手-${fixture.suffix}`;
   await page.getByTestId('wizard-input-name').fill(name);
@@ -152,7 +156,11 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await page.getByTestId('wizard-btn-next').click();
   await page.getByTestId('review-provider-select').selectOption('deepseek');
   await expect(page.getByTestId('review-tool-scope')).toContainText('不会授予角色');
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D02-delivery-review.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D02-delivery-review.png'),
+    fullPage: true,
+  });
   const created = page.waitForResponse(
     (r) => r.url().includes('/agent-definition/create') && r.request().method() === 'POST',
   );
@@ -237,7 +245,11 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     ),
   ).toBe(true);
 
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D03-grounded-progress.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D03-grounded-progress.png'),
+    fullPage: true,
+  });
   const title = `交付材料复核-${fixture.suffix}`;
   expect(await taskRows(page.request, title)).toHaveLength(0);
   await send(
@@ -252,7 +264,11 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(confirmation).toContainText(fixture.projectName);
   await expect(confirmation).not.toContainText(/tpm_|Tpm Ts/);
   expect(await taskRows(page.request, title)).toHaveLength(0);
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D04-before-confirmation.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D04-before-confirmation.png'),
+    fullPage: true,
+  });
   // Keep the denial fixture independent of successful multi-turn history.
   const beforeRevoke = await businessSnapshot(page.request, fixture.project);
   await body(
@@ -271,7 +287,8 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     await expect(chat).toContainText(/操作未完成|未完成|创建.*失败|无权|权限/);
     expect(await taskRows(page.request, title)).toHaveLength(0);
     expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
-    await page.screenshot({ animations: 'disabled',
+    await page.screenshot({
+      animations: 'disabled',
       path: join(shots, 'D10-revoked-before-confirmation.png'),
       fullPage: true,
     });
@@ -311,7 +328,11 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   expect(saved.tpm_ts_assignee).toBe('林晓');
   expect(saved.tpm_ts_status).toBe('todo');
   await expect(chat).toContainText(title);
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D05-confirmed-task.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D05-confirmed-task.png'),
+    fullPage: true,
+  });
   await page.reload();
   await expect(chat).toBeVisible();
   await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(
@@ -321,7 +342,109 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(chat.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
   expect(await taskRows(page.request, title)).toHaveLength(1);
   await chat.getByTestId('chat-msg-agent').filter({ hasText: title }).scrollIntoViewIfNeeded();
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D06-history-restored.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D06-history-restored.png'),
+    fullPage: true,
+  });
+
+  // O1: enter through the existing run-log menu and correlate this exact saved task.
+  await navigateToMenuByClick(page, ['AI 中心', '运行日志']);
+  await page.getByRole('button', { name: '会话任务', exact: true }).click();
+  const operations = page.getByTestId('conversation-task-operations');
+  await operations.getByRole('textbox').fill(title);
+  const listed = page.waitForResponse(
+    (r) =>
+      r.url().includes('/api/admin/agent-runs/conversation-tasks?') &&
+      r.url().includes(encodeURIComponent(title)),
+  );
+  await operations.getByRole('button', { name: '查询', exact: true }).click();
+  const tasks = (await body(await listed)).data;
+  expect(tasks.records.length).toBeGreaterThan(0);
+  const task = tasks.records.find(
+    (row: { title: string; traceId?: string }) => row.title.includes(title) && row.traceId,
+  );
+  expect(task).toBeTruthy();
+  const row = operations.getByTestId(`conversation-task-${task.taskPid}`);
+  await expect(row).toContainText('费用未知');
+  const detailResponse = page.waitForResponse((r) =>
+    r.url().endsWith(`/conversation-tasks/${task.taskPid}`),
+  );
+  await row.getByRole('button', { name: '联查回执' }).click();
+  const operationDetail = (await body(await detailResponse)).data;
+  expect(operationDetail.task.taskPid).toBe(task.taskPid);
+  expect(operationDetail.traces.length).toBeGreaterThan(0);
+  expect(
+    operationDetail.actions.some(
+      (action: { command: string }) => action.command === 'tpm:create_task',
+    ),
+  ).toBe(true);
+  const evidence = operations.getByTestId('conversation-task-detail');
+  await expect(evidence.getByRole('link', { name: '查看调用 1', exact: true })).toBeVisible();
+  await evidence.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'O01-task-receipts.png'),
+    fullPage: true,
+  });
+  await evidence.getByRole('link', { name: '打开我有权访问的会话' }).click();
+  await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(
+    /已创建|已保存|创建成功/,
+  );
+
+  // O04: a second browser tab observes a genuinely executing, read-only model turn.
+  const observer = await page.context().newPage();
+  await observer.goto(page.url());
+  await expect(observer.getByTestId('aurabot-input')).toBeEnabled();
+  const beforeRecovery = await businessSnapshot(page.request, fixture.project);
+  const readOnlyPrompt = `请只读查询项目“${fixture.projectName}”与现有任务，详细列出全部已记录的风险、进度、负责人和后续行动，区分缺失信息；不创建或修改任何记录。`;
+  const execution = await send(page, readOnlyPrompt);
+  const payload = execution.request().postDataJSON();
+  expect(payload.conversationId).toBeTruthy();
+  await expect
+    .poll(
+      async () =>
+        (
+          await body(
+            await observer.request.get(
+              `/api/ai/aurabot/conversations/${payload.conversationId}/execution`,
+            ),
+          )
+        ).data.state,
+    )
+    .toBe('running');
+  const running = observer.waitForResponse(
+    async (r) =>
+      r.url().endsWith(`/conversations/${payload.conversationId}/execution`) &&
+      (await r.json()).data?.state === 'running',
+  );
+  await observer.reload();
+  await running;
+  await expect(observer.getByTestId('conversation-execution-state')).toContainText('执行');
+  await expect(observer.getByTestId('aurabot-input')).toBeDisabled();
+  await observer.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'O04-running-reload.png'),
+    fullPage: true,
+  });
+  const duplicate = await observer.request.post('/api/ai/aurabot/chat/stream', { data: payload });
+  expect(await duplicate.text()).toContain('aurabot.execution.conversation_busy');
+  expect(await execution.finished()).toBeNull();
+  await expect(observer.getByTestId('aurabot-input')).toBeEnabled({ timeout: 150_000 });
+  await expect(observer.getByTestId('agent-chat-page')).toContainText(readOnlyPrompt);
+  await expect(observer.getByTestId('chat-msg-agent').last()).toContainText('67');
+  await observer.reload();
+  await expect(
+    observer.getByTestId('chat-msg-user').filter({ hasText: readOnlyPrompt }),
+  ).toHaveCount(1);
+  await expect(observer.getByTestId('chat-msg-agent').last()).toContainText('67');
+  expect(await businessSnapshot(observer.request, fixture.project)).toEqual(beforeRecovery);
+  await observer.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'O04-recovered-history.png'),
+    fullPage: true,
+  });
+  await observer.close();
 });
 
 test('D2: customer notes create a reviewed task draft without saving or replacing the selected project', async ({
@@ -350,9 +473,17 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
     fixture.projectName,
   );
   expect(await taskRows(page.request, title)).toHaveLength(0);
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D07-reviewed-task-draft.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D07-reviewed-task-draft.png'),
+    fullPage: true,
+  });
   await page.locator('#tpm_ts_description').scrollIntoViewIfNeeded();
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D07b-draft-scope-and-date.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D07b-draft-scope-and-date.png'),
+    fullPage: true,
+  });
   const persisted = page.waitForResponse(
     (r) => r.url().includes('/execute/tpm:create_task') && r.request().method() === 'POST',
   );
@@ -362,5 +493,9 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
   await expect(page).toHaveURL(/\/p\/tpm_task$/);
   await page.reload();
   await expect(page.getByRole('row').filter({ hasText: title })).toBeVisible();
-  await page.screenshot({ animations: 'disabled', path: join(shots, 'D08-task-saved.png'), fullPage: true });
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D08-task-saved.png'),
+    fullPage: true,
+  });
 });

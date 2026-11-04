@@ -110,6 +110,9 @@ export function ToolResultCard({ toolName, result, success }: ToolResultCardProp
         </button>
 
         {/* Expanded content */}
+        {!success && <p className="px-3 pb-3 text-sm text-danger" role="status">{result.errorCode === 'TOOL_ACCESS_DENIED'
+          ? t('aurabot.execution.tool_denied', undefined, isZh ? 'AI 同事当前没有此操作权限。请由管理员核对业务角色；人工确认不会授予权限，请勿调整参数绕过。' : 'The AI colleague currently lacks access. Ask an administrator to review its business roles. Confirmation does not grant access; do not change arguments to bypass this denial.')
+          : t('aurabot.execution.tool_failed', undefined, isZh ? '工具执行未完成，请查看诊断并核对实际结果，勿盲目重复写入。' : 'Tool execution did not complete. Review diagnostics and the actual outcome before repeating any write.')}</p>}
         {expanded && (
           <div className="border-t border-gray-100 dark:border-gray-700">
             {records && records.length > 0 ? (

@@ -6,7 +6,7 @@ import { auraBotApi } from '../../services/auraBotApi';
 const router = vi.hoisted(() => ({ params: {}, location: { pathname: '/p/c/ai_colleague_chat', search: '', hash: '', state: null, key: 'test' } }));
 vi.mock('react-router', async () => ({ ...await vi.importActual('react-router'), useLocation: () => router.location, useParams: () => router.params }));
 vi.mock('~/contexts/ApplicationCapabilitiesContext', () => ({ useApplicationCapabilities: () => ({ agent: 'installed' }) }));
-vi.mock('../../services/auraBotApi', () => ({ auraBotApi: { listConversations: vi.fn(), getConversationMessages: vi.fn() } }));
+vi.mock('../../services/auraBotApi', () => ({ auraBotApi: { getConversationExecution: vi.fn().mockResolvedValue({ state: 'idle' }), listConversations: vi.fn(), getConversationMessages: vi.fn() } }));
 function Chat() {
   const context = useAuraBot();
   useEffect(() => { context.setSelectedAgent('writer'); }, [context.setSelectedAgent]);

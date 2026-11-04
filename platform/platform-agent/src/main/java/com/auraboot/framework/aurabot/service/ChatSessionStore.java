@@ -154,6 +154,19 @@ public class ChatSessionStore implements PendingToolStore, ChatMessageTapeStore 
                 LogSanitizer.safe(pendingTool.getToolId()), LogSanitizer.safe(turnId));
     }
 
+    @Override
+    public PendingToolStore.Routing peekRouting(String turnId, Long tenantId, Long userId) {
+        PendingToolSnapshot snapshot;
+        if (redisAvailable) {
+            try {
+                String encoded = redisTemplate.opsForValue().get(pendingKey(turnId));
+                snapshot = encoded == null ? null : objectMapper.readValue(encoded, PendingToolSnapshot.class);
+            } catch (Exception e) { throw pendingStoreUnavailable("read pending routing from Redis", e); }
+        } else snapshot = inMemoryFallback.get(turnId);
+        if (snapshot == null || isExpired(snapshot) || !ownerMatches(snapshot, tenantId, userId)) return null;
+        return new PendingToolStore.Routing(snapshot.getConversationId(), snapshot.getChannel());
+    }
+
     /**
      * Consume a pending confirmation only when the stored owner identity matches
      * the caller. A mismatch leaves the pending payload intact so a bad resume

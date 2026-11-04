@@ -456,6 +456,7 @@ test('SG01-05: publish, trial, revise and restore immutable skill definitions wi
     .getByRole('button', { name: '查看并评审此版本' })
     .click();
   await expect(governance.getByTestId('skill-version-preview')).toContainText('只读核对技能目录');
+  await governance.getByTestId('skill-version-preview').getByText('执行指导', { exact: true }).click();
   await governance.screenshot({ path: path.join(shots, 'G03-rollback-review.png') });
   await governance.getByLabel('我已核对目标历史版本，确认切换生效版本并保留草稿。').check();
   await governance.getByRole('button', { name: '回退到已评审版本' }).click();

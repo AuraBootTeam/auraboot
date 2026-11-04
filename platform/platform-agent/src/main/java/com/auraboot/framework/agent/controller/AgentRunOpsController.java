@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -87,6 +88,17 @@ public class AgentRunOpsController {
         result.put("durableToolExecutions", durableToolExecutions);
         result.put("checkpoints", checkpoints);
         return ApiResponse.ok(result);
+    }
+
+    @GetMapping("/conversation-tasks")
+    public ApiResponse<Map<String,Object>> conversationTasks(@RequestParam(required=false) String query,
+            @RequestParam(defaultValue="20") int limit, @RequestParam(defaultValue="0") int offset) {
+        return ApiResponse.success(new ConversationTaskOperations(jdbcTemplate).list(MetaContext.getCurrentTenantId(),query,limit,offset));
+    }
+
+    @GetMapping("/conversation-tasks/{taskPid}")
+    public ApiResponse<Map<String,Object>> conversationTask(@PathVariable String taskPid) {
+        return ApiResponse.success(new ConversationTaskOperations(jdbcTemplate).detail(MetaContext.getCurrentTenantId(),taskPid));
     }
 
     // =========================================================================

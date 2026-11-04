@@ -900,6 +900,8 @@ public class ToolLoopService {
                 actionRecorder.recordAction(tenantId, runPid, commandCode,
                         toolDef, input, cmdResult, beforeData, null, error);
             }
+            if (e instanceof org.springframework.security.access.AccessDeniedException)
+                return toolAccessDenied("cmd:" + commandCode, input);
             return "Error executing command " + commandCode + ": " + error;
         }
     }

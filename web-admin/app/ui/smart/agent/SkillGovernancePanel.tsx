@@ -191,7 +191,7 @@ export function SkillGovernancePanel({
             <summary className="cursor-pointer text-sm font-medium">
               {text('draftChanges', { value1: Object.keys(view.changes).length })}
             </summary>
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 max-h-96 space-y-3 overflow-y-auto pr-2">
               {Object.entries(view.changes).map(([field, change]) => (
                 <div key={field} className="rounded-control border-border border p-3">
                   <h3 className="text-sm font-medium">
@@ -251,21 +251,36 @@ export function SkillGovernancePanel({
               <h3 className="font-medium">
                 {text('reviewRestorationOfVersion', { value1: selected.version })}
               </h3>
-              {Object.entries(selected.schemaSnapshot ?? {})
-                .filter(
-                  ([field, item]) =>
-                    item != null && !['execution_config', 'guardrails'].includes(field),
-                )
-                .map(([field, item]) => (
-                  <details key={field}>
-                    <summary className="cursor-pointer text-sm">
-                      {text(('field_' + field) as keyof typeof MESSAGES)}
-                    </summary>
-                    <pre className="text-xs break-words whitespace-pre-wrap">
-                      {value(field, item)}
-                    </pre>
-                  </details>
-                ))}
+              <div className="max-h-72 space-y-2 overflow-y-auto pr-2">
+                {Object.entries(selected.schemaSnapshot ?? {})
+                  .sort(([left], [right]) => {
+                    const order = [
+                      'skill_name',
+                      'skill_description',
+                      'prompt_template',
+                      'skill_tools',
+                      'skill_input_schema',
+                      'execution_mode',
+                    ];
+                    const rank = (field: string) =>
+                      order.includes(field) ? order.indexOf(field) : 100;
+                    return rank(left) - rank(right) || left.localeCompare(right);
+                  })
+                  .filter(
+                    ([field, item]) =>
+                      item != null && !['execution_config', 'guardrails'].includes(field),
+                  )
+                  .map(([field, item]) => (
+                    <details key={field}>
+                      <summary className="cursor-pointer text-sm">
+                        {text(('field_' + field) as keyof typeof MESSAGES)}
+                      </summary>
+                      <pre className="text-xs break-words whitespace-pre-wrap">
+                        {value(field, item)}
+                      </pre>
+                    </details>
+                  ))}
+              </div>
               <button
                 type="button"
                 className={BUTTON}

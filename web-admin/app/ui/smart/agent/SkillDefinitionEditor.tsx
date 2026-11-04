@@ -459,7 +459,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
       {notice && (
         <p
           role="status"
-          className="rounded-control border-border bg-subtle text-text sticky top-4 z-10 border p-3 shadow-sm"
+          className="rounded-control border-border bg-subtle text-text border p-3 shadow-sm"
         >
           {notice}
         </p>

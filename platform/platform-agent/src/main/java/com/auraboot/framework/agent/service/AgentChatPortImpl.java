@@ -515,6 +515,18 @@ public class AgentChatPortImpl implements AgentChatPort {
     // Tool loop
     // =========================================================================
 
+    private Map<String,Object> namedTraceMetadata(TurnContext ctx) {
+        Map<String,Object> metadata = new java.util.LinkedHashMap<>();
+        metadata.put("path", "named_agent");
+        metadata.put("agentCode", java.util.Objects.toString(ctx != null ? ctx.agentCode() : null, ""));
+        if (ctx != null) {
+            if (ctx.taskPid() != null) metadata.put("taskPid", ctx.taskPid());
+            if (ctx.turnId() != null) metadata.put("turnId", ctx.turnId());
+            if (ctx.conversationId() != null) metadata.put("conversationId", ctx.conversationId().toString());
+        }
+        return metadata;
+    }
+
     private com.auraboot.framework.agent.trace.TraceContext startNamedAgentTrace(
             TurnContext ctx, ChatRequest request) {
         if (aiTraceService != null) {
@@ -524,9 +536,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                         request != null ? request.getSessionId() : null,
                         request != null ? request.getMessage() : null,
                         ctx != null ? ctx.userId() : null,
-                        java.util.Map.of("path", "named_agent",
-                                "agentCode", java.util.Objects.toString(
-                                        ctx != null ? ctx.agentCode() : null, "")),
+                        namedTraceMetadata(ctx),
                         MetaContext.getOtelTraceId());
                 if (turnEvalTelemetryRegistry != null && ctx != null && trace != null) {
                     turnEvalTelemetryRegistry.recordTrace(ctx.turnId(), trace.getTraceId());

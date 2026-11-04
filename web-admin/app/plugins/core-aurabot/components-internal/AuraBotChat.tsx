@@ -201,7 +201,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading, canonicalListR
     if (message.toolName === 'aurabot:chat-bi' || message.toolName === 'aurabot_chat-bi') return null;
     // toolResult shape varies: { records, ... } or { success, data: { records, ... }, durationMs }
     const resultData = message.toolResult?.data || message.toolResult;
-    if (resultData?.records && Array.isArray(resultData.records) && resultData.records.length > 0) {
+    if (message.toolSuccess !== false && message.toolResult?.success !== false && resultData?.records && Array.isArray(resultData.records) && resultData.records.length > 0) {
       return <ChatBiResultCard result={toolQueryPresentation(resultData, message.toolName)} />;
     }
     const isModelSuggest =
@@ -213,7 +213,7 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading, canonicalListR
       <ToolResultCard
         toolName={message.toolName || 'unknown'}
         result={message.toolResult || {}}
-        success={true}
+        success={message.toolSuccess ?? message.toolResult?.success !== false}
       />
     );
   }
@@ -653,7 +653,7 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 export function AuraBotChat() {
-  const { state, sendMessage, setInputValue, confirmTool, cancelTool } = useAuraBot();
+  const { state, sendMessage, setInputValue, confirmTool, cancelTool, executionState, reloadExecutionState } = useAuraBot();
   const { t } = useI18n();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -771,9 +771,23 @@ export function AuraBotChat() {
   }, [dispatchSend, inputValue]);
 
   const hasMessages = messages.length > 0;
+  const lastRequest = messages.map(message => message.sender).lastIndexOf('user');
+  const hasPendingDecision = lastRequest >= 0 && messages.slice(lastRequest + 1)
+    .some(message => message.type === 'confirm_card' || message.type === 'skill_preview_card');
 
   return (
     <div className="flex h-full flex-col">
+      {executionState && executionState !== 'idle' && <div role={executionState === 'unavailable' ? 'alert' : 'status'} className="mx-4 my-2 rounded-control border border-border bg-subtle p-3 text-sm text-text-2" data-testid="conversation-execution-state">
+        {executionState === 'running'
+          ? t('aurabot.execution.restoring', undefined, 'The previous turn is still running. History will restore when it finishes; no business operation is retried.')
+          : executionState === 'unavailable'
+            ? t('aurabot.execution.unavailable', undefined, 'Execution state could not be checked. Reload before sending another request.')
+            : t('aurabot.execution.checking', undefined, 'Checking whether this conversation is still running…')}
+        {executionState === 'unavailable' && <button type="button" className="ml-3 underline" onClick={reloadExecutionState}>{t('aurabot.execution.reload', undefined, 'Check again')}</button>}
+      </div>}
+      {lastRequest >= 0 && !isLoading && <p className="mx-4 mt-2 text-xs text-text-2" data-testid="system-decision-state">{hasPendingDecision
+        ? t('aurabot.execution.pending_decision', undefined, 'System status: a confirmation is pending. Use the system card to decide.')
+        : t('aurabot.execution.no_pending_decision', undefined, 'System status: no confirmation is pending. Operation outcomes are shown in the execution receipts.')}</p>}
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto">
         {hasMessages ? (

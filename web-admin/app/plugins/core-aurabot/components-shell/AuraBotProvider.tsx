@@ -66,6 +66,7 @@ interface SimpleMessage {
   toolName?: string;
   toolInput?: Record<string, any>;
   toolResult?: Record<string, any>;
+  toolSuccess?: boolean;
   resultContract?: import('../types/ResultContract').ResultContract;
   retrievalEvidence?: RetrievalEvidence[];
   traceId?: string;
@@ -450,6 +451,8 @@ export interface ChatImageAttachment {
 }
 
 interface AuraBotContextValue {
+  executionState?: 'idle' | 'checking' | 'running' | 'unavailable';
+  reloadExecutionState?: () => void;
   state: AuraBotState;
   sessions: AuraBotSessionSummary[];
   openPanel: () => void;
@@ -467,6 +470,7 @@ interface AuraBotContextValue {
   newSession: () => void;
   selectSession: (sessionId: string) => void | Promise<void>;
   restoreAgentSession: (agentCode: string) => Promise<void>;
+  openConversation: (agentCode: string, conversationId: number) => Promise<void>;
   deleteSession: (sessionId: string) => void | Promise<void>;
   setInputValue: (value: string) => void;
   setPageContext: (ctx: Partial<PageContext>) => void;
@@ -575,6 +579,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const { agent } = useApplicationCapabilities();
   const [state, dispatch] = useReducer(auraBotReducer, initialState);
   const [sessions, setSessions] = React.useState<AuraBotSessionSummary[]>([]);
+  const [executionState, setExecutionState] = React.useState<'idle' | 'checking' | 'running' | 'unavailable'>('idle');
+  const executionStateRef = useRef(executionState);
+  const [executionCheck, setExecutionCheck] = React.useState(0);
   const location = useLocation();
   const params = useParams();
   const formFillTargetRef = useRef<FormFillTarget | null>(null);
@@ -588,6 +595,45 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   useEffect(() => {
     currentConversationIdRef.current = state.currentConversationId;
   }, [state.currentConversationId]);
+
+  useEffect(() => {
+    const conversationId = state.currentConversationId;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let sawRunning = false;
+    const update = (next: typeof executionState) => { executionStateRef.current = next; setExecutionState(next); };
+    const current = () => !cancelled && currentConversationIdRef.current === conversationId
+      && stateRef.current.currentConversationId === conversationId;
+    if (agent !== 'installed' || !conversationId || state.isLoading) {
+      update('idle'); return;
+    }
+    update('checking');
+    const check = async () => {
+      try {
+        const result = await auraBotApi.getConversationExecution(conversationId);
+        if (!current()) return;
+        if (result.state === 'running') {
+          sawRunning = true; update('running');
+          timer = setTimeout(() => { void check(); }, 1000);
+          return;
+        }
+        if (sawRunning) {
+          // Only recover a remotely executing turn. Never overwrite a local streaming response.
+          const history = await auraBotApi.getConversationMessages(conversationId);
+          if (!current() || stateRef.current.isLoading) return;
+          dispatch({ type: 'hydrate_session', payload: {
+            sessionId: stateRef.current.sessionId, conversationId,
+            messages: history.flatMap(toSimpleMessages), selectedAgentCode: stateRef.current.selectedAgentCode,
+          } });
+        }
+        update('idle');
+      } catch {
+        if (current()) update('unavailable');
+      }
+    };
+    void check();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [state.currentConversationId, state.isLoading, agent, executionCheck]);
 
   const refreshConversations = useCallback(async (expectedAgentCode?: string) => {
     const requestedSessionId = stateRef.current.sessionId;
@@ -678,6 +724,20 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const newSession = useCallback(() => {
     rememberConversationId(null);
     dispatch({ type: 'new_session' });
+  }, []);
+
+  const openConversation = useCallback(async (agentCode: string, conversationId: number) => {
+    const requestedSessionId = stateRef.current.sessionId;
+    const owned = await auraBotApi.listConversations();
+    const target = owned.find(item => item.conversationId === conversationId && item.agentCode === agentCode);
+    if (!target) throw new Error('Conversation is not available to this account');
+    const history = await auraBotApi.getConversationMessages(conversationId);
+    if (stateRef.current.sessionId !== requestedSessionId || stateRef.current.selectedAgentCode !== agentCode) return;
+    setSessions(owned.map(toSessionSummary));
+    dispatch({ type: 'hydrate_session', payload: {
+      sessionId: generateSessionId(), conversationId, messages: history.flatMap(toSimpleMessages), selectedAgentCode: agentCode,
+    } });
+    rememberConversationId(conversationId);
   }, []);
 
   const selectSession = useCallback(
@@ -800,7 +860,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       // still answer the implicit "what is this?". Without attachments, we
       // keep the original gating so blank Enter presses are no-ops.
       if (!hasAttachments && !content.trim()) return;
-      if (state.isLoading) return;
+      if (state.isLoading || executionStateRef.current !== 'idle') return;
 
       const fillTarget = formFillTargetRef.current;
       const fillTargetId = fillTarget?.snapshot().targetId;
@@ -902,7 +962,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 type: 'update_tool_message',
                 payload: {
                   toolId,
-                  updates: { type: 'tool_result', content: '', toolResult: result },
+                  updates: { type: 'tool_result', content: '', toolResult: result, toolSuccess: _success },
                 },
               });
               // Handle form_fill action — populate the current page's form
@@ -1105,7 +1165,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                 type: 'update_tool_message',
                 payload: {
                   toolId: tid,
-                  updates: { type: 'tool_result', content: '', toolResult: result },
+                  updates: { type: 'tool_result', content: '', toolResult: result, toolSuccess: _success },
                 },
               });
               if (_success === false && result?.approvalRequired !== true
@@ -1275,7 +1335,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   }, []);
 
   const value: AuraBotContextValue = {
-    state,
+    state: { ...state, isLoading: state.isLoading || executionState !== 'idle' },
+    executionState,
+    reloadExecutionState: () => setExecutionCheck(n => n + 1),
     sessions,
     openPanel,
     closePanel,
@@ -1287,6 +1349,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
     newSession,
     selectSession,
     restoreAgentSession: refreshConversations,
+    openConversation,
     deleteSession,
     setInputValue,
     setPageContext,

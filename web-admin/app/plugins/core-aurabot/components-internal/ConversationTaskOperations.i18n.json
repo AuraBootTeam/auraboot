@@ -1,0 +1,182 @@
+{
+  "title": {
+    "zh-CN": "会话任务运维",
+    "en-US": "Conversation task operations"
+  },
+  "scope": {
+    "zh-CN": "联查现有任务、调用、审批与操作回执。只读视图，不会重试或批准操作。",
+    "en-US": "Inspect existing tasks, calls, approvals and action receipts. Read-only: no retries or approvals."
+  },
+  "permission": {
+    "zh-CN": "此视图需要 Agent 运行审计权限。",
+    "en-US": "Agent run observability permission is required."
+  },
+  "refresh": {
+    "zh-CN": "刷新记录",
+    "en-US": "Refresh records"
+  },
+  "search": {
+    "zh-CN": "按任务内容或 AI 同事标识查找",
+    "en-US": "Search task content or colleague code"
+  },
+  "searchButton": {
+    "zh-CN": "查询",
+    "en-US": "Search"
+  },
+  "loadFailed": {
+    "zh-CN": "记录加载失败，请刷新重试；当前不展示过期结果。",
+    "en-US": "Records failed to load. Refresh to retry; stale results are hidden."
+  },
+  "loading": {
+    "zh-CN": "正在读取现有记录…",
+    "en-US": "Reading existing records…"
+  },
+  "empty": {
+    "zh-CN": "没有匹配的会话任务，请调整条件或完成一次 AI 同事对话。",
+    "en-US": "No matching tasks. Change the search or complete a colleague conversation."
+  },
+  "task": {
+    "zh-CN": "任务内容",
+    "en-US": "Task"
+  },
+  "agent": {
+    "zh-CN": "AI 同事",
+    "en-US": "AI colleague"
+  },
+  "status": {
+    "zh-CN": "状态",
+    "en-US": "Status"
+  },
+  "usage": {
+    "zh-CN": "输入 / 输出 token",
+    "en-US": "Input / output tokens"
+  },
+  "cost": {
+    "zh-CN": "可核实费用",
+    "en-US": "Verifiable cost"
+  },
+  "decisions": {
+    "zh-CN": "审批记录",
+    "en-US": "Approvals"
+  },
+  "details": {
+    "zh-CN": "查看",
+    "en-US": "Review"
+  },
+  "unknownCost": {
+    "zh-CN": "费用未知",
+    "en-US": "Cost unknown"
+  },
+  "unknown": {
+    "zh-CN": "未知",
+    "en-US": "Unknown"
+  },
+  "notRecorded": {
+    "zh-CN": "未记录",
+    "en-US": "Not recorded"
+  },
+  "running": {
+    "zh-CN": "执行中",
+    "en-US": "Running"
+  },
+  "completed": {
+    "zh-CN": "已完成",
+    "en-US": "Completed"
+  },
+  "failed": {
+    "zh-CN": "未完成",
+    "en-US": "Failed"
+  },
+  "cancelled": {
+    "zh-CN": "已取消",
+    "en-US": "Cancelled"
+  },
+  "pending": {
+    "zh-CN": "待处理 / 确认",
+    "en-US": "Pending / confirmation"
+  },
+  "inspect": {
+    "zh-CN": "联查回执",
+    "en-US": "Inspect receipts"
+  },
+  "total": {
+    "zh-CN": "任务总数",
+    "en-US": "Total tasks"
+  },
+  "previous": {
+    "zh-CN": "上一页",
+    "en-US": "Previous"
+  },
+  "next": {
+    "zh-CN": "下一页",
+    "en-US": "Next"
+  },
+  "detailTitle": {
+    "zh-CN": "本次任务的执行证据",
+    "en-US": "Task execution evidence"
+  },
+  "close": {
+    "zh-CN": "关闭详情",
+    "en-US": "Close details"
+  },
+  "detailFailed": {
+    "zh-CN": "无法读取详情，请关闭后重新打开。",
+    "en-US": "Detail unavailable. Close and reopen to retry."
+  },
+  "costHelp": {
+    "zh-CN": "费用来自 usage 账本。未定价、回执缺失或缓存定价口径不完整时显示未知，不能按 0 元解释。已知费用为配置费率估算，不是供应商账单。",
+    "en-US": "Cost comes from the usage ledger. Missing prices, receipts or complete cache pricing are unknown, not zero. Known amounts are configured-rate estimates, not provider invoices."
+  },
+  "conversation": {
+    "zh-CN": "打开我有权访问的会话",
+    "en-US": "Open conversation subject to membership"
+  },
+  "traces": {
+    "zh-CN": "调用与工具追踪",
+    "en-US": "Calls and tool traces"
+  },
+  "trace": {
+    "zh-CN": "查看调用",
+    "en-US": "Inspect call"
+  },
+  "noTrace": {
+    "zh-CN": "尚未关联到调用记录；不能据此认定未调用模型。",
+    "en-US": "No linked call record. This does not prove no model was called."
+  },
+  "approval": {
+    "zh-CN": "审批决定",
+    "en-US": "Approval decision"
+  },
+  "noApproval": {
+    "zh-CN": "未查到审批账本记录；会话内确认与审批账本是不同机制。",
+    "en-US": "No approval-ledger record. In-chat confirmation and approval ledger entries are different mechanisms."
+  },
+  "approved": {
+    "zh-CN": "已批准",
+    "en-US": "Approved"
+  },
+  "rejected": {
+    "zh-CN": "已拒绝",
+    "en-US": "Rejected"
+  },
+  "actions": {
+    "zh-CN": "业务操作回执",
+    "en-US": "Business action receipts"
+  },
+  "noAction": {
+    "zh-CN": "未查到操作账本回执，请结合调用详情和实际业务记录核对。",
+    "en-US": "No action-ledger receipt. Check call details and actual business records."
+  },
+  "truncated": {
+    "zh-CN": "每类仅展示最近 100 条，请在调用或审批专页进一步查询。",
+    "en-US": "Only the latest 100 records per category are shown. Continue in trace or approval views."
+  },
+  "identity": {
+    "zh-CN": "查看关联身份",
+    "en-US": "Inspect correlation identity"
+  },
+  "unparseable": {
+    "zh-CN": "当前租户有任务元数据无法读取，已单独排除；以下列表不代表完整任务历史。数量：",
+    "en-US": "Some tenant task metadata is unreadable and excluded. This list is not a complete history. Count:"
+  }
+}

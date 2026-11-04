@@ -7,6 +7,10 @@ import java.util.Map;
  */
 public interface PendingToolStore {
 
+    /** Read routing without consuming a confirmation; never exposes arguments or grants approval. */
+    record Routing(Long conversationId, String channel) {}
+    default Routing peekRouting(String turnId, Long tenantId, Long userId) { return null; }
+
     void storePending(String turnId, PendingToolSnapshot pendingTool);
 
     PendingToolSnapshot consumePendingForOwner(String turnId, Long tenantId, Long userId);
