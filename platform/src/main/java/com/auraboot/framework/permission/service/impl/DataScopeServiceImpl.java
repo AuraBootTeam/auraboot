@@ -47,6 +47,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @SuppressWarnings("java/log-injection")
 public class DataScopeServiceImpl implements DataScopeService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     private final RoleDataScopeMapper roleDataScopeMapper;
     private final UserRoleMapper userRoleMapper;
@@ -137,9 +139,11 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                          String scopeType, String mergeStrategy) {
+        authorizationWriteLock.mutate();
         try {
             DataScopeType.fromCode(scopeType);
         } catch (IllegalArgumentException e) {
@@ -176,8 +180,10 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void removeScope(Long tenantId, Long roleId, String resourceCode, String actionCode) {
+        authorizationWriteLock.mutate();
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
                 .eq(RoleDataScope::getRoleId, roleId)

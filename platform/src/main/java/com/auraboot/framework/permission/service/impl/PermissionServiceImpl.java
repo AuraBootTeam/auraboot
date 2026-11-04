@@ -43,6 +43,8 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Service
 @RequiredArgsConstructor
 public class PermissionServiceImpl implements PermissionService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
     
     private final PermissionMapper permissionMapper;
     private final PermissionConverter permissionConverter;
@@ -59,6 +61,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public PermissionDTO create(PermissionCreateRequest request) {
+        authorizationWriteLock.mutate();
         log.info("Creating permission: code={}", request.getCode());
         
         // 1. 验证请求
@@ -107,6 +110,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public PermissionDTO update(Long id, PermissionUpdateRequest request) {
+        authorizationWriteLock.mutate();
         log.info("Updating permission: id={}", id);
         
         // 1. 查询现有记录
@@ -141,6 +145,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public void delete(Long id) {
+        authorizationWriteLock.mutate();
         log.info("Deleting permission: id={}", id);
         
         // 1. 查询现有记录
@@ -246,6 +251,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public void deprecate(Long id) {
+        authorizationWriteLock.mutate();
         log.warn("Deprecating permission: id={}", id);
         
         // 1. 查询现有记录
@@ -288,6 +294,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public void archive(Long id) {
+        authorizationWriteLock.mutate();
         log.warn("Archiving permission: id={}", id);
         
         // 1. 查询现有记录
@@ -437,6 +444,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public void bindToRole(Long roleId, Long permissionId) {
+        authorizationWriteLock.mutate();
         log.info("Binding permission to role: roleId={}, permissionId={}", roleId, permissionId);
         
         // 1. 验证Permission存在
@@ -488,6 +496,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public void unbindFromRole(Long roleId, Long permissionId) {
+        authorizationWriteLock.mutate();
         log.info("Unbinding permission from role: roleId={}, permissionId={}", roleId, permissionId);
         
         // 1. 查询绑定记录

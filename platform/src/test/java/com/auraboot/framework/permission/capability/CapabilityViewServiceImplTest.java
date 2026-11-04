@@ -31,7 +31,7 @@ class CapabilityViewServiceImplTest {
     private final MenuMapper menuMapper = mock(MenuMapper.class);
     private final CapabilityResolver resolver = new CapabilityResolver();
     private final CapabilityViewServiceImpl service =
-            new CapabilityViewServiceImpl(permissionService, registry, resolver, rolePermissionService, menuMapper);
+            new CapabilityViewServiceImpl(mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class), permissionService, registry, resolver, rolePermissionService, menuMapper);
 
     private static Menu menu(String name, String permissionCode) {
         Menu m = new Menu();

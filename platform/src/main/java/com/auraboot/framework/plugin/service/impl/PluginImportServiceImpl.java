@@ -114,6 +114,7 @@ import io.micrometer.observation.annotation.Observed;
 @Service
 @RequiredArgsConstructor
 public class PluginImportServiceImpl implements PluginImportService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
     private static final int DEFAULT_IMPORT_LOCK_LEASE_MINUTES = 20;
     private static final int IMPORT_LOCK_LEASE_MINUTES = parseEnvInt(
             "plugin_import_lock_lease_minutes", DEFAULT_IMPORT_LOCK_LEASE_MINUTES);
@@ -649,7 +650,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         try {
             // Run import in a programmatic transaction
             TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-            return txTemplate.execute(status -> doExecute(context, request));
+            return txTemplate.execute(status -> {
+                authorizationWriteLock.mutate();
+                return doExecute(context, request);
+            });
         } catch (PluginException e) {
             markImportFailedInNewTransaction(importId, e);
             throw e;
@@ -1238,6 +1242,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     @Override
     @Transactional
     public int reconcileDirectoryRolePermissions(String directoryPath) {
+        authorizationWriteLock.mutate();
         return resourceImporter.reconcileDirectoryRolePermissions(directoryPath, directoryLoader, pluginRecordMapper);
     }
 
@@ -1488,6 +1493,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ImportExecuteResult rollback(String importId) {
+        authorizationWriteLock.mutate();
         PluginImportHistory history = importHistoryMapper.findByImportId(importId);
         if (history == null) {
             throw new PluginException("Import not found: " + importId);

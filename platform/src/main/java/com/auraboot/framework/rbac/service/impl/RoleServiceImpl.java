@@ -35,6 +35,9 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Slf4j
 @Service
 public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements RoleService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Autowired
     private RoleMapper roleMapper;
@@ -54,6 +57,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public Role createRole(Role role) {
+        authorizationWriteLock.mutate();
         if (!StringUtils.hasText(role.getCode())) {
             throw new RootUnCheckedException(ResponseCode.BadParam, "Role code is required");
         }
@@ -84,6 +88,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public Role updateRole(Role role) {
+        authorizationWriteLock.mutate();
         if (role.getCode() != null && !StringUtils.hasText(role.getCode())) {
             throw new RootUnCheckedException(ResponseCode.BadParam, "Role code must not be blank");
         }
@@ -111,6 +116,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public void setDefaultDataScopeType(Long roleId, String scopeType) {
+        authorizationWriteLock.mutate();
         if (scopeType != null) {
             try {
                 DataScopeType.fromCode(scopeType);
@@ -225,6 +231,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public boolean enableRole(Long roleId) {
+        authorizationWriteLock.mutate();
         log.info("Enabling role: {}", roleId);
         
         Role role = getById(roleId);
@@ -241,6 +248,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public boolean disableRole(Long roleId) {
+        authorizationWriteLock.mutate();
         log.info("Disabling role: {}", roleId);
         
         Role role = getById(roleId);
@@ -262,6 +270,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public boolean deleteRole(Long roleId) {
+        authorizationWriteLock.mutate();
         log.info("Deleting role: {}", roleId);
         
         Role role = getById(roleId);
@@ -364,6 +373,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Override
     @Transactional
     public Role copyRole(Long roleId, String newName, String newCode) {
+        authorizationWriteLock.mutate();
         log.info("Copying role: {} to new role: {}", roleId, newName);
         
         Role originalRole = getById(roleId);

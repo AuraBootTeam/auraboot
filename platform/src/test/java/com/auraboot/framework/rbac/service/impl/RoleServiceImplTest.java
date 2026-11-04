@@ -42,6 +42,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RoleServiceImpl")
 class RoleServiceImplTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Test
     void invalidDefaultScopeIsRejectedBeforeUpdatingRole() {
@@ -65,6 +68,7 @@ class RoleServiceImplTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new RoleServiceImpl();
+        injectField(service, "authorizationWriteLock", authorizationWriteLock);
         injectField(service, "baseMapper", roleMapper);
         injectField(service, "roleMapper", roleMapper);
         injectField(service, "rolePermissionService", rolePermissionService);

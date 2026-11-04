@@ -45,6 +45,9 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class DataScopeServiceImplTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Test
     void invalidScopeCannotBePersistedOrPromotedToAll() {
