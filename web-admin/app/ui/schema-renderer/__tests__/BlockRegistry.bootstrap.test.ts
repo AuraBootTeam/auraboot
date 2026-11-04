@@ -5,7 +5,7 @@ describe('BlockRegistry bootstrap', () => {
   it('initBlockRegistry registers all 35 runtime block types', () => {
     initBlockRegistry();
 
-    expect(BlockRegistry.size()).toBe(34);
+    expect(BlockRegistry.size()).toBe(35);
 
     // Must mirror the dispatch table in
     // web-admin/app/framework/meta/rendering/BlockRenderer.tsx — every
