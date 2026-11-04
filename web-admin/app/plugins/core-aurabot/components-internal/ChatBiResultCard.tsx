@@ -11,6 +11,7 @@
  */
 
 import { useState, useMemo, Suspense } from 'react';
+import { useBusinessFieldPresentation } from './useBusinessFieldPresentation';
 import { toast } from 'sonner';
 import { useSmartText } from '~/utils/i18n';
 import { resolveFieldLabel } from '~/framework/meta/utils/i18nResolver';
@@ -203,12 +204,16 @@ function DataTable({
   records,
   columns,
   labels = {},
+  modelCode,
 }: {
   records: Record<string, unknown>[];
   columns: string[];
   labels?: Record<string, string>;
+  modelCode?: string;
 }) {
   const { locale, t } = useI18n();
+  const presentation = useBusinessFieldPresentation(modelCode, records);
+  columns = columns.filter((column) => !column.endsWith("_display") || !columns.includes(column.slice(0, -8)));
   const numeric = new Set(
     columns.filter(
       (column) =>
@@ -239,7 +244,7 @@ function DataTable({
                 key={col}
                 className={`whitespace-nowrap px-2 py-1.5 font-medium text-gray-500 dark:text-gray-400 ${numeric.has(col) ? 'text-right' : 'text-left'}`}
               >
-                {labels[col] || col}
+                {presentation.label(col) || labels[col] || col}
               </th>
             ))}
           </tr>
@@ -259,7 +264,7 @@ function DataTable({
                     ? formats[col].format(row[col])
                     : typeof row[col] === 'boolean'
                       ? row[col] ? t('common.yes', undefined, locale.startsWith('zh') ? '是' : 'Yes') : t('common.no', undefined, locale.startsWith('zh') ? '否' : 'No')
-                      : String(row[col] ?? '')}
+                      : String(presentation.value(col, row[col], row) ?? '')}
                 </td>
               ))}
             </tr>
@@ -503,7 +508,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
               labels={columnLabels}
             />
           ) : (
-            <DataTable records={records} columns={effectiveColumns} labels={columnLabels} />
+            <DataTable records={records} columns={effectiveColumns} labels={columnLabels} modelCode={result.modelCode || result.dataSource?.modelCode} />
           )}
         </div>
 

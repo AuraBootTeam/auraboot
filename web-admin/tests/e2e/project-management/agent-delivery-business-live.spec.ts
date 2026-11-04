@@ -72,19 +72,29 @@ async function taskRows(api: APIRequestContext, title: string) {
 }
 async function businessSnapshot(api: APIRequestContext, projectPid: string) {
   const project = await body(await api.get(`/api/dynamic/tpm_project/${projectPid}`));
-  const tasks = await body(await api.get('/api/dynamic/tpm_task/list', {
-    params: { pageSize: '100', filters: JSON.stringify([
-      { fieldName: 'tpm_ts_project_id', operator: 'EQ', value: projectPid },
-    ]) },
-  }));
-  const fields = (row: Record<string, unknown>, prefix: string) => Object.fromEntries(
-    Object.entries(row).filter(([key]) => key === 'pid' || key.startsWith(prefix))
-      .sort(([a], [b]) => a.localeCompare(b)),
+  const tasks = await body(
+    await api.get('/api/dynamic/tpm_task/list', {
+      params: {
+        pageSize: '100',
+        filters: JSON.stringify([
+          { fieldName: 'tpm_ts_project_id', operator: 'EQ', value: projectPid },
+        ]),
+      },
+    }),
   );
+  const fields = (row: Record<string, unknown>, prefix: string) =>
+    Object.fromEntries(
+      Object.entries(row)
+        .filter(([key]) => key === 'pid' || key.startsWith(prefix))
+        .sort(([a], [b]) => a.localeCompare(b)),
+    );
   return {
     project: fields(project.data, 'tpm_pj_'),
-    tasks: tasks.data.records.map((row: Record<string, unknown>) => fields(row, 'tpm_ts_'))
-      .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.pid).localeCompare(String(b.pid))),
+    tasks: tasks.data.records
+      .map((row: Record<string, unknown>) => fields(row, 'tpm_ts_'))
+      .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
+        String(a.pid).localeCompare(String(b.pid)),
+      ),
   };
 }
 async function send(page: Page, text: string) {
@@ -163,17 +173,29 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await page.getByTestId('enroll-confirm-btn').click();
   await body(await enrolled);
   // Administrator fixture configuration is explicit; templates and enrollment grant no roles.
-  const placement = (await body(await page.request.get(`/api/agent/definitions/${agentPid}/org-placement`))).data;
-  const employee = (await body(await page.request.get(`/api/dynamic/org_employee/${placement.employeePid}`))).data;
+  const placement = (
+    await body(await page.request.get(`/api/agent/definitions/${agentPid}/org-placement`))
+  ).data;
+  const employee = (
+    await body(await page.request.get(`/api/dynamic/org_employee/${placement.employeePid}`))
+  ).data;
   const memberPid = employee.org_emp_member_id;
   expect(memberPid).toBeTruthy();
-  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual([]);
+  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual(
+    [],
+  );
   const roles = (await body(await page.request.get('/api/roles/all'))).data;
-  const deliveryRoles = roles.filter((role: { code: string }) => role.code === 'tpm_delivery_manager');
+  const deliveryRoles = roles.filter(
+    (role: { code: string }) => role.code === 'tpm_delivery_manager',
+  );
   expect(deliveryRoles).toHaveLength(1);
   const rolePids = deliveryRoles.map((role: { pid: string }) => role.pid);
-  await body(await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }));
-  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual(rolePids);
+  await body(
+    await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }),
+  );
+  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual(
+    rolePids,
+  );
   await page.getByTestId('tab-releases').click();
   await page.getByTestId('publish-agent-release').click();
   const published = page.waitForResponse(
@@ -225,6 +247,10 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   const confirmation = chat.getByTestId('aurabot-confirm-card').last();
   await expect(confirmation).toBeVisible({ timeout: 150_000 });
   await expect(confirmation).toContainText(title);
+  await expect(confirmation).toContainText('新建任务');
+  await expect(confirmation).toContainText('负责人');
+  await expect(confirmation).toContainText(fixture.projectName);
+  await expect(confirmation).not.toContainText(/tpm_|Tpm Ts/);
   expect(await taskRows(page.request, title)).toHaveLength(0);
   await page.screenshot({ path: join(shots, 'D04-before-confirmation.png'), fullPage: true });
   await confirmation.getByTestId('aurabot-confirm-approve').click();
