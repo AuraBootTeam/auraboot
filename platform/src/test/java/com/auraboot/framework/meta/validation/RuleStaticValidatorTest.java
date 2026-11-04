@@ -15,6 +15,17 @@ class RuleStaticValidatorTest {
     private final Set<String> knownFields = Set.of("amount", "startDate", "endDate", "priority", "deadline", "name");
 
     @Test
+    void rejectsUnsupportedPatternsBeforeImport() {
+        for (String pattern : List.of("[", "(a)\\1", "a(?=b)")) {
+            var assertion = new RuleAssert();
+            assertion.setField("name");
+            assertion.setPattern(pattern);
+            assertTrue(RuleStaticValidator.validate(List.of(rule("pattern-rule", assertion, "Invalid")), knownFields)
+                    .stream().anyMatch(error -> error.contains("supported RE2 syntax")));
+        }
+    }
+
+    @Test
     void validDeclarativeRule_noErrors() {
         var rule = rule("r1", assertField("amount", "gte", 0), "Error msg");
         var errors = RuleStaticValidator.validate(List.of(rule), knownFields);

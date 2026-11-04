@@ -9,7 +9,7 @@ import java.util.Map;
 
 /**
  * No-op SMS sender used as fallback when no real SMS provider is configured.
- * Logs the message content instead of sending.
+ * Logs delivery metadata without recording message content.
  *
  * @since 7.0.0
  */

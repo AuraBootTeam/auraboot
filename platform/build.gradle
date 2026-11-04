@@ -295,6 +295,8 @@ configurations {
 def jacocoToolVersion = '0.8.14'
 
 dependencies {
+    // Declarative validation accepts configurable patterns; never use a backtracking engine.
+    implementation 'com.google.re2j:re2j:1.8'
     testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
     // Plugin API module
     implementation project(':platform-plugin-api')

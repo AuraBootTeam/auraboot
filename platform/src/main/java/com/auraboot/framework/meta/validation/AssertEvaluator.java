@@ -3,7 +3,8 @@ package com.auraboot.framework.meta.validation;
 import com.auraboot.framework.meta.dto.RuleAssert;
 
 import java.util.Map;
-import java.util.regex.Pattern;
+import com.google.re2j.Pattern;
+import com.google.re2j.PatternSyntaxException;
 
 /**
  * Evaluates the 'assert' clause of a cross-field validation rule.
@@ -49,7 +50,12 @@ public final class AssertEvaluator {
             if (s.length() < assertion.getMinLength()) return AssertResult.failed("minLength");
         }
         if (assertion.getPattern() != null && value instanceof String s) {
-            if (!Pattern.matches(assertion.getPattern(), s)) return AssertResult.failed("pattern");
+            try {
+                if (!Pattern.matches(assertion.getPattern(), s)) return AssertResult.failed("pattern");
+            } catch (PatternSyntaxException e) {
+                // Legacy/unvalidated rules must fail closed, never fall back to backtracking.
+                return AssertResult.failed("pattern");
+            }
         }
 
         // Comparison operators — ref resolution may return null → SKIP
