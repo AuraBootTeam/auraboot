@@ -30,21 +30,22 @@ def main():
     private.mkdir(mode=0o700)
     receipt = json.loads((package / 'release-receipt.json').read_text())
     archive = private / 'trivy.tar.gz'
-    def dataset(variable, expected=None):
-        selected = os.environ.get(variable)
-        if not selected:
-            return None
+    def dataset(identity, expected=None):
         inputs = json.loads(Path(os.environ['AURA_CI_DATASET_INPUTS']).read_text())
-        matches = [item for item in inputs['files'] if item['file'] == selected]
-        source = Path(selected)
-        if len(matches) != 1 or source.is_symlink() or not source.is_file():
+        matches = [item for item in inputs['files'] if item['id'] == identity]
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise RuntimeError('one admitted scanner input required')
+        source = Path(matches[0]['file'])
+        if source.is_symlink() or not source.is_file():
             raise RuntimeError('one admitted regular scanner input required')
         actual = digest(source)
         if actual != matches[0]['sha256'] or (expected and actual != expected):
             raise RuntimeError('scanner input integrity mismatch')
         return source
 
-    scanner_input = dataset('AURA_SECURITY_TRIVY_ARCHIVE', ARCHIVE_SHA)
+    scanner_input = dataset('trivy-linux-0761', ARCHIVE_SHA)
     # Curl follows the admitted host's HTTPS/proxy policy; transient transfer
     # failures can retry, but a completed checksum mismatch never retries.
     if scanner_input:
@@ -67,7 +68,7 @@ def main():
     executable = private / 'trivy'
     executable.chmod(0o700)
     cache = private / 'cache'
-    cache_input = dataset('AURA_SECURITY_TRIVY_DATABASES')
+    cache_input = dataset('trivy-databases-20261105')
     if cache_input:
         cache.mkdir(mode=0o700)
         with tarfile.open(cache_input) as snapshot:

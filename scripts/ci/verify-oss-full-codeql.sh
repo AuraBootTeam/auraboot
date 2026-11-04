@@ -19,8 +19,9 @@ freeze() {
     --workspace-root "$AURA_CI_WORKSPACE_ROOT" --job "$AURA_CI_JOB_ID" > "$OUT/frozen-$1.json"
 }
 freeze before
-if [[ -n "${AURA_SECURITY_CODEQL_BUNDLE:-}" ]]; then
-  python3 -B - "$AURA_SECURITY_CODEQL_BUNDLE" "$AURA_CI_DATASET_INPUTS" "$PRIVATE/bundle.tar.zst" <<'PY'
+SELECTED_BUNDLE="$(node -e "const r=require(process.argv[1]);const a=r.files.filter(x=>x.id==='codeql-full-linux-2274');if(a.length>1)throw Error('Duplicate scanner input');if(a.length)process.stdout.write(a[0].file)" "$AURA_CI_DATASET_INPUTS")"
+if [[ -n "$SELECTED_BUNDLE" ]]; then
+  python3 -B - "$SELECTED_BUNDLE" "$AURA_CI_DATASET_INPUTS" "$PRIVATE/bundle.tar.zst" <<'PY'
 import hashlib,json,pathlib,shutil,sys
 source,receipt,target=map(pathlib.Path,sys.argv[1:])
 rows=[row for row in json.loads(receipt.read_text())['files'] if row['file']==str(source)]
