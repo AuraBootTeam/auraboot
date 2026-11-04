@@ -13,11 +13,27 @@ import java.util.Set;
 
 /** Read-side navigation projection. Never adds, removes, or evaluates a grant. */
 final class CapabilityNavigationGroups {
+    static final String CAPABILITY_CODES = "capabilityCodes";
     private CapabilityNavigationGroups() { }
 
     static List<CapabilityGroup> regroup(List<CapabilityGroup> groups, List<Menu> menus) {
         Map<Long, Menu> byId = new HashMap<>();
         menus.stream().filter(menu -> menu.getId() != null).forEach(menu -> byId.put(menu.getId(), menu));
+        Map<String, Menu> declaredSections = new HashMap<>();
+        for (Menu menu : menus) {
+            Object configured = menu.getExtension() == null ? null : menu.getExtension().get(CAPABILITY_CODES);
+            if (configured == null) continue;
+            if (!(configured instanceof List<?> codes)) {
+                throw new IllegalArgumentException("Navigation capabilityCodes must be a list");
+            }
+            Menu section = root(menu, byId);
+            for (Object value : codes) {
+                if (!(value instanceof String code) || code.isBlank()
+                        || declaredSections.putIfAbsent(code, section) != null) {
+                    throw new IllegalArgumentException("Navigation capability must have one declared module");
+                }
+            }
+        }
         Map<String, Set<Menu>> sectionsByPermission = new HashMap<>();
         for (Menu menu : menus) {
             if (menu.getPermissionCode() == null || menu.getPermissionCode().isBlank()) continue;
@@ -33,7 +49,10 @@ final class CapabilityNavigationGroups {
                 // their underlying permission happens to appear on a menu.
                 if (!capability.isConventionDerived()) {
                     Set<Menu> sections = new HashSet<>();
-                    if (capability.getIncludes() != null) {
+                    Menu declaredSection = declaredSections.get(capability.getCode());
+                    if (declaredSection != null) {
+                        sections.add(declaredSection);
+                    } else if (capability.getIncludes() != null) {
                         capability.getIncludes().forEach(code ->
                                 sections.addAll(sectionsByPermission.getOrDefault(code, Set.of())));
                     }

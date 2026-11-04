@@ -10,6 +10,37 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CapabilityNavigationGroupsTest {
     @Test
+    void productModuleOwnershipIsIndependentOfSharedReadDependenciesAndMenuVisibility() {
+        Capability duty = capability("报价单", "quote.read");
+        duty.setIncludes(List.of("quote.read", "customer.read"));
+        Menu quotation = menu(1, null, "报价", null, 30);
+        quotation.setVisible(false);
+        var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        extension.setDynamicProperty(CapabilityNavigationGroups.CAPABILITY_CODES, List.of(duty.getCode()));
+        quotation.setExtension(extension);
+        var result = CapabilityNavigationGroups.regroup(List.of(new CapabilityGroup("报价单", List.of(duty))),
+                List.of(quotation, menu(2, null, "客户", null, 40),
+                        menu(3, 1L, "报价单", "quote.read", 1),
+                        menu(4, 2L, "客户资料", "customer.read", 1)));
+        assertThat(result).extracting(CapabilityGroup::getGroup).containsExactly("报价");
+        assertThat(duty.getIncludes()).containsExactly("quote.read", "customer.read");
+        assertThat(duty.isGranted()).isFalse();
+    }
+
+    @Test
+    void rejectsAmbiguousProductModuleDeclarations() {
+        Menu first = menu(1, null, "报价", null, 30);
+        Menu second = menu(2, null, "客户", null, 40);
+        for (Menu menu : List.of(first, second)) {
+            var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+            extension.setDynamicProperty(CapabilityNavigationGroups.CAPABILITY_CODES, List.of("shared.duty"));
+            menu.setExtension(extension);
+        }
+        assertThatThrownBy(() -> CapabilityNavigationGroups.regroup(List.of(), List.of(first, second)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("one declared module");
+    }
+
+    @Test
     void followsNestedNavigationAndItsOrderWithoutChangingAuthority() {
         Capability warehouse = capability("legacy warehouse", "inv.warehouse.read");
         Capability sales = capability("legacy sales", "sl.sales.read");
