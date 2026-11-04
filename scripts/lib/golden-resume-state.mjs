@@ -1,7 +1,7 @@
 import { goldenStackState } from './golden-stack-state.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, realpathSync, readdirSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, realpathSync, readdirSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
@@ -29,7 +29,13 @@ export function fingerprintDirectory(root) {
       for (const name of readdirSync(real).sort()) visit(join(real, name), `${relative}/${name}`);
     } else {
       need(info.isFile(), 'Unsupported retained dependency entry');
-      digest.update(hash(readFileSync(real)) + '\n');
+      const descriptor = openSync(real, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      try {
+        const opened = fstatSync(descriptor);
+        need(opened.isFile() && opened.dev === info.dev && opened.ino === info.ino && opened.mode === info.mode,
+          'Retained dependency changed while opening');
+        digest.update(hash(readFileSync(descriptor)) + '\n');
+      } finally { closeSync(descriptor); }
     }
   }
   visit(root, '.');

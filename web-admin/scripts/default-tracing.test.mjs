@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import YAML from 'yaml';
 import { createServer } from 'node:http';
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -30,6 +30,26 @@ const span = (id, extra = {}) => ({
   },
 });
 const send = (exporter, spans) => new Promise((resolve) => exporter.export(spans, resolve));
+
+test('local trace retention rejects symlinks without appending or chmodding their target', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'aura-span-symlink-'));
+  try {
+    const target = join(dir, 'preserved');
+    await writeFile(target, 'preserved contents', { mode: 0o640 });
+    const beforeMode = (await stat(target)).mode;
+    await symlink(target, join(dir, 'test.jsonl'));
+    const exporter = new LocalSpanExporter(dir, 'test');
+    assert.equal((await send(exporter, [span('untrusted-path')])).code, 1);
+    await exporter.shutdown();
+    assert.equal(await readFile(target, 'utf8'), 'preserved contents');
+    assert.equal((await stat(target)).mode, beforeMode);
+    await rm(join(dir, 'test.jsonl'));
+    assert.equal((await send(exporter, [span('recovered-path')])).code, 0);
+    assert.equal(JSON.parse(await readFile(join(dir, 'test.jsonl'), 'utf8')).traceId, 'recovered-path');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test('local trace index survives missing collector configuration and excludes sensitive attributes', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'aura-span-'));

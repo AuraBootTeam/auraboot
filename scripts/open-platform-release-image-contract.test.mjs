@@ -380,11 +380,21 @@ assert.match(probe, /protocol-request-counts\.json/);
 const platformRoot = new URL('../platform/', import.meta.url);
 const settings = fs.readFileSync(new URL('settings.gradle', platformRoot), 'utf8');
 const subprojects = [...settings.matchAll(/^include ['"]([^'"]+)['"]/gm)].map(match => match[1]);
+function requiredSubprojectInputs(name, buildText) {
+  const build = new URL(`${name}/build.gradle`, platformRoot);
+  assert.ok(fs.existsSync(build), `Missing source input ${name}/build.gradle`);
+  // A java-platform project publishes dependency constraints, not implementation classes.
+  // All implementation projects still require src, including when that directory is missing.
+  const executable = (buildText ?? fs.readFileSync(build, 'utf8')).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
+  const plugins = executable.match(/\bplugins\s*\{([^}]+)\}/)?.[1] ?? '';
+  return /\bid\s*['"]java-platform['"]/.test(plugins)
+    ? ['build.gradle'] : ['build.gradle', 'src'];
+}
 function assertSubprojectInputs(text) {
   assert.ok(subprojects.length > 0, 'Declared subprojects required');
   const copies = text.split('\n').map(line => line.trim());
   for (const name of subprojects) {
-    for (const input of ['build.gradle', 'src']) {
+    for (const input of requiredSubprojectInputs(name)) {
       assert.ok(fs.existsSync(new URL(`${name}/${input}`, platformRoot)), `Missing source input ${name}/${input}`);
       assert.ok(copies.includes(`COPY platform/${name}/${input} ${name}/${input}`), `Image omits ${name}/${input}`);
     }
@@ -393,9 +403,14 @@ function assertSubprojectInputs(text) {
 test('backend image includes every declared subproject build and implementation', () => {
   assertSubprojectInputs(dockerfile);
 });
+test('only an explicit java-platform plugin excludes implementation source inputs', () => {
+  assert.deepEqual(requiredSubprojectInputs('platform-bom'), ['build.gradle']);
+  assert.deepEqual(requiredSubprojectInputs('platform-bom', "plugins { id 'java-library' } // id 'java-platform'"),
+    ['build.gradle', 'src']);
+});
 test('subproject packaging contract rejects each omitted build or source input', () => {
   for (const name of subprojects) {
-    for (const input of ['build.gradle', 'src']) {
+    for (const input of requiredSubprojectInputs(name)) {
       const line = `COPY platform/${name}/${input} ${name}/${input}`;
       assert.ok(dockerfile.includes(line), `Mutation input missing: ${line}`);
       assert.throws(() => assertSubprojectInputs(dockerfile.replace(line, '# removed input')), /Image omits/);

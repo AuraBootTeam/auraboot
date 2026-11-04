@@ -6,6 +6,13 @@ const { createServer } = require("node:net");
 const { target } = require("../runtime/environment");
 const { redact } = require("../runtime/logger");
 const MARKER = ".aura-mini-project.json";
+function readRegularSource(filename) {
+  const fd = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+  try {
+    if (!fs.fstatSync(fd).isFile()) throw new Error("Test source must be a regular file");
+    return fs.readFileSync(fd);
+  } finally { fs.closeSync(fd); }
+}
 function contained(parent, child) {
   return child === parent || child.startsWith(parent + path.sep);
 }
@@ -67,7 +74,7 @@ function prepareProject({
       if (fs.statSync(file).isDirectory()) fingerprint(file);
       else {
         sourceHash.update(path.relative(source, file));
-        sourceHash.update(fs.readFileSync(file));
+        sourceHash.update(readRegularSource(file));
       }
     }
   }
