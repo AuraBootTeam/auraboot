@@ -12,6 +12,14 @@ function show(appearance: AuthAppearance, previewTheme?: 'light' | 'dark') {
   return render(<AuthAppearanceShell branding={brand} appearance={appearance} previewTheme={previewTheme}><form><input aria-label="Account" /><button type="submit">Sign in</button></form></AuthAppearanceShell>);
 }
 describe('authentication appearance presentation', () => {
+  it.each(['javascript:alert(1)', 'java\nscript:alert(1)', 'data:image/svg+xml,<svg onload="alert(1)"/>', '//foreign.example/image.png', '/\\foreign.example/image.png'])(
+    'does not insert an unsafe image URL into the preview DOM: %s', (heroUrl) => {
+      const { container } = show({ ...base, images: { mode: 'illustration', heroUrl } });
+      expect(container.querySelector('.auth-brand-hero')).toBeNull();
+      expect(Array.from<HTMLImageElement>(container.querySelectorAll('img')).some(image => image.getAttribute('src') === heroUrl)).toBe(false);
+      expect(screen.getByRole('button', { name: 'Sign in' })).toBeVisible();
+    },
+  );
   it('uses English default brand copy when English translations are unavailable', () => {
     render(<AuthAppearanceShell branding={COMMUNITY_BRANDING} appearance={base}><form /></AuthAppearanceShell>);
     expect(screen.getByText('AI-native enterprise application runtime')).toBeVisible();

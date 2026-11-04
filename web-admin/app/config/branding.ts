@@ -214,7 +214,7 @@ function requiredText(value: unknown, field: keyof DeploymentBrandingDocument): 
 
 function safeUrl(value: unknown, field: keyof DeploymentBrandingDocument): string {
   const url = requiredText(value, field);
-  if (url.startsWith('/') && !url.startsWith('//')) return url;
+  if (url.startsWith('/') && !url.startsWith('//') && !/[\\\u0000-\u001f\u007f]/.test(url)) return url;
   try {
     const parsed = new URL(url);
     if (parsed.protocol === 'https:' && parsed.hostname) return url;
@@ -225,6 +225,8 @@ function safeUrl(value: unknown, field: keyof DeploymentBrandingDocument): strin
     `Deployment branding field "${field}" must be a same-origin path or an HTTPS URL.`,
   );
 }
+
+export { safeUrl as normalizeBrandAssetUrl };
 
 function printableAsciiText(value: unknown, field: keyof DeploymentBrandingDocument): string {
   const text = requiredText(value, field);

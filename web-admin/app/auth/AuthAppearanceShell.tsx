@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useTheme } from '~/contexts/ThemeContext';
-import { type BrandingConfig } from '~/config/branding';
+import { normalizeBrandAssetUrl, type BrandingConfig } from '~/config/branding';
 import { authForeground, resolveAuthContent, type AuthAppearance } from '~/config/auth-appearance';
 import './auth-appearance.css';
 
@@ -90,11 +90,14 @@ function BrandMark({ logo, name }: { logo: string; name: string }) {
 }
 
 function DecorativeImage({ src, className }: { src: string; className?: string }) {
+  let safeSrc: string | undefined;
+  try { safeSrc = normalizeBrandAssetUrl(src, 'logoUrl'); }
+  catch { /* Invalid preview input follows the existing missing-image fallback. */ }
   const [failedSource, setFailedSource] = useState<string>();
   const element = useRef<HTMLImageElement>(null);
   useEffect(() => {
     // A cached image can fail before React hydrates and attaches onError.
-    if (element.current?.complete && element.current.naturalWidth === 0) setFailedSource(src);
-  }, [src]);
-  return failedSource === src ? null : <img ref={element} src={src} className={className} alt="" aria-hidden="true" onError={() => setFailedSource(src)} />;
+    if (safeSrc && element.current?.complete && element.current.naturalWidth === 0) setFailedSource(safeSrc);
+  }, [safeSrc]);
+  return !safeSrc || failedSource === safeSrc ? null : <img ref={element} src={safeSrc} className={className} alt="" aria-hidden="true" onError={() => setFailedSource(safeSrc)} />;
 }
