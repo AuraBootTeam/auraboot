@@ -10,7 +10,6 @@ from pathlib import Path
 import subprocess
 import sys
 import tarfile
-import urllib.request
 import zipfile
 
 
@@ -31,8 +30,32 @@ def main():
     private.mkdir(mode=0o700)
     receipt = json.loads((package / 'release-receipt.json').read_text())
     archive = private / 'trivy.tar.gz'
-    with urllib.request.urlopen(URL, timeout=120) as source, archive.open('xb') as target:
-        __import__('shutil').copyfileobj(source, target)
+    def dataset(variable, expected=None):
+        selected = os.environ.get(variable)
+        if not selected:
+            return None
+        inputs = json.loads(Path(os.environ['AURA_CI_DATASET_INPUTS']).read_text())
+        matches = [item for item in inputs['files'] if item['file'] == selected]
+        source = Path(selected)
+        if len(matches) != 1 or source.is_symlink() or not source.is_file():
+            raise RuntimeError('one admitted regular scanner input required')
+        actual = digest(source)
+        if actual != matches[0]['sha256'] or (expected and actual != expected):
+            raise RuntimeError('scanner input integrity mismatch')
+        return source
+
+    scanner_input = dataset('AURA_SECURITY_TRIVY_ARCHIVE', ARCHIVE_SHA)
+    # Curl follows the admitted host's HTTPS/proxy policy; transient transfer
+    # failures can retry, but a completed checksum mismatch never retries.
+    if scanner_input:
+        __import__('shutil').copyfile(scanner_input, archive)
+    else:
+        with (private / 'scanner-download.log').open('xb') as log:
+            result = subprocess.run(['curl', '--fail', '--location', '--retry', '2', '--retry-all-errors',
+                '--connect-timeout', '20', '--max-time', '300', '--output', str(archive), URL],
+                stdout=log, stderr=subprocess.STDOUT, timeout=960)
+        if result.returncode:
+            raise RuntimeError('scanner download failed; original transfer log retained')
     if digest(archive) != ARCHIVE_SHA:
         raise RuntimeError('scanner archive integrity mismatch')
     with tarfile.open(archive) as compressed:
@@ -44,12 +67,23 @@ def main():
     executable = private / 'trivy'
     executable.chmod(0o700)
     cache = private / 'cache'
+    cache_input = dataset('AURA_SECURITY_TRIVY_DATABASES')
+    if cache_input:
+        cache.mkdir(mode=0o700)
+        with tarfile.open(cache_input) as snapshot:
+            if any(not (member.isfile() or member.isdir()) for member in snapshot.getmembers()):
+                raise RuntimeError('scanner DB snapshot has a nonregular entry')
+            snapshot.extractall(cache, filter='data')
+        if not (cache / 'db/metadata.json').is_file() or not (cache / 'java-db/metadata.json').is_file():
+            raise RuntimeError('scanner DB snapshot is incomplete')
     env = dict(os.environ, TRIVY_CACHE_DIR=str(cache))
     # Disable ambient CLI config/ignore inputs. This is not a source lock audit.
     empty_config, empty_ignore = private / 'trivy.yaml', private / 'trivyignore'
     empty_config.write_text('{}\n')
     empty_ignore.write_text('')
     common = ['--config', str(empty_config), '--ignorefile', str(empty_ignore), '--timeout', '20m']
+    if cache_input:
+        common += ['--skip-db-update', '--skip-java-db-update', '--skip-check-update']
 
     def run(args, label):
         with (private / (label + '.log')).open('xb') as log:

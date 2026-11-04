@@ -19,9 +19,24 @@ freeze() {
     --workspace-root "$AURA_CI_WORKSPACE_ROOT" --job "$AURA_CI_JOB_ID" > "$OUT/frozen-$1.json"
 }
 freeze before
+if [[ -n "${AURA_SECURITY_CODEQL_BUNDLE:-}" ]]; then
+  python3 -B - "$AURA_SECURITY_CODEQL_BUNDLE" "$AURA_CI_DATASET_INPUTS" "$PRIVATE/bundle.tar.zst" <<'PY'
+import hashlib,json,pathlib,shutil,sys
+source,receipt,target=map(pathlib.Path,sys.argv[1:])
+rows=[row for row in json.loads(receipt.read_text())['files'] if row['file']==str(source)]
+if source.is_symlink() or not source.is_file() or len(rows)!=1:
+    raise RuntimeError('one admitted regular CodeQL bundle required')
+with source.open('rb') as stream:
+    actual=hashlib.file_digest(stream,'sha256').hexdigest()
+if actual != rows[0]['sha256'] or actual != 'da3e952c7fe978a0b6b93e75d9cbabbdf8535667ca0810bd4b2ae37bc840ffee':
+    raise RuntimeError('CodeQL bundle integrity mismatch')
+shutil.copyfile(source,target)
+PY
+else
 curl --fail --location --connect-timeout 20 --max-time 1200 \
   'https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.4/codeql-bundle-linux64.tar.zst' \
   --output "$PRIVATE/bundle.tar.zst"
+fi
 printf '%s  %s\n' 'da3e952c7fe978a0b6b93e75d9cbabbdf8535667ca0810bd4b2ae37bc840ffee' "$PRIVATE/bundle.tar.zst" | sha256sum --check
 tar --zstd -xf "$PRIVATE/bundle.tar.zst" -C "$PRIVATE"
 QL="$PRIVATE/codeql/codeql"

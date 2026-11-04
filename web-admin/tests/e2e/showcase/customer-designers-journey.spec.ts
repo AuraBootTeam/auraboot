@@ -472,6 +472,63 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   } finally {
     await reader.context.close();
   }
+  // Recover a real server-owned Studio draft after a page restart. The standalone
+  // sample cache must remain untouched before, during and after governed saving.
+  const sampleKey = 'auraboot.unified-designer.sample';
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await page.goto(listUrl);
+  await expect(row).toBeVisible();
+  const openSession = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/authoring/sessions'
+      && response.request().method() === 'POST');
+  await page.getByRole('banner').getByRole('button', { name: '配置此页' }).click();
+  const sessionResponse = await openSession;
+  expect(sessionResponse.ok()).toBe(true);
+  const authoringSession = (await sessionResponse.json()).data;
+  expect(authoringSession.sessionPid).toMatch(/^[0-9A-Z]{26}$/);
+  await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
+  await page.getByTestId('authoring-inspector-open').click();
+  await page.getByRole('button', { name: '高级设置' }).click();
+  await page.getByRole('dialog', { name: '进入应用设计中心' })
+    .getByRole('button', { name: '继续到应用设计中心' }).click();
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+  const recoveredTitle = '客户跟进 · 恢复后保存';
+  await page.getByTestId(`outline-item-block_${code}_list`).click();
+  await page.getByTestId('inspector-field-title').fill(recoveredTitle);
+  await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+  const recoveryPresent = () => page.evaluate((sessionPid) => Object.keys(localStorage).some((key) =>
+    key.startsWith('auraboot:authoring-recovery:v2:studio:') && key.endsWith(':' + sessionPid)),
+  authoringSession.sessionPid);
+  await expect.poll(recoveryPresent).toBe(true);
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await page.reload();
+  await expect(page.getByTestId('studio-save-reconciliation-feedback')).toContainText('尚未写入权威草稿');
+  await page.getByTestId(`outline-item-block_${code}_list`).click();
+  await expect(page.getByTestId('inspector-field-title')).toHaveValue(recoveredTitle);
+  const saveRecovery = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === `/api/authoring/sessions/${authoringSession.sessionPid}/studio-batches`
+      && response.request().method() === 'POST');
+  await page.getByTestId('designer-save').click();
+  const recoveryResponse = await saveRecovery;
+  expect(recoveryResponse.ok()).toBe(true);
+  const savedRecovery = await recoveryResponse.json();
+  expect(String(savedRecovery.code)).toBe('0');
+  expect(savedRecovery.data.session.pagePid).toBe(authoringSession.pagePid);
+  expect(JSON.stringify(savedRecovery.data.session.snapshot)).toContain(recoveredTitle);
+  await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+  await expect.poll(recoveryPresent).toBe(false);
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await page.reload();
+  await page.getByTestId(`outline-item-block_${code}_list`).click();
+  await expect(page.getByTestId('inspector-field-title')).toHaveValue(recoveredTitle);
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await screenshot(page, info, 'SC02-server-studio-recovery-isolated-from-sample');
+  await info.attach('SC02-studio-recovery-storage-boundary', {
+    body: JSON.stringify({ pagePid: authoringSession.pagePid, sessionPid: authoringSession.sessionPid,
+      revision: savedRecovery.data.session.revision, standaloneSampleCache: 'absent',
+      realDraftSaved: true, browserRestartRecovered: true }),
+    contentType: 'application/json',
+  });
   await info.attach('SC02-model-identity', {
     body: JSON.stringify(
       { modelCode: code, modelPid: pid, fields: metadata.data, generated: generationBody.data },

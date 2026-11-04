@@ -151,7 +151,19 @@ def main():
         security_spec = importlib.util.spec_from_file_location('native_security_probes', root / 'scripts/ci/oss-security-probes.py')
         security_module = importlib.util.module_from_spec(security_spec)
         security_spec.loader.exec_module(security_module)
-        security_module.verify(base, request, login, login(), password, check, require)
+        def publish_security_tenant(token):
+            # Mirror the packaged publisher for the second tenant as well. Tenant
+            # creation initializes membership/RBAC, not this Core-only config set.
+            owners = subprocess.check_output(['node', current / 'bin/application/native-config-imports.mjs',
+                                             current / 'application.lock'], text=True).split()
+            require(bool(owners), 'security tenant configuration denominator is empty')
+            for owner in owners:
+                require('/' not in owner and '..' not in owner, 'invalid locked config owner')
+                api(token, '/api/plugins/import/import-directory-sync', 'POST', {
+                    'path': str(current / 'config' / owner), 'conflictStrategy': 'OVERWRITE',
+                    'autoPublishModels': True, 'autoPublishFields': True, 'autoPublishCommands': True,
+                    'autoPublishPages': True, 'deferReferenceValidation': True})
+        security_module.verify(base, request, login, login(), password, check, require, publish_security_tenant)
         stop()
         start(previous, 'aura_candidate_upgrade', True)
         token = login()

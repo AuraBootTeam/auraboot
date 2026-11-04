@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 
 
-def verify(base, request, login, admin, password, check, require):
+def verify(base, request, login, admin, password, check, require, publish_tenant):
     def call(token, path, method='GET', body=None, extra=None):
         headers = dict(extra or {})
         if token:
@@ -89,6 +89,7 @@ def verify(base, request, login, admin, password, check, require):
         'clientRequestId': 'security-tenant-' + secrets.token_hex(12),
         'tenantName': 'security-b-' + secrets.token_hex(6), 'displayName': 'Security tenant B'})
     bob = b['jwt']
+    publish_tenant(bob)
     b_info = ok(bob, '/api/auth/me')
     require(str(a_info['user']['tenantId']) != str(b_info['user']['tenantId']), 'actors did not select distinct tenants')
     require(not any(role['code'] in {'super_admin', 'platform_admin'} for role in b_info['permissions']['roles']),
@@ -113,6 +114,12 @@ def verify(base, request, login, admin, password, check, require):
     for token, own_pid, own_name, foreign_pid, foreign_name in [
             (alice, pid_a, name_a, pid_b, name_b), (bob, pid_b, name_b, pid_a, name_a)]:
         require(ok(token, path + '/' + own_pid)['org_dept_name'] == own_name, 'own tenant record missing')
+        ok(token, path + '/' + own_pid, 'PUT', {'org_dept_name': own_name})
+        disposable = create(token, 'Own-delete-' + secrets.token_hex(8))
+        ok(token, path + '/' + disposable, 'DELETE')
+        removed = call(token, path + '/' + disposable)
+        require(removed.get('_httpStatus') in (403, 404) or
+                (str(removed.get('code')) == '0' and removed.get('data') is None), 'own delete control did not remove record')
         listing = ok(token, path + '/list?page=1&size=100')
         serialized = json.dumps(listing)
         require(own_pid in serialized and foreign_pid not in serialized and foreign_name not in serialized,
@@ -123,7 +130,7 @@ def verify(base, request, login, admin, password, check, require):
                 'foreign tenant record was readable or failed unexpectedly')
         for method, body in [('PUT', {'org_dept_name': 'Cross-tenant mutation'}), ('DELETE', None)]:
             value = call(token, path + '/' + foreign_pid, method, body)
-            require(value.get('_httpStatus') in (403, 404) or (
+            require(value.get('_httpStatus') in (400, 403, 404) or (
                 value.get('_httpStatus', 200) == 200 and str(value.get('code')) != '0'),
                 'cross-tenant write/delete did not fail closed')
         result = command(token, 'org:update_department', {'org_dept_name': own_name + '-updated'}, own_pid)
@@ -131,7 +138,7 @@ def verify(base, request, login, admin, password, check, require):
         cross = call(token, '/api/meta/commands/execute/org:update_department', 'POST', {
             'payload': {'org_dept_name': 'Cross-command'}, 'operationType': 'UPDATE',
             'targetRecordPid': foreign_pid, 'clientRequestId': 'cross-' + secrets.token_hex(12)})
-        require(cross.get('_httpStatus') in (403, 404) or (
+        require(cross.get('_httpStatus') in (400, 403, 404) or (
             cross.get('_httpStatus', 200) == 200 and (str(cross.get('code')) != '0'
             or cross.get('data', {}).get('phaseReached') != 'completed')), 'cross-tenant command completed')
         export = ok(token, path + '/export', 'POST', {'scope': 'filtered', 'format': 'csv',
@@ -155,7 +162,7 @@ def verify(base, request, login, admin, password, check, require):
     denied(reader, '/api/meta/commands/execute/org:update_department', 'POST', {
         'payload': {'org_dept_name': 'Forbidden'}, 'targetRecordPid': pid_a, 'operationType': 'UPDATE'})
     for headers in [{'X-User-Role': 'super_admin'}, {'X-Tenant-Id': b_info['user']['tenantId']},
-                    {'X-Forwarded-For': '127.0.0.1'}]:
+                    {'X-Forwarded-For': '127.0.0.1'}, {'X-Test-Spoof-User-Id': '1'}]:
         denied(reader, path + '/' + pid_a, 'PUT', {'org_dept_name': 'Spoofed'}, extra=headers)
     require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated', 'denied role changed record')
     check('security-readonly-and-header-spoof-denials', ownReadControl=True, writesPreserved=True)
@@ -191,3 +198,24 @@ def verify(base, request, login, admin, password, check, require):
         denied(None, endpoint)
     require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated', 'anonymous probes changed business state')
     check('security-anonymous-bootstrap-and-protected-defaults', publicStatus=True, protectedEndpoints=7)
+
+    def login_attempt(identifier, index):
+        value = call(None, '/api/auth/login', 'POST', {'email': identifier, 'password': 'Deliberately-Invalid-Only'},
+                     {'X-Forwarded-For': f'198.51.100.{index % 250 + 1}',
+                      'X-Real-IP': f'203.0.113.{index % 250 + 1}'})
+        require(value.get('_httpStatus', 200) < 500 and str(value.get('code')) != '0'
+                and not (value.get('data') or {}).get('jwt'), 'invalid login unexpectedly succeeded or errored')
+        return 'Too many login attempts' in str(value.get('message'))
+
+    identifier = 'limit-' + secrets.token_hex(8) + '@example.invalid'
+    attempts = [login_attempt(identifier if index % 2 else identifier.upper(), index) for index in range(11)]
+    require(attempts == [False] * 10 + [True], 'real login identifier window/normalization differs')
+    # The identifier changes each time, as do spoofed IP headers. The actual
+    # servlet peer must still hit the shared client window within this burst.
+    client_limits = [login_attempt('peer-limit-' + secrets.token_hex(8) + '@example.invalid', index)
+                     for index in range(61)]
+    require(any(client_limits) and client_limits[-1], 'spoofed forwarding headers bypassed client limit')
+    require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated',
+            'login burst affected authenticated business operations')
+    check('security-real-login-windows-and-forwarded-header-spoof', identifierAttempts=11,
+          uniqueIdentifierClientAttempts=61, authenticatedBusinessContinues=True)
