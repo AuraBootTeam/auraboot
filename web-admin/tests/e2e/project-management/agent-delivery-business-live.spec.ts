@@ -284,11 +284,11 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await chat.getByTestId('chat-msg-agent').filter({ hasText: title }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(shots, 'D06-history-restored.png'), fullPage: true });
 
-  const revokedTitle = `撤权后不应创建-${fixture.suffix}`;
+  const revokedTitle = `培训安排复核-${fixture.suffix}`;
   const beforeRevoke = await businessSnapshot(page.request, fixture.project);
   await send(
     page,
-    `请为项目“${fixture.projectName}”创建任务“${revokedTitle}”，负责人林晓。实际调用创建工具，等待我确认。`,
+    `请为项目“${fixture.projectName}”创建任务“${revokedTitle}”，负责人林晓，截止2026-11-21，完成标准为核对培训日程与签到安排。请实际调用受控创建工具，等待我确认。`,
   );
   const pending = chat.getByTestId('aurabot-confirm-card').last();
   await expect(pending).toContainText(revokedTitle, { timeout: 90_000 });
