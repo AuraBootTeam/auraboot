@@ -72,13 +72,14 @@ public final class DynamicDataQueryScope implements AutoCloseable {
     public static FieldPermissionSet fieldPermissions(
             Long tenantId,
             String modelCode,
+            Long userId,
             Long memberId,
             Supplier<FieldPermissionSet> supplier) {
         State state = CURRENT.get();
         if (state == null) {
             return supplier.get();
         }
-        AccessKey key = new AccessKey(tenantId, modelCode, memberId);
+        FieldAccessKey key = new FieldAccessKey(tenantId, modelCode, userId, memberId);
         return state.fieldPermissions.computeIfAbsent(key, ignored -> supplier.get());
     }
 
@@ -127,7 +128,7 @@ public final class DynamicDataQueryScope implements AutoCloseable {
     private static final class State {
         private final Map<FilterKey, String> filters = new HashMap<>();
         private final Map<AccessKey, Set<String>> nonWritableFields = new HashMap<>();
-        private final Map<AccessKey, FieldPermissionSet> fieldPermissions = new HashMap<>();
+        private final Map<FieldAccessKey, FieldPermissionSet> fieldPermissions = new HashMap<>();
         private final Map<AccessKey, List<DataPermissionPolicy>> effectivePolicies = new HashMap<>();
         private int depth;
     }
@@ -149,4 +150,6 @@ public final class DynamicDataQueryScope implements AutoCloseable {
             Objects.requireNonNull(modelCode, "modelCode");
         }
     }
+
+    private record FieldAccessKey(Long tenantId, String modelCode, Long userId, Long memberId) {}
 }

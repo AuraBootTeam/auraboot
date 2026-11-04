@@ -7,15 +7,13 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
-import com.auraboot.framework.rbac.entity.Role;
-import com.auraboot.framework.rbac.service.UserRoleService;
-import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Field Permission Service implementation.
@@ -44,15 +42,19 @@ import java.util.stream.Collectors;
 public class FieldPermissionServiceImpl implements FieldPermissionService {
 
     private final MetaModelService metaModelService;
-    private final UserRoleService userRoleService;
-    private final RoleService roleService;
+    private final RoleMapper roleMapper;
+    private final List<MemberRoleContributor> memberRoleContributors;
 
     @Override
     public FieldPermissionSet getFieldPermissions(Long memberId, String modelCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (!Objects.equals(memberId, MetaContext.getCurrentMemberId())) {
+            return loadFieldPermissions(memberId, modelCode, tenantId);
+        }
         return DynamicDataQueryScope.fieldPermissions(
                 tenantId,
                 modelCode,
+                MetaContext.getCurrentUserId(),
                 memberId,
                 () -> loadFieldPermissions(memberId, modelCode, tenantId));
     }
@@ -64,16 +66,12 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
             return FieldPermissionSet.allAllowed(Set.of());
         }
 
-        Set<String> allFieldCodes = fields.stream()
-                .map(FieldDefinition::getCode)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
         // Roles cannot affect fields without a permission declaration. Avoid role IO entirely
         // for the common unrestricted model, while retaining the same evaluator for restricted fields.
         boolean hasFieldPermissions = fields.stream().map(this::extractFieldPermission)
                 .anyMatch(permission -> permission != null && !permission.isEmpty());
         Set<String> memberRoleCodes = hasFieldPermissions
-                ? resolveRoleCodes(userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId))
+                ? resolveRoleCodes(memberId, tenantId)
                 : Set.of();
 
         Set<String> viewableFields = new LinkedHashSet<>();
@@ -112,16 +110,23 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
     }
 
     /**
-     * Resolve role codes from role IDs.
+     * Read qualified role facts for the current actor without a cross-request authorization cache.
      */
-    private Set<String> resolveRoleCodes(List<Long> roleIds) {
-        if (roleIds == null || roleIds.isEmpty()) {
+    private Set<String> resolveRoleCodes(Long memberId, Long tenantId) {
+        Long userId = MetaContext.getCurrentUserId();
+        if (tenantId == null || tenantId <= 0 || userId == null || userId <= 0
+                || memberId == null || memberId <= 0 || !Objects.equals(memberId, MetaContext.getCurrentMemberId())) {
             return Set.of();
         }
-        return roleService.listByIds(roleIds).stream()
-                .map(Role::getCode)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        Set<Long> contributed = new LinkedHashSet<>();
+        for (MemberRoleContributor contributor : memberRoleContributors) {
+            List<Long> ids = contributor.findRoleIds(memberId, tenantId);
+            if (ids != null) {
+                ids.stream().filter(id -> id != null && id > 0).forEach(contributed::add);
+            }
+        }
+        return new LinkedHashSet<>(roleMapper.findEffectiveFieldRoleCodes(
+                tenantId, userId, memberId, List.copyOf(contributed)));
     }
 
     /**

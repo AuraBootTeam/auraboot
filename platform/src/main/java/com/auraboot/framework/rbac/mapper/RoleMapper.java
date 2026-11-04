@@ -17,6 +17,39 @@ import java.util.Set;
 @Mapper
 public interface RoleMapper extends BaseMapper<Role> {
 
+    /** Live field-role projection, including governed team/department contributions. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @org.apache.ibatis.annotations.Options(useCache = false,
+            flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
+    @Select("""
+        <script>
+        SELECT DISTINCT r.code FROM ab_role r
+        JOIN ab_tenant_member m ON m.id=#{memberId} AND m.tenant_id=#{tenantId}
+        JOIN ab_user u ON u.id=m.user_id AND u.id=#{userId}
+        WHERE (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.status='active' AND r.deleted_flag=FALSE
+          AND m.status='active' AND m.deleted_flag=FALSE
+          AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+          AND r.code IS NOT NULL
+          AND (EXISTS (
+            SELECT 1 FROM ab_user_role ur
+            WHERE ur.role_id=r.id AND ur.member_id=m.id AND ur.tenant_id=m.tenant_id
+              AND ur.status='active' AND ur.deleted_flag=FALSE
+              AND (ur.effective_date IS NULL OR ur.effective_date &lt;= CURRENT_DATE)
+              AND (ur.expiry_date IS NULL OR ur.expiry_date &gt;= CURRENT_DATE)
+          )
+          <if test="contributedRoleIds != null and !contributedRoleIds.isEmpty()">
+            OR r.id IN
+            <foreach collection="contributedRoleIds" item="roleId" open="(" separator="," close=")">
+              #{roleId}
+            </foreach>
+          </if>
+          ) ORDER BY r.code
+        </script>
+        """)
+    List<String> findEffectiveFieldRoleCodes(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+            @Param("memberId") Long memberId, @Param("contributedRoleIds") List<Long> contributedRoleIds);
+
     /** Effective actor facts for business guards, read in the caller's authorization snapshot. */
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
     @Select("""

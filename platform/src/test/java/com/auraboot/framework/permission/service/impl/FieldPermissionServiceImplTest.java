@@ -6,16 +6,14 @@ import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
-import com.auraboot.framework.rbac.entity.Role;
-import com.auraboot.framework.rbac.service.RoleService;
-import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -26,8 +24,6 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,12 +53,11 @@ class FieldPermissionServiceImplTest {
         assertThatThrownBy(() -> service.getFieldPermissions(1L, "model.user"))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessage("Invalid field permission declaration for field: salary");
-        verifyNoInteractions(userRoleService, roleService);
+        verifyNoInteractions(roleMapper, contributor);
     }
 
     @Test
     void unrelatedExtensionDoesNotHideDynamicPermission() {
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
         when(metaModelService.getModelFields("model.user"))
                 .thenReturn(List.of(field("salary", Map.of(
                         "extension", Map.of("helpText", "Salary"),
@@ -79,17 +74,18 @@ class FieldPermissionServiceImplTest {
     private MetaModelService metaModelService;
 
     @Mock
-    private UserRoleService userRoleService;
+    private RoleMapper roleMapper;
 
     @Mock
-    private RoleService roleService;
+    private MemberRoleContributor contributor;
 
-    @InjectMocks
     private FieldPermissionServiceImpl service;
 
     @BeforeEach
     void setUp() {
         MetaContext.setContext(100L, 1L, "user-pid", "tester");
+        MetaContext.setMemberId(1L);
+        service = new FieldPermissionServiceImpl(metaModelService, roleMapper, List.of(contributor));
     }
 
     @AfterEach
@@ -113,7 +109,7 @@ class FieldPermissionServiceImplTest {
         assertThat(result.viewableFields()).isEmpty();
         assertThat(result.editableFields()).isEmpty();
         assertThat(result.hiddenFields()).isEmpty();
-        verifyNoInteractions(userRoleService, roleService);
+        verifyNoInteractions(roleMapper, contributor);
     }
 
     @Test
@@ -128,7 +124,7 @@ class FieldPermissionServiceImplTest {
                     .containsExactly("name");
         }
 
-        verifyNoInteractions(userRoleService, roleService);
+        verifyNoInteractions(roleMapper, contributor);
         verify(metaModelService, times(1)).getModelFields("model.user");
     }
 
@@ -147,11 +143,7 @@ class FieldPermissionServiceImplTest {
 
     @Test
     void hidesFieldWhenMemberRoleNotInViewList() {
-        Role admin = new Role();
-        admin.setId(7L);
-        admin.setCode("admin");
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(admin));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of("admin"));
 
         Map<String, Object> fp = Map.of(
                 "view", List.of("sales_manager"),
@@ -170,11 +162,7 @@ class FieldPermissionServiceImplTest {
 
     @Test
     void readsFieldPermissionFromNestedExtensionMap() {
-        Role low = new Role();
-        low.setId(7L);
-        low.setCode("low_field_viewer");
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(low));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of("low_field_viewer"));
 
         Map<String, Object> fieldPermission = Map.of(
                 "view", List.of("full_field_editor"),
@@ -192,11 +180,7 @@ class FieldPermissionServiceImplTest {
 
     @Test
     void readsFieldPermissionFromDynamicPropertiesExtensionMap() {
-        Role low = new Role();
-        low.setId(7L);
-        low.setCode("low_field_viewer");
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(low));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of("low_field_viewer"));
 
         Map<String, Object> fieldPermission = Map.of(
                 "view", List.of("low_field_viewer"),
@@ -215,11 +199,7 @@ class FieldPermissionServiceImplTest {
 
     @Test
     void allowsViewButNotEditWhenOnlyInViewList() {
-        Role admin = new Role();
-        admin.setId(7L);
-        admin.setCode("admin");
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.listByIds(List.of(7L))).thenReturn(List.of(admin));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of("admin"));
 
         Map<String, Object> fp = Map.of(
                 "view", List.of("admin"),
@@ -236,14 +216,7 @@ class FieldPermissionServiceImplTest {
 
     @Test
     void unionsAccessAcrossMultipleRoles() {
-        Role r1 = new Role();
-        r1.setId(7L);
-        r1.setCode("admin");
-        Role r2 = new Role();
-        r2.setId(8L);
-        r2.setCode("manager");
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L, 8L));
-        when(roleService.listByIds(List.of(7L, 8L))).thenReturn(List.of(r1, r2));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of("admin", "manager"));
 
         Map<String, Object> fp = Map.of(
                 "view", List.of("manager"),
@@ -259,7 +232,6 @@ class FieldPermissionServiceImplTest {
 
     @Test
     void emptyAllowedListIsTreatedAsAllowed() {
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
         Map<String, Object> fp = Map.of(
                 "view", List.of(),
                 "edit", List.of());
@@ -273,9 +245,48 @@ class FieldPermissionServiceImplTest {
     }
 
     @Test
-    void skipsRolesWhenRoleServiceReturnsNull() {
-        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(roleService.listByIds(List.of(7L))).thenReturn(List.of());
+    void qualifiesContributedRolesThroughTheSameActorQuery() {
+        when(metaModelService.getModelFields("model.user"))
+                .thenReturn(List.of(field("salary", Map.of("fieldPermission", Map.of("view", List.of("team_viewer"))))));
+        when(contributor.findRoleIds(1L, 100L)).thenReturn(java.util.Arrays.asList(null, -1L, 7L, 7L));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of(7L)))
+                .thenReturn(List.of("team_viewer"));
+
+        assertThat(service.getFieldPermissions(1L, "model.user").viewableFields()).containsExactly("salary");
+    }
+
+    @Test
+    void currentUserChangesCannotReuseAnotherActorsFieldResult() {
+        when(metaModelService.getModelFields("model.user"))
+                .thenReturn(List.of(field("salary", Map.of("fieldPermission", Map.of("view", List.of("admin"))))));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of("admin"));
+        try (DynamicDataQueryScope ignored = DynamicDataQueryScope.open()) {
+            assertThat(service.getFieldPermissions(1L, "model.user").viewableFields()).containsExactly("salary");
+            MetaContext.setContext(100L, 2L, "other-user", "other");
+            MetaContext.setMemberId(1L);
+            assertThat(service.getFieldPermissions(1L, "model.user").hiddenFields()).containsExactly("salary");
+        }
+        verify(roleMapper).findEffectiveFieldRoleCodes(100L, 2L, 1L, List.of());
+    }
+
+    @Test
+    void mismatchedCurrentMemberCannotReuseAnAllowedFieldResult() {
+        when(metaModelService.getModelFields("model.user"))
+                .thenReturn(List.of(field("salary", Map.of("fieldPermission", Map.of("view", List.of("admin"))))));
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of("admin"));
+        try (DynamicDataQueryScope ignored = DynamicDataQueryScope.open()) {
+            assertThat(service.getFieldPermissions(1L, "model.user").viewableFields()).containsExactly("salary");
+            MetaContext.setMemberId(2L);
+            assertThat(service.getFieldPermissions(1L, "model.user").hiddenFields()).containsExactly("salary");
+            MetaContext.setMemberId(null);
+            assertThat(service.getFieldPermissions(1L, "model.user").hiddenFields()).containsExactly("salary");
+        }
+        verify(roleMapper, times(1)).findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of());
+    }
+
+    @Test
+    void hidesFieldsWhenNoEffectiveRolesRemain() {
+        when(roleMapper.findEffectiveFieldRoleCodes(100L, 1L, 1L, List.of())).thenReturn(List.of());
 
         Map<String, Object> fp = Map.of("view", List.of("admin"));
         when(metaModelService.getModelFields("model.user"))
