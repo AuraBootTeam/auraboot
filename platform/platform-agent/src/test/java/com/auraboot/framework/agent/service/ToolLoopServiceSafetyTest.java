@@ -89,10 +89,13 @@ class ToolLoopServiceSafetyTest {
         ReflectionTestUtils.setField(service, "observabilityService", observabilityService);
     }
 
-    @Test
-    void commandAuthorizationDenialRetainsItsTypedNonretryableBoundary() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void commandAuthorizationDenialRetainsItsTypedNonretryableBoundary(boolean commandBusinessRefusal) throws Exception {
         when(commandExecutor.execute(eq("tpm:create_task"), any())).thenThrow(
-                new org.springframework.security.access.AccessDeniedException("private role and tenant details"));
+                commandBusinessRefusal
+                        ? new com.auraboot.framework.exception.BusinessException(com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN,"private role and tenant details")
+                        : new org.springframework.security.access.AccessDeniedException("private role and tenant details"));
         var definition = AgentToolDefinition.builder().name("cmd:tpm:create_task").sourceCode("tpm:create_task")
                 .toolType("dsl_command").riskLevel("L0").build();
         String raw = service.executeToolCall(1L, "run", "task", "delivery", definition.getName(),

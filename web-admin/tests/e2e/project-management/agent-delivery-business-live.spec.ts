@@ -288,6 +288,8 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     await expect(chat).toContainText(/操作未完成|未完成|创建.*失败|无权|权限/);
     expect(await taskRows(page.request, title)).toHaveLength(0);
     expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
+    await expect(chat.getByText(/人工确认不会授予权限/)).toBeVisible();
+    await chat.getByText(/人工确认不会授予权限/).scrollIntoViewIfNeeded();
     await page.screenshot({
       animations: 'disabled',
       path: join(shots, 'D10-revoked-before-confirmation.png'),
@@ -462,6 +464,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     observer.getByTestId('agent-chat-page').getByTestId('chat-msg-agent').last(),
   ).toContainText('67');
   expect(await businessSnapshot(observer.request, fixture.project)).toEqual(beforeRecovery);
+  await observer.getByTestId('agent-chat-page').getByTestId('chat-msg-agent').last().scrollIntoViewIfNeeded();
   await observer.screenshot({
     animations: 'disabled',
     path: join(shots, 'O04-recovered-history.png'),
