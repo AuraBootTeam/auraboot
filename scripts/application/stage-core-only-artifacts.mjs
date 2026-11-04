@@ -472,6 +472,7 @@ async function main() {
   copyFileSync(manifestPath, resolve(output, 'app.yaml'));
   copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(output, 'LICENSE.txt'));
   copyFileSync(resolve(repoRoot, 'NOTICE'), resolve(output, 'NOTICE'));
+  copyFileSync(resolve(repoRoot, 'distribution/application/native-install.md'), resolve(output, 'INSTALL.md'));
   mkdirSync(resolve(output, 'bin/lib'), { recursive: true });
   copyFileSync(resolve(repoRoot, 'scripts/lib/runtime-process-owner.sh'), resolve(output, 'bin/lib/runtime-process-owner.sh'));
 

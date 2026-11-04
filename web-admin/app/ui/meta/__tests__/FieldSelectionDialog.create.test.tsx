@@ -59,6 +59,13 @@ describe('new field creation action', () => {
     const { onClose } = setup();
     fireEvent.click(screen.getByTestId('field-selection-create-bind'));
     expect(await screen.findByTestId('field-create-duplicate')).toHaveTextContent('already exists');
+    const codeInput = screen.getByPlaceholderText('例如: user_name, email, age');
+    expect(codeInput).toHaveAttribute('aria-invalid', 'true');
+    expect(codeInput).toHaveAttribute('aria-describedby', 'new-field-code-error');
+    expect(screen.getByTestId('field-create-duplicate').parentElement).toContainElement(codeInput);
+    fireEvent.change(codeInput, { target: { value: 'another_customer_name' } });
+    await waitFor(() => expect(screen.queryByTestId('field-create-duplicate')).not.toBeInTheDocument());
+
     expect(fieldLibraryService.createField).not.toHaveBeenCalled();
     expect(modelService.bindFieldToModel).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();

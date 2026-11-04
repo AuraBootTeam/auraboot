@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -34,7 +35,7 @@ def main():
     base = f'http://127.0.0.1:{backend_port}'
     container = 'aura-oss-trial-' + hashlib.sha256(job.encode()).hexdigest()[:16]
     pg_image = 'pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a'
-    lifecycle = current / 'bin/application/auraboot-core-env.sh'
+    lifecycle = current / 'bin/auraboot-core-env.sh'
     spec = importlib.util.spec_from_file_location('native_admin_session', current / 'bin/application/core-admin-session.py')
     session_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(session_module)
@@ -56,7 +57,8 @@ def main():
         require(result.returncode == accepted, f'{name} failed with exit {result.returncode}; private log retained')
     def cli(action, package, database):
         settings = dict(env, AURA_APP_ARTIFACT_ROOT=str(package), PGDATABASE=database,
-                        AURA_STATE_ROOT=str(private / ('state-' + database + '-' + package.name)))
+                        AURA_STATE_ROOT=str(private / ('state-' + database)),
+                        AURA_FILE_STORAGE_PATH=str(private / ('state-' + database) / 'files'))
         run(['bash', lifecycle, action], database + '-' + package.name + '-' + action, settings)
     def request(path, method='GET', body=None, headers=None):
         data = None if body is None else json.dumps(body).encode()
@@ -164,6 +166,21 @@ def main():
         replay = api(token, '/api/meta/commands/execute/' + command_code, 'POST', payload)
         require(replay['idempotentReplay'] is True and replay['data']['recordPid'] == pid, 'idempotent replay created a different record')
         record_probe(token, code, pid, 68000)
+        attachment_bytes = b'Customer delivery acceptance material. Budget approved: 68000.\n'
+        boundary = 'native-' + secrets.token_hex(12)
+        multipart = ('--' + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="delivery-acceptance.txt"\r\nContent-Type: text/plain\r\n\r\n').encode() + attachment_bytes + ('\r\n--' + boundary + '--\r\n').encode()
+        upload = urllib.request.Request(base + '/api/file/upload', data=multipart, method='POST',
+            headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'multipart/form-data; boundary=' + boundary})
+        with urllib.request.urlopen(upload, timeout=60) as response:
+            uploaded = json.load(response)
+        require(str(uploaded.get('code')) == '0', 'attachment upload failed')
+        file_id = uploaded['data']['fileId']
+        def assert_attachment():
+            download = urllib.request.Request(base + '/api/file/download/' + file_id, headers={'Authorization': 'Bearer ' + token})
+            with urllib.request.urlopen(download, timeout=60) as response:
+                require(response.read() == attachment_bytes, 'attachment bytes changed or missing')
+        assert_attachment()
+        (output / 'attachment.json').write_text(json.dumps({'fileId': file_id, 'name': 'delivery-acceptance.txt', 'sha256': hashlib.sha256(attachment_bytes).hexdigest()}))
         role_code = 'native_trial_reader'
         role = api(token, '/api/roles', 'POST', {'code': role_code, 'name': 'Native trial reader',
             'type': 'custom', 'status': 'active', 'scopeType': 'tenant', 'defaultDataScopeType': 'all'})
@@ -194,6 +211,7 @@ def main():
             require(any(row.get('commandCode') == command_code and row.get('success') is True
                         for row in rows), 'successful command audit evidence missing')
         assert_permissions_and_audit()
+        assert_attachment()
         check('previous-package-command-idempotency-permission-audit', recordPid=pid, amount=68000)
 
         stop()
@@ -201,19 +219,30 @@ def main():
         token = login()
         record_probe(token, code, pid, 68000)
         assert_permissions_and_audit()
+        assert_attachment()
         check('old-to-new-upgrade-preserves-business', previousSource=json.loads((previous / 'release-receipt.json').read_text())['source']['commit'], currentSource=json.loads((current / 'release-receipt.json').read_text())['source']['commit'], amount=68000)
         dump = private / 'candidate-backup.dump'
-        run(['pg_dump', '-Fc', '-h', env['PGHOST'], '-p', port, '-U', 'auraboot', '-d', 'aura_candidate_upgrade', '-f', dump], 'backup')
+        with dump.open('wb') as backup_stream, (private / 'backup.log').open('ab') as backup_log:
+            backup = subprocess.run(['docker', 'exec', container, 'pg_dump', '-U', 'auraboot', '-Fc', '-d', 'aura_candidate_upgrade'], stdout=backup_stream, stderr=backup_log, timeout=900)
+        require(backup.returncode == 0, 'source-major PostgreSQL backup failed')
         require(dump.stat().st_size > 0, 'empty backup rejected')
+        files_backup = private / 'files-backup'
+        shutil.copytree(private / 'state-aura_candidate_upgrade/files', files_backup)
         api(token, f'/api/dynamic/{code}/{pid}', 'PUT', {code + '_amount': 999999})
         record_probe(token, code, pid, 999999)
         stop()
         run(['createdb', '-h', env['PGHOST'], '-p', port, '-U', 'auraboot', 'aura_candidate_restore'], 'restore-create-empty-db')
-        run(['pg_restore', '--exit-on-error', '-h', env['PGHOST'], '-p', port, '-U', 'auraboot', '-d', 'aura_candidate_restore', dump], 'restore')
+        with dump.open('rb') as backup_stream, (private / 'restore.log').open('ab') as restore_log:
+            restore = subprocess.run(['docker', 'exec', '-i', container, 'pg_restore', '--exit-on-error', '-U', 'auraboot', '-d', 'aura_candidate_restore'], stdin=backup_stream, stdout=restore_log, stderr=subprocess.STDOUT, timeout=900)
+        require(restore.returncode == 0, 'source-major PostgreSQL restore failed')
+        restore_files = private / 'state-aura_candidate_restore/files'
+        restore_files.parent.mkdir(exist_ok=True)
+        shutil.copytree(files_backup, restore_files)
         start(current, 'aura_candidate_restore')
         token = login()
         record_probe(token, code, pid, 68000)
         assert_permissions_and_audit()
+        assert_attachment()
         check('backup-restore-recovers-record', observedBeforeRecovery=999999, restoredAmount=68000, backupSha256=hashlib.sha256(dump.read_bytes()).hexdigest())
         # The original unpack verifier must reject corrupt bytes before creating an active target.
         corrupt = output / 'corrupt-candidate.tar'

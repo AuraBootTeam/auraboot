@@ -96,6 +96,13 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('field-selection-create-bind').click();
   expect((await (await duplicate).json()).data).toBe(false);
   await expect(page.getByTestId('field-create-duplicate')).toBeVisible();
+  await expect(page.getByTestId('field-create-duplicate')).toBeInViewport();
+  const duplicateBox = await page.getByTestId('field-create-duplicate').boundingBox();
+  const submitBox = await page.getByTestId('field-selection-create-bind').boundingBox();
+  expect(duplicateBox).not.toBeNull();
+  expect(submitBox).not.toBeNull();
+  expect(duplicateBox!.y + duplicateBox!.height).toBeLessThan(submitBox!.y);
+
   await screenshot(page, info, 'SC02-duplicate-field-denied');
   await invalidDialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(invalidDialog).toBeHidden();

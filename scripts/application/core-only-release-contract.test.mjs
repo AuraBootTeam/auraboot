@@ -129,6 +129,25 @@ test('image verification creates a private per-attempt encryption key and refuse
   assert.match(productImageGate, /--env-file "\$RUNTIME_CRYPTO_ENV_FILE"/);
 });
 
+test('native install guide creates private persistent keys once and refuses to rotate them', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'native-guide-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const artifact = join(directory, 'artifact'); mkdirSync(artifact);
+  const guide = readFileSync(join(root, 'distribution/application/native-install.md'), 'utf8');
+  const code = guide.match(/python3 - <<'PY'\n([\s\S]*?)\nPY/)?.[1];
+  assert.ok(code, 'literal first-install configuration command must exist');
+  const run = () => spawnSync('python3', ['-c', code], { cwd: artifact, encoding: 'utf8' });
+  assert.equal(run().status, 0);
+  const config = join(directory, 'core-runtime.env');
+  assert.equal(statSync(config).mode & 0o777, 0o600);
+  const before = createHash('sha256').update(readFileSync(config)).digest('hex');
+  for (const key of ['JWT_SECRET', 'SESSION_SECRET', 'FIELD_ENCRYPTION_KEY', 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY']) {
+    assert.ok(readFileSync(config, 'utf8').includes(key + '='), 'generated configuration must include ' + key);
+  }
+  assert.notEqual(run().status, 0);
+  assert.equal(createHash('sha256').update(readFileSync(config)).digest('hex'), before);
+});
+
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
   assert.match(stage, /platform\/gradlew/);
   assert.match(stage, /'clean', 'bootJar', '--no-daemon', '-x', 'test'/);

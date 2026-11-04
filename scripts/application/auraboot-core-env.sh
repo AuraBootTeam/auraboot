@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 DRIVER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# The public bin entry and nested source driver share one module directory.
+if [[ -f "$DRIVER_DIR/application/auraboot-core-env.sh" ]]; then DRIVER_DIR="$DRIVER_DIR/application"; fi
 ACTION="${1:-}"
 shift || true
 ARTIFACT_ROOT="${AURA_APP_ARTIFACT_ROOT:-}"
@@ -94,7 +96,7 @@ start_backend() {
   aura_reset_assert_service_absent backend "$APP_PORT" "$ARTIFACT_ROOT" AuraBoot-1.0.0-boot.jar
   local pid
   pid="$(aura_reset_spawn_detached "$ARTIFACT_ROOT" "$STATE_ROOT/runtime.log" env \
-  AURA_APPLICATION_MODE=core-only AURABOOT_BOOTSTRAP_ENABLED=false AURABOOT_DEMO_SEED=false JWT_SECRET="$JWT_SECRET" \
+  AURA_APPLICATION_MODE=core-only AURABOOT_BOOTSTRAP_ENABLED=false AURABOOT_DEMO_SEED=false JWT_SECRET="$JWT_SECRET" AURA_FILE_STORAGE_PATH="${AURA_FILE_STORAGE_PATH:-$STATE_ROOT/files}" \
   java -Daura.plugins.dir="$STATE_ROOT/empty-plugins" -jar "$ARTIFACT_ROOT/runtime/AuraBoot-1.0.0-boot.jar" \
     --server.port="$APP_PORT" --spring.profiles.active="$SPRING_PROFILES_ACTIVE" --spring.datasource.url="$JDBC_URL" \
     --spring.datasource.username="$DB_USER" --spring.datasource.password="$DB_PASSWORD" \
@@ -196,7 +198,7 @@ verify() {
 }
 # Reuse the same ownership contract as managed development runtimes. Native
 # packages have two listeners (the production BFF also serves the client).
-source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../lib" && pwd)/runtime-process-owner.sh"
+source "$DRIVER_DIR/../lib/runtime-process-owner.sh"
 native_owner_init() {
   [[ "${NATIVE_OWNER_READY:-0}" == 1 ]] && return
   mkdir -p "$STATE_ROOT"
