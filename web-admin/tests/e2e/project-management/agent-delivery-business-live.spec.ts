@@ -268,6 +268,27 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(chat.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
   expect(await taskRows(page.request, title)).toHaveLength(1);
   await page.screenshot({ path: join(shots, 'D06-history-restored.png'), fullPage: true });
+
+  const revokedTitle = `撤权后不应创建-${fixture.suffix}`;
+  const beforeRevoke = await businessSnapshot(page.request, fixture.project);
+  await send(page, `请为项目“${fixture.projectName}”创建任务“${revokedTitle}”，负责人林晓。实际调用创建工具，等待我确认。`);
+  const pending = chat.getByTestId('aurabot-confirm-card').last();
+  await expect(pending).toContainText(revokedTitle, { timeout: 90_000 });
+  await body(await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids: [] } }));
+  try {
+    const decision = page.waitForResponse((response) => response.url().includes('/api/ai/aurabot/execute') && response.request().method() === 'POST');
+    await pending.getByTestId('aurabot-confirm-approve').click();
+    const receipt = await decision;
+    expect(receipt.ok()).toBe(true);
+    expect(await receipt.text()).toMatch(/permission|denied|revoked|权限|无权/i);
+    await expect(chat).toContainText(/权限|无权/);
+    expect(await taskRows(page.request, revokedTitle)).toHaveLength(0);
+    expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
+    await page.screenshot({ path: join(shots, 'D10-revoked-before-confirmation.png'), fullPage: true });
+  } finally {
+    await body(await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }));
+  }
+
 });
 
 test('D2: customer notes create a reviewed task draft without saving or replacing the selected project', async ({

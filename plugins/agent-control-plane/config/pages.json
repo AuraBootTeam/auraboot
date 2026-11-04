@@ -4030,6 +4030,11 @@
     "layout": {
       "type": "stack"
     },
+    "extension": {
+      "showEdit": false,
+      "showBack": false,
+      "showPrint": false
+    },
     "blocks": [
       {
         "id": "ai_colleagues_grid",
@@ -4046,6 +4051,11 @@
     "schemaVersion": 4,
     "layout": {
       "type": "stack"
+    },
+    "extension": {
+      "showEdit": false,
+      "showBack": false,
+      "showPrint": false
     },
     "blocks": [
       {
@@ -4085,6 +4095,11 @@
     "schemaVersion": 4,
     "layout": {
       "type": "stack"
+    },
+    "extension": {
+      "showEdit": false,
+      "showBack": false,
+      "showPrint": false
     },
     "blocks": [
       {

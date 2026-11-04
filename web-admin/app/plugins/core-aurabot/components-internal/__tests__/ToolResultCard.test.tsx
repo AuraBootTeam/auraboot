@@ -5,6 +5,12 @@ import { render, screen } from '@testing-library/react';
 import { ToolResultCard } from '../ToolResultCard';
 
 describe('ToolResultCard', () => {
+  it('keeps empty model query results readable without exposing the model identifier', () => {
+    render(<ToolResultCard toolName="list_tpm_milestone" result={{ records: [], total: 0 }} success />);
+    expect(screen.getByRole('button')).toHaveTextContent('查询业务记录');
+    expect(screen.getByRole('button')).not.toHaveTextContent(/tpm_|LIST/);
+  });
+
   it('shows a pending policy decision without exposing transport metadata or claiming completion', () => {
     render(
       <ToolResultCard

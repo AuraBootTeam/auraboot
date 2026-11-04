@@ -785,6 +785,14 @@ function ReviewRow({
   mono?: boolean;
   testId?: string;
 }) {
+  if (mono) {
+    return (
+      <details className="text-text text-sm" data-testid={testId}>
+        <summary className="text-text-3 cursor-pointer font-medium">{label}</summary>
+        <pre className="border-border bg-panel mt-2 max-h-48 overflow-auto rounded border p-3 font-mono text-xs whitespace-pre-wrap">{value}</pre>
+      </details>
+    );
+  }
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-start" data-testid={testId}>
       <span className="text-text-3 dark:text-text-3 shrink-0 text-sm font-medium sm:w-40">

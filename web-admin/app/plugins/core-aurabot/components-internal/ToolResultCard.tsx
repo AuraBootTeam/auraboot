@@ -66,7 +66,12 @@ export function ToolResultCard({ toolName, result, success }: ToolResultCardProp
   }
 
   const records = extractRecords(result);
-  const displayName = formatToolDisplayName(toolName, locale.toLowerCase().startsWith('zh'));
+  const query = /^(list|get)[:_]([a-z][a-z0-9_]*)$/.exec(toolName);
+  const isZh = locale.toLowerCase().startsWith('zh');
+  const modelLabel = query ? t(`model.${query[2]}._meta.label`, undefined, isZh ? '业务记录' : 'records') : '';
+  const displayName = query
+    ? `${query[1] === 'list' ? isZh ? '查询' : 'List ' : isZh ? '查看' : 'View '}${modelLabel}`
+    : formatToolDisplayName(toolName, isZh);
   const recordCount = records ? records.length : null;
   const recordLabel = (count: number) =>
     count === 1
