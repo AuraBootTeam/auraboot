@@ -127,6 +127,10 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
 
         lenient().when(metadataService.getModelDefinition(MODEL_CODE)).thenReturn(Optional.of(model));
         lenient().when(metadataService.getDefinitionByCode(MODEL_CODE)).thenReturn(model);
+        lenient().when(metadataService.getModelFields(MODEL_CODE)).thenAnswer(inv -> model.getFields());
+        lenient().when(fieldPermissionService.getFieldPermissions(anyLong(),eq(MODEL_CODE))).thenAnswer(inv ->
+                com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(
+                        model.getFields().stream().map(FieldDefinition::getCode).collect(java.util.stream.Collectors.toSet())));
         lenient().when(metadataService.getPrimaryKeyField(MODEL_CODE)).thenReturn(pk);
         lenient().when(tableMetadataService.tableExists("mt_" + MODEL_CODE)).thenReturn(true);
         lenient().when(dataPermissionEngine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID))
@@ -167,14 +171,44 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         // so a permitted read reaches the end instead of failing closed on a bare mock.
         lenient().when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE), anyMap(), anyLong()))
                 .thenAnswer(inv -> inv.getArgument(1));
-        lenient().when(fieldPermissionService.getFieldPermissions(anyLong(), eq(MODEL_CODE)))
-                .thenReturn(com.auraboot.framework.permission.engine.model.FieldPermissionSet
-                        .allAllowed(java.util.Set.of("pid", "name")));
+
     }
 
     @AfterEach
     void clearContext() {
         MetaContext.clear();
+    }
+
+    private void readonlyName() {
+        when(fieldPermissionService.getFieldPermissions(USER_ID,MODEL_CODE)).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(
+                        java.util.Set.of("pid","name"),java.util.Set.of("pid"),java.util.Set.of()));
+    }
+
+    @Test
+    void dslReadonlyFieldRejectsCreateAndBulkCreateBeforePersistence() {
+        readonlyName();
+        assertThatThrownBy(()->service.create(MODEL_CODE,new HashMap<>(Map.of("name","forbidden"))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->service.bulkCreate(MODEL_CODE,List.of(new HashMap<>(Map.of("name","forbidden")))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void dslReadonlyFieldRejectsCompareAndSetBeforePersistence() {
+        readonlyName();
+        assertThatThrownBy(()->service.compareAndSet(MODEL_CODE,RECORD_ID,"name","old","forbidden"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void dslReadonlyFieldRejectsChangedNativeUpdate() {
+        stubReadVerdict(true); readonlyName();
+        assertThatThrownBy(()->service.update(MODEL_CODE,RECORD_ID,Map.of("name","forbidden")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
     }
 
     @Test

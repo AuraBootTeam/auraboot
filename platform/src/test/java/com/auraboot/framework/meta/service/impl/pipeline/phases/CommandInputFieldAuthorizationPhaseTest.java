@@ -13,13 +13,15 @@ import static org.mockito.Mockito.*;
 
 class CommandInputFieldAuthorizationPhaseTest {
     final DataPermissionEngine policies = mock(DataPermissionEngine.class);
-    final CommandInputFieldAuthorizationPhase phase = new CommandInputFieldAuthorizationPhase(policies);
+    final com.auraboot.framework.meta.service.MetaModelService metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
+    final com.auraboot.framework.permission.service.FieldPermissionService fields = mock(com.auraboot.framework.permission.service.FieldPermissionService.class);
+    final CommandInputFieldAuthorizationPhase phase = new CommandInputFieldAuthorizationPhase(policies, metadata, fields);
     final CommandPipelineContext context = CommandPipelineContext.builder().build();
 
     @BeforeEach void prepare() {
         MetaContext.setContext(7L,20L,"actor","Actor"); MetaContext.setMemberId(30L);
         var command = new CommandDefinition(); command.setModelCode("orders"); context.setCommand(command);
-        when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(Set.of("cost"));
+        lenient().when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(Set.of("cost"));
     }
     @AfterEach void clear() { MetaContext.clear(); }
     @Test void declaredCommandAuthorityCannotOverrideInputFieldRestrictions() {
@@ -38,5 +40,44 @@ class CommandInputFieldAuthorizationPhaseTest {
     }
     @Test void emptyInputDoesNotCheckDerivedInternalWrites() {
         context.setPayload(Map.of()); phase.execute(context); verifyNoInteractions(policies);
+    }
+
+    private void dsl(String model) {
+        lenient().when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(Set.of());
+        lenient().when(metadata.getModelFields(model)).thenReturn(List.of(
+                com.auraboot.framework.meta.dto.FieldDefinition.builder().code("cost").columnName("cost_column").build(),
+                com.auraboot.framework.meta.dto.FieldDefinition.builder().code("description").columnName("description").build()));
+        lenient().when(fields.getFieldPermissions(30L,model)).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(Set.of("cost","description"),Set.of("description"),Set.of()));
+    }
+    @Test void implicitDslWriteChecksPresentNullBeforeReplay() {
+        dsl("orders"); context.setExecConfig(Map.of("type","update"));
+        var payload = new HashMap<String,Object>(); payload.put("cost",null); context.setPayload(payload);
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+    @Test void dslWriteCannotUseAColumnAliasToBypassTheField() {
+        dsl("orders"); context.setExecConfig(Map.of("type","create","inputFields",List.of("cost_column")));
+        context.setPayload(Map.of("cost_column",99));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+    @Test void crossModelBindingChecksTheTargetFieldRatherThanTheInputName() {
+        dsl("bills"); context.getCommand().setModelCode(null);
+        var mapping = new com.auraboot.framework.meta.entity.BindingRule();
+        mapping.setSourceField("amount"); mapping.setTargetModel("bills"); mapping.setTargetField("cost");
+        context.setRulesByType(Map.of("field_map",List.of(mapping))); context.setPayload(Map.of("amount",99));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+    @Test void readOnlyFilterInputIsNotAnEditAttempt() {
+        when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(Set.of());
+        context.setExecConfig(Map.of("type","query","inputFields",List.of("cost")));
+        context.setPayload(Map.of("cost",99)); phase.execute(context);
+        verifyNoInteractions(metadata,fields);
+    }
+    @Test void derivedTransitionFieldsDoNotRequireUserEditRights() {
+        dsl("orders");
+        context.setExecConfig(Map.of("type","state_transition","inputFields",List.of("description"),
+                "stateField","cost","toState","approved"));
+        context.setPayload(Map.of("description","approved by operator")); phase.execute(context);
+        assertThat(context.getPayload()).containsExactly(Map.entry("description","approved by operator"));
     }
 }

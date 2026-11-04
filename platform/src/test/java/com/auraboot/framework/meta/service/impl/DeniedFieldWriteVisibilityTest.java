@@ -24,6 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DeniedFieldWriteVisibilityTest {
 
+    @Test
+    void hiddenStoredValueCannotProveThatANullSubmissionWasUnchanged() {
+        assertThrows(AccessDeniedException.class, () ->
+                DynamicDataServiceImpl.assertNoDeniedFieldWrites(
+                        MODEL, submitted("cost_price", null), stripped("cost_price"), Map.of("memo", "old")));
+    }
+
     private static final String MODEL = "quote";
 
     private Map<String, Object> stored() {

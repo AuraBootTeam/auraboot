@@ -145,6 +145,10 @@ final class DynamicDataBatchSupport extends BaseMetaService {
                 // Check if record already exists (idempotent behavior)
                 Object primaryKeyValue = data.get(primaryKey.getCode());
                 if (primaryKeyValue != null) {
+                    if (!stripNonWritableFields(modelCode, new LinkedHashMap<>(data)).isEmpty()) {
+                        throw new org.springframework.security.access.AccessDeniedException(
+                                "FIELD_WRITE_DENIED: batch create contains a non-writable field");
+                    }
                     try {
                         Map<String, Object> existingRecord = getById(modelCode, primaryKeyValue.toString());
                         if (existingRecord != null) {

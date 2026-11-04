@@ -75,16 +75,22 @@ class CommandPipelinePhaseOrderTest {
 
     @Test void forbiddenInputStopsTheConfiguredPipelineBeforeCachedOutcomeLookup() throws Exception {
         var policies = org.mockito.Mockito.mock(com.auraboot.framework.meta.service.DataPermissionEngine.class);
-        org.mockito.Mockito.when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(java.util.Set.of("cost"));
+        org.mockito.Mockito.when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(java.util.Set.of());
+        var metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
+        var fields = mock(com.auraboot.framework.permission.service.FieldPermissionService.class);
+        org.mockito.Mockito.when(metadata.getModelFields("orders")).thenReturn(java.util.List.of(
+                com.auraboot.framework.meta.dto.FieldDefinition.builder().code("cost").columnName("cost").build()));
+        org.mockito.Mockito.when(fields.getFieldPermissions(30L,"orders")).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(java.util.Set.of("cost"),java.util.Set.of(),java.util.Set.of()));
         com.auraboot.framework.application.tenant.MetaContext.setContext(7L,20L,"actor","Actor");
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(30L);
         try {
             var instances = CONFIGURED_ORDER.stream().map(type -> type == CommandInputFieldAuthorizationPhase.class
-                    ? (CommandPhase)new CommandInputFieldAuthorizationPhase(policies) : (CommandPhase)mock(type)).toList();
+                    ? (CommandPhase)new CommandInputFieldAuthorizationPhase(policies, metadata, fields) : (CommandPhase)mock(type)).toList();
             var factory = CommandPipelineConfiguration.class.getDeclaredMethod("commandPipeline", CONFIGURED_ORDER.toArray(Class[]::new));
             var pipeline = (CommandPipeline)factory.invoke(new CommandPipelineConfiguration(), instances.toArray());
             var command = new com.auraboot.framework.meta.entity.CommandDefinition(); command.setModelCode("orders");
-            var context = CommandPipelineContext.builder().command(command).payload(java.util.Map.of("cost",99)).build();
+            var context = CommandPipelineContext.builder().command(command).execConfig(java.util.Map.of("type","update")).payload(java.util.Map.of("cost",99)).build();
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> pipeline.executePreGuardPhases(context))
                     .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
             org.mockito.Mockito.verify(instances.get(CONFIGURED_ORDER.indexOf(IdempotencyPhase.class)),org.mockito.Mockito.never())

@@ -632,6 +632,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
         String counterCol = resolveNumericColumn(model, counterCode);
+        if (!stripNonWritableFields(modelCode, new LinkedHashMap<>(Map.of(counterCode, delta))).isEmpty()) {
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: counter contains a non-writable field");
+        }
         String capCol = null;
         if (capCode != null) {
             capCol = resolveNumericColumn(model, capCode);
@@ -1102,14 +1105,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     /**
-     * Field-level write permission enforcement (gap #1).
-     *
-     * <p>Removes from the incoming payload any field the current user is not
-     * permitted to write (effective {@code field_write} data-permission policies).
-     * Stripping (rather than rejecting) keeps clients tolerant while guaranteeing
-     * restricted fields never reach the row; each strip is logged for audit.
-     */
-    /**
      * Remove fields the caller may not write.
      *
      * @return the field codes actually removed, so a caller holding the stored row can tell an
@@ -1126,10 +1121,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (MetaContext.hasCommandPermitScopeFor(modelCode)) {
             return Collections.emptySet();
         }
-        Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
-        Set<String> nonWritable = dataPermissionEngine.getNonWritableFields(tenantId, modelCode, userId);
-        if (nonWritable == null || nonWritable.isEmpty()) {
+        Set<String> nonWritable = new FieldWriteAuthorizationSupport(
+                metadataService, fieldPermissionService, dataPermissionEngine)
+                .nonWritableInputKeys(modelCode, data.keySet());
+        if (nonWritable.isEmpty()) {
             return Collections.emptySet();
         }
         Set<String> stripped = new LinkedHashSet<>();
@@ -1167,7 +1163,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (!submitted.containsKey(fieldCode)) {
                 continue;
             }
-            if (ValidationServiceImpl.valueChanges(existingRecord.get(fieldCode), submitted.get(fieldCode))) {
+            if (!existingRecord.containsKey(fieldCode)
+                    || ValidationServiceImpl.valueChanges(existingRecord.get(fieldCode), submitted.get(fieldCode))) {
                 denied.add(fieldCode);
             }
         }
