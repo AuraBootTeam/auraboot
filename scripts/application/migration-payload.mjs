@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Reviewed SQL payload packaging; runtime and release provenance are separate requirements. */
 import { createHash } from 'node:crypto';
-import { lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { auditComposition } from './migration-composition-audit.mjs';
@@ -9,7 +9,13 @@ import { auditComposition } from './migration-composition-audit.mjs';
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const encode = (value) => `${JSON.stringify(value, null, 2)}\n`;
 function need(condition, message) { if (!condition) throw new Error(message); }
-function regular(file) { const s = lstatSync(file); need(s.isFile() && !s.isSymbolicLink(), `regular file required: ${file}`); return readFileSync(file); }
+function regular(file) {
+  const descriptor = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    need(fstatSync(descriptor).isFile(), `regular file required: ${file}`);
+    return readFileSync(descriptor);
+  } finally { closeSync(descriptor); }
+}
 function walk(root, prefix = '') {
   const files = [];
   for (const entry of readdirSync(root).sort()) {
