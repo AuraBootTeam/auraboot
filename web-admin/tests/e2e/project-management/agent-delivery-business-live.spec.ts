@@ -70,6 +70,23 @@ async function taskRows(api: APIRequestContext, title: string) {
   );
   return value.data.records as Array<Record<string, unknown>>;
 }
+async function businessSnapshot(api: APIRequestContext, projectPid: string) {
+  const project = await body(await api.get(`/api/dynamic/tpm_project/${projectPid}`));
+  const tasks = await body(await api.get('/api/dynamic/tpm_task/list', {
+    params: { pageSize: '100', filters: JSON.stringify([
+      { fieldName: 'tpm_ts_project_id', operator: 'EQ', value: projectPid },
+    ]) },
+  }));
+  const fields = (row: Record<string, unknown>, prefix: string) => Object.fromEntries(
+    Object.entries(row).filter(([key]) => key === 'pid' || key.startsWith(prefix))
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+  return {
+    project: fields(project.data, 'tpm_pj_'),
+    tasks: tasks.data.records.map((row: Record<string, unknown>) => fields(row, 'tpm_ts_'))
+      .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.pid).localeCompare(String(b.pid))),
+  };
+}
 async function send(page: Page, text: string) {
   const chat = page.getByTestId('agent-chat-page');
   await chat.getByTestId('aurabot-input').fill(text);
@@ -156,6 +173,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await body(await published);
   await page.getByTestId('back-to-colleagues').click();
   await page.getByTestId(`agent-chat-${stored.agent_code}`).click();
+  const beforeRead = await businessSnapshot(page.request, fixture.project);
   const summary = await send(
     page,
     `请查询项目“${fixture.projectName}”，只读汇总已记录的进度、风险和已有任务，不创建或更新记录。`,
@@ -166,6 +184,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(chat).toContainText('67', { timeout: 150_000 });
   await expect(chat).toContainText('客户测试环境未开放');
   await expect(chat).toContainText(`接口联调-${fixture.suffix}`);
+  expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRead);
   const session = summary.request().postDataJSON().sessionId;
   const traces = await (
     await page.request.get('/api/ai/traces', { params: { sessionId: session, pageSize: '20' } })
