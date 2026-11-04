@@ -119,6 +119,14 @@ class ReservedPlatformRoleIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE role_id=?", Long.class, platform.roleId())).isEqualTo(before);
     }
 
+    @Test void legacyFlagsCannotPermitDisablingOrDeletingTheSystemPlatformRole() {
+        platform = PlatformAdministrationFixture.grant(jdbc, user);
+        MetaContext.setCurrentTenantId(1L);
+        assertThatThrownBy(() -> roles.disableRole(platform.roleId())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> roles.deleteRole(platform.roleId())).isInstanceOf(AccessDeniedException.class);
+        assertThat(jdbc.queryForObject("SELECT status FROM ab_role WHERE id=?", String.class, platform.roleId())).isEqualTo("active");
+    }
+
     @Test void systemDefinitionCanBeCreatedButItsReservedIdentityCannotBeRenamedOrRescoped() {
         platform = PlatformAdministrationFixture.grant(jdbc, user);
         MetaContext.setCurrentTenantId(1L);

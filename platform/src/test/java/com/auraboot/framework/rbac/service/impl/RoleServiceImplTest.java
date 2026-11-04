@@ -154,6 +154,7 @@ class RoleServiceImplTest {
         Role input = role(null, "platform_admin"); input.setTenantId(1L); input.setScopeType("global");
         doReturn(true).when(spyService).save(input);
         assertEquals(input, spyService.createRole(input));
+        assertTrue(input.getIsSystem());
     }
     @Test void updatingCannotPromoteAnOrdinaryRoleToPlatformAdmin() {
         MetaContext.setCurrentTenantId(10L);
@@ -185,6 +186,21 @@ class RoleServiceImplTest {
         MetaContext.setCurrentTenantId(20L);
         assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.copyRole(1L, "Copy", "new"));
         org.mockito.Mockito.verifyNoInteractions(rolePermissionService);
+    }
+
+    @Test void protectedPlatformLifecycleDoesNotDependOnALegacySystemFlag() {
+        MetaContext.setCurrentTenantId(1L);
+        Role existing = role(1L, "platform_admin"); existing.setTenantId(1L); existing.setScopeType("global"); existing.setIsSystem(false);
+        doReturn(existing).when(spyService).getById(1L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.disableRole(1L));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.deleteRole(1L));
+    }
+    @Test void ordinaryRoleUpdatesCannotSetTheHostSystemFlag() {
+        Role existing = role(1L, "ordinary"); existing.setIsSystem(false);
+        doReturn(existing).when(spyService).getById(1L);
+        Role input = role(1L, "ordinary"); input.setIsSystem(true);
+        spyService.updateRole(input);
+        assertFalse(input.getIsSystem());
     }
 
     @Test

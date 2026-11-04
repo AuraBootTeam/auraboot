@@ -71,7 +71,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         role.setCreatedAt(Instant.now());
         role.setUpdatedAt(Instant.now());
         role.setDeletedFlag(false);
-        role.setIsSystem(false);
+        role.setIsSystem(RoleConstants.isPlatformOnly(role.getCode()));
         
         save(role);
         
@@ -107,9 +107,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         role.setTenantId(existingRole.getTenantId());
 
         // 系统角色不允许修改某些字段
-        if (Boolean.TRUE.equals(existingRole.getIsSystem())) {
-            role.setIsSystem(true);
-        }
+        role.setIsSystem(Boolean.TRUE.equals(existingRole.getIsSystem()) || RoleConstants.isPlatformOnly(nextCode));
         
 
         
@@ -265,6 +263,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         if (role == null) {
             throw BusinessException.i18n("role.not_found", roleId);
         }
+        requireOwnedRole(role);
         
         role.setStatus(StatusConstants.ACTIVE);
         role.setUpdatedAt(Instant.now());
@@ -281,6 +280,11 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         Role role = getById(roleId);
         if (role == null) {
             throw BusinessException.i18n("role.not_found", roleId);
+        }
+        requireOwnedRole(role);
+        if (RoleConstants.isPlatformOnly(role.getCode())
+                && com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID.equals(role.getTenantId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Reserved platform roles cannot be disabled or deleted");
         }
         
         // 系统角色不允许禁用
@@ -303,6 +307,11 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         Role role = getById(roleId);
         if (role == null) {
             throw BusinessException.i18n("role.not_found", roleId);
+        }
+        requireOwnedRole(role);
+        if (RoleConstants.isPlatformOnly(role.getCode())
+                && com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID.equals(role.getTenantId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Reserved platform roles cannot be disabled or deleted");
         }
         
         // 系统角色不允许删除
