@@ -1,75 +1,44 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GlobeAltIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
-import { useToastContext } from '~/contexts/ToastContext';
-import { permissionService } from '~/shared/services/permissionService';
 import type { PermissionMatrixDTO } from '../types';
 import { SCOPE_OPTIONS, scopeOption, isValidScope } from '../scopeConfig';
 import { deriveRoleScope } from '../scopeHelpers';
 
 interface DataScopeBarProps {
-  rolePid: string;
   matrix: PermissionMatrixDTO | null;
-  /** Called after the role default scope is applied so the parent can refetch the matrix. */
-  onScopeApplied: () => void | Promise<unknown>;
+  defaultScope: string | null;
+  applyToCurrent: boolean;
+  onStage: (scope: string, applyToCurrent: boolean) => void;
+  onOpenChange?: (open: boolean) => void;
   disabled?: boolean;
 }
 
-/**
- * ② Data-scope dimension, pulled out of the matrix cells into its own top bar + drawer. The bar
- * shows the actual per-action scope summary separately from the persisted role default. The drawer persists the chosen tier
- * as the role default — newly-granted permissions inherit it — and materializes it onto current
- * grants. Per-permission overrides live in the ③ advanced table.
- */
+/** Scope edits join the parent role draft; closing this drawer never writes authorization. */
 export default function DataScopeBar({
-  rolePid,
   matrix,
-  onScopeApplied,
+  defaultScope: storedDefault,
+  applyToCurrent,
+  onStage,
+  onOpenChange,
   disabled = false,
 }: DataScopeBarProps) {
   const { t } = useI18n();
-  const { showSuccessToast, showErrorToast } = useToastContext();
   const [open, setOpen] = useState(false);
-  const [applying, setApplying] = useState(false);
-  const [storedDefault, setStoredDefault] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
-  const requestId = useRef(0);
+  const [pendingApply, setPendingApply] = useState(applyToCurrent);
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  const loadDefault = useCallback(async () => {
-    const id = ++requestId.current;
-    setLoading(true);
-    setLoadError(false);
-    try {
-      const value = await permissionService.getRoleDefaultScope(rolePid);
-      if (id !== requestId.current) return { ok: false, value: null };
-      setStoredDefault(value);
-      return { ok: true, value };
-    } catch {
-      if (id === requestId.current) setLoadError(true);
-      return { ok: false, value: null };
-    } finally {
-      if (id === requestId.current) setLoading(false);
-    }
-  }, [rolePid]);
-
   useEffect(() => {
-    setStoredDefault(null);
-    setOpen(false);
-    void loadDefault();
-    return () => {
-      requestId.current++;
-    };
-  }, [loadDefault]);
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     drawerRef.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !applying) setOpen(false);
+      if (event.key === 'Escape') setOpen(false);
       if (event.key !== 'Tab') return;
       const elements = drawerRef.current?.querySelectorAll<HTMLElement>(
         'button:not(:disabled), input:not(:disabled), [tabindex="0"]',
@@ -93,7 +62,7 @@ export default function DataScopeBar({
       document.removeEventListener('keydown', handleKey);
       previous?.focus();
     };
-  }, [open, applying]);
+  }, [open]);
 
   const derived = deriveRoleScope(matrix);
   const currentOption = scopeOption(derived);
@@ -103,36 +72,14 @@ export default function DataScopeBar({
     setPending(
       isValidScope(storedDefault) ? storedDefault : isValidScope(derived) ? derived : null,
     );
+    setPendingApply(applyToCurrent);
     setOpen(true);
   };
 
-  const apply = async () => {
-    if (!isValidScope(pending) || applying || disabled) return;
-    setApplying(true);
-    try {
-      // Persist as the role default (new grants inherit) + materialize onto current grants.
-      await permissionService.setRoleDefaultScope(rolePid, pending);
-      const refreshed = await loadDefault();
-      if (!refreshed.ok || refreshed.value !== pending) {
-        showErrorToast(
-          t(
-            'admin.permission.scope.verifyError',
-            undefined,
-            'Scope was submitted but could not be verified. Reload before continuing.',
-          ),
-        );
-        return;
-      }
-      await onScopeApplied();
-      showSuccessToast(t('admin.permission.scope.applySuccess', undefined, 'Data scope updated'));
-      setOpen(false);
-    } catch {
-      showErrorToast(
-        t('admin.permission.scope.applyError', undefined, 'Failed to update data scope'),
-      );
-    } finally {
-      setApplying(false);
-    }
+  const apply = () => {
+    if (!isValidScope(pending) || disabled) return;
+    onStage(pending, pendingApply);
+    setOpen(false);
   };
 
   return (
@@ -143,7 +90,7 @@ export default function DataScopeBar({
       >
         <GlobeAltIcon className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
         <span className="text-xs text-gray-700 dark:text-gray-200">
-          {t('admin.permission.scope.actual', undefined, 'Current granted actions')}:{' '}
+          {t('admin.permission.scope.draftActions', undefined, 'Draft action scopes')}:{' '}
           <span data-testid="data-scope-current" className="font-medium">
             {t(currentOption.labelKey, undefined, currentOption.labelFallback)}
           </span>
@@ -151,28 +98,14 @@ export default function DataScopeBar({
         <span className="text-xs text-gray-500">
           {t('admin.permission.scope.default', undefined, 'Role default')}:{' '}
           <span data-testid="data-scope-default">
-            {loading
-              ? t('common.loading', undefined, 'Loading…')
-              : loadError
-                ? t('admin.permission.scope.loadError', undefined, 'Could not load role default')
-                : t(defaultOption.labelKey, undefined, defaultOption.labelFallback)}
+            {t(defaultOption.labelKey, undefined, defaultOption.labelFallback)}
           </span>
         </span>
-        {loadError && (
-          <button
-            type="button"
-            data-testid="data-scope-retry"
-            onClick={() => void loadDefault()}
-            className="text-accent text-xs hover:underline"
-          >
-            {t('common.retry', undefined, 'Retry')}
-          </button>
-        )}
         <button
           type="button"
           data-testid="data-scope-modify-btn"
           onClick={openDrawer}
-          disabled={disabled || loading || loadError || applying}
+          disabled={disabled}
           className="text-accent ml-auto text-xs font-medium hover:underline disabled:opacity-50"
         >
           {t('admin.permission.scope.modify', undefined, 'Modify scope')} →
@@ -181,10 +114,7 @@ export default function DataScopeBar({
 
       {open && (
         <div className="fixed inset-0 z-50 flex justify-end" data-testid="data-scope-drawer">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => !applying && setOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <div
             ref={drawerRef}
             role="dialog"
@@ -203,7 +133,7 @@ export default function DataScopeBar({
                 type="button"
                 data-testid="data-scope-drawer-close"
                 onClick={() => setOpen(false)}
-                disabled={applying}
+                disabled={disabled}
                 aria-label={t('common.close', undefined, 'Close')}
                 className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
               >
@@ -214,11 +144,24 @@ export default function DataScopeBar({
             <div className="flex-1 overflow-y-auto px-5 py-4">
               <p className="mb-3 text-xs text-gray-500">
                 {t(
-                  'admin.permission.scope.drawerNote',
+                  'admin.permission.scope.draftNote',
                   undefined,
-                  "Sets the role's default data scope — newly-granted permissions inherit it, and it is applied to current grants.",
+                  'Stage the role default for new grants. Review and save all role changes together.',
                 )}
               </p>
+              <label className="mb-4 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  data-testid="data-scope-apply-current"
+                  checked={pendingApply}
+                  onChange={(event) => setPendingApply(event.target.checked)}
+                />
+                {t(
+                  'admin.permission.scope.applyCurrentDraft',
+                  undefined,
+                  'Also apply to current grants',
+                )}
+              </label>
               <div className="flex flex-col gap-1">
                 {SCOPE_OPTIONS.map((opt) => (
                   <label
@@ -235,7 +178,7 @@ export default function DataScopeBar({
                       name="data-scope"
                       value={opt.value}
                       checked={pending === opt.value}
-                      disabled={applying}
+                      disabled={disabled}
                       onChange={() => setPending(opt.value)}
                     />
                     <span
@@ -255,7 +198,7 @@ export default function DataScopeBar({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                disabled={applying}
+                disabled={disabled}
                 className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
               >
                 {t('common.cancel', undefined, 'Cancel')}
@@ -263,13 +206,11 @@ export default function DataScopeBar({
               <button
                 type="button"
                 data-testid="data-scope-apply"
-                disabled={applying || disabled || !isValidScope(pending)}
+                disabled={disabled || !isValidScope(pending)}
                 onClick={() => void apply()}
                 className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {applying
-                  ? t('admin.permission.scope.applying', undefined, 'Applying…')
-                  : t('admin.permission.scope.apply', undefined, 'Apply')}
+                {t('admin.permission.scope.stageDraft', undefined, 'Add to draft')}
               </button>
             </div>
           </div>

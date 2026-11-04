@@ -29,14 +29,14 @@ public class RoleAuthorizationDraftController {
 
     @GetMapping
     @RequirePermission(MetaPermission.ROLE_READ)
-    @Operation(summary = "Read a consistent role authorization draft baseline")
+    @Operation(operationId = "readRoleAuthorizationDraft", summary = "Read a consistent role authorization draft baseline")
     public ApiResponse<RoleAuthorizationDraftSnapshot> snapshot(@PathVariable String rolePid) {
         return ApiResponse.success(drafts.snapshot(rolePid));
     }
 
     @PostMapping("/preview")
     @RequirePermission(MetaPermission.ROLE_READ)
-    @Operation(summary = "Preview role duties and record scopes against an exact revision")
+    @Operation(operationId = "previewRoleAuthorizationDraft", summary = "Preview role duties and record scopes against an exact revision")
     public ApiResponse<RoleAuthorizationDraftPreview> preview(@PathVariable String rolePid,
             @Valid @RequestBody RoleAuthorizationDraftRequest request) {
         return ApiResponse.success(drafts.preview(rolePid, request));
@@ -44,7 +44,7 @@ public class RoleAuthorizationDraftController {
 
     @PutMapping
     @RequirePermission(MetaPermission.ROLE_MANAGE)
-    @Operation(summary = "Atomically commit role duties and record scopes with conflict detection")
+    @Operation(operationId = "applyRoleAuthorizationDraft", summary = "Atomically commit role duties and record scopes with conflict detection")
     public ApiResponse<RoleAuthorizationDraftSnapshot> apply(@PathVariable String rolePid,
             @Valid @RequestBody RoleAuthorizationDraftRequest request) {
         return ApiResponse.success(drafts.apply(rolePid, request));

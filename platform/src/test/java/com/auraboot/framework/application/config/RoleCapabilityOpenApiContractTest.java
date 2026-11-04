@@ -89,4 +89,20 @@ class RoleCapabilityOpenApiContractTest {
             assertThat(schemaJson.at("/properties/" + field + "/type").toString()).as(field).contains("null");
         }
     }
+    @Test
+    void authorizationDraftKeepsRequiredBaselinesAndNullableDefaults() {
+        var models = new ModelConverters(true);
+        var snapshot = models.readAll(com.auraboot.framework.permission.dto.RoleAuthorizationDraftSnapshot.class)
+                .get("RoleAuthorizationDraftSnapshot");
+        assertThat(snapshot.getRequired()).containsExactlyInAnyOrder(
+                "rolePid", "revision", "defaultScopeType", "groups", "matrix", "scopes");
+        assertThat(Json31.mapper().valueToTree(snapshot).at("/properties/defaultScopeType/type").toString())
+                .contains("string", "null");
+        var request = models.readAll(com.auraboot.framework.permission.dto.RoleAuthorizationDraftRequest.class)
+                .get("RoleAuthorizationDraftRequest");
+        assertThat(request.getRequired()).contains("expectedRevision", "selectedCapabilityCodes");
+        assertThat(Json31.mapper().valueToTree(request).at("/properties/expectedRevision/pattern").asText())
+                .isEqualTo("[a-f0-9]{64}");
+    }
+
 }

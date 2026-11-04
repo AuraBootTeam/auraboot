@@ -1,35 +1,26 @@
 import { getLocalizedText } from '~/utils/i18n';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
-import { useToastContext } from '~/contexts/ToastContext';
 import { modelService } from '~/shared/services/modelService';
-import { permissionService } from '~/shared/services/permissionService';
 import { SCOPE_OPTIONS, scopeOption, isValidScope } from '../scopeConfig';
 import type { PermissionMatrixDTO } from '../types';
 import type { Capability } from './types';
+import type { ScopeChange } from './authorizationDraftService';
 
 /** Keeps existing per-action scope authoring next to the business capability, without atomic grants. */
 export default function CapabilityScopeSettings({
-  rolePid,
   capability,
   matrix,
   onClose,
-  onRefresh,
-  onBusy,
-  onReadFailure,
+  onStage,
 }: {
-  rolePid: string;
   capability: Capability;
   matrix: PermissionMatrixDTO | null;
   onClose: () => void;
-  onRefresh: () => Promise<PermissionMatrixDTO>;
-  onBusy: (busy: boolean) => void;
-  onReadFailure: () => void;
+  onStage: (changes: ScopeChange[]) => void;
 }) {
   const { t, locale } = useI18n();
-  const { showSuccessToast, showErrorToast } = useToastContext();
   const [pending, setPending] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
   const [modelNames, setModelNames] = useState<Record<string, string>>({});
   const [modelTeams, setModelTeams] = useState<Record<string, boolean>>({});
   const [namesLoading, setNamesLoading] = useState(true);
@@ -39,7 +30,7 @@ export default function CapabilityScopeSettings({
     const previous = document.activeElement as HTMLElement | null;
     dialogRef.current?.querySelector<HTMLElement>('select, button')?.focus();
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving) onClose();
+      if (event.key === 'Escape') onClose();
       if (event.key !== 'Tab') return;
       const elements = dialogRef.current?.querySelectorAll<HTMLElement>(
         'button:not(:disabled), select:not(:disabled)',
@@ -63,7 +54,7 @@ export default function CapabilityScopeSettings({
       document.removeEventListener('keydown', handleKey);
       previous?.focus();
     };
-  }, [onClose, saving]);
+  }, [onClose]);
 
   const rows = useMemo(
     () =>
@@ -145,13 +136,12 @@ export default function CapabilityScopeSettings({
       : row.label;
   const teamUnavailable = (row: (typeof rows)[number]) =>
     row.code.startsWith('model.') && !modelTeams[row.resourceCode];
-  const apply = async () => {
+  const apply = () => {
     const changes = rows.filter(
       (row) => pending[row.code] != null && pending[row.code] !== row.scopeType,
     );
     if (
       !changes.length ||
-      saving ||
       namesLoading ||
       namesError ||
       changes.some(
@@ -161,44 +151,15 @@ export default function CapabilityScopeSettings({
       )
     )
       return;
-    setSaving(true);
-    onBusy(true);
-    try {
-      // The existing API applies one resource/action at a time. Readback is authoritative;
-      // any interrupted batch hides the snapshot rather than claiming an atomic rollback.
-      for (const row of changes)
-        await permissionService.updateScope(rolePid, {
-          resourceCode: row.resourceCode,
-          actionCode: row.action,
-          scopeType: pending[row.code],
-        });
-      const refreshed = await onRefresh();
-      const actions = refreshed.modules.flatMap((module) =>
-        module.resources.flatMap((resource) => resource.actions),
-      );
-      if (
-        changes.some(
-          (row) =>
-            actions.find((action) => action.code === row.code)?.scopeType !== pending[row.code],
-        )
-      ) {
-        throw new Error('Scope readback did not match the requested values');
-      }
-      showSuccessToast(t('admin.permission.scope.applySuccess', undefined, 'Data scope updated'));
-      onClose();
-    } catch {
-      onReadFailure();
-      showErrorToast(
-        t(
-          'admin.permission.capability.scopeFailureV2',
-          undefined,
-          'Scope changes could not be verified. Some changes may have been saved; reload before continuing.',
-        ),
-      );
-    } finally {
-      setSaving(false);
-      onBusy(false);
-    }
+    onStage(
+      changes.map((row) => ({
+        resourceCode: row.resourceCode,
+        actionCode: row.action,
+        scopeType: pending[row.code],
+        mergeStrategy: row.mergeStrategy,
+      })),
+    );
+    onClose();
   };
   return (
     <div
@@ -218,9 +179,9 @@ export default function CapabilityScopeSettings({
         </h3>
         <p className="text-text-2 my-3 text-xs">
           {t(
-            'admin.permission.capability.scopeNoteV2',
+            'admin.permission.capability.scopeDraftNote',
             undefined,
-            'Adjust existing grants for this capability. Shared actions also affect other capabilities; granting and revoking remain in the capability checklist.',
+            'Stage record scopes for this duty. Shared actions affect related duties. All changes are reviewed and saved together.',
           )}
         </p>
         {namesLoading && <p role="status">{t('common.loading', undefined, 'Loading…')}</p>}
@@ -249,7 +210,6 @@ export default function CapabilityScopeSettings({
                         teamUnavailable(row) ? `scope-team-note-${row.code}` : undefined
                       }
                       data-testid={`capability-scope-${row.code}`}
-                      disabled={saving}
                       value={value}
                       onChange={(event) =>
                         setPending((current) => ({ ...current, [row.code]: event.target.value }))
@@ -301,7 +261,6 @@ export default function CapabilityScopeSettings({
         <div className="mt-4 flex justify-end gap-3">
           <button
             type="button"
-            disabled={saving}
             onClick={onClose}
             className="rounded-control border-border border px-3 py-2"
           >
@@ -311,7 +270,6 @@ export default function CapabilityScopeSettings({
             type="button"
             data-testid="capability-scope-apply"
             disabled={
-              saving ||
               namesLoading ||
               namesError ||
               !rows.some((row) => pending[row.code] && pending[row.code] !== row.scopeType)
@@ -319,7 +277,7 @@ export default function CapabilityScopeSettings({
             onClick={() => void apply()}
             className="bg-accent rounded-control px-3 py-2 text-white disabled:opacity-50"
           >
-            {t('admin.permission.scope.apply', undefined, 'Apply')}
+            {t('admin.permission.scope.stageDraft', undefined, 'Add to draft')}
           </button>
         </div>
       </div>
