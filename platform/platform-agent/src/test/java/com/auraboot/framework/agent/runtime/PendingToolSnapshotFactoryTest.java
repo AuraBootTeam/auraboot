@@ -194,8 +194,8 @@ class PendingToolSnapshotFactoryTest {
         assertThat(pending.getToolVersion()).isEqualTo("v1");
         assertThat(pending.getArgsHash()).hasSize(64);
         assertThat(pending.getToolSchemaHash()).hasSize(64);
-        assertThat(pending.getIdempotencyKey()).isEqualTo(
-                "cmd_create_draft:v1:" + pending.getArgsHash());
+        assertThat(pending.getIdempotencyKey()).startsWith("pending-tool:intent:v2:1:turn-1:")
+                .endsWith("cmd_create_draft:v1:" + pending.getArgsHash());
         assertThat(pending.getExpiresAt()).isGreaterThan(pending.getCreatedAt());
         assertThat(pending.getPolicyDecisionReason()).isEqualTo("user_confirmation_required");
         assertThat(pending.getPreview()).isEqualTo("Create draft for P-100");
@@ -292,8 +292,8 @@ class PendingToolSnapshotFactoryTest {
                 .containsEntry("previewToken", "preview-1");
         assertThat(pending.getToolVersion()).isEqualTo("v1");
         assertThat(pending.getArgsHash()).hasSize(64);
-        assertThat(pending.getIdempotencyKey()).isEqualTo(
-                "aurabot_model_create:v1:" + pending.getArgsHash());
+        assertThat(pending.getIdempotencyKey()).startsWith("pending-tool:intent:v2:1:turn-resume:")
+                .endsWith("aurabot_model_create:v1:" + pending.getArgsHash());
         assertThat(pending.getExpiresAt()).isGreaterThan(pending.getCreatedAt());
         assertThat(pending.getPolicyDecisionReason()).isEqualTo("user_confirmation_required");
         assertThat(pending.getPreview()).isEqualTo("Execute: aurabot_model_create");
@@ -339,7 +339,8 @@ class PendingToolSnapshotFactoryTest {
 
         assertThat(pending.getToolVersion()).isEqualTo("v2");
         assertThat(pending.getArgsHash()).isEqualTo("hash-1");
-        assertThat(pending.getIdempotencyKey()).isEqualTo("idem-1");
+        assertThat(pending.getIdempotencyKey()).startsWith("pending-tool:intent:v2:1:turn-policy:")
+                .endsWith(":idem-1");
         assertThat(pending.getExpiresAt()).isEqualTo(1_800_000L);
         assertThat(pending.getPolicyDecisionReason()).isEqualTo("user_confirmation_required");
         assertThat(pending.getToolSchemaHash()).isEqualTo("schema-hash-1");
