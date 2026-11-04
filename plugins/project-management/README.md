@@ -119,3 +119,11 @@ Both review nodes use the acceptance form with all business fields read-only and
 On an empty local evaluation instance, run `bash scripts/project-delivery-demo.sh` after starting the stack. It performs the normal quickstart, explicitly imports this template, and creates fictional sample customers, real local members, projects, milestones, files and audit configuration through platform APIs. No SQL or application-start backfill is used.
 
 The default frontend URL is `http://localhost:3000`. Host-first maintainers set `BACKEND_URL` to their owned frontend URL and `PLUGINS_PATH` to the plugin directory visible to the backend. The script accepts only local HTTP evaluation URLs; it never clears projects and refuses to seed an already populated project list. The initialization receipt directory is printed. Existing installations may import the template with `bash scripts/quickstart.sh --project-delivery` without requesting sample data.
+
+### Project delivery colleague and task intake
+
+Create an AI colleague from the **Project Delivery Assistant** preset under AI Center. It checks that the governed project tools are installed, binds only project/task/milestone models and task create/update tools, and keeps the tenant-selected AI service. The preset grants no roles or permissions. Use the existing colleague enrollment, deployment and tool-policy controls before running it.
+
+The colleague reads current authorized facts for progress/risk questions, asks about ambiguous projects or missing inputs, drafts proposals from notes, and invokes a real command only for an explicit write request. Current authorization, confirmation and approval remain authoritative. A pending result is never reported as saved; acknowledged writes must be read back.
+
+The separate **AI task intake** menu uses the existing DSL task form and `form_draft_fill`. Select the project first, extract one task, review its evidence and manually save through `tpm:create_task`. Extraction itself never saves; normal form saving is distinct from the colleague's governed chat approval journey. Existing task forms are unchanged.

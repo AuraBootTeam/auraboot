@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+const json = p => JSON.parse(readFileSync(new URL(p, import.meta.url), 'utf8'));
+test('task extraction preserves the normal save boundary and current project context', () => {
+  const page = json('../config/pages/tpm_task_ai_intake.json');
+  const ordinary = json('../config/pages/tpm_task_form.json');
+  const menus = json('../config/menus.json');
+  assert.equal(page.modelCode, 'tpm_task');
+  const ai = page.blocks.filter(b => b.blockType === 'ai-fill-banner');
+  assert.equal(ai.length, 1);
+  assert.equal(ai[0].endpoint, undefined);
+  assert.equal(ordinary.blocks.some(b => b.blockType === 'ai-fill-banner'), false);
+  const fields = page.blocks.flatMap(b => b.fields ?? []);
+  assert.equal(fields.find(f => f.field === 'tpm_ts_project_id').required, true);
+  const buttons = page.blocks.find(b => b.blockType === 'form-buttons');
+  assert.deepEqual(buttons, ordinary.blocks.find(b => b.blockType === 'form-buttons'));
+  assert.equal(buttons.buttons[0].commandCode, 'tpm:create_task');
+  assert.equal(menus.find(m => m.code === page.pageKey).permissionCode, 'tpm.task.manage');
+});

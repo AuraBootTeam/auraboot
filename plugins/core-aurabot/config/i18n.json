@@ -726,5 +726,29 @@
     "zh-CN": "AI 操作未完成，请检查网络后重新发送。",
     "en-US": "The AI action could not complete. Check your connection and send again.",
     "refType": "ui"
-  }
+  },
+{
+  "key": "ai.template.projectDelivery.name",
+  "zh-CN": "项目交付助手",
+  "en-US": "Project Delivery Assistant",
+  "refType": "ui"
+},
+{
+  "key": "ai.template.projectDelivery.desc",
+  "zh-CN": "查询项目事实、整理任务提案，经确认后执行受控操作。",
+  "en-US": "Review project facts, prepare task proposals and perform governed writes after confirmation.",
+  "refType": "ui"
+},
+{
+  "key": "ai.template.projectDelivery.unavailable",
+  "zh-CN": "项目交付工具尚不可用。请先安装项目管理插件并核查访问权限，再创建该同事。",
+  "en-US": "Project delivery tools are unavailable. Install Project Management and verify your access before creating this colleague.",
+  "refType": "ui"
+},
+{
+  "key": "ai.template.projectDelivery.scope",
+  "zh-CN": "业务范围：读取项目、任务和里程碑；提议创建或更新任务。现有权限与确认、审批继续生效，模板不会授予角色。",
+  "en-US": "Scope: read projects, tasks and milestones; propose task creation and updates. Existing permissions and confirmation/approval still apply. No roles are granted by this template.",
+  "refType": "ui"
+}
 ]

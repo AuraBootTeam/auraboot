@@ -25,6 +25,7 @@ import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { PROJECT_DELIVERY_PROMPT, PROJECT_DELIVERY_SCOPE } from './projectDeliveryTemplate';
 
 // ---------------------------------------------------------------------------
 // Agent code
@@ -73,6 +74,7 @@ interface ConfiguredProvider {
 }
 
 interface AgentTemplate {
+  toolScope?: { models: string[]; tools: string[] };
   id: string;
   icon: string;
   nameKey: string;
@@ -91,6 +93,22 @@ interface AgentTemplate {
 // ---------------------------------------------------------------------------
 
 const AGENT_TEMPLATES: AgentTemplate[] = [
+  {
+    id: 'project_delivery',
+    icon: '🗂️',
+    nameKey: 'ai.template.projectDelivery.name',
+    descriptionKey: 'ai.template.projectDelivery.desc',
+    toolScope: PROJECT_DELIVERY_SCOPE,
+    defaults: {
+      name: 'Project Delivery Assistant',
+      description: 'Review live project facts, prepare task proposals and follow governed writes.',
+      agent_type: 'reactive',
+      personality:
+        'Evidence-grounded, careful with missing information, and explicit about human decisions.',
+      communication_style: 'professional',
+      system_prompt: PROJECT_DELIVERY_PROMPT,
+    },
+  },
   {
     id: 'procurement_approver',
     icon: '📋',
@@ -786,6 +804,7 @@ function ReviewRow({
 // ---------------------------------------------------------------------------
 
 export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown }) {
+  const [templateScope, setTemplateScope] = useState<AgentTemplate['toolScope']>();
   const { t } = useI18n();
   const navigate = useNavigate();
   const toast = useToastContext();
@@ -846,9 +865,12 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
   // created with an empty provider: model cleared, nothing to use in its place, and the failure
   // only visible when someone tried to talk to it.
   const handleSelectTemplate = (tpl: AgentTemplate) => {
+    setTemplateScope(tpl.toolScope);
     setData((prev) => ({
       ...INITIAL_DATA,
       ...tpl.defaults,
+      name: t(tpl.nameKey, undefined, tpl.defaults.name),
+      description: t(tpl.descriptionKey, undefined, tpl.defaults.description),
       provider: prev.provider,
     }));
     setErrors({});
@@ -858,6 +880,7 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
 
   /** Skip template selection and start fresh */
   const handleSkipTemplate = () => {
+    setTemplateScope(undefined);
     setData((prev) => ({ ...INITIAL_DATA, provider: prev.provider }));
     setErrors({});
     setStep(0);
@@ -909,6 +932,30 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
     }
     setCreating(true);
     try {
+      if (templateScope) {
+        const catalogs = await Promise.all(
+          templateScope.models.map((modelHint) =>
+            get<{ tools: Array<{ code: string }> }>('/api/agent/tools/registry', { modelHint }),
+          ),
+        );
+        const codes = new Set(
+          catalogs.flatMap((catalog) =>
+            ResultHelper.isSuccess(catalog)
+              ? (catalog.data?.tools ?? []).map((tool) => tool.code)
+              : [],
+          ),
+        );
+        if (!templateScope.tools.every((code) => codes.has(code))) {
+          toast.showErrorToast(
+            t(
+              'ai.template.projectDelivery.unavailable',
+              undefined,
+              'Project delivery tools are unavailable. Install Project Management and verify your access before creating this colleague.',
+            ),
+          );
+          return;
+        }
+      }
       const payload: Record<string, any> = {
         name: data.name.trim(),
         agent_code: deriveAgentCode(data.name.trim(), Date.now().toString(36)),
@@ -923,6 +970,10 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
         guardrails: JSON.stringify({ provider: data.provider }),
         model: null,
       };
+      if (templateScope) {
+        payload.tools = JSON.stringify(templateScope.tools);
+        payload.allowed_models = JSON.stringify(templateScope.models);
+      }
       if (data.description.trim()) payload.description = data.description.trim();
       if (data.personality.trim()) payload.personality = data.personality.trim();
       if (data.system_prompt.trim()) payload.system_prompt = data.system_prompt.trim();
@@ -976,6 +1027,19 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
               {step === 1 && <StepPersonality data={data} onChange={onChange} t={t} />}
               {step === 2 && (
                 <StepReview data={data} t={t} providers={providers} onChange={onChange} />
+              )}
+
+              {step === 2 && templateScope && (
+                <p
+                  className="border-border bg-subtle text-text-2 mt-4 rounded-lg border p-4 text-sm"
+                  data-testid="review-tool-scope"
+                >
+                  {t(
+                    'ai.template.projectDelivery.scope',
+                    undefined,
+                    'Scope: read projects, tasks and milestones; propose task creation and updates. Existing permissions and confirmation/approval still apply. No roles are granted by this template.',
+                  )}
+                </p>
               )}
 
               {/* Navigation Buttons */}
