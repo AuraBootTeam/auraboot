@@ -150,14 +150,57 @@ def main():
                        {'code': code + '_amount', 'displayName': 'Amount', 'dataType': 'integer', 'editable': True}]})
         api(token, f'/api/meta/models/{model["pid"]}/publish', 'POST', {'impactAcknowledged': True})
         api(token, '/api/templates/crud/generate', 'POST', {'modelCode': code, 'config': {'generateList': True, 'generateForm': True, 'generateDetail': True, 'createMenu': False, 'createPermissions': False, 'assignRoles': False}})
-        row = api(token, '/api/dynamic/' + code, 'POST', {code + '_customer': 'Huachen Manufacturing', code + '_amount': 68000})
-        pid = row['pid']
+        command_code = 'trial:create_native_followup'
+        command = api(token, '/api/meta/commands', 'POST', {
+            'code': command_code, 'displayName': 'Create native follow-up', 'modelCode': code,
+            'executionConfig': json.dumps({'type': 'create', 'inputFields': [code + '_customer', code + '_amount'],
+                                           'permissions': ['model.' + code + '.create']})})
+        api(token, '/api/meta/commands/' + command['pid'] + '/publish', 'POST')
+        payload = {'payload': {code + '_customer': 'Huachen Manufacturing', code + '_amount': 68000},
+                   'operationType': 'CREATE', 'clientRequestId': 'native-trial-' + secrets.token_hex(12)}
+        execution = api(token, '/api/meta/commands/execute/' + command_code, 'POST', payload)
+        require(execution['phaseReached'] == 'completed', 'command did not complete')
+        pid = execution['data']['recordPid']
+        replay = api(token, '/api/meta/commands/execute/' + command_code, 'POST', payload)
+        require(replay['idempotentReplay'] is True and replay['data']['recordPid'] == pid, 'idempotent replay created a different record')
         record_probe(token, code, pid, 68000)
-        check('previous-package-real-business-write', recordPid=pid, amount=68000)
+        role_code = 'native_trial_reader'
+        role = api(token, '/api/roles', 'POST', {'code': role_code, 'name': 'Native trial reader',
+            'type': 'custom', 'status': 'active', 'scopeType': 'tenant', 'defaultDataScopeType': 'all'})
+        permission_ids = {}
+        def collect_permission(node):
+            permission_ids[node['code']] = node['id']
+            for child in node.get('children') or []:
+                collect_permission(child)
+        for node in api(token, '/api/permissions/tree'):
+            collect_permission(node)
+        api(token, '/api/permissions/matrix/' + role['pid'] + '/batch', 'PUT',
+            [{'permissionId': permission_ids['model.' + code + '.read'], 'granted': True}])
+        reader_email = 'native-reader@auraboot.local'
+        api(token, '/api/admin/users', 'POST', {'email': reader_email, 'displayName': 'Native trial reader',
+            'initialPassword': password, 'roleCodes': [role_code], 'sendInviteEmail': False})
+        def assert_permissions_and_audit():
+            reader = login(reader_email, password)
+            record_probe(reader, code, pid, 68000)
+            denied = request('/api/dynamic/' + code + '/' + pid, 'PUT', {code + '_amount': 123456},
+                             {'Authorization': 'Bearer ' + reader})
+            require(denied.get('_httpStatus') == 403 and 'model.' + code + '.update' in str(denied.get('context')), 'model permission denial was not enforced')
+            denied_command = request('/api/meta/commands/execute/' + command_code, 'POST', payload,
+                                     {'Authorization': 'Bearer ' + reader})
+            require(denied_command.get('_httpStatus') == 403 and 'meta.command.execute' in str(denied_command.get('context')), 'command endpoint permission denial was not enforced')
+            record_probe(token, code, pid, 68000)
+            audit = api(token, '/api/meta/commands/audit-logs?commandCode=' + command_code)
+            rows = audit['records']
+            require(any(row.get('commandCode') == command_code and row.get('success') is True
+                        for row in rows), 'successful command audit evidence missing')
+        assert_permissions_and_audit()
+        check('previous-package-command-idempotency-permission-audit', recordPid=pid, amount=68000)
+
         stop()
         start(current, 'aura_candidate_upgrade')
         token = login()
         record_probe(token, code, pid, 68000)
+        assert_permissions_and_audit()
         check('old-to-new-upgrade-preserves-business', previousSource=json.loads((previous / 'release-receipt.json').read_text())['source']['commit'], currentSource=json.loads((current / 'release-receipt.json').read_text())['source']['commit'], amount=68000)
         dump = private / 'candidate-backup.dump'
         run(['pg_dump', '-Fc', '-h', env['PGHOST'], '-p', port, '-U', 'auraboot', '-d', 'aura_candidate_upgrade', '-f', dump], 'backup')
@@ -170,6 +213,7 @@ def main():
         start(current, 'aura_candidate_restore')
         token = login()
         record_probe(token, code, pid, 68000)
+        assert_permissions_and_audit()
         check('backup-restore-recovers-record', observedBeforeRecovery=999999, restoredAmount=68000, backupSha256=hashlib.sha256(dump.read_bytes()).hexdigest())
         # The original unpack verifier must reject corrupt bytes before creating an active target.
         corrupt = output / 'corrupt-candidate.tar'
