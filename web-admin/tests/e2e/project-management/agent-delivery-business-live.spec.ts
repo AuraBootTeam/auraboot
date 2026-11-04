@@ -581,6 +581,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
       const newSpace = (
         await body(
           await foreign.request.post('/api/tenant-selection/process', {
+            headers: { Origin: baseURL! },
             data: {
               action: 'create',
               tenantName: `交付隔离-${fixture.suffix}`,
@@ -601,6 +602,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
       expect(String(identity.user.tenantId)).toBe(String(newSpace.tenantId));
       for (const plugin of ['core-aurabot', 'agent-control-plane', 'project-management']) {
         const imported = await foreign.request.post('/api/plugins/import/import-directory-sync', {
+          headers: { Origin: baseURL! },
           data: {
             path: join(process.cwd(), '..', 'plugins', plugin),
             conflictStrategy: 'OVERWRITE',
@@ -657,6 +659,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     // This retained installation intentionally has no second business space. The same
     // journey runs in an explicitly registered multi-tenant control composition.
     const deniedSpace = await page.request.post('/api/tenant-selection/process', {
+      headers: { Origin: baseURL! },
       data: {
         action: 'create',
         tenantName: `forbidden_single_${fixture.suffix}`,
@@ -665,13 +668,12 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     });
     expect(deniedSpace.status()).toBe(403);
     expect(String((await deniedSpace.json()).code)).not.toBe('0');
-    test
-      .info()
-      .annotations.push({
-        type: 'qualification-scope',
-        description:
-          'single deployment: self-provisioning denied; foreign-space facet requires the separately recorded multi control run',
-      });
+    expect(await deniedSpace.text()).toContain('Tenant self-provisioning is disabled');
+    test.info().annotations.push({
+      type: 'qualification-scope',
+      description:
+        'single deployment: self-provisioning denied; foreign-space facet requires the separately recorded multi control run',
+    });
   }
   expect(await businessSnapshot(page.request, fixture.project)).toEqual(protectedBefore);
 });
