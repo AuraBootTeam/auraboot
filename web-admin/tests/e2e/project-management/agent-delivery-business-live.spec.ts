@@ -557,94 +557,121 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   });
 
   // A separate actor creates and visibly switches to its own isolated business space.
-  const foreignActor = await provisionOwnedTenantUser(page, 'delivery_foreign');
-  const foreignContext = await page
-    .context()
-    .browser()!
-    .newContext({
-      baseURL,
-      locale: 'zh-CN',
-      viewport: { width: 1440, height: 1000 },
-      storageState: { cookies: [], origins: [] },
-    });
-  try {
-    await authenticateBffSession(
-      foreignContext.request,
-      baseURL!,
-      foreignActor.email,
-      foreignActor.password,
-    );
-    const foreign = await foreignContext.newPage();
-    const newSpace = (
-      await body(
-        await foreign.request.post('/api/tenant-selection/process', {
-          data: {
-            action: 'create',
-            tenantName: `交付隔离-${fixture.suffix}`,
-            displayName: '独立验收空间',
-          },
-        }),
-      )
-    ).data;
-    await foreign.goto('/home');
-    await foreign.getByTestId('user-menu').getByRole('button').first().click();
-    const switched = foreign.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname === '/_action/switch-space' && r.request().method() === 'POST',
-    );
-    await foreign.getByTestId(`tenant-switch-${newSpace.tenantId}`).click();
-    expect((await switched).status()).toBe(302);
-    const identity = (await body(await foreign.request.get('/api/auth/me'))).data;
-    expect(String(identity.user.tenantId)).toBe(String(newSpace.tenantId));
-    for (const plugin of ['core-aurabot', 'agent-control-plane', 'project-management']) {
-      const imported = await foreign.request.post('/api/plugins/import/import-directory-sync', {
-        data: {
-          path: join(process.cwd(), '..', 'plugins', plugin),
-          conflictStrategy: 'OVERWRITE',
-          deferReferenceValidation: true,
-        },
-        timeout: 180000,
+  const deployment = (await body(await page.request.get('/api/bootstrap/status'))).data;
+  expect(['single', 'multi']).toContain(deployment.mode);
+  if (deployment.mode === 'multi') {
+    const foreignActor = await provisionOwnedTenantUser(page, 'delivery_foreign');
+    const foreignContext = await page
+      .context()
+      .browser()!
+      .newContext({
+        baseURL,
+        locale: 'zh-CN',
+        viewport: { width: 1440, height: 1000 },
+        storageState: { cookies: [], origins: [] },
       });
-      expect(imported.ok()).toBe(true);
-      expect((await imported.json()).success).toBe(true);
+    try {
+      await authenticateBffSession(
+        foreignContext.request,
+        baseURL!,
+        foreignActor.email,
+        foreignActor.password,
+      );
+      const foreign = await foreignContext.newPage();
+      const newSpace = (
+        await body(
+          await foreign.request.post('/api/tenant-selection/process', {
+            data: {
+              action: 'create',
+              tenantName: `交付隔离-${fixture.suffix}`,
+              displayName: '独立验收空间',
+            },
+          }),
+        )
+      ).data;
+      await foreign.goto('/home');
+      await foreign.getByTestId('user-menu').getByRole('button').first().click();
+      const switched = foreign.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === '/_action/switch-space' && r.request().method() === 'POST',
+      );
+      await foreign.getByTestId(`tenant-switch-${newSpace.tenantId}`).click();
+      expect((await switched).status()).toBe(302);
+      const identity = (await body(await foreign.request.get('/api/auth/me'))).data;
+      expect(String(identity.user.tenantId)).toBe(String(newSpace.tenantId));
+      for (const plugin of ['core-aurabot', 'agent-control-plane', 'project-management']) {
+        const imported = await foreign.request.post('/api/plugins/import/import-directory-sync', {
+          data: {
+            path: join(process.cwd(), '..', 'plugins', plugin),
+            conflictStrategy: 'OVERWRITE',
+            deferReferenceValidation: true,
+          },
+          timeout: 180000,
+        });
+        expect(imported.ok()).toBe(true);
+        expect((await imported.json()).success).toBe(true);
+      }
+      await foreign.reload();
+      await navigateToMenuByClick(foreign, ['项目交付', '项目']);
+      const ownProjects = (await body(await foreign.request.get('/api/dynamic/tpm_project/list')))
+        .data;
+      expect(ownProjects.records).toEqual([]);
+      const privateProject = await foreign.request.get(
+        `/api/dynamic/tpm_project/${fixture.project}`,
+      );
+      expect(privateProject.status()).toBeLessThan(500);
+      expect((await privateProject.json()).code).toBeDefined();
+      expect(String((await privateProject.json()).code)).not.toBe('0');
+      expect(await privateProject.text()).not.toContain(fixture.projectName);
+      const privateHistory = await foreign.request.get(
+        `/api/ai/aurabot/conversations/${payload.conversationId}/messages`,
+      );
+      expect(privateHistory.status()).toBeLessThan(500);
+      expect((await privateHistory.json()).code).toBeDefined();
+      expect(String((await privateHistory.json()).code)).not.toBe('0');
+      expect(await privateHistory.text()).not.toContain(title);
+      const privateTask = await foreign.request.get(
+        `/api/admin/agent-runs/conversation-tasks/${task.taskPid}`,
+      );
+      expect(privateTask.status()).toBeLessThan(500);
+      expect((await privateTask.json()).code).toBeDefined();
+      expect(String((await privateTask.json()).code)).not.toBe('0');
+      expect(await privateTask.text()).not.toContain(title);
+      await foreign.goto(
+        `/p/c/ai_colleague_chat?agentPid=${agentPid}&conversationId=${payload.conversationId}`,
+      );
+      await expect(foreign.getByTestId('agent-chat-page')).toHaveCount(0);
+      await expect(foreign.getByRole('link', { name: '返回 AI 同事', exact: true })).toBeVisible();
+      await expect(foreign.getByTestId('agent-chat-unavailable')).not.toContainText(
+        fixture.projectName,
+      );
+      await foreign.screenshot({
+        animations: 'disabled',
+        path: join(shots, 'D10-foreign-private-boundary.png'),
+        fullPage: true,
+      });
+    } finally {
+      await foreignContext.close();
     }
-    await foreign.reload();
-    await navigateToMenuByClick(foreign, ['项目交付', '项目']);
-    const ownProjects = (await body(await foreign.request.get('/api/dynamic/tpm_project/list')))
-      .data;
-    expect(ownProjects.records).toEqual([]);
-    const privateProject = await foreign.request.get(`/api/dynamic/tpm_project/${fixture.project}`);
-    expect(privateProject.status()).toBeLessThan(500);
-    expect((await privateProject.json()).code).toBeDefined();
-    expect(String((await privateProject.json()).code)).not.toBe('0');
-    expect(await privateProject.text()).not.toContain(fixture.projectName);
-    const privateHistory = await foreign.request.get(
-      `/api/ai/aurabot/conversations/${payload.conversationId}/messages`,
-    );
-    expect(privateHistory.status()).toBeLessThan(500);
-    expect((await privateHistory.json()).code).toBeDefined();
-    expect(String((await privateHistory.json()).code)).not.toBe('0');
-    expect(await privateHistory.text()).not.toContain(title);
-    const privateTask = await foreign.request.get(
-      `/api/admin/agent-runs/conversation-tasks/${task.taskPid}`,
-    );
-    expect(privateTask.status()).toBeLessThan(500);
-    expect((await privateTask.json()).code).toBeDefined();
-    expect(String((await privateTask.json()).code)).not.toBe('0');
-    expect(await privateTask.text()).not.toContain(title);
-    await foreign.goto(
-      `/p/c/ai_colleague_chat?agentPid=${agentPid}&conversationId=${payload.conversationId}`,
-    );
-    await expect(foreign.getByTestId('agent-chat-page')).toHaveCount(0);
-    await expect(foreign.getByRole('link', { name: '返回 AI 同事', exact: true })).toBeVisible();
-    await expect(foreign.getByTestId('agent-chat-unavailable')).not.toContainText(fixture.projectName);
-    await foreign.screenshot({
-      animations: 'disabled',
-      path: join(shots, 'D10-foreign-private-boundary.png'),
-      fullPage: true,
+  } else {
+    // This retained installation intentionally has no second business space. The same
+    // journey runs in an explicitly registered multi-tenant control composition.
+    const deniedSpace = await page.request.post('/api/tenant-selection/process', {
+      data: {
+        action: 'create',
+        tenantName: `forbidden_single_${fixture.suffix}`,
+        displayName: 'Must not be created',
+      },
     });
-  } finally {
-    await foreignContext.close();
+    expect(deniedSpace.status()).toBe(403);
+    expect(String((await deniedSpace.json()).code)).not.toBe('0');
+    test
+      .info()
+      .annotations.push({
+        type: 'qualification-scope',
+        description:
+          'single deployment: self-provisioning denied; foreign-space facet requires the separately recorded multi control run',
+      });
   }
   expect(await businessSnapshot(page.request, fixture.project)).toEqual(protectedBefore);
 });

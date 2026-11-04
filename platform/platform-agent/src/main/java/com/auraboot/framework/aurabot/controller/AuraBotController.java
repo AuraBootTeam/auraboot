@@ -49,6 +49,15 @@ public class AuraBotController {
         this.tracer = tracer;
     }
 
+    private SseEmitter utf8Emitter() {
+        return new SseEmitter(300_000L) {
+            @Override protected void extendResponse(org.springframework.http.server.ServerHttpResponse response) {
+                super.extendResponse(response);
+                response.getHeaders().setContentType(new MediaType("text", "event-stream", java.nio.charset.StandardCharsets.UTF_8));
+            }
+        };
+    }
+
     /**
      * Phase A.5 + B.0: every chat turn (aurabot and named-agent) flows through
      * {@code turnService.runTurn} — the controller is purely a transport adapter.
@@ -61,13 +70,13 @@ public class AuraBotController {
      * {@code ConversationTurnServiceImpl.runTurn} so all chokepoint features
      * (metrics, persistence, audit, events) cover both paths uniformly.
      */
-    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8")
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
         if (request.getAnalyticsExecution() != null) {
             if (request.getOptions() == null) request.setOptions(new ChatRequest.ChatOptions());
             request.getOptions().setExplicitDurableRequest(true);
         }
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
+        SseEmitter emitter = utf8Emitter(); // 5 min timeout
 
         // Snapshot identity BEFORE the async hop — MetaContext is a ThreadLocal that
         // does not propagate into asyncTaskExecutor's worker thread.
@@ -144,9 +153,9 @@ public class AuraBotController {
      * pipeline (persistence + event + audit + metrics) covers both initial and
      * resume paths.
      */
-    @PostMapping(value = "/execute", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/execute", produces = MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8")
     public SseEmitter executeAction(@RequestBody ChatRequest.ExecuteRequest request) {
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
+        SseEmitter emitter = utf8Emitter(); // 5 min timeout
 
         // Snapshot identity BEFORE the async hop (MetaContext is ThreadLocal).
         Long tenantId = MetaContext.getCurrentTenantId();
