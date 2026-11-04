@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest;
+import com.auraboot.framework.meta.constant.DataPermissionPolicyVocabulary;
 import com.auraboot.framework.meta.entity.DataPermissionPolicy;
 import com.auraboot.framework.meta.entity.DataPermissionRoleBinding;
 import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
@@ -46,6 +47,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         authorizationWriteLock.mutate();
         authoringAccess.requireWrite();
         Long tenantId = MetaContext.getCurrentTenantId();
+        validateRequest(request);
         String pid = UniqueIdGenerator.generate();
 
         DataPermissionPolicy entity = new DataPermissionPolicy();
@@ -54,12 +56,12 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         entity.setName(request.getName());
         entity.setDescription(request.getDescription());
         entity.setModelCode(request.getModelCode());
-        entity.setPolicyType(request.getPolicyType());
-        entity.setScopeType(request.getScopeType());
+        entity.setPolicyType(DataPermissionPolicyVocabulary.type(request.getPolicyType()));
+        entity.setScopeType(request.getScopeType()==null?null:DataPermissionPolicyVocabulary.token(request.getScopeType()));
         entity.setScopeExpression(request.getScopeExpression());
         entity.setConditionAst(request.getConditionAst());
         entity.setFieldCode(request.getFieldCode());
-        entity.setMaskType(request.getMaskType());
+        entity.setMaskType(request.getMaskType()==null?null:DataPermissionPolicyVocabulary.token(request.getMaskType()));
         entity.setMaskExpression(request.getMaskExpression());
         entity.setPriority(request.getPriority());
         entity.setEnabled(request.isEnabled());
@@ -106,15 +108,16 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
             throw missing(pid);
         }
 
+        validateRequest(request);
         existing.setName(request.getName());
         existing.setDescription(request.getDescription());
         existing.setModelCode(request.getModelCode());
-        existing.setPolicyType(request.getPolicyType());
-        existing.setScopeType(request.getScopeType());
+        existing.setPolicyType(DataPermissionPolicyVocabulary.type(request.getPolicyType()));
+        existing.setScopeType(request.getScopeType()==null?null:DataPermissionPolicyVocabulary.token(request.getScopeType()));
         existing.setScopeExpression(request.getScopeExpression());
         existing.setConditionAst(request.getConditionAst());
         existing.setFieldCode(request.getFieldCode());
-        existing.setMaskType(request.getMaskType());
+        existing.setMaskType(request.getMaskType()==null?null:DataPermissionPolicyVocabulary.token(request.getMaskType()));
         existing.setMaskExpression(request.getMaskExpression());
         existing.setPriority(request.getPriority());
         existing.setEnabled(request.isEnabled());
@@ -224,6 +227,19 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public String previewRowFilter(String modelCode, Long userId) {
         return preview(modelCode,userId).rowFilter();
+    }
+
+    private static void validateRequest(DataPermissionPolicyCreateRequest request) {
+        if(request==null || request.getName()==null || request.getName().isBlank()
+                || request.getModelCode()==null || request.getModelCode().isBlank() || request.getPriority()==null)
+            throw new BusinessException(ResponseCode.BadParam,"Invalid data permission policy");
+        String type=DataPermissionPolicyVocabulary.type(request.getPolicyType());
+        if("row".equals(type)) DataPermissionPolicyVocabulary.scope(request.getScopeType());
+        else {
+            if(request.getFieldCode()==null || request.getFieldCode().isBlank())
+                throw new BusinessException(ResponseCode.BadParam,"Field policy requires a target field");
+            if("column".equals(type)) DataPermissionPolicyVocabulary.mask(request.getMaskType());
+        }
     }
 
     private DataPermissionPolicy requirePolicy(Long tenant,String pid) {

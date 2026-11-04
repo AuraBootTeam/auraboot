@@ -33,6 +33,25 @@ class DataPermissionPolicyServiceBoundaryTest {
     }
     @AfterEach void clear() {MetaContext.clear();}
 
+    private com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest request(String scope) {
+        var request=new com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest();
+        request.setName("Policy");request.setModelCode("orders");request.setPolicyType("ROW");request.setScopeType(scope);return request;
+    }
+
+    @Test void authoringNormalizesDocumentedCaseBeforePersistence() {
+        var saved=service.create(request(" SeLf "));
+        assertThat(saved.getPolicyType()).isEqualTo("row");assertThat(saved.getScopeType()).isEqualTo("self");
+        verify(policies).insert(saved);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings={"unknown","SELF_TYPO"})
+    void invalidRowScopeCannotBeSavedAsAnIgnoredRestriction(String scope) {
+        assertThatThrownBy(()->service.create(request(scope))).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        verifyNoInteractions(policies,bindings,engine);
+    }
+
     @Test void previewResolvesTheTargetMemberAndNeverBorrowsAdminCommandAuthority() {
         when(access.previewSubject(21L)).thenReturn(target);
         var policy=new DataPermissionPolicy();policy.setPid("target-policy");

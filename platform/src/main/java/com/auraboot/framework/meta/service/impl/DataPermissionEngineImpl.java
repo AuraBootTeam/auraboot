@@ -9,6 +9,7 @@ import com.auraboot.framework.decision.ast.EvalTrace;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.decision.ast.Truth;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.meta.constant.DataPermissionPolicyVocabulary;
 import com.auraboot.framework.meta.dto.FieldMaskRule;
 import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.entity.DataPermissionPolicy;
@@ -210,7 +211,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
 
         List<DataPermissionPolicy> rowPolicies = policies.stream()
-                .filter(p -> "row".equals(p.getPolicyType()))
+                .filter(p -> "row".equals(DataPermissionPolicyVocabulary.token(p.getPolicyType())))
                 .collect(Collectors.toList());
 
         if (rowPolicies.isEmpty()) {
@@ -219,7 +220,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
         // If any policy grants ALL access, no filter needed
         boolean hasAllAccess = rowPolicies.stream()
-                .anyMatch(p -> "all".equals(p.getScopeType()));
+                .anyMatch(p -> "all".equals(DataPermissionPolicyVocabulary.token(p.getScopeType())));
         if (hasAllAccess) {
             return "";
         }
@@ -262,14 +263,14 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
         List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
         List<DataPermissionPolicy> rowPolicies = policies.stream()
-                .filter(p -> "row".equals(p.getPolicyType()))
+                .filter(p -> "row".equals(DataPermissionPolicyVocabulary.token(p.getPolicyType())))
                 .collect(Collectors.toList());
 
         List<Map<String, Object>> policyFiltered = records;
 
         // ANY policy with ALL scope = allow all
         boolean hasAllAccess = rowPolicies.stream()
-                .anyMatch(p -> "all".equals(p.getScopeType()));
+                .anyMatch(p -> "all".equals(DataPermissionPolicyVocabulary.token(p.getScopeType())));
         if (!rowPolicies.isEmpty() && !hasAllAccess) {
             // Filter each record: a record passes if ANY policy allows it (OR logic)
             policyFiltered = records.stream()
@@ -318,12 +319,12 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
         List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
         List<DataPermissionPolicy> rowPolicies = policies.stream()
-                .filter(p -> "row".equals(p.getPolicyType()))
+                .filter(p -> "row".equals(DataPermissionPolicyVocabulary.token(p.getPolicyType())))
                 .collect(Collectors.toList());
 
         // ANY policy with ALL scope = allow all
         boolean hasAllAccess = rowPolicies.stream()
-                .anyMatch(p -> "all".equals(p.getScopeType()));
+                .anyMatch(p -> "all".equals(DataPermissionPolicyVocabulary.token(p.getScopeType())));
         if (!rowPolicies.isEmpty() && !hasAllAccess) {
             boolean policyAllows = rowPolicies.stream()
                     .anyMatch(policy -> recordMatchesPolicy(policy, userId, record));
@@ -345,9 +346,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                                              Map<String, Object> record) {
         if (tenantId == null || userId == null || memberId == null || record == null) return false;
         var policies = getEffectivePolicies(tenantId, modelCode, memberId).stream()
-                .filter(policy -> "row".equals(policy.getPolicyType())).toList();
+                .filter(policy -> "row".equals(DataPermissionPolicyVocabulary.token(policy.getPolicyType()))).toList();
         if (!policies.isEmpty() && policies.stream().noneMatch(policy -> {
-            String type = policy.getScopeType();
+            String type = DataPermissionPolicyVocabulary.token(policy.getScopeType());
             if ("all".equals(type)) return true;
             if ("self".equals(type)) return matchesSelf(userId, record);
             if ("custom".equals(type) && policy.getConditionAst() != null) return matchesCustom(policy, userId, record);
@@ -376,7 +377,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
 
         return policies.stream()
-                .filter(p -> "column".equalsIgnoreCase(p.getPolicyType()))
+                .filter(p -> "column".equals(DataPermissionPolicyVocabulary.token(p.getPolicyType())))
                 .map(p -> FieldMaskRule.builder()
                         .fieldCode(p.getFieldCode())
                         .maskType(p.getMaskType())
@@ -403,7 +404,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
         List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
         return policies.stream()
-                .filter(p -> "field_write".equalsIgnoreCase(p.getPolicyType()))
+                .filter(p -> "field_write".equals(DataPermissionPolicyVocabulary.token(p.getPolicyType())))
                 .map(DataPermissionPolicy::getFieldCode)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -413,11 +414,14 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             Long tenantId,
             String modelCode,
             Long memberId) {
-        return DynamicDataQueryScope.effectivePolicies(
+        var policies=DynamicDataQueryScope.effectivePolicies(
                 tenantId,
                 modelCode,
                 memberId,
                 () -> policyMapper.findEffectivePolicies(tenantId, modelCode, memberId));
+        if(policies.stream().anyMatch(policy->!DataPermissionPolicyVocabulary.supportedType(policy.getPolicyType())))
+            throw new org.springframework.security.access.AccessDeniedException("Stored data permission policy type is unsupported");
+        return policies;
     }
 
     @Override
@@ -630,9 +634,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
      * Returns the raw condition, e.g. "created_by = 123".
      */
     private String buildSingleRowFilterFragment(DataPermissionPolicy policy, Long userId) {
-        String scopeType = policy.getScopeType();
-        if (scopeType == null) {
-            return "";
+        String scopeType = DataPermissionPolicyVocabulary.token(policy.getScopeType());
+        if (scopeType.isEmpty()) {
+            return "1=0";
         }
 
         switch (scopeType) {
@@ -663,7 +667,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
             default:
                 log.warn("Unknown scope type '{}' in policy pid={}", scopeType, policy.getPid());
-                return "";
+                return "1=0";
         }
     }
 
@@ -872,10 +876,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
      */
     private boolean recordMatchesPolicy(DataPermissionPolicy policy, Long userId,
                                         Map<String, Object> record) {
-        String scopeType = policy.getScopeType();
-        if (scopeType == null || "all".equals(scopeType)) {
-            return true;
-        }
+        String scopeType = DataPermissionPolicyVocabulary.token(policy.getScopeType());
+        if ("all".equals(scopeType)) return true;
+        if (scopeType.isEmpty()) return false;
 
         switch (scopeType) {
             case "self":
