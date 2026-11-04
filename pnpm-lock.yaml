@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@hono/node-server': 1.19.15
+  '@hono/node-server': 2.1.3
   brace-expansion: 1.1.21
   dompurify: 3.4.17
   esbuild: 0.28.1
@@ -24,7 +24,7 @@ overrides:
   browserslist: 4.28.7
   fast-copy: 4.3.0
   fflate: 0.8.3
-  follow-redirects: 1.16.1
+  follow-redirects: 1.16.2
   form-data@4: 4.0.6
   handlebars: 4.7.10
   ip-address: 10.7.4
@@ -1287,9 +1287,9 @@ packages:
     peerDependencies:
       react: '>= 16 || ^19.0.0-rc'
 
-  '@hono/node-server@1.19.15':
-    resolution: {integrity: sha512-Za2ai6TLdKjUvnur+eenO6nuYYipVAEhyCAdaV8IRvmU9kK8crOZUSYvIXn72E4f8fJqyAbpcJuTsYYmZp9Deg==}
-    engines: {node: '>=18.14.1'}
+  '@hono/node-server@2.1.3':
+    resolution: {integrity: sha512-TA//nWMqPhbfdfneACk6t5a9eqbS9lABEPyKn0/xZTah3H3U2XaVg85rJFl0/Fyit0I552YDHgXGVSf3GwqbUw==}
+    engines: {node: '>=20'}
     peerDependencies:
       hono: 4.13.12
 
@@ -4018,8 +4018,8 @@ packages:
   flatted@3.4.2:
     resolution: {integrity: sha512-PjDse7RzhcPkIJwy5t7KPWQSZ9cAbzQXcafsetQoD7sOJRQlGikNbx7yZp2OotDnJyrDcbyRq3Ttb18iYOqkxA==}
 
-  follow-redirects@1.16.1:
-    resolution: {integrity: sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==}
+  follow-redirects@1.16.2:
+    resolution: {integrity: sha512-/kVP2U8z596Ia0gwFrwyIeo74ta5aVmSeU1FfAUMAmcEP5EP7zydmag3SLiN64NaRKef3lxsq7i/g7ltJQDGow==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
@@ -7667,7 +7667,7 @@ snapshots:
     dependencies:
       react: 19.2.6
 
-  '@hono/node-server@1.19.15(hono@4.13.12)':
+  '@hono/node-server@2.1.3(hono@4.13.12)':
     dependencies:
       hono: 4.13.12
 
@@ -7904,7 +7904,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.32.2(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 1.19.15(hono@4.13.12)
+      '@hono/node-server': 2.1.3(hono@4.13.12)
       ajv: 8.18.0
       ajv-formats: 3.0.1(ajv@8.18.0)
       content-type: 1.0.5
@@ -9634,7 +9634,7 @@ snapshots:
 
   axios@1.20.0:
     dependencies:
-      follow-redirects: 1.16.1
+      follow-redirects: 1.16.2
       form-data: 4.0.6
       https-proxy-agent: 5.0.1
       proxy-from-env: 2.1.0
@@ -10641,7 +10641,7 @@ snapshots:
 
   flatted@3.4.2: {}
 
-  follow-redirects@1.16.1: {}
+  follow-redirects@1.16.2: {}
 
   foreground-child@2.0.0:
     dependencies:

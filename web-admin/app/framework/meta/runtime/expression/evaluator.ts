@@ -75,16 +75,35 @@ export class ExpressionEvaluator {
       return String(template || '');
     }
 
-    // 替换所有 ${...} 表达式
-    return template.replace(/\$\{([^}]+)\}/g, (match, expr) => {
-      try {
-        const value = this.evaluate(expr, context);
-        return String(value ?? '');
-      } catch (error) {
-        console.error('Template expression evaluation failed:', expr, error);
-        return match;
+    // Scan each character at most a constant number of times, including input
+    // containing many opening delimiters without a closing delimiter.
+    const parts: string[] = [];
+    let cursor = 0;
+    let searchFrom = 0;
+    while (searchFrom < template.length) {
+      const opening = template.indexOf('${', searchFrom);
+      if (opening < 0) break;
+      const closing = template.indexOf('}', opening + 2);
+      if (closing < 0) break;
+      if (closing === opening + 2) {
+        searchFrom = closing + 1;
+        continue;
       }
-    });
+      const match = template.slice(opening, closing + 1);
+      const expression = template.slice(opening + 2, closing);
+      parts.push(template.slice(cursor, opening));
+      try {
+        parts.push(String(this.evaluate(expression, context) ?? ''));
+      } catch {
+        // Preserve failed interpolation without logging user-controlled values.
+        console.error('Template expression evaluation failed');
+        parts.push(match);
+      }
+      cursor = closing + 1;
+      searchFrom = cursor;
+    }
+    parts.push(template.slice(cursor));
+    return parts.join('');
   }
 
   /**

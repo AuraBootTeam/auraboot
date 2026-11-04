@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import { handleLegacySessionMigration } from '../legacy-session-migration';
 
-function request(origin = 'https://app.example.com'): Request {
+function request(origin = 'https://app.example.com', authorization = 'Bearer legacy.jwt.value'): Request {
   const headers: Record<string, string> = {
     origin,
     host: 'app.example.com',
-    authorization: 'Bearer legacy.jwt.value',
+    authorization,
     'x-aura-remember': 'true',
   };
   return {
@@ -51,6 +51,19 @@ describe('legacy session migration endpoint', () => {
     expect(res.status).toHaveBeenCalledWith(204);
     expect(next).not.toHaveBeenCalled();
   });
+
+  it.each(['Bearer \u2028', 'Bearer a b', 'Bearer abc\r\nInjected: yes', 'Bearer ' + ' '.repeat(100_000) + '\n'])
+    ('rejects malformed headers before backend validation or cookie creation', async (authorization) => {
+      const res = response();
+      const fetchImpl = vi.fn();
+      const commitSession = vi.fn();
+      await handleLegacySessionMigration(request('https://app.example.com', authorization), res.value, vi.fn(), {
+        backendUrl: 'http://backend.internal', fetchImpl, commitSession,
+      });
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(commitSession).not.toHaveBeenCalled();
+    });
 
   it('rejects cross-origin and invalid-token exchanges without setting a cookie', async () => {
     const commitSession = vi.fn();

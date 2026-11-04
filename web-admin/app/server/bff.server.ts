@@ -1,3 +1,4 @@
+import { safeLoginRedirect } from './auth/login-redirect';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -188,12 +189,6 @@ app.use((req, res, next) => {
   next();
 });
 
-function safeLoginRedirect(value: unknown): string {
-  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
-    return '/';
-  }
-  return value;
-}
 
 function isMobileDevice(userAgent: string): boolean {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
