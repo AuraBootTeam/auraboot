@@ -341,6 +341,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 throw new MetaServiceException(
                         "compareAndSet cannot bypass immutable field rules: " + fieldCode);
             }
+            fieldPredicateAuthorizationSupport().requireReadable(model, Set.of(compareField.getCode()));
             compareColumn = compareField.getColumnName() != null
                     ? compareField.getColumnName() : compareField.getCode();
         }
@@ -437,6 +438,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         ModelMutationGuard.assertMutable(model, "updated");
         FieldDefinition compareField = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
         assertBatchCasField(compareField, fieldCode);
+        fieldPredicateAuthorizationSupport().requireReadable(model, Set.of(compareField.getCode()));
         Set<String> ids = new HashSet<>();
         List<Map<String, Object>> rows = new ArrayList<>();
         List<Object> expectedValues = new ArrayList<>();
@@ -587,6 +589,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return java.util.Objects.equals(proposed, expected);
     }
 
+    private FieldPredicateAuthorizationSupport fieldPredicateAuthorizationSupport() {
+        return new FieldPredicateAuthorizationSupport(fieldPermissionService, dataPermissionEngine, fieldMaskService);
+    }
+
     /**
      * Resolve a field code to its physical column name, asserting it is numeric.
      * Throws {@link IllegalArgumentException} (NOT {@link MetaServiceException}) so the
@@ -639,6 +645,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (capCode != null) {
             capCol = resolveNumericColumn(model, capCode);
         }
+        Set<String> observedFields = new LinkedHashSet<>();
+        observedFields.add(counterCode);
+        if (capCode != null) observedFields.add(capCode);
+        fieldPredicateAuthorizationSupport().requireReadable(model, observedFields);
         StringBuilder guardedClause = new StringBuilder(buildSoftDeleteClause(model));
         RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         String softDeleteClause = guardedClause.toString();

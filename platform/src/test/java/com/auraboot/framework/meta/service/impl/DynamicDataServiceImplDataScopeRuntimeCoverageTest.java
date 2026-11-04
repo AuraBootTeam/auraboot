@@ -819,6 +819,9 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     private void wireModel(ModelDefinition model) {
+        lenient().when(fieldPermissionService.getFieldPermissions(MEMBER_ID,model.getCode()))
+                .thenAnswer(invocation -> FieldPermissionSet.allAllowed(model.getFields().stream()
+                        .map(FieldDefinition::getCode).collect(java.util.stream.Collectors.toSet())));
         lenient().when(metadataService.getDefinitionByCode(model.getCode())).thenReturn(model);
         lenient().when(metadataService.getModelDefinition(model.getCode())).thenReturn(Optional.of(model));
         lenient().when(metadataService.getPrimaryKeyField(model.getCode())).thenReturn(primaryKey());

@@ -46,6 +46,8 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
     @Autowired MetaModelFieldBindingMapper bindings;
     @Autowired FieldPermissionService fieldPermissions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.auraboot.framework.meta.service.FieldMaskService masks;
+    private final List<Long> maskIds = new ArrayList<>();
     @Autowired com.auraboot.framework.meta.mapper.CommandDefinitionMapper commands;
     @Autowired com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
@@ -109,6 +111,7 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
 
     @AfterEach void cleanup() {
         applyTestMetaContext();
+        for (Long id : maskIds) masks.deleteConfig(id);
         for (Long id : commandIds) jdbc.update("DELETE FROM ab_command_definition WHERE tenant_id=? AND id=?",testTenant.getId(),id);
         if (physicalCreated) assertThat(schema.dropTableByModel(model).isSuccess()).isTrue();
         if (modelId != null) {
@@ -149,6 +152,48 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         assertThatThrownBy(()->data.compareAndSet(model,pid,secret,10,11)).isInstanceOf(AccessDeniedException.class);
         assertThat(data.compareAndSet(model,pid,label,"before","after-cas")).isTrue();
         assertThat(stored(secret,pid)).isEqualTo(10); assertThat(stored(label,pid)).isEqualTo("after-cas");
+    }
+
+    @Test void hiddenComparisonCannotRevealEitherMatchingOrNonmatchingValues() {
+        for (int expected : List.of(17,99)) {
+            assertThatThrownBy(()->data.compareAndSet(model,pid,hidden,expected,Map.of(label,"inferred")))
+                    .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        }
+        assertThat(stored(label,pid)).isEqualTo("before");
+        assertThat(stored(hidden,pid)).isEqualTo(17);
+        assertThatThrownBy(()->data.compareAndSetBatch(model,hidden,List.of(
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(pid,17,Map.of(label,"inferred")))))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        assertThat(stored(label,pid)).isEqualTo("before");
+    }
+
+    @Test void hiddenCapCannotBeProbedButVisibleReadonlyCapAllowsBoundedIncrement() {
+        assertThatThrownBy(()->data.incrementWithinCap(model,pid,quantity,1,hidden))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        assertThat(stored(quantity,pid)).isEqualTo(1);
+        assertThat(data.incrementWithinCap(model,pid,quantity,1,secret)).contains(2L);
+        assertThat(stored(quantity,pid)).isEqualTo(2);
+        assertThat(stored(secret,pid)).isEqualTo(10);
+    }
+
+    @Test void writableMaskedCounterCannotReturnItsRawNewValue() {
+        var config = new com.auraboot.framework.meta.entity.FieldMaskConfig();
+        config.setModelCode(model); config.setFieldCode(quantity); config.setEnabled(true);
+        config.setApplyToDetail(true); config.setApplyToList(true); config.setApplyToExport(true);
+        config.setMaskType("FULL"); config.setReplacementChar("*");
+        masks.saveConfig(config); maskIds.add(config.getId());
+        assertThat(fieldPermissions.getFieldPermissions(testTenantMember.getId(),model).editableFields()).contains(quantity);
+        assertThat(masks.getEffectiveConfigs(model,testUser.getId(),"detail")).hasSize(1);
+        assertThatThrownBy(()->data.incrementWithinCap(model,pid,quantity,1,null))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        assertThat(stored(quantity,pid)).isEqualTo(1);
+        assertThatThrownBy(()->data.compareAndSet(model,pid,quantity,1,Map.of(label,"inferred")))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        assertThat(stored(label,pid)).isEqualTo("before");
+        assertThat(count()).isEqualTo(1);
+        masks.deleteConfig(config.getId()); maskIds.remove(config.getId());
+        assertThat(data.incrementWithinCap(model,pid,quantity,1,null)).contains(2L);
+        assertThat(stored(quantity,pid)).isEqualTo(2);
     }
 
     @Test void bulkCreateRejectsTheWholeWriteAndAllowsUnrestrictedRows() {
