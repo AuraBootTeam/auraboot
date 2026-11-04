@@ -8,7 +8,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -317,7 +316,7 @@ class DeploymentBrandingProviderTest {
                 .withProperty("AURABOOT_WHITE_LABEL_ORDER_REFERENCE", orderReference);
     }
 
-    private MockEnvironment signedEnvironment(Path config) throws URISyntaxException {
+    private MockEnvironment signedEnvironment(Path config) throws IOException {
         return environment("standard", config, "SO-2026-001")
                 .withProperty(
                         "AURABOOT_COMMERCIAL_LICENSE_ENFORCEMENT",
@@ -338,9 +337,13 @@ class DeploymentBrandingProviderTest {
                 .withProperty("AURABOOT_VERSION", "1.0.0");
     }
 
-    private Path fixturePath(String name) throws URISyntaxException {
-        return Path.of(Objects.requireNonNull(
-                getClass().getResource("/branding/commercial-license/" + name)).toURI());
+    private Path fixturePath(String name) throws IOException {
+        Path target = tempDirectory.resolve(name);
+        try (var input = Objects.requireNonNull(
+                getClass().getResourceAsStream("/branding/commercial-license/" + name))) {
+            Files.copy(input, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        return target;
     }
 
     private Path writeBranding(String orderReference, String websiteUrl) throws IOException {

@@ -4,6 +4,10 @@ import com.auraboot.framework.notification.mapper.PushDeviceTokenMapper;
 import com.auraboot.framework.notification.model.PushDeviceToken;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -23,6 +27,12 @@ class DeviceTokenServiceTest {
 
     @Mock
     PushDeviceTokenMapper mapper;
+
+    @BeforeAll
+    static void registerEntityMetadata() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""), PushDeviceToken.class);
+    }
 
     @Test
     void registerToken_createsNewWhenNoExisting() {

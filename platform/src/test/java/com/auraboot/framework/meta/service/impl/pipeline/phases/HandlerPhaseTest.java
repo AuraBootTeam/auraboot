@@ -1236,9 +1236,9 @@ class HandlerPhaseTest {
 
     @Test
     void targetFileCapabilityReceivesTrustedPipelineContextAndClosesOnSuccessAndFailure() {
-        var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
-        ReflectionTestUtils.setField(phase, "commandTargetFiles", factory);
         for (boolean reject : List.of(false, true)) {
+            var factory = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.class);
+            ReflectionTestUtils.setField(phase, "commandTargetFiles", factory);
             var scope = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory.Scope.class);
             var accessor = org.mockito.Mockito.mock(FileAccessor.class);
             var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type","custom","handler",PLUGIN_HANDLER_CODE));
