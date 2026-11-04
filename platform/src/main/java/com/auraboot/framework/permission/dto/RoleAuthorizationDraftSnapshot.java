@@ -11,5 +11,6 @@ public record RoleAuthorizationDraftSnapshot(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String defaultScopeType,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<CapabilityGroup> groups,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PermissionMatrixDTO matrix,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopes) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopes,
+        List<RoleFieldPolicyView> fieldPolicies) {
 }

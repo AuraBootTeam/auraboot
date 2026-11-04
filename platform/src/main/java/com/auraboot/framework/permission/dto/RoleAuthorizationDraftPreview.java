@@ -11,5 +11,6 @@ public record RoleAuthorizationDraftPreview(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean defaultScopeChanged,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String defaultScopeType,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean applyDefaultToCurrentGrants,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopeChanges) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopeChanges,
+        RoleFieldPolicyPreview fieldPolicies) {
 }

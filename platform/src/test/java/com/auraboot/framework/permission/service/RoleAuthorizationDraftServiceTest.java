@@ -38,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RoleAuthorizationDraftServiceTest {
+    private final RoleFieldPolicyDraftService fieldPolicies = mock(RoleFieldPolicyDraftService.class);
     private final RoleAuthorizationWriteLock writes = mock(RoleAuthorizationWriteLock.class);
     private final RoleService roles = mock(RoleService.class);
     private final RolePermissionMapper grants = mock(RolePermissionMapper.class);
@@ -48,7 +49,7 @@ class RoleAuthorizationDraftServiceTest {
     private final DataScopeService scopes = mock(DataScopeService.class);
     private final DataPermissionRoleBindingMapper bindings = mock(DataPermissionRoleBindingMapper.class);
     private final DataPermissionPolicyMapper policies = mock(DataPermissionPolicyMapper.class);
-    private final RoleAuthorizationDraftService service = new RoleAuthorizationDraftService(writes, roles, grants,
+    private final RoleAuthorizationDraftService service = new RoleAuthorizationDraftService(writes, fieldPolicies, roles, grants,
             permissions, catalog, capabilities, matrix, scopes,
             JsonMapper.builder().addModule(new JavaTimeModule()).build(), bindings, policies);
     private final Role role = new Role();
@@ -123,6 +124,18 @@ class RoleAuthorizationDraftServiceTest {
         assertThatThrownBy(() -> service.apply("role-a", request(revision, true, "self", List.of())))
                 .isInstanceOf(IllegalStateException.class).hasMessage("injected write failure");
         verify(matrix, never()).applyDefaultScopeToCurrentGrants(any(), any(), any());
+    }
+
+    @Test void changingAnUnboundFieldCandidateInvalidatesAnEarlierPreview() {
+        var policy = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        policy.setPid("candidate"); policy.setPolicyType("column"); policy.setMaskType("hide");
+        when(policies.findAllEnabled(100L)).thenReturn(List.of(policy));
+        var baseline = service.snapshot("role-a");
+        policy.setMaskType("hash");
+        assertThatThrownBy(() -> service.apply("role-a", request(baseline.revision(), false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate();
     }
 
     @Test void revisionsAreIndependentOfStorageReturnOrder() {

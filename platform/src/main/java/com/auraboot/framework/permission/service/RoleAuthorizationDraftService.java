@@ -39,6 +39,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RoleAuthorizationDraftService {
     private final RoleAuthorizationWriteLock writes;
+    private final RoleFieldPolicyDraftService fieldPolicies;
     private final RoleService roles;
     private final RolePermissionMapper grants;
     private final PermissionService permissions;
@@ -67,7 +68,7 @@ public class RoleAuthorizationDraftService {
     public RoleAuthorizationDraftSnapshot apply(String rolePid, RoleAuthorizationDraftRequest request) {
         writes.lock();
         Role role = resolve(rolePid);
-        validate(role, request);
+        var reviewed = validate(role, request);
         writes.mutate();
         if (request.defaultScopeChanged()) roles.setDefaultDataScopeType(role.getId(), request.defaultScopeType());
         capabilities.applyCapabilitySelection(role.getId(), request.selectedCapabilityCodes(), revoked(request));
@@ -79,6 +80,7 @@ public class RoleAuthorizationDraftService {
             scopes.setScope(tenant, role.getId(), change.resourceCode(), change.actionCode(),
                     change.scopeType(), change.mergeStrategy());
         }
+        fieldPolicies.apply(role, reviewed.fieldPolicies());
         // A failed write or readback propagates and rolls back the entire authoring operation.
         return snapshot(resolve(rolePid));
     }
@@ -101,10 +103,12 @@ public class RoleAuthorizationDraftService {
         resulting.removeAll(selection.revokedCodes());
         resulting.addAll(selection.grantedCodes());
         Set<String> permittedPairs = new HashSet<>();
+        Set<String> permittedModels = new HashSet<>();
         for (var permission : permissions.findAllActive()) {
             if (resulting.contains(permission.getCode()) && permission.getResourceCode() != null
                     && permission.getAction() != null) {
                 permittedPairs.add(permission.getResourceCode() + ":" + permission.getAction());
+                permittedModels.add(permission.getResourceCode());
             }
         }
         Set<String> seen = new HashSet<>();
@@ -118,7 +122,8 @@ public class RoleAuthorizationDraftService {
             scopeType(change.scopeType());
         }
         return new RoleAuthorizationDraftPreview(revision, selection, request.defaultScopeChanged(),
-                request.defaultScopeType(), request.applyDefaultToCurrentGrants(), changes(request));
+                request.defaultScopeType(), request.applyDefaultToCurrentGrants(), changes(request),
+                fieldPolicies.preview(role, request.fieldPolicyPids(), permittedModels));
     }
 
     private RoleAuthorizationDraftSnapshot snapshot(Role role) {
@@ -126,7 +131,7 @@ public class RoleAuthorizationDraftService {
                 capabilities.resolveForRole(role.getId()), matrix.getMatrixForRole(role.getTenantId(), role.getId()),
                 scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
                         .map(scope -> new DataScopeUpdateRequest(scope.getResourceCode(), scope.getActionCode(),
-                                scope.getScopeType(), scope.getMergeStrategy())).toList());
+                                scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role));
     }
 
     private Role resolve(String rolePid) {
@@ -149,6 +154,11 @@ public class RoleAuthorizationDraftService {
         bindings.forEach(binding -> policies.put(binding.getPolicyPid(),
                 dataPolicies.findByPid(role.getTenantId(), binding.getPolicyPid())));
         state.put("dataAndFieldPolicies", policies);
+        // An unbound candidate must not change between preview and commit without a conflict.
+        state.put("fieldPolicyCatalog", dataPolicies.findAllEnabled(role.getTenantId()).stream()
+                .filter(policy -> "column".equalsIgnoreCase(policy.getPolicyType())
+                        || "field_write".equalsIgnoreCase(policy.getPolicyType()))
+                .sorted(Comparator.comparing(policy -> policy.getPid())).toList());
         state.put("catalog", catalog.listDeclarations(role.getTenantId()).stream()
                 .sorted(Comparator.comparing(declaration -> declaration.getCode())).toList());
         state.put("permissions", permissions.findAllActive().stream()

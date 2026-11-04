@@ -61,6 +61,30 @@ class DataPermissionEngineImplDataScopeTest {
         MetaContext.clear();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings={"unknown"})
+    void malformedMaskNeverReturnsTheOriginalSensitiveValue(String mask) {
+        var policy = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        policy.setPolicyType("column"); policy.setFieldCode("cost"); policy.setMaskType(mask);
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of(policy));
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost", "sensitive")),
+                engine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID)))
+                .singleElement().satisfies(row -> assertThat(row).containsEntry("cost", null));
+    }
+
+    @Test void legacyUppercaseFieldPoliciesStillHideAndBlockWrites() {
+        var hidden = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        hidden.setPolicyType("COLUMN"); hidden.setFieldCode("cost"); hidden.setMaskType("HIDE");
+        var readOnly = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        readOnly.setPolicyType("FIELD_WRITE"); readOnly.setFieldCode("cost");
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of(hidden, readOnly));
+        var rules = engine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID);
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost", "secret")), rules))
+                .singleElement().satisfies(row -> assertThat(row).containsEntry("cost", null));
+        assertThat(engine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID)).containsExactly("cost");
+    }
+
     @Test void exactDisplayCandidatesRetainTheBaseScopeWithoutEnumeratingOtherRoots() {
         when(required.isConfigured(MODEL_CODE)).thenReturn(true);
         when(dataScopeEvaluator.getCondition(MEMBER_ID, MODEL_CODE, "read"))

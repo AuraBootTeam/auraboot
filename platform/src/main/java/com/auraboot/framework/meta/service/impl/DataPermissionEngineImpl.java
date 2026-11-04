@@ -376,7 +376,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
 
         return policies.stream()
-                .filter(p -> "column".equals(p.getPolicyType()))
+                .filter(p -> "column".equalsIgnoreCase(p.getPolicyType()))
                 .map(p -> FieldMaskRule.builder()
                         .fieldCode(p.getFieldCode())
                         .maskType(p.getMaskType())
@@ -403,7 +403,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
         List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
         return policies.stream()
-                .filter(p -> "field_write".equals(p.getPolicyType()))
+                .filter(p -> "field_write".equalsIgnoreCase(p.getPolicyType()))
                 .map(DataPermissionPolicy::getFieldCode)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -982,10 +982,10 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
         String maskType = rule.getMaskType();
         if (maskType == null) {
-            return value;
+            return null;
         }
 
-        switch (maskType) {
+        switch (maskType.toLowerCase(java.util.Locale.ROOT)) {
             case "hide":
                 return null;
             case "partial":
@@ -996,7 +996,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
                 return applyCustomMask(value, rule.getMaskExpression());
             default:
                 log.warn("Unknown mask type: {}", maskType);
-                return value;
+                return null;
         }
     }
 

@@ -44,7 +44,15 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private RoleAuthorizationDraftService drafts;
     @Autowired private CapabilityRegistryService catalog;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
+    @Autowired private com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper policyMapper;
     @MockitoSpyBean private DataScopeService scopes;
+    @MockitoSpyBean private com.auraboot.framework.meta.mapper.DataPermissionRoleBindingMapper fieldBindings;
+    @Autowired private com.auraboot.framework.meta.mapper.MetaModelMapper models;
+    @Autowired private com.auraboot.framework.meta.mapper.MetaFieldMapper fields;
+    @Autowired private com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper modelFields;
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService metadata;
+    private Long modelId, fieldId;
     private long roleId;
     private String rolePid;
     private String resource;
@@ -80,11 +88,18 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     }
 
     @AfterEach void cleanup() {
-        reset(scopes);
+        reset(scopes, fieldBindings);
+        if (modelId != null) {
+            jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?", getTestTenant().getId(), modelId);
+            jdbc.update("DELETE FROM ab_meta_model WHERE tenant_id=? AND id=?", getTestTenant().getId(), modelId);
+            jdbc.update("DELETE FROM ab_meta_field WHERE tenant_id=? AND id=?", getTestTenant().getId(), fieldId);
+            metadata.clearAllCache();
+        }
         if (rolePid != null) {
             jdbc.update("DELETE FROM ab_data_permission_role_binding WHERE tenant_id=? AND role_pid=?", getTestTenant().getId(), rolePid);
             jdbc.update("DELETE FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);
             jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);
+            jdbc.update("DELETE FROM ab_user_role WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);
             jdbc.update("DELETE FROM ab_role WHERE tenant_id=? AND id=?", getTestTenant().getId(), roleId);
             jdbc.update("DELETE FROM ab_permission_capability WHERE tenant_id=? AND code LIKE ?", getTestTenant().getId(), resource + ".%");
             jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND resource_code=?", getTestTenant().getId(), resource);
@@ -168,6 +183,105 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                 .isInstanceOfSatisfying(RootUnCheckedException.class,
                         error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
         assertThat(persistedCodes()).isEmpty();
+    }
+
+    @Test void fieldBindingsCommitWithDutiesAndScopesAndCanBeExplicitlyRemoved() {
+        String policy = fieldPolicy();
+        var saved = drafts.apply(rolePid, fieldsRequest(drafts.snapshot(rolePid), Set.of(policy)));
+        assertThat(saved.fieldPolicies()).extracting(view -> view.policyPid()).containsExactly(policy);
+        assertThat(persistedCodes()).containsExactly(readCode, updateCode);
+        assertThat(defaultScope()).isEqualTo("self");
+        assertThat(fieldBindings.findByRolePid(getTestTenant().getId(), rolePid)).hasSize(1);
+        var removed = drafts.apply(rolePid, fieldsRequest(saved, Set.of()));
+        assertThat(removed.fieldPolicies()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_data_permission_policy WHERE tenant_id=? AND pid=?",
+                Long.class, getTestTenant().getId(), policy)).isEqualTo(1L);
+    }
+
+    @Test void failureAfterActualFieldBindingRollsBackDutiesDefaultsScopesAndFieldChanges() {
+        String policy = fieldPolicy();
+        var baseline = drafts.snapshot(rolePid);
+        var nativeBindings = sqlSession.getMapper(com.auraboot.framework.meta.mapper.DataPermissionRoleBindingMapper.class);
+        doAnswer(invocation -> {
+            nativeBindings.insertBinding(invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
+            assertThat(persistedCodes()).containsExactly(readCode, updateCode);
+            assertThat(fieldBindings.findByRolePid(getTestTenant().getId(), rolePid)).hasSize(1);
+            throw new IllegalStateException("Fault after actual field binding write");
+        }).when(fieldBindings).insertBinding(eq(getTestTenant().getId()), eq(policy), eq(rolePid));
+        assertThatThrownBy(() -> drafts.apply(rolePid, fieldsRequest(baseline, Set.of(policy))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("actual field binding");
+        assertThat(persistedCodes()).isEmpty();
+        assertThat(defaultScope()).isNull();
+        assertThat(persistedScopes()).isEmpty();
+        assertThat(fieldBindings.findByRolePid(getTestTenant().getId(), rolePid)).isEmpty();
+        assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
+    }
+
+    @Test void unboundCandidateChangedAfterReviewConflictsBeforeAnyWrite() {
+        String policy = fieldPolicy();
+        var baseline = drafts.snapshot(rolePid);
+        var request = fieldsRequest(baseline, Set.of(policy));
+        assertThat(drafts.preview(rolePid, request).fieldPolicies().added()).hasSize(1);
+        jdbc.update("UPDATE ab_data_permission_policy SET mask_type='hash',updated_at=now() WHERE tenant_id=? AND pid=?",
+                getTestTenant().getId(), policy);
+        assertThatThrownBy(() -> drafts.apply(rolePid, request)).isInstanceOfSatisfying(RootUnCheckedException.class,
+                error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        assertThat(persistedCodes()).isEmpty();
+        assertThat(fieldBindings.findByRolePid(getTestTenant().getId(), rolePid)).isEmpty();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"role-inactive","role-deleted","assignment-inactive","assignment-deleted","expired","future"})
+    void fieldPoliciesUseOnlyCurrentActiveRoleAssignments(String mode) {
+        String policy = fieldPolicy();
+        jdbc.update("INSERT INTO ab_data_permission_role_binding (tenant_id,policy_pid,role_pid) VALUES (?,?,?)",
+                getTestTenant().getId(), policy, rolePid);
+        jdbc.update("""
+                INSERT INTO ab_user_role (id,pid,tenant_id,member_id,role_id,status,deleted_flag)
+                VALUES (?,?,?,?,?,'active',false)
+                """, IdWorker.getId(), UniqueIdGenerator.generate(), getTestTenant().getId(), getTestTenantMember().getId(), roleId);
+        assertThat(policyMapper.findEffectivePolicies(getTestTenant().getId(), resource, getTestTenantMember().getId())).hasSize(1);
+        switch (mode) {
+            case "role-inactive" -> jdbc.update("UPDATE ab_role SET status='inactive' WHERE id=?",roleId);
+            case "role-deleted" -> jdbc.update("UPDATE ab_role SET deleted_flag=true WHERE id=?",roleId);
+            case "assignment-inactive" -> jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE role_id=?",roleId);
+            case "assignment-deleted" -> jdbc.update("UPDATE ab_user_role SET deleted_flag=true WHERE role_id=?",roleId);
+            case "expired" -> jdbc.update("UPDATE ab_user_role SET expiry_date=CURRENT_DATE-1 WHERE role_id=?",roleId);
+            case "future" -> jdbc.update("UPDATE ab_user_role SET effective_date=CURRENT_DATE+1 WHERE role_id=?",roleId);
+        }
+        assertThat(policyMapper.findEffectivePolicies(getTestTenant().getId(), resource, getTestTenantMember().getId())).isEmpty();
+    }
+
+    private RoleAuthorizationDraftRequest fieldsRequest(RoleAuthorizationDraftSnapshot baseline, Set<String> selected) {
+        return new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(), true,
+                "self", true, List.of(new DataScopeUpdateRequest(resource, "update", "none", "MAX")), selected);
+    }
+
+    private String fieldPolicy() {
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.PERMISSION_MANAGE,
+                "operation", "permission", "update", "Manage field policy fixtures");
+        var model = new com.auraboot.framework.meta.entity.Model();
+        model.setTenantId(getTestTenant().getId()); model.setPid(UniqueIdGenerator.generate()); model.setCode(resource);
+        model.setVersion(1); model.setIsCurrent(true); model.setStatus("published"); model.setDeletedFlag(false);
+        var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        extension.setExtension(new java.util.HashMap<>(Map.of("modelType","entity")));
+        model.setExtension(extension);
+        models.insert(model); modelId = model.getId();
+        var field = new com.auraboot.framework.meta.entity.Field();
+        field.setTenantId(getTestTenant().getId()); field.setPid(UniqueIdGenerator.generate()); field.setCode(resource+"_secret");
+        field.setDataType("string"); field.setVersion(1); field.setIsCurrent(true); field.setStatus("published"); field.setDeletedFlag(false);
+        field.setFeature(new com.auraboot.framework.meta.entity.payload.FieldFeatureBean());
+        fields.insert(field); fieldId = field.getId();
+        var binding = new com.auraboot.framework.meta.entity.ModelFieldBinding();
+        binding.setTenantId(getTestTenant().getId()); binding.setModelId(modelId); binding.setFieldId(fieldId); binding.setFieldOrder(0);
+        modelFields.insert(binding); metadata.clearAllCache();
+        String pid = UniqueIdGenerator.generate();
+        jdbc.update("""
+                INSERT INTO ab_data_permission_policy (tenant_id,pid,name,model_code,policy_type,field_code,
+                                                      mask_type,priority,enabled,created_at,updated_at)
+                VALUES (?,?,?,?,'column',?,'hide',10,true,now(),now())
+                """, getTestTenant().getId(), pid, resource, resource, resource+"_secret");
+        return pid;
     }
 
     private RoleAuthorizationDraftRequest editRequest(RoleAuthorizationDraftSnapshot baseline) {

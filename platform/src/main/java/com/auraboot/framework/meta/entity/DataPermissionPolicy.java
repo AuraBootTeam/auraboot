@@ -37,7 +37,7 @@ public class DataPermissionPolicy {
     private String modelCode;
 
     /**
-     * Policy type: ROW or COLUMN.
+     * Policy type: row, column or field_write (case-insensitive).
      */
     @TableField("policy_type")
     private String policyType;
