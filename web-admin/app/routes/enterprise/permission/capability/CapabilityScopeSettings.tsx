@@ -130,10 +130,12 @@ export default function CapabilityScopeSettings({
     import: t('action.import', undefined, 'Import'),
     export: t('action.export', undefined, 'Export'),
   };
+  const capabilityLabel =
+    getLocalizedText(capability.localizedLabels, locale, t) || capability.label;
   const rowLabel = (row: (typeof rows)[number]) =>
     row.code.startsWith('model.')
-      ? `${modelNames[row.resourceCode]} · ${actionNames[row.action] ?? row.label}`
-      : `${getLocalizedText(capability.localizedLabels, locale, t) || capability.label} · ${actionNames[row.action] ?? row.label}`;
+      ? `${modelNames[row.resourceCode]} · ${actionNames[row.action] ?? capabilityLabel}`
+      : `${capabilityLabel}${actionNames[row.action] ? ` · ${actionNames[row.action]}` : ''}`;
   const teamUnavailable = (row: (typeof rows)[number]) =>
     row.code.startsWith('model.') && !modelTeams[row.resourceCode];
   const apply = () => {

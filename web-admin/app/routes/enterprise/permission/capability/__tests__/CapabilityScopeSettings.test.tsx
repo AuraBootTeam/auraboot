@@ -205,4 +205,16 @@ describe('CapabilityScopeSettings', () => {
     expect(screen.getAllByRole('combobox')).toHaveLength(1);
     expect(permissionService.updateScope).not.toHaveBeenCalled();
   });
+  it('uses the declared business duty for custom actions instead of generated technical labels', async () => {
+    const custom = structuredClone(matrix);
+    custom.modules[0].resources[0].resourceCode = 'technical.resource';
+    const action = custom.modules[0].resources[0].actions[0];
+    action.code = 'technical.resource.manage';
+    action.action = 'manage';
+    action.label = 'Technical Resource Manage';
+    action.scopeType = 'self';
+    fixture(custom, custom, { ...cap, includes: [action.code], label: 'Manage quotes' });
+    expect(await screen.findByRole('combobox', { name: 'Manage quotes' })).toBeVisible();
+    expect(screen.queryByText('Technical Resource Manage')).not.toBeInTheDocument();
+  });
 });
