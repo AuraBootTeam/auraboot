@@ -159,6 +159,8 @@ public class BusinessCommandDataAccessorFactory {
             return operation(() -> {
                 if (!(result instanceof Map<?, ?> map) || map.keySet().stream()
                         .anyMatch(key -> !(key instanceof String field) || !resultFields.contains(field))) throw denied();
+                if (context.getBusinessResultProjection() != null)
+                    return context.getBusinessResultProjection().validateEnvelope(map);
                 Map<String, Object> copy = new LinkedHashMap<>();
                 map.forEach((key, value) -> copy.put((String) key, value));
                 return BusinessResourceAuthorization.snapshot(copy);

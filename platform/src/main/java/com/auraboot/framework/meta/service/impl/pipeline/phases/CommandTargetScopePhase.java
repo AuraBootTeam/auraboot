@@ -64,6 +64,9 @@ public class CommandTargetScopePhase implements CommandPhase {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization businessAuthorization;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
+
 
     @Override
     public String name() {
@@ -309,6 +312,7 @@ public class CommandTargetScopePhase implements CommandPhase {
             ctx.setBusinessGrantDecision(result);
             ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
+            if (resultProjection != null) ctx.setBusinessResultProjection(resultProjection.prepare(ctx,owner));
             return true;
         }
 

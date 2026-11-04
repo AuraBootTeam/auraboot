@@ -133,6 +133,9 @@ public class CommandPipelineContext {
     /** Complete grant alternatives captured by the host target authorization snapshot. */
     private com.auraboot.framework.permission.engine.model.BusinessGrantDecision businessGrantDecision;
 
+    /** Immutable public projection captured by the host authorization snapshot, not a request flag. */
+    private com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan businessResultProjection;
+
     public record BusinessTargetAuthorization(String commandCode, String modelCode, String targetRecordId,
                                                String action, Long tenantId, Long userId, Long memberId) {}
 

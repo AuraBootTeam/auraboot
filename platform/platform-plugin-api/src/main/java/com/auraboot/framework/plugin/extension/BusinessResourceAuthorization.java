@@ -39,6 +39,9 @@ public interface BusinessResourceAuthorization {
     /** Only these top-level business-result fields may leave the handler. */
     Set<String> businessResultFields();
 
+    /** Complete public result classification; empty is not a permission to return unclassified data. */
+    default Map<String, BusinessResultField> businessResultProjection() { return Map.of(); }
+
     enum Action { READ, QUERY, CREATE, UPDATE, DELETE }
 
     /** Current records are host-loaded. Filters and changes are intentions, never authority. */
