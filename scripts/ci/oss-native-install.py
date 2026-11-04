@@ -133,10 +133,15 @@ def main():
             require(bool(owners), 'security tenant configuration denominator is empty')
             for owner in owners:
                 require('/' not in owner and '..' not in owner, 'invalid locked config owner')
-                api(token, '/api/plugins/import/import-directory-sync', 'POST', {
+                # This endpoint returns ImportExecuteResult directly, rather than
+                # the ApiResponse envelope used by business APIs above.
+                imported = request('/api/plugins/import/import-directory-sync', 'POST', {
                     'path': str(current / 'config' / owner), 'conflictStrategy': 'OVERWRITE',
                     'autoPublishModels': True, 'autoPublishFields': True, 'autoPublishCommands': True,
-                    'autoPublishPages': True, 'deferReferenceValidation': True})
+                    'autoPublishPages': True, 'deferReferenceValidation': True},
+                    {'Authorization': 'Bearer ' + token})
+                require(imported.get('_httpStatus', 200) == 200 and imported.get('success') is True,
+                        'security tenant import failed for locked configuration owner ' + owner)
         security_module.verify(base, request, login, login(), password, check, require, publish_security_tenant,
                                f'http://127.0.0.1:{web_port}')
         stop()
