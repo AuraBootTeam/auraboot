@@ -75,7 +75,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
             for (Map.Entry<String, Object> entry : filters.entrySet()) {
                 conditions.add(QueryCondition.builder()
                         .fieldName(entry.getKey())
-                        .operator(QueryCondition.Operator.EQ)
+                        .operator(entry.getValue()==null?QueryCondition.Operator.IS_NULL:QueryCondition.Operator.EQ)
                         .value(entry.getValue())
                         .build());
             }

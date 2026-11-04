@@ -29,6 +29,7 @@ class BusinessCommandDataAccessorFactoryTest {
     final MetaModelService models = mock(MetaModelService.class);
     final DataSource source = mock(DataSource.class);
     final Connection connection = mock(Connection.class);
+    final com.auraboot.framework.meta.mapper.DynamicDataMapper mapper=mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class);
     final Owner owner = new Owner();
     BusinessCommandDataAccessorFactory factory;
     CommandPipelineContext context;
@@ -45,18 +46,20 @@ class BusinessCommandDataAccessorFactoryTest {
         var configuration = new Configuration();
         configuration.setEnvironment(new Environment("unit", mock(org.apache.ibatis.transaction.TransactionFactory.class), source));
         var sessions = mock(SqlSessionFactory.class); when(sessions.getConfiguration()).thenReturn(configuration);
-        factory = new BusinessCommandDataAccessorFactory(data, models, sessions);
+        factory = new BusinessCommandDataAccessorFactory(data, models, sessions, mapper);
         var command = new CommandDefinition(); command.setCode("receipt.confirm"); command.setModelCode("receipt");
         var request = new CommandExecuteRequest(); request.setTargetRecordId("root-1");
         context = CommandPipelineContext.builder().commandCode("receipt.confirm").tenantId(7L).userId(20L)
                 .command(command).request(request).targetRecordReadable(true).targetRecordVersion(9L)
                 .businessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
                         "receipt.confirm", "receipt", "root-1", "update", 7L, 20L, 30L))
+                .execConfig(Map.of("type","custom","permissions",List.of("inventory.receipt.confirm"),"handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false)))
                 .authorizationVerdict(CommandAuthorizationVerdict.authorized("inventory.receipt.confirm"))
                 .permitPlan(new CommandPermitPlan(CommandPermitPlan.Decision.PERMIT, null, null, "root-1", CommandPermitPlan.ScopeGrade.TARGET, 9L))
                 .build();
         for (String model : owner.businessResourceModels()) when(models.getModelDefinition(model))
-                .thenReturn(Optional.of(ModelDefinition.builder().code(model).sourceType("physical").modelType("entity").build()));
+                .thenReturn(Optional.of(ModelDefinition.builder().code(model).sourceType("physical").tableName("mt_"+model).modelType("entity").build()));
+        when(mapper.selectTargetVersionForUpdate(anyString(),eq("pid"),eq(7L),anyString())).thenReturn(List.of(Map.of("row_version",9L)));
         when(data.getByIdForAuthorization("receipt", "root-1")).thenAnswer(call -> root);
         when(data.getByIdForAuthorization("line", "line-1")).thenAnswer(call -> line);
     }
@@ -244,15 +247,58 @@ class BusinessCommandDataAccessorFactoryTest {
         verify(data,never()).getByIdForAuthorization("line","line-1");
     }
 
+    @Test void lockedOwnerFactsCannotApproveAnOutdatedSourceVersion() {
+        owner.inspectLockedLine = true;
+        when(mapper.selectTargetVersionForUpdate("mt_line", "pid", 7L, "line-1"))
+                .thenReturn(List.of(Map.of("row_version", 10L)));
+        command(scope -> { denied(() -> scope.accessor().getById("line", "line-1")); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void lockedOwnerFactsUseTheSameTransactionAndExpireAfterCallback() {
+        owner.inspectLockedLine = true;
+        command(scope -> {
+            assertThat(scope.accessor().getById("line", "line-1")).containsEntry("qty", 2);
+            verify(mapper).selectTargetVersionForUpdate("mt_line", "pid", 7L, "line-1");
+            denied(() -> ((BusinessResourceSourceReader) owner.captured).getLockedById("line", "line-1"));
+            return null;
+        });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void optionalMissingModelRequiresOwnerApprovalAndCannotReadNatively() {
+        owner.optionalReference = true;
+        when(models.getModelDefinition("reference")).thenReturn(Optional.empty());
+        command(scope -> {
+            assertThat(scope.accessor().getByIdOrNull("reference", "optional-1")).isNull();
+            return null;
+        });
+        verify(data, never()).getByIdForAuthorization(eq("reference"), anyString());
+        assertThat(holder.isRollbackOnly()).isFalse();
+    }
+
+    @Test void missingOptionalModelCannotHideAnOwnerDenial() {
+        owner.optionalReference = true;
+        when(models.getModelDefinition("reference")).thenReturn(Optional.empty());
+        command(scope -> { denied(() -> scope.accessor().getByIdOrNull("reference", "foreign")); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
     static final class Owner implements CommandHandlerExtension, BusinessResourceAuthorization {
         RecordReadAccessor captured;
         String extraWrite;
+        boolean inspectLockedLine, optionalReference;
+        public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }
         public String getCommandType() { return "receipt.confirm"; }
         public Object execute(CommandContext context) { throw new AssertionError("Not called by unit fixture"); }
+        public Boundary businessBoundary(){return new Boundary("receipt.confirm","receipt","update",Set.of("inventory.receipt.confirm"));}
         public Set<String> businessResourceModels() { return Set.of("receipt", "line", "ledger", "reference"); }
         public Set<String> businessResultFields() { return Set.of("status"); }
         public Grant authorizeResource(TargetAuthorizationContext root, Request request) {
             captured = root.records();
+            if (inspectLockedLine) ((BusinessResourceSourceReader) root.records()).getLockedById("line", "line-1");
+            if (optionalReference && request.action() == Action.READ && "reference".equals(request.modelCode())
+                    && "optional-1".equals(request.recordId())) return new Grant(Set.of("pid", "tenant_id", "row_version"), Set.of(), 1);
             Set<String> read = Set.of("pid", "tenant_id", "row_version", "parent", "qty", "status");
             if (request.action() == Action.READ && ("receipt".equals(request.modelCode()) && root.recordId().equals(request.recordId())
                     || "line".equals(request.modelCode()) && root.recordId().equals(request.record().get("parent")))) return new Grant(read, Set.of(), 1);

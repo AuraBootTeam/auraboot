@@ -56,7 +56,7 @@ class CommandTargetScopePhaseTest {
     @Mock private TransactionStatus transactionStatus;
     @Mock private IdempotencyService idempotencyService;
     @Mock private ExtensionRegistry extensionRegistry;
-    @Mock private CommandHandlerExtension commandHandler;
+    @Mock(extraInterfaces=com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.class) private CommandHandlerExtension commandHandler;
 
     /**
      * A cached response is data too. Revoking the caller's row scope must stop the request before
@@ -649,10 +649,40 @@ class CommandTargetScopePhaseTest {
         verifyNoInteractions(permissionFacade, authorizer);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"disable","permission","model","action","handler","async","persistence","rules"})
+    void compiledBusinessBoundaryCannotBeDowngradedBeforeIdempotentReplay(String attack) {
+        var ctx=businessTarget();
+        when(extensionRegistry.getBusinessResourceOwner(ctx.getCommandCode())).thenReturn(Optional.of(commandHandler));
+        var config=new java.util.HashMap<>(ctx.getExecConfig());
+        var params=new java.util.HashMap<String,Object>((Map<String,Object>)config.get("handlerParams"));
+        switch(attack) {
+            case "disable" -> params.remove("targetRecordAuthorization");
+            case "permission" -> {config.put("permissions",List.of("inventory.receipt.read"));ctx.setAuthorizationVerdict(
+                    com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("inventory.receipt.read"));}
+            case "model" -> ctx.getCommand().setModelCode("other_model");
+            case "action" -> params.put("targetRecordAction","read");
+            case "handler" -> config.put("handler","other_handler");
+            case "async" -> params.put("async",true);
+            case "persistence" -> params.put("dslPersistence",true);
+            case "rules" -> ctx.setRulesByType(Map.of("handler",List.of(new com.auraboot.framework.meta.entity.BindingRule())));
+            default -> throw new AssertionError(attack);
+        }
+        config.put("handlerParams",params);ctx.setExecConfig(config);
+        var pipeline=new CommandPipeline(List.of(phase()),List.of(new IdempotencyPhase(idempotencyService)));
+        assertThatThrownBy(()->{
+            if(pipeline.executePreGuardPhases(ctx)==null)pipeline.executeGuardedPhases(ctx);
+        }).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(idempotencyService,permissionFacade);
+        assertThat(ctx.getBusinessTargetAuthorization()).isNull();
+    }
+
     private CommandPipelineContext businessTarget() {
         givenMember(); when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
         var ctx = context("inv_inbound", "REC-1");
-        ctx.setExecConfig(Map.of("permissions", List.of("inventory.receipt.confirm"), "handlerParams", Map.of(
+        org.mockito.Mockito.lenient().when(((com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)commandHandler).businessBoundary())
+                .thenReturn(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.Boundary(ctx.getCommandCode(),"inv_inbound","update",java.util.Set.of("inventory.receipt.confirm")));
+        ctx.setExecConfig(Map.of("type","custom","permissions", List.of("inventory.receipt.confirm"), "handlerParams", Map.of(
                 "targetRecordAuthorization", "business", "targetRecordAction", "update", "dslPersistence", false)));
         ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("inventory.receipt.confirm"));
         when(extensionRegistry.getCommandHandler(ctx.getCommandCode())).thenReturn(Optional.of(commandHandler));

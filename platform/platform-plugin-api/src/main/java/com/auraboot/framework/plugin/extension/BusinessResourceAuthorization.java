@@ -12,6 +12,25 @@ import java.util.Set;
  * Returning null denies the exact operation. Unknown resources/actions must deny.
  */
 public interface BusinessResourceAuthorization {
+    /** A fresh policy may retain locked source facts for this invocation only. */
+    default BusinessResourceAuthorization newInvocationAuthorization() { return this; }
+
+    /** Optional installed dependencies may yield null only on an approved nullable read. */
+    default Set<String> optionalBusinessResourceModels() { return Set.of(); }
+
+    /** Immutable owner lower bound; mutable command metadata cannot substitute a weaker duty. */
+    Boundary businessBoundary();
+
+    record Boundary(String commandCode,String rootModel,String targetAction,Set<String> permissions) {
+        public Boundary {
+            permissions=Set.copyOf(permissions);
+            identifier(rootModel);
+            if(commandCode==null || commandCode.isBlank() || !commandCode.equals(commandCode.strip())
+                    || commandCode.length()>128 || !Set.of("read","update","delete").contains(targetAction))
+                throw new IllegalArgumentException("Exact business boundary required");
+        }
+    }
+
     Grant authorizeResource(CommandHandlerExtension.TargetAuthorizationContext root, Request request);
 
     /** Finite dependency inventory; undeclared models are rejected before any lookup. */

@@ -73,6 +73,7 @@ public class CommandTargetScopePhase implements CommandPhase {
     @Override
     public boolean shouldSkip(CommandPipelineContext ctx) {
         CommandDefinition command = ctx.getCommand();
+        requireBusinessOwnerBinding(ctx);
         if (businessTargetAuthorization(ctx) && (command == null || !StringUtils.hasText(command.getModelCode())
                 || ctx.getRequest() == null || !StringUtils.hasText(ctx.getRequest().getTargetRecordId()))) {
             throw new BusinessException(ResponseCode.FORBIDDEN, "Business target policy requires a named record");
@@ -118,6 +119,21 @@ public class CommandTargetScopePhase implements CommandPhase {
         return targetAuthorizationPolicy(ctx) != null;
     }
 
+    private void requireBusinessOwnerBinding(CommandPipelineContext context) {
+        if(extensionRegistry==null || context==null || context.getCommand()==null)return;
+        var canonical=extensionRegistry.getBusinessResourceOwner(context.getCommandCode()).orElse(null);
+        var resolved=extensionRegistry.getBusinessResourceOwner(resolveHandlerCode(context)).orElse(null);
+        var owner=canonical==null?resolved:canonical;
+        if(owner==null)return;
+        if(canonical!=null && canonical!=resolved || !businessTargetAuthorization(context))
+            throw new BusinessException(ResponseCode.FORBIDDEN,"The business owner contract cannot be disabled or replaced");
+        try {com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(context,
+                (com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)owner);}
+        catch(org.springframework.security.access.AccessDeniedException denied){
+            throw new BusinessException(ResponseCode.FORBIDDEN,"The business owner contract does not match the command");
+        }
+    }
+
     private boolean isHandlerManagedTarget(CommandPipelineContext ctx) {
         String handlerCode = resolveHandlerCode(ctx);
         return Optional.ofNullable(extensionRegistry)
@@ -145,6 +161,7 @@ public class CommandTargetScopePhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        requireBusinessOwnerBinding(ctx);
         var nativeOwner = springTargetAuthorizer(ctx);
         if (nativeOwner != null) {
             if (businessTargetAuthorization(ctx)) throw new BusinessException(ResponseCode.FORBIDDEN,
@@ -281,9 +298,12 @@ public class CommandTargetScopePhase implements CommandPhase {
                     || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId())
                     || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
                     || !java.util.Objects.equals(recordId, record.get("pid"))) return false;
-            Object raw = ctx.getExecConfig().get("permissions");
-            if (!(raw instanceof java.util.List<?> declared) || declared.stream().anyMatch(code -> !(code instanceof String))) return false;
-            var codes = declared.stream().map(String.class::cast).toList();
+            var handler=extensionRegistry.getCommandHandler(resolveHandlerCode(ctx)).orElse(null);
+            if(!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner))return false;
+            java.util.List<String> codes;
+            try {codes=com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(ctx,owner);}
+            catch(org.springframework.security.access.AccessDeniedException denied){return false;}
+
             var result = businessAuthorization.evaluate(member, codes, modelCode, record);
             if (result == null || !result.granted()) return false;
             ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(

@@ -110,6 +110,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         var request=new CommandExecuteRequest();request.setTargetRecordId(rootPid);
         return CommandPipelineContext.builder().commandCode(command.getCode()).command(command).request(request)
                 .tenantId(getTestTenant().getId()).userId(getTestUser().getId()).targetRecordReadable(true).targetRecordVersion(rootVersion)
+                .execConfig(Map.of("type","custom","permissions",List.of("fixture.receipt.confirm"),"handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false)))
                 .authorizationVerdict(CommandAuthorizationVerdict.authorized("fixture.receipt.confirm"))
                 .businessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(command.getCode(),rootModel,rootPid,"update",
                         getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getId()))
@@ -214,6 +215,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         Runnable onUpdate;
         public String getCommandType(){return "fixture:receipt_confirm";}
         public Object execute(CommandContext context){throw new AssertionError("Not a product handler fixture");}
+        public Boundary businessBoundary(){return new Boundary("fixture:receipt_confirm",rootModel,"update",Set.of("fixture.receipt.confirm"));}
         public Set<String> businessResourceModels(){return Set.of(rootModel,lineModel,ledgerModel);}
         public Set<String> businessResultFields(){return Set.of("success");}
         Set<String> read(String... fields){var set=new HashSet<>(Set.of("pid","tenant_id","row_version"));set.addAll(List.of(fields));return set;}
