@@ -935,13 +935,13 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
       if (templateScope) {
         const catalogs = await Promise.all(
           templateScope.models.map((modelHint) =>
-            get<{ tools: Array<{ code: string }> }>('/api/agent/tools/registry', { modelHint }),
+            get<{ tools: Array<{ toolCode: string }> }>('/api/agent/tools/registry', { modelHint }),
           ),
         );
         const codes = new Set(
           catalogs.flatMap((catalog) =>
             ResultHelper.isSuccess(catalog)
-              ? (catalog.data?.tools ?? []).map((tool) => tool.code)
+              ? (catalog.data?.tools ?? []).map((tool) => tool.toolCode)
               : [],
           ),
         );

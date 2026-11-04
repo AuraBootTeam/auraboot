@@ -48,7 +48,7 @@ beforeEach(() => {
         ],
       }),
   );
-  get.mockResolvedValue({ code: '0', data: { tools: tools.map((code) => ({ code })) } });
+  get.mockResolvedValue({ code: '0', data: { tools: tools.map((toolCode) => ({ toolCode })) } });
   post.mockResolvedValue({ code: '0', data: { pid: 'test-agent' } });
 });
 afterEach(() => {
