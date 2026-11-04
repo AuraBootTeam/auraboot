@@ -4,6 +4,8 @@ import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 describe('BlockRegistry bootstrap', () => {
   it('initBlockRegistry registers the complete 35-type runtime block contract', () => {
     initBlockRegistry();
+    expect(BlockRegistry.size()).toBe(35);
+
 
     // Must mirror the dispatch table in
     // web-admin/app/framework/meta/rendering/BlockRenderer.tsx — every
