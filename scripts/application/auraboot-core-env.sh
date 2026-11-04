@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+DRIVER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ACTION="${1:-}"
 shift || true
 ARTIFACT_ROOT="${AURA_APP_ARTIFACT_ROOT:-}"
@@ -43,7 +44,7 @@ preflight() {
   test -f "$ARTIFACT_ROOT/runtime/AuraBoot-1.0.0-boot.jar"
   test -d "$ARTIFACT_ROOT/web/client"
   test -f "$ARTIFACT_ROOT/web/server/index.js"
-  node "$ARTIFACT_ROOT/bin/application/application-artifact-verifier.mjs" \
+  node "$DRIVER_DIR/application-artifact-verifier.mjs" \
     --lock "$ARTIFACT_ROOT/application.lock" --artifact-root "$ARTIFACT_ROOT"
 }
 require_web_settings() {
@@ -124,7 +125,7 @@ start_web() {
     tar -xzf "$ARTIFACT_ROOT/$web_shell" -C "$web_root" --strip-components=1
     mkdir -p "$web_root/web-admin"
     cp -R "$ARTIFACT_ROOT/web" "$web_root/web-admin/build"
-    node "$ARTIFACT_ROOT/bin/application/web-shell-capsule.mjs" "$web_root"
+    node "$DRIVER_DIR/web-shell-capsule.mjs" "$web_root"
     HUSKY=0 pnpm --dir "$web_root" install --frozen-lockfile --ignore-scripts
     materialize_locked_npm_packages "$web_root"
     touch "$web_root/.ready"
@@ -161,14 +162,15 @@ init_core() {
 login_jwt() {
   [[ -n "$ADMIN_PASSWORD" ]] || { echo 'ADMIN_PASSWORD is required for publish' >&2; exit 2; }
   AURA_CORE_BASE_URL="$BASE_URL" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-    python3 "$ARTIFACT_ROOT/bin/application/core-admin-session.py"
+    python3 "$DRIVER_DIR/core-admin-session.py"
 }
 publish() {
-  wait_ready
-  local jwt response
+  preflight; wait_ready
+  local jwt response owners
   jwt="$(login_jwt)"
   [[ -n "$jwt" ]] || { echo 'login failed' >&2; exit 1; }
-  for owner in core-meta platform-admin org-management core-ownership; do
+  owners="$(node "$DRIVER_DIR/native-config-imports.mjs" "$ARTIFACT_ROOT/application.lock")"
+  for owner in $owners; do
     response="$(curl -fsS -X POST "$BASE_URL/api/plugins/import/import-directory-sync" \
       -H "Authorization: Bearer $jwt" -H 'Content-Type: application/json' \
       -d "{\"path\":\"$ARTIFACT_ROOT/config/$owner\",\"conflictStrategy\":\"OVERWRITE\",\"autoPublishModels\":true,\"autoPublishFields\":true,\"autoPublishCommands\":true,\"autoPublishPages\":true,\"deferReferenceValidation\":true}")"

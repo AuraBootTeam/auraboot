@@ -82,7 +82,7 @@ def main():
         cli('start', package, database)
         if initialize:
             cli('init-core', package, database)
-            cli('publish', package, database)
+        cli('publish', package, database)
         cli('verify', package, database)
     def stop():
         nonlocal active

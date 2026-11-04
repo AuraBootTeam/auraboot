@@ -507,6 +507,7 @@ async function main() {
     resolve(output, 'migrations/core'),
   );
   const coreMeta = copyArtifact(resolve(repoRoot, 'plugins/core-meta'), resolve(output, 'config/core-meta'));
+  const pageManager = copyArtifact(resolve(repoRoot, 'plugins/page-manager'), resolve(output, 'config/page-manager'));
   const orgManagement = copyArtifact(
     resolve(repoRoot, 'plugins/org-management'),
     resolve(output, 'config/org-management'),
@@ -564,6 +565,7 @@ async function main() {
       { source: resolve(output, 'NOTICE'), destination: '/opt/auraboot/NOTICE' },
       { source: coreMigrations, destination: '/opt/auraboot/migrations/core' },
       { source: coreMeta, destination: '/opt/auraboot/config/core-meta' },
+      { source: pageManager, destination: '/opt/auraboot/config/page-manager' },
       { source: platformAdmin, destination: '/opt/auraboot/config/platform-admin' },
       { source: orgManagement, destination: '/opt/auraboot/config/org-management' },
       { source: coreOwnership, destination: '/opt/auraboot/config/core-ownership' },
@@ -600,6 +602,7 @@ async function main() {
     { type: 'npm', id: '@auraboot/web-testkit', version, path: webTestkit },
     { type: 'migration', id: 'core', version, path: coreMigrations },
     { type: 'config', id: 'core-meta', version, path: coreMeta },
+    { type: 'config', id: 'page-manager', version, path: pageManager },
     { type: 'config', id: 'platform-admin', version: JSON.parse(readFileSync(resolve(platformAdmin, 'plugin.json'), 'utf8')).version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },

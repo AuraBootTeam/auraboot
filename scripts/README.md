@@ -190,6 +190,8 @@ the original review behavior; pause idle services through their product owner.
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
 | `application/web-shell-capsule.mjs` | Restore the immutable capsule override map before frozen pnpm installation; shared by build and native lifecycle. |
 | `application/web-shell-capsule.test.mjs` | Verify override hydration, lock preservation, idempotency and malformed-map rejection. |
+| `application/native-config-imports.mjs` | Project the verified lock config nodes in composition order for native initialization and upgrade. |
+| `application/native-config-imports.test.mjs` | Reject missing, duplicate, ambiguous or unsafe native config projections. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
 | `application/export-product-image.mjs` | 1 | 2026-10-22 | Export the tested OCI graph before native gate cleanup; checksum-bound strict archive consumption; immutable transport only. |
 | `application/platform-artifact-package.mjs` | 1 | 2026-10-23 | Export/consume an explicitly selected native Core artifact package; original catalog/lock/source/OCI checks, no compilation or qualification. |
