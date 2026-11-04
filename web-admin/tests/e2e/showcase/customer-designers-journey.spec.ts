@@ -289,6 +289,15 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await expect(page).toHaveURL(listUrl);
   await expect(row).toBeVisible();
 
+  const detailUrl = generationBody.data.accessLinks.detailPage.replace(':recordPid', recordPid);
+  await page.goto(detailUrl);
+  await expect(page).toHaveURL(`${listUrl}/view/${recordPid}`);
+  await expect(page.getByRole('main')).toContainText(customerName);
+  await expect(page.getByRole('main')).toContainText(/68,?000/);
+  await screenshot(page, info, 'SC02-generated-record-detail');
+  await page.goto(listUrl);
+  await expect(row).toBeVisible();
+
   // Refine the generated page through its Schema inspector, then verify the
   // actual runtime rather than accepting a successful designer save as proof.
   const formResource = generationBody.data.generatedResources.pages.find(

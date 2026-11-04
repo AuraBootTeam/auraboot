@@ -2,10 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers all 34 runtime block types', () => {
+  it('initBlockRegistry registers the complete 35-type runtime block contract', () => {
     initBlockRegistry();
-
-    expect(BlockRegistry.size()).toBe(34);
 
     // Must mirror the dispatch table in
     // web-admin/app/framework/meta/rendering/BlockRenderer.tsx — every
@@ -48,7 +46,10 @@ describe('BlockRegistry bootstrap', () => {
       'trace-graph',
       'card-grid',
       'code-snippet',
+      'conversation-panel',
     ];
+    expect(expected).toHaveLength(35);
+    expect(BlockRegistry.list().map(([type]) => type).sort()).toEqual([...expected].sort());
     for (const type of expected) {
       const spec = BlockRegistry.get(type);
       expect(spec, `blockType "${type}" must be registered`).toBeDefined();
