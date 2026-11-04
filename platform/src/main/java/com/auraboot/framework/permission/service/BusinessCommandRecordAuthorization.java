@@ -131,8 +131,10 @@ public class BusinessCommandRecordAuthorization {
 
     private static BusinessGrantDecision decision(PermissionResult result, Long member, String model,
                                                   Map<String, Object> record, List<BusinessGrantDecision.Grant> matched) {
-        return new BusinessGrantDecision(result, MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(),
-                member, model, record != null && record.get("pid") instanceof String pid ? pid : null, matched);
+        boolean initialized = MetaContext.exists();
+        return new BusinessGrantDecision(result, initialized ? MetaContext.getCurrentTenantId() : null,
+                initialized ? MetaContext.getCurrentUserId() : null, member, model,
+                record != null && record.get("pid") instanceof String pid ? pid : null, matched);
     }
 
     private static EvaluationStep step(EvaluationVerdict verdict, String reason, String code, Long role, Long grant) {

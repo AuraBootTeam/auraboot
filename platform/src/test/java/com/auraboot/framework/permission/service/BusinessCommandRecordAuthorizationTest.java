@@ -152,6 +152,15 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(authorization.resolve(5L,List.of(CODE),MODEL,record(1,"Beijing")).canWrite("label")).isTrue();
     }
 
+    @Test void missingContextReturnsARefusalWithoutLoadingAuthorizationData() {
+        MetaContext.clear();
+        var result=authorization.resolve(5L,List.of(CODE),MODEL,record(1,"Shanghai"));
+        assertThat(result.result().granted()).isFalse();assertThat(result.canWrite("label")).isFalse();
+        assertThat(result.tenantId()).isNull();assertThat(result.userId()).isNull();
+        assertThat(authorization.evaluate(5L,List.of(CODE),MODEL,record(1,"Shanghai")).granted()).isFalse();
+        verifyNoInteractions(bindings,scopes,policies);
+    }
+
     private String fieldScope(String field) throws Exception {
         return json.writeValueAsString(Map.of("modelCode",MODEL,"readFields",List.of(field),"writeFields",List.of(field)));
     }
