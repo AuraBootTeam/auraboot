@@ -38,8 +38,15 @@ final class ConversationTaskOperations {
                               OR g.pricing_version LIKE '%%cache-incomplete%%' OR COALESCE(g.cache_read_tokens,0)>0
                               OR COALESCE(g.cache_write_tokens,0)>0) THEN 'unknown'
                          ELSE 'known' END AS cost_status
-               FROM ab_gen_ai_usage g JOIN ab_ai_trace r ON r.tenant_id=g.tenant_id AND r.trace_id=g.trace_id
-              WHERE %s
+               FROM ab_gen_ai_usage g
+              WHERE g.tenant_id=t.tenant_id AND (
+                 g.run_id=agent_task_metadata_v1(t.input_data)->>'turnId'
+                 OR (g.run_id IS NULL AND EXISTS (
+                    SELECT 1 FROM ab_ai_trace r WHERE %s AND r.otel_trace_id=g.trace_id
+                      AND NOT EXISTS (SELECT 1 FROM ab_ai_trace other
+                         WHERE other.tenant_id=r.tenant_id AND other.otel_trace_id=r.otel_trace_id
+                           AND other.metadata->>'taskPid' IS NOT NULL AND other.metadata->>'taskPid'<>t.pid)
+                 )))
           ) u ON TRUE
           ORDER BY t.created_at DESC, t.pid DESC
         """.formatted(RELATED, RELATED);

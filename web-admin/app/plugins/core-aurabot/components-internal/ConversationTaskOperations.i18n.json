@@ -178,5 +178,9 @@
   "unparseable": {
     "zh-CN": "当前租户有任务元数据无法读取，已单独排除；以下列表不代表完整任务历史。数量：",
     "en-US": "Some tenant task metadata is unreadable and excluded. This list is not a complete history. Count:"
+  },
+  "turnCompleted": {
+    "zh-CN": "回合已结束",
+    "en-US": "Turn ended"
   }
 }

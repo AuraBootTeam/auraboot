@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { authenticateBffSession } from '../../helpers/bff-auth-session';
+import { provisionOwnedTenantUser } from '../../helpers/owned-tenant-user';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { navigateToMenuByClick } from '../helpers';
 
@@ -57,7 +58,7 @@ async function setup(page: Page, base: string) {
     tpm_ts_assignee: '林晓',
     tpm_ts_description: '核对接口验收清单',
   });
-  return { suffix, projectName, project };
+  return { suffix, projectName, project, customer, owner: identity.userPid };
 }
 async function taskRows(api: APIRequestContext, title: string) {
   const value = await body(
@@ -352,6 +353,14 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await navigateToMenuByClick(page, ['AI 中心', '运行日志']);
   await page.getByRole('button', { name: '会话任务', exact: true }).click();
   const operations = page.getByTestId('conversation-task-operations');
+  await operations.getByRole('textbox').fill(`no_match_${fixture.suffix}`);
+  await operations.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(operations.getByRole('status')).toContainText('没有匹配');
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'O02-empty-search.png'),
+    fullPage: true,
+  });
   await operations.getByRole('textbox').fill(title);
   const listed = page.waitForResponse(
     (r) =>
@@ -374,6 +383,9 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   const operationDetail = (await body(await detailResponse)).data;
   expect(operationDetail.task.taskPid).toBe(task.taskPid);
   expect(operationDetail.traces.length).toBeGreaterThan(0);
+  expect(operationDetail.task.usageCalls).toBeGreaterThan(0);
+  expect(operationDetail.task.inputTokens).toBeGreaterThan(0);
+  expect(operationDetail.task.knownAmount).toBeNull();
   expect(
     operationDetail.actions.some(
       (action: { command: string }) => action.command === 'tpm:create_task',
@@ -395,7 +407,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   // O04: a second browser tab observes a genuinely executing, read-only model turn.
   const observer = await page.context().newPage();
   await observer.goto(page.url());
-  await expect(observer.getByTestId('aurabot-input')).toBeEnabled();
+  await expect(observer.getByTestId('agent-chat-page').getByTestId('aurabot-input')).toBeEnabled();
   const beforeRecovery = await businessSnapshot(page.request, fixture.project);
   const readOnlyPrompt = `请只读查询项目“${fixture.projectName}”与现有任务，详细列出全部已记录的风险、进度、负责人和后续行动，区分缺失信息；不创建或修改任何记录。`;
   const execution = await send(page, readOnlyPrompt);
@@ -420,8 +432,10 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   );
   await observer.reload();
   await running;
-  await expect(observer.getByTestId('conversation-execution-state')).toContainText('执行');
-  await expect(observer.getByTestId('aurabot-input')).toBeDisabled();
+  await expect(
+    observer.getByTestId('agent-chat-page').getByTestId('conversation-execution-state'),
+  ).toContainText('执行');
+  await expect(observer.getByTestId('agent-chat-page').getByTestId('aurabot-input')).toBeDisabled();
   await observer.screenshot({
     animations: 'disabled',
     path: join(shots, 'O04-running-reload.png'),
@@ -430,14 +444,23 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   const duplicate = await observer.request.post('/api/ai/aurabot/chat/stream', { data: payload });
   expect(await duplicate.text()).toContain('aurabot.execution.conversation_busy');
   expect(await execution.finished()).toBeNull();
-  await expect(observer.getByTestId('aurabot-input')).toBeEnabled({ timeout: 150_000 });
+  await expect(observer.getByTestId('agent-chat-page').getByTestId('aurabot-input')).toBeEnabled({
+    timeout: 150_000,
+  });
   await expect(observer.getByTestId('agent-chat-page')).toContainText(readOnlyPrompt);
-  await expect(observer.getByTestId('chat-msg-agent').last()).toContainText('67');
+  await expect(
+    observer.getByTestId('agent-chat-page').getByTestId('chat-msg-agent').last(),
+  ).toContainText('67');
   await observer.reload();
   await expect(
-    observer.getByTestId('chat-msg-user').filter({ hasText: readOnlyPrompt }),
+    observer
+      .getByTestId('agent-chat-page')
+      .getByTestId('chat-msg-user')
+      .filter({ hasText: readOnlyPrompt }),
   ).toHaveCount(1);
-  await expect(observer.getByTestId('chat-msg-agent').last()).toContainText('67');
+  await expect(
+    observer.getByTestId('agent-chat-page').getByTestId('chat-msg-agent').last(),
+  ).toContainText('67');
   expect(await businessSnapshot(observer.request, fixture.project)).toEqual(beforeRecovery);
   await observer.screenshot({
     animations: 'disabled',
@@ -445,6 +468,31 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     fullPage: true,
   });
   await observer.close();
+
+  // D09: neutral duplicate project names require clarification before any proposed write.
+  await command(page.request, 'tpm:create_project', {
+    tpm_pj_name: fixture.projectName,
+    tpm_pj_description: '独立业务范围，需由用户选择',
+    tpm_pj_customer_id: fixture.customer,
+    tpm_pj_owner_user: fixture.owner,
+  });
+  const ambiguousTitle = `待澄清任务-${fixture.suffix}`;
+  await page.getByTestId('agent-chat-new-session-btn').click();
+  const ambiguous = await send(
+    page,
+    `请为项目“${fixture.projectName}”新建任务“${ambiguousTitle}”，负责人林晓，截止2026-11-20，完成标准为核对材料。`,
+  );
+  expect(await ambiguous.finished()).toBeNull();
+  await expect(chat.getByTestId('chat-msg-agent').last()).toContainText(
+    /同名|两个|两条|2 个|2个|哪个|哪一个|确认.*项目/,
+  );
+  await expect(chat.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
+  expect(await taskRows(page.request, ambiguousTitle)).toHaveLength(0);
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'D09-ambiguous-project.png'),
+    fullPage: true,
+  });
 });
 
 test('D2: customer notes create a reviewed task draft without saving or replacing the selected project', async ({
@@ -496,6 +544,29 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
   await page.screenshot({
     animations: 'disabled',
     path: join(shots, 'D08-task-saved.png'),
+    fullPage: true,
+  });
+});
+
+test('O03: a fresh tenant member cannot inspect operator task evidence', async ({
+  page,
+  baseURL,
+}) => {
+  await authenticateBffSession(
+    page.context().request,
+    baseURL!,
+    DEFAULT_TEST_ACCOUNT.email,
+    DEFAULT_TEST_ACCOUNT.password,
+  );
+  const member = await provisionOwnedTenantUser(page, 'delivery_ops_deny');
+  await authenticateBffSession(page.context().request, baseURL!, member.email, member.password);
+  await page.goto('/home');
+  await expect(page.getByRole('link', { name: '运行日志', exact: true })).toHaveCount(0);
+  const denied = await page.request.get('/api/admin/agent-runs/conversation-tasks');
+  expect(denied.status()).toBe(403);
+  await page.screenshot({
+    animations: 'disabled',
+    path: join(shots, 'O03-permission-denied.png'),
     fullPage: true,
   });
 });

@@ -108,7 +108,7 @@ export function ConversationTaskOperations({ allowed }: { allowed: boolean }) {
     task.status === 'in_progress' && task.traceStatus === 'pending'
       ? text('pending')
       : ({
-          completed: text('completed'),
+          completed: text('turnCompleted'),
           failed: text('failed'),
           in_progress: text('running'),
           cancelled: text('cancelled'),

@@ -59,8 +59,9 @@ public class UsageRecordingLlmProvider implements LlmProvider {
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception {
         Long tenantId = currentTenantId();
         String traceId = currentTraceId();
+        String runId = currentRunId(tenantId);
         LlmChatResponse response = delegate.chat(request, apiKey, baseUrl);
-        recordUsage(tenantId, traceId, request, response);
+        recordUsage(tenantId, traceId, runId, request, response);
         return response;
     }
 
@@ -68,10 +69,11 @@ public class UsageRecordingLlmProvider implements LlmProvider {
     public Flux<LlmChunk> streamChat(LlmChatRequest request, String apiKey, String baseUrl) {
         Long tenantId = currentTenantId();
         String traceId = currentTraceId();
+        String runId = currentRunId(tenantId);
         return delegate.streamChat(request, apiKey, baseUrl)
                 .doOnNext(chunk -> {
                     if (chunk.done() && chunk.aggregateResponse() != null) {
-                        recordUsage(tenantId, traceId, request, chunk.aggregateResponse());
+                        recordUsage(tenantId, traceId, runId, request, chunk.aggregateResponse());
                     }
                 });
     }
@@ -99,14 +101,25 @@ public class UsageRecordingLlmProvider implements LlmProvider {
                 .orElseGet(MetaContext::getCurrentTenantId);
     }
 
-    private void recordUsage(Long tenantId, String traceId, LlmChatRequest request, LlmChatResponse response) {
+    private String currentRunId(Long tenantId) {
+        return com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.current()
+                .filter(envelope -> java.util.Objects.equals(tenantId, envelope.tenantId()))
+                .map(com.auraboot.framework.agent.runtime.context.ContextEnvelope::turnId).orElse(null);
+    }
+
+    private void recordUsage(Long tenantId, String traceId, String runId, LlmChatRequest request, LlmChatResponse response) {
         if (response == null) {
             return;
         }
-        usageRecorder.record(tenantId, traceId, attributedProviderCode(),
-                request != null ? request.getModel() : null,
-                response.getInputTokens(), response.getOutputTokens(),
-                response.getCacheReadInputTokens(), response.getCacheCreationInputTokens(), null);
+        if (runId == null) {
+            usageRecorder.record(tenantId, traceId, attributedProviderCode(),
+                    request != null ? request.getModel() : null, response.getInputTokens(), response.getOutputTokens(),
+                    response.getCacheReadInputTokens(), response.getCacheCreationInputTokens(), null);
+        } else {
+            usageRecorder.recordForRun(tenantId, traceId, runId, attributedProviderCode(),
+                    request != null ? request.getModel() : null, response.getInputTokens(), response.getOutputTokens(),
+                    response.getCacheReadInputTokens(), response.getCacheCreationInputTokens());
+        }
     }
 
     // --- metadata: pure delegation ---

@@ -82,4 +82,14 @@ class GenAiUsageRecorderTest {
                 GenAiUsageRecorder.METRIC_WRITE_FAILURE, "provider", "openai").count())
                 .isEqualTo(1.0);
     }
+    @Test void explicitRunIdentityIsStoredWithoutChangingTraceOrUnpricedSemantics() {
+        GenAiUsageMapper mapper=mock(GenAiUsageMapper.class);
+        GenAiUsageRecorder recorder=new GenAiUsageRecorder(mapper,mock(ObjectProvider.class),new SimpleMeterRegistry());
+        recorder.recordForRun(7L,"shared-otel","turn-8","deepseek","unpriced-model",12,3,0,0);
+        var inserted=ArgumentCaptor.forClass(GenAiUsageRecord.class);verify(mapper).insert(inserted.capture());
+        assertThat(inserted.getValue().getRunId()).isEqualTo("turn-8");
+        assertThat(inserted.getValue().getTraceId()).isEqualTo("shared-otel");
+        assertThat(inserted.getValue().getPricingVersion()).isEqualTo(GenAiPricing.UNPRICED_VERSION);
+    }
+
 }
