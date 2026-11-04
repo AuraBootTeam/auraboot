@@ -18,6 +18,11 @@ freeze() {
     --workspace-root "$AURA_CI_WORKSPACE_ROOT" --job "$AURA_CI_JOB_ID" \
     > "$ARTIFACTS/native-frozen-$1.json"
 }
+REUSE_COMMIT=""
+if [[ "$#" -gt 0 ]]; then
+  [[ "$#" == 2 && "$1" == --consume-candidate && "$2" =~ ^[a-f0-9]{40}$ ]] || exit 2
+  REUSE_COMMIT="$2"
+fi
 freeze before
 CI=1 pnpm install --frozen-lockfile --ignore-scripts
 if [[ -n "${AURA_PRODUCT_PLATFORM_ARCHIVE:-}" ]]; then
@@ -26,6 +31,14 @@ if [[ -n "${AURA_PRODUCT_PLATFORM_ARCHIVE:-}" ]]; then
     "$AURA_PRODUCT_PLATFORM_ARCHIVE" "$AURA_CI_DATASET_INPUTS" "$ARTIFACTS/previous" \
     640057f2a3ee08c7cc581202781a3be49bb409ae > "$ARTIFACTS/previous-consumption.json"
 fi
+if [[ -n "$REUSE_COMMIT" ]]; then
+  CANDIDATE_ARCHIVE="$(node -e "const r=require(process.argv[1]);const f=r.files.filter(x=>x.id==='oss-install-candidate');if(f.length!==1)throw Error('One frozen selected candidate required');process.stdout.write(f[0].file)" "$AURA_CI_DATASET_INPUTS")"
+  node scripts/application/platform-artifact-package.mjs consume \
+    "$CANDIDATE_ARCHIVE" "$AURA_CI_DATASET_INPUTS" "$ARTIFACTS/unpacked" "$REUSE_COMMIT" \
+    > "$ARTIFACTS/current-consumption.json"
+  cmp LICENSE.txt "$ARTIFACTS/unpacked/LICENSE.txt"
+  cmp NOTICE "$ARTIFACTS/unpacked/NOTICE"
+else
 AURA_OCI_BUILDER=docker node scripts/application/stage-core-only-artifacts.mjs \
   --repo-root "$ROOT" --output "$ARTIFACTS/platform"
 cmp LICENSE.txt "$ARTIFACTS/platform/LICENSE.txt"
@@ -40,8 +53,10 @@ node scripts/application/platform-artifact-package.mjs unpack \
   > "$ARTIFACTS/platform-unpack.json"
 cmp LICENSE.txt "$ARTIFACTS/unpacked/LICENSE.txt"
 cmp NOTICE "$ARTIFACTS/unpacked/NOTICE"
+  CANDIDATE_ARCHIVE="$ARTIFACTS/platform-artifacts.tar"
+fi
 if [[ -n "${AURA_PRODUCT_PLATFORM_ARCHIVE:-}" ]]; then
-  python3 -B scripts/ci/oss-native-install.py "$ARTIFACTS/unpacked" "$ARTIFACTS/previous" "$ARTIFACTS/installation"
+  python3 -B scripts/ci/oss-native-install.py "$ARTIFACTS/unpacked" "$ARTIFACTS/previous" "$ARTIFACTS/installation" "$CANDIDATE_ARCHIVE"
 fi
 freeze after
 cmp "$ARTIFACTS/native-frozen-before.json" "$ARTIFACTS/native-frozen-after.json"

@@ -305,6 +305,8 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   );
   expect(formResource?.pid).toMatch(/^[0-9A-Z]{26}$/);
   await menu(page, '页面配置');
+  await expect(page).toHaveURL(/\/p\/page_schema(?:\?|$)/);
+  await expect(page.getByRole('main')).toContainText('页面配置');
   await page.getByTestId('list-search-input').fill(`${code}_form`);
   await page.getByTestId('list-search-input').press('Enter');
   await page.locator('tr').filter({ hasText: `${code}_form` })

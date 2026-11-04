@@ -22,7 +22,7 @@ def require(condition, message):
 
 
 def main():
-    current, previous, output = map(lambda item: Path(item).resolve(), sys.argv[1:])
+    current, previous, output, candidate_archive = map(lambda item: Path(item).resolve(), sys.argv[1:])
     output.mkdir(mode=0o700)
     private = output / 'private'
     private.mkdir(mode=0o700)
@@ -218,7 +218,7 @@ def main():
         # The original unpack verifier must reject corrupt bytes before creating an active target.
         corrupt = output / 'corrupt-candidate.tar'
         corrupt.write_bytes(b'invalid archived candidate')
-        expected = hashlib.sha256((current.parent / 'platform-artifacts.tar').read_bytes()).hexdigest()
+        expected = hashlib.sha256(candidate_archive.read_bytes()).hexdigest()
         destination = output / 'rejected-candidate'
         result = subprocess.run(['node', root / 'scripts/application/platform-artifact-package.mjs', 'unpack', corrupt, expected, destination, json.loads((current / 'release-receipt.json').read_text())['source']['commit']], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         require(result.returncode != 0 and not destination.exists(), 'corrupt candidate was activated')
