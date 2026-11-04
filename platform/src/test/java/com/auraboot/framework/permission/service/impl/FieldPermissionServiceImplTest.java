@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,8 +22,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
@@ -33,6 +38,42 @@ import static org.mockito.Mockito.verifyNoInteractions;
  */
 @ExtendWith(MockitoExtension.class)
 class FieldPermissionServiceImplTest {
+
+    static Stream<Object> malformedPermissions() {
+        Map<String, Object> nullAction = new HashMap<>();
+        nullAction.put("view", null);
+        return Stream.of("admin", List.of("admin"), true,
+                Map.of("view", "admin"), Map.of("edit", true),
+                Map.of("view", List.of("admin", 7)), Map.of("view", List.of(" ")),
+                Map.of("views", List.of("admin")), nullAction);
+    }
+
+    @ParameterizedTest
+    @MethodSource("malformedPermissions")
+    void rejectsMalformedPermissionBeforeResolvingRoles(Object permission) {
+        when(metaModelService.getModelFields("model.user"))
+                .thenReturn(List.of(field("salary", Map.of("fieldPermission", permission))));
+
+        assertThatThrownBy(() -> service.getFieldPermissions(1L, "model.user"))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessage("Invalid field permission declaration for field: salary");
+        verifyNoInteractions(userRoleService, roleService);
+    }
+
+    @Test
+    void unrelatedExtensionDoesNotHideDynamicPermission() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
+        when(metaModelService.getModelFields("model.user"))
+                .thenReturn(List.of(field("salary", Map.of(
+                        "extension", Map.of("helpText", "Salary"),
+                        "dynamicProperties", Map.of("fieldPermission", Map.of("view", List.of("admin")))))));
+
+        FieldPermissionSet result = service.getFieldPermissions(1L, "model.user");
+
+        assertThat(result.hiddenFields()).containsExactly("salary");
+        assertThat(result.viewableFields()).isEmpty();
+        assertThat(result.editableFields()).isEmpty();
+    }
 
     @Mock
     private MetaModelService metaModelService;

@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
@@ -133,10 +134,24 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
             return null;
         }
         Object fp = findFieldPermission(extraProps);
-        if (fp instanceof Map) {
-            return (Map<String, Object>) fp;
+        if (fp == null) {
+            return null;
         }
-        return null;
+        if (!(fp instanceof Map<?, ?> permissions)) {
+            throw invalidFieldPermission(field);
+        }
+        for (Map.Entry<?, ?> entry : permissions.entrySet()) {
+            if ((!"view".equals(entry.getKey()) && !"edit".equals(entry.getKey()))
+                    || !(entry.getValue() instanceof List<?> roles)
+                    || roles.stream().anyMatch(role -> !(role instanceof String code) || code.isBlank())) {
+                throw invalidFieldPermission(field);
+            }
+        }
+        return (Map<String, Object>) permissions;
+    }
+
+    private MetaServiceException invalidFieldPermission(FieldDefinition field) {
+        return new MetaServiceException("Invalid field permission declaration for field: " + field.getCode());
     }
 
     private Object findFieldPermission(Map<String, Object> extraProps) {
@@ -146,7 +161,10 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
         }
         Object nested = extraProps.get("extension");
         if (nested instanceof Map<?, ?> nestedMap) {
-            return nestedMap.get("fieldPermission");
+            Object nestedPermission = nestedMap.get("fieldPermission");
+            if (nestedPermission != null) {
+                return nestedPermission;
+            }
         }
         Object dynamic = extraProps.get("dynamicProperties");
         if (dynamic instanceof Map<?, ?> dynamicMap) {
@@ -172,7 +190,6 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
      * @param memberRoleCodes the member's role codes
      * @return true if access is allowed
      */
-    @SuppressWarnings("unchecked")
     private boolean checkRoleAccess(Map<String, Object> fieldPermission,
                                     String permType,
                                     Set<String> memberRoleCodes) {
@@ -182,15 +199,14 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
             return true;
         }
         if (rolesObj instanceof List<?> rolesList) {
-            List<String> allowedRoles = (List<String>) rolesList;
-            if (allowedRoles.isEmpty()) {
+            if (rolesList.isEmpty()) {
                 // Empty list — default to allowed
                 return true;
             }
             // UNION: if any of the member's roles is in the allowed list
-            return memberRoleCodes.stream().anyMatch(allowedRoles::contains);
+            return memberRoleCodes.stream().anyMatch(rolesList::contains);
         }
-        // Unexpected format — default to allowed
-        return true;
+        // Declarations are validated before role resolution; never grant on malformed input.
+        throw new MetaServiceException("Invalid field permission action: " + permType);
     }
 }
