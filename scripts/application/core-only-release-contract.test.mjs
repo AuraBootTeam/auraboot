@@ -139,13 +139,22 @@ test('native install guide creates private persistent keys once and refuses to r
   const run = () => spawnSync('python3', ['-c', code], { cwd: artifact, encoding: 'utf8' });
   assert.equal(run().status, 0);
   const config = join(directory, 'core-runtime.env');
-  assert.equal(statSync(config).mode & 0o777, 0o600);
-  const before = createHash('sha256').update(readFileSync(config)).digest('hex');
+  const readPrivateConfig = () => {
+    const descriptor = openSync(config, 'r');
+    try {
+      assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
+      return readFileSync(descriptor);
+    } finally {
+      closeSync(descriptor);
+    }
+  };
+  const original = readPrivateConfig();
+  const before = createHash('sha256').update(original).digest('hex');
   for (const key of ['JWT_SECRET', 'SESSION_SECRET', 'FIELD_ENCRYPTION_KEY', 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY']) {
-    assert.ok(readFileSync(config, 'utf8').includes(key + '='), 'generated configuration must include ' + key);
+    assert.ok(original.toString('utf8').includes(key + '='), 'generated configuration must include ' + key);
   }
   assert.notEqual(run().status, 0);
-  assert.equal(createHash('sha256').update(readFileSync(config)).digest('hex'), before);
+  assert.equal(createHash('sha256').update(readPrivateConfig()).digest('hex'), before);
 });
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
