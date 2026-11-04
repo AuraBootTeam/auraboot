@@ -88,5 +88,18 @@
     "permissionCode": "tpm.acceptance.read",
     "orderNo": 4,
     "visible": true
+  },
+  {
+    "code": "tpm_task_ai_intake",
+    "parentCode": "tpm_root",
+    "name:zh-CN": "AI整理交付任务",
+    "name:en": "AI task intake",
+    "path": "/p/c/tpm_task_ai_intake",
+    "component": null,
+    "icon": "sparkles",
+    "type": 1,
+    "permissionCode": "tpm.task.manage",
+    "orderNo": 5,
+    "visible": true
   }
 ]

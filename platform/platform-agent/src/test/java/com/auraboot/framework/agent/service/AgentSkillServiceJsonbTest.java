@@ -41,6 +41,20 @@ class AgentSkillServiceJsonbTest {
     }
 
     @Test
+    void contractUsesTheSameSystemTenantFallbackAndDoesNotExposeExecutionConfiguration() {
+        var mapper = org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class);
+        var resolver = org.mockito.Mockito.mock(DeclaredAgentToolResolver.class);
+        var service = new AgentSkillService(mapper, null, new ObjectMapper(), resolver);
+        org.mockito.Mockito.when(mapper.selectByQueryWithoutTenant(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap()))
+                .thenReturn(List.of(Map.of("pid", "builtin", "tenant_id", 1L, "skill_code", "form_draft_fill",
+                        "skill_input_schema", Map.of("type", "object"), "execution_config", Map.of("private", true))));
+        Map<String,Object> contract = service.loadSkillContract(42L, "form_draft_fill");
+        org.assertj.core.api.Assertions.assertThat(contract).containsKey("skill_input_schema").doesNotContainKey("execution_config");
+        org.mockito.Mockito.verify(mapper).selectByQueryWithoutTenant(org.mockito.ArgumentMatchers.contains("platformTenantId"),
+                org.mockito.ArgumentMatchers.eq(Map.of("tenantId",42L,"platformTenantId",1L,"skillCode","form_draft_fill")));
+    }
+
+    @Test
     void parseToolCodes_pgobjectJsonArray_notDroppedToEmpty() {
         assertEquals(List.of("tool_a", "tool_b"),
                 service.parseToolCodes(jsonb("[\"tool_a\",\"tool_b\"]")),

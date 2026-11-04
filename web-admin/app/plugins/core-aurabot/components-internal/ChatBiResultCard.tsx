@@ -19,6 +19,7 @@ import {
   DialogDescription,
 } from '~/ui/ui/dialog';
 import { narrativeWithoutTables } from './analysisReportDraft';
+import { useBusinessFieldPresentation } from './useBusinessFieldPresentation';
 import { toast } from 'sonner';
 import { useSmartText } from '~/utils/i18n';
 import { resolveFieldLabel } from '~/framework/meta/utils/i18nResolver';
@@ -223,12 +224,18 @@ function DataTable({
   records,
   columns,
   labels = {},
+  modelCode,
 }: {
   records: Record<string, unknown>[];
   columns: string[];
   labels?: Record<string, string>;
+  modelCode?: string;
 }) {
   const { locale, t } = useI18n();
+  const presentation = useBusinessFieldPresentation(modelCode, records);
+  columns = columns.filter(
+    (column) => !column.endsWith('_display') || !columns.includes(column.slice(0, -8)),
+  );
   const numeric = new Set(
     columns.filter(
       (column) =>
@@ -257,9 +264,9 @@ function DataTable({
             {columns.map((col) => (
               <th
                 key={col}
-                className={`whitespace-nowrap px-2 py-1.5 font-medium text-gray-500 dark:text-gray-400 ${numeric.has(col) ? 'text-right' : 'text-left'}`}
+                className={`px-2 py-1.5 font-medium whitespace-nowrap text-gray-500 dark:text-gray-400 ${numeric.has(col) ? 'text-right' : 'text-left'}`}
               >
-                {labels[col] || col}
+                {presentation.label(col) || labels[col] || col}
               </th>
             ))}
           </tr>
@@ -273,13 +280,15 @@ function DataTable({
               {columns.map((col) => (
                 <td
                   key={col}
-                  className={`whitespace-nowrap px-2 py-1.5 ${numeric.has(col) ? 'text-right tabular-nums' : ''}`}
+                  className={`px-2 py-1.5 whitespace-nowrap ${numeric.has(col) ? 'text-right tabular-nums' : ''}`}
                 >
                   {typeof row[col] === 'number' && formats[col]
                     ? formats[col].format(row[col])
                     : typeof row[col] === 'boolean'
-                      ? row[col] ? t('common.yes', undefined, locale.startsWith('zh') ? '是' : 'Yes') : t('common.no', undefined, locale.startsWith('zh') ? '否' : 'No')
-                      : String(row[col] ?? '')}
+                      ? row[col]
+                        ? t('common.yes', undefined, locale.startsWith('zh') ? '是' : 'Yes')
+                        : t('common.no', undefined, locale.startsWith('zh') ? '否' : 'No')
+                      : String(presentation.value(col, row[col], row) ?? '')}
                 </td>
               ))}
             </tr>
@@ -351,8 +360,10 @@ export function ChatBiResultCard({
     count_distinct: text({ 'zh-CN': '去重数量', 'en-US': 'Distinct count' }),
   };
   for (const column of effectiveColumns) {
-    const metric = (result.metrics || result.dataSource?.metrics || []).find(
-      (candidate) => [candidate.alias, candidate.field, `${candidate.field}_${candidate.aggregation}`].includes(column),
+    const metric = (result.metrics || result.dataSource?.metrics || []).find((candidate) =>
+      [candidate.alias, candidate.field, `${candidate.field}_${candidate.aggregation}`].includes(
+        column,
+      ),
     );
     const field = metric?.field || column;
     const fieldLabel = resolveFieldLabel(
@@ -587,7 +598,12 @@ export function ChatBiResultCard({
               labels={columnLabels}
             />
           ) : (
-            <DataTable records={records} columns={effectiveColumns} labels={columnLabels} />
+            <DataTable
+              records={records}
+              columns={effectiveColumns}
+              labels={columnLabels}
+              modelCode={result.modelCode || result.dataSource?.modelCode}
+            />
           )}
         </div>
 

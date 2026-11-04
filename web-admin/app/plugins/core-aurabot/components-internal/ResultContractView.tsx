@@ -315,7 +315,11 @@ export function ResultContractView({
   // DSL list contracts share the business table projection with legacy tool output.
   if (contract.status === 'success' && /^list:[a-z][a-z0-9_]*$/.test(contract.skillCode || '')) {
     const records = resolveTableRows(contract);
-    return <ChatBiResultCard result={toolQueryPresentation({ records, total: records.length }, contract.skillCode)} />;
+    return (
+      <ChatBiResultCard
+        result={toolQueryPresentation({ records, total: records.length }, contract.skillCode)}
+      />
+    );
   }
 
   const skillPayload = contract.data?.data ?? contract.data;
@@ -352,6 +356,9 @@ export function ResultContractView({
       : null;
   const businessModel = createdModel ?? queriedModel;
 
+  // Command/read envelopes are diagnostic; business facts remain in the assistant's readback.
+  const diagnosticPayload =
+    !businessModel && !modelQuery && /^(cmd|get)[:_]/.test(contract.skillCode || '');
   const statusStyle = STATUS_STYLE[contract.status] ?? STATUS_STYLE.unknown;
   const { color, Icon } = statusStyle;
   const metric = contractMetric(contract);
@@ -360,10 +367,24 @@ export function ResultContractView({
     <div className="max-w-full min-w-0 space-y-2" data-testid="result-contract">
       <div className={`flex items-center gap-2 text-sm ${color}`}>
         <Icon className="h-4 w-4 shrink-0" />
-        <span>{text({
-          'zh-CN': ({ success: '工具已执行', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
-          'en-US': ({ success: 'Tool executed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
-        })}</span>
+        <span>
+          {text({
+            'zh-CN':
+              {
+                success: '工具已执行',
+                partial_success: '部分完成',
+                failed: '未完成',
+                unknown: '状态未知',
+              }[contract.status] ?? '状态未知',
+            'en-US':
+              {
+                success: 'Tool executed',
+                partial_success: 'Partially completed',
+                failed: 'Not completed',
+                unknown: 'Status unknown',
+              }[contract.status] ?? 'Status unknown',
+          })}
+        </span>
       </div>
       <details className="min-w-0 text-xs text-gray-500" data-testid="rc-diagnostics">
         <summary className="cursor-pointer py-1">
@@ -430,54 +451,68 @@ export function ResultContractView({
             <CardView contract={contract} />
           </div>
         )}
+        {diagnosticPayload && (
+          <div className="mt-2">
+            {contract.renderHint === 'summary' ? (
+              <SummaryView contract={contract} />
+            ) : (
+              <CardView contract={contract} />
+            )}
+          </div>
+        )}
       </details>
 
-      {businessModel ? (
-        <dl
-          className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm"
-          data-testid={createdModel ? 'rc-created-model' : 'rc-queried-model'}
-        >
-          <dt className="text-gray-600">{text({ 'zh-CN': '模型名称', 'en-US': 'Model name' })}</dt>
-          <dd className="min-w-0 font-medium break-words">{String(businessModel.displayName)}</dd>
-          <dt className="text-gray-600">{text({ 'zh-CN': '模型编码', 'en-US': 'Model code' })}</dt>
-          <dd className="min-w-0 [overflow-wrap:anywhere] break-words">
-            {String(businessModel.modelCode)}
-          </dd>
-        </dl>
-      ) : modelQuery ? (
-        <div
-          className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm"
-          data-testid="rc-model-not-found"
-        >
-          {modelQuery.matched === false
-            ? text({
-                'zh-CN': '未找到该模型，请核对模型编码或联系管理员。',
-                'en-US': 'Model not found. Check its code or contact an administrator.',
-              })
-            : text({
-                'zh-CN': '模型结果不完整，请重新查询或联系管理员。',
-                'en-US': 'The model result is incomplete. Try again or contact an administrator.',
-              })}
-        </div>
-      ) : contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
-        <TableView
-          rows={resolveTableRows(contract)}
-          label={(key) =>
-            text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })
-          }
-          structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })}
-        />
-      ) : contract.renderHint === 'summary' ? (
-        <SummaryView contract={contract} />
-      ) : contract.renderHint === 'card' ? (
-        <CardView contract={contract} />
-      ) : contract.renderHint === 'timeline' ? (
-        <TimelineView contract={contract} />
-      ) : contract.textSummary ? (
-        <SummaryView contract={contract} />
-      ) : (
-        <JsonFallback contract={contract} />
-      )}
+      {!diagnosticPayload &&
+        (businessModel ? (
+          <dl
+            className="grid grid-cols-[minmax(4rem,0.4fr)_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm"
+            data-testid={createdModel ? 'rc-created-model' : 'rc-queried-model'}
+          >
+            <dt className="text-gray-600">
+              {text({ 'zh-CN': '模型名称', 'en-US': 'Model name' })}
+            </dt>
+            <dd className="min-w-0 font-medium break-words">{String(businessModel.displayName)}</dd>
+            <dt className="text-gray-600">
+              {text({ 'zh-CN': '模型编码', 'en-US': 'Model code' })}
+            </dt>
+            <dd className="min-w-0 [overflow-wrap:anywhere] break-words">
+              {String(businessModel.modelCode)}
+            </dd>
+          </dl>
+        ) : modelQuery ? (
+          <div
+            className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm"
+            data-testid="rc-model-not-found"
+          >
+            {modelQuery.matched === false
+              ? text({
+                  'zh-CN': '未找到该模型，请核对模型编码或联系管理员。',
+                  'en-US': 'Model not found. Check its code or contact an administrator.',
+                })
+              : text({
+                  'zh-CN': '模型结果不完整，请重新查询或联系管理员。',
+                  'en-US': 'The model result is incomplete. Try again or contact an administrator.',
+                })}
+          </div>
+        ) : contract.renderHint === 'table' || contract.renderHint === 'chart_table' ? (
+          <TableView
+            rows={resolveTableRows(contract)}
+            label={(key) =>
+              text({ 'zh-CN': formatParamName(key, true), 'en-US': formatParamName(key, false) })
+            }
+            structuredLabel={text({ 'zh-CN': '结构化结果', 'en-US': 'Structured result' })}
+          />
+        ) : contract.renderHint === 'summary' ? (
+          <SummaryView contract={contract} />
+        ) : contract.renderHint === 'card' ? (
+          <CardView contract={contract} />
+        ) : contract.renderHint === 'timeline' ? (
+          <TimelineView contract={contract} />
+        ) : contract.textSummary ? (
+          <SummaryView contract={contract} />
+        ) : (
+          <JsonFallback contract={contract} />
+        ))}
 
       {contract.suggestedActions && contract.suggestedActions.length > 0 && (
         <div className="flex flex-wrap gap-1 pt-1" data-testid="rc-suggested-actions">

@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Web 页面扩展机制(webShell / 应用 web 包 / 贡献组件)
 
 > 状态:机制参考(2026-11-04,依 aura-bpm 生产实例与 web-admin 源码逐层核实)。

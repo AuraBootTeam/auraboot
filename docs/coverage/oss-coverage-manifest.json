@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "ab1b466bb",
+    "commit": "aefe5bd3d",
     "evidenceKind": "static-registration",
     "executed": 0,
     "generator": "scripts/gen-coverage-manifest.mjs"
@@ -4226,6 +4226,7 @@
           "driver": "browser",
           "evidence": [
             "tests/customer-ai-intake-config.test.mjs",
+            "web-admin/tests/e2e/project-management/agent-delivery-business-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-ai-intake-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-analysis-report-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-print-parity-real.spec.ts"
@@ -4251,6 +4252,7 @@
           "driver": "browser",
           "evidence": [
             "tests/delivery-brief-config.test.mjs",
+            "web-admin/tests/e2e/project-management/agent-delivery-business-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-ai-project-intake-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-analysis-report-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-print-parity-real.spec.ts",
@@ -4268,7 +4270,9 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/task-ai-intake-config.test.mjs",
             "web-admin/tests/e2e/automation/project-delivery-automation-dashboard.spec.ts",
+            "web-admin/tests/e2e/project-management/agent-delivery-business-live.spec.ts",
             "web-admin/tests/e2e/project-management/showcase-connected-real.spec.ts"
           ],
           "assertion": "browser test reference registered; execution and assertions not verified",
@@ -4706,6 +4710,17 @@
           "assertion": "browser page reference registered; execution and assertions not verified",
           "verdict": "partial",
           "note": "kind=list model=tpm_project"
+        },
+        {
+          "id": "page:tpm_task_ai_intake",
+          "action": "tpm_task_ai_intake",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tpm_task"
         },
         {
           "id": "page:tpm_task_detail",
@@ -6918,6 +6933,7 @@
             "web-admin/tests/e2e/pcba-solution/team-data-scope-runtime.spec.ts",
             "web-admin/tests/e2e/permission/capability-save-ui-golden.spec.ts",
             "web-admin/tests/e2e/permission/role-default-scope-golden.spec.ts",
+            "web-admin/tests/e2e/project-management/agent-delivery-business-live.spec.ts",
             "web-admin/tests/e2e/project-management/customer-delivery-integration-ui.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-formats-real.spec.ts",
             "web-admin/tests/e2e/project-management/customer-report-permissions-real.spec.ts",
@@ -7420,6 +7436,7 @@
             "web-admin/tests/e2e/marketplace/marketplace-upgrade.spec.ts",
             "web-admin/tests/e2e/plugin/plugin-deep.spec.ts",
             "web-admin/tests/e2e/plugin/plugin-lifecycle.spec.ts",
+            "web-admin/tests/e2e/plugin/two-customer-upgrade.spec.ts",
             "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/project-management/showcase-package-real.spec.ts",
             "web-admin/tests/e2e/website/website-smoke.spec.ts"
@@ -7591,8 +7608,8 @@
   "stats": {
     "commands": 279,
     "untested": 153,
-    "pages": 197,
-    "pagesUntested": 91,
+    "pages": 198,
+    "pagesUntested": 92,
     "platformPages": 95,
     "platformPagesUntested": 36
   }

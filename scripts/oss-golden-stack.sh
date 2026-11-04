@@ -769,6 +769,14 @@ XML
     cmd_import "$name" "${import_args[@]}"
   fi
 
+  # Explicit initialization, matching oss-reset-and-init; never seed on application startup.
+  if [ "$agent_mode" = "with-agent" ]; then
+    PGPASSWORD="$pg_pass" psql -v ON_ERROR_STOP=1 \
+      -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" \
+      -q -f "$SCRIPT_DIR/seed-form-fill-skill.sql" >"$sd/logs/form-fill-skill-init.log" 2>&1 \
+      || die "form fill skill initialization failed — see $sd/logs/form-fill-skill-init.log"
+  fi
+
   if [ "$frontend" -eq 1 ]; then
     log "7/9 frontend: reuse or provision node_modules + start Vite+BFF"
     if ! web_admin_node_modules_matches_checkout "$REPO_ROOT/web-admin/node_modules" "$REPO_ROOT"; then

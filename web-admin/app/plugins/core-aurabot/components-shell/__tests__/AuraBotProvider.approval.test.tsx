@@ -6,7 +6,7 @@ import { auraBotApi } from '../../services/auraBotApi';
 const router = vi.hoisted(() => ({ params: {}, location: { pathname: '/', search: '', hash: '', state: null, key: 'test' } }));
 vi.mock('react-router', async () => ({ ...await vi.importActual('react-router'), useLocation: () => router.location, useParams: () => router.params }));
 vi.mock('~/contexts/ApplicationCapabilitiesContext', () => ({ useApplicationCapabilities: () => ({ agent: 'installed' }) }));
-vi.mock('../../services/auraBotApi', () => ({ auraBotApi: { ensureConversation: vi.fn(), listConversations: vi.fn(), chatStream: vi.fn(), executeStream: vi.fn() } }));
+vi.mock('../../services/auraBotApi', () => ({ auraBotApi: { ensureConversation: vi.fn(), getConversationExecution: vi.fn().mockResolvedValue({ state: 'idle' }), listConversations: vi.fn(), chatStream: vi.fn(), executeStream: vi.fn() } }));
 function Chat() {
   const c = useAuraBot();
   return <><output data-testid="state">{JSON.stringify(c.state)}</output>

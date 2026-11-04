@@ -68,4 +68,40 @@ class UsageRecordingProviderAttributionTest {
                 .isEqualTo("qianwen");
         assertThat(model.getValue()).isEqualTo("qwen-plus");
     }
+    @Test
+    void capturesTurnIdentityBeforeSyncProviderChangesThreadContext() throws Exception {
+        LlmProvider delegate=mock(LlmProvider.class);
+        GenAiUsageRecorder recorder=mock(GenAiUsageRecorder.class);
+        var envelope=mock(com.auraboot.framework.agent.runtime.context.ContextEnvelope.class);
+        when(envelope.tenantId()).thenReturn(7L); when(envelope.turnId()).thenReturn("turn-7");
+        var response=LlmChatResponse.builder().inputTokens(11).outputTokens(7).build();
+        when(delegate.chat(any(),anyString(),anyString())).thenAnswer(invocation -> {
+            com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear(); return response;
+        });
+        MetaContext.setSystemTenantContext(7L);
+        com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.restore(envelope);
+        try {
+            new UsageRecordingLlmProvider(delegate,recorder,null,"deepseek").chat(LlmChatRequest.builder().model("deepseek-flash").build(),"k","https://example.invalid");
+            verify(recorder).recordForRun(eq(7L),any(),eq("turn-7"),eq("deepseek"),eq("deepseek-flash"),eq(11),eq(7),eq(0),eq(0));
+        } finally { MetaContext.clear();com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear(); }
+    }
+
+    @Test
+    void streamingTerminalUsesCapturedTurnAndTenantAfterTheCallingThreadIsCleared() {
+        LlmProvider delegate=mock(LlmProvider.class);
+        GenAiUsageRecorder recorder=mock(GenAiUsageRecorder.class);
+        var envelope=mock(com.auraboot.framework.agent.runtime.context.ContextEnvelope.class);
+        when(envelope.tenantId()).thenReturn(7L);when(envelope.turnId()).thenReturn("turn-stream");
+        when(delegate.streamChat(any(),anyString(),anyString())).thenReturn(reactor.core.publisher.Flux.just(
+                com.auraboot.framework.agent.dto.LlmChunk.done(1,LlmChatResponse.builder().inputTokens(23).outputTokens(9).build())));
+        MetaContext.setSystemTenantContext(7L);
+        com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.restore(envelope);
+        try {
+            var stream=new UsageRecordingLlmProvider(delegate,recorder,null,"deepseek").streamChat(LlmChatRequest.builder().model("deepseek-flash").build(),"k","https://example.invalid");
+            MetaContext.clear();com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear();
+            stream.subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).blockLast();
+            verify(recorder).recordForRun(eq(7L),any(),eq("turn-stream"),eq("deepseek"),eq("deepseek-flash"),eq(23),eq(9),eq(0),eq(0));
+        } finally { MetaContext.clear();com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext.clear(); }
+    }
+
 }

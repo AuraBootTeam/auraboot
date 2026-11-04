@@ -8,6 +8,10 @@
  */
 
 import { AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { get } from '~/shared/services/http-client';
+import { ResultHelper } from '~/utils/type';
+import { useBusinessFieldPresentation } from './useBusinessFieldPresentation';
 import { useI18n } from '~/contexts/I18nContext';
 import { formatToolDisplayName } from './toolDisplayName';
 
@@ -87,6 +91,22 @@ export function ConfirmCard({
   const isApproval = toolName === 'agent_approval_gate';
   const businessInput = isApproval && input.input && typeof input.input === 'object' && !Array.isArray(input.input)
     ? input.input as Record<string, unknown> : input;
+  const actualToolName = isApproval && typeof input.toolName === 'string' ? input.toolName : toolName;
+  const [tool, setTool] = useState<{ toolName?: string; modelCode?: string }>();
+  useEffect(() => {
+    let active = true;
+    setTool(undefined);
+    if (/^cmd[:_]/.test(actualToolName)) {
+      get<{ tools: Array<{ toolCode: string; toolName?: string; modelCode?: string }> }>('/api/agent/tools/registry')
+        .then((response) => {
+          if (!active || !ResultHelper.isSuccess(response)) return;
+          const normalize = (code: string) => code.replace(/[:.]/g, '_');
+          setTool(response.data?.tools.find((candidate) => normalize(candidate.toolCode) === normalize(actualToolName)));
+        }).catch(() => { /* Preserve the existing review when metadata is unavailable. */ });
+    }
+    return () => { active = false; };
+  }, [actualToolName, locale]);
+  const fields = useBusinessFieldPresentation(tool?.modelCode, [businessInput]);
   const isAnalyticsSuggestion = [
     'cmd_core_dashboard_propose_suggestion',
     'cmd:core_dashboard:propose_suggestion',
@@ -97,7 +117,7 @@ export function ConfirmCard({
     ? isZh
       ? '保存建议版本'
       : 'Save suggestion version'
-    : formatToolDisplayName(toolName, isZh);
+    : tool?.toolName || formatToolDisplayName(toolName, isZh);
 
   // Filter input params for display
   const visibleParams = Object.entries(businessInput).filter(([key]) =>
@@ -147,7 +167,7 @@ export function ConfirmCard({
                         ? isZh
                           ? '建议内容'
                           : 'Suggestion'
-                        : formatParamName(key, isZh)}
+                        : fields.label(key) || formatParamName(key, isZh)}
                     :
                   </span>
                   <span className="break-all text-amber-700 dark:text-amber-300/70">
@@ -155,7 +175,7 @@ export function ConfirmCard({
                       ? String((value as { goal?: string })?.goal ?? '')
                       : typeof value === 'object'
                         ? JSON.stringify(value)
-                        : String(value)}
+                        : String(fields.value(key, value, businessInput))}
                   </span>
                 </div>
               ))}

@@ -43,7 +43,18 @@ class SkillEngineTest {
                 agentSkillService,
                 toolLoopService,
                 stepLoopService,
-                new ObjectMapper());
+                new ObjectMapper(), org.mockito.Mockito.mock(SkillDefinitionGovernanceService.class));
+    }
+
+    @Test
+    void staleTrialContractCannotExecuteAnyTool() {
+        Map<String,Object> definition = Map.of("pid", "s", "skill_code", "review", "execution_mode", "template", "skill_tools", List.of("write"));
+        when(agentSkillService.loadSkill(1L, "review")).thenReturn(definition);
+        when(agentSkillService.definitionHash(definition)).thenReturn("current");
+        SkillResult result = skillEngine.execute(1L,"run","review",SkillInput.builder().parameters(Map.of()).build(),null,null,null,"stale");
+        assertThat(result.getStatus()).isEqualTo(SkillResult.Status.FAILED);
+        assertThat(result.getErrorMessage()).contains("definition changed");
+        org.mockito.Mockito.verifyNoInteractions(toolLoopService,stepLoopService);
     }
 
     @Test
@@ -124,7 +135,7 @@ class SkillEngineTest {
     void templateListQueryRetainsItsSourceAndProducesNoBusinessActions() {
         when(agentSkillService.loadSkill(1L, "query-recipe")).thenReturn(Map.of(
                 "execution_mode", "template", "skill_tools", List.of("list:customer")));
-        when(agentSkillService.resolveSkillTools(1L, "query-recipe")).thenReturn(List.of(
+        when(agentSkillService.resolveToolCodes(1L, List.of("list:customer"))).thenReturn(List.of(
                 AgentToolDefinition.builder().name("list:customer").build()));
         when(toolLoopService.executeToolCall(anyLong(), anyString(), any(), any(), anyString(), any(), any(), any()))
                 .thenReturn("{\"success\":true,\"records\":[{\"name\":\"Owned customer\"}],\"total\":1}");
@@ -151,7 +162,7 @@ class SkillEngineTest {
         when(agentSkillService.loadSkill(1L, "jdbc")).thenReturn(Map.of(
                 "execution_mode", "sequential", "skill_input_schema", schema,
                 "skill_tools", tools, "step_input_mappings", mappings));
-        when(agentSkillService.resolveSkillTools(1L, "jdbc")).thenReturn(List.of(
+        when(agentSkillService.resolveToolCodes(1L, List.of("first", "second"))).thenReturn(List.of(
                 AgentToolDefinition.builder().name("first").build(),
                 AgentToolDefinition.builder().name("second").build()));
         when(toolLoopService.executeToolCall(anyLong(), anyString(), any(), any(), anyString(), any(), any(), any()))
@@ -170,7 +181,7 @@ class SkillEngineTest {
                 "skill_tools", List.of("first", "second")));
         AgentToolDefinition first = AgentToolDefinition.builder().name("first").build();
         AgentToolDefinition second = AgentToolDefinition.builder().name("second").build();
-        when(agentSkillService.resolveSkillTools(1L, "sequence")).thenReturn(List.of(first, second));
+        when(agentSkillService.resolveToolCodes(1L, List.of("first", "second"))).thenReturn(List.of(first, second));
         when(toolLoopService.executeToolCall(eq(1L), eq("run"), any(), any(), eq("first"), any(), any(), any()))
                 .thenReturn("{\"success\":false,\"approvalRequired\":true,\"approvalPid\":\"pending\"}");
         SkillResult result = skillEngine.execute(1L, "run", "sequence",
@@ -205,7 +216,7 @@ class SkillEngineTest {
                 "skill_code", "orchestrate", "execution_mode", "orchestration",
                 "failure_mode", "retry_then_fail", "max_retry", 3, "skill_tools", List.of("write")));
         AgentToolDefinition tool = AgentToolDefinition.builder().name("write").build();
-        when(agentSkillService.resolveSkillTools(1L, "orchestrate")).thenReturn(List.of(tool));
+        when(agentSkillService.resolveToolCodes(1L, List.of("write"))).thenReturn(List.of(tool));
         when(stepLoopService.executeAgentLoop(anyLong(), anyString(), any(), any(), anyString(),
                 anyString(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt()))
                 .thenThrow(new AgentApprovalPendingException("approval-1", "Pending review"));
@@ -224,7 +235,7 @@ class SkillEngineTest {
         when(agentSkillService.loadSkill(1L, "orchestrate")).thenReturn(Map.of(
                 "skill_code", "orchestrate", "execution_mode", "orchestration",
                 "failure_mode", "retry_then_fail", "max_retry", 3, "skill_tools", List.of("write")));
-        when(agentSkillService.resolveSkillTools(1L, "orchestrate"))
+        when(agentSkillService.resolveToolCodes(1L, List.of("write")))
                 .thenReturn(List.of(AgentToolDefinition.builder().name("write").build()));
         when(stepLoopService.executeAgentLoop(anyLong(), anyString(), any(), any(), anyString(),
                 anyString(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt()))
@@ -273,7 +284,7 @@ class SkillEngineTest {
                 "skill_input_schema", Map.of("type", "object", "$defs", Map.of("count", Map.of("type", "integer")),
                         "properties", Map.of("count", Map.of("$ref", "#/$defs/count")))));
         AgentToolDefinition tool = AgentToolDefinition.builder().name("read").build();
-        when(agentSkillService.resolveSkillTools(1L, "inline-schema")).thenReturn(List.of(tool));
+        when(agentSkillService.resolveToolCodes(1L, List.of("read"))).thenReturn(List.of(tool));
         when(toolLoopService.executeToolCall(anyLong(), anyString(), any(), any(), anyString(), any(), any(), any()))
                 .thenReturn("{\"success\":true}");
         SkillResult result = skillEngine.execute(1L, "run", "inline-schema",
