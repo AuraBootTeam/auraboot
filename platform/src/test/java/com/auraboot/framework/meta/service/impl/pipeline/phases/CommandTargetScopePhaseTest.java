@@ -613,8 +613,9 @@ class CommandTargetScopePhaseTest {
     @Test void businessTargetUsesCompleteDutyGrantWithoutGenericModelRead() {
         var ctx = businessTarget();
         var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
-        when(authorizer.evaluate(99L, List.of("inventory.receipt.confirm"), "inv_inbound", RECORD))
-                .thenReturn(PermissionResult.allow(List.of()));
+        when(authorizer.resolve(99L, List.of("inventory.receipt.confirm"), "inv_inbound", RECORD))
+                .thenReturn(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                        PermissionResult.allow(List.of()),1L,42L,99L,"inv_inbound","REC-1",List.of()));
         var phase = phase(); org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
         phase.execute(ctx);
         assertThat(ctx.getTargetRecordReadable()).isTrue();
@@ -628,7 +629,9 @@ class CommandTargetScopePhaseTest {
     @Test void deniedBusinessTargetCannotReachCachedReplay() {
         var ctx = businessTarget();
         var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
-        when(authorizer.evaluate(any(), any(), any(), any())).thenReturn(PermissionResult.deny("outside grant scope", List.of()));
+        when(authorizer.resolve(any(), any(), any(), any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                        PermissionResult.deny("outside grant scope", List.of()),1L,42L,99L,"inv_inbound","REC-1",List.of()));
         var phase = phase(); org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
         var pipeline = new CommandPipeline(List.of(phase), List.of(new IdempotencyPhase(idempotencyService)));
         assertThatThrownBy(() -> {

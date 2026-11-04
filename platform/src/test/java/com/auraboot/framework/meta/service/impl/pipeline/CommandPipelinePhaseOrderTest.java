@@ -73,7 +73,9 @@ class CommandPipelinePhaseOrderTest {
         assertThat(CONFIGURED_ORDER.stream().map(Class::getName).toList()).containsExactlyInAnyOrderElementsOf(discovered);
     }
 
-    @Test void forbiddenInputStopsTheConfiguredPipelineBeforeCachedOutcomeLookup() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void forbiddenInputStopsTheConfiguredPipelineBeforeCachedOutcomeLookup(boolean completeGrantRestricted) throws Exception {
         var policies = org.mockito.Mockito.mock(com.auraboot.framework.meta.service.DataPermissionEngine.class);
         org.mockito.Mockito.when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(java.util.Set.of());
         var metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
@@ -81,7 +83,8 @@ class CommandPipelinePhaseOrderTest {
         org.mockito.Mockito.when(metadata.getModelFields("orders")).thenReturn(java.util.List.of(
                 com.auraboot.framework.meta.dto.FieldDefinition.builder().code("cost").columnName("cost").build()));
         org.mockito.Mockito.when(fields.getFieldPermissions(30L,"orders")).thenReturn(
-                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(java.util.Set.of("cost"),java.util.Set.of(),java.util.Set.of()));
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(java.util.Set.of("cost"),
+                        completeGrantRestricted ? java.util.Set.of("cost") : java.util.Set.of(),java.util.Set.of()));
         com.auraboot.framework.application.tenant.MetaContext.setContext(7L,20L,"actor","Actor");
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(30L);
         try {
@@ -91,7 +94,18 @@ class CommandPipelinePhaseOrderTest {
             var pipeline = (CommandPipeline)factory.invoke(new CommandPipelineConfiguration(), instances.toArray());
             var command = new com.auraboot.framework.meta.entity.CommandDefinition(); command.setModelCode("orders");
             var context = CommandPipelineContext.builder().command(command).execConfig(java.util.Map.of("type","update")).payload(java.util.Map.of("cost",99)).build();
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> pipeline.executePreGuardPhases(context))
+            if (completeGrantRestricted) {
+                var request = new com.auraboot.framework.meta.dto.CommandExecuteRequest();request.setTargetRecordId("root");
+                context = CommandPipelineContext.builder().command(command).request(request)
+                        .execConfig(java.util.Map.of("type","update")).payload(java.util.Map.of("cost",99)).build();
+                context.setBusinessGrantDecision(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                        com.auraboot.framework.permission.engine.model.PermissionResult.allow(java.util.List.of()),
+                        7L,20L,30L,"orders","root",java.util.List.of(
+                            new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"orders.update",
+                                new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,java.util.Set.of(),java.util.Set.of())))));
+            }
+            var checkedContext = context;
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> pipeline.executePreGuardPhases(checkedContext))
                     .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
             org.mockito.Mockito.verify(instances.get(CONFIGURED_ORDER.indexOf(IdempotencyPhase.class)),org.mockito.Mockito.never())
                     .execute(org.mockito.ArgumentMatchers.any());

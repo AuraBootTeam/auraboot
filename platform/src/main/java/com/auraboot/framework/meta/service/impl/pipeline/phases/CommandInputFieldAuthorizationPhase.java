@@ -29,19 +29,40 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
 
     @Override public void execute(CommandPipelineContext context) {
         if (context.getCommand() == null || submittedKeys(context).isEmpty()) return;
+        String rootModel = context.getCommand().getModelCode();
+        var complete = context.getBusinessGrantDecision();
+        if (context.getBusinessTargetAuthorization() != null && complete == null) deny();
+        if (complete != null && (!complete.result().granted()
+                || !Objects.equals(complete.tenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(complete.userId(), MetaContext.getCurrentUserId())
+                || !Objects.equals(complete.memberId(), MetaContext.getCurrentMemberId())
+                || !Objects.equals(complete.modelCode(), rootModel)
+                || !Objects.equals(complete.recordPid(), context.getRequest().getTargetRecordId()))) deny();
         // Machine and installed invocations use their separately verified writable-field contracts.
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || MetaContext.getCurrentMemberId() == null || MetaContext.getCurrentUserId() == null) return;
-        String rootModel = context.getCommand().getModelCode();
         if (StringUtils.hasText(rootModel)) {
             var restricted = policies.getNonWritableFields(MetaContext.getCurrentTenantId(),
                     rootModel, MetaContext.getCurrentUserId());
             if (restricted != null && submittedKeys(context).stream().anyMatch(restricted::contains)) deny();
         }
+        var writes = mappedInputs(context);
+        if (complete != null && complete.grants().stream().noneMatch(grant -> grant.fields().unrestricted())
+                && writes.isEmpty()) deny();
         var authorization = new FieldWriteAuthorizationSupport(metadata, fields, policies);
-        for (var write : mappedInputs(context).entrySet()) {
+        for (var write : writes.entrySet()) {
             if (!authorization.nonWritableInputKeys(write.getKey(), write.getValue()).isEmpty()) deny();
+            if (complete != null && rootModel.equals(write.getKey())) {
+                var definitions = metadata.getModelFields(rootModel);
+                if (definitions == null) deny();
+                for (String input : write.getValue()) {
+                    String canonical = definitions.stream().filter(field -> input.equals(field.getCode())
+                                    || input.equals(field.getColumnName()))
+                            .map(field -> field.getCode()).findFirst().orElse(input);
+                    if (!complete.canWrite(canonical)) deny();
+                }
+            }
         }
     }
 

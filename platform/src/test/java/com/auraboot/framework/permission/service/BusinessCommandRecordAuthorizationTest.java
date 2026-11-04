@@ -35,7 +35,7 @@ class BusinessCommandRecordAuthorizationTest {
     private final BusinessCommandRecordAuthorization authorization = new BusinessCommandRecordAuthorization(
             snapshots, bindings, policies, scopes,
             new DataScopeEvaluator(scopes, mock(RecordShareService.class), mock(RecordShareRowSurfaceResolver.class)),
-            new PolicyEvaluator(policies, vocabulary, json, mock(ObjectProvider.class)));
+            new PolicyEvaluator(policies, vocabulary, json, mock(ObjectProvider.class)), json);
     private static final String CODE = "inventory.receipt.confirm";
     private static final String MODEL = "receipt";
 
@@ -119,6 +119,41 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(evaluate(foreign).granted()).isFalse();
         TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(Connection.TRANSACTION_READ_COMMITTED);
         assertThat(evaluate(record(1, "Shanghai")).granted()).isFalse(); verifyNoInteractions(bindings);
+    }
+
+    @Test void fieldsComeOnlyFromCompleteMatchingGrantsAndMergeForTheSameRecord() throws Exception {
+        var own = grant(11,101,CODE); own.setFieldScopeJson(fieldScope("label"));
+        var shanghai = grant(22,202,CODE); shanghai.setFieldScopeJson(fieldScope("cost"));
+        grants(own,shanghai);
+        scope(101,new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        scope(202,DataScopeCondition.all());
+        guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null),guard(22,"Shanghai"));
+        var ownBeijing=authorization.resolve(5L,List.of(CODE),MODEL,record(1,"Beijing"));
+        assertThat(ownBeijing.result().granted()).isTrue();
+        assertThat(ownBeijing.canWrite("label")).isTrue(); assertThat(ownBeijing.canWrite("cost")).isFalse();
+        var foreignShanghai=authorization.resolve(5L,List.of(CODE),MODEL,record(999,"Shanghai"));
+        assertThat(foreignShanghai.canWrite("cost")).isTrue(); assertThat(foreignShanghai.canWrite("label")).isFalse();
+        var ownShanghai=authorization.resolve(5L,List.of(CODE),MODEL,record(1,"Shanghai"));
+        assertThat(ownShanghai.grants()).hasSize(2);
+        assertThat(ownShanghai.canWrite("cost")).isTrue(); assertThat(ownShanghai.canWrite("label")).isTrue();
+        assertThat(ownShanghai.canRead("cost")).isTrue(); assertThat(ownShanghai.canRead("other")).isFalse();
+        own.setFieldScopeJson(json.writeValueAsString(Map.of("modelCode",MODEL,"readFields",List.of(),"writeFields",List.of())));
+        var emptyPlusAllowed=authorization.resolve(5L,List.of(CODE),MODEL,record(1,"Shanghai"));
+        assertThat(emptyPlusAllowed.canWrite("cost")).isTrue();assertThat(emptyPlusAllowed.canWrite("label")).isFalse();
+    }
+
+    @Test void explicitEmptyFieldsDoNotBecomeLegacyUnrestrictedOrGlobalDeny() throws Exception {
+        var row=grant(11,101,CODE);row.setFieldScopeJson(json.writeValueAsString(Map.of(
+                "modelCode",MODEL,"readFields",List.of(),"writeFields",List.of())));
+        grants(row);scope(101,DataScopeCondition.all());guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null));
+        var result=authorization.resolve(5L,List.of(CODE),MODEL,record(1,"Beijing"));
+        assertThat(result.result().granted()).isTrue();assertThat(result.canRead("label")).isFalse();assertThat(result.canWrite("label")).isFalse();
+        row.setFieldScopeJson(null);
+        assertThat(authorization.resolve(5L,List.of(CODE),MODEL,record(1,"Beijing")).canWrite("label")).isTrue();
+    }
+
+    private String fieldScope(String field) throws Exception {
+        return json.writeValueAsString(Map.of("modelCode",MODEL,"readFields",List.of(field),"writeFields",List.of(field)));
     }
 
     private com.auraboot.framework.permission.engine.model.PermissionResult evaluate(Map<String, Object> record) {

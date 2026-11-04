@@ -6,6 +6,7 @@ import com.auraboot.framework.permission.engine.evaluator.PolicyEvaluator;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
+import com.auraboot.framework.permission.engine.model.BusinessGrantDecision;
 import com.auraboot.framework.permission.service.impl.PermissionSnapshotCache;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import lombok.RequiredArgsConstructor;
@@ -36,10 +37,17 @@ public class BusinessCommandRecordAuthorization {
     private final DataScopeService scopes;
     private final DataScopeEvaluator scopeEvaluator;
     private final PolicyEvaluator policyEvaluator;
+    private final com.fasterxml.jackson.databind.ObjectMapper json;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PermissionResult evaluate(Long memberId, List<String> declaredPermissions,
                                      String recordModel, Map<String, Object> record) {
+        return resolve(memberId, declaredPermissions, recordModel, record).result();
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolve(Long memberId, List<String> declaredPermissions,
+                                         String recordModel, Map<String, Object> record) {
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || !MetaContext.exists() || memberId == null
@@ -54,22 +62,23 @@ public class BusinessCommandRecordAuthorization {
                 || TransactionSynchronizationManager.getCurrentTransactionIsolationLevel() == null
                 || !List.of(Connection.TRANSACTION_REPEATABLE_READ, Connection.TRANSACTION_SERIALIZABLE)
                     .contains(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel())) {
-            return denied("Business target authorization context is unavailable", List.of());
+            return decision(denied("Business target authorization context is unavailable", List.of()), memberId, recordModel, record, List.of());
         }
         if (declaredPermissions == null || declaredPermissions.isEmpty() || declaredPermissions.size() > 128
                 || declaredPermissions.stream().anyMatch(code -> code == null || code.isBlank()
                     || !code.equals(code.strip()) || code.length() > 255 || "*".equals(code)
                     || "meta.command.execute".equals(code))) {
-            return denied("A declared business permission is required", List.of());
+            return decision(denied("A declared business permission is required", List.of()), memberId, recordModel, record, List.of());
         }
         // The complete decision uses the same database snapshot, including membership and policy
         // rows. Shared caches must not splice a stale grant into a freshly changed scope.
         return snapshots.withFreshReads(() -> evaluateSnapshot(memberId, declaredPermissions, recordModel, record));
     }
 
-    private PermissionResult evaluateSnapshot(Long member, List<String> codes, String model, Map<String, Object> record) {
+    private BusinessGrantDecision evaluateSnapshot(Long member, List<String> codes, String model, Map<String, Object> record) {
         var tenant = MetaContext.getCurrentTenantId();
         List<EvaluationStep> trace = new ArrayList<>();
+        List<BusinessGrantDecision.Grant> matched = new ArrayList<>();
         Map<String, Map<Long, PermissionPolicyService.ConditionGuard>> guardsByCode = new HashMap<>();
         for (String code : new java.util.LinkedHashSet<>(codes)) {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
@@ -112,10 +121,18 @@ public class BusinessCommandRecordAuthorization {
                 }
                 trace.add(step(EvaluationVerdict.ALLOW, "One complete business grant permits this target", code,
                         grant.getRoleId(), grant.getId()));
-                return PermissionResult.allow(trace);
+                matched.add(new BusinessGrantDecision.Grant(grant.getId(), grant.getRoleId(), code,
+                        BusinessGrantFieldScope.parse(json, grant.getFieldScopeJson(), model)));
             }
         }
-        return denied("No complete business grant permits this target", trace);
+        return decision(matched.isEmpty() ? denied("No complete business grant permits this target", trace)
+                : PermissionResult.allow(List.copyOf(trace)), member, model, record, matched);
+    }
+
+    private static BusinessGrantDecision decision(PermissionResult result, Long member, String model,
+                                                  Map<String, Object> record, List<BusinessGrantDecision.Grant> matched) {
+        return new BusinessGrantDecision(result, MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(),
+                member, model, record != null && record.get("pid") instanceof String pid ? pid : null, matched);
     }
 
     private static EvaluationStep step(EvaluationVerdict verdict, String reason, String code, Long role, Long grant) {

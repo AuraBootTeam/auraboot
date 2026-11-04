@@ -304,8 +304,9 @@ public class CommandTargetScopePhase implements CommandPhase {
             try {codes=com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(ctx,owner);}
             catch(org.springframework.security.access.AccessDeniedException denied){return false;}
 
-            var result = businessAuthorization.evaluate(member, codes, modelCode, record);
-            if (result == null || !result.granted()) return false;
+            var result = businessAuthorization.resolve(member, codes, modelCode, record);
+            if (result == null || !result.result().granted()) return false;
+            ctx.setBusinessGrantDecision(result);
             ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
             return true;

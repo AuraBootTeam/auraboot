@@ -46,7 +46,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
     @Select("""
         SELECT DISTINCT rp.id, rp.role_id, p.code AS permission_code, rp.grant_type,
-               rp.data_scope_ast::text AS data_scope_ast_json
+               rp.data_scope_ast::text AS data_scope_ast_json, rp.field_scope::text AS field_scope_json
         FROM ab_role_permission rp
         JOIN ab_permission p ON p.id=rp.permission_id
         JOIN ab_role r ON r.id=rp.role_id
@@ -76,6 +76,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
         private String permissionCode;
         private String grantType;
         private String dataScopeAstJson;
+        private String fieldScopeJson;
     }
 
     /**

@@ -16,7 +16,8 @@ class CommandInputFieldAuthorizationPhaseTest {
     final com.auraboot.framework.meta.service.MetaModelService metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
     final com.auraboot.framework.permission.service.FieldPermissionService fields = mock(com.auraboot.framework.permission.service.FieldPermissionService.class);
     final CommandInputFieldAuthorizationPhase phase = new CommandInputFieldAuthorizationPhase(policies, metadata, fields);
-    final CommandPipelineContext context = CommandPipelineContext.builder().build();
+    final CommandPipelineContext context = CommandPipelineContext.builder()
+            .request(new com.auraboot.framework.meta.dto.CommandExecuteRequest()).build();
 
     @BeforeEach void prepare() {
         MetaContext.setContext(7L,20L,"actor","Actor"); MetaContext.setMemberId(30L);
@@ -99,4 +100,37 @@ class CommandInputFieldAuthorizationPhaseTest {
         context.setPayload(Map.of()); context.setExecConfig(Map.of("type","update"));
         assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
     }
+    private void completeFields(Set<String> allowed) {
+        dsl("orders");
+        when(fields.getFieldPermissions(30L,"orders")).thenReturn(
+                com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(Set.of("cost","description")));
+        context.setExecConfig(Map.of("type","update"));
+        context.getRequest().setTargetRecordId("root");
+        var fieldSet=new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,allowed,allowed);
+        context.setBusinessGrantDecision(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),7L,20L,30L,"orders","root",
+                List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"orders.update",fieldSet))));
+    }
+
+    @Test void matchedGrantFieldsAreEnforcedBeforeReplayIncludingColumnAliases() {
+        completeFields(Set.of("description"));context.setPayload(Map.of("cost_column",99));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        completeFields(Set.of("cost"));phase.execute(context);
+        assertThat(context.getPayload()).containsEntry("cost_column",99);
+    }
+
+    @Test void completeDecisionCannotBeReusedForAnotherActorOrTarget() {
+        completeFields(Set.of("description"));context.setPayload(Map.of("description","text"));
+        context.getRequest().setTargetRecordId("other");
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        context.getRequest().setTargetRecordId("root");MetaContext.setMemberId(null);
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+
+    @Test void restrictedGrantCannotAssumeAnArbitraryHandlerInputIsNotAWritableField() {
+        completeFields(Set.of("description"));context.setPayload(Map.of("description","text"));
+        context.setExecConfig(Map.of("type","handler"));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+
 }

@@ -130,6 +130,9 @@ public class CommandPipelineContext {
     /** Host-only completed business-target decision; never parsed from command payload/settings. */
     private BusinessTargetAuthorization businessTargetAuthorization;
 
+    /** Complete grant alternatives captured by the host target authorization snapshot. */
+    private com.auraboot.framework.permission.engine.model.BusinessGrantDecision businessGrantDecision;
+
     public record BusinessTargetAuthorization(String commandCode, String modelCode, String targetRecordId,
                                                String action, Long tenantId, Long userId, Long memberId) {}
 

@@ -172,6 +172,49 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(allowed(false, "Beijing")).isTrue();
     }
 
+    @Test void fieldAllowancesFollowMatchingGrantScopeConditionAndLiveRevocation() throws Exception {
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("label"),bindingA);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("cost"),bindingB);
+        var ownBeijing=authorization.resolve(member(),List.of(code),model,record(true,"Beijing"));
+        assertThat(ownBeijing.result().granted()).isTrue();
+        assertThat(ownBeijing.canWrite("label")).isTrue();assertThat(ownBeijing.canWrite("cost")).isFalse();
+        var foreignShanghai=authorization.resolve(member(),List.of(code),model,record(false,"Shanghai"));
+        assertThat(foreignShanghai.canWrite("cost")).isTrue();assertThat(foreignShanghai.canWrite("label")).isFalse();
+        var both=authorization.resolve(member(),List.of(code),model,record(true,"Shanghai"));
+        assertThat(both.grants()).hasSize(2);assertThat(both.canWrite("cost")).isTrue();assertThat(both.canWrite("label")).isTrue();
+        assertThat(both.canRead("cost")).isTrue();assertThat(both.canRead("unknown")).isFalse();
+        jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE tenant_id=? AND role_id=?",tenant(),roleB);
+        var revoked=authorization.resolve(member(),List.of(code),model,record(true,"Shanghai"));
+        assertThat(revoked.canWrite("label")).isTrue();assertThat(revoked.canWrite("cost")).isFalse();
+        assertThat(revoked.canRead("cost")).isFalse();
+    }
+
+    @Test void fieldScopeAndConditionAreReadFromTheSameDatabaseSnapshot() throws Exception {
+        jdbc.update("UPDATE ab_role SET default_data_scope_type='none' WHERE id=?",roleA);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("label"),bindingB);
+        String costScope=fieldScope("cost");
+        AtomicBoolean changed=new AtomicBoolean();
+        doAnswer(call->{
+            Object result=call.callRealMethod();
+            if(changed.compareAndSet(false,true)) {
+                TransactionTemplate writer=new TransactionTemplate(transactions);
+                writer.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                writer.executeWithoutResult(status->{
+                    jdbc.update("UPDATE ab_role_permission SET condition_ast=NULL,field_scope=?::jsonb WHERE id=?",costScope,bindingB);
+                });
+            }
+            return result;
+        }).when(scopes).resolveScopeForRole(eq(member()),eq(roleB),eq(resource),eq("confirm"),eq(model));
+        var before=authorization.resolve(member(),List.of(code),model,record(false,"Beijing"));
+        assertThat(before.result().granted()).isFalse();assertThat(before.canWrite("cost")).isFalse();
+        assertThat(changed).isTrue();
+        var after=authorization.resolve(member(),List.of(code),model,record(false,"Beijing"));
+        assertThat(after.result().granted()).isTrue();assertThat(after.canWrite("cost")).isTrue();assertThat(after.canWrite("label")).isFalse();
+    }
+
+    private String fieldScope(String field) throws Exception {
+        return json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(field),"writeFields",List.of(field)));
+    }
     private long role(String name, String scope) {
         long id = IdWorker.getId();
         jdbc.update("""
