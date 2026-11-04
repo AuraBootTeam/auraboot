@@ -138,6 +138,12 @@ export function initBlockRegistry(): void {
       'StageRailBlockRenderer',
     ),
   });
+  BlockRegistry.register('dag-canvas', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/DagCanvasBlockRenderer'),
+      'DagCanvasBlockRenderer',
+    ),
+  });
   BlockRegistry.register('record-inspector', {
     component: lazy(
       () => import('~/framework/meta/rendering/blocks/RecordInspectorBlockRenderer'),
