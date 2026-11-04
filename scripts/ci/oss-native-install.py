@@ -146,8 +146,8 @@ def main():
         model = api(token, '/api/meta/models', 'POST', {
             'code': code, 'tableName': code, 'displayName': 'Native trial follow-up', 'modelType': 'entity', 'sourceType': 'physical',
             'capabilities': {key: True for key in ['list', 'detail', 'create', 'update', 'delete', 'filter', 'sort', 'paginate']},
-            'fields': [{'code': code + '_customer', 'displayName': 'Customer', 'dataType': 'string', 'required': True, 'editable': True},
-                       {'code': code + '_amount', 'displayName': 'Amount', 'dataType': 'integer', 'editable': True}]})
+            'fields': [{'code': code + '_customer', 'columnName': code + '_customer', 'displayName': 'Customer', 'dataType': 'string', 'required': True, 'editable': True},
+                       {'code': code + '_amount', 'columnName': code + '_amount', 'displayName': 'Amount', 'dataType': 'integer', 'editable': True}]})
         api(token, f'/api/meta/models/{model["pid"]}/publish', 'POST', {'impactAcknowledged': True})
         api(token, '/api/templates/crud/generate', 'POST', {'modelCode': code, 'config': {'generateList': True, 'generateForm': True, 'generateDetail': True, 'createMenu': False, 'createPermissions': False, 'assignRoles': False}})
         command_code = 'trial:create_native_followup'
