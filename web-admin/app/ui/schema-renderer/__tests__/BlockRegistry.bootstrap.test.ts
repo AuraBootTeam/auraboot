@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers all 34 runtime block types', () => {
+  it('initBlockRegistry registers all 35 runtime block types', () => {
     initBlockRegistry();
 
     expect(BlockRegistry.size()).toBe(34);
