@@ -563,7 +563,11 @@ test('O03: a fresh tenant member cannot inspect operator task evidence', async (
   await page.goto('/home');
   await expect(page.getByRole('link', { name: '运行日志', exact: true })).toHaveCount(0);
   const denied = await page.request.get('/api/admin/agent-runs/conversation-tasks');
-  expect(denied.status()).toBe(403);
+  expect(denied.status()).toBe(200); // Existing admin-prefix guard uses an API denial envelope.
+  const refusal = await denied.json();
+  expect(String(refusal.code)).toBe('409');
+  expect(refusal.message).toBe('admin role required');
+  expect(refusal.data).toBeNull();
   await page.screenshot({
     animations: 'disabled',
     path: join(shots, 'O03-permission-denied.png'),
