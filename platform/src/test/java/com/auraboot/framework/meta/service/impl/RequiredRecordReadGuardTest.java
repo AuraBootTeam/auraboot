@@ -47,6 +47,31 @@ class RequiredRecordReadGuardTest {
         var member=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(7L,"installed","fixture_member",java.util.Set.of("read"),java.util.Set.of("pid"),java.util.Set.of(),List.of());
         return target?Map.of("fixture_bundle",root,"fixture_member",member):Map.of("fixture_bundle",root);
     }
+    @Test void businessDependenciesUseTheirOwnResourceContractWithoutGenericModelRead() {
+        var reads=mock(com.auraboot.framework.plugin.extension.RecordReadAccessor.class);
+        when(reads.getById("fixture_member",id(1))).thenReturn(root(1));
+        BusinessResourceReadScope.withReader(new Object(),reads,()->{},()->{
+            guard.require("fixture_bundle",root(9,id(1)));return null;
+        });
+        verify(reads).getById("fixture_member",id(1));verifyNoInteractions(permissions,data);
+        assertThat(BusinessResourceReadScope.active()).isFalse();
+    }
+    @Test void deniedBusinessDependencyCannotFallBackToHumanPermissions() {
+        var reads=mock(com.auraboot.framework.plugin.extension.RecordReadAccessor.class);
+        when(reads.getById("fixture_member",id(1))).thenThrow(new AccessDeniedException("Outside root"));
+        assertThatThrownBy(()->BusinessResourceReadScope.withReader(new Object(),reads,()->{},()->{
+            guard.require("fixture_bundle",root(9,id(1)));return null;
+        })).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(permissions,data);assertThat(BusinessResourceReadScope.active()).isFalse();
+    }
+    @Test void lastBusinessDependencyCannotChangeTheActorAndReturnAnAllow() {
+        var reads=mock(com.auraboot.framework.plugin.extension.RecordReadAccessor.class);
+        when(reads.getById("fixture_member",id(1))).thenAnswer(call->{MetaContext.setMemberId(99L);return root(1);});
+        assertThatThrownBy(()->BusinessResourceReadScope.withReader(new Object(),reads,()->{},()->{
+            guard.require("fixture_bundle",root(9,id(1)));return null;
+        })).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(permissions,data);
+    }
     @Test void legacyMachineReadScopeStillRejectsHumanReferencePolicies() {
         var principal=machine();
         try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);

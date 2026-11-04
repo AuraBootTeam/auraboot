@@ -25,13 +25,30 @@ import static org.mockito.Mockito.when;
 
 class CapabilityViewServiceImplTest {
 
+    private final com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess = mock(com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess.class);
     private final PermissionService permissionService = mock(PermissionService.class);
     private final CapabilityRegistryService registry = mock(CapabilityRegistryService.class);
     private final RolePermissionService rolePermissionService = mock(RolePermissionService.class);
     private final MenuMapper menuMapper = mock(MenuMapper.class);
     private final CapabilityResolver resolver = new CapabilityResolver();
     private final CapabilityViewServiceImpl service =
-            new CapabilityViewServiceImpl(permissionService, registry, resolver, rolePermissionService, menuMapper);
+            new CapabilityViewServiceImpl(mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class), authoringAccess, permissionService, registry, resolver, rolePermissionService, menuMapper);
+
+    @Test void directCapabilityWriteMustPassAdministrationAndTargetChecks() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("administrator required"))
+                .when(authoringAccess).requireWrite();
+        assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(permissionService, rolePermissionService);
+    }
+
+    @Test void foreignRoleCannotBeWrittenEvenByAnAdministrator() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("foreign role"))
+                .when(authoringAccess).requireTarget(5L);
+        assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of(), Set.of()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(permissionService, rolePermissionService);
+    }
 
     private static Menu menu(String name, String permissionCode) {
         Menu m = new Menu();
@@ -106,7 +123,7 @@ class CapabilityViewServiceImplTest {
 
         MetaContext.setContext(1L, 1L, "p", "u");
         Capability cap = service.resolveForRole(5L).stream()
-                .filter(g -> "客户管理".equals(g.getGroup())).findFirst().orElseThrow()
+                .filter(g -> "客户".equals(g.getGroup())).findFirst().orElseThrow()
                 .getCapabilities().get(0);
 
         assertThat(cap.getUnlockedMenus()).containsExactly("客户");

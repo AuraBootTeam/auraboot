@@ -6503,5 +6503,55 @@
     "en-US": "Valid currency and exchange-rate configuration is unavailable. Ask an administrator to check it and try again.",
     "ja-JP": "有効な通貨・為替レート設定を読み込めません。管理者に設定の確認を依頼してください。",
     "ko-KR": "유효한 통화 및 환율 설정을 읽을 수 없습니다. 관리자에게 설정 확인을 요청하세요."
+  },
+  {
+    "key": "admin.permission.scope.draftNote",
+    "zh-CN": "暂存角色默认范围，新授权将继承此范围。所有变更统一预览并保存。",
+    "en-US": "Stage the role default for new grants. Review and save all role changes together."
+  },
+  {
+    "key": "admin.permission.scope.applyCurrentDraft",
+    "zh-CN": "同时应用到当前授权",
+    "en-US": "Also apply to current grants"
+  },
+  {
+    "key": "admin.permission.scope.stageDraft",
+    "zh-CN": "加入草稿",
+    "en-US": "Add to draft"
+  },
+  {
+    "key": "admin.permission.scope.draftActions",
+    "zh-CN": "草稿中的动作范围",
+    "en-US": "Draft action scopes"
+  },
+  {
+    "key": "admin.permission.capability.scopeDraftNote",
+    "zh-CN": "暂存此职责的记录范围。共享动作也会影响相关职责，所有变更统一预览并保存。",
+    "en-US": "Stage record scopes for this duty. Shared actions affect related duties. All changes are reviewed and saved together."
+  },
+  {
+    "key": "admin.permission.editor.draftSaveError",
+    "zh-CN": "尚未确认保存结果，草稿已保留。可重新载入查看当前配置。",
+    "en-US": "Could not confirm the save. Your draft is preserved; reload to check the current configuration."
+  },
+  {
+    "key": "admin.permission.editor.conflictDraft",
+    "zh-CN": "授权配置已被修改。当前草稿已保留，不能覆盖新版本。",
+    "en-US": "Authorization configuration changed. Your draft is preserved and cannot overwrite the newer version."
+  },
+  {
+    "key": "admin.permission.editor.reloadDraft",
+    "zh-CN": "放弃草稿并重新载入",
+    "en-US": "Discard draft and reload"
+  },
+  {
+    "key": "admin.permission.editor.jointDraft",
+    "zh-CN": "待保存：{count} 项职责变更、{scopes} 项记录范围例外。默认范围变更也将一并预览和保存。",
+    "en-US": "{count} duty changes and {scopes} record scope overrides pending. Default scope changes are reviewed and saved together."
+  },
+  {
+    "key": "admin.permission.editor.scopeChangeCount",
+    "zh-CN": "{count} 项记录范围例外",
+    "en-US": "{count} record scope overrides"
   }
 ]

@@ -61,6 +61,13 @@ public class CommandTargetScopePhase implements CommandPhase {
     private final PlatformTransactionManager transactionManager;
     private final ExtensionRegistry extensionRegistry;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization businessAuthorization;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
+
+
     @Override
     public String name() {
         return "target_scope";
@@ -69,10 +76,15 @@ public class CommandTargetScopePhase implements CommandPhase {
     @Override
     public boolean shouldSkip(CommandPipelineContext ctx) {
         CommandDefinition command = ctx.getCommand();
+        requireBusinessOwnerBinding(ctx);
+        if (businessTargetAuthorization(ctx) && (command == null || !StringUtils.hasText(command.getModelCode())
+                || ctx.getRequest() == null || !StringUtils.hasText(ctx.getRequest().getTargetRecordId()))) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Business target policy requires a named record");
+        }
         return command == null
                 || !StringUtils.hasText(command.getModelCode())
                 || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
-                || (isHandlerManagedTarget(ctx) && targetRecordAction(ctx) == null && !handlerTargetAuthorization(ctx));
+                || (isHandlerManagedTarget(ctx) && targetRecordAction(ctx) == null && !protectedTargetAuthorization(ctx));
     }
 
     /** Server-owned command metadata; callers cannot turn a write into a read. */
@@ -88,13 +100,41 @@ public class CommandTargetScopePhase implements CommandPhase {
         return value;
     }
 
-    private boolean handlerTargetAuthorization(CommandPipelineContext ctx) {
+    private String targetAuthorizationPolicy(CommandPipelineContext ctx) {
         Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
-        if (!(params instanceof Map<?, ?> values) || !values.containsKey("targetRecordAuthorization")) return false;
-        if (!"handler".equals(values.get("targetRecordAuthorization"))) {
+        if (!(params instanceof Map<?, ?> values) || !values.containsKey("targetRecordAuthorization")) return null;
+        Object policy = values.get("targetRecordAuthorization");
+        if (!"handler".equals(policy) && !"business".equals(policy)) {
             throw new BusinessException(ResponseCode.FORBIDDEN, "Invalid target authorization policy");
         }
-        return true;
+        return String.valueOf(policy);
+    }
+
+    private boolean handlerTargetAuthorization(CommandPipelineContext ctx) {
+        return "handler".equals(targetAuthorizationPolicy(ctx));
+    }
+
+    private boolean businessTargetAuthorization(CommandPipelineContext ctx) {
+        return "business".equals(targetAuthorizationPolicy(ctx));
+    }
+
+    private boolean protectedTargetAuthorization(CommandPipelineContext ctx) {
+        return targetAuthorizationPolicy(ctx) != null;
+    }
+
+    private void requireBusinessOwnerBinding(CommandPipelineContext context) {
+        if(extensionRegistry==null || context==null || context.getCommand()==null)return;
+        var canonical=extensionRegistry.getBusinessResourceOwner(context.getCommandCode()).orElse(null);
+        var resolved=extensionRegistry.getBusinessResourceOwner(resolveHandlerCode(context)).orElse(null);
+        var owner=canonical==null?resolved:canonical;
+        if(owner==null)return;
+        if(canonical!=null && canonical!=resolved || !businessTargetAuthorization(context))
+            throw new BusinessException(ResponseCode.FORBIDDEN,"The business owner contract cannot be disabled or replaced");
+        try {com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(context,
+                (com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)owner);}
+        catch(org.springframework.security.access.AccessDeniedException denied){
+            throw new BusinessException(ResponseCode.FORBIDDEN,"The business owner contract does not match the command");
+        }
     }
 
     private boolean isHandlerManagedTarget(CommandPipelineContext ctx) {
@@ -124,8 +164,11 @@ public class CommandTargetScopePhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        requireBusinessOwnerBinding(ctx);
         var nativeOwner = springTargetAuthorizer(ctx);
         if (nativeOwner != null) {
+            if (businessTargetAuthorization(ctx)) throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Business target policy requires one explicit plugin owner");
             if (ctx.getAuthorizationVerdict() == null || !ctx.getAuthorizationVerdict().isAuthorized()
                     || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId())
                     || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
@@ -212,6 +255,10 @@ public class CommandTargetScopePhase implements CommandPhase {
     private Boolean evaluateReadableInIsolatedTransaction(CommandPipelineContext ctx) {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        if (businessTargetAuthorization(ctx)) {
+            transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+            transaction.setReadOnly(true);
+        }
         return transaction.execute(status -> evaluateReadable(ctx));
     }
 
@@ -232,15 +279,42 @@ public class CommandTargetScopePhase implements CommandPhase {
         } catch (MetaRecordNotFoundException missing) {
             // Protected targets absent from this tenant's scope are denied like a null lookup.
             // Other lookup failures still propagate; ordinary commands retain not-found behavior.
-            if (handlerTargetAuthorization(ctx)) return false;
+            if (protectedTargetAuthorization(ctx)) return false;
             throw missing;
         }
         if (record == null) {
-            if (handlerTargetAuthorization(ctx)) return false;
+            if (protectedTargetAuthorization(ctx)) return false;
             // A missing record is not an authorization answer — later phases surface "not found".
             return null;
         }
         ctx.setTargetRecordVersion(resolveRecordVersion(record));
+
+        if (businessTargetAuthorization(ctx)) {
+            Long member = resolveMemberId(ctx);
+            String action = targetRecordAction(ctx);
+            if (businessAuthorization == null || member == null || action == null
+                    || ctx.getTargetRecordVersion() == null || ctx.getTargetRecordVersion() < 0
+                    || !isHandlerManagedTarget(ctx) || ctx.getAuthorizationVerdict() == null
+                    || !ctx.getAuthorizationVerdict().isAuthorized()
+                    || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                    || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                    || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId())
+                    || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
+                    || !java.util.Objects.equals(recordId, record.get("pid"))) return false;
+            var handler=extensionRegistry.getCommandHandler(resolveHandlerCode(ctx)).orElse(null);
+            if(!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner))return false;
+            java.util.List<String> codes;
+            try {codes=com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(ctx,owner);}
+            catch(org.springframework.security.access.AccessDeniedException denied){return false;}
+
+            var result = businessAuthorization.resolve(member, codes, modelCode, record);
+            if (result == null || !result.result().granted()) return false;
+            ctx.setBusinessGrantDecision(result);
+            ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
+                    ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
+            if (resultProjection != null) ctx.setBusinessResultProjection(resultProjection.prepare(ctx,owner));
+            return true;
+        }
 
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
             var decision = com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode);
@@ -264,7 +338,7 @@ public class CommandTargetScopePhase implements CommandPhase {
 
         Long memberId = resolveMemberId(ctx);
         if (memberId == null) {
-            if (handlerTargetAuthorization(ctx)) return false;
+            if (protectedTargetAuthorization(ctx)) return false;
             // No subject to evaluate (system/scheduled invocation), but D5 still retains the
             // server-loaded target version for the write that follows.
             return null;

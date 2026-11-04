@@ -55,7 +55,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
 
     private Long parentTenant;
     private Long childTenant;
-    private Long platformAdminRoleId;
+    private com.auraboot.framework.integration.PlatformAdministrationFixture platformFixture;
 
     @BeforeEach
     void setup() {
@@ -72,15 +72,7 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         // Drop platform_admin role grant we inserted. Only drop the role row
         // itself when this test created it; pre-existing rows belong to
         // some prior bootstrap and must not be deleted.
-        if (platformAdminRoleId != null) {
-            jdbc.update("DELETE FROM ab_user_role WHERE member_id = ? AND role_id = ? AND tenant_id = ?",
-                    testTenantMember.getId(), platformAdminRoleId, testTenant.getId());
-            if (!roleWasPreexisting) {
-                jdbc.update("DELETE FROM ab_role WHERE id = ?", platformAdminRoleId);
-            }
-            platformAdminRoleId = null;
-            roleWasPreexisting = false;
-        }
+        if (platformFixture != null) platformFixture.close();
         jdbc.update("DELETE FROM ab_cross_tenant_spawn_audit "
                         + "WHERE parent_tenant_id IN (?, ?) OR child_tenant_id IN (?, ?)",
                 parentTenant, childTenant, parentTenant, childTenant);
@@ -95,60 +87,10 @@ class CrossTenantGrantControllerIntegrationTest extends BaseIntegrationTest {
         MetaContext.clear();
     }
 
-    private boolean roleWasPreexisting;
 
     /** Grant testUser the platform_admin role in the test tenant. */
     private void grantPlatformAdmin() {
-        // A previous run may have left the role around (BaseIntegrationTest
-        // uses a long-lived testTenant). Look it up first; only insert when
-        // missing. Track whether we created it so cleanup can decide.
-        java.util.List<Long> existing = jdbc.queryForList(
-                "SELECT id FROM ab_role WHERE tenant_id = ? AND code = ? "
-                        + "AND (deleted_flag = false OR deleted_flag IS NULL) LIMIT 1",
-                Long.class, testTenant.getId(), RoleCodes.PLATFORM_ADMIN);
-        if (!existing.isEmpty()) {
-            platformAdminRoleId = existing.get(0);
-            roleWasPreexisting = true;
-        } else {
-            // ab_role.id is ASSIGN_ID at the MyBatis-Plus layer (no DB
-            // default), so a raw JdbcTemplate INSERT must supply an id.
-            // Use a millis+nanos blend to stay unique inside the test run.
-            long roleId = (System.currentTimeMillis() << 12) | (System.nanoTime() & 0xFFF);
-            jdbc.update(
-                    "INSERT INTO ab_role (id, pid, name, code, type, scope_type, status, "
-                            + " tenant_id, is_default, is_system, deleted_flag, priority, "
-                            + " created_at, updated_at) "
-                            + "VALUES (?, ?, ?, ?, 'system', 'global', 'active', ?, false, true, false, 1, now(), now())",
-                    roleId,
-                    "rl_pa_" + System.nanoTime(),
-                    "platform_admin",
-                    RoleCodes.PLATFORM_ADMIN,
-                    testTenant.getId());
-            platformAdminRoleId = roleId;
-            roleWasPreexisting = false;
-        }
-
-        // Bind to testUser via testTenantMember (idempotent: skip if exists).
-        Long alreadyBound = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ab_user_role WHERE member_id = ? AND role_id = ? "
-                        + "AND tenant_id = ? AND status = 'active' "
-                        + "AND (deleted_flag = false OR deleted_flag IS NULL)",
-                Long.class, testTenantMember.getId(), platformAdminRoleId, testTenant.getId());
-        if (alreadyBound == null || alreadyBound == 0L) {
-            long urId = (System.currentTimeMillis() << 12) | ((System.nanoTime() + 1) & 0xFFF);
-            jdbc.update("INSERT INTO ab_user_role (id, pid, member_id, role_id, tenant_id, "
-                            + " status, deleted_flag, created_at, updated_at) "
-                            + "VALUES (?, ?, ?, ?, ?, 'active', false, now(), now())",
-                    urId,
-                    "ur_pa_" + System.nanoTime(),
-                    testTenantMember.getId(),
-                    platformAdminRoleId,
-                    testTenant.getId());
-        }
-        // Drop any cached "user does NOT have platform_admin" entry from a prior
-        // caseA invocation in the same JVM — the 60 s TTL on AdminRoleChecker
-        // would otherwise mask the freshly-inserted ab_user_role binding.
-        adminRoleChecker.invalidateAll();
+        platformFixture = com.auraboot.framework.integration.PlatformAdministrationFixture.grant(jdbc, testUser.getId());
     }
 
     /** Snowflake ids are returned from the controller as precision-safe strings. */

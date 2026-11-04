@@ -14768,6 +14768,58 @@
         },
         "type": "object"
       },
+      "ApiResponseRoleAuthorizationDraftPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRoleAuthorizationDraftSnapshot": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseRoleMemberTreeResponse": {
         "properties": {
           "code": {
@@ -45388,6 +45440,153 @@
         },
         "type": "object"
       },
+      "RoleAuthorizationDraftPreview": {
+        "properties": {
+          "applyDefaultToCurrentGrants": {
+            "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilitySelectionPreview"
+          },
+          "defaultScopeChanged": {
+            "type": "boolean"
+          },
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldPolicies": {
+            "$ref": "#/components/schemas/RoleFieldPolicyPreview"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "scopeChanges": {
+            "items": {
+              "$ref": "#/components/schemas/DataScopeUpdateRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "applyDefaultToCurrentGrants",
+          "capabilities",
+          "defaultScopeChanged",
+          "defaultScopeType",
+          "revision",
+          "scopeChanges"
+        ],
+        "type": "object"
+      },
+      "RoleAuthorizationDraftRequest": {
+        "properties": {
+          "applyDefaultToCurrentGrants": {
+            "type": "boolean"
+          },
+          "defaultScopeChanged": {
+            "type": "boolean"
+          },
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedRevision": {
+            "minLength": 1,
+            "pattern": "[a-f0-9]{64}",
+            "type": "string"
+          },
+          "fieldPolicyPids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "revokedPartialCapabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "scopeChanges": {
+            "items": {
+              "$ref": "#/components/schemas/DataScopeUpdateRequest"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          "selectedCapabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "selectedCapabilityCodes"
+        ],
+        "type": "object"
+      },
+      "RoleAuthorizationDraftSnapshot": {
+        "properties": {
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityGroup"
+            },
+            "type": "array"
+          },
+          "matrix": {
+            "$ref": "#/components/schemas/PermissionMatrixDTO"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "rolePid": {
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/DataScopeUpdateRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "defaultScopeType",
+          "groups",
+          "matrix",
+          "revision",
+          "rolePid",
+          "scopes"
+        ],
+        "type": "object"
+      },
       "RoleDTO": {
         "properties": {
           "code": {
@@ -45500,6 +45699,49 @@
           },
           "valid": {
             "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "RoleFieldPolicyPreview": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "removed": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RoleFieldPolicyView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "fieldCode": {
+            "type": "string"
+          },
+          "maskType": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "policyPid": {
+            "type": "string"
+          },
+          "policyType": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -96630,6 +96872,117 @@
         ]
       }
     },
+    "/api/permission/roles/{rolePid}/draft": {
+      "get": {
+        "operationId": "readRoleAuthorizationDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleAuthorizationDraftSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Read a consistent role authorization draft baseline",
+        "tags": [
+          "Role Authorization Draft"
+        ]
+      },
+      "put": {
+        "operationId": "applyRoleAuthorizationDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleAuthorizationDraftSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Atomically commit role duties and record scopes with conflict detection",
+        "tags": [
+          "Role Authorization Draft"
+        ]
+      }
+    },
+    "/api/permission/roles/{rolePid}/draft/preview": {
+      "post": {
+        "operationId": "previewRoleAuthorizationDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleAuthorizationDraftPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Preview role duties and record scopes against an exact revision",
+        "tags": [
+          "Role Authorization Draft"
+        ]
+      }
+    },
     "/api/permissions": {
       "post": {
         "operationId": "create_7",
@@ -111272,6 +111625,10 @@
     {
       "description": "Add/remove a single field on a published model — Spec §4",
       "name": "Meta Field Orchestrator"
+    },
+    {
+      "description": "Atomic role authorization authoring",
+      "name": "Role Authorization Draft"
     },
     {
       "description": "User menu tree and menu management APIs",

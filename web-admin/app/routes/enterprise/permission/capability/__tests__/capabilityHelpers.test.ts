@@ -282,9 +282,8 @@ describe('capabilityHelpers', () => {
 
     const split = splitCapabilityGroupsForPrimaryView(mixed);
 
-    // Menu-view: business groups regroup into menu sections (报价单→报价工具, 客户管理→客户);
-    // generated model/meta capabilities fold into advanced.
-    expect(split.primaryGroups.map((group) => group.group)).toEqual(['客户', '报价工具']);
+    // Preserve server-provided business groups; technical diagnostics stay advanced.
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['报价单', '客户管理']);
     expect(split.primaryGranted).toBe(2); // quote_view + crm.cap.account both granted
     expect(split.primaryTotal).toBe(2);
     expect(split.advancedGroups.map((group) => group.group)).toEqual(['model', 'meta']);
@@ -365,16 +364,15 @@ describe('capabilityHelpers', () => {
 
     const split = splitCapabilityGroupsForPrimaryView(mixed);
 
-    // 规则配置→BOM 转化工具, 报价管理→报价工具; sections ordered by menu tree (BOM 30 < 报价 40);
-    // capabilities within a section sorted by display metadata.
-    expect(split.primaryGroups.map((group) => group.group)).toEqual(['BOM 转化工具', '报价工具']);
-    expect(split.primaryGroups[1].capabilities.map((capability) => capability.code)).toEqual([
+    // Both module order and duty order come from the server, without product name tables.
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['报价管理', '规则配置']);
+    expect(split.primaryGroups[0].capabilities.map((capability) => capability.code)).toEqual([
       'qo.cap.quote_view',
       'qo.cap.quote_edit',
     ]);
   });
 
-  it('menu-view: 组织与权限管理 capabilities land in the 组织管理 section (R5/menu-view)', () => {
+  it('preserves server grouping for organization duties', () => {
     const groups: CapabilityGroup[] = [
       {
         group: '组织与权限管理',
@@ -404,7 +402,7 @@ describe('capabilityHelpers', () => {
 
     const split = splitCapabilityGroupsForPrimaryView(groups);
 
-    expect(split.primaryGroups.map((group) => group.group)).toEqual(['组织管理']);
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['组织与权限管理']);
     expect(split.advancedGroups).toEqual([]);
   });
 
@@ -487,5 +485,21 @@ describe('capabilityHelpers', () => {
       },
     ];
     expect(capabilityCodesForTier(groups, 'admin')).toEqual(['normal']);
+  });
+});
+
+// A deployed product can reorder or rename its modules without releasing the frontend.
+describe('runtime navigation grouping', () => {
+  it('uses server module names and order for warehouse and new modules', () => {
+    const warehouse = { ...cap('inv.cap.receipt', true), group: '仓库', displayGroupOrder: 100 };
+    const custom = { ...cap('custom.cap.read', false), group: '维修中心', displayGroupOrder: 15 };
+    const split = splitCapabilityGroupsForPrimaryView([
+      { group: '仓库', capabilities: [warehouse] },
+      { group: '维修中心', capabilities: [custom] },
+    ]);
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['维修中心', '仓库']);
+    expect(split.primaryTotal).toBe(2);
+    expect(split.primaryGranted).toBe(1);
+    expect(grantedCapabilityCodes(split.primaryGroups)).toEqual(['inv.cap.receipt']);
   });
 });

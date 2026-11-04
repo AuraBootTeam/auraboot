@@ -213,6 +213,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
+        BusinessResourceDataScope.query(modelCode, request);
         return dynamicDataListingSupport().list(modelCode,request);
     }
 
@@ -293,6 +294,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                                  String fieldCode,
                                  Object expectedValue,
                                  Object nextValue) {
+        BusinessResourceDataScope.unsupported();
         Map<String, Object> nextValues = new LinkedHashMap<>();
         nextValues.put(fieldCode, nextValue);
         return compareAndSet(modelCode, recordId, fieldCode, expectedValue, nextValues);
@@ -305,6 +307,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                                  String fieldCode,
                                  Object expectedValue,
                                  Map<String, Object> nextValues) {
+        BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (recordId == null || recordId.isBlank()) {
@@ -338,6 +341,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 throw new MetaServiceException(
                         "compareAndSet cannot bypass immutable field rules: " + fieldCode);
             }
+            fieldPredicateAuthorizationSupport().requireReadable(model, Set.of(compareField.getCode()));
             compareColumn = compareField.getColumnName() != null
                     ? compareField.getColumnName() : compareField.getCode();
         }
@@ -347,7 +351,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Map<String, Object> data = new LinkedHashMap<>(nextValues);
         stripNonWritableFields(modelCode, data);
         if (data.size() != nextValues.size()) {
-            throw new MetaServiceException("compareAndSet contains a non-writable field");
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: compareAndSet contains a non-writable field");
         }
         for (String nextFieldCode : data.keySet()) {
             if ("row_version".equals(nextFieldCode)) {
@@ -424,6 +428,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public void compareAndSetBatch(String modelCode, String fieldCode,
             List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> updates) {
+        BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (updates == null || updates.isEmpty() || fieldCode == null || fieldCode.isBlank()) {
@@ -433,6 +438,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         ModelMutationGuard.assertMutable(model, "updated");
         FieldDefinition compareField = DynamicDataValueMapper.findFieldDefinition(model, fieldCode);
         assertBatchCasField(compareField, fieldCode);
+        fieldPredicateAuthorizationSupport().requireReadable(model, Set.of(compareField.getCode()));
         Set<String> ids = new HashSet<>();
         List<Map<String, Object>> rows = new ArrayList<>();
         List<Object> expectedValues = new ArrayList<>();
@@ -449,7 +455,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
             stripNonWritableFields(modelCode, data);
             if (data.size() != update.nextValues().size()) {
-                throw new MetaServiceException("CAS batch contains a non-writable field");
+                throw new AccessDeniedException("FIELD_WRITE_DENIED: CAS batch contains a non-writable field");
             }
             for (String code : data.keySet()) {
                 assertBatchCasField(DynamicDataValueMapper.findFieldDefinition(model, code), code);
@@ -583,6 +589,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return java.util.Objects.equals(proposed, expected);
     }
 
+    private FieldPredicateAuthorizationSupport fieldPredicateAuthorizationSupport() {
+        return new FieldPredicateAuthorizationSupport(fieldPermissionService, dataPermissionEngine, fieldMaskService);
+    }
+
     /**
      * Resolve a field code to its physical column name, asserting it is numeric.
      * Throws {@link IllegalArgumentException} (NOT {@link MetaServiceException}) so the
@@ -613,6 +623,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public Optional<Long> incrementWithinCap(String modelCode, String recordId,
                                               String counterCode, long delta, String capCode) {
+        BusinessResourceDataScope.unsupported();
         assertWritable(modelCode);
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertMutable(model, "incremented");
@@ -627,10 +638,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
         String counterCol = resolveNumericColumn(model, counterCode);
+        if (!stripNonWritableFields(modelCode, new LinkedHashMap<>(Map.of(counterCode, delta))).isEmpty()) {
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: counter contains a non-writable field");
+        }
         String capCol = null;
         if (capCode != null) {
             capCol = resolveNumericColumn(model, capCode);
         }
+        Set<String> observedFields = new LinkedHashSet<>();
+        observedFields.add(counterCode);
+        if (capCode != null) observedFields.add(capCode);
+        fieldPredicateAuthorizationSupport().requireReadable(model, observedFields);
         StringBuilder guardedClause = new StringBuilder(buildSoftDeleteClause(model));
         RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         String softDeleteClause = guardedClause.toString();
@@ -688,6 +706,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     public PaginationResult<Map<String, Object>> listByQueryCode(String queryCode, DynamicQueryRequest request) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataListingSupport().listByQueryCode(queryCode,request);
     }
 
@@ -719,6 +738,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-authorize-record-read")
     public void withCanonicalRecordRead(String modelCode, String recordId,
             java.util.function.Consumer<Map<String,Object>> finalAuthorizer) {
+        BusinessResourceDataScope.unsupported();
         java.util.Objects.requireNonNull(finalAuthorizer,"finalAuthorizer");
         RequiredRecordReadGuard.withCanonicalRead(modelCode,recordId,() ->
                 DynamicDataService.super.withCanonicalRecordRead(modelCode,recordId,record ->
@@ -726,6 +746,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private Map<String, Object> getByIdInternal(String modelCode, String recordId, boolean enrichDisplay) {
+        BusinessResourceDataScope.read(modelCode, recordId);
         RequiredRecordReadGuard.beforeIndependentRecordLoad();
         validateModelCode(modelCode);
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
@@ -918,6 +939,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
+        BusinessResourceDataScope.create(modelCode, data);
         if (MachineDataAccessContext.isActive()) MachineDataAccessContext.requireDecision(modelCode).requireAction("create");
         validateModelCode(modelCode);
         assertWritable(modelCode);
@@ -928,8 +950,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         ModelMutationGuard.assertCreateAllowed(model);
         FieldWriterGuard.assertCreateAllowed(model, data);
 
-        // Field-level write permission (gap #1): strip fields the current user may not write
-        stripNonWritableFields(modelCode, data);
+        // A create cannot silently discard an explicitly forbidden initial value.
+        if (!stripNonWritableFields(modelCode, data).isEmpty()) {
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: create contains a non-writable field");
+        }
 
         logOperation("create", modelCode, data.keySet());
 
@@ -989,6 +1013,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Materialize computed fields after insert
         String recordIdValue = enrichedData.get(primaryKey.getCode()).toString();
+        BusinessResourceDataScope.created(modelCode, recordIdValue);
         virtualFieldEngine.materialize(modelCode, recordIdValue, changedFields);
         notifyModelMutation(model, recordIdValue, ModelMutationObserver.Operation.CREATED);
 
@@ -1002,7 +1027,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // (b) hand automations and SLA a field-masked, incomplete record.
         // The create itself is already authorized by the caller-facing layer.
         Map<String, Object> createdRecord =
-                MetaContext.runWithCommandPermitScope("ALL", () -> getById(modelCode, recordIdValue));
+                BusinessResourceDataScope.readback(modelCode, recordIdValue, () -> getById(modelCode, recordIdValue));
         try {
             List<FieldChange> changes = changeTracker.diff(null, createdRecord, modelCode);
             changeTracker.recordChange(ChangeRecord.builder()
@@ -1090,14 +1115,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     /**
-     * Field-level write permission enforcement (gap #1).
-     *
-     * <p>Removes from the incoming payload any field the current user is not
-     * permitted to write (effective {@code field_write} data-permission policies).
-     * Stripping (rather than rejecting) keeps clients tolerant while guaranteeing
-     * restricted fields never reach the row; each strip is logged for audit.
-     */
-    /**
      * Remove fields the caller may not write.
      *
      * @return the field codes actually removed, so a caller holding the stored row can tell an
@@ -1114,15 +1131,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (MetaContext.hasCommandPermitScopeFor(modelCode)) {
             return Collections.emptySet();
         }
-        Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
-        Set<String> nonWritable = dataPermissionEngine.getNonWritableFields(tenantId, modelCode, userId);
-        if (nonWritable == null || nonWritable.isEmpty()) {
+        Set<String> nonWritable = new FieldWriteAuthorizationSupport(
+                metadataService, fieldPermissionService, dataPermissionEngine)
+                .nonWritableInputKeys(modelCode, data.keySet());
+        if (nonWritable.isEmpty()) {
             return Collections.emptySet();
         }
         Set<String> stripped = new LinkedHashSet<>();
         for (String fieldCode : nonWritable) {
-            if (data.remove(fieldCode) != null) {
+            if (data.containsKey(fieldCode)) {
+                data.remove(fieldCode);
                 stripped.add(fieldCode);
                 log.warn("Field-write permission: stripped non-writable field '{}' from {} write by user {}",
                         logSafe(fieldCode), logSafe(modelCode), logSafe(userId));
@@ -1154,12 +1173,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (!submitted.containsKey(fieldCode)) {
                 continue;
             }
-            if (ValidationServiceImpl.valueChanges(existingRecord.get(fieldCode), submitted.get(fieldCode))) {
+            if (!existingRecord.containsKey(fieldCode)
+                    || ValidationServiceImpl.valueChanges(existingRecord.get(fieldCode), submitted.get(fieldCode))) {
                 denied.add(fieldCode);
             }
         }
         if (!denied.isEmpty()) {
-            throw new MetaServiceException("FIELD_WRITE_DENIED: not permitted to change "
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: not permitted to change "
                     + String.join(", ", denied) + " on " + modelCode);
         }
     }
@@ -1198,6 +1218,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> inputData) {
+        BusinessResourceDataScope.update(modelCode, recordId, inputData);
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {
@@ -1331,7 +1352,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // The pre-update read of existingRecord above deliberately keeps the
             // permission projection — you may not modify a record you cannot see.
             Map<String, Object> updatedRecord =
-                    MetaContext.runWithCommandPermitScope("ALL", () -> getById(modelCode, recordId));
+                    BusinessResourceDataScope.readback(modelCode, recordId, () -> getById(modelCode, recordId));
             try {
                 List<FieldChange> changes = changeTracker.diff(existingRecord, updatedRecord, modelCode);
                 if (!changes.isEmpty()) {
@@ -1378,6 +1399,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public void delete(String modelCode, String recordId) {
+        BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {
@@ -1580,6 +1602,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     public DynamicBatchResponse batchCreate(String modelCode, List<Map<String, Object>> dataList) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().batchCreate(modelCode,dataList);
     }
 
@@ -1598,6 +1621,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().bulkCreate(modelCode,dataList);
     }
 
@@ -1608,12 +1632,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public DynamicBatchResponse batchUpdate(String modelCode, List<Map<String, Object>> dataList) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().batchUpdate(modelCode,dataList);
     }
 
     @Override
     @Transactional
     public void batchDelete(String modelCode, List<String> recordIds) {
+        BusinessResourceDataScope.unsupported();
         dynamicDataBatchSupport().batchDelete(modelCode,recordIds);
     }
 
@@ -1630,6 +1656,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public List<Map<String, Object>> executeCustomQuery(String modelCode, String queryName, Map<String, Object> queryParams) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataListingSupport().executeCustomQuery(modelCode,queryName,queryParams);
     }
 
@@ -1638,6 +1665,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> aggregate(String modelCode, AggregateRequest aggregateRequest) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataListingSupport().aggregate(modelCode,aggregateRequest);
     }
 
@@ -1646,6 +1674,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> getStats(String modelCode, Map<String, Object> statsParams) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataListingSupport().getStats(modelCode,statsParams);
     }
 
@@ -1658,6 +1687,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getRelationData(String modelCode, String recordId,
                                                     String relationName, Map<String, Object> queryParams) {
+        BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         logOperation("getRelationData", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
@@ -1671,6 +1701,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public RelationOperationResult createRelations(String modelCode, String recordId,
                                                     String relationName, List<String> targetRecordIds) {
+        BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         logOperation("createRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
@@ -1685,6 +1716,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public RelationOperationResult removeRelations(String modelCode, String recordId,
                                                     String relationName, List<String> targetRecordIds) {
+        BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         logOperation("removeRelations", modelCode, relationName);
         RelationDefinition relation = DynamicDataValueMapper.findRelation(getModelDefinition(modelCode), relationName);
@@ -1699,6 +1731,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     public ValidationResult validate(String modelCode, Map<String, Object> data, ValidationContext validationContext) {
+        BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
 
         ModelDefinition model = getModelDefinition(modelCode);
@@ -1716,6 +1749,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public List<FieldOption> getFieldOptions(String modelCode, String fieldCode, FieldOptionRequest optionRequest) {
+        BusinessResourceDataScope.unsupported();
         return referenceOptionsQuery().getFieldOptions(modelCode,fieldCode,optionRequest);
     }
 
@@ -1724,6 +1758,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public ExportResult exportData(String modelCode, DataExportRequest exportRequest) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataTransferSupport().exportData(modelCode,exportRequest);
     }
 
@@ -1732,6 +1767,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public ImportResult importData(String modelCode, DataImportRequest importRequest) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataTransferSupport().importData(modelCode,importRequest);
     }
 
@@ -1740,6 +1776,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public ActionExecutionResult executeCustomAction(String modelCode, String actionName, Map<String, Object> actionParams) {
+        BusinessResourceDataScope.unsupported();
         return dynamicDataTransferSupport().executeCustomAction(modelCode,actionName,actionParams);
     }
 
@@ -1825,6 +1862,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public JointSubTableSaveResponse saveWithRelations(String modelCode, JointSubTableSaveRequest request) {
+        BusinessResourceDataScope.unsupported();
         return dynamicJointSaveSupport().saveWithRelations(modelCode,request);
     }
 

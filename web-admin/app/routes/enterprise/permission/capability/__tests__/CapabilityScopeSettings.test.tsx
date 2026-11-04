@@ -65,22 +65,17 @@ function fixture(
   initial: PermissionMatrixDTO = matrix,
   capability = cap,
 ) {
-  const onRefresh = vi.fn().mockResolvedValue(refreshed);
+  const onStage = vi.fn();
   const onClose = vi.fn();
-  const onReadFailure = vi.fn();
-  const onBusy = vi.fn();
   render(
     <CapabilityScopeSettings
-      rolePid="role-5"
       capability={capability}
       matrix={initial}
-      onRefresh={onRefresh}
+      onStage={onStage}
       onClose={onClose}
-      onReadFailure={onReadFailure}
-      onBusy={onBusy}
     />,
   );
-  return { onRefresh, onClose, onReadFailure, onBusy };
+  return { onStage, onClose };
 }
 describe('CapabilityScopeSettings', () => {
   beforeEach(() => {
@@ -90,7 +85,7 @@ describe('CapabilityScopeSettings', () => {
     >);
     vi.mocked(permissionService.updateScope).mockResolvedValue(undefined);
   });
-  it('uses the existing exact resource/action scope API and verifies readback', async () => {
+  it('stages the exact resource/action scope without persisting it', async () => {
     const updated = structuredClone(matrix);
     updated.modules[0].resources[0].actions[0].scopeType = 'self';
     const callbacks = fixture(updated);
@@ -100,22 +95,18 @@ describe('CapabilityScopeSettings', () => {
     });
     fireEvent.click(screen.getByTestId('capability-scope-apply'));
     await waitFor(() => expect(callbacks.onClose).toHaveBeenCalledOnce());
-    expect(permissionService.updateScope).toHaveBeenCalledWith('role-5', {
-      resourceCode: 'qo_quote_common',
-      actionCode: 'read',
-      scopeType: 'self',
-    });
-    expect(callbacks.onReadFailure).not.toHaveBeenCalled();
-  });
-  it('blocks continued editing when successful submission reads back the wrong scope', async () => {
-    const callbacks = fixture();
-    await screen.findByTestId('capability-scope-model.qo_quote_common.read');
-    fireEvent.change(screen.getByTestId('capability-scope-model.qo_quote_common.read'), {
-      target: { value: 'self' },
-    });
-    fireEvent.click(screen.getByTestId('capability-scope-apply'));
-    await waitFor(() => expect(callbacks.onReadFailure).toHaveBeenCalledOnce());
-    expect(callbacks.onClose).not.toHaveBeenCalled();
+    expect(callbacks.onStage).toHaveBeenCalledWith(
+      [
+        {
+          resourceCode: 'qo_quote_common',
+          actionCode: 'read',
+          scopeType: 'self',
+          mergeStrategy: undefined,
+        },
+      ],
+      expect.objectContaining({ 'qo_quote_common:read': '报价单 · View' }),
+    );
+    expect(permissionService.updateScope).not.toHaveBeenCalled();
   });
   it('cancels through Escape without writing', () => {
     const callbacks = fixture();
@@ -167,11 +158,17 @@ describe('CapabilityScopeSettings', () => {
     fireEvent.change(select, { target: { value: 'team' } });
     fireEvent.click(screen.getByTestId('capability-scope-apply'));
     await waitFor(() => expect(callbacks.onClose).toHaveBeenCalledOnce());
-    expect(permissionService.updateScope).toHaveBeenCalledWith('role-5', {
-      resourceCode: 'qo_quote_common',
-      actionCode: 'read',
-      scopeType: 'team',
-    });
+    expect(callbacks.onStage).toHaveBeenCalledWith(
+      [
+        {
+          resourceCode: 'qo_quote_common',
+          actionCode: 'read',
+          scopeType: 'team',
+          mergeStrategy: undefined,
+        },
+      ],
+      expect.objectContaining({ 'qo_quote_common:read': '报价单 · View' }),
+    );
   });
 
   it('rejects a forced unsupported team selection before calling the scope API', async () => {
@@ -207,5 +204,17 @@ describe('CapabilityScopeSettings', () => {
     expect(screen.queryByTestId('capability-scope-meta.command.execute')).not.toBeInTheDocument();
     expect(screen.getAllByRole('combobox')).toHaveLength(1);
     expect(permissionService.updateScope).not.toHaveBeenCalled();
+  });
+  it('uses the declared business duty for custom actions instead of generated technical labels', async () => {
+    const custom = structuredClone(matrix);
+    custom.modules[0].resources[0].resourceCode = 'technical.resource';
+    const action = custom.modules[0].resources[0].actions[0];
+    action.code = 'technical.resource.manage';
+    action.action = 'manage';
+    action.label = 'Technical Resource Manage';
+    action.scopeType = 'self';
+    fixture(custom, custom, { ...cap, includes: [action.code], label: 'Manage quotes' });
+    expect(await screen.findByRole('combobox', { name: 'Manage quotes' })).toBeVisible();
+    expect(screen.queryByText('Technical Resource Manage')).not.toBeInTheDocument();
   });
 });

@@ -45,6 +45,9 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class DataScopeServiceImplTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Test
     void invalidScopeCannotBePersistedOrPromotedToAll() {
@@ -78,6 +81,9 @@ class DataScopeServiceImplTest {
 
     @Mock
     private RoleDataScopeMapper roleDataScopeMapper;
+    @Mock
+    private com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
+
 
     @Mock
     private UserRoleMapper userRoleMapper;
@@ -602,6 +608,51 @@ class DataScopeServiceImplTest {
         when(organizationService.getEmployeeByMemberPid("creator-member")).thenReturn(null, Map.of());
         assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
         assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+    }
+
+    @Test
+    void businessGrantScopeNeverBorrowsAnUnrelatedRoleScope() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("self");
+        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
+        var unrelated = scope("other", "manage", "all");
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(unrelated));
+        var result = service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt");
+        assertThat(result.scopeType()).isEqualTo("self"); assertThat(result.ownerValue()).isEqualTo(1L);
+        org.mockito.Mockito.verify(userRoleMapper, org.mockito.Mockito.never()).findRoleIdsByMemberId(any());
+    }
+
+    @Test
+    void businessGrantExactOverrideWinsOverRoleDefault() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("all");
+        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(scope("inventory.receipt", "confirm", "none")));
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void missingDefaultAndUnknownScopeConfigurationDenyBusinessTargets() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of());
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+        var entry = scope("inventory.receipt", "confirm", "all"); entry.setScopeConfig(Map.of("unrecognizedRestriction", "do not ignore"));
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(entry));
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void businessRoleResolutionRejectsAnotherSubjectAndInactiveMembership() {
+        MetaContext.setMemberId(5L);
+        assertThat(service.resolveScopeForRole(6L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+        org.mockito.Mockito.verifyNoInteractions(roleDataScopeMapper);
+    }
+
+    private static RoleDataScope scope(String resource, String action, String type) {
+        var scope = new RoleDataScope(); scope.setResourceCode(resource); scope.setActionCode(action); scope.setScopeType(type); return scope;
     }
 
 }

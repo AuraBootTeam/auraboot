@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 507b294c41121edd1e3bb28bed83e703f74d61a39809fcb8584808edc76bddfd
+ * Contract SHA-256: 96736d4485add82888fa84737d477c5b16b93e4dad9cfeddeb585469a99c9485
  */
 export interface paths {
     "/api/activities": {
@@ -18027,6 +18027,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/permission/roles/{rolePid}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a consistent role authorization draft baseline */
+        get: operations["readRoleAuthorizationDraft"];
+        /** Atomically commit role duties and record scopes with conflict detection */
+        put: operations["applyRoleAuthorizationDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permission/roles/{rolePid}/draft/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview role duties and record scopes against an exact revision */
+        post: operations["previewRoleAuthorizationDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/permissions": {
         parameters: {
             query?: never;
@@ -27927,6 +27962,22 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["RevokePurchaseResponse"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseRoleAuthorizationDraftPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleAuthorizationDraftPreview"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseRoleAuthorizationDraftSnapshot: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleAuthorizationDraftSnapshot"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -38699,6 +38750,34 @@ export interface components {
             /** Format: int64 */
             updatedBy?: number;
         };
+        RoleAuthorizationDraftPreview: {
+            applyDefaultToCurrentGrants: boolean;
+            capabilities: components["schemas"]["CapabilitySelectionPreview"];
+            defaultScopeChanged: boolean;
+            defaultScopeType: string | null;
+            fieldPolicies?: components["schemas"]["RoleFieldPolicyPreview"];
+            revision: string;
+            scopeChanges: components["schemas"]["DataScopeUpdateRequest"][];
+        };
+        RoleAuthorizationDraftRequest: {
+            applyDefaultToCurrentGrants?: boolean;
+            defaultScopeChanged?: boolean;
+            defaultScopeType?: string | null;
+            expectedRevision: string;
+            fieldPolicyPids?: string[];
+            revokedPartialCapabilityCodes?: string[];
+            scopeChanges?: components["schemas"]["DataScopeUpdateRequest"][];
+            selectedCapabilityCodes: string[];
+        };
+        RoleAuthorizationDraftSnapshot: {
+            defaultScopeType: string | null;
+            fieldPolicies?: components["schemas"]["RoleFieldPolicyView"][];
+            groups: components["schemas"]["CapabilityGroup"][];
+            matrix: components["schemas"]["PermissionMatrixDTO"];
+            revision: string;
+            rolePid: string;
+            scopes: components["schemas"]["DataScopeUpdateRequest"][];
+        };
         RoleDataScopeDefinitionDTO: {
             mergeStrategy?: string;
             permissionCode?: string;
@@ -38737,6 +38816,19 @@ export interface components {
             id?: number;
             name?: string;
             type?: string;
+        };
+        RoleFieldPolicyPreview: {
+            added?: components["schemas"]["RoleFieldPolicyView"][];
+            removed?: components["schemas"]["RoleFieldPolicyView"][];
+        };
+        RoleFieldPolicyView: {
+            enabled?: boolean;
+            fieldCode?: string;
+            maskType?: string;
+            modelCode?: string;
+            name?: string;
+            policyPid?: string;
+            policyType?: string;
         };
         RoleMemberDTO: {
             /** Format: date-time */
@@ -71583,6 +71675,80 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseCapabilitySelectionPreview"];
+                };
+            };
+        };
+    };
+    readRoleAuthorizationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleAuthorizationDraftSnapshot"];
+                };
+            };
+        };
+    };
+    applyRoleAuthorizationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAuthorizationDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleAuthorizationDraftSnapshot"];
+                };
+            };
+        };
+    };
+    previewRoleAuthorizationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAuthorizationDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleAuthorizationDraftPreview"];
                 };
             };
         };

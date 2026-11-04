@@ -105,11 +105,21 @@ public class CommandExecutorImpl implements CommandExecutor {
     private com.auraboot.framework.infrastructure.metrics.CommandMetrics commandMetrics;
 
     @Autowired(required = false)
+    private CommandResultProjectionService resultProjection;
+
+    @Autowired(required = false)
     private com.auraboot.framework.governance.service.GovernanceSnapshotService governanceSnapshotService;
 
     /** Cache for column existence checks — table structure rarely changes. Bounded to prevent OOM. */
     private static final int COLUMN_CACHE_MAX_SIZE = 1024;
     private final ConcurrentHashMap<String, Boolean> columnExistsCache = new ConcurrentHashMap<>();
+
+    private CommandExecuteResult projectForCaller(CommandPipelineContext context, CommandExecuteResult result) {
+        if (context.getBusinessTargetAuthorization() == null) return result;
+        if (resultProjection == null) throw new AccessDeniedException("Business result projection service is unavailable");
+        result.setData(resultProjection.project(context,result.getData()));
+        return result;
+    }
 
     @Override
     @Transactional
@@ -148,6 +158,7 @@ public class CommandExecutorImpl implements CommandExecutor {
             // Pre-guard phases: Load, SchemaValidate, Idempotency, Entitlement
             CommandExecuteResult shortCircuit = commandPipeline.executePreGuardPhases(ctx);
             if (shortCircuit != null) {
+                shortCircuit = projectForCaller(ctx, shortCircuit);
                 if (request.isDryRun()) {
                     shortCircuit.setPhaseReached("completed_dry_run");
                 }
@@ -165,6 +176,7 @@ public class CommandExecutorImpl implements CommandExecutor {
                 result = guardedPipeline.get();
             }
 
+            result = projectForCaller(ctx, result);
             if (request.isDryRun()) {
                 result.setPhaseReached("completed_dry_run");
             }

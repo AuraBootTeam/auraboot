@@ -87,6 +87,11 @@ public class ExtensionRegistry {
      * @param commandType the command type
      * @return optional command handler
      */
+    /** Code-owned command protection remains discoverable even when mutable metadata changes its handler. */
+    public Optional<CommandHandlerExtension> getBusinessResourceOwner(String commandCode) {
+        return getCommandHandler(commandCode).filter(handler->handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization);
+    }
+
     public Optional<CommandHandlerExtension> getCommandHandler(String commandType) {
         return getAllCommandHandlers().stream()
                 .filter(h -> h.supports(commandType))

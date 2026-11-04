@@ -48,7 +48,7 @@ class AutoPermissionAssignmentServiceTest {
 
     @Test
     void shouldBindGeneratedPermissionsToExplicitTenant() {
-        AutoPermissionAssignmentService service = new AutoPermissionAssignmentService(
+        AutoPermissionAssignmentService service = new AutoPermissionAssignmentService(org.mockito.Mockito.mock(RoleAuthorizationWriteLock.class),
                 permissionService,
                 permissionMapper,
                 roleService,
@@ -125,7 +125,7 @@ class AutoPermissionAssignmentServiceTest {
     }
     @Test
     void shouldRegisterImportedActionsWithoutGrantingRoles() {
-        AutoPermissionAssignmentService service = new AutoPermissionAssignmentService(
+        AutoPermissionAssignmentService service = new AutoPermissionAssignmentService(org.mockito.Mockito.mock(RoleAuthorizationWriteLock.class),
                 permissionService, permissionMapper, roleService, rolePermissionMapper,
                 commandActionDeriver, userPermissionService);
         when(commandActionDeriver.deriveActions("crm_lead_common")).thenReturn(List.of("read", "create"));

@@ -35,6 +35,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PermissionMatrixServiceImpl implements PermissionMatrixService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     private final PermissionService permissionService;
     private final PermissionMapper permissionMapper;
@@ -88,6 +90,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     @Transactional
     public void batchUpdateRolePermissions(Long roleId, List<PermissionGrantRequest> grants) {
+        authorizationWriteLock.mutate();
         if (grants == null || grants.isEmpty()) {
             return;
         }
@@ -118,6 +121,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     @Transactional
     public void applyDefaultScopeToCurrentGrants(Long tenantId, Long roleId, String scopeType) {
+        authorizationWriteLock.mutate();
         Set<Long> grantedIds = rolePermissionService.getPermissionIdsByRoleId(roleId);
         if (grantedIds.isEmpty()) {
             return;

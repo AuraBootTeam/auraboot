@@ -37,6 +37,7 @@ public interface RoleDataScopeMapper extends BaseMapper<RoleDataScope> {
     /**
      * Find all data scope entries for a specific role in a tenant.
      */
+    @org.apache.ibatis.annotations.ResultMap("mybatis-plus_RoleDataScope")
     @Select("SELECT * FROM ab_role_data_scope WHERE tenant_id = #{tenantId} AND role_id = #{roleId}")
     List<RoleDataScope> findByTenantAndRole(
             @Param("tenantId") Long tenantId,

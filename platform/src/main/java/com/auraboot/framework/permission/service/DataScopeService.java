@@ -21,6 +21,16 @@ public interface DataScopeService {
      */
     DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode);
 
+    /**
+     * Resolve only the role that supplied a business grant. The permission resource/action
+     * identifies the configuration; the record model owns field/department/team metadata.
+     * Missing/inactive membership, role, or scope denies. Never unions another role or share.
+     */
+    default DataScopeCondition resolveScopeForRole(Long memberId, Long roleId, String permissionResource,
+                                                   String action, String recordModel) {
+        return DataScopeCondition.none();
+    }
+
     /** Resolve current member-group scope without requiring a business-row team column. */
     default DataScopeCondition resolveAudienceScope(Long memberId, String resourceCode, String actionCode) {
         return resolveHistoricalScope(memberId, resourceCode, actionCode);

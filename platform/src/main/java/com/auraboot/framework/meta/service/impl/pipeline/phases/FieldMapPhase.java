@@ -88,11 +88,16 @@ public class FieldMapPhase implements CommandPhase {
             boolean isCreateOrUpdate = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
 
             if (noBindingRules && (hasInputFields || hasAutoSetFields || isDeleteOp || isStateTransition || isCreateOrUpdate)) {
-                fieldMapResults = fieldMapExecutor.executeImplicitFieldMapPhase(
-                        ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand());
+                fieldMapResults = ctx.submittedInputKeys() == null
+                        ? fieldMapExecutor.executeImplicitFieldMapPhase(
+                                ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand())
+                        : fieldMapExecutor.executeImplicitFieldMapPhase(
+                                ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand(), ctx.submittedInputKeys());
             } else {
-                fieldMapResults = fieldMapExecutor.executeFieldMapPhase(
-                        fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest());
+                fieldMapResults = ctx.submittedInputKeys() == null
+                        ? fieldMapExecutor.executeFieldMapPhase(fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest())
+                        : fieldMapExecutor.executeFieldMapPhase(fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(),
+                                ctx.submittedInputKeys(), ctx.getCommandCode());
             }
         }
         ctx.setFieldMapResults(fieldMapResults);

@@ -16508,7 +16508,9 @@ CREATE TABLE public.ab_role_permission (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     created_by bigint,
     updated_by bigint,
-    CONSTRAINT chk_ab_role_permission_grant_type CHECK ((grant_type = ANY (ARRAY['grant'::text, 'deny'::text])))
+    field_scope jsonb,
+    CONSTRAINT chk_ab_role_permission_grant_type CHECK ((grant_type = ANY (ARRAY['grant'::text, 'deny'::text]))),
+    CONSTRAINT chk_role_permission_field_scope_object CHECK (((field_scope IS NULL) OR (jsonb_typeof(field_scope) = 'object'::text)))
 );
 
 
@@ -16517,6 +16519,13 @@ CREATE TABLE public.ab_role_permission (
 --
 
 COMMENT ON TABLE public.ab_role_permission IS 'Role-Permission绑定表 - ';
+
+
+--
+-- Name: COLUMN ab_role_permission.field_scope; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_role_permission.field_scope IS 'Fields on the same complete grant: modelCode, readFields and writeFields; SQL NULL retains legacy semantics.';
 
 
 --

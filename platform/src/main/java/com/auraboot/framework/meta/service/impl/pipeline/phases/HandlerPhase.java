@@ -79,6 +79,9 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private com.auraboot.framework.integration.InventoryReceiptEnqueueProvenance inventoryReceiptProvenance;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory businessResources;
+
     private final ApplicationContext applicationContext;
     private final ExtensionRegistry extensionRegistry;
     private final ObjectMapper objectMapper;
@@ -622,6 +625,8 @@ public class HandlerPhase implements CommandPhase {
             throw new AccessDeniedException("Related updates cannot execute asynchronously");
         }
 
+        validateBusinessResources(pipelineContext,handler,secondaryHandlers);
+
         // Opt-in async dispatch: commands declaring handlerParams.async run off the
         // request thread via AsyncTaskService, so long-running handlers (e.g. bulk
         // Excel imports) finish in the background instead of blocking the HTTP
@@ -662,10 +667,12 @@ public class HandlerPhase implements CommandPhase {
                     : commandTargetFiles.forCommand(pipelineContext, commandCreates);
             try (fileScope;
                  var sealedContentScope = sealedContentFactory == null ? null : sealedContentFactory.forCommand(pipelineContext);
-                 var subjectScope = subjectAcknowledgements == null ? null : subjectAcknowledgements.forCommand(pipelineContext)) {
+                 var subjectScope = subjectAcknowledgements == null ? null : subjectAcknowledgements.forCommand(pipelineContext);
+                 var businessScope = openBusinessResources(pipelineContext,handler,secondaryHandlers)) {
                 String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
                 Map<String, Object> pluginSettings = new HashMap<>();
                 pluginSettings.putAll(resolveHandlerParams(execConfig));
+
                 pluginSettings.put("__commandCode", commandCode);
                 pluginSettings.put("__handlerCode", handlerCode);
                 // Authenticated actor identity is a server-owned setting, never a client payload
@@ -791,6 +798,15 @@ public class HandlerPhase implements CommandPhase {
                             sealedContentScope.accessor());
                 }
                 com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.finishSettings(pluginSettings);
+                if (businessScope != null) {
+                    // Only the constrained resource capability and authenticated invocation facts
+                    // enter business handlers; other host capabilities require their own contract.
+                    Set<String> controls=Set.of("__commandCode","__handlerCode","__currentUser",
+                            CommandHandlerExtension.CURRENT_USER_PID_KEY,CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
+                            CommandHandlerExtension.EXPECTED_VERSION_KEY,CommandHandlerExtension.DATA_ACCESSOR_KEY);
+                    pluginSettings.keySet().removeIf(key->key.startsWith("__") && !controls.contains(key));
+                    pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,businessScope.accessor());
+                }
                 CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                         .tenantId(tenantId)
                         .namespace(namespace)
@@ -812,6 +828,7 @@ public class HandlerPhase implements CommandPhase {
                     } else {
                         Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
                                 : inventoryReceiptProvenance.route(handler, pluginContext);
+                        if(businessScope!=null)result=businessScope.projectResult(result);
                         if (result instanceof Map) {
                             @SuppressWarnings("unchecked")
                             Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -910,6 +927,27 @@ public class HandlerPhase implements CommandPhase {
             }
         }
         return commandCode;
+    }
+
+    private boolean validateBusinessResources(CommandPipelineContext context,CommandHandlerExtension handler,
+            List<CommandHandlerExtension> secondaryHandlers) {
+        Object raw=context.getExecConfig()==null?null:context.getExecConfig().get("handlerParams");
+        var canonical=extensionRegistry.getBusinessResourceOwner(context.getCommandCode()).orElse(null);
+        boolean business=raw instanceof Map<?,?> values && "business".equals(values.get("targetRecordAuthorization"));
+        if((canonical!=null && canonical!=handler) || ((canonical!=null || handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization) && !business))
+            throw new AccessDeniedException("The business owner contract cannot be disabled or replaced");
+        if(!(raw instanceof Map<?,?> params) || !"business".equals(params.get("targetRecordAuthorization")))return false;
+        if(businessResources==null || !(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)
+                || !secondaryHandlers.isEmpty() || !Boolean.FALSE.equals(params.get("dslPersistence"))
+                || params.containsKey("async") || params.containsKey("commandCreatedModels")
+                || params.containsKey("relatedUpdateAuthorization") || params.containsKey("relatedDeleteAuthorization"))
+            throw new AccessDeniedException("A synchronous business command requires one complete resource owner");
+        return true;
+    }
+
+    private com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory.Scope openBusinessResources(
+            CommandPipelineContext context,CommandHandlerExtension handler,List<CommandHandlerExtension> secondaryHandlers) {
+        return validateBusinessResources(context,handler,secondaryHandlers)?businessResources.open(context,handler):null;
     }
 
     private boolean isAsyncHandler(Map<String, Object> handlerParams) {

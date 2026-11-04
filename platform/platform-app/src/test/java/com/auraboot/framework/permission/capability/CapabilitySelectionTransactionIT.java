@@ -29,7 +29,10 @@ class CapabilitySelectionTransactionIT extends BaseIntegrationTest {
     private Long newId;
     private String prefix;
 
+    private com.auraboot.framework.integration.TenantAdministrationFixture administrator;
     @BeforeEach void fixture() {
+        administrator = com.auraboot.framework.integration.TenantAdministrationFixture.grant(jdbc, getTestTenant().getId(), getTestTenantMember().getId());
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE, "API", "role", "update", "Role authoring fixture");
         prefix = "cap_tx_" + UniqueIdGenerator.generate().toLowerCase();
         roleId = jdbc.queryForObject("""
                 INSERT INTO ab_role (id,pid,tenant_id,code,name,type,status,deleted_flag,created_at,updated_at)
@@ -54,6 +57,7 @@ class CapabilitySelectionTransactionIT extends BaseIntegrationTest {
     }
     @AfterEach void cleanup() {
         reset(grants);
+        if (administrator != null) administrator.close();
         if (roleId != null) {
             jdbc.update("DELETE FROM ab_role_permission WHERE role_id=?", roleId);
             jdbc.update("DELETE FROM ab_role WHERE id=?", roleId);

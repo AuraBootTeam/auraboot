@@ -75,9 +75,19 @@ class CapabilityLifecycleEnforcementIT extends BaseIntegrationTest {
     @Autowired
     private CommandAuthorizationPhase commandAuthorizationPhase;
 
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private com.auraboot.framework.integration.TenantAdministrationFixture administrator;
+
     @BeforeEach
     void ctx() {
         applyTestMetaContext();
+        administrator = com.auraboot.framework.integration.TenantAdministrationFixture.grant(jdbc, getTestTenant().getId(), getTestTenantMember().getId());
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE, "API", "role", "update", "Role authoring fixture");
+    }
+
+    @org.junit.jupiter.api.AfterEach void cleanupAdministration() {
+        applyTestMetaContext();
+        if (administrator != null) administrator.close();
     }
 
     @Test

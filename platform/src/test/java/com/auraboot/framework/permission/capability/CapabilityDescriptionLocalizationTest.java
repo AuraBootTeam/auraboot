@@ -50,7 +50,7 @@ class CapabilityDescriptionLocalizationTest {
                 assertThat(declaration.getDescriptionEn()).doesNotContainPattern("[一-鿿]");
             }
             CapabilityMapper mapper = mock(CapabilityMapper.class);
-            CapabilityRegistryServiceImpl registry = new CapabilityRegistryServiceImpl(mapper);
+            CapabilityRegistryServiceImpl registry = new CapabilityRegistryServiceImpl(mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class), mapper);
             registry.saveDefinition(declaration);
             ArgumentCaptor<CapabilityRecord> written = ArgumentCaptor.forClass(CapabilityRecord.class);
             verify(mapper).insert(written.capture());
@@ -88,7 +88,7 @@ class CapabilityDescriptionLocalizationTest {
     @Test
     void overwritePreservesRecordIdentityAndReplacesTheEnglishDescription() {
         CapabilityMapper mapper = mock(CapabilityMapper.class);
-        CapabilityRegistryServiceImpl registry = new CapabilityRegistryServiceImpl(mapper);
+        CapabilityRegistryServiceImpl registry = new CapabilityRegistryServiceImpl(mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class), mapper);
         CapabilityRecord existing = new CapabilityRecord();
         existing.setId(42L);
         existing.setDescriptionEn("Previous description");

@@ -27,6 +27,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     private final DataPermissionPolicyMapper policyMapper;
     private final DataPermissionRoleBindingMapper bindingMapper;
@@ -36,6 +38,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional
     @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public DataPermissionPolicy create(DataPermissionPolicyCreateRequest request) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         String pid = UniqueIdGenerator.generate();
 
@@ -83,6 +86,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional
     @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public DataPermissionPolicy update(String pid, DataPermissionPolicyCreateRequest request) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         DataPermissionPolicy existing = policyMapper.findByPid(tenantId, pid);
         if (existing == null) {
@@ -111,6 +115,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional
     @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void delete(String pid) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         bindingMapper.deleteByPolicyPid(tenantId, pid);
         policyMapper.deleteByPid(tenantId, pid);
@@ -121,6 +126,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional
     @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void enable(String pid) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         policyMapper.updateEnabled(tenantId, pid, true);
         log.info("Enabled data permission policy: pid={}", pid);
@@ -130,6 +136,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional
     @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void disable(String pid) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         policyMapper.updateEnabled(tenantId, pid, false);
         log.info("Disabled data permission policy: pid={}", pid);
@@ -139,6 +146,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional
     @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void bindToRole(String policyPid, String rolePid) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         bindingMapper.insertBinding(tenantId, policyPid, rolePid);
         log.info("Bound policy to role: policyPid={}, rolePid={}", policyPid, rolePid);
@@ -148,6 +156,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     @Transactional
     @CacheEvict(value = "dataPermissionMaskRules", allEntries = true)
     public void unbindFromRole(String policyPid, String rolePid) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         bindingMapper.deleteBinding(tenantId, policyPid, rolePid);
         log.info("Unbound policy from role: policyPid={}, rolePid={}", policyPid, rolePid);

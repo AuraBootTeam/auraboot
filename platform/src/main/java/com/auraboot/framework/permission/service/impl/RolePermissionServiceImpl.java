@@ -58,6 +58,8 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Service
 @RequiredArgsConstructor
 public class RolePermissionServiceImpl implements RolePermissionService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
     
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
@@ -68,6 +70,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean assignPermissionsToRole(Long roleId, List<Long> permissionIds) {
+        authorizationWriteLock.mutate();
         log.info("分配Permission到角色: roleId={}, permissionCount={}", roleId, permissionIds.size());
         
         try {
@@ -136,6 +139,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean inheritDefaultDataScope(Long roleId, List<Long> permissionIds) {
+        authorizationWriteLock.mutate();
         if (permissionIds == null || permissionIds.isEmpty()) {
             return true;
         }
@@ -184,6 +188,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean removePermission(Long roleId, Long permissionId) {
+        authorizationWriteLock.mutate();
         log.info("从角色移除Permission: roleId={}, permissionId={}", roleId, permissionId);
         
         try {
@@ -212,6 +217,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean removeAllPermissionsByRoleId(Long roleId) {
+        authorizationWriteLock.mutate();
         log.info("移除角色的所有Permission: roleId={}", roleId);
         
         try {
@@ -291,6 +297,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean syncRolePermissionsByPids(Long roleId, List<String> permissionPids, String grantType) {
+        authorizationWriteLock.mutate();
         List<Permission> permissions = resolveRequestedPermissions(permissionPids);
         log.info("Sync role permissions: roleId={}, permissionCount={}", roleId, permissions.size());
         
@@ -322,6 +329,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean removePermissionsFromRoleByPids(Long roleId, List<String> permissionPids) {
+        authorizationWriteLock.mutate();
         List<Permission> permissions = resolveRequestedPermissions(permissionPids);
         log.info("Remove role permissions: roleId={}, permissionCount={}", roleId, permissions.size());
         
@@ -414,7 +422,15 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean copyRolePermissions(Long sourceRoleId, Long targetRoleId) {
+        authorizationWriteLock.mutate();
         log.info("复制角色Permission: sourceRoleId={}, targetRoleId={}", sourceRoleId, targetRoleId);
+        for (Long roleId : java.util.Arrays.asList(sourceRoleId, targetRoleId)) {
+            Role role = roleId == null ? null : roleMapper.selectById(roleId);
+            if (role == null || !java.util.Objects.equals(role.getTenantId(), MetaContext.getCurrentTenantId())) {
+                throw new org.springframework.security.access.AccessDeniedException("Permission copy roles must belong to the current tenant");
+            }
+        }
+
         
         try {
             // 获取源角色的所有Permission IDs

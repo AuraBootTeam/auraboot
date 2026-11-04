@@ -43,7 +43,15 @@ public interface DataPermissionPolicyMapper extends BaseMapper<DataPermissionPol
         INNER JOIN ab_data_permission_role_binding rb ON rb.policy_pid = p.pid AND rb.tenant_id = p.tenant_id
         INNER JOIN ab_role r ON r.pid = rb.role_pid AND r.tenant_id = p.tenant_id
         INNER JOIN ab_user_role ur ON ur.role_id = r.id AND ur.tenant_id = p.tenant_id
+        INNER JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+        INNER JOIN ab_user u ON u.id=m.user_id
         WHERE p.tenant_id = #{tenantId}
+          AND r.status='active' AND r.deleted_flag=FALSE
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND m.status='active' AND m.deleted_flag=FALSE
+          AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
           AND p.model_code = #{modelCode}
           AND p.enabled = TRUE
           AND ur.member_id = #{memberId}

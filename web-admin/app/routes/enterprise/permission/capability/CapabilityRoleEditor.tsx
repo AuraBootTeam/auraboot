@@ -4,7 +4,15 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { Capability, CapabilityGroup, CapabilitySelectionPreview } from './types';
 import type { PermissionMatrixDTO } from '../types';
-import { capabilityService } from './capabilityService';
+import {
+  authorizationDraftService,
+  AuthorizationConflict,
+  draftMatrix,
+  type AuthorizationSnapshot,
+  type AuthorizationDraft,
+  type AuthorizationPreview,
+  type ScopeChange,
+} from './authorizationDraftService';
 import {
   grantedCapabilityCodes,
   toggleCapability,
@@ -12,9 +20,9 @@ import {
   capabilityCodesForTier,
   splitCapabilityGroupsForPrimaryView,
 } from './capabilityHelpers';
-import { permissionService } from '~/shared/services/permissionService';
 import CapabilityChecklist from './CapabilityChecklist';
 import DataScopeBar from './DataScopeBar';
+import { scopeOption } from '../scopeConfig';
 import CapabilityDiagnostics from './CapabilityDiagnostics';
 import CapabilityScopeSettings from './CapabilityScopeSettings';
 import ConfirmDialog from '~/ui/ConfirmDialog';
@@ -55,8 +63,16 @@ export default function CapabilityRoleEditor({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPlan, setPreviewPlan] = useState<CapabilitySelectionPreview | null>(null);
   const [scopeCapability, setScopeCapability] = useState<Capability | null>(null);
-  const [scopeUpdating, setScopeUpdating] = useState(false);
+  const [baselineSnapshot, setBaselineSnapshot] = useState<AuthorizationSnapshot | null>(null);
+  const [defaultScope, setDefaultScope] = useState<string | null>(null);
+  const [applyDefault, setApplyDefault] = useState(false);
+  const [scopeChanges, setScopeChanges] = useState<ScopeChange[]>([]);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [scopeLabels, setScopeLabels] = useState<Record<string, string>>({});
+  const [conflict, setConflict] = useState(false);
+  const [draftPreview, setDraftPreview] = useState<AuthorizationPreview | null>(null);
   const loadRequest = useRef(0);
+  const reviewedDraft = useRef<AuthorizationDraft | null>(null);
 
   const capabilityView = useMemo(() => splitCapabilityGroupsForPrimaryView(groups), [groups]);
   const primaryCodes = useMemo(
@@ -68,8 +84,61 @@ export default function CapabilityRoleEditor({
       ),
     [capabilityView.primaryGroups],
   );
+  // Editing projection only. The server validates grants and scopes again before preview/save.
+  const projectedMatrix = useMemo(() => {
+    if (!matrix) return null;
+    const current = new Set(
+      matrix.modules.flatMap((m) =>
+        m.resources.flatMap((r) => r.actions.filter((a) => a.granted).map((a) => a.code)),
+      ),
+    );
+    const caps = groups.flatMap((g) => g.capabilities).filter((c) => !c.conventionDerived);
+    const desired = new Set(
+      caps.filter((c) => selected.includes(c.code)).flatMap((c) => c.includes),
+    );
+    const revokable = new Set(
+      caps
+        .filter(
+          (c) => c.includes.every((code) => current.has(code)) || revokedPartial.includes(c.code),
+        )
+        .flatMap((c) => c.includes),
+    );
+    return {
+      modules: matrix.modules.map((module) => ({
+        ...module,
+        resources: module.resources.map((resource) => ({
+          ...resource,
+          actions: resource.actions.map((action) => {
+            const granted =
+              desired.has(action.code) || (current.has(action.code) && !revokable.has(action.code));
+            const staged = scopeChanges.find(
+              (c) => c.resourceCode === resource.resourceCode && c.actionCode === action.action,
+            );
+            return {
+              ...action,
+              granted,
+              scopeType:
+                staged?.scopeType ??
+                (applyDefault || (granted && !action.granted) ? defaultScope : action.scopeType),
+            };
+          }),
+        })),
+      })),
+    };
+  }, [matrix, groups, selected, revokedPartial, scopeChanges, applyDefault, defaultScope]);
+  const activeScopeChanges = scopeChanges.filter((change) =>
+    projectedMatrix?.modules.some((module) =>
+      module.resources.some(
+        (resource) =>
+          resource.resourceCode === change.resourceCode &&
+          resource.actions.some((action) => action.action === change.actionCode && action.granted),
+      ),
+    ),
+  );
+  const defaultChanged =
+    defaultScope !== (baselineSnapshot?.defaultScopeType ?? null) || applyDefault;
   const scopeConfigurableCodes = useMemo(() => {
-    const actions = (matrix?.modules ?? [])
+    const actions = (projectedMatrix?.modules ?? [])
       .flatMap((module) => module.resources.flatMap((resource) => resource.actions))
       .filter(
         (action) =>
@@ -81,49 +150,68 @@ export default function CapabilityRoleEditor({
         .filter((cap) => actions.some((action) => cap.includes.includes(action.code)))
         .map((cap) => cap.code),
     );
-  }, [matrix, capabilityView.primaryGroups]);
+  }, [projectedMatrix, capabilityView.primaryGroups]);
   const primarySelected = selected.filter((code) => primaryCodes.has(code));
-  const dirty = isDirty(capabilityView.primaryGroups, primarySelected) || revokedPartial.length > 0;
+  const dirty =
+    isDirty(capabilityView.primaryGroups, primarySelected) ||
+    revokedPartial.length > 0 ||
+    defaultChanged ||
+    activeScopeChanges.length > 0;
   useEffect(() => {
-    onDirtyChange?.(dirty || saving || previewLoading || scopeUpdating || scopeCapability !== null);
-  }, [dirty, saving, previewLoading, scopeUpdating, scopeCapability, onDirtyChange]);
+    onDirtyChange?.(dirty || saving || previewLoading || scopeCapability !== null || scopeOpen);
+  }, [dirty, saving, previewLoading, scopeCapability, scopeOpen, onDirtyChange]);
 
-  const loadMatrix = useCallback(async () => {
-    const data = await permissionService.getMatrixForRole(rolePid);
+  const acceptSnapshot = useCallback((snapshot: AuthorizationSnapshot) => {
+    const data = draftMatrix(snapshot.matrix);
+    reviewedDraft.current = null;
+    setBaselineSnapshot(snapshot);
+    setDefaultScope(snapshot.defaultScopeType);
+    setApplyDefault(false);
+    setScopeChanges([]);
+    setScopeLabels({});
+    setConflict(false);
+    setDraftPreview(null);
+    setRevokedPartial([]);
+    setGroups(snapshot.groups);
+    setSelected(
+      grantedCapabilityCodes(snapshot.groups).filter((code) =>
+        snapshot.groups.some((group) =>
+          group.capabilities.some((cap) => cap.code === code && !cap.conventionDerived),
+        ),
+      ),
+    );
     setMatrix(data);
-    return data;
-  }, [rolePid]);
+  }, []);
+  const requestBody = (): AuthorizationDraft => ({
+    expectedRevision: baselineSnapshot?.revision ?? '',
+    selectedCapabilityCodes: primarySelected,
+    revokedPartialCapabilityCodes: revokedPartial,
+    defaultScopeChanged: defaultChanged,
+    defaultScopeType: defaultChanged ? defaultScope : null,
+    applyDefaultToCurrentGrants: applyDefault,
+    scopeChanges: activeScopeChanges,
+  });
 
   const load = useCallback(async () => {
     const request = ++loadRequest.current;
     setLoading(true);
     setLoadError(false);
     setScopeCapability(null);
+    setScopeOpen(false);
     setRevokedPartial([]);
     setPreview(false);
     setPreviewPlan(null);
     try {
-      const [fetched, data] = await Promise.all([
-        capabilityService.getForRole(rolePid),
-        permissionService.getMatrixForRole(rolePid),
-      ]);
-      // StrictMode can launch two reads. Only the current initialization may seed a draft.
+      const snapshot = await authorizationDraftService.read(rolePid);
+      // StrictMode and role switches cannot seed a draft from an obsolete response.
       if (request !== loadRequest.current) return;
-      setGroups(fetched);
-      setSelected(
-        grantedCapabilityCodes(fetched).filter((code) =>
-          fetched.some((group) =>
-            group.capabilities.some((cap) => cap.code === code && !cap.conventionDerived),
-          ),
-        ),
-      );
-      setMatrix(data);
+      acceptSnapshot(snapshot);
     } catch {
       if (request === loadRequest.current) setLoadError(true);
     } finally {
       if (request === loadRequest.current) setLoading(false);
     }
-  }, [rolePid, readOnly, scopeReadOnly]);
+  }, [rolePid, readOnly, scopeReadOnly, acceptSnapshot]);
 
   useEffect(() => {
     void load();
@@ -156,66 +244,45 @@ export default function CapabilityRoleEditor({
     [capabilityView.primaryGroups, primaryCodes, selected, readOnly],
   );
 
-  const save = useCallback(async () => {
-    if (readOnly) return;
+  const save = async () => {
+    if (readOnly || !baselineSnapshot || conflict || !reviewedDraft.current) return;
     setSaving(true);
-    let submitted = false;
+    const request = loadRequest.current;
     try {
-      const refreshed = await (revokedPartial.length
-        ? capabilityService.applySelection(rolePid, primarySelected, undefined, revokedPartial)
-        : capabilityService.applySelection(rolePid, primarySelected));
-      submitted = true;
-      const refreshedMatrix = await permissionService.getMatrixForRole(rolePid);
-      setGroups(refreshed);
-      setRevokedPartial([]);
-      setSelected(
-        grantedCapabilityCodes(refreshed).filter((code) =>
-          refreshed.some((group) =>
-            group.capabilities.some((cap) => cap.code === code && !cap.conventionDerived),
-          ),
-        ),
-      );
-      // capability grants change the underlying atomic codes (and inherit the role default scope) —
-      // keep ③ in sync.
-      setMatrix(refreshedMatrix);
+      const snapshot = await authorizationDraftService.save(rolePid, reviewedDraft.current);
+      if (request !== loadRequest.current) return;
+      acceptSnapshot(snapshot);
       showSuccessToast(t('common.saveSuccess', undefined, 'Saved'));
-    } catch {
-      if (submitted) setLoadError(true);
+    } catch (error) {
+      if (request !== loadRequest.current) return;
+      if (error instanceof AuthorizationConflict) setConflict(true);
       showErrorToast(
-        submitted
-          ? t(
-              'admin.permission.editor.readbackErrorV2',
-              undefined,
-              'Permissions were saved, but the result could not be loaded. Reload before continuing.',
-            )
-          : t('common.saveError', undefined, 'Save failed'),
+        t(
+          'admin.permission.editor.draftSaveError',
+          undefined,
+          'Could not confirm the save. Your draft is preserved; reload to check the current configuration.',
+        ),
       );
     } finally {
       setSaving(false);
     }
-  }, [
-    rolePid,
-    selected,
-    primarySelected,
-    revokedPartial,
-    showSuccessToast,
-    showErrorToast,
-    t,
-    readOnly,
-  ]);
+  };
 
   const reviewChanges = async () => {
-    if (readOnly || !dirty || saving || previewLoading) return;
+    if (readOnly || !dirty || saving || previewLoading || conflict) return;
     setPreviewLoading(true);
     const request = loadRequest.current;
     try {
-      const plan = await (revokedPartial.length
-        ? capabilityService.previewSelection(rolePid, primarySelected, revokedPartial)
-        : capabilityService.previewSelection(rolePid, primarySelected));
+      const body = requestBody();
+      const plan = await authorizationDraftService.preview(rolePid, body);
       if (request !== loadRequest.current) return;
-      setPreviewPlan(plan);
+      reviewedDraft.current = body;
+      setPreviewPlan(plan.capabilities);
+      setDraftPreview(plan);
       setPreview(true);
-    } catch {
+    } catch (error) {
+      if (request !== loadRequest.current) return;
+      if (error instanceof AuthorizationConflict) setConflict(true);
       showErrorToast(
         t(
           'admin.permission.editor.previewErrorV2',
@@ -411,6 +478,40 @@ export default function CapabilityRoleEditor({
           </ul>
         </div>
       </details>
+      {draftPreview?.defaultScopeChanged && (
+        <p data-testid="draft-preview-default">
+          {t('admin.permission.scope.default', undefined, 'Role default')}:{' '}
+          {t(
+            scopeOption(draftPreview.defaultScopeType).labelKey,
+            undefined,
+            scopeOption(draftPreview.defaultScopeType).labelFallback,
+          )}
+          {draftPreview.applyDefaultToCurrentGrants &&
+            ` · ${t('admin.permission.scope.applyCurrentDraft', undefined, 'Also apply to current grants')}`}
+        </p>
+      )}
+      {(draftPreview?.scopeChanges.length ?? 0) > 0 && (
+        <div data-testid="draft-preview-scopes">
+          <p>
+            {t(
+              'admin.permission.editor.scopeChangeCount',
+              { count: draftPreview?.scopeChanges.length },
+              `${draftPreview?.scopeChanges.length} record scope overrides`,
+            )}
+          </p>
+          <ul className="mt-2 space-y-1">
+            {draftPreview?.scopeChanges.map((change, index) => {
+              const scope = scopeOption(change.scopeType);
+              return (
+                <li key={index}>
+                  {scopeLabels[`${change.resourceCode}:${change.actionCode}`]}:{' '}
+                  {t(scope.labelKey, undefined, scope.labelFallback)}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       <p className="text-text-3">
         {t(
           'admin.permission.editor.roleLocalV2',
@@ -431,12 +532,40 @@ export default function CapabilityRoleEditor({
     >
       {/* ② data scope */}
       <DataScopeBar
-        rolePid={rolePid}
-        matrix={matrix}
-        onScopeApplied={loadMatrix}
-        disabled={scopeReadOnly || dirty || saving || previewLoading || scopeUpdating}
+        matrix={projectedMatrix}
+        defaultScope={defaultScope}
+        applyToCurrent={applyDefault}
+        onOpenChange={setScopeOpen}
+        onStage={(scope, applyCurrent) => {
+          setDefaultScope(scope);
+          setApplyDefault(applyCurrent);
+        }}
+        disabled={scopeReadOnly || saving || previewLoading || conflict}
       />
 
+      {conflict && (
+        <div
+          role="alert"
+          data-testid="authorization-conflict"
+          className="rounded-card border border-amber-300 p-3 text-sm"
+        >
+          <p>
+            {t(
+              'admin.permission.editor.conflictDraft',
+              undefined,
+              'Authorization configuration changed. Your draft is preserved and cannot overwrite the newer version.',
+            )}
+          </p>
+          <button
+            type="button"
+            data-testid="authorization-reload"
+            onClick={() => void load()}
+            className="text-accent mt-2 underline"
+          >
+            {t('admin.permission.editor.reloadDraft', undefined, 'Discard draft and reload')}
+          </button>
+        </div>
+      )}
       {/* ① business capabilities (primary) */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -484,7 +613,7 @@ export default function CapabilityRoleEditor({
               type="button"
               data-testid={`capability-preset-${p.tier}`}
               onClick={() => applyPreset(p.tier)}
-              disabled={readOnly || saving || previewLoading || scopeUpdating}
+              disabled={readOnly || saving || previewLoading}
               className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 hover:bg-gray-50"
             >
               {p.label}
@@ -501,9 +630,9 @@ export default function CapabilityRoleEditor({
             setSelected((current) => current.filter((item) => item !== code));
             setRevokedPartial((current) => toggleCapability(current, code));
           }}
-          onConfigureScope={scopeReadOnly || dirty ? undefined : setScopeCapability}
+          onConfigureScope={scopeReadOnly || conflict ? undefined : setScopeCapability}
           scopeConfigurableCodes={scopeConfigurableCodes}
-          disabled={readOnly || saving || previewLoading || scopeUpdating}
+          disabled={readOnly || saving || previewLoading}
         />
         {filteredGroups.length === 0 && (
           <p data-testid="capability-search-empty" className="text-text-2 py-4 text-sm">
@@ -516,9 +645,9 @@ export default function CapabilityRoleEditor({
             className="rounded-card border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
           >
             {t(
-              'admin.permission.editor.draftV2',
-              { count: changes.length },
-              `${changes.length} pending changes. Save or discard before editing record scope.`,
+              'admin.permission.editor.jointDraft',
+              { count: changes.length, scopes: activeScopeChanges.length },
+              `${changes.length} duty changes and ${activeScopeChanges.length} record scope overrides pending. Review and save together.`,
             )}
           </div>
         )}
@@ -530,8 +659,8 @@ export default function CapabilityRoleEditor({
                 data-testid="capability-discard"
                 disabled={saving}
                 onClick={() => {
-                  setSelected(grantedCapabilityCodes(capabilityView.primaryGroups));
-                  setRevokedPartial([]);
+                  if (conflict) void load();
+                  else if (baselineSnapshot) acceptSnapshot(baselineSnapshot);
                 }}
                 className="rounded-control border-border text-text-2 h-8 border px-3 text-sm"
               >
@@ -541,7 +670,7 @@ export default function CapabilityRoleEditor({
             <button
               type="button"
               data-testid="capability-save"
-              disabled={readOnly || !dirty || saving || previewLoading}
+              disabled={readOnly || !dirty || saving || previewLoading || conflict}
               onClick={() => void reviewChanges()}
               className="h-8 rounded-md bg-blue-600 px-3 text-sm text-white disabled:opacity-50"
             >
@@ -556,13 +685,23 @@ export default function CapabilityRoleEditor({
       <CapabilityDiagnostics matrix={matrix} groups={groups} />
       {scopeCapability && !scopeReadOnly && (
         <CapabilityScopeSettings
-          rolePid={rolePid}
           capability={scopeCapability}
-          matrix={matrix}
+          matrix={projectedMatrix}
           onClose={() => setScopeCapability(null)}
-          onRefresh={loadMatrix}
-          onBusy={setScopeUpdating}
-          onReadFailure={() => setLoadError(true)}
+          onStage={(changes, labels) => {
+            setScopeLabels((current) => ({ ...current, ...labels }));
+            setScopeChanges((current) => [
+              ...current.filter(
+                (old) =>
+                  !changes.some(
+                    (change) =>
+                      change.resourceCode === old.resourceCode &&
+                      change.actionCode === old.actionCode,
+                  ),
+              ),
+              ...changes,
+            ]);
+          }}
         />
       )}
 

@@ -145,6 +145,10 @@ final class DynamicDataBatchSupport extends BaseMetaService {
                 // Check if record already exists (idempotent behavior)
                 Object primaryKeyValue = data.get(primaryKey.getCode());
                 if (primaryKeyValue != null) {
+                    if (!stripNonWritableFields(modelCode, new LinkedHashMap<>(data)).isEmpty()) {
+                        throw new org.springframework.security.access.AccessDeniedException(
+                                "FIELD_WRITE_DENIED: batch create contains a non-writable field");
+                    }
                     try {
                         Map<String, Object> existingRecord = getById(modelCode, primaryKeyValue.toString());
                         if (existingRecord != null) {
@@ -211,7 +215,9 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             // Validate the complete batch before the first write to share relation lookups.
             Map<String, Object> data = new HashMap<>(input);
             FieldWriterGuard.assertCreateAllowed(model, data);
-            stripNonWritableFields(modelCode, data);
+            if (!stripNonWritableFields(modelCode, data).isEmpty()) {
+                throw new org.springframework.security.access.AccessDeniedException("FIELD_WRITE_DENIED: bulk create contains a non-writable field");
+            }
             payloadTemporalNormalizer.normalize(data, model);
             validationRows.add(data);
 
