@@ -871,6 +871,9 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
       ...tpl.defaults,
       name: t(tpl.nameKey, undefined, tpl.defaults.name),
       description: t(tpl.descriptionKey, undefined, tpl.defaults.description),
+      personality: tpl.id === 'project_delivery'
+        ? t('ai.template.projectDelivery.personality', undefined, tpl.defaults.personality)
+        : tpl.defaults.personality,
       provider: prev.provider,
     }));
     setErrors({});

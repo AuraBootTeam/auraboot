@@ -162,6 +162,18 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   );
   await page.getByTestId('enroll-confirm-btn').click();
   await body(await enrolled);
+  // Administrator fixture configuration is explicit; templates and enrollment grant no roles.
+  const placement = (await body(await page.request.get(`/api/agent/definitions/${agentPid}/org-placement`))).data;
+  const employee = (await body(await page.request.get(`/api/dynamic/org_employee/${placement.employeePid}`))).data;
+  const memberPid = employee.org_emp_member_id;
+  expect(memberPid).toBeTruthy();
+  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual([]);
+  const roles = (await body(await page.request.get('/api/roles/all'))).data;
+  const deliveryRoles = roles.filter((role: { code: string }) => role.code === 'tpm_delivery_manager');
+  expect(deliveryRoles).toHaveLength(1);
+  const rolePids = deliveryRoles.map((role: { pid: string }) => role.pid);
+  await body(await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }));
+  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual(rolePids);
   await page.getByTestId('tab-releases').click();
   await page.getByTestId('publish-agent-release').click();
   const published = page.waitForResponse(
@@ -265,6 +277,7 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
   await page.getByTestId('form-btn-submit').click();
   await body(await persisted);
   expect(await taskRows(page.request, title)).toHaveLength(1);
+  await navigateToMenuByClick(page, ['项目交付', '任务']);
   await page.reload();
   await expect(page.getByRole('row').filter({ hasText: title })).toBeVisible();
   await page.screenshot({ path: join(shots, 'D08-task-saved.png'), fullPage: true });
