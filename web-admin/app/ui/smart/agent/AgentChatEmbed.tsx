@@ -166,7 +166,7 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
 
   if (error || !agent) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4">
+      <div data-testid="agent-chat-unavailable" className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-text-3 text-sm">{error || 'Agent not found'}</p>
         <Link to="/p/c/ai_colleagues" className="text-accent hover:text-accent text-sm font-medium">
           {t('ai.chat.backToColleagues', undefined, 'Back to AI Colleagues')}

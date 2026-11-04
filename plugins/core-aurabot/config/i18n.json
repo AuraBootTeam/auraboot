@@ -841,5 +841,26 @@
     "zh-CN": "无法打开该会话，请确认你仍是会话成员，并重新选择 AI 同事。",
     "en-US": "Conversation unavailable. Confirm your membership and select the colleague again.",
     "refType": "ui"
+  },
+  {
+    "key": "ai.chat.backToColleagues",
+    "source": "import",
+    "zh-CN": "返回 AI 同事",
+    "en-US": "Back to AI Colleagues",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.error.notFound",
+    "source": "import",
+    "zh-CN": "AI 同事不存在或当前不可访问。",
+    "en-US": "AI colleague does not exist or is unavailable.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.error.loadFailed",
+    "source": "import",
+    "zh-CN": "无法读取 AI 同事，请返回后重新选择。",
+    "en-US": "Unable to load the AI colleague. Return and select it again.",
+    "refType": "ui"
   }
 ]
