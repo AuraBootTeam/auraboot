@@ -350,7 +350,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Map<String, Object> data = new LinkedHashMap<>(nextValues);
         stripNonWritableFields(modelCode, data);
         if (data.size() != nextValues.size()) {
-            throw new MetaServiceException("compareAndSet contains a non-writable field");
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: compareAndSet contains a non-writable field");
         }
         for (String nextFieldCode : data.keySet()) {
             if ("row_version".equals(nextFieldCode)) {
@@ -453,7 +453,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Map<String, Object> data = new LinkedHashMap<>(update.nextValues());
             stripNonWritableFields(modelCode, data);
             if (data.size() != update.nextValues().size()) {
-                throw new MetaServiceException("CAS batch contains a non-writable field");
+                throw new AccessDeniedException("FIELD_WRITE_DENIED: CAS batch contains a non-writable field");
             }
             for (String code : data.keySet()) {
                 assertBatchCasField(DynamicDataValueMapper.findFieldDefinition(model, code), code);
@@ -937,8 +937,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         ModelMutationGuard.assertCreateAllowed(model);
         FieldWriterGuard.assertCreateAllowed(model, data);
 
-        // Field-level write permission (gap #1): strip fields the current user may not write
-        stripNonWritableFields(modelCode, data);
+        // A create cannot silently discard an explicitly forbidden initial value.
+        if (!stripNonWritableFields(modelCode, data).isEmpty()) {
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: create contains a non-writable field");
+        }
 
         logOperation("create", modelCode, data.keySet());
 
@@ -1132,7 +1134,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         Set<String> stripped = new LinkedHashSet<>();
         for (String fieldCode : nonWritable) {
-            if (data.remove(fieldCode) != null) {
+            if (data.containsKey(fieldCode)) {
+                data.remove(fieldCode);
                 stripped.add(fieldCode);
                 log.warn("Field-write permission: stripped non-writable field '{}' from {} write by user {}",
                         logSafe(fieldCode), logSafe(modelCode), logSafe(userId));
@@ -1169,7 +1172,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
         if (!denied.isEmpty()) {
-            throw new MetaServiceException("FIELD_WRITE_DENIED: not permitted to change "
+            throw new AccessDeniedException("FIELD_WRITE_DENIED: not permitted to change "
                     + String.join(", ", denied) + " on " + modelCode);
         }
     }

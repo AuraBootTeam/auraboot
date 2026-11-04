@@ -493,7 +493,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         lenient().when(dataPermissionEngine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID))
                 .thenReturn(java.util.Set.of("quantity"));
         assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
-                Map.of("quantity", 25))).isInstanceOf(MetaServiceException.class).hasMessageContaining("non-writable");
+                Map.of("quantity", 25))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessageContaining("non-writable");
         verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
     }
 

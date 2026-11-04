@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 07bf7da8e3d4fae63e5d115f5eb36e7ba7ba5d694a2783971f9a9fb356d385a7
+ * Contract SHA-256: 96736d4485add82888fa84737d477c5b16b93e4dad9cfeddeb585469a99c9485
  */
 export interface paths {
     "/api/activities": {
@@ -38755,6 +38755,7 @@ export interface components {
             capabilities: components["schemas"]["CapabilitySelectionPreview"];
             defaultScopeChanged: boolean;
             defaultScopeType: string | null;
+            fieldPolicies?: components["schemas"]["RoleFieldPolicyPreview"];
             revision: string;
             scopeChanges: components["schemas"]["DataScopeUpdateRequest"][];
         };
@@ -38763,12 +38764,14 @@ export interface components {
             defaultScopeChanged?: boolean;
             defaultScopeType?: string | null;
             expectedRevision: string;
+            fieldPolicyPids?: string[];
             revokedPartialCapabilityCodes?: string[];
             scopeChanges?: components["schemas"]["DataScopeUpdateRequest"][];
             selectedCapabilityCodes: string[];
         };
         RoleAuthorizationDraftSnapshot: {
             defaultScopeType: string | null;
+            fieldPolicies?: components["schemas"]["RoleFieldPolicyView"][];
             groups: components["schemas"]["CapabilityGroup"][];
             matrix: components["schemas"]["PermissionMatrixDTO"];
             revision: string;
@@ -38813,6 +38816,19 @@ export interface components {
             id?: number;
             name?: string;
             type?: string;
+        };
+        RoleFieldPolicyPreview: {
+            added?: components["schemas"]["RoleFieldPolicyView"][];
+            removed?: components["schemas"]["RoleFieldPolicyView"][];
+        };
+        RoleFieldPolicyView: {
+            enabled?: boolean;
+            fieldCode?: string;
+            maskType?: string;
+            modelCode?: string;
+            name?: string;
+            policyPid?: string;
+            policyType?: string;
         };
         RoleMemberDTO: {
             /** Format: date-time */

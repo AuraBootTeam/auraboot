@@ -45457,6 +45457,9 @@
               "null"
             ]
           },
+          "fieldPolicies": {
+            "$ref": "#/components/schemas/RoleFieldPolicyPreview"
+          },
           "revision": {
             "type": "string"
           },
@@ -45495,6 +45498,15 @@
             "minLength": 1,
             "pattern": "[a-f0-9]{64}",
             "type": "string"
+          },
+          "fieldPolicyPids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
           },
           "revokedPartialCapabilityCodes": {
             "items": {
@@ -45536,6 +45548,12 @@
               "string",
               "null"
             ]
+          },
+          "fieldPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
           },
           "groups": {
             "items": {
@@ -45681,6 +45699,49 @@
           },
           "valid": {
             "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "RoleFieldPolicyPreview": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "removed": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RoleFieldPolicyView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "fieldCode": {
+            "type": "string"
+          },
+          "maskType": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "policyPid": {
+            "type": "string"
+          },
+          "policyType": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -111566,6 +111627,10 @@
       "name": "Meta Field Orchestrator"
     },
     {
+      "description": "Atomic role authorization authoring",
+      "name": "Role Authorization Draft"
+    },
+    {
       "description": "User menu tree and menu management APIs",
       "name": "Menu"
     },
@@ -111624,10 +111689,6 @@
     {
       "description": "Chart data aggregate query API",
       "name": "Chart Data"
-    },
-    {
-      "description": "Atomic role authorization authoring",
-      "name": "Role Authorization Draft"
     }
   ]
 }

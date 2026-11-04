@@ -211,7 +211,9 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             // Validate the complete batch before the first write to share relation lookups.
             Map<String, Object> data = new HashMap<>(input);
             FieldWriterGuard.assertCreateAllowed(model, data);
-            stripNonWritableFields(modelCode, data);
+            if (!stripNonWritableFields(modelCode, data).isEmpty()) {
+                throw new org.springframework.security.access.AccessDeniedException("FIELD_WRITE_DENIED: bulk create contains a non-writable field");
+            }
             payloadTemporalNormalizer.normalize(data, model);
             validationRows.add(data);
 

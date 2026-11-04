@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline;
 
 import com.auraboot.framework.meta.service.impl.pipeline.phases.AssertPhase;
+import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandInputFieldAuthorizationPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.AutoSetPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandAuthorizationPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandInvocationAuthorizationPhase;
@@ -45,6 +46,7 @@ class CommandPipelinePhaseOrderTest {
             CommandInvocationAuthorizationPhase.class,
             CommandTargetScopePhase.class,
             SchemaValidatePhase.class,
+            CommandInputFieldAuthorizationPhase.class,
             EntitlementPhase.class,
             SodCheckPhase.class,
             CommandSubjectAcknowledgementPhase.class,
@@ -62,6 +64,33 @@ class CommandPipelinePhaseOrderTest {
             PostExecutionPhase.class,
             CompletionPhase.class
     );
+
+    @Test void everyProductionPhaseMustBeExplicitlyWired() {
+        var scanner = new org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new org.springframework.core.type.filter.AssignableTypeFilter(CommandPhase.class));
+        var discovered = scanner.findCandidateComponents("com.auraboot.framework.meta.service.impl.pipeline.phases")
+                .stream().map(bean -> bean.getBeanClassName()).toList();
+        assertThat(CONFIGURED_ORDER.stream().map(Class::getName).toList()).containsExactlyInAnyOrderElementsOf(discovered);
+    }
+
+    @Test void forbiddenInputStopsTheConfiguredPipelineBeforeCachedOutcomeLookup() throws Exception {
+        var policies = org.mockito.Mockito.mock(com.auraboot.framework.meta.service.DataPermissionEngine.class);
+        org.mockito.Mockito.when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(java.util.Set.of("cost"));
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L,20L,"actor","Actor");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(30L);
+        try {
+            var instances = CONFIGURED_ORDER.stream().map(type -> type == CommandInputFieldAuthorizationPhase.class
+                    ? (CommandPhase)new CommandInputFieldAuthorizationPhase(policies) : (CommandPhase)mock(type)).toList();
+            var factory = CommandPipelineConfiguration.class.getDeclaredMethod("commandPipeline", CONFIGURED_ORDER.toArray(Class[]::new));
+            var pipeline = (CommandPipeline)factory.invoke(new CommandPipelineConfiguration(), instances.toArray());
+            var command = new com.auraboot.framework.meta.entity.CommandDefinition(); command.setModelCode("orders");
+            var context = CommandPipelineContext.builder().command(command).payload(java.util.Map.of("cost",99)).build();
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> pipeline.executePreGuardPhases(context))
+                    .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+            org.mockito.Mockito.verify(instances.get(CONFIGURED_ORDER.indexOf(IdempotencyPhase.class)),org.mockito.Mockito.never())
+                    .execute(org.mockito.ArgumentMatchers.any());
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+    }
 
     @Test
     void orderAnnotationsDescribeTheAuthoritativePipelineSequence() throws Exception {

@@ -1,6 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
-import com.auraboot.framework.meta.exception.MetaServiceException;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -49,7 +49,7 @@ class DeniedFieldWriteVisibilityTest {
     @Test
     @DisplayName("changing a field you may not write is refused out loud")
     void realDenialIsVisible() {
-        MetaServiceException ex = assertThrows(MetaServiceException.class, () ->
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () ->
                 DynamicDataServiceImpl.assertNoDeniedFieldWrites(
                         MODEL, submitted("cost_price", 999), stripped("cost_price"), stored()));
 
@@ -80,7 +80,7 @@ class DeniedFieldWriteVisibilityTest {
     @Test
     @DisplayName("every denied field is named, not just the first")
     void allDeniedFieldsAreNamed() {
-        MetaServiceException ex = assertThrows(MetaServiceException.class, () ->
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () ->
                 DynamicDataServiceImpl.assertNoDeniedFieldWrites(
                         MODEL,
                         submitted("cost_price", 999, "discount_rate", 50),
@@ -118,7 +118,7 @@ class DeniedFieldWriteVisibilityTest {
         Map<String, Object> row = stored();
         row.put("cost_price", null);
 
-        assertThrows(MetaServiceException.class, () ->
+        assertThrows(AccessDeniedException.class, () ->
                 DynamicDataServiceImpl.assertNoDeniedFieldWrites(
                         MODEL, submitted("cost_price", 999), stripped("cost_price"), row));
     }

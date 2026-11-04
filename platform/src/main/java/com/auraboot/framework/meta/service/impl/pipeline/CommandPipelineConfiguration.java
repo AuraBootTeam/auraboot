@@ -21,6 +21,7 @@ public class CommandPipelineConfiguration {
             CommandInvocationAuthorizationPhase commandInvocationAuthorizationPhase,
             CommandTargetScopePhase commandTargetScopePhase,
             SchemaValidatePhase schemaValidatePhase,
+            CommandInputFieldAuthorizationPhase inputFieldAuthorizationPhase,
             EntitlementPhase entitlementPhase,
             // Guarded phases (Order 500-1400)
             SodCheckPhase sodCheckPhase,
@@ -45,6 +46,7 @@ public class CommandPipelineConfiguration {
                 commandInvocationAuthorizationPhase,
                 commandTargetScopePhase,
                 schemaValidatePhase,
+                inputFieldAuthorizationPhase,
                 entitlementPhase
         );
 
