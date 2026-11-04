@@ -136,8 +136,8 @@
     "en-US": "Succeeded"
   },
   "incompleteFailed": {
-    "zh-CN": "未完成 / 执行失败",
-    "en-US": "Incomplete / failed"
+    "zh-CN": "未完成",
+    "en-US": "Incomplete"
   },
   "version2": {
     "zh-CN": "版本 {value1}",

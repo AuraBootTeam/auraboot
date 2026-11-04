@@ -284,12 +284,14 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     await confirmation.getByTestId('aurabot-confirm-approve').click();
     const receipt = await denied;
     expect(receipt.ok()).toBe(true);
-    expect(await receipt.text()).toMatch(/permission|denied|revoked|权限|无权/i);
+    const refusalStream = await receipt.text();
+    expect(refusalStream).toContain('TOOL_ACCESS_DENIED');
+    expect(refusalStream).toMatch(/permission|denied|revoked|权限|无权/i);
     await expect(chat).toContainText(/操作未完成|未完成|创建.*失败|无权|权限/);
     expect(await taskRows(page.request, title)).toHaveLength(0);
     expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
-    await expect(chat.getByText(/人工确认不会授予权限/)).toBeVisible();
-    await chat.getByText(/人工确认不会授予权限/).scrollIntoViewIfNeeded();
+    await expect(chat.getByText(/确认审批不会补授权限/)).toBeVisible();
+    await chat.getByText(/确认审批不会补授权限/).scrollIntoViewIfNeeded();
     await page.screenshot({
       animations: 'disabled',
       path: join(shots, 'D10-revoked-before-confirmation.png'),
