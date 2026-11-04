@@ -1,13 +1,16 @@
 /**
- * Unit tests for DagCanvasBlockRenderer.
+ * Unit tests for the dag-canvas delivery DAG derivation + card.
  *
- * Test plan:
- *   smoke-linear:      status progression drives complete/current/upcoming states
- *   gate-hidden:       a conditional gate node with unmatched values is skipped
- *   gate-shown-done:   a matched gate node with its doneValue renders complete
- *   gate-shown-active: a matched gate node without doneValue renders current
- *   terminal-pill:     a matching terminal record value renders the terminal pill
- *   no-nodes:          an empty node list renders nothing
+ * Test plan (deriveDeliveryNodeStatuses — pure):
+ *   ladder-complete:  doneStatuses mark nodes complete
+ *   ladder-running:   runningStatuses mark nodes running
+ *   ladder-failed:    failedStatuses win over doneStatuses
+ *   gate-skip:        an unmatched whenField marks the node skipped
+ *   gate-pass:        a matched whenField node follows its own ladder
+ *   always-complete:  unconditional fact nodes are complete
+ *
+ * Card smoke (React Flow mocked):
+ *   renders the canvas card and passes the derived status map down
  */
 
 import React from 'react'
@@ -15,7 +18,57 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime'
 import type { BlockConfig } from '~/framework/meta/schemas/types'
-import { DagCanvasBlockRenderer } from '../DagCanvasBlockRenderer'
+
+const statusMapSpy = vi.fn()
+
+vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
+  FlowCanvas: ({ className }: { className?: string }) => (
+    <div data-testid="flow-canvas" className={className} />
+  ),
+  NodeRuntimeStatusProvider: ({
+    statuses,
+    children,
+  }: {
+    statuses: Record<string, string>
+    children: React.ReactNode
+  }) => {
+    statusMapSpy(statuses)
+    return <div data-testid="status-provider">{children}</div>
+  },
+  useFlowStore: () => (data: unknown) => {
+    void data
+  },
+}))
+
+import { DagCanvasBlockRenderer, deriveDeliveryNodeStatuses } from '../DagCanvasBlockRenderer'
+
+const nodes = [
+  { key: 'register', label: { 'zh-CN': '登记' }, alwaysComplete: true },
+  {
+    key: 'approval',
+    label: { 'zh-CN': '审批门' },
+    whenField: 'approval',
+    whenValues: ['pending', 'approved'],
+    doneField: 'approval',
+    doneValue: 'approved',
+  },
+  {
+    key: 'migration',
+    label: { 'zh-CN': '迁移' },
+    whenField: 'migration_summary',
+    whenValues: ['present'],
+    failedStatuses: ['failed'],
+    runningStatuses: ['applying'],
+    doneStatuses: ['verifying', 'succeeded'],
+  },
+  {
+    key: 'deploy',
+    label: { 'zh-CN': '部署' },
+    failedStatuses: ['failed'],
+    runningStatuses: ['applying'],
+    doneStatuses: ['verifying', 'succeeded'],
+  },
+]
 
 function runtimeWithRecord(record: Record<string, unknown>): SchemaRuntime {
   const context = {
@@ -33,115 +86,109 @@ function runtimeWithRecord(record: Record<string, unknown>): SchemaRuntime {
   } as unknown as SchemaRuntime
 }
 
-function block(overrides: Record<string, unknown> = {}): BlockConfig {
+function block(): BlockConfig {
   return {
     id: 'delivery',
     blockType: 'dag-canvas',
     title: { 'zh-CN': '交付 DAG' },
-    stageField: 'status',
-    stageOrder: ['planned', 'applying', 'verifying', 'succeeded'],
-    nodes: [
-      { key: 'planned', label: { 'zh-CN': '已规划' } },
-      { key: 'applying', label: { 'zh-CN': '执行中' } },
-      { key: 'verifying', label: { 'zh-CN': '验证中' } },
-      { key: 'succeeded', label: { 'zh-CN': '成功' } },
-    ],
-    ...overrides,
+    statusField: 'status',
+    nodes: nodes as never,
+    terminal: [{ field: 'status', value: 'failed', label: { 'zh-CN': '失败' } }],
   } as unknown as BlockConfig
 }
 
-describe('DagCanvasBlockRenderer', () => {
-  it('smoke-linear: status progression drives complete/current/upcoming states', () => {
-    render(<DagCanvasBlockRenderer block={block()} runtime={runtimeWithRecord({ status: 'verifying' })} />)
-    expect(screen.getByTestId('dag-canvas-node-planned').dataset.nodeState).toBe('complete')
-    expect(screen.getByTestId('dag-canvas-node-applying').dataset.nodeState).toBe('complete')
-    expect(screen.getByTestId('dag-canvas-node-verifying').dataset.nodeState).toBe('current')
-    expect(screen.getByTestId('dag-canvas-node-succeeded').dataset.nodeState).toBe('upcoming')
+describe('deriveDeliveryNodeStatuses', () => {
+  it('ladder-complete: doneStatuses mark nodes complete', () => {
+    const map = deriveDeliveryNodeStatuses(nodes as never, 'status', {
+      status: 'succeeded',
+      approval: 'approved',
+      migration_summary: 'present',
+    })
+    expect(map.register).toBe('completed')
+    expect(map.approval).toBe('completed')
+    expect(map.migration).toBe('completed')
+    expect(map.deploy).toBe('completed')
   })
 
-  it('gate-hidden: a conditional gate node with unmatched values is skipped', () => {
+  it('ladder-running: runningStatuses mark nodes running', () => {
+    const map = deriveDeliveryNodeStatuses(nodes as never, 'status', {
+      status: 'applying',
+      approval: 'approved',
+      migration_summary: 'present',
+    })
+    expect(map.migration).toBe('running')
+    expect(map.deploy).toBe('running')
+  })
+
+  it('ladder-failed: failedStatuses win over doneStatuses', () => {
+    const map = deriveDeliveryNodeStatuses(nodes as never, 'status', {
+      status: 'failed',
+      approval: 'approved',
+      migration_summary: 'present',
+    })
+    expect(map.migration).toBe('failed')
+    expect(map.deploy).toBe('failed')
+  })
+
+  it('gate-skip: an unmatched whenField marks the node skipped', () => {
+    const map = deriveDeliveryNodeStatuses(nodes as never, 'status', {
+      status: 'succeeded',
+      approval: '',
+      migration_summary: '',
+    })
+    expect(map.approval).toBe('skipped')
+    expect(map.migration).toBe('skipped')
+  })
+
+  it('gate-pass: a matched whenField node follows its own ladder', () => {
+    const map = deriveDeliveryNodeStatuses(nodes as never, 'status', {
+      status: 'verifying',
+      approval: 'pending',
+      migration_summary: 'present',
+    })
+    // 'verifying' is not in approval's doneStatuses; approval falls to pending
+    expect(map.approval).toBe('pending')
+    expect(map.migration).toBe('completed')
+  })
+
+  it('always-complete: unconditional fact nodes are complete', () => {
+    const map = deriveDeliveryNodeStatuses(nodes as never, 'status', { status: 'planned' })
+    expect(map.register).toBe('completed')
+  })
+})
+
+describe('DagCanvasBlockRenderer card', () => {
+  it('renders the canvas card and passes the derived status map down', () => {
+    statusMapSpy.mockClear()
     render(
       <DagCanvasBlockRenderer
-        block={block({
-          nodes: [
-            { key: 'planned', label: { 'zh-CN': '已规划' } },
-            {
-              key: 'migration',
-              label: { 'zh-CN': '迁移' },
-              when: { field: 'migration_summary', values: ['sha256:abc'] },
-            },
-            { key: 'succeeded', label: { 'zh-CN': '成功' } },
-          ],
+        block={block()}
+        runtime={runtimeWithRecord({
+          status: 'succeeded',
+          approval: 'approved',
+          migration_summary: 'present',
         })}
-        runtime={runtimeWithRecord({ status: 'succeeded', migration_summary: '' })}
       />,
     )
-    const node = screen.getByTestId('dag-canvas-node-migration')
-    expect(node.dataset.nodeState).toBe('skipped')
+    expect(screen.getByTestId('flow-canvas')).toBeDefined()
+    expect(screen.queryByTestId('dag-canvas-terminal')).toBeNull()
+    const last = statusMapSpy.mock.calls.at(-1)?.[0] as Record<string, string>
+    expect(last.register).toBe('completed')
+    expect(last.approval).toBe('completed')
+    expect(last.migration).toBe('completed')
   })
 
-  it('gate-shown-done: a matched gate node with its doneValue renders complete', () => {
+  it('renders the terminal pill on failed runs', () => {
     render(
       <DagCanvasBlockRenderer
-        block={block({
-          nodes: [
-            { key: 'planned', label: { 'zh-CN': '已规划' } },
-            {
-              key: 'approval',
-              label: { 'zh-CN': '审批门' },
-              when: { field: 'approval', values: ['pending', 'approved'] },
-              doneField: 'approval',
-              doneValue: 'approved',
-              activeField: 'approval',
-              activeValue: 'pending',
-            },
-            { key: 'succeeded', label: { 'zh-CN': '成功' } },
-          ],
+        block={block()}
+        runtime={runtimeWithRecord({
+          status: 'failed',
+          approval: 'approved',
+          migration_summary: 'present',
         })}
-        runtime={runtimeWithRecord({ status: 'succeeded', approval: 'approved' })}
-      />,
-    )
-    expect(screen.getByTestId('dag-canvas-node-approval').dataset.nodeState).toBe('complete')
-  })
-
-  it('gate-shown-active: a matched gate node without doneValue renders current', () => {
-    render(
-      <DagCanvasBlockRenderer
-        block={block({
-          nodes: [
-            { key: 'planned', label: { 'zh-CN': '已规划' } },
-            {
-              key: 'approval',
-              label: { 'zh-CN': '审批门' },
-              when: { field: 'approval', values: ['pending', 'approved'] },
-              activeField: 'approval',
-              activeValue: 'pending',
-            },
-            { key: 'succeeded', label: { 'zh-CN': '成功' } },
-          ],
-        })}
-        runtime={runtimeWithRecord({ status: 'succeeded', approval: 'pending' })}
-      />,
-    )
-    expect(screen.getByTestId('dag-canvas-node-approval').dataset.nodeState).toBe('current')
-  })
-
-  it('terminal-pill: a matching terminal record value renders the terminal pill', () => {
-    render(
-      <DagCanvasBlockRenderer
-        block={block({
-          terminal: [{ field: 'status', value: 'failed', label: { 'zh-CN': '失败' } }],
-        })}
-        runtime={runtimeWithRecord({ status: 'failed' })}
       />,
     )
     expect(screen.getByTestId('dag-canvas-terminal').textContent).toBe('失败')
-  })
-
-  it('no-nodes: an empty node list renders nothing', () => {
-    const { container } = render(
-      <DagCanvasBlockRenderer block={block({ nodes: [] })} runtime={runtimeWithRecord({})} />,
-    )
-    expect(container.querySelector('[data-testid^="dag-canvas-"]')).toBeNull()
   })
 })
