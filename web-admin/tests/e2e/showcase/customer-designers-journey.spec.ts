@@ -289,6 +289,44 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await expect(page).toHaveURL(listUrl);
   await expect(row).toBeVisible();
 
+  // Refine the generated page through its Schema inspector, then verify the
+  // actual runtime rather than accepting a successful designer save as proof.
+  const formResource = generationBody.data.generatedResources.pages.find(
+    (resource: { kind: string }) => resource.kind === 'form',
+  );
+  expect(formResource?.pid).toMatch(/^[0-9A-Z]{26}$/);
+  await menu(page, '页面配置');
+  await page.getByTestId('list-search-input').fill(`${code}_form`);
+  await page.getByTestId('list-search-input').press('Enter');
+  await page.locator('tr').filter({ hasText: `${code}_form` })
+    .getByText('统一设计器', { exact: true }).click();
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+  await page.getByTestId(`outline-item-block_${code}_form`).click();
+  const sectionTitle = page.getByTestId('inspector-field-title');
+  await sectionTitle.fill('客户商机与跟进信息');
+  await screenshot(page, info, 'SC02-schema-title-adjustment');
+  const saveGeneratedForm = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === `/api/pages/${formResource.pid}`
+      && response.request().method() === 'PUT',
+  );
+  await page.getByTestId('designer-save').click();
+  expect(String((await (await saveGeneratedForm).json()).code)).toBe('0');
+  await page.reload();
+  await page.getByTestId(`outline-item-block_${code}_form`).click();
+  await expect(sectionTitle).toHaveValue('客户商机与跟进信息');
+  await screenshot(page, info, 'SC02-schema-saved-reopened');
+  const savedForm = (await (await page.request.get(`/api/pages/${formResource.pid}`)).json()).data;
+  expect(savedForm.schemaVersion).toBe(4);
+  expect(savedForm.blocks.find((block: { id: string }) => block.id === `block_${code}_form`).title)
+    .toMatchObject({ 'zh-CN': '客户商机与跟进信息' });
+  await page.goto(`${listUrl}/edit/${recordPid}`);
+  await expect(page.getByText('客户商机与跟进信息', { exact: true })).toBeVisible();
+  await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(customerName);
+  await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('68000');
+  await screenshot(page, info, 'SC02-schema-adjusted-runtime');
+  await page.getByTestId('form-btn-cancel').click();
+  await expect(page).toHaveURL(listUrl);
+
   // Provision a task-owned read-only role. API use here is setup and a negative
   // authorization probe; the successful create/update path above is browser-only.
   const authorIdentityResponse = await page.request.get('/api/auth/me');

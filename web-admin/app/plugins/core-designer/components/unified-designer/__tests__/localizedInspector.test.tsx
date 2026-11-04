@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ locale: 'zh-CN' }));
+const state = vi.hoisted(() => ({ locale: 'zh-CN', titleType: 'text' }));
 vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({ locale: state.locale, t: (key: string) => key }),
 }));
@@ -11,13 +11,14 @@ vi.mock('~/shared/services/http-client', () => ({
 }));
 vi.mock('../inspector/schemas', () => ({
   getInspectorFields: () => [
-    { key: 'title', label: 'Title', type: 'text' },
+    { key: 'title', label: 'Title', type: state.titleType },
     { key: 'description', label: 'Description', type: 'textarea' },
   ],
 }));
 
 import { SchemaInspector } from '../inspector/SchemaInspector';
 import type { DslBlockV3 } from '../types';
+import { createDefaultInspectorSchemaRegistry } from '../registry/InspectorSchemaRegistry';
 
 function Harness({ initial, onUpdate }: { initial: Record<string, unknown>; onUpdate: (path: string, value: unknown) => void }) {
   const [block, setBlock] = useState({ id: 'section', blockType: 'detail-section', ...initial });
@@ -28,7 +29,24 @@ function Harness({ initial, onUpdate }: { initial: Record<string, unknown>; onUp
 }
 
 describe('localized inspector authoring', () => {
-  beforeEach(() => { state.locale = 'zh-CN'; });
+  beforeEach(() => { state.locale = 'zh-CN'; state.titleType = 'text'; });
+
+  it('declares generated section titles as localized text in the real schema registry', () => {
+    const registry = createDefaultInspectorSchemaRegistry();
+    for (const blockType of ['form', 'form-section', 'detail-section']) {
+      expect(registry.getFields(blockType).find((field) => field.key === 'title')?.type).toBe('localizedText');
+    }
+  });
+
+  it.each([undefined, '', 'Original English'])('creates a locale map for a schema-declared localized title starting at %s', (title) => {
+    state.titleType = 'localizedText';
+    const onUpdate = vi.fn();
+    render(<Harness initial={{ title }} onUpdate={onUpdate} />);
+    fireEvent.change(screen.getByTestId('inspector-field-title'), { target: { value: '客户商机与跟进信息' } });
+    expect(onUpdate).toHaveBeenLastCalledWith('title', { 'zh-CN': '客户商机与跟进信息' });
+    fireEvent.change(screen.getByTestId('inspector-field-title'), { target: { value: '' } });
+    expect(onUpdate).toHaveBeenLastCalledWith('title', { 'zh-CN': '' });
+  });
 
   it('edits the current language while retaining other languages for text and textarea', () => {
     const onUpdate = vi.fn();
