@@ -28,8 +28,7 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
     @Override public String name() { return "input_field_authorization"; }
 
     @Override public void execute(CommandPipelineContext context) {
-        if (context.getCommand() == null
-                || context.getPayload() == null || context.getPayload().isEmpty()) return;
+        if (context.getCommand() == null || submittedKeys(context).isEmpty()) return;
         // Machine and installed invocations use their separately verified writable-field contracts.
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
@@ -38,7 +37,7 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
         if (StringUtils.hasText(rootModel)) {
             var restricted = policies.getNonWritableFields(MetaContext.getCurrentTenantId(),
                     rootModel, MetaContext.getCurrentUserId());
-            if (restricted != null && context.getPayload().keySet().stream().anyMatch(restricted::contains)) deny();
+            if (restricted != null && submittedKeys(context).stream().anyMatch(restricted::contains)) deny();
         }
         var authorization = new FieldWriteAuthorizationSupport(metadata, fields, policies);
         for (var write : mappedInputs(context).entrySet()) {
@@ -48,11 +47,12 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
 
     private Map<String, Set<String>> mappedInputs(CommandPipelineContext context) {
         Map<String, Set<String>> result = new LinkedHashMap<>();
+        Set<String> submitted = submittedKeys(context);
         var mappings = context.getRulesByType().getOrDefault("field_map", List.of());
         if (!mappings.isEmpty()) {
             for (var rule : mappings) {
                 if (StringUtils.hasText(rule.getTargetModel()) && StringUtils.hasText(rule.getTargetField())
-                        && StringUtils.hasText(rule.getSourceField()) && context.getPayload().containsKey(rule.getSourceField()))
+                        && StringUtils.hasText(rule.getSourceField()) && submitted.contains(rule.getSourceField()))
                     result.computeIfAbsent(rule.getTargetModel(), ignored -> new LinkedHashSet<>()).add(rule.getTargetField());
             }
             return result;
@@ -74,15 +74,26 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
             for (Object key : inputs) {
                 if (!(key instanceof String field) || field.isBlank())
                     throw new BusinessException(ResponseCode.BadParam, "Command inputFields contains an invalid field");
-                if (context.getPayload().containsKey(field)) keys.add(field);
+                if (submitted.contains(field)) keys.add(field);
             }
         }
-        if (directWrite && (input == null || ((List<?>) input).isEmpty())) keys.addAll(context.getPayload().keySet());
+        if (directWrite && (input == null || ((List<?>) input).isEmpty())) keys.addAll(submitted);
+        Object autoSet = context.getExecConfig().get("autoSetFields");
+        if (autoSet instanceof Map<?, ?> defaults) {
+            for (Object key : defaults.keySet()) {
+                if (key instanceof String field && submitted.contains(field)) keys.add(field);
+            }
+        }
         if (!keys.isEmpty()) result.put(model, keys);
         return result;
     }
 
     private void deny() {
         throw new BusinessException(ResponseCode.FORBIDDEN, "Command input contains a non-writable field");
+    }
+
+    private Set<String> submittedKeys(CommandPipelineContext context) {
+        if (context.submittedInputKeys() != null) return context.submittedInputKeys();
+        return context.getPayload() == null ? Set.of() : context.getPayload().keySet();
     }
 }

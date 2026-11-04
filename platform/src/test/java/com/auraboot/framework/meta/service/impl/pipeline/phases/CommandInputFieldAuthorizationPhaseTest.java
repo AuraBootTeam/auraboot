@@ -80,4 +80,23 @@ class CommandInputFieldAuthorizationPhaseTest {
         context.setPayload(Map.of("description","approved by operator")); phase.execute(context);
         assertThat(context.getPayload()).containsExactly(Map.entry("description","approved by operator"));
     }
+
+    @Test void submittedAutoSetOverrideIsCheckedEvenOutsideExplicitInputFields() {
+        dsl("orders"); context.captureSubmittedInput(Map.of("cost",99,"description","text"));
+        context.setPayload(Map.of("cost",99,"description","text"));
+        context.setExecConfig(Map.of("type","create","inputFields",List.of("description"),
+                "autoSetFields",Map.of("cost",Map.of("strategy","default_value","value",0,"preserveInput",true))));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+    @Test void ownerInjectedKeysAreNotReclassifiedAsSubmittedFields() {
+        dsl("orders"); context.captureSubmittedInput(Map.of("description","text"));
+        context.setPayload(Map.of("cost",99,"description","text")); context.setExecConfig(Map.of("type","create"));
+        phase.execute(context);
+        assertThat(context.submittedInputKeys()).containsExactly("description");
+    }
+    @Test void removingANormalizedInputCannotEraseItsOriginalEditAttempt() {
+        dsl("orders"); context.captureSubmittedInput(Map.of("cost",99));
+        context.setPayload(Map.of()); context.setExecConfig(Map.of("type","update"));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
 }

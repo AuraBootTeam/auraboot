@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -31,8 +31,9 @@ public class SchemaValidatePhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        ctx.captureSubmittedInput(ctx.getRequest().getPayload());
         Map<String, Object> payload = ctx.getRequest().getPayload() != null
-                ? ctx.getRequest().getPayload() : new HashMap<>();
+                ? new LinkedHashMap<>(ctx.getRequest().getPayload()) : new LinkedHashMap<>();
         ctx.setPayload(payload);
 
         // Temporal normalization — convert date/datetime strings to typed Java objects

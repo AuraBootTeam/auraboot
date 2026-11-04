@@ -14,8 +14,9 @@ import java.util.Map;
 /**
  * Builds the immutable, canonical command intent fenced by an idempotency key.
  *
- * <p>The authenticated actor and command payload are intentionally captured before any
- * normalize/auto-set/computed phase can mutate state. Claim and completion then hash the exact same
+ * <p>The authenticated actor and normalized command payload are captured at the idempotency
+ * claim, before owner auto-set/computed phases can mutate state. Original submitted keys are
+ * separately captured by {@link CommandPipelineContext#captureSubmittedInput(Map)}. Claim and completion then hash the exact same
  * object, so successful execution can never write an outcome under a different actor or intent than
  * the one that entered the handler.</p>
  */

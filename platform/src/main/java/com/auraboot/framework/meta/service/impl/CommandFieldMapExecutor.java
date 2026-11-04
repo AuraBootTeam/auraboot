@@ -52,6 +52,15 @@ public class CommandFieldMapExecutor {
                                               Map<String, Object> payload,
                                               Long tenantId,
                                               CommandExecuteRequest request) {
+        return executeFieldMapPhase(fieldMapRules, payload, tenantId, request, null, null);
+    }
+
+    public Map<String, Object> executeFieldMapPhase(List<BindingRule> fieldMapRules,
+                                              Map<String, Object> payload,
+                                              Long tenantId,
+                                              CommandExecuteRequest request,
+                                              Set<String> submittedInputKeys,
+                                              String commandCode) {
         Map<String, Object> results = new HashMap<>();
 
         // Group rules by target model
@@ -94,7 +103,8 @@ public class CommandFieldMapExecutor {
                     if (value != null || ("update".equalsIgnoreCase(request.getOperationType())
                             && payload.containsKey(sourceField))) {
                         data.put(targetField, value);
-                        userMappedFields.add(targetField);
+                        if (isUserInput(targetModel, commandCode, submittedInputKeys, sourceField))
+                            userMappedFields.add(targetField);
                     }
                 }
             }
@@ -198,6 +208,16 @@ public class CommandFieldMapExecutor {
                                                       Long tenantId,
                                                       CommandExecuteRequest request,
                                                       CommandDefinition command) {
+        return executeImplicitFieldMapPhase(execConfig, payload, tenantId, request, command, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> executeImplicitFieldMapPhase(Map<String, Object> execConfig,
+                                                      Map<String, Object> payload,
+                                                      Long tenantId,
+                                                      CommandExecuteRequest request,
+                                                      CommandDefinition command,
+                                                      Set<String> submittedInputKeys) {
         Map<String, Object> results = new HashMap<>();
         String modelCode = command.getModelCode();
         if (!StringUtils.hasText(modelCode)) {
@@ -252,7 +272,8 @@ public class CommandFieldMapExecutor {
                     continue;
                 }
                 data.put(fieldCode, value);
-                userMappedFields.add(fieldCode);
+                if (isUserInput(modelCode, command.getCode(), submittedInputKeys, fieldCode))
+                    userMappedFields.add(fieldCode);
             }
         }
 
@@ -263,6 +284,8 @@ public class CommandFieldMapExecutor {
                 Object value = payload.get(fieldCode);
                 if (value != null) {
                     data.put(fieldCode, value);
+                    if (isUserInput(modelCode, command.getCode(), submittedInputKeys, fieldCode))
+                        userMappedFields.add(fieldCode);
                 }
             }
         }
@@ -604,6 +627,12 @@ public class CommandFieldMapExecutor {
             throw new BusinessException(ResponseCode.FORBIDDEN,
                     "Field edit permission denied for model " + modelCode + ": " + String.join(", ", blockedFields));
         }
+    }
+
+    private boolean isUserInput(String model, String commandCode, Set<String> submittedKeys, String sourceField) {
+        return submittedKeys == null || submittedKeys.contains(sourceField)
+                || commandCode == null || !commandCode.equals(MetaContext.getAuthorizedCommandCode())
+                || !MetaContext.isCommandPermitBoundTo(model);
     }
 
     private boolean isSystemField(String fieldKey) {

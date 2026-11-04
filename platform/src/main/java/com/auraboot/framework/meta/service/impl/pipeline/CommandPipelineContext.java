@@ -12,6 +12,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 
 /**
  * Shared mutable state that flows through every phase.
@@ -40,6 +43,27 @@ public class CommandPipelineContext {
     /** Request payload — may be mutated by normalize/autoSet/computed phases */
     @Builder.Default
     private Map<String, Object> payload = new HashMap<>();
+
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    private SubmittedInputOrigin submittedInputOrigin;
+
+    private record SubmittedInputOrigin(Set<String> keys) {
+        private SubmittedInputOrigin {
+            keys = Collections.unmodifiableSet(new LinkedHashSet<>(keys));
+        }
+    }
+
+    /** Capture top-level source keys once, before normalization or owner derivation. */
+    public void captureSubmittedInput(Map<String, Object> input) {
+        if (submittedInputOrigin != null) throw new IllegalStateException("Command input origin is already captured");
+        submittedInputOrigin = new SubmittedInputOrigin(input == null ? Set.of() : input.keySet());
+    }
+
+    /** Null means unknown origin; consumers must then treat every input as user supplied. */
+    public Set<String> submittedInputKeys() {
+        return submittedInputOrigin == null ? null : submittedInputOrigin.keys();
+    }
 
     /** Immutable canonical request intent claimed by the idempotency phase. */
     private Map<String, Object> idempotencyIntent;

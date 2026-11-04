@@ -46,8 +46,12 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
     @Autowired MetaModelFieldBindingMapper bindings;
     @Autowired FieldPermissionService fieldPermissions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.auraboot.framework.meta.mapper.CommandDefinitionMapper commands;
+    @Autowired com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     @TempDir Path files;
     private final List<Long> fieldIds = new ArrayList<>(), permissionIds = new ArrayList<>();
+    private final List<Long> commandIds = new ArrayList<>();
     private String model, table, label, secret, hidden, quantity, pid;
     private Long modelId;
     private boolean physicalCreated;
@@ -105,6 +109,7 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
 
     @AfterEach void cleanup() {
         applyTestMetaContext();
+        for (Long id : commandIds) jdbc.update("DELETE FROM ab_command_definition WHERE tenant_id=? AND id=?",testTenant.getId(),id);
         if (physicalCreated) assertThat(schema.dropTableByModel(model).isSuccess()).isTrue();
         if (modelId != null) {
             jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?",testTenant.getId(),modelId);
@@ -179,5 +184,70 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         assertThat(result.getErrors()).anySatisfy(error->assertThat(error.getErrorMessage()).contains("FIELD_WRITE_DENIED"));
         assertThat(count()).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE "+label+"='import-denied'",Long.class)).isZero();
+    }
+
+    private String derivedCommand(boolean explicitInputs,boolean preserveInput) throws Exception {
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
+                "API","command","execute","Command fixture invocation");
+        String code = model+":derived";
+        var definition = new com.auraboot.framework.meta.entity.CommandDefinition();
+        definition.setTenantId(testTenant.getId()); definition.setPid(UniqueIdGenerator.generate()); definition.setCode(code);
+        definition.setModelCode(model); definition.setDisplayName("Input origin fixture"); definition.setVersion(1);
+        definition.setIsCurrent(true); definition.setStatus("published"); definition.setDeletedFlag(false);
+        definition.setInputSchema("{}"); definition.setTargetModels("[]"); definition.setCmdRiskLevel("L1");
+        Map<String,Object> configuration = new LinkedHashMap<>(Map.of("type","create","cacheResult",true,
+                "permissions",List.of("model."+model+".create"),"autoSetFields",Map.of(secret,
+                        Map.of("strategy","default_value","value",10,"preserveInput",preserveInput))));
+        if (explicitInputs) configuration.put("inputFields",List.of(label));
+        definition.setExecutionConfig(json.writeValueAsString(configuration)); commands.insert(definition); commandIds.add(definition.getId());
+        return code;
+    }
+
+    private com.auraboot.framework.meta.dto.CommandExecuteRequest request(Map<String,Object> input) {
+        var request = new com.auraboot.framework.meta.dto.CommandExecuteRequest();
+        request.setPayload(input); request.setOperationType("create"); request.setClientRequestId(UniqueIdGenerator.generate());
+        return request;
+    }
+
+    private void secretEditable(boolean allowed) {
+        Field definition = fields.selectById(fieldIds.get(1));
+        ExtensionBean extension = new ExtensionBean(); extension.setExtension(new HashMap<>(Map.of(
+                "fieldPermission",Map.of("edit",List.of(allowed?testRole.getCode():"unassigned_"+model)))));
+        definition.setExtension(extension); fields.updateById(definition); metadata.clearAllCache();
+    }
+
+    @Test void fullCommandPersistsReadonlyOwnerDefaultsWithoutChangingTheOriginalInput() throws Exception {
+        String command = derivedCommand(false,false);
+        var request = request(Map.of(label,"derived-command"));
+        var result = commandExecutor.execute(command,request);
+        assertThat(result.getPhaseReached()).isEqualTo("completed");
+        assertThat(result.isIdempotentReplay()).isFalse();
+        assertThat(request.getPayload()).containsExactly(Map.entry(label,"derived-command"));
+        assertThat(jdbc.queryForObject("SELECT "+secret+" FROM "+table+" WHERE "+label+"='derived-command'",Integer.class)).isEqualTo(10);
+        assertThat(count()).isEqualTo(2);
+    }
+
+    @Test void submittedReadonlyAutoSetInputIsRejectedEvenOutsideDeclaredInputFields() throws Exception {
+        String command = derivedCommand(true,true);
+        assertThatThrownBy(()->commandExecutor.execute(command,request(Map.of(label,"forbidden-command",secret,99))))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                .satisfies(error->assertThat(((com.auraboot.framework.exception.BusinessException)error).getResponseCode())
+                        .isEqualTo(com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN));
+        assertThat(count()).isEqualTo(1);
+    }
+
+    @Test void fieldRevocationRejectsAnActuallyCachedAutoSetOverrideBeforeReplay() throws Exception {
+        secretEditable(true);
+        String command = derivedCommand(true,true);
+        var request = request(Map.of(label,"cached-command",secret,11));
+        assertThat(commandExecutor.execute(command,request).isIdempotentReplay()).isFalse();
+        assertThat(commandExecutor.execute(command,request).isIdempotentReplay()).isTrue();
+        secretEditable(false);
+        assertThatThrownBy(()->commandExecutor.execute(command,request))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                .satisfies(error->assertThat(((com.auraboot.framework.exception.BusinessException)error).getResponseCode())
+                        .isEqualTo(com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN));
+        assertThat(jdbc.queryForObject("SELECT "+secret+" FROM "+table+" WHERE "+label+"='cached-command'",Integer.class)).isEqualTo(11);
+        assertThat(count()).isEqualTo(2);
     }
 }
