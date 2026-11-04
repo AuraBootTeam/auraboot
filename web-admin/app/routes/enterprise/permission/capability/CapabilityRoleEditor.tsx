@@ -68,6 +68,7 @@ export default function CapabilityRoleEditor({
   const [applyDefault, setApplyDefault] = useState(false);
   const [scopeChanges, setScopeChanges] = useState<ScopeChange[]>([]);
   const [scopeOpen, setScopeOpen] = useState(false);
+  const [scopeLabels, setScopeLabels] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState(false);
   const [draftPreview, setDraftPreview] = useState<AuthorizationPreview | null>(null);
   const loadRequest = useRef(0);
@@ -167,6 +168,7 @@ export default function CapabilityRoleEditor({
     setDefaultScope(snapshot.defaultScopeType);
     setApplyDefault(false);
     setScopeChanges([]);
+    setScopeLabels({});
     setConflict(false);
     setDraftPreview(null);
     setRevokedPartial([]);
@@ -499,17 +501,10 @@ export default function CapabilityRoleEditor({
           </p>
           <ul className="mt-2 space-y-1">
             {draftPreview?.scopeChanges.map((change, index) => {
-              const resource = matrix?.modules
-                .flatMap((module) => module.resources)
-                .find((resource) => resource.resourceCode === change.resourceCode);
-              const action = resource?.actions.find(
-                (action) => action.action === change.actionCode,
-              );
               const scope = scopeOption(change.scopeType);
               return (
                 <li key={index}>
-                  {resource?.resourceName} ·{' '}
-                  {action ? t(`permission.${action.code}`, undefined, action.label) : ''}:{' '}
+                  {scopeLabels[`${change.resourceCode}:${change.actionCode}`]}:{' '}
                   {t(scope.labelKey, undefined, scope.labelFallback)}
                 </li>
               );
@@ -693,7 +688,8 @@ export default function CapabilityRoleEditor({
           capability={scopeCapability}
           matrix={projectedMatrix}
           onClose={() => setScopeCapability(null)}
-          onStage={(changes) =>
+          onStage={(changes, labels) => {
+            setScopeLabels((current) => ({ ...current, ...labels }));
             setScopeChanges((current) => [
               ...current.filter(
                 (old) =>
@@ -704,8 +700,8 @@ export default function CapabilityRoleEditor({
                   ),
               ),
               ...changes,
-            ])
-          }
+            ]);
+          }}
         />
       )}
 

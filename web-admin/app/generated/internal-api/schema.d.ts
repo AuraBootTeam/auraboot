@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 47d178220b9b91bf05b939c2698b96d6c8b5c76ee512a310c815f55bd31d0fd3
+ * Contract SHA-256: 07bf7da8e3d4fae63e5d115f5eb36e7ba7ba5d694a2783971f9a9fb356d385a7
  */
 export interface paths {
     "/api/activities": {

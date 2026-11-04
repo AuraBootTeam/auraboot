@@ -17,7 +17,7 @@ export default function CapabilityScopeSettings({
   capability: Capability;
   matrix: PermissionMatrixDTO | null;
   onClose: () => void;
-  onStage: (changes: ScopeChange[]) => void;
+  onStage: (changes: ScopeChange[], labels: Record<string, string>) => void;
 }) {
   const { t, locale } = useI18n();
   const [pending, setPending] = useState<Record<string, string>>({});
@@ -133,7 +133,7 @@ export default function CapabilityScopeSettings({
   const rowLabel = (row: (typeof rows)[number]) =>
     row.code.startsWith('model.')
       ? `${modelNames[row.resourceCode]} · ${actionNames[row.action] ?? row.label}`
-      : row.label;
+      : `${getLocalizedText(capability.localizedLabels, locale, t) || capability.label} · ${actionNames[row.action] ?? row.label}`;
   const teamUnavailable = (row: (typeof rows)[number]) =>
     row.code.startsWith('model.') && !modelTeams[row.resourceCode];
   const apply = () => {
@@ -158,6 +158,9 @@ export default function CapabilityScopeSettings({
         scopeType: pending[row.code],
         mergeStrategy: row.mergeStrategy,
       })),
+      Object.fromEntries(
+        changes.map((row) => [`${row.resourceCode}:${row.action}`, rowLabel(row)]),
+      ),
     );
     onClose();
   };

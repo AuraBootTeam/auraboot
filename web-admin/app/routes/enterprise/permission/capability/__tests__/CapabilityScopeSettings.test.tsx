@@ -95,14 +95,17 @@ describe('CapabilityScopeSettings', () => {
     });
     fireEvent.click(screen.getByTestId('capability-scope-apply'));
     await waitFor(() => expect(callbacks.onClose).toHaveBeenCalledOnce());
-    expect(callbacks.onStage).toHaveBeenCalledWith([
-      {
-        resourceCode: 'qo_quote_common',
-        actionCode: 'read',
-        scopeType: 'self',
-        mergeStrategy: undefined,
-      },
-    ]);
+    expect(callbacks.onStage).toHaveBeenCalledWith(
+      [
+        {
+          resourceCode: 'qo_quote_common',
+          actionCode: 'read',
+          scopeType: 'self',
+          mergeStrategy: undefined,
+        },
+      ],
+      expect.objectContaining({ 'qo_quote_common:read': '报价单 · View' }),
+    );
     expect(permissionService.updateScope).not.toHaveBeenCalled();
   });
   it('cancels through Escape without writing', () => {
@@ -155,14 +158,17 @@ describe('CapabilityScopeSettings', () => {
     fireEvent.change(select, { target: { value: 'team' } });
     fireEvent.click(screen.getByTestId('capability-scope-apply'));
     await waitFor(() => expect(callbacks.onClose).toHaveBeenCalledOnce());
-    expect(callbacks.onStage).toHaveBeenCalledWith([
-      {
-        resourceCode: 'qo_quote_common',
-        actionCode: 'read',
-        scopeType: 'team',
-        mergeStrategy: undefined,
-      },
-    ]);
+    expect(callbacks.onStage).toHaveBeenCalledWith(
+      [
+        {
+          resourceCode: 'qo_quote_common',
+          actionCode: 'read',
+          scopeType: 'team',
+          mergeStrategy: undefined,
+        },
+      ],
+      expect.objectContaining({ 'qo_quote_common:read': '报价单 · View' }),
+    );
   });
 
   it('rejects a forced unsupported team selection before calling the scope API', async () => {

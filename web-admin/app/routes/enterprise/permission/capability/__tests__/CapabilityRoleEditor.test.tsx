@@ -166,6 +166,10 @@ describe('CapabilityRoleEditor joint authorization draft', () => {
     );
     expect(screen.getByTestId('draft-preview-default')).toBeVisible();
     expect(screen.getByTestId('draft-preview-scopes')).toBeVisible();
+    expect(screen.getByTestId('draft-preview-scopes')).toHaveTextContent(
+      'Order · Update: 无权访问',
+    );
+    expect(screen.getByTestId('draft-preview-scopes')).not.toHaveTextContent('model.order');
   });
   it('preserves a rejected preview draft and requires explicit reload on conflict', async () => {
     vi.mocked(authorizationDraftService.preview).mockRejectedValue(new AuthorizationConflict());

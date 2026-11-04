@@ -111624,6 +111624,10 @@
     {
       "description": "Chart data aggregate query API",
       "name": "Chart Data"
+    },
+    {
+      "description": "Atomic role authorization authoring",
+      "name": "Role Authorization Draft"
     }
   ]
 }
