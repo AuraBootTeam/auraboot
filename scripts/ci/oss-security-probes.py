@@ -179,7 +179,30 @@ def verify(base, request, login, admin, password, check, require, publish_tenant
                                       (None, file_a, (401, 403))]:
         denied(token, '/api/file/' + file_id, statuses=expected)
         require(raw(token, '/api/file/download/' + file_id)[0] in expected, 'attachment download ownership missing')
-        denied(token, '/api/file/' + file_id, 'DELETE', statuses=expected)
+        deletion = call(token, '/api/file/' + file_id, 'DELETE')
+        if deletion.get('_httpStatus') == 422 and token is not None:
+            # FileServiceImpl deliberately raises BUSINESS_ERROR for owner
+            # mismatch / tenant-scoped absence. Accept only that exact domain
+            # refusal, not an arbitrary validation failure or server exception.
+            context = deletion.get('context')
+            reason = context.get('detail') if isinstance(context, dict) else context
+            expected_reason = ("You don't have permission to delete this file"
+                               if token in (alice, peer) and file_id in (file_a, file_peer)
+                               else 'File not found: ' + file_id)
+            require(str(deletion.get('code')) == '40000' and reason == expected_reason,
+                    'attachment deletion returned an unrelated domain failure')
+        else:
+            require(deletion.get('_httpStatus', 200) in expected,
+                    'attachment deletion ownership/anonymous denial missing')
+    # Prove the deletion endpoint is usable for an owned object; a blanket
+    # failure, broken storage transaction or wrong endpoint cannot satisfy this.
+    disposable_file, disposable_content = upload(alice, 'own-delete-control.txt')
+    require(raw(alice, '/api/file/download/' + disposable_file) == (200, disposable_content),
+            'own delete control upload bytes differ')
+    require(ok(alice, '/api/file/' + disposable_file, 'DELETE') is True,
+            'own attachment deletion failed')
+    require(raw(alice, '/api/file/download/' + disposable_file)[0] == 404,
+            'owned deleted attachment remains downloadable')
     for token, file_id, content in [(alice, file_a, content_a), (peer, file_peer, content_peer), (bob, file_b, content_b)]:
         require(raw(token, '/api/file/download/' + file_id) == (200, content), 'denied attachment operation changed bytes')
     # Exercise path-like IDs against the public HTTP surface, not the storage helper alone.
