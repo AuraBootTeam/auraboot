@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {hydrateCapsuleOverrides} from './web-shell-capsule.mjs';
 
 import { execFileSync } from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -87,16 +88,6 @@ function extractTarball(tarball, target) {
   run('tar', ['-xzf', tarball, '-C', target, '--strip-components=1']);
 }
 
-function hydrateCapsuleOverrides(root) {
-  const manifestPath = resolve(root, 'package.json');
-  const overridesPath = resolve(root, 'pnpm-overrides.json');
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  manifest.pnpm = {
-    ...(manifest.pnpm ?? {}),
-    overrides: JSON.parse(readFileSync(overridesPath, 'utf8')),
-  };
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-}
 
 function materializeAndBuildCoreWeb({ repoRoot, output, webShell, npmArtifacts }) {
   const workRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-core-web-build-'));

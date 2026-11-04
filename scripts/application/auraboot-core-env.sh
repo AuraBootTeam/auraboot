@@ -124,6 +124,7 @@ start_web() {
     tar -xzf "$ARTIFACT_ROOT/$web_shell" -C "$web_root" --strip-components=1
     mkdir -p "$web_root/web-admin"
     cp -R "$ARTIFACT_ROOT/web" "$web_root/web-admin/build"
+    node "$ARTIFACT_ROOT/bin/application/web-shell-capsule.mjs" "$web_root"
     HUSKY=0 pnpm --dir "$web_root" install --frozen-lockfile --ignore-scripts
     materialize_locked_npm_packages "$web_root"
     touch "$web_root/.ready"
