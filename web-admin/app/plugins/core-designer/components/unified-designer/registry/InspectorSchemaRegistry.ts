@@ -1087,6 +1087,12 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     detail: modelContainerFields,
     'detail-section': formSectionFields,
     list: listFields,
+    text: [
+      { key: 'contentKey', label: 'Content key', type: 'text' },
+      { key: 'content', label: 'Content', type: 'localizedText' },
+      { key: 'visibleWhen', label: 'Visible when', type: 'text' },
+      { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
+    ],
     dashboard: dashboardFields,
     columns: columnsContainerFields,
     field: fieldFields,

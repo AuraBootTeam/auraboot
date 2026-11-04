@@ -62,6 +62,7 @@ export const PASSTHROUGH_BLOCK_TYPES = new Set([
   'code-snippet',
   'conversation-panel',
   'selection-info',
+  'text',
   'trace-graph',
   'gerber-viewer',
   'custom',

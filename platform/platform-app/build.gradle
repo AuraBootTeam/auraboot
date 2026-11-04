@@ -24,7 +24,7 @@ dependencyManagement {
     dependencies {
         dependency 'com.github.ben-manes.caffeine:caffeine:3.3.1'
         dependency 'com.google.http-client:google-http-client-jackson2:1.47.1'
-        dependency 'io.netty:netty-resolver-dns-native-macos:4.2.19.Final'
+        dependency 'io.netty:netty-resolver-dns-native-macos:4.1.137.Final'
         dependency 'org.postgresql:postgresql:42.7.14'
         dependency 'org.checkerframework:checker-qual:3.55.1'
     }

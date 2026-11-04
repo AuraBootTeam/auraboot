@@ -121,6 +121,25 @@ def main():
             raise RuntimeError('owned PostgreSQL did not become ready')
         port = subprocess.check_output(['docker', 'port', container, '5432/tcp'], text=True).strip().split(':')[-1]
         env['PGPORT'] = port
+        start(current, 'aura_candidate_security', 'multi')
+        security_spec = importlib.util.spec_from_file_location('native_security_probes', root / 'scripts/ci/oss-security-probes.py')
+        security_module = importlib.util.module_from_spec(security_spec)
+        security_spec.loader.exec_module(security_module)
+        def publish_security_tenant(token):
+            # Mirror the packaged publisher for the second tenant as well. Tenant
+            # creation initializes membership/RBAC, not this Core-only config set.
+            owners = subprocess.check_output(['node', current / 'bin/application/native-config-imports.mjs',
+                                             current / 'application.lock'], text=True).split()
+            require(bool(owners), 'security tenant configuration denominator is empty')
+            for owner in owners:
+                require('/' not in owner and '..' not in owner, 'invalid locked config owner')
+                api(token, '/api/plugins/import/import-directory-sync', 'POST', {
+                    'path': str(current / 'config' / owner), 'conflictStrategy': 'OVERWRITE',
+                    'autoPublishModels': True, 'autoPublishFields': True, 'autoPublishCommands': True,
+                    'autoPublishPages': True, 'deferReferenceValidation': True})
+        security_module.verify(base, request, login, login(), password, check, require, publish_security_tenant,
+                               f'http://127.0.0.1:{web_port}')
+        stop()
         start(current, 'aura_candidate_cold', True)
         check('cold-install-initialize-publish', packageSource=json.loads((current / 'release-receipt.json').read_text())['source']['commit'], initialized=True)
         # Reuse the existing first-user browser case against the installed package.
@@ -146,25 +165,6 @@ def main():
         require(browser_results['expected'] == 1 and browser_results['unexpected'] == 0
                 and browser_results['skipped'] == 0 and browser_results['flaky'] == 0, 'first-user browser denominator differs')
         check('installed-package-model-crud-schema-runtime-readonly', expected=1, passed=1, skipped=0, retries=0)
-        stop()
-        start(current, 'aura_candidate_security', 'multi')
-        security_spec = importlib.util.spec_from_file_location('native_security_probes', root / 'scripts/ci/oss-security-probes.py')
-        security_module = importlib.util.module_from_spec(security_spec)
-        security_spec.loader.exec_module(security_module)
-        def publish_security_tenant(token):
-            # Mirror the packaged publisher for the second tenant as well. Tenant
-            # creation initializes membership/RBAC, not this Core-only config set.
-            owners = subprocess.check_output(['node', current / 'bin/application/native-config-imports.mjs',
-                                             current / 'application.lock'], text=True).split()
-            require(bool(owners), 'security tenant configuration denominator is empty')
-            for owner in owners:
-                require('/' not in owner and '..' not in owner, 'invalid locked config owner')
-                api(token, '/api/plugins/import/import-directory-sync', 'POST', {
-                    'path': str(current / 'config' / owner), 'conflictStrategy': 'OVERWRITE',
-                    'autoPublishModels': True, 'autoPublishFields': True, 'autoPublishCommands': True,
-                    'autoPublishPages': True, 'deferReferenceValidation': True})
-        security_module.verify(base, request, login, login(), password, check, require, publish_security_tenant,
-                               f'http://127.0.0.1:{web_port}')
         stop()
         start(previous, 'aura_candidate_upgrade', True)
         token = login()

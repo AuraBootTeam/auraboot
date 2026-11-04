@@ -285,7 +285,7 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 });
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
-  assert.match(oci, /eclipse-temurin:21-jre@sha256:[0-9a-f]{64}/);
+  assert.match(oci, /eclipse-temurin:21-jre-jammy@sha256:[0-9a-f]{64}/);
   assert.doesNotMatch(oci, /execFileSync\('container'/);
   assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
   assert.match(oci, /AURA_OCI_BUILDER must be docker/);
