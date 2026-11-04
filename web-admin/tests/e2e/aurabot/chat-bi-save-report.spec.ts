@@ -83,10 +83,12 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
       r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/report-definitions',
   );
   await card.getByTestId('chatbi-save-report').click();
-  const review=page.getByTestId('analysis-report-review');
+  const review = page.getByTestId('analysis-report-review');
   await expect(review).toBeVisible();
   await expect(review.getByTestId('analysis-report-confirm')).toBeDisabled();
-  await review.getByLabel('报表名称',{exact:true}).fill('订单数量分析');
+  await review.getByLabel('报表名称', { exact: true }).fill('订单数量分析');
+  const adoptedNarrative = '本次查询仅统计一条指定订单，已人工核对。';
+  await review.getByLabel('采用的分析说明', { exact: true }).fill(adoptedNarrative);
   await review.getByRole('checkbox').check();
   await review.getByTestId('analysis-report-confirm').click();
   const created = await createdPromise;
@@ -97,9 +99,17 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
   expect(persistedQuery).toMatchObject({ type: 'aggregate', ...query });
   const columns = created.request().postDataJSON().dsl.body[0].columns;
   expect(columns).toEqual([
-    { field: 'e2et_order_title', label: '订单标题', width:300, align:'left', format:'' },
-    { field: 'cnt', label: '数量', width:150, align:'right', format:'number' },
+    { field: 'e2et_order_title', label: '订单标题', width: 300, align: 'left', format: '' },
+    { field: 'cnt', label: '数量', width: 150, align: 'right', format: 'number' },
   ]);
+  const adoptedContent = 'AI 分析 · 经人工核对采用；建议不代替业务审批。\n' + adoptedNarrative;
+  expect(created.request().postDataJSON().dsl.body).toContainEqual(
+    expect.objectContaining({
+      id: 'analysis-summary',
+      blockType: 'rich-text',
+      content: adoptedContent,
+    }),
+  );
   const saved = (await created.json()).data;
   const db = new Client(PG_CONN);
   await db.connect();
@@ -341,10 +351,13 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
     if (format === 'excel') {
       const XLSX = await import('xlsx');
       const workbook = XLSX.read(bytes, { type: 'buffer' });
-      expect(workbook.SheetNames).toHaveLength(1);
+      expect(workbook.SheetNames).toEqual(['Table', '分析说明']);
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
-      expect(rows).toContainEqual(['数量', '订单标题']);
-      expect(rows).toContainEqual([1, title]);
+      expect(rows).toContainEqual(['订单标题', '数量']);
+      expect(rows).toContainEqual([title, 1]);
+      const narrativeRows = XLSX.utils.sheet_to_json(workbook.Sheets['分析说明'], { header: 1 });
+      expect(narrativeRows.flat().join('\n')).toContain(adoptedNarrative);
+      expect(narrativeRows.flat().join('\n')).toContain('经人工核对采用');
     } else if (format === 'pdf') {
       expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
     } else {
@@ -352,6 +365,8 @@ test('AuraBot analysis saves an executable report and reopens its data', async (
       expect(document).toContain('订单数量分析');
       expect(document).toContain(title);
       expect(document).toContain('数量');
+      expect(document).toContain(adoptedNarrative);
+      expect(document).toContain('经人工核对采用');
       if (format === 'html') {
         expect(document.toLowerCase()).toContain('<!doctype html>');
         expect(document).not.toMatch(/<script[^>]+src=/);
