@@ -14,35 +14,15 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 
 /**
- * Invalidates the {@code aggregateQuery} cache whenever dynamic-model data is written.
+ * Compatibility invalidator for installations that explicitly register aggregate result caches.
  *
- * <p><b>Why an interceptor and not annotations.</b> {@code AggregateQueryService#execute} is
- * {@code @Cacheable("aggregateQuery")} and serves the dashboard chart endpoint
- * ({@code POST /api/meta/chart-data}) and the {@code chat_bi} skill. Nothing evicted it, so
- * after a record was inserted/updated/deleted the charts kept showing the pre-change
- * aggregate for up to the cache TTL (30 min) — the same class of defect as the dict cache
- * (OSS #1226), and found by the gate written for it.
+ * <p>Default aggregate queries are intentionally uncached: authorization and data
+ * scopes execute inside the query method and must run again after permission
+ * changes. No default {@code aggregateQuery} region is registered. When an
+ * installation has no such explicit region, this interceptor does nothing.
  *
- * <p>Annotating the write paths was not viable: dynamic-table writes go through
- * {@code DynamicDataMapper} from <b>121 call sites across 39 classes</b> — the command
- * pipeline writes via {@code HandlerPhase} directly, not through {@code DynamicDataService}
- * — so any hand-wired approach is one new call site away from being wrong again. Every write
- * does, however, pass through the MyBatis executor. That is the one place where the
- * invalidation cannot be forgotten.
- *
- * <p><b>Why it clears everything rather than the affected model.</b> The cache key is
- * {@code dataAccessContext + ':' + request.hashCode()} — the model is folded into the hash,
- * so a key cannot be matched back to a model. The interceptor, on the other side, only has
- * the physical table name (from {@code model.getTableName()}, not derivable from a model code
- * without a metadata lookup). Bridging the two would mean either restructuring the cache key
- * or doing a table→model reverse lookup on every write. Neither is justified yet: the cache
- * key already includes the caller's data-access context, so entries are per-user to begin
- * with and hit rates are modest. Correct-and-simple first; if profiling later shows the
- * eviction is too broad, put the model code into the key and narrow this to a prefix sweep.
- *
- * <p>Clearing happens even if the surrounding transaction later rolls back. That costs one
- * recomputation and is always safe; the opposite trade (evict on commit only) risks serving
- * stale aggregates and is not.
+ * <p>For compatible custom installations, dynamic-model writes still invalidate
+ * that region through the MyBatis executor, including rolled-back writes.
  */
 @Slf4j
 @Component

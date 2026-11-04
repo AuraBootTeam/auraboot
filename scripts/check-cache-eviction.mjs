@@ -32,10 +32,11 @@
  * `docs/` honest: a gate you have never seen go red is not a gate.
  */
 import { readFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const REPO = path.resolve(new URL('..', import.meta.url).pathname);
+const REPO = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const MAIN = path.join(REPO, 'platform/src/main');
 
 /**
@@ -50,7 +51,7 @@ const ALLOWLIST = {
   // An allowlist entry is a promise to come back, not a place to park a defect.
 };
 
-const files = execSync(`find ${MAIN} -name '*.java'`, { encoding: 'utf8' })
+const files = execFileSync('find', [MAIN, '-name', '*.java'], { encoding: 'utf8' })
   .trim()
   .split('\n')
   .filter(Boolean);

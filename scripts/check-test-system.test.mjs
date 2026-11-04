@@ -51,3 +51,31 @@ for (const failure of ['--test', 'check-command-reachability.mjs', 'check-script
     assert.ok(result.calls.some(call => call.includes('check-scripts-index.mjs')));
   });
 }
+
+for (const gate of ['check-e2e-assertions.mjs', 'check-cache-eviction.mjs']) {
+  for (const violation of [false, true]) {
+    test(`${gate} handles literal shell characters and preserves violation detection (${violation})`, () => {
+      const base = fs.mkdtempSync(path.join(os.tmpdir(), 'aura-gate-argv-'));
+      const root = path.join(base, "repo with spaces; literal 'quotes'");
+      try {
+        for (const dir of ['scripts', 'web-admin/app', 'web-admin/tests', 'plugins', 'platform/src/main']) {
+          fs.mkdirSync(path.join(root, dir), { recursive: true });
+        }
+        fs.copyFileSync(new URL(`./${gate}`, import.meta.url), path.join(root, 'scripts', gate));
+        fs.writeFileSync(path.join(root, 'web-admin/app/fixture.tsx'), '<div data-testid="known-widget" />');
+        fs.writeFileSync(path.join(root, 'web-admin/tests/fixture.spec.ts'), violation
+          ? "expect(page.getByTestId('nonexistent-widget')).toHaveCount(0);"
+          : "expect(page.getByTestId('known-widget')).toHaveCount(0);");
+        fs.writeFileSync(path.join(root, 'platform/src/main/Fixture.java'), violation
+          ? 'class Fixture { @Cacheable("customers") public String get() { return ""; } }'
+          : 'class Fixture {}');
+        const result = spawnSync(process.execPath, [path.join(root, 'scripts', gate)], {
+          cwd: root, encoding: 'utf8',
+        });
+        assert.equal(result.status, violation ? 1 : 0, result.stderr + result.stdout);
+      } finally {
+        fs.rmSync(base, { recursive: true, force: true });
+      }
+    });
+  }
+}
