@@ -82,7 +82,12 @@ def main():
         cli('migrate', package, database)
         active = (package, database)
         cli('start', package, database)
-        if initialize:
+        if initialize == 'multi':
+            result = request('/api/bootstrap/setup', 'POST', {
+                'companyName': 'Native security tenant A', 'adminEmail': env['ADMIN_EMAIL'],
+                'adminPassword': password, 'adminDisplayName': 'Security administrator', 'systemMode': 'multi'})
+            require(str(result.get('code')) == '0', 'security MULTI bootstrap failed')
+        elif initialize:
             cli('init-core', package, database)
         cli('publish', package, database)
         cli('verify', package, database)
@@ -141,6 +146,12 @@ def main():
         require(browser_results['expected'] == 1 and browser_results['unexpected'] == 0
                 and browser_results['skipped'] == 0 and browser_results['flaky'] == 0, 'first-user browser denominator differs')
         check('installed-package-model-crud-schema-runtime-readonly', expected=1, passed=1, skipped=0, retries=0)
+        stop()
+        start(current, 'aura_candidate_security', 'multi')
+        security_spec = importlib.util.spec_from_file_location('native_security_probes', root / 'scripts/ci/oss-security-probes.py')
+        security_module = importlib.util.module_from_spec(security_spec)
+        security_spec.loader.exec_module(security_module)
+        security_module.verify(base, request, login, login(), password, check, require)
         stop()
         start(previous, 'aura_candidate_upgrade', True)
         token = login()
@@ -258,7 +269,7 @@ def main():
         check('corrupt-candidate-rejected-current-business-continues', amount=68000)
         stop()
         check('owned-process-stop', backendPort=backend_port, webPort=web_port)
-        (output / 'result.json').write_text(json.dumps({'status': 'passed', 'releaseQualification': False, 'checks': checks, 'databaseScope': 'new attempt-owned PostgreSQL container; three databases retained', 'previousLifecycle': 'current packaged installer operates the original previous artifact without relabelling its source', 'prerequisites': {'postgres': pg_image, 'node': subprocess.check_output(['node', '--version'], text=True).strip()}}, indent=2))
+        (output / 'result.json').write_text(json.dumps({'status': 'passed', 'releaseQualification': False, 'checks': checks, 'databaseScope': 'new attempt-owned PostgreSQL container; four databases retained, including separate supported MULTI security bootstrap', 'previousLifecycle': 'current packaged installer operates the original previous artifact without relabelling its source', 'prerequisites': {'postgres': pg_image, 'node': subprocess.check_output(['node', '--version'], text=True).strip()}}, indent=2))
     finally:
         # A failed ownership check preserves resources instead of stopping others.
         if active:

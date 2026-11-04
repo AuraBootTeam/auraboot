@@ -55,8 +55,13 @@ cmp LICENSE.txt "$ARTIFACTS/unpacked/LICENSE.txt"
 cmp NOTICE "$ARTIFACTS/unpacked/NOTICE"
   CANDIDATE_ARCHIVE="$ARTIFACTS/platform-artifacts.tar"
 fi
+security_status=0
+installation_status=0
+# Collect both real execution and artifact findings; either failure keeps the gate red.
+python3 -B scripts/ci/oss-artifact-security.py "$ARTIFACTS/unpacked" "$ARTIFACTS/security" || security_status=$?
 if [[ -n "${AURA_PRODUCT_PLATFORM_ARCHIVE:-}" ]]; then
-  python3 -B scripts/ci/oss-native-install.py "$ARTIFACTS/unpacked" "$ARTIFACTS/previous" "$ARTIFACTS/installation" "$CANDIDATE_ARCHIVE"
+  python3 -B scripts/ci/oss-native-install.py "$ARTIFACTS/unpacked" "$ARTIFACTS/previous" "$ARTIFACTS/installation" "$CANDIDATE_ARCHIVE" || installation_status=$?
 fi
 freeze after
 cmp "$ARTIFACTS/native-frozen-before.json" "$ARTIFACTS/native-frozen-after.json"
+[[ "$security_status" == 0 && "$installation_status" == 0 ]]

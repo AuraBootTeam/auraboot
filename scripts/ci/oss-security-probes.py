@@ -1,0 +1,193 @@
+"""Real HTTP security probes for the attempt-owned installed native candidate.
+
+No forged JWTs, SQL fixture insertion, mock servers or shared runtime changes.
+The caller bootstraps a separate MULTI database through the public setup API.
+"""
+import hashlib
+import json
+import secrets
+import urllib.error
+import urllib.request
+
+
+def verify(base, request, login, admin, password, check, require):
+    def call(token, path, method='GET', body=None, extra=None):
+        headers = dict(extra or {})
+        if token:
+            headers['Authorization'] = 'Bearer ' + token
+        return request(path, method, body, headers)
+
+    def ok(token, path, method='GET', body=None):
+        value = call(token, path, method, body)
+        require(value.get('_httpStatus', 200) == 200 and str(value.get('code')) == '0',
+                f'security positive control failed: {method} {path}')
+        return value.get('data')
+
+    def denied(token, path, method='GET', body=None, statuses=(401, 403, 404), extra=None):
+        value = call(token, path, method, body, extra)
+        status = value.get('_httpStatus', 200)
+        require(status in statuses, f'security denial missing: {method} {path} HTTP {status}')
+        return status
+
+    def raw(token, path, body=None, content_type=None):
+        headers = {'Authorization': 'Bearer ' + token} if token else {}
+        if content_type:
+            headers['Content-Type'] = content_type
+        req = urllib.request.Request(base + path, data=body, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=60) as response:
+                return response.status, response.read()
+        except urllib.error.HTTPError as error:
+            return error.code, error.read()
+
+    def upload(token, name='acceptance.txt'):
+        boundary = 'security-' + secrets.token_hex(12)
+        content = ('Private acceptance material ' + secrets.token_hex(12)).encode()
+        body = ('--' + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="'
+                + name + '"\r\nContent-Type: text/plain\r\n\r\n').encode()
+        body += content + ('\r\n--' + boundary + '--\r\n').encode()
+        status, response = raw(token, '/api/file/upload', body, 'multipart/form-data; boundary=' + boundary)
+        value = json.loads(response)
+        require(status == 200 and str(value.get('code')) == '0', 'security attachment upload failed')
+        return value['data']['fileId'], content
+
+    permissions = {}
+
+    def collect(node):
+        permissions[node['code']] = node['id']
+        for child in node.get('children') or []:
+            collect(child)
+
+    for node in ok(admin, '/api/permissions/tree'):
+        collect(node)
+    model = 'org_department'
+    path = '/api/dynamic/' + model
+    writer_codes = ['model.' + model + '.' + action for action in ['read', 'create', 'update', 'delete']]
+    writer_codes += ['org.hr.manage', 'meta.command.execute', 'sys.file.upload', 'sys.file.read', 'sys.file.delete']
+    reader_codes = ['model.' + model + '.read', 'sys.file.upload', 'sys.file.read', 'sys.file.delete']
+    for role_code, codes in [('security_writer', writer_codes), ('security_reader', reader_codes)]:
+        require(all(code in permissions for code in codes), 'required security permission absent from shipped inventory')
+        role = ok(admin, '/api/roles', 'POST', {'code': role_code, 'name': role_code,
+            'type': 'custom', 'status': 'active', 'scopeType': 'tenant', 'defaultDataScopeType': 'all'})
+        ok(admin, '/api/permissions/matrix/' + role['pid'] + '/batch', 'PUT',
+           [{'permissionId': permissions[code], 'granted': True} for code in codes])
+
+    actors = {}
+    for name, role in [('alice', 'security_writer'), ('peer', 'security_writer'),
+                       ('reader', 'security_reader'), ('founder', 'security_writer')]:
+        email = 'security-' + name + '@auraboot.local'
+        provisioned = ok(admin, '/api/admin/users', 'POST', {'email': email, 'displayName': name,
+            'initialPassword': password, 'roleCodes': [role], 'sendInviteEmail': False})
+        actors[name] = {'token': login(email, password), 'userId': str(provisioned['userId'])}
+    alice, peer, reader, founder = (actors[name]['token'] for name in ['alice', 'peer', 'reader', 'founder'])
+    a_info = ok(alice, '/api/auth/me')
+    require({role['code'] for role in a_info['permissions']['roles']} == {'security_writer'},
+            'tenant A negative actor unexpectedly has additional roles')
+    require('*' not in a_info['permissions']['permissionCodes'], 'negative actor has wildcard permissions')
+
+    b = ok(founder, '/api/tenant-selection/process', 'POST', {'action': 'create',
+        'clientRequestId': 'security-tenant-' + secrets.token_hex(12),
+        'tenantName': 'security-b-' + secrets.token_hex(6), 'displayName': 'Security tenant B'})
+    bob = b['jwt']
+    b_info = ok(bob, '/api/auth/me')
+    require(str(a_info['user']['tenantId']) != str(b_info['user']['tenantId']), 'actors did not select distinct tenants')
+    require(not any(role['code'] in {'super_admin', 'platform_admin'} for role in b_info['permissions']['roles']),
+            'tenant B actor unexpectedly has platform administration')
+    check('security-real-actor-contexts', tenantA=a_info['user']['tenantId'],
+          tenantB=b_info['user']['tenantId'], tenantAWriterRoles=['security_writer'])
+
+    def command(token, command_code, values, pid=None):
+        body = {'payload': values, 'clientRequestId': 'security-' + secrets.token_hex(12),
+                'operationType': 'UPDATE' if pid else 'CREATE'}
+        if pid:
+            body['targetRecordPid'] = pid
+        return ok(token, '/api/meta/commands/execute/' + command_code, 'POST', body)
+
+    def create(token, name):
+        result = command(token, 'org:create_department', {'org_dept_name': name, 'org_dept_status': 'active'})
+        require(result['phaseReached'] == 'completed', 'security create command did not complete')
+        return result['data']['recordPid']
+
+    name_a, name_b = 'Private-A-' + secrets.token_hex(8), 'Private-B-' + secrets.token_hex(8)
+    pid_a, pid_b = create(alice, name_a), create(bob, name_b)
+    for token, own_pid, own_name, foreign_pid, foreign_name in [
+            (alice, pid_a, name_a, pid_b, name_b), (bob, pid_b, name_b, pid_a, name_a)]:
+        require(ok(token, path + '/' + own_pid)['org_dept_name'] == own_name, 'own tenant record missing')
+        listing = ok(token, path + '/list?page=1&size=100')
+        serialized = json.dumps(listing)
+        require(own_pid in serialized and foreign_pid not in serialized and foreign_name not in serialized,
+                'tenant list isolation failed')
+        foreign = call(token, path + '/' + foreign_pid)
+        require(foreign.get('_httpStatus') in (403, 404)
+                or (str(foreign.get('code')) == '0' and foreign.get('data') is None),
+                'foreign tenant record was readable or failed unexpectedly')
+        for method, body in [('PUT', {'org_dept_name': 'Cross-tenant mutation'}), ('DELETE', None)]:
+            value = call(token, path + '/' + foreign_pid, method, body)
+            require(value.get('_httpStatus') in (403, 404) or (
+                value.get('_httpStatus', 200) == 200 and str(value.get('code')) != '0'),
+                'cross-tenant write/delete did not fail closed')
+        result = command(token, 'org:update_department', {'org_dept_name': own_name + '-updated'}, own_pid)
+        require(result['phaseReached'] == 'completed', 'own update command failed')
+        cross = call(token, '/api/meta/commands/execute/org:update_department', 'POST', {
+            'payload': {'org_dept_name': 'Cross-command'}, 'operationType': 'UPDATE',
+            'targetRecordPid': foreign_pid, 'clientRequestId': 'cross-' + secrets.token_hex(12)})
+        require(cross.get('_httpStatus') in (403, 404) or (
+            cross.get('_httpStatus', 200) == 200 and (str(cross.get('code')) != '0'
+            or cross.get('data', {}).get('phaseReached') != 'completed')), 'cross-tenant command completed')
+        export = ok(token, path + '/export', 'POST', {'scope': 'filtered', 'format': 'csv',
+            'fields': ['org_dept_name']})
+        url = export['downloadUrl']
+        status, content = raw(token, url)
+        require(status == 200 and (own_name + '-updated').encode() in content
+                and foreign_name.encode() not in content, 'export tenant scope differs')
+        other = bob if token == alice else alice
+        require(raw(other, url)[0] in (403, 404), 'foreign tenant export artifact readable')
+        if token == alice:
+            require(raw(peer, url)[0] in (403, 404), 'same-tenant foreign export artifact readable')
+    require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated', 'tenant A changed by foreign write')
+    require(ok(bob, path + '/' + pid_b)['org_dept_name'] == name_b + '-updated', 'tenant B changed by foreign write')
+    check('security-cross-tenant-read-list-write-delete-command-export', directions=2,
+          knownLiveRecords=2, ownReadAndCommandAndExportControls=True)
+
+    ok(reader, path + '/' + pid_a)
+    denied(reader, path + '/' + pid_a, 'PUT', {'org_dept_name': 'Forbidden'})
+    denied(reader, path + '/' + pid_a, 'DELETE')
+    denied(reader, '/api/meta/commands/execute/org:update_department', 'POST', {
+        'payload': {'org_dept_name': 'Forbidden'}, 'targetRecordPid': pid_a, 'operationType': 'UPDATE'})
+    for headers in [{'X-User-Role': 'super_admin'}, {'X-Tenant-Id': b_info['user']['tenantId']},
+                    {'X-Forwarded-For': '127.0.0.1'}]:
+        denied(reader, path + '/' + pid_a, 'PUT', {'org_dept_name': 'Spoofed'}, extra=headers)
+    require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated', 'denied role changed record')
+    check('security-readonly-and-header-spoof-denials', ownReadControl=True, writesPreserved=True)
+
+    file_a, content_a = upload(alice)
+    file_peer, content_peer = upload(peer)
+    file_b, content_b = upload(bob)
+    for token, file_id, content in [(alice, file_a, content_a), (peer, file_peer, content_peer), (bob, file_b, content_b)]:
+        require(raw(token, '/api/file/download/' + file_id) == (200, content), 'own attachment bytes differ')
+        ok(token, '/api/file/' + file_id)
+    for token, file_id, expected in [(peer, file_a, (403,)), (alice, file_peer, (403,)),
+                                      (bob, file_a, (403, 404)), (alice, file_b, (403, 404)),
+                                      (None, file_a, (401, 403))]:
+        denied(token, '/api/file/' + file_id, statuses=expected)
+        require(raw(token, '/api/file/download/' + file_id)[0] in expected, 'attachment download ownership missing')
+        denied(token, '/api/file/' + file_id, 'DELETE', statuses=expected)
+    for token, file_id, content in [(alice, file_a, content_a), (peer, file_peer, content_peer), (bob, file_b, content_b)]:
+        require(raw(token, '/api/file/download/' + file_id) == (200, content), 'denied attachment operation changed bytes')
+    # Exercise path-like IDs against the public HTTP surface, not the storage helper alone.
+    for suffix in ['%2e%2e%2f%2e%2e%2fetc%2fpasswd', '%2e%2e%5c%2e%2e%5cetc%5cpasswd']:
+        status, content = raw(alice, '/api/file/download/' + suffix)
+        require(status in (400, 403, 404) and b'root:x:' not in content, 'path traversal was not rejected')
+    check('security-attachment-owner-tenant-anonymous-traversal', ownUploads=3, foreignBytesPreserved=True,
+          contentSha256=hashlib.sha256(content_a).hexdigest())
+
+    status = ok(None, '/api/bootstrap/status')
+    require(status['initialized'] is True and status['mode'] == 'multi', 'public bootstrap status differs')
+    setup = call(None, '/api/bootstrap/setup', 'POST', {'companyName': 'Overwrite',
+        'adminEmail': 'attacker@example.invalid', 'adminPassword': password, 'systemMode': 'multi'})
+    require(str(setup.get('code')) != '0', 'initialized bootstrap was overwritten anonymously')
+    for endpoint in ['/api/auth/me', '/api/meta/models', '/api/roles', '/api/admin/users',
+                     path + '/list', path + '/' + pid_a, '/api/file/list']:
+        denied(None, endpoint)
+    require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated', 'anonymous probes changed business state')
+    check('security-anonymous-bootstrap-and-protected-defaults', publicStatus=True, protectedEndpoints=7)
