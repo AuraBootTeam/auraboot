@@ -38,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RoleAuthorizationDraftServiceTest {
+    private final RoleAuthorizationAuthoringAccess authoringAccess = mock(RoleAuthorizationAuthoringAccess.class);
     private final RoleFieldPolicyDraftService fieldPolicies = mock(RoleFieldPolicyDraftService.class);
     private final RoleAuthorizationWriteLock writes = mock(RoleAuthorizationWriteLock.class);
     private final RoleService roles = mock(RoleService.class);
@@ -49,7 +50,7 @@ class RoleAuthorizationDraftServiceTest {
     private final DataScopeService scopes = mock(DataScopeService.class);
     private final DataPermissionRoleBindingMapper bindings = mock(DataPermissionRoleBindingMapper.class);
     private final DataPermissionPolicyMapper policies = mock(DataPermissionPolicyMapper.class);
-    private final RoleAuthorizationDraftService service = new RoleAuthorizationDraftService(writes, fieldPolicies, roles, grants,
+    private final RoleAuthorizationDraftService service = new RoleAuthorizationDraftService(writes, authoringAccess, fieldPolicies, roles, grants,
             permissions, catalog, capabilities, matrix, scopes,
             JsonMapper.builder().addModule(new JavaTimeModule()).build(), bindings, policies);
     private final Role role = new Role();
@@ -151,6 +152,18 @@ class RoleAuthorizationDraftServiceTest {
         role.setTenantId(200L);
         assertThatThrownBy(() -> service.snapshot("role-a")).isInstanceOf(RootUnCheckedException.class);
         verify(capabilities, never()).resolveForRole(any());
+    }
+
+    @Test void directCallCannotBypassTheAuthoringBoundary() {
+        String revision = service.snapshot("role-a").revision();
+        doThrow(new org.springframework.security.access.AccessDeniedException("administrator required"))
+                .when(authoringAccess).requireWrite();
+        assertThatThrownBy(() -> service.apply("role-a", request(revision, true, "all", List.of())))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(writes, never()).mutate();
+        verify(roles, never()).setDefaultDataScopeType(any(), any());
+        verify(capabilities, never()).applyCapabilitySelection(any(), any(), any());
+        verify(fieldPolicies, never()).apply(any(), any());
     }
 
     private static PermissionDTO permission(String code, String resource, String action) {

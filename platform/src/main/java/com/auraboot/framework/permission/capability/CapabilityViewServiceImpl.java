@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CapabilityViewServiceImpl implements CapabilityViewService {
     private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+    private final com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
 
 
     private final PermissionService permissionService;
@@ -105,7 +106,6 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     @Override
     @Transactional
     public void applyCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes) {
-        authorizationWriteLock.mutate();
         applyCapabilitySelection(roleId, selectedCapabilityCodes, Set.of());
     }
 
@@ -113,6 +113,9 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     @Transactional
     public void applyCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes,
                                          Set<String> revokedPartialCapabilityCodes) {
+        authorizationWriteLock.lock();
+        authoringAccess.requireWrite();
+        authoringAccess.requireTarget(roleId);
         authorizationWriteLock.mutate();
         List<PermissionDTO> all = permissionService.findAllActive();
         CapabilitySelectionPreview plan = calculateSelection(roleId, selectedCapabilityCodes, revokedPartialCapabilityCodes, all);

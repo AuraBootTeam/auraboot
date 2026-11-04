@@ -39,6 +39,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RoleAuthorizationDraftService {
     private final RoleAuthorizationWriteLock writes;
+    private final RoleAuthorizationAuthoringAccess authoringAccess;
     private final RoleFieldPolicyDraftService fieldPolicies;
     private final RoleService roles;
     private final RolePermissionMapper grants;
@@ -67,6 +68,7 @@ public class RoleAuthorizationDraftService {
     @Transactional
     public RoleAuthorizationDraftSnapshot apply(String rolePid, RoleAuthorizationDraftRequest request) {
         writes.lock();
+        authoringAccess.requireWrite();
         Role role = resolve(rolePid);
         var reviewed = validate(role, request);
         writes.mutate();

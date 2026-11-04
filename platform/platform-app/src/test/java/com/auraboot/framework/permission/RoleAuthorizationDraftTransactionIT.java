@@ -61,7 +61,10 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     private String readCapability;
     private String editCapability;
 
+    private com.auraboot.framework.integration.TenantAdministrationFixture administrator;
     @BeforeEach void fixture() {
+        administrator = com.auraboot.framework.integration.TenantAdministrationFixture.grant(jdbc, getTestTenant().getId(), getTestTenantMember().getId());
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE, "API", "role", "update", "Role authoring fixture");
         roleId = IdWorker.getId();
         rolePid = UniqueIdGenerator.generate();
         resource = "draft_tx_" + rolePid.toLowerCase();
@@ -89,6 +92,7 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
 
     @AfterEach void cleanup() {
         reset(scopes, fieldBindings);
+        if (administrator != null) administrator.close();
         if (modelId != null) {
             jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?", getTestTenant().getId(), modelId);
             jdbc.update("DELETE FROM ab_meta_model WHERE tenant_id=? AND id=?", getTestTenant().getId(), modelId);
@@ -105,6 +109,37 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND resource_code=?", getTestTenant().getId(), resource);
             jdbc.update("DELETE FROM ab_data_permission_policy WHERE tenant_id=? AND model_code=?", getTestTenant().getId(), resource);
         }
+    }
+
+    @Test void directServiceCallsDenyARealDelegatedRoleManagerWithoutChangingTheDraft() {
+        long user = IdWorker.getId(), member = IdWorker.getId(), assignment = IdWorker.getId();
+        String userPid = UniqueIdGenerator.generate();
+        var baseline = drafts.snapshot(rolePid);
+        jdbc.update("INSERT INTO ab_user (id,pid,is_enabled,deleted_flag) VALUES (?,?,TRUE,FALSE)", user, userPid);
+        jdbc.update("INSERT INTO ab_tenant_member (id,pid,tenant_id,user_id,status,deleted_flag) VALUES (?,?,?,?,'active',FALSE)",
+                member, UniqueIdGenerator.generate(), getTestTenant().getId(), user);
+        jdbc.update("INSERT INTO ab_user_role (id,pid,tenant_id,member_id,role_id,status,deleted_flag) VALUES (?,?,?,?,?,'active',FALSE)",
+                assignment, UniqueIdGenerator.generate(), getTestTenant().getId(), member, getTestRole().getId());
+        try {
+            MetaContext.setContext(getTestTenant().getId(), user, userPid, "delegated-author-test");
+            MetaContext.setMemberId(member);
+            var effective = applicationContext.getBean(com.auraboot.framework.permission.service.UserPermissionService.class);
+            assertThat(effective.hasPermission(user, com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE)).isTrue();
+            assertThatThrownBy(() -> drafts.apply(rolePid, editRequest(baseline)))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(() -> applicationContext.getBean(com.auraboot.framework.permission.capability.CapabilityViewService.class)
+                    .applyCapabilitySelection(roleId, Set.of(editCapability)))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        } finally {
+            applyTestMetaContext();
+            jdbc.update("DELETE FROM ab_user_role WHERE id=?", assignment);
+            jdbc.update("DELETE FROM ab_tenant_member WHERE id=?", member);
+            jdbc.update("DELETE FROM ab_user WHERE id=?", user);
+        }
+        assertThat(persistedCodes()).isEmpty();
+        assertThat(persistedScopes()).isEmpty();
+        assertThat(defaultScope()).isNull();
+        assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
     }
 
     @Test void savesDutiesDefaultAndPerActionOverrideAsOneState() {
