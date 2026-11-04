@@ -253,6 +253,45 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(confirmation).not.toContainText(/tpm_|Tpm Ts/);
   expect(await taskRows(page.request, title)).toHaveLength(0);
   await page.screenshot({ path: join(shots, 'D04-before-confirmation.png'), fullPage: true });
+  // Keep the denial fixture independent of successful multi-turn history.
+  const beforeRevoke = await businessSnapshot(page.request, fixture.project);
+  await body(
+    await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids: [] } }),
+  );
+  try {
+    const denied = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/ai/aurabot/execute') &&
+        response.request().method() === 'POST',
+    );
+    await confirmation.getByTestId('aurabot-confirm-approve').click();
+    const receipt = await denied;
+    expect(receipt.ok()).toBe(true);
+    expect(await receipt.text()).toMatch(/permission|denied|revoked|权限|无权/i);
+    await expect(chat).toContainText(/操作未完成|未完成|创建.*失败|无权|权限/);
+    expect(await taskRows(page.request, title)).toHaveLength(0);
+    expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
+    await page.screenshot({
+      path: join(shots, 'D10-revoked-before-confirmation.png'),
+      fullPage: true,
+    });
+  } finally {
+    await body(
+      await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }),
+    );
+  }
+  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual(
+    rolePids,
+  );
+  await page.getByTestId('agent-chat-new-session-btn').click();
+  await expect(chat.getByTestId('chat-msg-user')).toHaveCount(0);
+  await send(
+    page,
+    `请为项目“${fixture.projectName}”创建任务“${title}”，负责人林晓，截止2026-11-20，完成标准为核对培训手册与验收清单。请实际调用受控创建工具，由我确认。`,
+  );
+  await expect(confirmation).toContainText(title, { timeout: 90_000 });
+  await expect(confirmation).toContainText(fixture.projectName);
+  expect(await taskRows(page.request, title)).toHaveLength(0);
   const continuation = page.waitForResponse(
     (response) =>
       response.url().includes('/api/ai/aurabot/execute') && response.request().method() === 'POST',
@@ -283,40 +322,6 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   expect(await taskRows(page.request, title)).toHaveLength(1);
   await chat.getByTestId('chat-msg-agent').filter({ hasText: title }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(shots, 'D06-history-restored.png'), fullPage: true });
-
-  const revokedTitle = `培训安排复核-${fixture.suffix}`;
-  const beforeRevoke = await businessSnapshot(page.request, fixture.project);
-  await send(
-    page,
-    `请为项目“${fixture.projectName}”创建任务“${revokedTitle}”，负责人林晓，截止2026-11-21，完成标准为核对培训日程与签到安排。请实际调用受控创建工具，等待我确认。`,
-  );
-  const pending = chat.getByTestId('aurabot-confirm-card').last();
-  await expect(pending).toContainText(revokedTitle, { timeout: 90_000 });
-  await body(
-    await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids: [] } }),
-  );
-  try {
-    const decision = page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/ai/aurabot/execute') &&
-        response.request().method() === 'POST',
-    );
-    await pending.getByTestId('aurabot-confirm-approve').click();
-    const receipt = await decision;
-    expect(receipt.ok()).toBe(true);
-    expect(await receipt.text()).toMatch(/permission|denied|revoked|权限|无权/i);
-    await expect(chat).toContainText(/权限|无权/);
-    expect(await taskRows(page.request, revokedTitle)).toHaveLength(0);
-    expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
-    await page.screenshot({
-      path: join(shots, 'D10-revoked-before-confirmation.png'),
-      fullPage: true,
-    });
-  } finally {
-    await body(
-      await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }),
-    );
-  }
 });
 
 test('D2: customer notes create a reviewed task draft without saving or replacing the selected project', async ({
