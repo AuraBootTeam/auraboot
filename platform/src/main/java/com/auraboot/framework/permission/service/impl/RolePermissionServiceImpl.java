@@ -424,6 +424,13 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     public boolean copyRolePermissions(Long sourceRoleId, Long targetRoleId) {
         authorizationWriteLock.mutate();
         log.info("复制角色Permission: sourceRoleId={}, targetRoleId={}", sourceRoleId, targetRoleId);
+        for (Long roleId : java.util.Arrays.asList(sourceRoleId, targetRoleId)) {
+            Role role = roleId == null ? null : roleMapper.selectById(roleId);
+            if (role == null || !java.util.Objects.equals(role.getTenantId(), MetaContext.getCurrentTenantId())) {
+                throw new org.springframework.security.access.AccessDeniedException("Permission copy roles must belong to the current tenant");
+            }
+        }
+
         
         try {
             // 获取源角色的所有Permission IDs

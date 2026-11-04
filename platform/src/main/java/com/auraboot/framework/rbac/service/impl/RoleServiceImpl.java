@@ -63,13 +63,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         }
         log.info("Creating role: {} for tenant: {}", role.getName(), role.getTenantId());
 
-        // Guard: platform-only roles (e.g. platform_admin) must have scope_type=global
-        if (RoleConstants.isPlatformOnly(role.getCode())
-                && !"global".equals(role.getScopeType())) {
-            throw new BusinessException(
-                "Role code '" + role.getCode() + "' is reserved for platform level (scope_type=global). "
-                + "It cannot be created in a business tenant.");
-        }
+        validatePlatformDefinition(role.getCode(), role.getTenantId(), role.getScopeType());
 
         // 设置默认值
         role.setStatus(StatusConstants.ACTIVE);
@@ -99,6 +93,19 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
             throw BusinessException.i18n("role.not_found", role.getId());
         }
         
+        requireOwnedRole(existingRole);
+        if (role.getTenantId() != null && !java.util.Objects.equals(role.getTenantId(), existingRole.getTenantId())) {
+            throw new org.springframework.security.access.AccessDeniedException("A role cannot move between tenants");
+        }
+        String nextCode = role.getCode() == null ? existingRole.getCode() : role.getCode();
+        if ((RoleConstants.isPlatformOnly(nextCode) || RoleConstants.isPlatformOnly(existingRole.getCode()))
+                && !java.util.Objects.equals(nextCode, existingRole.getCode())) {
+            throw new org.springframework.security.access.AccessDeniedException("Platform role codes cannot be promoted or renamed");
+        }
+        validatePlatformDefinition(nextCode, existingRole.getTenantId(),
+                role.getScopeType() == null ? existingRole.getScopeType() : role.getScopeType());
+        role.setTenantId(existingRole.getTenantId());
+
         // 系统角色不允许修改某些字段
         if (Boolean.TRUE.equals(existingRole.getIsSystem())) {
             role.setIsSystem(true);
@@ -111,6 +118,26 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         
         log.info("Role updated successfully: {}", role.getId());
         return role;
+    }
+
+    private static void validatePlatformDefinition(String code, Long tenant, String scope) {
+        if (RoleConstants.isPlatformOnly(code)
+                && (!com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID.equals(tenant)
+                || !"global".equals(scope) || !MetaContext.exists()
+                || !tenant.equals(MetaContext.getCurrentTenantId()))) {
+            throw new org.springframework.security.access.AccessDeniedException("Platform roles require the System tenant and global scope");
+        }
+    }
+
+    private static void requireOwnedRole(Role role) {
+        if (MetaContext.exists()) {
+            Long tenant = MetaContext.getCurrentTenantId();
+            boolean ownsGlobalTemplate = role.getTenantId() == null
+                    && com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID.equals(tenant);
+            if (!ownsGlobalTemplate && !java.util.Objects.equals(role.getTenantId(), tenant)) {
+                throw new org.springframework.security.access.AccessDeniedException("Role belongs to another tenant");
+            }
+        }
     }
 
     @Override
@@ -381,6 +408,11 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
             throw BusinessException.i18n("role.original_not_found", roleId);
         }
         
+        requireOwnedRole(originalRole);
+        if (RoleConstants.isPlatformOnly(newCode)) {
+            throw new org.springframework.security.access.AccessDeniedException("Copying cannot create a platform role");
+        }
+
         // 检查新编码是否可用
         if (!isCodeAvailable(newCode, originalRole.getTenantId())) {
             throw BusinessException.i18n("role.code_exists", newCode);

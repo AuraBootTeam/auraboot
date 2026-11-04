@@ -97,13 +97,16 @@ public class AdminRoleChecker {
         // the tenant_id filter for these so a System-Tenant grant satisfies a
         // request whose MetaContext is a business tenant.
         boolean platformOnly = RoleConstants.isPlatformOnly(roleCode);
+        Long sourceTenant = platformOnly
+                ? com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID : tenantId;
         String sql = "SELECT COUNT(*) FROM ab_user_role ur " +
                 " JOIN ab_tenant_member tm ON ur.member_id = tm.id " +
                 " JOIN ab_role r ON ur.role_id = r.id " +
                 " JOIN ab_user u ON u.id = tm.user_id " +
                 " WHERE tm.user_id = ? " +
-                (platformOnly ? "" : "   AND ur.tenant_id = ? ") +
+                "   AND ur.tenant_id = ? " +
                 "   AND r.code = ? " +
+                (platformOnly ? " AND r.tenant_id = ur.tenant_id AND r.scope_type = 'global' " : "") +
                 "   AND tm.tenant_id = ur.tenant_id " +
                 "   AND (r.tenant_id = ur.tenant_id OR r.tenant_id IS NULL) " +
                 "   AND tm.status = 'active' AND tm.deleted_flag = FALSE " +
@@ -114,9 +117,7 @@ public class AdminRoleChecker {
                 "   AND ur.status = 'active' " +
                 "   AND (r.deleted_flag = FALSE OR r.deleted_flag IS NULL) " +
                 "   AND r.status = 'active'";
-        Long count = platformOnly
-                ? jdbcTemplate.queryForObject(sql, Long.class, userId, roleCode)
-                : jdbcTemplate.queryForObject(sql, Long.class, userId, tenantId, roleCode);
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, userId, sourceTenant, roleCode);
         return count != null && count > 0;
     }
 

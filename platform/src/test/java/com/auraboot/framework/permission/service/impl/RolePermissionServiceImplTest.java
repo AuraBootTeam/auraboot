@@ -378,8 +378,23 @@ class RolePermissionServiceImplTest {
         assertThat(byResource).containsEntry("MODEL", 1L);
     }
 
+    private void copyRoles() {
+        for (Long id : List.of(7L, 8L)) {
+            Role role = new Role(); role.setId(id); role.setTenantId(100L);
+            org.mockito.Mockito.lenient().when(roleMapper.selectById(id)).thenReturn(role);
+        }
+    }
+    @Test void copyRejectsForeignNumericTargetEvenWhenTheSourceIsEmpty() {
+        copyRoles(); Role foreign = new Role(); foreign.setTenantId(1L);
+        when(roleMapper.selectById(8L)).thenReturn(foreign);
+        assertThatThrownBy(() -> service.copyRolePermissions(7L, 8L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionMapper, eventPublisher);
+    }
+
     @Test
     void copyRolePermissionsSkipsWhenSourceEmpty() {
+        copyRoles();
         when(rolePermissionMapper.findByRoleId(7L, 100L)).thenReturn(List.of());
 
         assertThat(service.copyRolePermissions(7L, 8L)).isTrue();
@@ -388,6 +403,7 @@ class RolePermissionServiceImplTest {
 
     @Test
     void copyRolePermissionsAssignsToTarget() {
+        copyRoles();
         RolePermission rp = new RolePermission();
         rp.setPermissionId(50L);
         when(rolePermissionMapper.findByRoleId(7L, 100L)).thenReturn(List.of(rp));
