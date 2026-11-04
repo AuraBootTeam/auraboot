@@ -97,10 +97,15 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({
         }
       }
       let state: 'complete' | 'current' | 'upcoming' = 'upcoming'
-      if (node.doneField && node.doneValue) {
-        if (String(readPath(record, node.doneField) ?? '') === node.doneValue) state = 'complete'
-        else if (node.activeField && node.activeValue && String(readPath(record, node.activeField) ?? '') === node.activeValue) state = 'current'
-      } else {
+      const doneMatch =
+        node.doneField && node.doneValue &&
+        String(readPath(record, node.doneField) ?? '') === node.doneValue
+      const activeMatch =
+        node.activeField && node.activeValue &&
+        String(readPath(record, node.activeField) ?? '') === node.activeValue
+      if (doneMatch) state = 'complete'
+      else if (activeMatch) state = 'current'
+      else {
         const rank = stageRank(node.key)
         if (rank === -1) state = currentRank >= stageOrder.length ? 'complete' : 'upcoming'
         else if (currentRank > rank) state = 'complete'
