@@ -277,7 +277,7 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
   await page.getByTestId('form-btn-submit').click();
   await body(await persisted);
   expect(await taskRows(page.request, title)).toHaveLength(1);
-  await navigateToMenuByClick(page, ['项目交付', '任务']);
+  await expect(page).toHaveURL(/\/p\/tpm_task$/);
   await page.reload();
   await expect(page.getByRole('row').filter({ hasText: title })).toBeVisible();
   await page.screenshot({ path: join(shots, 'D08-task-saved.png'), fullPage: true });

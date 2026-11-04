@@ -7,6 +7,8 @@ test('task extraction preserves the normal save boundary and current project con
   const ordinary = json('../config/pages/tpm_task_form.json');
   const menus = json('../config/menus.json');
   assert.equal(page.modelCode, 'tpm_task');
+  assert.equal(page.extension.afterSubmitRedirect, '/p/tpm_task');
+  assert.equal(page.extension.backTo, '/p/tpm_task');
   const ai = page.blocks.filter(b => b.blockType === 'ai-fill-banner');
   assert.equal(ai.length, 1);
   assert.equal(ai[0].endpoint, undefined);

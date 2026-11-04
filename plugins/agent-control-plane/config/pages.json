@@ -4064,6 +4064,11 @@
     "layout": {
       "type": "stack"
     },
+    "extension": {
+      "showEdit": false,
+      "showBack": false,
+      "showPrint": false
+    },
     "blocks": [
       {
         "id": "ai_colleague_new_wizard",

@@ -12,6 +12,10 @@
   "layout": {
     "type": "stack"
   },
+  "extension": {
+    "afterSubmitRedirect": "/p/tpm_task",
+    "backTo": "/p/tpm_task"
+  },
   "blocks": [
     {
       "id": "task_intake_ai",
