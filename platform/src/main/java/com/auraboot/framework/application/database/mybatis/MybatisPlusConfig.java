@@ -388,6 +388,17 @@ public class MybatisPlusConfig {
         }
 
         @Override
+        protected Expression appendExpression(Expression currentExpression, Expression injectExpression) {
+            // XOR binds less tightly than AND. Preserve the whole business/ON
+            // predicate when the shared tenant or environment scope is appended.
+            Expression grouped = currentExpression instanceof
+                    net.sf.jsqlparser.expression.operators.conditional.XorExpression
+                    ? new net.sf.jsqlparser.expression.operators.relational.ParenthesedExpressionList<>(currentExpression)
+                    : currentExpression;
+            return super.appendExpression(grouped, injectExpression);
+        }
+
+        @Override
         public void beforeQuery(org.apache.ibatis.executor.Executor executor,
                 org.apache.ibatis.mapping.MappedStatement mappedStatement, Object parameter,
                 org.apache.ibatis.session.RowBounds rowBounds,

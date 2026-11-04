@@ -493,7 +493,11 @@ dependencies {
 
     // PF4J Plugin Framework for hot-loading
     implementation "org.pf4j:pf4j:${pf4jVersion}"
-    implementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
+    implementation("org.pf4j:pf4j-spring:${pf4jSpringVersion}") {
+        // The upstream POM declares this unused legacy library; verified plugin
+        // lifecycle and Spring extension discovery do not require its classes.
+        exclude group: 'commons-lang', module: 'commons-lang'
+    }
 
     // Google OAuth (for ID token verification) + Gmail API
     implementation 'com.google.api-client:google-api-client:2.9.2'

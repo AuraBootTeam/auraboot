@@ -126,7 +126,6 @@ commons-codec:commons-codec:1.18.0=baseRuntimeClasspath,integrationTestCompileCl
 commons-collections:commons-collections:3.2.2=checkstyle
 commons-io:commons-io:2.21.0=integrationTestCompileClasspath,testCompileClasspath
 commons-io:commons-io:2.22.0=baseRuntimeClasspath,integrationTestRuntimeClasspath,productionRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
-commons-lang:commons-lang:2.4=baseRuntimeClasspath,integrationTestCompileClasspath,integrationTestRuntimeClasspath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 commons-logging:commons-logging:1.2=integrationTestCompileClasspath,testCompileClasspath
 commons-logging:commons-logging:1.3.6=baseRuntimeClasspath,integrationTestRuntimeClasspath,productionRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
 de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0=baseRuntimeClasspath,integrationTestCompileClasspath,integrationTestRuntimeClasspath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
