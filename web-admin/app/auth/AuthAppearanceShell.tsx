@@ -38,6 +38,7 @@ export default function AuthAppearanceShell({ branding, appearance, children, di
   const background = (dark ? images?.darkBackgroundUrl : undefined) ?? images?.backgroundUrl;
   const accent = appearance.theme?.accent ?? '#35745b';
   const surface = dark ? '#111827' : (appearance.theme?.background ?? '#f6f8f3');
+  const effect = appearance.effects?.mode;
   const style: AuthStyle = {
     '--auth-accent': accent,
     '--auth-on-accent': authForeground(accent),
@@ -54,11 +55,13 @@ export default function AuthAppearanceShell({ branding, appearance, children, di
   return (
     <div className="auth-appearance" style={style} data-auth-template={appearance.template} data-auth-theme={dark ? 'dark' : 'light'} data-brand-position={appearance.brandPosition ?? 'left'} data-card-position={appearance.cardPosition ?? 'center'}>
       {appearance.template === 'background' && background && <div className="auth-background" aria-hidden="true"><DecorativeImage src={background} /><div className="auth-background-overlay" /></div>}
+      {effect === 'beams' && <div className="auth-fx auth-fx-beams" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <span key={index} />)}</div>}
+      {effect === 'aurora' && <div className="auth-fx auth-fx-aurora" aria-hidden="true"><span /><span /><span /></div>}
       <div className="auth-appearance-layout">
-        {appearance.template === 'split' && <section className="auth-brand-story">
+        {(appearance.template === 'split' || appearance.template === 'background') && <section className="auth-brand-story">
           <BrandMark logo={logo} name={displayName ?? branding.productName} />
           {badge && <p className="auth-brand-badge">{badge}</p>}
-          {(headline || emphasis) && <h1 className="auth-brand-headline">{headline}{emphasis && <span>{emphasis}</span>}</h1>}
+          {(headline || emphasis) && <h1 className="auth-brand-headline">{headline && <HighlightedHeadline text={headline} />}{emphasis && <span>{emphasis}</span>}</h1>}
           {lead && <p className="auth-brand-lead">{lead}</p>}
           {images?.mode === 'illustration' && hero && <DecorativeImage className="auth-brand-hero" src={hero} />}
           {features && <ul className="auth-brand-features">{features.map(feature => <li key={feature}>{feature}</li>)}</ul>}
@@ -73,6 +76,13 @@ export default function AuthAppearanceShell({ branding, appearance, children, di
       </div>
     </div>
   );
+}
+
+/** Brand stories commonly lead with the AI token; the platform highlights it in the headline. */
+function HighlightedHeadline({ text }: { text: string }) {
+  const parts = text.split(/(AI)/);
+  if (parts.length === 1) return <>{text}</>;
+  return <>{parts.map((part, index) => part === 'AI' ? <b key={index}>AI</b> : part)}</>;
 }
 
 function BrandMark({ logo, name }: { logo: string; name: string }) {

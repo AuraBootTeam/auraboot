@@ -22,7 +22,11 @@ public final class FieldWriterGuard {
         if (data == null || data.isEmpty()) {
             return;
         }
-        assertFieldsAllowed(model, data.keySet());
+        if (model != null && model.getFields() != null) {
+            for (FieldDefinition field : model.getFields()) {
+                if (field != null && data.containsKey(field.getCode())) assertFieldWriteAllowed(model, field, true);
+            }
+        }
     }
 
     /**
@@ -76,11 +80,17 @@ public final class FieldWriterGuard {
     }
 
     private static void assertFieldWriteAllowed(ModelDefinition model, FieldDefinition field) {
+        assertFieldWriteAllowed(model, field, false);
+    }
+
+    private static void assertFieldWriteAllowed(ModelDefinition model, FieldDefinition field, boolean creating) {
         if (!isProtected(field)) {
             return;
         }
         String commandCode = MetaContext.getAuthorizedCommandCode();
         List<String> allowed = field.getAllowedWriterCommands();
+        if (creating && allowed.stream().filter(Objects::nonNull).map(String::trim)
+                .anyMatch(code -> MetaContext.isCommandCreateWriter(model.getCode(), code))) return;
         boolean exactMatch = MetaContext.hasCommandPermitScope()
                 && commandCode != null
                 && allowed.stream()

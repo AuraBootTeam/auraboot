@@ -431,6 +431,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             return value instanceof AnnouncementAcknowledgementAccessor accessor ? accessor : null;
         }
 
+        /** Current server-resolved subject proof, or null on a host without the original command scope. */
+        public AnnouncementSubjectAcknowledgementAccessor announcementSubjectAcknowledgementAccessor() {
+            Object value = settings != null ? settings.get(AnnouncementSubjectAcknowledgementAccessor.SETTINGS_KEY) : null;
+            return value instanceof AnnouncementSubjectAcknowledgementAccessor accessor ? accessor : null;
+        }
+
         /** Returns the authenticated user's stable public PID. */
         public String currentUserPid() {
             Object value = settings != null ? settings.get(CURRENT_USER_PID_KEY) : null;

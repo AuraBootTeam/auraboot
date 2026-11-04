@@ -45,7 +45,8 @@ describe('authentication appearance presentation', () => {
     const img = container.querySelector('.auth-background img')!;
     fireEvent.error(img);
     expect(container.querySelector('.auth-background img')).toBeNull();
-    expect(screen.getByText('School')).toBeVisible();
+    // The background template renders the brand story and the compact card brand.
+    expect(screen.getAllByText('School').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
   });
   it('does not render the story in centered mode', () => {
@@ -61,6 +62,22 @@ describe('authentication appearance presentation', () => {
       expect((container.firstChild as HTMLElement).style.getPropertyValue('--auth-bg')).toBe('#fafafa');
       expect(applicationTheme.isDark).toBe(true);
     } finally { applicationTheme.isDark = false; }
+  });
+  it('renders the configured decorative effect layer', () => {
+    const beams = show({ ...base, effects: { mode: 'beams' } }).container;
+    expect(beams.querySelectorAll('.auth-fx-beams span')).toHaveLength(5);
+    const aurora = show({ ...base, effects: { mode: 'aurora' } }).container;
+    expect(aurora.querySelectorAll('.auth-fx-aurora span')).toHaveLength(3);
+  });
+  it('highlights the AI token inside the story headline', () => {
+    show({ ...base, content: { headline: { mode: 'custom', values: { 'zh-CN': '以 AI 数智之力' } } } });
+    expect(screen.getByText('AI', { selector: '.auth-brand-headline b' })).toBeVisible();
+  });
+  it('renders no effect layer by default or for none', () => {
+    show(base);
+    expect(document.querySelector('.auth-fx')).toBeNull();
+    show({ ...base, effects: { mode: 'none' } });
+    expect(document.querySelector('.auth-fx')).toBeNull();
   });
 
 });

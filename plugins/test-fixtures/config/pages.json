@@ -2197,5 +2197,130 @@
         ]
       }
     ]
+  },
+  {
+    "pageKey": "e2et_customer_ai_intake",
+    "name:zh-CN": "AI整理客户资料",
+    "name:en": "AI customer intake",
+    "modelCode": "e2et_customer",
+    "description": "Internal live-agent draft qualification using the existing customer command.",
+    "kind": "form",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "agent_customer_source",
+        "blockType": "ai-fill-banner",
+        "placeholder": {
+          "zh-CN": "例如：客户编码C-101，晨光制造有限公司，联系人李明。请只整理明确资料。",
+          "en": "Example: customer C-101, Acorn Manufacturing Ltd, contact Alex. Extract explicit facts only."
+        }
+      },
+      {
+        "id": "agent_customer_draft",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "核对客户草稿",
+          "en": "Review the customer draft"
+        },
+        "columns": 2,
+        "fields": [
+          {
+            "field": "e2et_cust_code",
+            "span": 1,
+            "required": true,
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如 C-101",
+                "en": "e.g. C-101"
+              },
+              "helpText": {
+                "zh-CN": "核对原始客户编码；缺失时手工补充。",
+                "en": "Check the source identifier; enter it manually when absent."
+              }
+            }
+          },
+          {
+            "field": "e2et_cust_name",
+            "span": 1,
+            "required": true,
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如 晨光制造有限公司",
+                "en": "e.g. Acorn Manufacturing Ltd"
+              },
+              "helpText": {
+                "zh-CN": "名称有多个候选时请人工确认，已有输入不会被AI覆盖。",
+                "en": "Resolve competing names manually; AI preserves existing input."
+              }
+            }
+          },
+          {
+            "field": "e2et_cust_contact",
+            "span": 1,
+            "props": {
+              "placeholder": {
+                "zh-CN": "例如 李明 · 采购部",
+                "en": "e.g. Alex · Procurement"
+              },
+              "helpText": {
+                "zh-CN": "保留原文明确的联系人资料，核对后可直接修改。",
+                "en": "Keep explicit contact details and edit them after review."
+              }
+            }
+          },
+          {
+            "field": "e2et_cust_region",
+            "span": 1,
+            "required": true,
+            "dictCode": "e2et_region"
+          }
+        ]
+      },
+      {
+        "id": "agent_customer_actions",
+        "blockType": "form-buttons",
+        "area": "footer",
+        "buttons": [
+          {
+            "code": "save",
+            "action": "save",
+            "commandCode": "e2et:create_customer",
+            "primary": true,
+            "label": {
+              "zh-CN": "保存",
+              "en": "Save"
+            }
+          },
+          {
+            "code": "cancel",
+            "action": "cancel",
+            "label": {
+              "zh-CN": "取消",
+              "en": "Cancel"
+            }
+          }
+        ]
+      }
+    ],
+    "title": {
+      "zh-CN": "整理客户资料",
+      "en": "Review customer notes"
+    },
+    "extension": {
+      "presentation": "workspace",
+      "backTo": "/p/e2et_customer",
+      "afterSubmitRedirect": "/p/e2et_customer",
+      "pageDescription": {
+        "zh-CN": "从资料提取客户草稿，核对来源、人工修正后再保存。",
+        "en": "Extract a draft, review the source and make corrections before saving."
+      },
+      "footerNote": {
+        "zh-CN": "AI只整理当前草稿；点击保存前不会创建客户。",
+        "en": "AI only edits this draft. No customer is created until you save."
+      }
+    }
   }
 ]

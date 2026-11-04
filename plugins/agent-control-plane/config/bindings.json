@@ -1782,5 +1782,29 @@
     "required": false,
     "visible": true,
     "editable": true
+  },
+  {
+    "modelCode": "agent_skill",
+    "fieldCode": "execution_mode",
+    "sequence": 20,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_skill",
+    "fieldCode": "max_steps",
+    "sequence": 21,
+    "required": false,
+    "visible": false,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_skill",
+    "fieldCode": "step_input_mappings",
+    "sequence": 22,
+    "required": false,
+    "visible": false,
+    "editable": false
   }
 ]

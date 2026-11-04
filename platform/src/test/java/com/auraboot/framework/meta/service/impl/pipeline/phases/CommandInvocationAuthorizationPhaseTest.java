@@ -35,6 +35,20 @@ class CommandInvocationAuthorizationPhaseTest {
         assertThat(phase.shouldSkip(context)).isTrue();
         verifyNoInteractions(registry);
     }
+    @Test void strictResultReadsRequireTheHostCapabilityAndACompleteDeclaration() {
+        var refs=List.of(Map.of("model","output_model","path","result.pid"));
+        var strict=context(Map.of("handler","app:category","handlerParams",Map.of("invocationAuthorization","handler-with-result-reads","cachedResultReadReferences",refs)));
+        assertThatThrownBy(()->phase.execute(strict)).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(registry);
+        var factory=new com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory(mock(org.springframework.context.ApplicationContext.class),mock(org.springframework.transaction.PlatformTransactionManager.class),mock(org.apache.ibatis.session.SqlSessionFactory.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(phase,"recordScopeFactory",factory);
+        var incomplete=context(Map.of("handlerParams",Map.of("invocationAuthorization","handler-with-result-reads")));
+        assertThatThrownBy(()->phase.execute(incomplete)).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(registry);
+        var handler=authorizer();when(((CommandInvocationAuthorizer)handler).authorizeInvocation(any())).thenAnswer(call->{
+            CommandInvocationAuthorizer.InvocationContext invocation=call.getArgument(0);assertThat(invocation.recordScopes()).isNotNull();return true;
+        });
+        strict.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("category.create"));
+        phase.execute(strict);assertThat(strict.getHandlerInvocationAuthorization()).isNotNull();
+    }
     @Test void unknownOptInValuesFailClosed() {
         var context = context(Map.of("handlerParams", Map.of("invocationAuthorization", false)));
         assertThat(phase.shouldSkip(context)).isFalse();

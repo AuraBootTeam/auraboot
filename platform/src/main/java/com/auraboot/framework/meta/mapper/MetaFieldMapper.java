@@ -192,6 +192,14 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
         <script>
         SELECT * FROM ab_meta_field
         WHERE deleted_flag = false
+        <if test="businessName != null and businessName != ''">
+          AND strpos(lower(CASE
+            WHEN jsonb_typeof(ui_schema->'label') = 'string' AND btrim(ui_schema->>'label') != ''
+              THEN btrim(ui_schema->>'label')
+            WHEN jsonb_typeof(extension->'extension'->'displayName') = 'string' AND btrim(extension->'extension'->>'displayName') != ''
+              THEN btrim(extension->'extension'->>'displayName')
+            ELSE NULL END), lower(#{businessName})) > 0
+        </if>
         <if test="code != null and code != ''">
           AND code LIKE CONCAT('%', #{code}, '%')
         </if>
@@ -204,7 +212,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
         <if test="currentOnly != null and currentOnly == true">
           AND is_current = TRUE
         </if>
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         </script>
         """)
     @ResultMap("mybatis-plus_Field")
@@ -213,7 +221,8 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
         @Param("code") String code,
         @Param("dataType") String dataType,
         @Param("status") String status,
-        @Param("currentOnly") Boolean currentOnly
+        @Param("currentOnly") Boolean currentOnly,
+        @Param("businessName") String businessName
     );
 
     /**

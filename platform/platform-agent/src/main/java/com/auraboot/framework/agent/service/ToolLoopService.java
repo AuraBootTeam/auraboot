@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
  * dsl_command, dsl_query, api_call, llm_native.
  *
  * Entry adapters must call {@link #executeToolCall(Long, String, String, String, String, Map, List, TraceContext)}
+ * (saved approved provider steps use {@link #executeApprovedToolCall})
  * or {@link #confirmAuraBotSkill(Long, String, String, String, String, Map, List, String, TraceContext)}
  * so authorization, effects, actions, result contracts, and traces stay in one
  * runtime path.
@@ -133,10 +134,34 @@ public class ToolLoopService {
                                    String toolName, Map<String, Object> input,
                                    List<AgentToolDefinition> tools, TraceContext traceCtx,
                                    String profileId, String channel) {
+        return executeScopedToolCall(tenantId, runPid, taskPid, agentCode, toolName, input,
+                tools, traceCtx, profileId, channel, null);
+    }
+
+    /** Recheck current authority before consuming one exact persisted tool approval. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public String executeApprovedToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
+                                          String toolName, Map<String, Object> input,
+                                          List<AgentToolDefinition> tools, TraceContext traceCtx,
+                                          String approvalPid) {
+        if (approvalPid == null || approvalPid.isBlank()) {
+            throw new IllegalArgumentException("An exact approval PID is required for a resumed tool");
+        }
+        BusinessIntentFrame bif = BifContext.getCurrentBif();
+        return executeScopedToolCall(tenantId, runPid, taskPid, agentCode, toolName, input, tools,
+                traceCtx, bif != null ? bif.getProfileId() : null,
+                bif != null ? bif.getChannel() : null, approvalPid);
+    }
+
+    private String executeScopedToolCall(Long tenantId, String runPid, String taskPid, String agentCode,
+                                         String toolName, Map<String, Object> input,
+                                         List<AgentToolDefinition> tools, TraceContext traceCtx,
+                                         String profileId, String channel, String expectedApprovalPid) {
         StepContext.setRunPid(runPid);
         StepContext.setAgentCode(agentCode);
         try {
-            return executeToolCallInternal(tenantId, runPid, taskPid, agentCode, toolName, input, tools, traceCtx, profileId, channel);
+            return executeToolCallInternal(tenantId, runPid, taskPid, agentCode, toolName, input,
+                    tools, traceCtx, profileId, channel, expectedApprovalPid);
         } finally {
             StepContext.clearRunPid();
             StepContext.clearAgentCode();
@@ -187,7 +212,7 @@ public class ToolLoopService {
     private String executeToolCallInternal(Long tenantId, String runPid, String taskPid, String agentCode,
                                             String toolName, Map<String, Object> input,
                                             List<AgentToolDefinition> tools, TraceContext traceCtx,
-                                            String profileId, String channel) {
+                                            String profileId, String channel, String expectedApprovalPid) {
         AgentToolDefinition toolDef = tools.stream()
                 .filter(t -> t.getName().equals(toolName))
                 .findFirst().orElse(null);
@@ -234,6 +259,7 @@ public class ToolLoopService {
             return "Error: Runtime authorization denied for tool '" + toolName + "': " + reason;
         }
         if (authorization.requireApproval()
+                && expectedApprovalPid == null
                 && authorization.approvalRequestId() != null
                 && !authorization.approvalRequestId().isBlank()) {
             String approvalPid = authorization.approvalRequestId() == null
@@ -251,7 +277,7 @@ public class ToolLoopService {
         // D1 Grounding → Approval Gate loop (spec §5.1 RiskEvaluator quality gate).
         boolean auraBotSkill = isAuraBotSkill(toolDef);
         boolean requiresApproval =
-                toolDef.isRequiresApproval() || authorization.requireApproval();
+                expectedApprovalPid != null || toolDef.isRequiresApproval() || authorization.requireApproval();
         if (!requiresApproval) {
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
             if (bif != null && isHighRisk(bif.getRiskLevel()) && isWriteTool(toolName, toolDef)) {
@@ -261,8 +287,11 @@ public class ToolLoopService {
             }
         }
         if (requiresApproval && !auraBotSkill) {
-            String approvalPid = approvalGate.checkAndRequestApproval(
-                    tenantId, runPid, taskPid, toolName, toolDef.getDescription(), input, true);
+            String approvalPid = expectedApprovalPid != null
+                    ? approvalGate.checkAndRequestApproval(tenantId, runPid, taskPid,
+                        toolName, toolDef.getDescription(), input, true, expectedApprovalPid)
+                    : approvalGate.checkAndRequestApproval(tenantId, runPid, taskPid,
+                        toolName, toolDef.getDescription(), input, true);
             if (approvalPid != null) {
                 return toJsonResult(Map.of(
                         "success", false,

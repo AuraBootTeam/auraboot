@@ -101,7 +101,40 @@ tests/
 | `test-data/` | Static test data definitions | `TEST_USERS` |
 | `storage/` | Cached auth state | `admin.json` |
 
-### 2.2 Page Designer Regression Layers
+### 2.2 Agent product qualification
+
+`playwright.agent-approval.config.ts` is the explicit paid-model entry point. Its
+`AGENT_ACCEPTANCE_SCOPE` selects `permissions`, `memory`, `steady`, `forms`,
+`governance`, or `recovery`; it never runs global setup, resets storage, or retries
+business requests. Supply an absolute private `AGENT_PERMISSION_FIXTURE`, an
+absolute `AGENT_PERMISSION_EVIDENCE`, explicit owned Web/backend/DB ports,
+`PG_DB`, `PW_SKIP_WEBSERVER=1`, and `AGENT_ACCEPTANCE_REAL_MODEL=deepseek`.
+
+For `forms`, explicitly import the internal test-fixtures plugin and install the
+versioned `scripts/seed-form-fill-skill.sql` through the existing initialization
+flow. The `AI整理客户资料` menu opens the separate DSL page
+`e2et_customer_ai_intake`; it reuses the customer schema and create command. The
+fixture declares the new record's code and expected manual values before model
+execution. Draft extraction, source review, undo and submission have independent
+UI, trace and database assertions; a prior saved record is not a clean baseline.
+
+`governance` requires separate business owner, reader and writer accounts, the
+exact reader role and writer initial roles, and user-bound approval policies for
+the selected tools. It tests the current ACP skill preview protocol, revocation
+after proposal, a server-acknowledged cancellation, and private history/memory.
+The private source is a bounded, successful business-turn summary; this does not
+qualify retrieval of facts beyond the existing snippet limit.
+
+`recovery` additionally requires `AGENT_PROCESS_FAULTS=owned-jvm` and exact
+runtime, bundle and process paths. It checks ownership before interrupting only
+the declared JVM. PG approval rows, resumed run identities and append-only plan
+checkpoints are the local model-creation oracle; this profile does not claim the
+external-network execution ledger was exercised. The expiry counterexample
+creates a new approval under the owned policy's valid zero-hour deadline, then
+restores that policy to 24 hours. Existing approval rows, Redis TTLs and clocks
+are never edited. Retain every failed round, its data and the original evidence.
+
+### 2.3 Page Designer Regression Layers
 
 当前 `page-designer` 已收敛为 8 个稳定回归入口，不再包含历史 V2/composite/list-canvas 套件。
 

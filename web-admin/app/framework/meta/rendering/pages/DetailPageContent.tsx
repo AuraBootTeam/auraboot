@@ -108,6 +108,7 @@ function DetailPageContentInner(props: PageContentProps) {
     schema,
     token,
     setModelFieldMap,
+    modelFieldMap,
     location,
     setRawData,
     setRecordData,

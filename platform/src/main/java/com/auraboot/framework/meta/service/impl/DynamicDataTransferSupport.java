@@ -411,6 +411,7 @@ final class DynamicDataTransferSupport extends BaseMetaService {
                     String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
                     if (permitFilter != null) {
                         appendScopedBulkFilter(sql, permitFilter);
+                        appendScopedBulkFilter(sql, dataPermissionEngine.buildRequiredReadFilter(tenantId, modelCode, userId));
                     } else {
                         String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
                         if (rowFilter != null && !rowFilter.isBlank()) {

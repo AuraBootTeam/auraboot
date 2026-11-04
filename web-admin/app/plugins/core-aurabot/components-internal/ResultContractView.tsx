@@ -16,6 +16,7 @@
  */
 
 import { ChatBiResultCard, type ChatBiResult } from './ChatBiResultCard';
+import { toolQueryPresentation } from './toolQueryPresentation';
 import { useSmartText } from '~/utils/i18n';
 import { formatParamName } from './ConfirmCard';
 import { CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
@@ -311,6 +312,12 @@ export function ResultContractView({
     );
   }
 
+  // DSL list contracts share the business table projection with legacy tool output.
+  if (contract.status === 'success' && /^list:[a-z][a-z0-9_]*$/.test(contract.skillCode || '')) {
+    const records = resolveTableRows(contract);
+    return <ChatBiResultCard result={toolQueryPresentation({ records, total: records.length }, contract.skillCode)} />;
+  }
+
   const skillPayload = contract.data?.data ?? contract.data;
   const createdModel =
     contract.status === 'success' &&
@@ -353,24 +360,10 @@ export function ResultContractView({
     <div className="max-w-full min-w-0 space-y-2" data-testid="result-contract">
       <div className={`flex items-center gap-2 text-sm ${color}`}>
         <Icon className="h-4 w-4 shrink-0" />
-        <span>
-          {text({
-            'zh-CN':
-              {
-                success: '已完成',
-                partial_success: '部分完成',
-                failed: '未完成',
-                unknown: '状态未知',
-              }[contract.status] ?? '状态未知',
-            'en-US':
-              {
-                success: 'Completed',
-                partial_success: 'Partially completed',
-                failed: 'Not completed',
-                unknown: 'Status unknown',
-              }[contract.status] ?? 'Status unknown',
-          })}
-        </span>
+        <span>{text({
+          'zh-CN': ({ success: '工具已执行', partial_success: '部分完成', failed: '未完成', unknown: '状态未知' })[contract.status] ?? '状态未知',
+          'en-US': ({ success: 'Tool executed', partial_success: 'Partially completed', failed: 'Not completed', unknown: 'Status unknown' })[contract.status] ?? 'Status unknown',
+        })}</span>
       </div>
       <details className="min-w-0 text-xs text-gray-500" data-testid="rc-diagnostics">
         <summary className="cursor-pointer py-1">

@@ -159,7 +159,7 @@ public class SkillRequestValidator {
         // ── Step 5: risk gating (EXECUTE only, ≥ MEDIUM) ───────────────────
         Optional<PreviewTokenStore.PreviewPayload> preview = Optional.empty();
         if (mode == ValidationMode.EXECUTE && skill.riskLevel().atLeast(RiskLevel.MEDIUM)) {
-            preview = Optional.of(consumePreviewToken(skill, req));
+            preview = Optional.of(consumePreviewToken(skill, req, tenantId));
         }
 
         return new ValidatedRequest(skill, req, tenantId, candidatePid,
@@ -275,7 +275,7 @@ public class SkillRequestValidator {
     // Step 5 helper
 
     private PreviewTokenStore.PreviewPayload consumePreviewToken(AuraBotSkill skill,
-                                                                 SkillRequest req) {
+                                                                 SkillRequest req, long tenantId) {
         String token = req.getPreviewToken();
         if (token == null || token.isBlank()) {
             throw new SkillSpiException(SkillErrorCode.CONFIRM_REQUIRED,
@@ -289,6 +289,7 @@ public class SkillRequestValidator {
                     "preview token store unavailable (redis not configured)");
         }
         return previewTokenStore.consume(token, skill.name(), req.getParams())
+                .filter(payload -> payload.tenantId() == tenantId)
                 .orElseThrow(() -> new SkillSpiException(
                         SkillErrorCode.PREVIEW_TOKEN_INVALID,
                         "preview token invalid, expired, or params mismatch"));

@@ -25,6 +25,7 @@ public interface PluginResourceImporter {
     boolean checkRoleExists(Long tenantId, String code);
     boolean checkMenuExists(Long tenantId, String code);
     boolean checkPageExists(Long tenantId, String pageKey);
+    boolean checkDashboardExists(Long tenantId, String code);
     boolean checkDictExists(Long tenantId, String code);
     boolean checkNamedQueryExists(Long tenantId, String code);
     boolean checkAgentDefinitionExists(Long tenantId, String agentCode);

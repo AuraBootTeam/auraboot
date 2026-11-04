@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -220,7 +221,10 @@ public class ModelCreateSkill implements AuraBotSkill {
         return v == null ? fallback : v.toString();
     }
 
+    // Model metadata, field binding and PostgreSQL DDL form one local effect.
+    // A disconnected JVM must never leave an independently committed draft row.
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public SkillResult execute(SkillRequest req) {
         Map<String, Object> params = parseParams(req);
         String code = (String) params.get("code");

@@ -71,6 +71,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     private final MultiTenantIndexManager multiTenantIndexManager;
     private final DataSource dataSource;
     private final ModelFieldRenameColumnPolicy fieldRenameColumnPolicy;
+    private final FieldDeletionGuard fieldDeletionGuard;
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -606,8 +607,11 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 throw new BusinessException("Field not found: " + fieldCode);
             }
             
-            String tableName = model.getTableName();
-            String columnName = field.getColumnName();
+            String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "remove field table");
+            String columnName = SqlSafetyUtils.requireIdentifier(field.getColumnName(), "remove field column");
+            if (isMetadataOnlyModel(model) || isExternallyManagedTable(tableName)) {
+                throw new BusinessException("Cannot remove fields from externally managed or metadata-only models");
+            }
             
             // 3. 检查表是否存在
             if (!tableMetadataService.tableExists(tableName)) {
@@ -632,7 +636,12 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             if (field.isPrimaryKey()) {
                 throw new BusinessException("Cannot remove primary key field: " + fieldCode);
             }
+            if (SystemFieldConstants.isSystemField(fieldCode)) {
+                throw new BusinessException("Cannot remove system field: " + fieldCode);
+            }
             
+            fieldDeletionGuard.requireSafeDrop(model, field);
+
             // 6. 生成DROP COLUMN DDL
             String ddl = "ALTER TABLE " + tableName + " DROP COLUMN " + columnName;
             

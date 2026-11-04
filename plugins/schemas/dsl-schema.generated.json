@@ -455,6 +455,9 @@
             "$ref": "#/definitions/FieldConfig"
           }
         },
+        "resetFieldsOnReset": {
+          "type": "boolean"
+        },
         "buttons": {
           "type": "array",
           "items": {
@@ -1246,13 +1249,13 @@
         "pagination": {
           "type": "boolean"
         },
-        "paginationRequest": {
-          "$ref": "#/definitions/PaginationRequestConfig",
-          "description": "Explicit placement of runtime pageNum/pageSize, without changing other request inputs."
-        },
         "adaptor": {
           "type": "string",
           "description": "Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata."
+        },
+        "paginationRequest": {
+          "$ref": "#/definitions/PaginationRequestConfig",
+          "description": "Explicit placement of runtime pageNum/pageSize, without changing other request inputs."
         },
         "dataPath": {
           "type": "string",
@@ -2443,6 +2446,30 @@
         },
         "showQuickJumper": {
           "type": "boolean"
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "pageState": {
+              "type": "string"
+            },
+            "pageSizeState": {
+              "type": "string"
+            },
+            "resetOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Context paths whose changes return the queue to page one, e.g. state.selectedStore.pid."
+            }
+          },
+          "required": [
+            "pageState",
+            "pageSizeState"
+          ],
+          "additionalProperties": false,
+          "description": "Opt-in server pagination for a data-source table block. API parameters bind these state keys."
         }
       },
       "additionalProperties": false

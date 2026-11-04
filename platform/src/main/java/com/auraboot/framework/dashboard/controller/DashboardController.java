@@ -12,6 +12,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import com.auraboot.framework.plugin.service.PluginResourceTracker;
+import com.auraboot.framework.plugin.dto.imports.ResourceType;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +40,7 @@ import java.util.Map;
 public class DashboardController {
 
     private final DashboardService dashboardService;
+    private final PluginResourceTracker pluginResourceTracker;
 
     // ==================== CRUD Operations ====================
 
@@ -83,6 +87,7 @@ public class DashboardController {
         return ApiResponse.success(result);
     }
 
+    @Transactional
     @PutMapping("/{pid}")
     @Operation(summary = "Update dashboard", description = "Update an existing dashboard")
     @RequirePermission(MetaPermission.DASHBOARD_MANAGE)
@@ -91,6 +96,10 @@ public class DashboardController {
             @Valid @RequestBody DashboardUpdateRequest request) {
         log.info("Updating dashboard: pid={}", pid);
 
+        DashboardDTO current = dashboardService.findByPid(pid);
+        if (current != null) {
+            pluginResourceTracker.markAsUserModified(ResourceType.DASHBOARD, current.getCode());
+        }
         DashboardDTO result = dashboardService.update(pid, request);
 
         log.info("Dashboard updated: pid={}", pid);
@@ -214,6 +223,7 @@ public class DashboardController {
 
     // ==================== Publish Operations ====================
 
+    @Transactional
     @PostMapping("/{pid}/publish")
     @Operation(summary = "Publish dashboard",
             description = "Publish a draft dashboard")
@@ -222,12 +232,17 @@ public class DashboardController {
             @Parameter(description = "Dashboard PID") @PathVariable @NotBlank String pid) {
         log.info("Publishing dashboard: pid={}", pid);
 
+        DashboardDTO current = dashboardService.findByPid(pid);
+        if (current != null) {
+            pluginResourceTracker.markAsUserModified(ResourceType.DASHBOARD, current.getCode());
+        }
         DashboardDTO result = dashboardService.publish(pid);
 
         log.info("Dashboard published: pid={}", pid);
         return ApiResponse.success("Dashboard published successfully", result);
     }
 
+    @Transactional
     @PostMapping("/{pid}/unpublish")
     @Operation(summary = "Unpublish dashboard",
             description = "Unpublish a published dashboard")
@@ -236,6 +251,10 @@ public class DashboardController {
             @Parameter(description = "Dashboard PID") @PathVariable @NotBlank String pid) {
         log.info("Unpublishing dashboard: pid={}", pid);
 
+        DashboardDTO current = dashboardService.findByPid(pid);
+        if (current != null) {
+            pluginResourceTracker.markAsUserModified(ResourceType.DASHBOARD, current.getCode());
+        }
         DashboardDTO result = dashboardService.unpublish(pid);
 
         log.info("Dashboard unpublished: pid={}", pid);

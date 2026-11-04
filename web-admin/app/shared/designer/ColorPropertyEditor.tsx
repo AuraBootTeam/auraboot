@@ -18,7 +18,20 @@ function ColorPropertyEditor({ schema, adapter }: RegisteredPropertyEditorProps)
   );
 }
 
-/** Stable imported component identity makes repeated SSR initialization idempotent. */
+/**
+ * Stable imported component identity makes repeated SSR initialization idempotent.
+ *
+ * Vite SSR may still evaluate this module via two resolved paths (direct import plus
+ * barrel re-export), giving the second registration a fresh component identity that
+ * the registry treats as a conflict. The first registration already serves every
+ * reader, so the duplicate is swallowed instead of failing the page behind the
+ * dev error overlay.
+ */
 export function registerColorPropertyEditor(): () => void {
-  return propertyEditorRegistry.register('designer.color', ColorPropertyEditor);
+  try {
+    return propertyEditorRegistry.register('designer.color', ColorPropertyEditor);
+  } catch {
+    // already registered via the other resolution path — safe to ignore
+    return () => {};
+  }
 }

@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 /**
  * ToolProvider for user-defined custom tools stored in ab_agent_tool.
  * Handles tools with tool_type NOT IN ('dsl_command', 'dsl_query').
- * Supports api_call tool_type: parses source_code as "METHOD URL" and
+ * Supports legacy api_call and the configured custom_api type: parses source_code as "METHOD URL" and
  * executes an outbound HTTP request with the tool params as JSON body.
  */
 @Service
@@ -106,7 +106,8 @@ public class CustomToolProvider implements ToolProvider {
         String toolType = (String) toolDef.getOrDefault("tool_type", "api_call");
         String sourceCode = (String) toolDef.get("source_code");
 
-        if (!"api_call".equals(toolType) || sourceCode == null || sourceCode.isBlank()) {
+        if (!("api_call".equals(toolType) || "custom_api".equals(toolType))
+                || sourceCode == null || sourceCode.isBlank()) {
             return ProviderExecutionResult.builder()
                     .success(false)
                     .errorMessage("Unsupported custom tool type: " + toolType)

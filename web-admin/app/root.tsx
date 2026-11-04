@@ -21,6 +21,7 @@ import { context as traceContext, propagation as tracePropagation } from '@opent
 import React, { useEffect, useState } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
 import { startActiveSessionRenewal } from '~/shared/services/active-session';
+import { PdaOfflineShell } from '~/shared/pda/PdaOfflineShell';
 
 import { I18nProvider, useI18n } from '~/contexts/I18nContext';
 import { ThemeProvider } from '~/contexts/ThemeContext';
@@ -534,6 +535,7 @@ export default function App() {
 
   const appFrame = (
     <>
+      <PdaOfflineShell enabled={authenticated} />
       {data.bootstrapStatus && !data.bootstrapStatus.initialized && (
         <BootstrapBanner status={data.bootstrapStatus} />
       )}

@@ -604,6 +604,22 @@ $$;
 
 
 --
+-- Name: ab_automation_seed_identity_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_automation_seed_identity_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.seed_plugin_id IS NOT NULL AND
+       (NEW.seed_plugin_id IS DISTINCT FROM OLD.seed_plugin_id OR NEW.seed_key IS DISTINCT FROM OLD.seed_key) THEN
+        RAISE EXCEPTION 'Automation seed identity is immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
 -- Name: ab_guard_announcement_reminder_batch(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5991,6 +6007,9 @@ CREATE TABLE public.ab_automation (
     created_by character varying(26),
     updated_by character varying(26),
     flow_config jsonb,
+    seed_plugin_id text,
+    seed_key text,
+    CONSTRAINT chk_automation_seed_identity CHECK ((((seed_plugin_id IS NULL) AND (seed_key IS NULL)) OR ((seed_plugin_id IS NOT NULL) AND (length(btrim(seed_plugin_id)) > 0) AND (seed_key IS NOT NULL) AND (length(btrim(seed_key)) > 0)))),
     CONSTRAINT chk_automation_trigger_type CHECK (((trigger_type)::text = ANY ((ARRAY['on_record_create'::character varying, 'on_record_update'::character varying, 'on_field_change'::character varying, 'on_state_change'::character varying, 'scheduled'::character varying, 'webhook'::character varying, 'on_workflow_event'::character varying, 'on_inactivity'::character varying, 'external_event'::character varying])::text[])))
 );
 
@@ -15318,7 +15337,7 @@ CREATE TABLE public.ab_plugin_resource (
     last_sync_version character varying(50),
     CONSTRAINT ab_plugin_resource_ownership_type_check CHECK (((ownership_type)::text = ANY ((ARRAY['plugin_owned'::character varying, 'shared'::character varying, 'user_claimed'::character varying])::text[]))),
     CONSTRAINT chk_resource_action CHECK (((action)::text = ANY ((ARRAY['create'::character varying, 'update'::character varying, 'delete'::character varying, 'skip'::character varying])::text[]))),
-    CONSTRAINT chk_resource_type CHECK (((resource_type)::text = ANY ((ARRAY['model'::character varying, 'field'::character varying, 'model_field_binding'::character varying, 'command'::character varying, 'binding_rule'::character varying, 'permission'::character varying, 'role'::character varying, 'role_permission'::character varying, 'menu'::character varying, 'process'::character varying, 'page'::character varying, 'dict'::character varying, 'dict_item'::character varying, 'named_query'::character varying, 'agent_definition'::character varying, 'i18n'::character varying, 'saved_view'::character varying, 'notification_template'::character varying, 'public_resource'::character varying, 'public_query'::character varying])::text[])))
+    CONSTRAINT chk_resource_type CHECK (((resource_type)::text = ANY ((ARRAY['model'::character varying, 'field'::character varying, 'model_field_binding'::character varying, 'command'::character varying, 'binding_rule'::character varying, 'permission'::character varying, 'role'::character varying, 'role_permission'::character varying, 'menu'::character varying, 'process'::character varying, 'page'::character varying, 'dashboard'::character varying, 'dict'::character varying, 'dict_item'::character varying, 'named_query'::character varying, 'agent_definition'::character varying, 'i18n'::character varying, 'saved_view'::character varying, 'notification_template'::character varying, 'public_resource'::character varying, 'public_query'::character varying])::text[])))
 );
 
 
@@ -31368,6 +31387,13 @@ CREATE UNIQUE INDEX uq_authoring_identity_simulation_active_session ON public.ab
 
 
 --
+-- Name: uq_automation_seed_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_automation_seed_identity ON public.ab_automation USING btree (tenant_id, seed_plugin_id, seed_key) WHERE ((deleted_flag IS NOT TRUE) AND (seed_plugin_id IS NOT NULL));
+
+
+--
 -- Name: uq_billing_rc_resource_code; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -32037,6 +32063,13 @@ CREATE TRIGGER trg_authoring_release_item_append_only BEFORE DELETE OR UPDATE ON
 --
 
 CREATE TRIGGER trg_authoring_validation_run_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_validation_run FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_automation trg_automation_seed_identity; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_automation_seed_identity BEFORE UPDATE OF seed_plugin_id, seed_key ON public.ab_automation FOR EACH ROW EXECUTE FUNCTION public.ab_automation_seed_identity_guard();
 
 
 --

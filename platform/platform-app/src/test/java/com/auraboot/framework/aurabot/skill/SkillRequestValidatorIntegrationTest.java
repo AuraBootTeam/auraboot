@@ -220,4 +220,23 @@ class SkillRequestValidatorIntegrationTest extends BaseIntegrationTest {
                                 SkillRequestValidator.ValidationMode.EXECUTE))
                 .isInstanceOf(com.auraboot.framework.aurabot.skill.error.SkillSpiException.class);
     }
+
+    @Test
+    void foreignTenantPreviewIsRejectedAgainstTheRealRedisStore() {
+        long tenant = testTenantId();
+        String name = "it-foreign-preview-" + UniqueIdGenerator.generate().toLowerCase();
+        AuraBotSkill skill = mockSkill(name, RiskLevel.HIGH);
+        when(registry.get(name)).thenReturn(Optional.of(skill));
+        when(registry.getCompiledSchema(name)).thenReturn(Optional.of(acceptAllSchema()));
+        ObjectNode params = objectMapper.createObjectNode().put("code", "owned-model");
+        String token = previewTokenStore.save(tenant + 1, name, params, params);
+        SkillRequest request = SkillRequest.builder().skillName(name).params(params).previewToken(token).build();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> validator.validate(
+                request, Set.of(), tenant, SkillRequestValidator.ValidationMode.EXECUTE))
+                .isInstanceOf(com.auraboot.framework.aurabot.skill.error.SkillSpiException.class)
+                .satisfies(error -> assertThat(((com.auraboot.framework.aurabot.skill.error.SkillSpiException) error)
+                        .getErrorCode()).isEqualTo(
+                                com.auraboot.framework.aurabot.skill.error.SkillErrorCode.PREVIEW_TOKEN_INVALID));
+        assertThat(previewTokenStore.consume(token, name, params)).isEmpty();
+    }
 }

@@ -776,6 +776,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getQueryCache(SecureQueryRequest request) {
+        if (RequiredReadReferences.policy(metaModelService.getModelDefinition(request.getModelCode()).orElse(null)) != null) return null;
         Cache cache = cacheManager.getCache(QUERY_CACHE);
         if (cache == null) {
             return null;
@@ -786,6 +787,7 @@ public class SecureQueryExecutorImpl implements SecureQueryExecutor {
 
     @Override
     public <T> void setQueryCache(SecureQueryRequest request, T result) {
+        if (RequiredReadReferences.policy(metaModelService.getModelDefinition(request.getModelCode()).orElse(null)) != null) return;
         if (result == null) {
             return;
         }

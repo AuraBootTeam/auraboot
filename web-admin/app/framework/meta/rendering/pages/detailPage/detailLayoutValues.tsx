@@ -263,7 +263,8 @@ export function evaluateDetailVisibleWhen(
     context: runtimeContext ?? undefined,
     record,
     row: record,
-    form: record,
+    // Preserve scoped UI inputs, while the loaded record owns business fields.
+    form: { ...runtimeContext?.form, ...record },
     state: runtimeContext?.state,
   });
 }

@@ -11,6 +11,12 @@ installBrowserTracing(
 
 installRouteRequestDiagnostics();
 
+// Preserve shared static/offline shell registration. Inventory replay is owned
+// by the authenticated PDA route lifecycle, not every application page.
+import('./shared/pda/offlineReplay')
+  .then((m) => m.registerServiceWorker())
+  .catch((err) => console.warn('[pda-offline] shell start failed', err));
+
 startTransition(() => {
   hydrateRoot(
     document,

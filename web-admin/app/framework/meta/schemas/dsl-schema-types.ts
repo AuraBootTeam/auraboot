@@ -101,6 +101,7 @@ export interface StrictBlockConfig {
 
   // Form
   fields?: FieldConfig[];
+  resetFieldsOnReset?: boolean;
   buttons?: ButtonConfig[];
 
   // Table

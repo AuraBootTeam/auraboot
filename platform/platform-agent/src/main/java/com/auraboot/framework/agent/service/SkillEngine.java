@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.dto.SkillResult;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.trace.TraceContext;
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -233,7 +234,7 @@ public class SkillEngine {
         String resultJson = toolLoopService.executeToolCall(
                 tenantId, runPid, null, null, toolCode, params, tools, traceCtx);
 
-        return parseToolResult(resultJson, 1);
+        return normalizeSingleToolResult(toolCode, resultJson);
     }
 
     /**
@@ -519,8 +520,13 @@ public class SkillEngine {
         // Dynamic dispatch is a recipe adapter, never an alternate execution authority.
         String result = toolLoopService.executeToolCall(tenantId, runPid, null, null,
                 tool.getName(), toolInput, List.of(tool), traceCtx);
+        return normalizeSingleToolResult(code, result);
+    }
+
+    private SkillResult normalizeSingleToolResult(String code, String result) {
         SkillResult outcome = parseToolResult(result, 1);
-        if ("dsl.query".equals(skillCode) && (code.startsWith("get:") || code.startsWith("list:"))) {
+        outcome.setSourceToolCode(code);
+        if (code.startsWith("get:") || code.startsWith("list:")) {
             outcome.setOutputType("structured_result");
             outcome.setActionCount(0);
             if (outcome.getStatus() == SkillResult.Status.SUCCESS) {
@@ -547,15 +553,13 @@ public class SkillEngine {
         if (input == null) return "SkillInput is null";
         if (inputSchemaRaw == null) return null;
         JsonNode schemaNode;
-        if (inputSchemaRaw instanceof String json) {
-            try {
-                schemaNode = objectMapper.readTree(json);
-            } catch (JsonProcessingException invalid) {
-                // CATCH: expected configuration validation; malformed schemas fail closed.
-                return "Invalid skill input schema";
-            }
-        } else {
-            schemaNode = objectMapper.valueToTree(inputSchemaRaw);
+        String schemaJson = JsonbColumns.toJsonText(inputSchemaRaw, objectMapper);
+        if (schemaJson == null) return "Invalid skill input schema";
+        try {
+            schemaNode = objectMapper.readTree(schemaJson);
+        } catch (JsonProcessingException invalid) {
+            // CATCH: expected configuration validation; malformed schemas fail closed.
+            return "Invalid skill input schema";
         }
         try {
             JsonSchema schema = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012,
@@ -742,9 +746,10 @@ public class SkillEngine {
     private List<String> parseToolCodes(Object skillTools) {
         if (skillTools == null) return List.of();
         if (skillTools instanceof List) return (List<String>) skillTools;
-        if (skillTools instanceof String s && !s.isBlank()) {
+        String json = JsonbColumns.toJsonText(skillTools, objectMapper);
+        if (json != null) {
             try {
-                return objectMapper.readValue(s, new TypeReference<>() {});
+                return objectMapper.readValue(json, new TypeReference<>() {});
             } catch (Exception e) {
                 log.warn("Failed to parse skill_tools: {}", e.getMessage());
             }
@@ -756,8 +761,8 @@ public class SkillEngine {
     private Map<String, Map<String, Object>> parseStepInputMappings(Object raw) {
         if (raw == null) return Map.of();
         try {
-            String json = raw instanceof String s ? s : objectMapper.writeValueAsString(raw);
-            if (json.isBlank() || "null".equals(json)) return Map.of();
+            String json = JsonbColumns.toJsonText(raw, objectMapper);
+            if (json == null) return Map.of();
             return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (Exception e) {
             log.debug("Failed to parse step_input_mappings: {}", e.getMessage());

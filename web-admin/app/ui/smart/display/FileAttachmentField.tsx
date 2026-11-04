@@ -10,6 +10,7 @@ import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-rende
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import FILE_ATTACHMENT_TEXT from './FileAttachmentField.i18n.json';
+import { ReadonlyFileReference } from './ReadonlyFileReference';
 import { StagedFileAttachmentField } from './StagedFileAttachmentField';
 
 export interface FileItem {
@@ -158,6 +159,8 @@ function LegacyFileAttachmentField({
   );
 
   if (readOnly) {
+    if (typeof value === 'string' && value && !value.trim().startsWith('['))
+      return <ReadonlyFileReference fileId={value} locale={locale} />;
     if (files.length === 0) return <span className="text-text-3 text-sm">—</span>;
     return (
       <div className="flex flex-wrap gap-x-8 gap-y-4">

@@ -268,6 +268,35 @@ class SkillRequestValidatorUnitTest {
     // Step 5
 
     @Test
+    void foreignTenantPreviewCannotAuthorizeAnOtherwisePermittedSkill() {
+        AuraBotSkill skill = mockSkill("owned:create", RiskLevel.HIGH, Set.of());
+        when(registry.get("owned:create")).thenReturn(Optional.of(skill));
+        when(registry.getCompiledSchema("owned:create")).thenReturn(Optional.of(acceptAllSchema()));
+        SkillRequest req = SkillRequest.builder().skillName("owned:create")
+                .params(params("{}")).previewToken("foreign-preview").build();
+        when(previewStore.consume(eq("foreign-preview"), eq("owned:create"), any()))
+                .thenReturn(Optional.of(new PreviewTokenStore.PreviewPayload(TENANT + 1, "owned:create", params("{}"))));
+        assertThatThrownBy(() -> validator.validate(req, Set.of(), TENANT,
+                SkillRequestValidator.ValidationMode.EXECUTE))
+                .isInstanceOf(SkillSpiException.class)
+                .satisfies(t -> assertThat(((SkillSpiException) t).getErrorCode())
+                        .isEqualTo(SkillErrorCode.PREVIEW_TOKEN_INVALID));
+    }
+
+    @Test
+    void sameTenantPreviewStillAuthorizesAnOtherwisePermittedSkill() {
+        AuraBotSkill skill = mockSkill("owned:create", RiskLevel.HIGH, Set.of());
+        when(registry.get("owned:create")).thenReturn(Optional.of(skill));
+        when(registry.getCompiledSchema("owned:create")).thenReturn(Optional.of(acceptAllSchema()));
+        SkillRequest req = SkillRequest.builder().skillName("owned:create")
+                .params(params("{}")).previewToken("own-preview").build();
+        when(previewStore.consume(eq("own-preview"), eq("owned:create"), any()))
+                .thenReturn(Optional.of(new PreviewTokenStore.PreviewPayload(TENANT, "owned:create", params("{}"))));
+        assertThat(validator.validate(req, Set.of(), TENANT, SkillRequestValidator.ValidationMode.EXECUTE)
+                .preview().orElseThrow().tenantId()).isEqualTo(TENANT);
+    }
+
+    @Test
     @DisplayName("step5 — risk≥MEDIUM with no preview token throws CONFIRM_REQUIRED (422)")
     void step5_riskMedium_noToken_throws422_CONFIRM_REQUIRED() {
         AuraBotSkill skill = mockSkill("admin:reset", RiskLevel.MEDIUM, Set.of());

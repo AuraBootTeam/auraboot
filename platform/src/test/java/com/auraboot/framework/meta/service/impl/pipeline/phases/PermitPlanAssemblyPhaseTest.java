@@ -114,6 +114,87 @@ class PermitPlanAssemblyPhaseTest {
     // ---------- row scope (D3) ----------
 
     @Test
+    void readonlyHandlersRetainRestrictedPolicyInsteadOfInventingCreatorOwnership() {
+        var engine = Mockito.mock(DataPermissionEngine.class);
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        for (String predicate : java.util.List.of("owner_team IN ('team-a')", "department_id IN (3)",
+                "custom_owner = 'another-authorized-principal'")) {
+            when(engine.buildRowFilter(99L, "work_item", 10L)).thenReturn(predicate);
+            var ctx = verifiedReadonlyContext();
+            phase.execute(ctx);
+            assertThat(ctx.getPermitPlan().decision()).isEqualTo(CommandPermitPlan.Decision.PERMIT);
+            assertThat(ctx.getPermitPlan().scope()).as(predicate).isNull();
+            assertThat(ctx.getPermitPlan().aggregateId()).isEqualTo("item-1");
+            assertThat(ctx.getPermitPlan().expectedVersion()).isEqualTo(7L);
+        }
+    }
+
+    @Test
+    void readonlyPolicyFallbackRequiresAnActuallyResolvedHandlerAndTarget() {
+        var engine = Mockito.mock(DataPermissionEngine.class);
+        when(engine.buildRowFilter(99L, "work_item", 10L)).thenReturn("owner_team IN ('team-a')");
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        for (String missing : java.util.List.of("handler", "persistence", "target", "readable", "capability")) {
+            var ctx = verifiedReadonlyContext();
+            switch (missing) {
+                case "handler" -> ctx.setHasPluginHandler(false);
+                case "persistence" -> ctx.setPluginRequiresDslPersistence(true);
+                case "target" -> ctx.getRequest().setTargetRecordId(null);
+                case "readable" -> ctx.setTargetRecordReadable(false);
+                case "capability" -> ctx.setAuthorizationVerdict(null);
+                default -> throw new AssertionError(missing);
+            }
+            phase.execute(ctx);
+            assertThat(ctx.getPermitPlan().scope()).as(missing).isEqualTo(ScopeGrade.SELF);
+        }
+    }
+
+    @Test
+    void restrictedWritesKeepTheirExistingPermitAndVersionSemantics() {
+        var engine = Mockito.mock(DataPermissionEngine.class);
+        when(engine.buildRowFilter(99L, "work_item", 10L)).thenReturn("created_by = 10");
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        for (String action : java.util.List.of("update", "delete")) {
+            var ctx = verifiedReadonlyContext();
+            ctx.setExecConfig(java.util.Map.of("handlerParams", java.util.Map.of("targetRecordAction", action)));
+            phase.execute(ctx);
+            assertThat(ctx.getPermitPlan().scope()).as(action).isEqualTo(ScopeGrade.SELF);
+            assertThat(ctx.getPermitPlan().expectedVersion()).isEqualTo(7L);
+        }
+        when(engine.buildRowFilter(99L, "work_item", 10L)).thenReturn("");
+        var unrestricted = verifiedReadonlyContext();
+        phase.execute(unrestricted);
+        assertThat(unrestricted.getPermitPlan().scope()).isEqualTo(ScopeGrade.ALL);
+    }
+
+    private CommandPipelineContext verifiedReadonlyContext() {
+        var ctx = ctxWithModel("item-1", "work_item");
+        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("work.read"));
+        ctx.setTargetRecordReadable(true);
+        ctx.setTargetRecordVersion(7L);
+        ctx.setHasPluginHandler(true);
+        ctx.setPluginRequiresDslPersistence(false);
+        ctx.setExecConfig(java.util.Map.of("handlerParams", java.util.Map.of("targetRecordAction", "read")));
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+        return ctx;
+    }
+
+    @Test
+    void asyncHandlersKeepTheirExistingPermitEnvelope() {
+        var engine = Mockito.mock(DataPermissionEngine.class);
+        when(engine.buildRowFilter(99L, "work_item", 10L)).thenReturn("owner_team IN ('team-a')");
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        for (Object async : java.util.List.of(true, "true", "TRUE")) {
+            var ctx = verifiedReadonlyContext();
+            ctx.setExecConfig(java.util.Map.of("handlerParams", java.util.Map.of(
+                    "targetRecordAction", "read", "async", async)));
+            phase.execute(ctx);
+            assertThat(ctx.getPermitPlan().scope()).as(async.toString()).isEqualTo(ScopeGrade.SELF);
+            assertThat(ctx.getPermitPlan().expectedVersion()).isEqualTo(7L);
+        }
+    }
+
+    @Test
     void verifiedHandlerWritePinsTheExactRootInsteadOfInheritingGenericAllScope() {
         var engine = Mockito.mock(DataPermissionEngine.class);
         ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);

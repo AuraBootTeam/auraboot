@@ -149,7 +149,11 @@ final class ModelFieldBindingSupport extends BaseMetaService {
                 if (field != null) {
                     log.info("模型已发布，执行 ALTER TABLE DROP COLUMN: modelCode={}, fieldCode={}",
                             logSafe(model.getCode()), logSafe(field.getCode()));
-                    schemaManagementService.removeFieldFromModel(model.getCode(), field.getCode());
+                    SchemaOperationResult removal = schemaManagementService.removeFieldFromModel(model.getCode(), field.getCode());
+                    if (removal == null || !Boolean.TRUE.equals(removal.getSuccess())) {
+                        throw new MetaServiceException("Field removal refused; binding retained: "
+                                + (removal == null ? "missing schema result" : removal.getMessage()));
+                    }
                 }
             }
 

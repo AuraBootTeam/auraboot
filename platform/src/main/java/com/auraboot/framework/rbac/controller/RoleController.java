@@ -1,5 +1,6 @@
 package com.auraboot.framework.rbac.controller;
 
+import org.springframework.transaction.annotation.Transactional;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -127,6 +128,7 @@ public class RoleController {
      */
     @PutMapping("/{pid}")
     @RequirePermission(MetaPermission.ROLE_MANAGE)
+    @Transactional
     public ApiResponse<RoleResponse> updateRole(
             @PathVariable String pid,
             @RequestBody Role role,
@@ -148,6 +150,7 @@ public class RoleController {
      */
     @DeleteMapping("/{pid}")
     @RequirePermission(MetaPermission.ROLE_MANAGE)
+    @Transactional
     public ApiResponse<Boolean> deleteRole(@PathVariable String pid) {
         Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {

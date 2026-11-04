@@ -8,6 +8,7 @@ export type {
 } from './source-state';
 import type { RowProjection } from '../runtime/expression/row-projection';
 import type { WorkspaceCellPresentation } from '../runtime/renderers/WorkspaceCells';
+import type { CrossFieldRule, RuleOverride } from '../validation/crossFieldRuleTypes';
 /**
  * 统一 DSL Schema 类型定义
  * 基于 final.v1.0 DSL 结构
@@ -120,6 +121,8 @@ export interface BlockConfig {
 
   // 表单相关
   fields?: FieldConfig[];
+  /** Opt-in filters behavior: reset only declared filter fields before the onReset action. */
+  resetFieldsOnReset?: boolean;
   /** Optional card-grid inner field layout; existing cards retain stacked fields. */
   fieldsLayout?: LayoutConfig;
   /** Explicit card-row selection; eligibility derives from current exact positive facts. */
@@ -642,6 +645,13 @@ export interface PaginationConfig {
   showTotal?: boolean;
   showSizeChanger?: boolean;
   showQuickJumper?: boolean;
+  /** Opt-in server pagination for a data-source table block. API parameters bind these state keys. */
+  server?: {
+    pageState: string;
+    pageSizeState: string;
+    /** Context paths whose changes return the queue to page one, e.g. state.selectedStore.pid. */
+    resetOn?: string[];
+  };
 }
 
 export interface SelectionConfig {
@@ -952,10 +962,10 @@ export interface UnifiedSchema {
   linkageRules?: LinkageRule[];
 
   // Cross-field validation rules (model-level baseline)
-  rules?: import('~/framework/meta/validation/crossFieldRuleTypes').CrossFieldRule[];
+  rules?: CrossFieldRule[];
 
   // Command-level rule overrides (loaded per command)
-  ruleOverrides?: import('~/framework/meta/validation/crossFieldRuleTypes').RuleOverride[];
+  ruleOverrides?: RuleOverride[];
 
   // Multi-view support — when true, show view type tabs (Table/Kanban/Calendar/etc.)
   // Default: false (only table view, no view switcher)

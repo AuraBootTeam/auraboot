@@ -17,6 +17,7 @@ export interface AuthAppearance {
     focusX?: number; focusY?: number; mobileFocusX?: number; mobileFocusY?: number; overlay?: number;
   };
   theme?: { accent?: string; background?: string; radius?: 'square' | 'soft' | 'rounded'; mode?: 'light' | 'dark' | 'auto' };
+  effects?: { mode?: 'none' | 'beams' | 'aurora' };
   helpUrl?: string;
 }
 

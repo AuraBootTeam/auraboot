@@ -20,6 +20,12 @@ import java.util.Optional;
  */
 public interface MetaFieldService {
 
+    /** Resolve one published version without adding a field to a model or changing storage.
+     * Consumers must freeze the returned definition when publishing their own schema. */
+    default Optional<PublishedFieldDefinition> resolvePublishedDefinition(String code, Integer version) {
+        throw new UnsupportedOperationException("Published field definition resolution is unavailable");
+    }
+
     // ==================== 基础CRUD操作 ====================
 
     /**
@@ -95,6 +101,10 @@ public interface MetaFieldService {
     PageResult<MetaFieldDTO> listFields(Integer page, Integer size, String code, 
                                        String dataType, String status,
                                         Boolean currentOnly);
+
+    /** Page by the displayed business label, with optional existing code/type/status filters. */
+    PageResult<MetaFieldDTO> listFieldsByBusinessName(Integer page, Integer size, String code,
+            String businessName, String dataType, String status, Boolean currentOnly);
 
     // ==================== 字段查询 ====================
 

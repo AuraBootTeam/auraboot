@@ -133,12 +133,12 @@ public interface AutomationMapper extends BaseMapper<Automation> {
      */
     @Insert("""
         INSERT INTO ab_automation (
-            pid, tenant_id, name, description, model_code,
+            pid, tenant_id, name, description, model_code, seed_plugin_id, seed_key,
             trigger_type, trigger_config, trigger_condition, actions,
             flow_config, enabled, trigger_count, deleted_flag, created_at, updated_at,
             created_by, updated_by
         ) VALUES (
-            #{pid}, #{tenantId}, #{name}, #{description}, #{modelCode},
+            #{pid}, #{tenantId}, #{name}, #{description}, #{modelCode}, #{seedPluginId}, #{seedKey},
             #{triggerType},
             #{triggerConfig, jdbcType=OTHER, typeHandler=com.auraboot.framework.automation.typehandler.TriggerConfigTypeHandler},
             #{triggerCondition},

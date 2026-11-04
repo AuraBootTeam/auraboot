@@ -79,6 +79,8 @@ export interface SmartTableChartProps {
   };
   /** Record filters applied by the model-table shorthand branch. */
   filters?: FilterConfig[];
+  /** Declared default filters ({fieldName, operator, value}) applied on load when no explicit filters are set. */
+  defaultFilters?: Array<Record<string, unknown>>;
   /** Default server/client sort for model-table rows. */
   defaultSort?: { field: string; order: 'asc' | 'desc' };
   /** Page size for pagination */
@@ -123,6 +125,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   modelCode,
   table,
   filters,
+  defaultFilters,
   defaultSort,
   pageSize = 10,
   showPagination = true,
@@ -168,6 +171,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<Error | null>(null);
   const modelFiltersKey = useMemo(() => JSON.stringify(filters ?? []), [filters]);
+  const modelDefaultFiltersKey = useMemo(() => JSON.stringify(defaultFilters ?? []), [defaultFilters]);
   const modelSortKey = `${defaultSort?.field ?? ''}:${defaultSort?.order ?? ''}`;
 
   // Stable value-key for the api params: dataSource (and its params object) is a fresh object
@@ -231,14 +235,19 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       pageNum: '1',
       pageSize: String(pageSize * 5), // headroom for sort/pagination on client
     };
-    if (filters?.length) {
-      params.filters = JSON.stringify(
-        filters.map((filter) => ({
+    const effectiveFilters = filters?.length
+      ? filters.map((filter) => ({
           fieldName: filter.field,
           operator: String(filter.operator || 'eq').toUpperCase(),
           value: filter.value,
-        })),
-      );
+        }))
+      : (defaultFilters ?? []).map((filter) => ({
+          fieldName: String(filter.fieldName ?? filter.field ?? ''),
+          operator: String(filter.operator ?? 'eq').toUpperCase(),
+          value: filter.value,
+        }));
+    if (effectiveFilters.length) {
+      params.filters = JSON.stringify(effectiveFilters);
     }
     if (defaultSort?.field) {
       params.sortField = defaultSort.field;
@@ -266,10 +275,10 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     return () => {
       cancelled = true;
     };
-    // `modelFiltersKey` / `modelSortKey` are stable value keys. Dashboard config
+    // `modelFiltersKey` / `modelDefaultFiltersKey` / `modelSortKey` are stable value keys. Dashboard config
     // objects may be reconstructed by the renderer without changing semantics.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useModelBranch, modelCode, pageSize, modelFiltersKey, modelSortKey]);
+  }, [useModelBranch, modelCode, pageSize, modelFiltersKey, modelDefaultFiltersKey, modelSortKey]);
 
   const data = useMemo(() => useChartBranch
     ? chartData

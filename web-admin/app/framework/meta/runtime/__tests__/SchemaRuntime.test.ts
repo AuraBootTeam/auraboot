@@ -4,7 +4,10 @@ import { Activity, createElement, type ReactNode } from 'react';
 import { useSchemaRuntime } from '~/framework/meta/hooks/useSchemaRuntime';
 import { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
-import { createExpressionContext, type GlobalState } from '~/framework/meta/runtime/expression/context';
+import {
+  createExpressionContext,
+  type GlobalState,
+} from '~/framework/meta/runtime/expression/context';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { fetchResult } from '~/shared/services/http-client';
@@ -39,6 +42,56 @@ const minimalSchema: UnifiedSchema = {
 };
 
 describe('SchemaRuntime', () => {
+  it('exposes raw source metadata and empty-page revision in the action binding context', async () => {
+    const manager = createManager();
+    manager.register('media', { type: 'api', endpoint: '/api/media', autoFetch: false });
+    const runtime = new SchemaRuntime({
+      schema: minimalSchema,
+      globalState: createGlobalState(),
+      dataSourceManager: manager,
+      disableAutoFetch: true,
+    });
+    const page = {
+      productPid: 'product-1',
+      records: [],
+      revision: 'empty-revision',
+      totalCount: 0,
+    };
+    mockedFetchResult.mockResolvedValueOnce({ code: '0', data: page } as any);
+    await manager.fetch('media');
+    expect(runtime.getContext().dataSource.media).toEqual(page);
+    expect(runtime.getContext().dataSources.media).toEqual(page);
+    expect(runtime.getContext().data.media).toBeUndefined();
+    expect(runtime.getContext().dataSourceStatus.media).toEqual({ loading: false, error: false });
+    expect(runtime.getContext().__dataSourceManager).toBe(manager);
+    expect(runtime.getContext().locale).toBe('zh-CN');
+    runtime.destroy();
+  });
+
+  it('exposes current loading and sanitized failure flags without mutating scoped state', () => {
+    const manager = createManager();
+    manager.register('media', { type: 'api', endpoint: '/api/media', autoFetch: false });
+    const runtime = new SchemaRuntime({
+      schema: minimalSchema,
+      globalState: createGlobalState(),
+      dataSourceManager: manager,
+      disableAutoFetch: true,
+    });
+    manager.setData('media', { records: [{ label: 'Front' }], revision: 'r1' });
+    manager.setLoading('media', true);
+    expect(runtime.getContext().dataSourceStatus.media).toEqual({ loading: true, error: false });
+    expect(runtime.getContext().data.media).toEqual({ label: 'Front' });
+    manager.setError('media', new Error('private database detail'));
+    expect(runtime.getContext().dataSourceStatus.media).toEqual({ loading: false, error: true });
+    expect(JSON.stringify(runtime.getContext().dataSourceStatus)).not.toContain(
+      'private database detail',
+    );
+    expect(
+      runtime.getStateManager().getContext(runtime.getScopeId()).dataSourceStatus,
+    ).toBeUndefined();
+    runtime.destroy();
+  });
+
   it('registers missing data sources and cleans up only those it owns', () => {
     const manager = createManager();
 
@@ -325,9 +378,13 @@ describe('SchemaRuntime', () => {
   });
 });
 
-
 vi.mock('~/contexts/ToastContext', () => ({
-  useToastContext: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn(), showWarningToast: vi.fn(), showInfoToast: vi.fn() }),
+  useToastContext: () => ({
+    showSuccessToast: vi.fn(),
+    showErrorToast: vi.fn(),
+    showWarningToast: vi.fn(),
+    showInfoToast: vi.fn(),
+  }),
 }));
 
 describe('page runtime manager lifecycle', () => {
@@ -336,17 +393,38 @@ describe('page runtime manager lifecycle', () => {
     const manager = createManager();
     let mode: 'visible' | 'hidden' = 'visible';
     try {
-      const { result, rerender, unmount } = renderHook(({ status }: { status: string }) => useSchemaRuntime({
-        schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
-        disableAutoFetch: true, skipDataSourceRegistration: true,
-        initialContext: { record: { inv_fgpt_status: status } },
-      }), { initialProps: { status: 'pending_pack' }, wrapper: ({ children }: { children: ReactNode }) => createElement(Activity, { mode, children }) });
-      await waitFor(() => expect(result.current?.getContext()).toMatchObject({ record: { inv_fgpt_status: 'pending_pack' } }));
+      const { result, rerender, unmount } = renderHook(
+        ({ status }: { status: string }) =>
+          useSchemaRuntime({
+            schema: minimalSchema,
+            dataSourceManager: manager,
+            navigate: vi.fn(),
+            locale: 'en',
+            t: (key) => key,
+            disableAutoFetch: true,
+            skipDataSourceRegistration: true,
+            initialContext: { record: { inv_fgpt_status: status } },
+          }),
+        {
+          initialProps: { status: 'pending_pack' },
+          wrapper: ({ children }: { children: ReactNode }) =>
+            createElement(Activity, { mode, children }),
+        },
+      );
+      await waitFor(() =>
+        expect(result.current?.getContext()).toMatchObject({
+          record: { inv_fgpt_status: 'pending_pack' },
+        }),
+      );
       mode = 'hidden';
       rerender({ status: 'pending_pack' });
       mode = 'visible';
       rerender({ status: 'received' });
-      await waitFor(() => expect(result.current?.getContext()).toMatchObject({ record: { inv_fgpt_status: 'received' } }));
+      await waitFor(() =>
+        expect(result.current?.getContext()).toMatchObject({
+          record: { inv_fgpt_status: 'received' },
+        }),
+      );
       unmount();
       expect(consoleError).not.toHaveBeenCalled();
     } finally {
@@ -358,18 +436,29 @@ describe('page runtime manager lifecycle', () => {
     const first = createManager();
     const second = createManager();
     second.register('pageOwned', { endpoint: '/api/page-owned', autoFetch: false });
-    const { result, rerender, unmount } = renderHook(({ manager }: { manager: DataSourceManager }) => useSchemaRuntime({
-      schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
-      disableAutoFetch: true, skipDataSourceRegistration: true,
-      initialContext: { record: { pid: 'fixture-task', inv_fgpt_status: 'pending_pack' } },
-    }), { initialProps: { manager: first } });
+    const { result, rerender, unmount } = renderHook(
+      ({ manager }: { manager: DataSourceManager }) =>
+        useSchemaRuntime({
+          schema: minimalSchema,
+          dataSourceManager: manager,
+          navigate: vi.fn(),
+          locale: 'en',
+          t: (key) => key,
+          disableAutoFetch: true,
+          skipDataSourceRegistration: true,
+          initialContext: { record: { pid: 'fixture-task', inv_fgpt_status: 'pending_pack' } },
+        }),
+      { initialProps: { manager: first } },
+    );
     await waitFor(() => expect(result.current).not.toBeNull());
     const previous = result.current!;
     rerender({ manager: second });
     await waitFor(() => expect(result.current).not.toBe(previous));
     const active = result.current!;
     expect(active.getDataSourceManager()).toBe(second);
-    expect(active.getContext()).toMatchObject({ record: { pid: 'fixture-task', inv_fgpt_status: 'pending_pack' } });
+    expect(active.getContext()).toMatchObject({
+      record: { pid: 'fixture-task', inv_fgpt_status: 'pending_pack' },
+    });
     expect(previous.getStateManager().getScope(previous.getScopeId())).toBeUndefined();
     unmount();
     expect(active.getStateManager().getScope(active.getScopeId())).toBeUndefined();
@@ -378,16 +467,29 @@ describe('page runtime manager lifecycle', () => {
 
   it('synchronizes later record values without recreating a stable manager or losing action state', async () => {
     const manager = createManager();
-    const { result, rerender, unmount } = renderHook(({ status }: { status: string }) => useSchemaRuntime({
-      schema: minimalSchema, dataSourceManager: manager, navigate: vi.fn(), locale: 'en', t: key => key,
-      disableAutoFetch: true, skipDataSourceRegistration: true,
-      initialContext: { record: { inv_fgpt_status: status } },
-    }), { initialProps: { status: 'pending_pack' } });
+    const { result, rerender, unmount } = renderHook(
+      ({ status }: { status: string }) =>
+        useSchemaRuntime({
+          schema: minimalSchema,
+          dataSourceManager: manager,
+          navigate: vi.fn(),
+          locale: 'en',
+          t: (key) => key,
+          disableAutoFetch: true,
+          skipDataSourceRegistration: true,
+          initialContext: { record: { inv_fgpt_status: status } },
+        }),
+      { initialProps: { status: 'pending_pack' } },
+    );
     await waitFor(() => expect(result.current).not.toBeNull());
     const active = result.current!;
     active.getStateManager().updateState(active.getScopeId(), 'selectedPackage', 'fixture-package');
     rerender({ status: 'received' });
-    await waitFor(() => expect(result.current!.getContext()).toMatchObject({ record: { inv_fgpt_status: 'received' } }));
+    await waitFor(() =>
+      expect(result.current!.getContext()).toMatchObject({
+        record: { inv_fgpt_status: 'received' },
+      }),
+    );
     expect(result.current).toBe(active);
     expect(active.getContext().state).toMatchObject({ selectedPackage: 'fixture-package' });
     unmount();

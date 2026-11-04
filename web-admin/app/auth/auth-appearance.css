@@ -13,13 +13,16 @@
 .auth-brand-story { padding: clamp(2rem, 5vw, 5rem); display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .auth-brand-mark { display: flex; gap: 0.75rem; align-items: center; font-size: 1.25rem; font-weight: 650; overflow-wrap: anywhere; }
 .auth-brand-mark img { max-width: 10rem; max-height: 2.5rem; object-fit: contain; }
+.auth-brand-story .auth-brand-mark img { max-width: 36rem; max-height: 7rem; }
+.auth-brand-story .auth-brand-mark span { display: none; }
 .auth-brand-badge { margin-top: 1.5rem; font-size: 0.875rem; }
 .auth-brand-headline { margin-top: 1.5rem; font-size: clamp(2rem, 3.5vw, 3rem); font-weight: 750; line-height: 1.2; overflow-wrap: anywhere; }
-.auth-brand-headline span { display: inline; margin-inline-start: 0.35em; text-decoration: underline; text-decoration-color: var(--auth-accent); text-underline-offset: 0.15em; }
+.auth-brand-headline span { display: block; margin-top: 0.2em; }
+.auth-brand-headline b { color: #00b0f0; font-weight: inherit; }
 .auth-brand-lead { margin-top: 1rem; max-width: 34rem; line-height: 1.7; overflow-wrap: anywhere; }
 .auth-brand-hero { margin-top: 1.5rem; max-width: 100%; max-height: 12rem; object-fit: contain; align-self: flex-start; }
-.auth-brand-features { margin-top: 1.5rem; padding: 0; list-style: none; }
-.auth-brand-features li { padding-block: 0.75rem; border-bottom: 1px solid var(--auth-border); overflow-wrap: anywhere; }
+.auth-brand-features { margin-top: 1.5rem; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; max-width: 34rem; }
+.auth-brand-features li { padding: 0.55rem 1.375rem; border: 1px solid var(--auth-accent); border-radius: 999px; font-size: 1.15rem; background: var(--auth-accent); color: var(--auth-on-accent); }
 .auth-form-region { display: flex; justify-content: center; align-items: center; min-width: 0; padding: 2rem; }
 .auth-card { width: 100%; max-width: 28rem; padding: 2rem; background: var(--auth-panel); color: var(--auth-text); border: 1px solid var(--auth-border); border-radius: var(--auth-radius, var(--radius-card, 10px)); box-shadow: var(--shadow-card); }
 .auth-compact-brand { margin-bottom: 1.5rem; }
@@ -43,10 +46,13 @@
 .auth-background-overlay { position: absolute; inset: 0; background: rgb(0 0 0 / var(--auth-overlay)); }
 @media (min-width: 1024px) {
   .auth-appearance[data-auth-template="split"] .auth-appearance-layout { grid-template-columns: 1.15fr 1fr; }
+  .auth-appearance[data-auth-template="background"]:has(.auth-brand-story) .auth-appearance-layout { grid-template-columns: 1.15fr 1fr; }
   .auth-appearance[data-auth-template="split"] .auth-compact-brand { display: none; }
+  .auth-appearance[data-auth-template="background"]:has(.auth-brand-story) .auth-compact-brand { display: none; }
+  .auth-appearance[data-auth-template="background"]:has(.auth-brand-story) .auth-form-region { justify-content: flex-end; padding-inline: 4vw 6vw; }
   .auth-appearance[data-brand-position="right"] .auth-brand-story { order: 2; }
-  .auth-appearance[data-auth-template="background"][data-card-position="left"] .auth-form-region { justify-content: flex-start; padding-inline: 8vw; }
-  .auth-appearance[data-auth-template="background"][data-card-position="right"] .auth-form-region { justify-content: flex-end; padding-inline: 8vw; }
+  .auth-appearance[data-auth-template="background"]:not(:has(.auth-brand-story))[data-card-position="left"] .auth-form-region { justify-content: flex-start; padding-inline: 8vw; }
+  .auth-appearance[data-auth-template="background"]:not(:has(.auth-brand-story))[data-card-position="right"] .auth-form-region { justify-content: flex-end; padding-inline: 8vw; }
 }
 @media (max-width: 1023px) {
   .auth-brand-story { display: none; }
@@ -58,3 +64,36 @@
 .auth-appearance-form [role="alert"] { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
 .auth-appearance[data-auth-theme="dark"] .auth-appearance-form [role="alert"] { color: #fca5a5; background: #450a0a; border-color: #991b1b; }
 .auth-appearance-form [role="alert"] p { color: inherit !important; }
+
+/* Decorative background effects; fixed blue-cyan palette keeps text contrast independent of the brand color. */
+.auth-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.auth-fx span { position: absolute; will-change: transform, opacity; }
+.auth-fx-beams span {
+  top: -20%; height: 140%; width: clamp(40px, 6vw, 96px); filter: blur(6px);
+  background: linear-gradient(180deg, transparent, rgb(56 189 248 / 0.32) 35%, rgb(96 165 250 / 0.5) 60%, transparent);
+  animation: authBeamDrift 9s ease-in-out infinite alternate;
+}
+.auth-fx-beams span:nth-child(1) { left: 8%; animation-delay: 0s; }
+.auth-fx-beams span:nth-child(2) { left: 28%; height: 120%; top: -10%; animation-delay: -3s; opacity: 0.7; }
+.auth-fx-beams span:nth-child(3) { left: 52%; animation-delay: -6s; }
+.auth-fx-beams span:nth-child(4) { left: 71%; height: 110%; top: -5%; animation-delay: -1.5s; opacity: 0.6; }
+.auth-fx-beams span:nth-child(5) { left: 88%; animation-delay: -4.5s; opacity: 0.8; }
+@keyframes authBeamDrift {
+  from { transform: translateY(4%) scaleY(0.96); opacity: 0.45; }
+  to { transform: translateY(-6%) scaleY(1.05); opacity: 1; }
+}
+.auth-fx-aurora span { border-radius: 50%; filter: blur(72px); }
+.auth-fx-aurora span:nth-child(1) { top: -18%; left: -8%; width: 46vw; height: 46vw; background: rgb(29 78 216 / 0.42); animation: authAuroraOne 22s ease-in-out infinite alternate; }
+.auth-fx-aurora span:nth-child(2) { bottom: -22%; right: -10%; width: 40vw; height: 40vw; background: rgb(34 211 238 / 0.28); animation: authAuroraTwo 26s ease-in-out infinite alternate; }
+.auth-fx-aurora span:nth-child(3) { top: 30%; left: 38%; width: 30vw; height: 30vw; background: rgb(99 102 241 / 0.3); animation: authAuroraOne 30s ease-in-out infinite alternate-reverse; }
+@keyframes authAuroraOne {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(6%, 8%) scale(1.15); }
+}
+@keyframes authAuroraTwo {
+  from { transform: translate(0, 0) rotate(0deg); }
+  to { transform: translate(-7%, -6%) rotate(12deg) scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-fx-beams span, .auth-fx-aurora span { animation: none; }
+}

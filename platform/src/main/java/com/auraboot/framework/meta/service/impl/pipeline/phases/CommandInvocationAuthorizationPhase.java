@@ -32,10 +32,14 @@ public class CommandInvocationAuthorizationPhase implements CommandPhase {
     @Override public void execute(CommandPipelineContext context) {
         context.setHandlerInvocationAuthorization(null);
         var params = (Map<?, ?>) context.getExecConfig().get("handlerParams");
-        if (!"handler".equals(params.get("invocationAuthorization")) || !MetaContext.exists()
+        if (!("handler".equals(params.get("invocationAuthorization")) || "handler-with-result-reads".equals(params.get("invocationAuthorization"))) || !MetaContext.exists()
                 || context.getTenantId() == null || !Objects.equals(context.getTenantId(), MetaContext.getCurrentTenantId())
                 || MetaContext.getCurrentMemberId() == null || !StringUtils.hasText(MetaContext.getCurrentUserPid())) {
             throw denied();
+        }
+        if ("handler-with-result-reads".equals(params.get("invocationAuthorization"))) {
+            IdempotencyPhase.cachedReads(context);
+            if (recordScopeFactory == null) throw denied();
         }
         Object configured = context.getExecConfig().get("handler");
         String code = configured instanceof String value && StringUtils.hasText(value) ? value.trim() : context.getCommandCode();

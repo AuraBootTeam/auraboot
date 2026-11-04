@@ -487,7 +487,12 @@ test('MEMBER-DETAIL-08: independent member-view capability permits reading and r
     const selectorBounds = await viewerPage.getByTestId('view-selector-trigger').boundingBox();
     expect(draftBounds).not.toBeNull();
     expect(selectorBounds).not.toBeNull();
-    expect(draftBounds!.y + draftBounds!.height).toBeLessThanOrEqual(selectorBounds!.y);
+    // The polished list shell places its title/view selector above the feedback card.
+    // Draft feedback must remain below that header and before the business data.
+    expect(selectorBounds!.y + selectorBounds!.height).toBeLessThanOrEqual(draftBounds!.y);
+    const resultsBounds = await viewerPage.locator('main table').boundingBox();
+    expect(resultsBounds).not.toBeNull();
+    expect(draftBounds!.y + draftBounds!.height).toBeLessThanOrEqual(resultsBounds!.y);
     const deniedViewWrite = await viewerPage.request.put(`/api/views/${viewPid}`, {
       data: { viewConfig: { rowHeight: 'short' } },
     });

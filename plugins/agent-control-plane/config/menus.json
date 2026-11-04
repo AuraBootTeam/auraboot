@@ -159,17 +159,16 @@
   },
   {
     "code": "acp_skills",
-    "parentCode": "acp_agents",
-    "name:zh-CN": "技能市场",
-    "name:en": "Skills Market",
+    "parentCode": "ai_center",
+    "name:zh-CN": "技能管理",
+    "name:en": "Skills",
     "path": "/p/agent_skill",
     "component": null,
-    "icon": null,
+    "icon": "sparkles",
     "type": 1,
     "permissionCode": "acp_agent_skill",
-    "orderNo": 4,
-    "visible": false,
-    "_deprecated": "DEPRECATED — Accessed via Agent detail page > 'Tools & Skills' tab. DSL page still accessible at /p/agent-skill.",
+    "orderNo": 15,
+    "visible": true,
     "extension": {
       "platforms": [
         "web"

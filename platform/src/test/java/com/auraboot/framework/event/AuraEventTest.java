@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AuraEventTest {
 
@@ -73,4 +74,52 @@ class AuraEventTest {
         event.addMetadata("source", "unit-test");
         assertThat(event.getMetadata()).containsEntry("source", "unit-test");
     }
+    @Test
+    void shouldPreserveExplicitNullAndFalsyValuesInIndependentSnapshot() {
+        var payload = new HashMap<String, Object>();
+        payload.put("unknownCapacity", null);
+        payload.put("enabled", false);
+        payload.put("count", 0);
+        payload.put("note", "");
+        var event = new TestEventWithModel(1L, "anc_resource", "resource-1", payload);
+
+        payload.put("unknownCapacity", 100);
+        payload.remove("enabled");
+        payload.put("later", "change");
+
+        assertThat(event.getPayload()).hasSize(4)
+                .containsEntry("unknownCapacity", null)
+                .containsEntry("enabled", false)
+                .containsEntry("count", 0)
+                .containsEntry("note", "")
+                .doesNotContainKeys("absent", "later");
+        assertThatThrownBy(() -> event.getPayload().put("added", null))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> event.getPayload().remove("unknownCapacity"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> event.getPayload().entrySet().iterator().next().setValue("changed"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void shouldRetainShallowCopySemantics() {
+        var nested = new HashMap<String, Object>();
+        nested.put("value", "before");
+        var event = new TestEventWithModel(1L, "order", "123", Map.of("nested", nested));
+
+        nested.put("value", "after");
+
+        assertThat(event.getPayload().get("nested")).isSameAs(nested);
+        assertThat(event.getPayload()).containsEntry("nested", Map.of("value", "after"));
+    }
+
+    @Test
+    void shouldRejectNullPayloadKeys() {
+        var payload = new HashMap<String, Object>();
+        payload.put(null, "invalid");
+
+        assertThatThrownBy(() -> new TestEventWithModel(1L, "order", "123", payload))
+                .isInstanceOf(NullPointerException.class);
+    }
+
 }

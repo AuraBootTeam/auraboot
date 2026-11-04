@@ -97,7 +97,7 @@
     "code": "skills",
     "displayName:zh-CN": "技能列表",
     "displayName:en": "Skills",
-    "dataType": "text",
+    "dataType": "json",
     "extension": {
       "multiline": true,
       "placeholder:zh-CN": "JSON 格式",
@@ -400,7 +400,11 @@
     "displayName:zh-CN": "关联任务",
     "displayName:en": "Task",
     "dataType": "string",
-    "refTarget": { "targetEntity": "agent_task", "displayField": "title", "valueField": "pid" },
+    "refTarget": {
+      "targetEntity": "agent_task",
+      "displayField": "title",
+      "valueField": "pid"
+    },
     "constraints": {
       "required": false,
       "maxLength": 64
@@ -411,7 +415,11 @@
     "displayName:zh-CN": "Agent",
     "displayName:en": "Agent",
     "dataType": "string",
-    "refTarget": { "targetEntity": "agent_definition", "displayField": "name", "valueField": "agent_code" },
+    "refTarget": {
+      "targetEntity": "agent_definition",
+      "displayField": "name",
+      "valueField": "agent_code"
+    },
     "constraints": {
       "required": true,
       "maxLength": 64
@@ -1207,7 +1215,7 @@
     "code": "skill_tools",
     "displayName:zh-CN": "关联工具",
     "displayName:en": "Tools",
-    "dataType": "text",
+    "dataType": "json",
     "extension": {
       "renderComponent": "agenttoolpicker",
       "placeholder:zh-CN": "选择工具...",
@@ -1229,7 +1237,7 @@
     "code": "skill_input_schema",
     "displayName:zh-CN": "输入 Schema",
     "displayName:en": "Input Schema",
-    "dataType": "text",
+    "dataType": "json",
     "extension": {
       "multiline": true,
       "rows": 4,
@@ -1734,5 +1742,25 @@
       "placeholder:zh-CN": "由 AI 同事详情页选择；空数组表示不检索",
       "placeholder:en": "Choose on the AI colleague detail page; an empty array disables retrieval"
     }
+  },
+  {
+    "code": "execution_mode",
+    "displayName:zh-CN": "执行方式",
+    "displayName:en": "Execution mode",
+    "dataType": "string",
+    "defaultValue": "template"
+  },
+  {
+    "code": "max_steps",
+    "displayName:zh-CN": "最大执行步数",
+    "displayName:en": "Maximum steps",
+    "dataType": "integer",
+    "defaultValue": 5
+  },
+  {
+    "code": "step_input_mappings",
+    "displayName:zh-CN": "步骤输入映射",
+    "displayName:en": "Step input mappings",
+    "dataType": "json"
   }
 ]

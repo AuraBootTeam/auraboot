@@ -75,8 +75,10 @@ class PluginDefinitionResourceImporterTest {
         verify(save,times("NULL".equals(action) ? 0 : 10)).execute(resource,42L);
         verify(snapshot,times("NULL".equals(action) ? 0 : 10)).execute(eq(resource),any());
         if (!"NULL".equals(action)) {
-            assertThat(result.getResourceCounts().get("PAGE")).containsEntry(action,2);
-            assertThat(result.getCreatedResources().get("PAGE")).containsExactly("r-42","r-42");
+            assertThat(result.getResourceCounts().get("PAGE")).containsEntry(action,1);
+            assertThat(result.getResourceCounts().get("DASHBOARD")).containsEntry(action,1);
+            assertThat(result.getCreatedResources().get("PAGE")).containsExactly("r-42");
+            assertThat(result.getCreatedResources().get("DASHBOARD")).containsExactly("r-42");
             assertThat(result.getResourceCounts().get("MODEL_FIELD_BINDING")).containsEntry(action,1);
         }
         assertThat(manifest.getNamedQueries().get(0).getStatus()).isEqualTo("published");
@@ -91,7 +93,7 @@ class PluginDefinitionResourceImporterTest {
         assertThat(importer.importModels(m,q,r,"p","i",42L)).isEmpty();
         importer.importModelFieldBindings(m,q,r,"p","i",42L); importer.importCommands(m,q,r,"p","i",42L);
         importer.importBindingRules(m,q,r,"p","i",42L); importer.importDashboards(m,q,r,"p","i",42L);
-        importer.importNamedQueries(m,q,r,"p","i",42L); importer.importAgentDefinitions(m,q,r,"p","i",42L); importer.importAutomations(m);
+        importer.importNamedQueries(m,q,r,"p","i",42L); importer.importAgentDefinitions(m,q,r,"p","i",42L); importer.importAutomations(m, overwriteRequest(), new ImportExecuteResult());
         assertThatThrownBy(() -> importer.importPages(m,q,r,"p","i",42L)).isInstanceOf(PluginException.class).hasMessageContaining("broken");
         verifyNoInteractions(resources,save,snapshot,automations); assertThat(r.getTotalResourceCount()).isZero();
     }
@@ -102,13 +104,13 @@ class PluginDefinitionResourceImporterTest {
                 .flowConfig(Map.of("mode","serial")).actions(List.of()).build();
         var existing=new AutomationDTO(); existing.setPid("a-42"); existing.setName(seed.getName());
         when(automations.getByModelCode("invoice")).thenReturn(exists ? List.of(existing) : List.of());
-        var m=new PluginManifestExtended(); m.setAutomations(List.of(seed)); importer.importAutomations(m);
+        var m=new PluginManifestExtended(); m.setPluginId("seed-test");m.setAutomations(List.of(seed)); importer.importAutomations(m, overwriteRequest(), new ImportExecuteResult());
         if (exists) {
-            verify(automations).update(eq("a-42"),argThat(q -> !q.getEnabled() && q.getTriggerCondition().equals("amount > 0") && q.getFlowConfig().equals(Map.of("mode","serial"))));
+            verify(automations).updatePluginSeed(eq("a-42"),argThat(q -> !q.getEnabled() && q.getTriggerCondition().equals("amount > 0") && q.getFlowConfig().equals(Map.of("mode","serial"))),eq("seed-test"),eq(seed.getAutomationKey()));
             verify(automations,never()).create(any());
         } else {
-            verify(automations).create(argThat(q -> q.getModelCode().equals("invoice") && !q.getEnabled() && q.getName().equals(seed.getName()) && q.getActions().isEmpty()));
-            verify(automations,never()).update(anyString(),any());
+            verify(automations).createPluginSeed(argThat(q -> q.getModelCode().equals("invoice") && !q.getEnabled() && q.getName().equals(seed.getName()) && q.getActions().isEmpty()),eq("seed-test"),eq(seed.getAutomationKey()));
+            verify(automations,never()).updatePluginSeed(anyString(),any(),anyString(),anyString());
         }
     }
     @Test void generatedDocumentCommandsRespectPluginOverridesAndCrossModelDeduplication() {
@@ -121,5 +123,8 @@ class PluginDefinitionResourceImporterTest {
         assertThat(manifest.getCommands()).containsExactly(override,generated);
         manifest.setCommands(null); importer.generateDocumentTemplateCommands(manifest);
         assertThat(manifest.getCommands()).containsExactly(override,generated);
+    }
+    private static ImportRequest overwriteRequest() {
+        var request = new ImportRequest();request.setConflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE);return request;
     }
 }

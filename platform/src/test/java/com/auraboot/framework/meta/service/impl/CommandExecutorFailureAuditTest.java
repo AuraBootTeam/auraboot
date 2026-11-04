@@ -242,6 +242,33 @@ class CommandExecutorFailureAuditTest {
         assertThatThrownBy(() -> commandExecutor.execute("test.create", request)).isSameAs(failure);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(com.auraboot.framework.plugin.extension.PluginCommandRejectionException.Code.class)
+    void invocationRejectionPreservesLocalizedKeyArgumentsCauseAndFailureAudit(
+            com.auraboot.framework.plugin.extension.PluginCommandRejectionException.Code code) {
+        MetaContext.setContext(77L, 42L, "user_42", "Operator");
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(Map.of("amount", "0.001"));
+        var failure = new com.auraboot.framework.plugin.extension.PluginCommandRejectionException(
+                code, "test.refund.invalid", "CNY");
+        org.mockito.Mockito.doAnswer(invocation -> {
+            CommandPipelineContext context = invocation.getArgument(0);
+            context.transitionTo("invocation_authorization");
+            throw failure;
+        }).when(commandPipeline).executePreGuardPhases(any(CommandPipelineContext.class));
+
+        assertThatThrownBy(() -> commandExecutor.execute("test:refund", request))
+                .isInstanceOfSatisfying(BusinessException.class, translated -> {
+                    assertThat(translated.getResponseCode()).isEqualTo(ResponseCode.BadParam);
+                    assertThat(translated.getMessage()).isEqualTo("$i18n:test.refund.invalid");
+                    assertThat(translated.getCause()).isSameAs(failure);
+                    assertThat(translated.getI18nArgs()).containsExactly("CNY");
+                });
+        verify(effectExecutor).saveAuditLog(eq(77L), eq("test:refund"), isNull(), eq(42L),
+                any(), isNull(), eq(false), eq("$i18n:test.refund.invalid"), anyLong(),
+                eq("invocation_authorization"), any());
+    }
+
     @Test
     void executePreservesConflictExceptionForHttp409Mapping() {
         MetaContext.setContext(77L, 42L, "user_42", "Operator");

@@ -381,7 +381,7 @@
     "displayName:en": "Create Skill",
     "type": "create",
     "modelCode": "agent_skill",
-    "inputFields": ["skill_code", "skill_name", "skill_description", "skill_level", "skill_category", "skill_icon", "skill_tools", "prompt_template", "skill_input_schema", "skill_version", "skill_status", "is_builtin"]
+    "inputFields": ["skill_code", "skill_name", "skill_description", "skill_level", "skill_category", "skill_icon", "skill_tools", "prompt_template", "skill_input_schema", "skill_version", "skill_status", "is_builtin", "execution_mode", "max_steps"]
   },
   {
     "code": "acp:update_agent_skill",
@@ -389,7 +389,7 @@
     "displayName:en": "Update Skill",
     "type": "update",
     "modelCode": "agent_skill",
-    "inputFields": ["skill_code", "skill_name", "skill_description", "skill_level", "skill_category", "skill_icon", "skill_tools", "prompt_template", "skill_input_schema", "skill_version", "skill_status", "is_builtin"]
+    "inputFields": ["skill_code", "skill_name", "skill_description", "skill_level", "skill_category", "skill_icon", "skill_tools", "prompt_template", "skill_input_schema", "skill_version", "skill_status", "is_builtin", "execution_mode", "max_steps"]
   },
   {
     "code": "acp:delete_agent_skill",

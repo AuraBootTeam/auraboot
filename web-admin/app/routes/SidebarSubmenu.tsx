@@ -77,7 +77,7 @@ export default function SidebarSubmenu({
         onClick={() => setIsExpanded(!isExpanded)}
         className={`group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${tokenized ? 'text-text-2 hover:bg-hover hover:text-text' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'}`}
       >
-        <span className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
+        <span aria-hidden="true" className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
           {resolveIcon(typeof icon === 'string' ? icon : null, name, 16)}
         </span>
         <span className="flex-1 truncate text-start">{name}</span>
@@ -133,7 +133,7 @@ export default function SidebarSubmenu({
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
                 }`}
               >
-                <span className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
+                <span aria-hidden="true" className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
                   {resolveIcon(typeof item.icon === 'string' ? item.icon : null, itemName, 14)}
                 </span>
                 <span className="truncate">{itemName}</span>

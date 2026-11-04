@@ -24,6 +24,12 @@ public interface AutomationService {
      */
     AutomationDTO create(AutomationCreateRequest request);
 
+    /** Internal plugin seed operations. Identity is derived from the imported manifest. */
+    AutomationDTO createPluginSeed(AutomationCreateRequest request, String pluginId, String seedKey);
+    AutomationDTO findPluginSeed(String pluginId, String seedKey);
+    boolean hasUnidentifiedAutomations(String modelCode);
+    AutomationDTO updatePluginSeed(String pid, AutomationUpdateRequest request, String pluginId, String seedKey);
+
     /**
      * Get automation by PID
      */

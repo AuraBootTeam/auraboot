@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
  * Model-Field Binding Service Implementation
  * 
  * Manages the binding relationships between models and fields.
- * This service resolves the circular dependency between MetaFieldService and MetaModelService.
+ * Binding creation is independent; removals delegate to the protected model lifecycle.
  * 
  * @author AuraBoot Team
  * @since 3.0.0
@@ -52,6 +52,7 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
     private final MetaFieldMapper metaFieldMapper;
     private final MetaModelFieldBindingMapper bindingMapper;
     private final MetaFieldDictBindingMapper fieldDictBindingMapper;
+    private final com.auraboot.framework.meta.service.MetaModelService metaModelService;
 
     @Override
     @Transactional
@@ -133,16 +134,8 @@ public class ModelFieldBindingServiceImpl implements ModelFieldBindingService {
             return false;
         }
         
-        // 3. Delete binding
-        int deleted = bindingMapper.deleteByModelAndField(model.getId(), field.getId());
-        
-        if (deleted > 0) {
-            log.info("Field unbound from model: modelId={}, fieldId={}", model.getId(), field.getId());
-            return true;
-        } else {
-            log.warn("Binding not found: modelId={}, fieldId={}", model.getId(), field.getId());
-            return false;
-        }
+        // Keep the PID entrypoint on the same protected physical/metadata lifecycle.
+        return metaModelService.unbindFieldFromModel(model.getId(), field.getId());
     }
 
     @Override

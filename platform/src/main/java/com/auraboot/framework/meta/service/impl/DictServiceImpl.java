@@ -425,6 +425,16 @@ public class DictServiceImpl implements DictService {
     }
 
     @Override
+    public Page<DictDTO> findPublishedFamilies(String businessName, int page, int pageSize) {
+        IPage<Dict> result = dictMapper.selectPublishedFamilies(new Page<>(page, pageSize),
+                MetaContext.getCurrentTenantId(), businessName);
+        Page<DictDTO> output = new Page<>(page, pageSize);
+        output.setTotal(result.getTotal());
+        output.setRecords(dictConverter.toDTOList(result.getRecords()));
+        return output;
+    }
+
+    @Override
     public List<DictDTO> findByTenant() {
         // 验证租户上下文
           
@@ -505,6 +515,8 @@ public class DictServiceImpl implements DictService {
         //todo check transiation
 
         Dict dict = findEntityByPid(pid);
+        dictMapper.lockVersionFamily(MetaContext.getCurrentTenantId(), dict.getCode());
+        dict = findEntityByPid(pid);
 
         // 验证是否可以发布
         validateCanPublish(dict);
@@ -520,7 +532,8 @@ public class DictServiceImpl implements DictService {
                 String.format("Cannot publish from %s status (only DRAFT and DEPRECATED allowed)", dict.getStatus()));
         }
 
-        // 更新发布状态
+        // Switch the current marker atomically; historical published versions remain published.
+        dictMapper.clearCurrentFlag(dict.getCode());
         dict.setStatus(Status.PUBLISHED.getCode());
         dict.setIsCurrent(true);
         dict.setUpdatedAt(Instant.now());

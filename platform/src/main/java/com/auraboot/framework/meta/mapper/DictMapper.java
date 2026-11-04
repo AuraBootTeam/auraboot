@@ -237,6 +237,10 @@ public interface DictMapper extends BaseMapper<Dict> {
     @Update("UPDATE ab_dict SET is_current = FALSE  WHERE    code = #{code}")
     int clearCurrentFlag(  @Param("code") String code);
 
+    /** Serialize native publication across versions of one tenant-owned family. */
+    @Select("SELECT id FROM ab_dict WHERE tenant_id = #{tenantId} AND code = #{code} ORDER BY id FOR UPDATE")
+    List<Long> lockVersionFamily(@Param("tenantId") Long tenantId, @Param("code") String code);
+
     /**
      * 设置指定版本为当前版本
      * @param id 字典ID
@@ -371,6 +375,27 @@ public interface DictMapper extends BaseMapper<Dict> {
      * @param status 状态（可选）
      * @return 字典列表
      */
+    /** Select family representatives before count and pagination, independently of is_current. */
+    @Select("""
+        <script>
+        SELECT d.* FROM ab_dict d
+        WHERE d.tenant_id = #{tenantId}
+          AND d.status = 'published' AND d.deleted_flag = FALSE
+          AND NOT EXISTS (
+            SELECT 1 FROM ab_dict newer
+            WHERE newer.tenant_id = d.tenant_id AND newer.code = d.code
+              AND newer.status = 'published' AND newer.deleted_flag = FALSE
+              AND newer.version &gt; d.version
+          )
+        <if test="businessName != null and businessName != ''">
+          AND strpos(lower(d.name), lower(#{businessName})) &gt; 0
+        </if>
+        ORDER BY d.created_at DESC, d.id DESC
+        </script>
+        """)
+    IPage<Dict> selectPublishedFamilies(Page<?> page, @Param("tenantId") Long tenantId,
+            @Param("businessName") String businessName);
+
     // Administration includes non-current drafts/deprecated versions needed for lifecycle actions.
     @Select("""
         <script>

@@ -3,6 +3,8 @@ package com.auraboot.framework.agent.provider;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 import java.util.Map;
@@ -13,6 +15,31 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class CustomToolProviderTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"api_call", "custom_api"})
+    void configuredApiTypesReachTheSameSsrfValidationWithoutNetwork(String toolType) {
+        var mapper = mock(DynamicDataMapper.class);
+        var provider = new CustomToolProvider(mapper, new ObjectMapper(), null);
+        when(mapper.selectByQueryWithoutTenant(any(), any())).thenReturn(List.of(Map.of(
+                "tool_type", toolType, "source_code", "POST file:///not-a-network-target")));
+
+        var result = provider.execute(123L, "custom:owned-receipt", Map.of("requestId", "owned"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getErrorMessage()).contains("URL scheme not allowed")
+                .doesNotContain("Unsupported custom tool type");
+    }
+
+    @Test
+    void unrelatedCustomTypesRemainUnsupported() {
+        var mapper = mock(DynamicDataMapper.class);
+        var provider = new CustomToolProvider(mapper, new ObjectMapper(), null);
+        when(mapper.selectByQueryWithoutTenant(any(), any())).thenReturn(List.of(Map.of(
+                "tool_type", "mcp_server", "source_code", "POST file:///not-a-network-target")));
+        assertThat(provider.execute(123L, "custom:owned-receipt", Map.of()).getErrorMessage())
+                .contains("Unsupported custom tool type");
+    }
 
     @Test
     void discoverIncludesSchemaApprovalAndRiskMetadataFromAgentTool() {

@@ -8,9 +8,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -80,4 +82,53 @@ class DomainEventPublisherTest {
         assertThat(event.getPayload()).containsEntry("amount", 100);
         assertThat(event.getPayload()).containsEntry("status", "draft");
     }
+    @Test
+    void shouldPublishRealCommandEventWithNullableCapabilitySnapshot() {
+        var payload = new HashMap<String, Object>();
+        payload.put("usableLengthMeters", null);
+        payload.put("enabled", false);
+        payload.put("count", 0);
+        payload.put("note", "");
+
+        domainEventPublisher.publishCommandCompleted(
+                "anc_resource:publish_capability", "update", 7L, "resource-1", "anc_resource",
+                payload, 42L, "operator", Map.of("traceId", "null-payload-regression"));
+
+        var captor = ArgumentCaptor.forClass(CommandCompletedEvent.class);
+        verify(auraEventBus).publish(captor.capture());
+        var event = captor.getValue();
+        payload.put("usableLengthMeters", 100);
+        payload.remove("enabled");
+        payload.put("later", true);
+
+        assertThat(event.getPayload()).hasSize(4)
+                .containsEntry("usableLengthMeters", null)
+                .containsEntry("enabled", false)
+                .containsEntry("count", 0)
+                .containsEntry("note", "")
+                .doesNotContainKeys("absent", "later");
+        assertThat(event.getCommandCode()).isEqualTo("anc_resource:publish_capability");
+        assertThat(event.getOperationType()).isEqualTo("update");
+        assertThat(event.getTenantId()).isEqualTo(7L);
+        assertThat(event.getRecordId()).isEqualTo("resource-1");
+        assertThat(event.getModelCode()).isEqualTo("anc_resource");
+        assertThat(event.getMetadata()).containsEntry("actorId", 42L)
+                .containsEntry("actorName", "operator")
+                .containsEntry("traceId", "null-payload-regression");
+        assertThatThrownBy(() -> event.getPayload().put("note", "changed"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        verifyNoMoreInteractions(auraEventBus);
+    }
+
+    @Test
+    void shouldRejectNullKeyBeforePublishing() {
+        var payload = new HashMap<String, Object>();
+        payload.put(null, "invalid");
+
+        assertThatThrownBy(() -> domainEventPublisher.publishCommandCompleted(
+                "anc_resource:publish_capability", "update", 7L, "resource-1", "anc_resource", payload))
+                .isInstanceOf(NullPointerException.class);
+        verifyNoInteractions(auraEventBus);
+    }
+
 }

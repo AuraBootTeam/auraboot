@@ -23,6 +23,29 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserPermissionServiceImplTest {
 
+    @Test
+    void currentEffectiveRolesUseNativeDatedBindingsAndRejectForeignDisabledDeletedRoles() {
+        when(permissionSnapshotCache.getUserRoleIds(100L,1L,5L)).thenReturn(List.of(1L,2L,3L,4L));
+        var baseline=role(5L,100L,"tenant_member","active",false);
+        when(roleMapper.findByTenantIdAndCode(100L,"tenant_member")).thenReturn(baseline);
+        when(roleMapper.selectBatchIds(Set.of(1L,2L,3L,4L,5L))).thenReturn(List.of(
+                role(1L,100L,"catalog","active",false),role(2L,101L,"foreign","active",false),
+                role(3L,100L,"disabled","inactive",false),role(4L,100L,"deleted","active",true),baseline));
+        assertThat(service.getCurrentEffectiveRoleCodes()).containsExactlyInAnyOrder("catalog","tenant_member");
+    }
+
+    @Test
+    void currentEffectiveRolesFailClosedWithoutSubjectAndCannotBeMutated() {
+        when(permissionSnapshotCache.getUserRoleIds(100L,1L,5L)).thenReturn(List.of(1L));
+        when(roleMapper.selectBatchIds(Set.of(1L))).thenReturn(List.of(role(1L,100L,"catalog","active",false)));
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.getCurrentEffectiveRoleCodes().clear()).isInstanceOf(UnsupportedOperationException.class);
+        MetaContext.clear(); assertThat(service.getCurrentEffectiveRoleCodes()).isEmpty();
+    }
+
+    private com.auraboot.framework.rbac.entity.Role role(Long id,Long tenant,String code,String status,boolean deleted) {
+        var role=new com.auraboot.framework.rbac.entity.Role();role.setId(id);role.setTenantId(tenant);role.setCode(code);role.setStatus(status);role.setDeletedFlag(deleted);return role;
+    }
+
     @Mock
     private com.auraboot.framework.application.security.AdminRoleChecker adminRoleChecker;
 

@@ -195,6 +195,45 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     }
 
     @Test
+    void realCreateInvalidatesPredicatesForDependentModelsInsideTheSameCommand() {
+        stubReadVerdict(false);
+        var visible=new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.function.Supplier<String> filter=()->visible.get()?"AND pid = 'new-child'":"AND 1 = 0";
+        when(dynamicDataMapper.insert(anyString(),anyMap())).thenAnswer(call->{visible.set(true);return 1;});
+        try (DynamicDataQueryScope scope=DynamicDataQueryScope.open()) {
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND 1 = 0");
+            service.create(MODEL_CODE,new HashMap<>(Map.of("pid",RECORD_ID,"name","written-value")));
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND pid = 'new-child'");
+        }
+    }
+
+    @Test
+    void observersReadFreshPredicatesAndDoNotLeakIntermediateFilters() { assertObserverInvalidation(false); }
+
+    @Test
+    void observerFailureStillDiscardsIntermediatePredicatesAndPropagates() { assertObserverInvalidation(true); }
+
+    private void assertObserverInvalidation(boolean fail) {
+        stubReadVerdict(false);
+        var version=new java.util.concurrent.atomic.AtomicInteger();
+        java.util.function.Supplier<String> filter=()->"AND version = "+version.get();
+        when(dynamicDataMapper.insert(anyString(),anyMap())).thenAnswer(call->{version.set(1);return 1;});
+        ModelMutationObserver observer=(changed,pid,operation)->{
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 1");
+            version.set(2);
+            if(fail)throw new IllegalStateException("observer failed");
+        };
+        when(applicationContext.getBeansOfType(ModelMutationObserver.class)).thenReturn(Map.of("fixture",observer));
+        try (DynamicDataQueryScope scope=DynamicDataQueryScope.open()) {
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 0");
+            Runnable create=()->service.create(MODEL_CODE,new HashMap<>(Map.of("pid",RECORD_ID,"name","written-value")));
+            if(fail)org.assertj.core.api.Assertions.assertThatThrownBy(create::run).isInstanceOf(IllegalStateException.class).hasMessage("observer failed");
+            else create.run();
+            assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 2");
+        }
+    }
+
+    @Test
     @DisplayName("command-permitted write read-back keeps canonical ids without reference enrichment")
     void create_readBackSkipsPresentationReferenceEnrichment() {
         stubReadVerdict(false);

@@ -30748,6 +30748,10 @@
           "pluginPid": {
             "type": "string"
           },
+          "preservedResourceCount": {
+            "format": "int32",
+            "type": "integer"
+          },
           "resourceCounts": {
             "additionalProperties": {
               "format": "int32",
@@ -30770,6 +30774,12 @@
           },
           "version": {
             "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -41936,6 +41946,7 @@
               "ROLE_PERMISSION",
               "MENU",
               "PAGE",
+              "DASHBOARD",
               "DICT",
               "NAMED_QUERY",
               "AGENT_DEFINITION",
@@ -44516,6 +44527,7 @@
               "ROLE_PERMISSION",
               "MENU",
               "PAGE",
+              "DASHBOARD",
               "DICT",
               "NAMED_QUERY",
               "AGENT_DEFINITION",
@@ -44675,6 +44687,7 @@
               "ROLE_PERMISSION",
               "MENU",
               "PAGE",
+              "DASHBOARD",
               "DICT",
               "NAMED_QUERY",
               "AGENT_DEFINITION",
@@ -44797,6 +44810,7 @@
               "ROLE_PERMISSION",
               "MENU",
               "PAGE",
+              "DASHBOARD",
               "DICT",
               "NAMED_QUERY",
               "AGENT_DEFINITION",
@@ -58835,6 +58849,16 @@
     "/api/agent/tools/registry": {
       "get": {
         "operationId": "listToolRegistry",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "modelHint",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -99352,6 +99376,7 @@
                 "ROLE_PERMISSION",
                 "MENU",
                 "PAGE",
+                "DASHBOARD",
                 "DICT",
                 "NAMED_QUERY",
                 "AGENT_DEFINITION",
@@ -99408,6 +99433,7 @@
                 "ROLE_PERMISSION",
                 "MENU",
                 "PAGE",
+                "DASHBOARD",
                 "DICT",
                 "NAMED_QUERY",
                 "AGENT_DEFINITION",
@@ -99506,6 +99532,7 @@
                 "ROLE_PERMISSION",
                 "MENU",
                 "PAGE",
+                "DASHBOARD",
                 "DICT",
                 "NAMED_QUERY",
                 "AGENT_DEFINITION",
@@ -99634,6 +99661,7 @@
                 "ROLE_PERMISSION",
                 "MENU",
                 "PAGE",
+                "DASHBOARD",
                 "DICT",
                 "NAMED_QUERY",
                 "AGENT_DEFINITION",

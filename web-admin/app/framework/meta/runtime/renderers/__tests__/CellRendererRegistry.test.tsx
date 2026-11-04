@@ -85,11 +85,7 @@ describe('CellRendererRegistry datetime renderer', () => {
 });
 
 describe('CellRendererRegistry progress renderer — threshold tones', () => {
-  const thresholds = [
-    { max: 60, tone: 'gray' },
-    { max: 80, tone: 'amber' },
-    { tone: 'green' },
-  ];
+  const thresholds = [{ max: 60, tone: 'gray' }, { max: 80, tone: 'amber' }, { tone: 'green' }];
   const renderScore = (value: number) => {
     const result = cellRendererRegistry.render('progress', {
       value,
@@ -155,24 +151,90 @@ describe('CellRendererRegistry rating renderer', () => {
   });
 });
 
-
 describe('CellRendererRegistry reference privacy', () => {
   const pid = '01M435AQ7T2VQPQHBYT37EJX6K';
   it('shows the authorized business label without exposing its identifier in a tooltip', () => {
-    render(<>{cellRendererRegistry.render('reference', {
-      value: pid, record: { classroom_display: '三年级2班' },
-      column: { field: 'classroom' }, locale: 'zh-CN',
-    })}</>);
+    render(
+      <>
+        {cellRendererRegistry.render('reference', {
+          value: pid,
+          record: { classroom_display: '三年级2班' },
+          column: { field: 'classroom' },
+          locale: 'zh-CN',
+        })}
+      </>,
+    );
     expect(screen.getByText('三年级2班')).toBeVisible();
     expect(screen.queryByText(pid)).not.toBeInTheDocument();
     expect(screen.getByText('三年级2班')).not.toHaveAttribute('title');
   });
   it('uses a localized unavailable state for a deleted or inaccessible reference', () => {
-    render(<>{cellRendererRegistry.render('reference', {
-      value: pid, record: {}, column: { field: 'classroom' },
-      locale: 'zh-CN', t: key => key,
-    })}</>);
+    render(
+      <>
+        {cellRendererRegistry.render('reference', {
+          value: pid,
+          record: {},
+          column: { field: 'classroom' },
+          locale: 'zh-CN',
+          t: (key) => key,
+        })}
+      </>,
+    );
     expect(screen.getByText('关联记录不存在或无权访问')).toBeVisible();
     expect(screen.queryByText(pid)).not.toBeInTheDocument();
+  });
+});
+
+describe('CellRendererRegistry localized business text', () => {
+  it('chooses the current language without numeric or HTML interpretation', () => {
+    const context = {
+      record: {},
+      column: { field: 'value' },
+      locale: 'zh-CN',
+      t: (key: string) => key,
+    };
+    render(
+      <>
+        {cellRendererRegistry.render('localized-text', {
+          ...context,
+          value: { 'zh-CN': '否', en: 'No' },
+        })}
+        {cellRendererRegistry.render('localized-text', {
+          ...context,
+          value: '1234567890123456.79',
+        })}
+        {cellRendererRegistry.render('localized-text', {
+          ...context,
+          value: '<img src=x onerror=alert(1)>',
+        })}
+      </>,
+    );
+    expect(screen.getByText('否')).toBeInTheDocument();
+    expect(screen.getByText('1234567890123456.79')).toBeInTheDocument();
+    expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
+  });
+  it('renders English labels and withholds unsupported structured values', () => {
+    const context = {
+      record: {},
+      column: { field: 'value' },
+      locale: 'en-US',
+      t: (key: string) => key,
+    };
+    render(
+      <>
+        {cellRendererRegistry.render('localized-text', {
+          ...context,
+          value: { 'zh-CN': '未填写', en: 'Not set' },
+        })}
+        {cellRendererRegistry.render('localized-text', {
+          ...context,
+          value: { secret: { internal: 'do-not-display' } },
+        })}
+      </>,
+    );
+    expect(screen.getByText('Not set')).toBeInTheDocument();
+    expect(screen.getByText('-')).toBeInTheDocument();
+    expect(screen.queryByText(/do-not-display|object Object/)).toBeNull();
   });
 });

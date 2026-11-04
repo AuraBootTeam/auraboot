@@ -83,6 +83,58 @@ public class AutomationServiceImpl implements AutomationService {
     @Transactional
     @Override
     public AutomationDTO create(AutomationCreateRequest request) {
+        return createInternal(request, null, null);
+    }
+
+    @Override
+    @Transactional
+    public AutomationDTO createPluginSeed(AutomationCreateRequest request, String pluginId, String seedKey) {
+        requireSeedIdentity(pluginId, seedKey);
+        return createInternal(request, pluginId, seedKey);
+    }
+
+    @Override
+    public AutomationDTO findPluginSeed(String pluginId, String seedKey) {
+        requireSeedIdentity(pluginId, seedKey);
+        var query = new LambdaQueryWrapper<Automation>().eq(Automation::getTenantId, requireCurrentTenant())
+                .eq(Automation::getSeedPluginId, pluginId).eq(Automation::getSeedKey, seedKey)
+                .eq(Automation::getDeletedFlag, false);
+        Automation value = automationMapper.selectOne(query);
+        return value == null ? null : toDTO(value);
+    }
+
+    @Override
+    public boolean hasUnidentifiedAutomations(String modelCode) {
+        return automationMapper.selectCount(new LambdaQueryWrapper<Automation>()
+                .eq(Automation::getTenantId, requireCurrentTenant()).eq(Automation::getModelCode, modelCode)
+                .isNull(Automation::getSeedPluginId).eq(Automation::getDeletedFlag, false)) > 0;
+    }
+
+    @Override
+    @Transactional
+    public AutomationDTO updatePluginSeed(String pid, AutomationUpdateRequest request, String pluginId, String seedKey) {
+        requireSeedIdentity(pluginId, seedKey);
+        var value = automationMapper.selectOne(new LambdaQueryWrapper<Automation>()
+                .eq(Automation::getPid, pid).eq(Automation::getTenantId, requireCurrentTenant())
+                .eq(Automation::getDeletedFlag, false).last("FOR UPDATE"));
+        if (value == null) throw new IllegalArgumentException("Automation seed target not found");
+        if (value.getSeedPluginId() != null && (!pluginId.equals(value.getSeedPluginId()) || !seedKey.equals(value.getSeedKey()))) {
+            throw new IllegalArgumentException("Automation seed identity conflicts with the existing owner");
+        }
+        if (value.getSeedPluginId() == null) {
+            value.setSeedPluginId(pluginId);value.setSeedKey(seedKey);
+            if (automationMapper.updateById(value) != 1) throw new IllegalStateException("Automation seed identity update failed");
+        }
+        return update(pid, request);
+    }
+
+    private static void requireSeedIdentity(String pluginId, String seedKey) {
+        if (!StringUtils.hasText(pluginId) || !StringUtils.hasText(seedKey)) {
+            throw new IllegalArgumentException("Plugin and automation seed identity are required");
+        }
+    }
+
+    private AutomationDTO createInternal(AutomationCreateRequest request, String pluginId, String seedKey) {
         log.info("Creating automation: name={}, modelCode={}, triggerType={}",
                 request.getName(), request.getModelCode(), request.getTriggerType());
 
@@ -111,6 +163,8 @@ public class AutomationServiceImpl implements AutomationService {
         automation.setPid(UniqueIdGenerator.generate());
         automation.setTenantId(tenantId);
         automation.setName(request.getName());
+        automation.setSeedPluginId(pluginId);
+        automation.setSeedKey(seedKey);
         automation.setDescription(request.getDescription());
         automation.setModelCode(request.getModelCode());
         automation.setTriggerType(request.getTriggerType());

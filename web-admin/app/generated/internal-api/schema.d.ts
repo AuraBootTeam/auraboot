@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 631d615ebcac5d9acf488a473ce883f67e5af1a371a05cd9c8ee587e04b5eb32
+ * Contract SHA-256: 507b294c41121edd1e3bb28bed83e703f74d61a39809fcb8584808edc76bddfd
  */
 export interface paths {
     "/api/activities": {
@@ -33369,6 +33369,8 @@ export interface components {
             namespace?: string;
             pluginId?: string;
             pluginPid?: string;
+            /** Format: int32 */
+            preservedResourceCount?: number;
             resourceCounts?: {
                 [key: string]: number;
             };
@@ -33378,6 +33380,7 @@ export interface components {
             startedAt?: string;
             status?: string;
             version?: string;
+            warnings?: string[];
         };
         ImportOptions: {
             autoDeployProcesses?: boolean;
@@ -37487,7 +37490,7 @@ export interface components {
             resourcePid?: string;
             resourceType?: string;
             /** @enum {string} */
-            resourceTypeEnum?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+            resourceTypeEnum?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
             /** Format: int32 */
             sequence?: number;
             /** Format: int64 */
@@ -38386,7 +38389,7 @@ export interface components {
             resourceCode?: string;
             resourceName?: string;
             /** @enum {string} */
-            resourceType?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+            resourceType?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
             userModified?: boolean;
             /** Format: date-time */
             userModifiedAt?: string;
@@ -38439,7 +38442,7 @@ export interface components {
             pluginPid?: string;
             resourceCode?: string;
             /** @enum {string} */
-            resourceType?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+            resourceType?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
             userModified?: boolean;
         };
         ResourceRef: {
@@ -38504,7 +38507,7 @@ export interface components {
             /** @enum {string} */
             suggestedDecision?: "DELETE" | "KEEP_AND_DETACH" | "SKIP";
             /** @enum {string} */
-            type?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+            type?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
         };
         ResultContract: {
             actionability?: string;
@@ -45591,7 +45594,9 @@ export interface operations {
     };
     listToolRegistry: {
         parameters: {
-            query?: never;
+            query?: {
+                modelHint?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -73597,7 +73602,7 @@ export interface operations {
                 /** @description Resource code */
                 resourceCode: string;
                 /** @description Resource type */
-                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
             };
             header?: never;
             path?: never;
@@ -73620,7 +73625,7 @@ export interface operations {
                 /** @description Resource code */
                 resourceCode: string;
                 /** @description Resource type */
-                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
             };
             header?: never;
             path?: never;
@@ -73667,7 +73672,7 @@ export interface operations {
                 /** @description Resource code */
                 resourceCode: string;
                 /** @description Resource type */
-                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
             };
             header?: never;
             path?: never;
@@ -73737,7 +73742,7 @@ export interface operations {
                 /** @description Resource code */
                 resourceCode: string;
                 /** @description Resource type */
-                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+                resourceType: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
             };
             header?: never;
             path?: never;

@@ -16,7 +16,8 @@
       "acp_agent_memory",
       "acp_agent_observation",
       "acp_agent_tool",
-      "acp_mission_control"
+      "acp_mission_control",
+      "acp_agent_skill"
     ]
   }
 ]

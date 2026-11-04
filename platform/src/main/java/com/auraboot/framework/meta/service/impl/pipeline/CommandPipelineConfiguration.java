@@ -24,6 +24,7 @@ public class CommandPipelineConfiguration {
             EntitlementPhase entitlementPhase,
             // Guarded phases (Order 500-1400)
             SodCheckPhase sodCheckPhase,
+            CommandSubjectAcknowledgementPhase subjectAcknowledgementPhase,
             IdempotencyPhase idempotencyPhase,
             CommandTargetVersionLockPhase commandTargetVersionLockPhase,
             PermitPlanAssemblyPhase permitPlanAssemblyPhase,
@@ -49,6 +50,8 @@ public class CommandPipelineConfiguration {
 
         List<CommandPhase> guardedPhases = List.of(
                 sodCheckPhase,
+                // Host-issued original-subject facts are current even when idempotency replays a cached outcome.
+                subjectAcknowledgementPhase,
                 // Replay is allowed only after every enforcing authorization gate, including the
                 // target-row BOLA gate. The atomic database claim then fences handler execution; a
                 // non-replay locks/rechecks the target version.

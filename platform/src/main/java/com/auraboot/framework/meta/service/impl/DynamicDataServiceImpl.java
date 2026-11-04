@@ -706,6 +706,27 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-by-id")
     public Map<String, Object> getById(String modelCode, String recordId) {
+        return getByIdInternal(modelCode, recordId, true);
+    }
+
+    @Override
+    @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-for-authorization")
+    public Map<String, Object> getByIdForAuthorization(String modelCode, String recordId) {
+        return getByIdInternal(modelCode, recordId, false);
+    }
+
+    @Override
+    @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-authorize-record-read")
+    public void withCanonicalRecordRead(String modelCode, String recordId,
+            java.util.function.Consumer<Map<String,Object>> finalAuthorizer) {
+        java.util.Objects.requireNonNull(finalAuthorizer,"finalAuthorizer");
+        RequiredRecordReadGuard.withCanonicalRead(modelCode,recordId,() ->
+                DynamicDataService.super.withCanonicalRecordRead(modelCode,recordId,record ->
+                        RequiredRecordReadGuard.finalizeCanonicalRead(modelCode,recordId,() -> finalAuthorizer.accept(record))));
+    }
+
+    private Map<String, Object> getByIdInternal(String modelCode, String recordId, boolean enrichDisplay) {
+        RequiredRecordReadGuard.beforeIndependentRecordLoad();
         validateModelCode(modelCode);
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
             com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
@@ -726,6 +747,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (record == null) {
                 throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(modelCode, recordId);
             }
+            dataPermissionEngine.requireRecordReads(modelCode, record);
             return record;
         }
 
@@ -766,6 +788,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
             throw new AccessDeniedException("Access denied: command permit scope does not include this record");
         }
+        if (commandPermitInForce) dataPermissionEngine.requireRecordReads(modelCode, record);
 
         if (!commandPermitInForce) {
             // Apply the Rule Center-backed permission pipeline before the
@@ -850,7 +873,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
 
-        if (!commandPermitInForce) {
+        if (!enrichDisplay && !commandPermitInForce && !MachineDataAccessContext.isActive()
+                && (model.getSourceType()==null || "physical".equals(model.getSourceType()))
+                && !"view".equals(model.getModelType())) {
+            RequiredRecordReadGuard.completePhysicalCanonicalRead(modelCode,recordId);
+        }
+
+        if (enrichDisplay && !commandPermitInForce && !RequiredRecordReadGuard.isResolvingReference()) {
+            // Authorization dependencies retain every gate above, without presentation-only back-links.
             // Resolve reference display names (same as list) so the detail page shows names, not pids.
             // Internal command reads intentionally retain the canonical stored shape.
             List<Map<String, Object>> single = new java.util.ArrayList<>(1);
@@ -1424,8 +1454,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private void notifyModelMutation(ModelDefinition model, String pid, ModelMutationObserver.Operation operation) {
         // Lazy resolution prevents model services and publication validators from forming a cycle.
         // Observer failures deliberately propagate: a published event is part of the business fact.
-        applicationContext.getBeansOfType(ModelMutationObserver.class).values()
-                .forEach(observer -> observer.observe(model, pid, operation));
+        DynamicDataQueryScope.invalidateFiltersAfterMutation();
+        try {
+            applicationContext.getBeansOfType(ModelMutationObserver.class).values()
+                    .forEach(observer -> observer.observe(model, pid, operation));
+        } finally {
+            // Observer reads must not leave intermediate data-derived guards in the outer command.
+            DynamicDataQueryScope.invalidateFiltersAfterMutation();
+        }
     }
 
     private int executeScopedUpdate(

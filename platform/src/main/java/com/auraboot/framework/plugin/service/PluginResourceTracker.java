@@ -5,6 +5,8 @@ import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import lombok.RequiredArgsConstructor;
+import com.auraboot.framework.plugin.exception.PluginException;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +35,7 @@ public class PluginResourceTracker {
      * @param resourceType the resource type (e.g., COMMAND, PAGE, FIELD)
      * @param resourceCode the resource code (e.g., command code, page key, field code)
      */
+    @Transactional
     public void markAsUserModified(ResourceType resourceType, String resourceCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         if (tenantId == null || resourceCode == null) {
@@ -40,19 +43,20 @@ public class PluginResourceTracker {
         }
 
         try {
-            PluginResource pr = pluginResourceMapper.findByTypeAndCode(
-                    tenantId, resourceType.name(), resourceCode);
+            PluginResource pr = pluginResourceMapper.lockByTypeAndCode(
+                    tenantId, resourceType.code(), resourceCode);
 
             if (pr != null && !Boolean.TRUE.equals(pr.getUserModified())) {
                 pr.markAsUserModified();
-                pluginResourceMapper.updateById(pr);
+                if (pluginResourceMapper.updateById(pr) != 1) {
+                    throw new PluginException("Customization protection update did not affect exactly one resource");
+                }
                 log.info("Marked plugin resource as user-modified: type={}, code={}",
                         resourceType, resourceCode);
             }
         } catch (Exception e) {
-            // Non-blocking: don't fail the user's operation if tracking fails
-            log.warn("Failed to mark resource as user-modified: type={}, code={}, error={}",
-                    resourceType, resourceCode, e.getMessage());
+            throw new PluginException("Cannot persist customization protection for "
+                    + resourceType.code() + ":" + resourceCode, e);
         }
     }
 }

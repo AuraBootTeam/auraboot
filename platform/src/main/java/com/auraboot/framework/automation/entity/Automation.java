@@ -36,6 +36,12 @@ public class Automation {
     @TableField("name")
     private String name;
 
+    /** Immutable module-owned seed identity; never accepted from public CRUD requests. */
+    @TableField("seed_plugin_id")
+    private String seedPluginId;
+    @TableField("seed_key")
+    private String seedKey;
+
     /**
      * Description
      */

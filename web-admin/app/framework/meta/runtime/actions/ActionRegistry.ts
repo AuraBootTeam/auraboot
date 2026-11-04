@@ -1,3 +1,4 @@
+import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
 import {
   createPromptSubmissionFeedback,
   type PromptSubmissionFeedback,
@@ -739,7 +740,9 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
  *
  * Shared by the `dialog.form` action (which stores the values into stateManager)
  * and `command.execute`'s `inputFields` sugar (which merges them into the command
- * payload). Pre-fetches options for choice fields with dictCode or api/static dataSources.
+ * payload). Resolves choice options for select-like fields from, in priority
+ * order: inline `options: [{ value, label }]`, `dictCode`, or api/static
+ * `dataSource`.
  */
 type PromptFeedbackContext = Pick<ActionContext, 't' | 'locale'>;
 
@@ -805,6 +808,17 @@ async function fetchPromptChoices(
 
 let nextPromptRequestId = 0;
 
+/** One renderable choice of a prompt select field (see FormDialog FormOptionConfig). */
+type PromptFieldOption = {
+  label: any;
+  value: string;
+  description?: any;
+  disabled?: boolean;
+  visibleWhen?: any;
+  options?: Array<{ value: string; disabled?: boolean }>;
+  defaultValues?: unknown;
+};
+
 export async function promptInputForm(
   fields: Array<Record<string, any> | string>,
   title: any,
@@ -815,6 +829,7 @@ export async function promptInputForm(
   presentation?: CommandInputPresentation,
   signal?: AbortSignal,
   submissionFeedback?: PromptSubmissionFeedback,
+  options: { bindingsResolved?: boolean } = {},
 ): Promise<Record<string, any>> {
   // Capture lifecycle and display values before any async choices request.
   const signals = [
@@ -826,18 +841,7 @@ export async function promptInputForm(
   if (aborted()) throw new ActionCancelledError();
   const snapshot = snapshotPromptPresentation(title, presentation, runtimeContext, feedback);
   const normalizedFields = fields.map((field) => normalizePromptInputField(field));
-  const fieldOptions: Record<
-    string,
-    Array<{
-      label: any;
-      value: string;
-      description?: any;
-      disabled?: boolean;
-      visibleWhen?: any;
-      options?: Array<{ value: string; disabled?: boolean }>;
-      defaultValues?: unknown;
-    }>
-  > = {};
+  const fieldOptions: Record<string, PromptFieldOption[]> = {};
   const dictOptions = new Map<
     string,
     Promise<Array<{ label: any; value: string; description?: any; disabled?: boolean }>>
@@ -888,6 +892,15 @@ export async function promptInputForm(
     return pending;
   };
   for (const field of normalizedFields) {
+    // Inline options win over dictCode/dataSource (options > dictCode >
+    // dataSource): an author-provided `options: [{ value, label }]` list is
+    // used verbatim with no fetch. Previously inline options were silently
+    // dropped and the select rendered empty (plugins#747).
+    const inlineOptions = Array.isArray(field.options) ? field.options : [];
+    if (inlineOptions.length > 0) {
+      fieldOptions[field.field] = normalizeInlinePromptOptions(inlineOptions);
+      continue;
+    }
     if (field.dataSource?.pagination === true) {
       if (
         field.type !== 'multiselect' ||
@@ -907,9 +920,11 @@ export async function promptInputForm(
     if (field.dictCode && fetchResult) {
       fieldOptions[field.field] = await loadDictionary(String(field.dictCode));
     } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
-      const endpoint = String(field.dataSource.endpoint).replace(/\$\{([^}]+)\}/g, (_match, path) =>
-        String(readInputPath(runtimeContext, path) ?? ''),
-      );
+      const endpoint = options.bindingsResolved
+        ? String(field.dataSource.endpoint)
+        : String(field.dataSource.endpoint).replace(/\$\{([^}]+)\}/g, (_match, path) =>
+            String(readInputPath(runtimeContext, path) ?? ''),
+          );
       const result = await fetchPromptChoices(
         fetchResult,
         endpoint,
@@ -1012,7 +1027,9 @@ export async function promptInputForm(
   const defaults: Record<string, any> = {};
   for (const field of normalizedFields) {
     if (field.defaultValue !== undefined) {
-      const resolvedDefaultValue = resolveInputDefaultValue(field.defaultValue, runtimeContext);
+      const resolvedDefaultValue = options.bindingsResolved
+        ? field.defaultValue
+        : resolveInputDefaultValue(field.defaultValue, runtimeContext);
       if (field.type === 'multiselect') {
         const raw = resolvedDefaultValue;
         if (Array.isArray(raw)) {
@@ -1095,6 +1112,7 @@ export async function promptInputForm(
           presentation: snapshot.presentation,
           fields: normalizedFields,
           fieldOptions,
+          fetchResult,
           defaults,
           submitLabel,
           onSubmit: (formData: Record<string, any>) => finish(true, formData),
@@ -1103,6 +1121,31 @@ export async function promptInputForm(
       }),
     );
   });
+}
+
+/**
+ * Normalize author-provided inline options (`options: [{ value, label }]` on a
+ * prompt input field) into the option shape FormDialog renders: string-coerced
+ * `value`, label kept as a localized object or stringified; sibling keys
+ * (description, disabled, visibleWhen, grouped `options`) pass through
+ * untouched. Scalar entries become `{ value, label }` pairs.
+ */
+function normalizeInlinePromptOptions(options: Array<unknown>): PromptFieldOption[] {
+  return options
+    .map((option: any) => {
+      if (option && typeof option === 'object') {
+        if (option.value === undefined || option.value === null) return null;
+        const label = option.label ?? option.name ?? option.value;
+        return {
+          ...option,
+          value: String(option.value),
+          label: label && typeof label === 'object' ? label : String(label ?? option.value),
+        };
+      }
+      if (option === undefined || option === null) return null;
+      return { value: String(option), label: String(option) };
+    })
+    .filter(Boolean) as PromptFieldOption[];
 }
 
 function normalizePromptInputField(field: Record<string, any> | string): Record<string, any> {
@@ -1633,8 +1676,6 @@ actionRegistry.register(
         operationType = expressionEvaluator.evaluateTemplate(operationType, expressionContext);
       }
     }
-    targetRecordPid = targetRecordPid ?? targetRecordPid;
-    targetRecordPid = targetRecordPid ?? targetRecordPid;
 
     let validatedVersion: number | undefined;
     if (args?.expectedVersion !== undefined) {
@@ -1652,6 +1693,7 @@ actionRegistry.register(
       validatedVersion = version;
     }
 
+    mergeCommandInputPayload(payload, {}, args?.inputFieldsPayloadKey);
     const submissionFeedback = createPromptSubmissionFeedback({ t, locale });
     try {
       // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
@@ -1670,7 +1712,7 @@ actionRegistry.register(
           undefined,
           submissionFeedback,
         );
-        payload = { ...payload, ...collected };
+        payload = mergeCommandInputPayload(payload, collected, args?.inputFieldsPayloadKey);
       }
 
       const body: Record<string, any> = {

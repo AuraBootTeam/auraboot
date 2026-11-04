@@ -62,6 +62,8 @@ class FileUploadControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().doCallRealMethod().when(dynamicDataService)
+                .withCanonicalRecordRead(any(),any(),any());
         controller = new FileUploadController();
         ReflectionTestUtils.setField(controller, "fileService", fileService);
         ReflectionTestUtils.setField(controller, "storageProvider", storageProvider);
@@ -280,6 +282,117 @@ class FileUploadControllerTest {
                 .hasMessage("revoked");
         verify(storageProvider, org.mockito.Mockito.never()).download(any());
         verifyNoInteractions(adminEventLogService);
+    }
+
+    @Test void fileRelationAuthorizationUsesTheCanonicalReadWithoutDisplayExpansion() {
+        var file = storedFile("original.json", "application/json", "/tmp/original");
+        var relation = new FileRelationEntity().setEntityType("bundle").setEntityId("bundle-pid").setFieldName("original");
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dynamicDataService.getByIdForAuthorization("bundle", "bundle-pid")).thenReturn(java.util.Map.of("pid", "bundle-pid"));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any()))
+                .thenAnswer(call -> {
+                    java.util.function.Function<String, java.util.Map<String, Object>> loader = call.getArgument(3);
+                    return loader.apply("bundle-pid") != null;
+                });
+        assertThat(controller.getFile("file-pid", 42L).getStatusCode().value()).isEqualTo(200);
+        verify(dynamicDataService).getByIdForAuthorization("bundle", "bundle-pid");
+        org.mockito.Mockito.verify(dynamicDataService, org.mockito.Mockito.never()).getById(any(), any());
+    }
+    @Test void canonicalReadDefaultPreservesLoaderDenialAndFailureClassification() {
+        var called=new java.util.concurrent.atomic.AtomicBoolean();
+        var denied=new org.springframework.security.access.AccessDeniedException("revoked");
+        when(dynamicDataService.getByIdForAuthorization("bundle","bundle-pid")).thenThrow(denied);
+        assertThatThrownBy(()->dynamicDataService.withCanonicalRecordRead("bundle","bundle-pid",row -> called.set(true))).isSameAs(denied);
+        var failure=new IllegalStateException("database unavailable");
+        org.mockito.Mockito.doThrow(failure).when(dynamicDataService).getByIdForAuthorization("bundle","bundle-pid");
+        assertThatThrownBy(()->dynamicDataService.withCanonicalRecordRead("bundle","bundle-pid",row -> called.set(true)))
+                .isInstanceOf(com.auraboot.framework.meta.exception.MetaServiceException.class)
+                .hasMessage("Failed to load record for authorization: bundle-pid").hasCause(failure);
+        assertThat(called.get()).isFalse();
+    }
+
+    @Test void fileListSharesOnlyRequestMetadataAndReauthorizesEveryRelationOnTheNextRequest() {
+        var file = storedFile("original.json", "application/json", "/tmp/original");
+        var relation = new FileRelationEntity().setEntityType("bundle").setEntityId("bundle-pid").setFieldName("original");
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of(file));
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any()))
+                .thenAnswer(call -> {
+                    assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+                    return true;
+                }).thenThrow(new org.springframework.security.access.AccessDeniedException("revoked"));
+        assertThat(controller.getUserFiles(42L).getData()).hasSize(1);
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        assertThat(controller.getUserFiles(42L).getData()).isEmpty();
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+        org.mockito.Mockito.verify(dataAccessAuthorizationHelper, org.mockito.Mockito.times(2))
+                .authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any());
+    }
+
+    @Test void fileListClosesItsMetadataScopeWhenAuthorizationHasAnUnexpectedFailure() {
+        var file = storedFile("original.json", "application/json", "/tmp/original");
+        var relation = new FileRelationEntity().setEntityType("bundle").setEntityId("bundle-pid").setFieldName("original");
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of(file));
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"), eq("read"), eq("bundle-pid"), any()))
+                .thenAnswer(call -> {
+                    assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+                    throw new IllegalStateException("authorization storage unavailable");
+                });
+        assertThatThrownBy(() -> controller.getUserFiles(42L)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("authorization storage unavailable");
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test void fileListDoesNotCloseAnExistingCallerMetadataScope() {
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of());
+        try (var parent = com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.open()) {
+            assertThat(controller.getUserFiles(42L).getData()).isEmpty();
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isTrue();
+        }
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test void machineFileListDoesNotOpenAHumanMetadataScope() {
+        var principal = new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                7L, "machine-pid", "machine", java.util.Set.of());
+        when(fileService.getFilesByUserId(null)).thenAnswer(call -> {
+            assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+            return List.of();
+        });
+        try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+            assertThat(controller.getUserFiles(null).getData()).isEmpty();
+        }
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test void ownerFileMetadataListDoesNotRevealFilesWithARevokedAdditionalRelation() {
+        var own=storedFile("own.txt","text/plain","/tmp/own");own.setPid("own-file");
+        var hidden=storedFile("hidden.txt","text/plain","/tmp/hidden");hidden.setPid("hidden-file");
+        var relation=new FileRelationEntity().setEntityType("bundle").setEntityId("restricted-bundle").setFieldName("original");
+        when(fileService.getFilesByUserId(42L)).thenReturn(List.of(own,hidden));
+        when(fileService.getFileRelations("own-file")).thenReturn(List.of());
+        when(fileService.getFileRelations("hidden-file")).thenReturn(List.of(relation));
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"),eq("read"),eq("restricted-bundle"),any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("revoked"));
+        assertThat(controller.getUserFiles(42L).getData()).extracting(com.auraboot.framework.file.dto.FileUploadResponseDTO::getFileId).containsExactly("own-file");
+    }
+    @Test void relationFileMetadataListChecksAllOtherRelationsBeforeReturningMetadata() {
+        var file=storedFile("hidden.txt","text/plain","/tmp/hidden");
+        var first=new FileRelationEntity().setEntityType("bundle").setEntityId("allowed-bundle").setFieldName("original");
+        var other=new FileRelationEntity().setEntityType("bundle").setEntityId("restricted-bundle").setFieldName("original");
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"),eq("read"),eq("allowed-bundle"),any())).thenReturn(true);
+        when(dataAccessAuthorizationHelper.authorizeRecordId(eq("bundle"),eq("read"),eq("restricted-bundle"),any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("revoked"));
+        when(fileService.getFilesByEntity("bundle","allowed-bundle")).thenReturn(List.of(file));
+        when(fileService.getFilesByEntityAndField("bundle","allowed-bundle","original")).thenReturn(List.of(file));
+        when(fileService.getFileRelations("file-pid")).thenReturn(List.of(first,other));
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L,42L,"actor","Actor");
+        try {
+            assertThat(controller.getEntityFiles("bundle","allowed-bundle").getData()).isEmpty();
+            assertThat(controller.getEntityFieldFiles("bundle","allowed-bundle","original").getData()).isEmpty();
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
     }
 
     private static void assertPermission(String methodName, String expected, Class<?>... parameterTypes)

@@ -415,4 +415,13 @@ class AggregateQueryServiceImplDataScopeTest {
                 .hasMessage("Invalid semantic model code format");
         org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper, namedQueryMapper);
     }
+    @Test void authoritativeRootAggregateStillRequiresTheAdditionalMemberPredicate() {
+        when(metaModelService.getTableName(MODEL_CODE)).thenReturn("mt_phase_one_model");
+        when(dataPermissionEngine.buildRequiredReadFilter(TENANT_ID,MODEL_CODE,USER_ID)).thenReturn("AND pid IN ('allowed-root')");
+        when(dynamicDataMapper.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).contains("pid IN ('allowed-root')");return List.of(Map.of("total",1L)); });
+        MetaContext.runWithCommandPermitScope("ALL",()->assertThat(service.execute(countRequest()).getRows()).hasSize(1));
+        verify(dataPermissionEngine,never()).buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID);
+        org.mockito.Mockito.verifyNoInteractions(dataDomainService);
+    }
 }

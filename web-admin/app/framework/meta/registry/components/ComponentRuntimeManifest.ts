@@ -24,6 +24,7 @@ function runtime(
 }
 
 export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> = {
+  skilldefinitioneditor: runtime('agent', 'SkillDefinitionEditor', { aliases: ['SkillDefinitionEditor'] }),
   openapiactionpublicationeditor: runtime('admin', 'OpenApiActionPublicationEditor', { aliases: ['open-api-action-publication-editor'] }),
   openapipublicationeditor: runtime('admin', 'OpenApiPublicationEditor', { aliases: ['open-api-publication-editor'] }),
   openapiquerypublicationeditor: runtime('admin', 'OpenApiQueryPublicationEditor', { aliases: ['open-api-query-publication-editor'] }),

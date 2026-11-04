@@ -120,7 +120,10 @@ final class PluginPageNavigationImporter {
                 return false;
             }
             Object flag = existing.getExtension().get("auto_created");
-            return Boolean.TRUE.equals(flag) || "true".equals(String.valueOf(flag));
+            // Supported customer saves increment rowVersion. A historical stub flag alone
+            // must never exempt an edited page from customization protection.
+            return java.util.Objects.equals(existing.getRowVersion(), 1)
+                    && (Boolean.TRUE.equals(flag) || "true".equals(String.valueOf(flag)));
         } catch (Exception e) {
             // Defensive: on lookup failure, do not bypass the user-modified guard.
             log.debug("isAutoCreatedStubPage lookup failed for pageKey={}: {}",
@@ -260,7 +263,7 @@ final class PluginPageNavigationImporter {
                     null, null, dto.getPageKey(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
 
-        if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PAGE, dto.getPageKey())) {
+        if (exists && support.shouldSkipExistingForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PAGE, dto.getPageKey())) {
             // Stub pages emitted by MetaModelServiceImpl.autoCreateDefaultPages are tagged with
             // extension.auto_created=true. Such rows carry no user content (zero columns / buttons /
             // fields) and exist solely so that /api/pages/key/{pageKey} resolves between model
@@ -382,13 +385,20 @@ final class PluginPageNavigationImporter {
 
         if (existing != null && conflictStrategy == ImportRequest.ConflictStrategy.SKIP) {
             log.info("Dashboard '{}' already exists — skipping (SKIP strategy)", PluginImportSupport.logSafe(dto.getCode()));
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DASHBOARD,
+                    existing.getPid(), null, dto.getCode(), dto.getTitle(),
+                    ResourceAction.SKIP, null, null);
+        }
+
+        if (existing != null && support.shouldSkipExistingForOverwriteSafe(
+                tenantId, conflictStrategy, ResourceType.DASHBOARD, dto.getCode())) {
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DASHBOARD,
                     existing.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.SKIP, null, null);
         }
 
         if (existing != null) {
-            // OVERWRITE or OVERWRITE_SAFE — update in place
+            // Explicit overwrite or an unmodified, locked resource.
             DashboardUpdateRequest updateReq = new DashboardUpdateRequest();
             updateReq.setTitle(dto.getTitle());
             updateReq.setDescription(dto.getDescription());
@@ -406,7 +416,7 @@ final class PluginPageNavigationImporter {
             }
             log.info("Dashboard updated from config/dashboards/: code={}, pid={}",
                     PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(existing.getPid()));
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DASHBOARD,
                     existing.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.UPDATE, null, null);
         } else {
@@ -427,7 +437,7 @@ final class PluginPageNavigationImporter {
             }
             log.info("Dashboard created from config/dashboards/: code={}, pid={}",
                     PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(created.getPid()));
-            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PAGE,
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DASHBOARD,
                     created.getPid(), null, dto.getCode(), dto.getTitle(),
                     ResourceAction.CREATE, null, null);
         }

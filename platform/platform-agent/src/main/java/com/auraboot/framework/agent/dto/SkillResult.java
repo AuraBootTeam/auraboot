@@ -21,6 +21,7 @@ public class SkillResult {
     public enum Status { SUCCESS, PARTIAL_SUCCESS, FAILED }
 
     private String skillCode;
+    private String sourceToolCode;      // actual canonical tool for a single-tool result
     private String outputType;          // text | structured_result | action_proposal | artifact
     private String renderHint;          // chart_table | table | summary | form
     private Map<String, Object> data;

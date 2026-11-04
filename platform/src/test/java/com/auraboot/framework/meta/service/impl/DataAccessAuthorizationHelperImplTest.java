@@ -135,7 +135,7 @@ class DataAccessAuthorizationHelperImplTest {
     }
 
     @Test
-    @DisplayName("an authoritative SELF plan supplies list and record scope without consulting the engine")
+    @DisplayName("an authoritative SELF plan is preserved while applying independent read references")
     void authoritativeSelfPlanExecutesWithoutEngineRedecision() {
         MetaContext.runWithCommandPermitScope("SELF", () -> {
             DataAccessAuthorizationContext context = helper.authorizeList(RESOURCE_CODE, "read");
@@ -148,11 +148,12 @@ class DataAccessAuthorizationHelperImplTest {
                     .hasMessageContaining("Access denied");
         });
 
-        verifyNoInteractions(dataPermissionEngine);
+        verify(dataPermissionEngine).buildRequiredReadFilter(TENANT_ID, RESOURCE_CODE, USER_ID);
+        org.mockito.Mockito.verifyNoMoreInteractions(dataPermissionEngine);
     }
 
     @Test
-    @DisplayName("an authoritative ALL plan supplies an empty list filter and permits any record")
+    @DisplayName("an authoritative ALL plan remains authoritative with no declared read reference filter")
     void authoritativeAllPlanExecutesWithoutEngineRedecision() {
         MetaContext.runWithCommandPermitScope("ALL", () -> {
             assertThat(helper.authorizeList(RESOURCE_CODE, "read").filterClause()).isEmpty();
@@ -160,7 +161,8 @@ class DataAccessAuthorizationHelperImplTest {
                     RESOURCE_CODE, "delete", Map.of("created_by", 999L))).isTrue();
         });
 
-        verifyNoInteractions(dataPermissionEngine);
+        verify(dataPermissionEngine).buildRequiredReadFilter(TENANT_ID, RESOURCE_CODE, USER_ID);
+        org.mockito.Mockito.verifyNoMoreInteractions(dataPermissionEngine);
     }
 
     @Test

@@ -24,6 +24,7 @@ type UseDetailRecordArgs = Pick<
   | 'schema'
   | 'token'
   | 'setModelFieldMap'
+  | 'modelFieldMap'
   | 'location'
   | 'setRawData'
   | 'setRecordData'
@@ -42,6 +43,7 @@ export function useDetailRecord({
   schema,
   token,
   setModelFieldMap,
+  modelFieldMap,
   location,
   setRawData,
   setRecordData,
@@ -60,7 +62,7 @@ export function useDetailRecord({
     const currentModelCode = recordModelCode;
     let cancelled = false;
 
-    async function loadModelFields(): Promise<void> {
+    async function loadModelFields(): Promise<Map<string, any> | undefined> {
       // Use /api/dynamic/{pageKey}/field-meta which requires model-level read permission
       // instead of /api/meta/models/{pid}/fields which requires management permission
       const pageKey = currentModelCode;
@@ -76,7 +78,9 @@ export function useDetailRecord({
         map.set(f.code, f);
       }
       setModelFieldMap(map);
+      return map;
     }
+    const modelFields = loadModelFields().catch(() => undefined);
 
     async function loadRecord(): Promise<void> {
       try {
@@ -93,14 +97,16 @@ export function useDetailRecord({
           const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
           setRawData(result.data);
           if (currentRecordPid && !shouldSkipDetailModelFieldMeta(schema)) {
-            setRecordData(
-              await enrichDetailRecordDisplayFields(
-                currentModelCode,
-                currentRecordPid,
-                unwrappedRecord,
-                token || undefined,
-              ),
+            const enriched = await enrichDetailRecordDisplayFields(
+              currentModelCode,
+              currentRecordPid,
+              unwrappedRecord,
+              token || undefined,
+              await modelFields,
+              schema,
             );
+            if (cancelled) return;
+            setRecordData(enriched);
           } else {
             setRecordData(unwrappedRecord);
           }
@@ -133,7 +139,7 @@ export function useDetailRecord({
     (async () => {
       try {
         // Fetch model fields and record data in parallel
-        await Promise.all([loadModelFields().catch(() => {}), loadRecord().catch(() => {})]);
+        await Promise.all([modelFields, loadRecord().catch(() => {})]);
       } finally {
         if (!cancelled) setRecordLoading(false);
       }
@@ -192,6 +198,8 @@ export function useDetailRecord({
       currentModelCode,
       shouldEnrich ? currentRecordPid : undefined,
       token || undefined,
+      (model, pid, record, auth) =>
+        enrichDetailRecordDisplayFields(model, pid, record, auth, modelFieldMap, schema),
     );
     if (!snapshot) throw new Error('Detail record refresh failed');
     setRawData(snapshot.rawData);
@@ -204,6 +212,7 @@ export function useDetailRecord({
     hasApiSingletonRecordSource,
     location.search,
     rawData,
+    modelFieldMap,
     setRawData,
     setRecordData,
   ]);

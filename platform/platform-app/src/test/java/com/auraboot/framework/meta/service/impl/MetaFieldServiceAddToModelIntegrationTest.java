@@ -85,6 +85,11 @@ public class MetaFieldServiceAddToModelIntegrationTest extends BaseIntegrationTe
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private com.auraboot.framework.meta.controller.PageSchemaController pageController;
+    @Autowired
+    private com.auraboot.framework.meta.service.PageSchemaService pages;
+
     private String testModelCode;
     private String tableName;
     private Model model;
@@ -450,4 +455,42 @@ public class MetaFieldServiceAddToModelIntegrationTest extends BaseIntegrationTe
         b.setFieldOrder(order);
         return b;
     }
+    @Test
+    @DisplayName("Data protection cannot be bypassed by refuseIfDataExists=false")
+    public void removeFromModel_falseProbeFlagStillRetainsDataAndBinding() {
+        String fieldCode="it_protected_"+UUID.randomUUID().toString().replace("-", "").substring(0,8);
+        AddFieldResult added=metaFieldService.addToModel(AddFieldRequest.builder().modelCode(testModelCode)
+                .code(fieldCode).dataType("string").displayName("Protected value").build());
+        String row=UniqueIdGenerator.generate();
+        jdbcTemplate.update("INSERT INTO "+tableName+" (pid,tenant_id,"+fieldCode+") VALUES (?,?,?)",row,getTestTenant().getId(),"preserve");
+        assertThatThrownBy(() -> metaFieldService.removeFromModel(RemoveFieldRequest.builder().modelCode(testModelCode)
+                .storageCode(added.getStorageCode()).refuseIfDataExists(false).build())).isInstanceOf(RuntimeException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT "+fieldCode+" FROM "+tableName+" WHERE pid=?",String.class,row)).isEqualTo("preserve");
+        Field current=metaFieldMapper.findCurrentByCode(fieldCode);
+        assertThat(current).isNotNull();
+        assertThat(bindingMapper.findByModelAndField(model.getId(),current.getId(),getTestTenant().getId())).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Saving an actual generated page persists customization protection and clears its stub exemption")
+    public void generatedPageCustomerSaveProtectsItsDslAndRetainsExtensionProperties() {
+        var original=pages.findAnyByPageKey(testModelCode+"_form");
+        assertThat(original).isNotNull();
+        String pluginPid=UniqueIdGenerator.generate();
+        jdbcTemplate.update("INSERT INTO ab_plugin(pid,tenant_id,plugin_id,namespace,version,manifest) VALUES (?,?,?,?,'1.0.0','{}')",
+                pluginPid,getTestTenant().getId(),testModelCode,testModelCode);
+        jdbcTemplate.update("INSERT INTO ab_plugin_resource(pid,tenant_id,plugin_pid,resource_type,resource_code,resource_pid,user_modified) VALUES (?,?,?,'page',?,?,false)",
+                UniqueIdGenerator.generate(),getTestTenant().getId(),pluginPid,original.getPageKey(),original.getPid());
+        var edit=new com.auraboot.framework.meta.dto.PageSchemaUpdateRequest();
+        edit.setName(original.getName());edit.setRowVersion(original.getRowVersion());
+        edit.setExtension(Map.of("auto_created",true,"custom_note","retain"));
+        pageController.update(original.getPid(),edit,getTestUser().getId());
+        var reopened=pages.findAnyByPageKey(original.getPageKey());
+        assertThat(reopened.getRowVersion()).isEqualTo(original.getRowVersion()+1);
+        assertThat(reopened.getExtension()).containsEntry("custom_note","retain").doesNotContainKey("auto_created");
+        assertThat(edit.getExtension()).containsEntry("auto_created",true);
+        assertThat(jdbcTemplate.queryForObject("SELECT user_modified FROM ab_plugin_resource WHERE tenant_id=? AND resource_type='page' AND resource_code=?",
+                Boolean.class,getTestTenant().getId(),original.getPageKey())).isTrue();
+    }
+
 }

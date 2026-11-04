@@ -460,6 +460,45 @@ class FileServiceImplTest {
     // ----- deleteFile -----
 
     @Test
+    void deleteFile_domainReferenceVetoRunsUnderTheFileLockBeforeAnyDeletion() {
+        FileEntity entity = new FileEntity();
+        entity.setId(71L); entity.setPid("referenced-file"); entity.setCreatedBy(42L); entity.setFileName("key.png");
+        when(fileMapper.selectActiveByPidForUpdate(7L, "referenced-file")).thenReturn(entity);
+        com.auraboot.framework.file.service.FileDeletionGuard guard = (tenant, pid) -> {
+            verify(fileMapper).selectActiveByPidForUpdate(7L, "referenced-file");
+            assertThat(tenant).isEqualTo(7L); assertThat(pid).isEqualTo("referenced-file");
+            throw new BusinessException("File is still referenced");
+        };
+        ReflectionTestUtils.setField(fileService, "deletionGuards", List.of(guard));
+        assertThatThrownBy(() -> fileService.deleteFile("referenced-file", 42L))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("still referenced");
+        verify(fileMapper, never()).markDeletedIfUnlocked(anyLong(), anyLong(), any(Instant.class));
+        assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty();
+        verify(storageProvider, never()).delete(anyString());
+    }
+
+    @Test
+    void deleteFile_allDomainGuardsMustAllowDeletionAndLookupErrorsFailClosed() {
+        FileEntity entity = new FileEntity();
+        entity.setId(72L); entity.setPid("guarded-file"); entity.setCreatedBy(42L); entity.setFileName("key.png");
+        when(fileMapper.selectActiveByPidForUpdate(7L, "guarded-file")).thenReturn(entity);
+        var visited = new java.util.ArrayList<String>();
+        com.auraboot.framework.file.service.FileDeletionGuard first = (tenant, pid) -> visited.add("first");
+        com.auraboot.framework.file.service.FileDeletionGuard second = (tenant, pid) -> { throw new IllegalStateException("Reference lookup failed"); };
+        ReflectionTestUtils.setField(fileService, "deletionGuards", List.of(first, second));
+        assertThatThrownBy(() -> fileService.deleteFile("guarded-file", 42L))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("lookup failed");
+        assertThat(visited).containsExactly("first");
+        verify(fileMapper, never()).markDeletedIfUnlocked(anyLong(), anyLong(), any(Instant.class));
+        ReflectionTestUtils.setField(fileService, "deletionGuards", List.of(first));
+        when(fileMapper.markDeletedIfUnlocked(eq(7L), eq(72L), any(Instant.class))).thenReturn(1);
+        assertThat(fileService.deleteFile("guarded-file", 42L)).isTrue();
+        verify(storageProvider, never()).delete(anyString());
+        fireAfterCommit();
+        verify(storageProvider).delete("key.png");
+    }
+
+    @Test
     void deleteFile_notFound_throwsBusinessException() {
         assertThatThrownBy(() -> fileService.deleteFile("404", 1L))
                 .isInstanceOf(BusinessException.class)

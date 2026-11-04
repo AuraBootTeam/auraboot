@@ -1162,6 +1162,13 @@
         "sortNo": 60,
         "color": "#6B7280",
         "status": "enabled"
+      },
+      {
+        "value": "crud",
+        "label": "Business operations",
+        "label:zh-CN": "业务操作",
+        "sortNo": 70,
+        "status": "enabled"
       }
     ]
   },

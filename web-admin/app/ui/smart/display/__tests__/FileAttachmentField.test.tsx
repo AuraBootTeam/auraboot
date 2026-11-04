@@ -34,6 +34,14 @@ describe('Authenticated attachment links', () => {
       expect(attachmentDownloadUrl(value)).toBeNull();
     }
   });
+  it('reads a scalar reference without upload capabilities or changing its stored value', async () => {
+    mocks.fetchResult.mockResolvedValue({ code: '0', data: { fileId: '01J4P1X4S5R6T7V8W9X0Y1Z2A3', originalName: 'actual.yaml', fileSize: 15 } });
+    const onChange = vi.fn();
+    render(<FileAttachmentField readOnly value="01J4P1X4S5R6T7V8W9X0Y1Z2A3" onChange={onChange} />);
+    expect(await screen.findByRole('link', { name: 'actual.yaml 15 B' })).toHaveAttribute('href', '/api/file/download/01J4P1X4S5R6T7V8W9X0Y1Z2A3');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(mocks.uploadFile).not.toHaveBeenCalled();
+  });
   it('displays actual filename, size and download target', () => {
     render(<FileAttachmentField readOnly value={[{ name: 'scope.pdf', url: '/download/42', size: 768 }]} />);
     expect(screen.getByTestId('attachment-download-0')).toHaveAttribute('href', '/api/file/download/42');

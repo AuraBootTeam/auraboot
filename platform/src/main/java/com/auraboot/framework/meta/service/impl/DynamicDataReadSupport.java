@@ -407,6 +407,11 @@ final class DynamicDataReadSupport {
      */
     ReferenceReadAccess evaluateReferenceReadAccess(
             Long tenantId, Long userId, String targetModelCode) {
+        return evaluateReferenceReadAccess(tenantId,userId,targetModelCode,null);
+    }
+
+    ReferenceReadAccess evaluateReferenceReadAccess(
+            Long tenantId, Long userId, String targetModelCode, Set<String> recordPids) {
         if (tenantId == null || userId == null || !org.springframework.util.StringUtils.hasText(targetModelCode)) {
             return ReferenceReadAccess.denied();
         }
@@ -419,8 +424,10 @@ final class DynamicDataReadSupport {
                     || !permissionFacadeSupplier.get().canAction(memberId, targetModelCode, "read")) {
                 return ReferenceReadAccess.denied();
             }
-            return ReferenceReadAccess.allowed(
-                    dataPermissionEngine.buildRowFilter(tenantId, targetModelCode, userId));
+            var target=recordPids==null ? null : metadataService.getModelDefinition(targetModelCode).orElse(null);
+            return ReferenceReadAccess.allowed(recordPids!=null && RequiredReadReferences.policy(target)!=null
+                    ? dataPermissionEngine.buildRowFilterForRecords(tenantId,targetModelCode,userId,recordPids)
+                    : dataPermissionEngine.buildRowFilter(tenantId, targetModelCode, userId));
         } catch (Exception e) {
             log.error("Reference target authorization failed for model {}; denying lookup",
                     logSafe(targetModelCode), e);
@@ -468,7 +475,7 @@ final class DynamicDataReadSupport {
             // row-scope and masking lookups; otherwise every nullable reference on every write
             // read-back pays the full authorization query cost despite having nothing to enrich.
             ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
-                    tenantId, userId, targetModelCode);
+                    tenantId, userId, targetModelCode, refIds);
             if (!targetAccess.allowed()) {
                 continue;
             }

@@ -45,6 +45,13 @@ public interface ValidationService {
      */
     FieldValidationResult validateField(FieldDefinition fieldDefinition, Object value, ValidationContext context);
 
+    /** Validate a JSON value without primitive coercion, then reuse native field constraints.
+     * Enum membership remains the caller's pinned-dictionary contract. Unknown types fail closed. */
+    default FieldValidationResult validateJsonField(FieldDefinition fieldDefinition,
+            com.fasterxml.jackson.databind.JsonNode value, ValidationContext context) {
+        throw new UnsupportedOperationException("Strict JSON field validation is unavailable");
+    }
+
     /**
      * 验证业务规则
      * @param modelDefinition 模型定义

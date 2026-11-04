@@ -25,7 +25,7 @@ class FieldVersionMetadataTest {
     @Test void editingAFieldPreservesMetadataAndDictionaryForTheNewBoundVersion() {
         var fields = mock(MetaFieldMapper.class); var dictionaries = mock(MetaFieldDictBindingMapper.class);
         var bindings = mock(MetaModelFieldBindingMapper.class); var validator = mock(MetaFieldValidator.class);
-        var service = new MetaFieldServiceImpl(fields, null, null, null, new ExtensionConverter(), validator, dictionaries, bindings, null, new ObjectMapper());
+        var service = new MetaFieldServiceImpl(fields, null, null, null, new ExtensionConverter(), validator, dictionaries, bindings, null, new ObjectMapper(), null);
         var old = new Field(); old.setId(1L); old.setPid("old-field"); old.setCode("customer"); old.setDataType("enum");
         var feature = new FieldFeatureBean(); feature.setRequired(true); old.setFeature(feature);
         var extension = new ExtensionBean(); extension.setExtension(Map.of("displayName", "客户")); old.setExtension(extension);
@@ -53,7 +53,7 @@ class FieldVersionMetadataTest {
         var fields = mock(MetaFieldMapper.class); var dictionaries = mock(MetaFieldDictBindingMapper.class);
         var validator = mock(MetaFieldValidator.class);
         var service = new MetaFieldServiceImpl(fields, null, null, null, new ExtensionConverter(), validator,
-                dictionaries, mock(MetaModelFieldBindingMapper.class), null, new ObjectMapper());
+                dictionaries, mock(MetaModelFieldBindingMapper.class), null, new ObjectMapper(), null);
         var old = new Field(); old.setId(1L); old.setPid("old-field"); old.setCode("customer"); old.setDataType("reference");
         var target = new FieldRefTargetBean(); target.setTargetEntity("customer"); target.setDisplayField("name"); old.setRefTarget(target);
         when(fields.selectByPidWithContext("old-field", 7L)).thenReturn(old);

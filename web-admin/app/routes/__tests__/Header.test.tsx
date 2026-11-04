@@ -44,6 +44,9 @@ vi.mock('~/hooks/useSSE', () => ({ useSSE: () => null }));
 vi.mock('~/ui/inbox/InboxDropdown', () => ({
   InboxHeaderWidget: () => <button aria-label="notifications">99</button>,
 }));
+vi.mock('~/ui/notification/NotificationHeaderWidget', () => ({
+  NotificationHeaderWidget: () => <button aria-label="notification center">0</button>,
+}));
 vi.mock('~/ui/CommandPalette', () => ({
   CommandPalette: () => (
     <button
@@ -75,6 +78,37 @@ beforeEach(() => {
 });
 
 describe('Header — polish', () => {
+  it('keeps sibling notification identities distinct on mount and account changes', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      Object.assign(rootLoaderData.value.user, { tenantId: 'tenant-a', pid: 'reader-a' });
+      const { rerender } = render(
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('button', { name: 'notifications', exact: true })).toBeVisible();
+      expect(
+        screen.getByRole('button', { name: 'notification center', exact: true }),
+      ).toBeVisible();
+      Object.assign(rootLoaderData.value.user, { tenantId: 'tenant-b', pid: 'reader-b' });
+      rerender(
+        <MemoryRouter>
+          <Header />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('button', { name: 'notifications', exact: true })).toBeVisible();
+      expect(
+        screen.getByRole('button', { name: 'notification center', exact: true }),
+      ).toBeVisible();
+      expect(errors.mock.calls.filter((args) => String(args[0]).includes('same key'))).toHaveLength(
+        0,
+      );
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
   it('renders with h-14 height', () => {
     const { container } = render(
       <MemoryRouter>
