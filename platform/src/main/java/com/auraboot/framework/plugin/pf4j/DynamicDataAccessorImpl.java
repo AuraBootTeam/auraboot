@@ -89,7 +89,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         java.util.Objects.requireNonNull(query, "query");
         List<QueryCondition> conditions = new ArrayList<>();
         query.exactFilters().forEach((field, value) -> conditions.add(QueryCondition.builder()
-                .fieldName(field).operator(QueryCondition.Operator.EQ).value(value).build()));
+                .fieldName(field).operator(value == null ? QueryCondition.Operator.IS_NULL : QueryCondition.Operator.EQ).value(value).build()));
         query.anyOfFilters().forEach((field, values) -> conditions.add(QueryCondition.builder()
                 .fieldName(field).operator(QueryCondition.Operator.IN).values(values).build()));
         List<SortField> sorts = new ArrayList<>();
