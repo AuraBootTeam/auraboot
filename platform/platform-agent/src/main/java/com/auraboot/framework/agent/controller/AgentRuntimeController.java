@@ -540,6 +540,29 @@ public class AgentRuntimeController {
         return ApiResponse.success(skillService.listSkills(tenantId, category, level));
     }
 
+    private Object parseSkillInputSchema(Object raw) {
+        String text = com.auraboot.framework.agent.util.JsonbColumns.toJsonText(raw, objectMapper);
+        if (text == null) return null;
+        try { return objectMapper.readTree(text); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("Invalid skill input contract", e); }
+    }
+
+    /** Effective input contract only; no prompt or provider configuration is exposed to trial runners. */
+    @GetMapping("/skills/{skillCode}/trial-definition")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ApiResponse<Map<String, Object>> skillTrialDefinition(@PathVariable String skillCode) {
+        Map<String, Object> skill = skillService.loadSkill(MetaContext.getCurrentTenantId(), skillCode);
+        if (skill == null) return ApiResponse.success(Map.of("available", false));
+        Map<String, Object> definition = new LinkedHashMap<>();
+        definition.put("available", true);
+        definition.put("definitionHash", skillService.definitionHash(skill));
+        definition.put("inputSchema", parseSkillInputSchema(skill.get("skill_input_schema")));
+        definition.put("executionMode", skill.get("execution_mode"));
+        definition.put("versionPid", skill.get("skill_version_pid"));
+        definition.put("versionHash", skill.get("skill_version_hash"));
+        return ApiResponse.success(definition);
+    }
+
     /** Resolve a skill into its tool definitions */
     @GetMapping("/skills/{skillCode}/tools")
     public ApiResponse<List<AgentToolDefinition>> resolveSkillTools(@PathVariable String skillCode) {
@@ -579,7 +602,8 @@ public class AgentRuntimeController {
         LlmProviderFactory.ProviderConfig config = resolution != null ? resolution.getConfig() : null;
 
         String runPid = UniqueIdGenerator.generate();
-        SkillResult result = skillEngine.execute(tenantId, runPid, skillCode, skillInput, null, provider, config);
+        String expectedHash = body != null && body.get("expectedDefinitionHash") instanceof String hash ? hash : null;
+        SkillResult result = skillEngine.execute(tenantId, runPid, skillCode, skillInput, null, provider, config, expectedHash);
         return ApiResponse.success(result);
     }
 

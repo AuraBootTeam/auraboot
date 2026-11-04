@@ -356,3 +356,146 @@ test('SM11/12: search empty state and English keyboard labels use the real menu'
   await expect(page.getByRole('heading', { name: 'Create skill', exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(shots, 'SM12.png'), fullPage: true });
 });
+
+test('SG01-05: publish, trial, revise and restore immutable skill definitions without losing drafts', async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(180_000);
+  mkdirSync(shots, { recursive: true });
+  await authenticateBffSession(
+    page.request,
+    baseURL!,
+    DEFAULT_TEST_ACCOUNT.email,
+    DEFAULT_TEST_ACCOUNT.password,
+  );
+  const suffix = `publication_${Date.now()}`;
+  const create = await page.request.post('/api/meta/commands/execute/acp:create_agent_skill', {
+    data: {
+      operationType: 'CREATE',
+      payload: {
+        skill_code: suffix,
+        skill_name: '技能发布验收',
+        skill_status: 'draft',
+        skill_level: 'atomic',
+        skill_version: '1.0.0',
+        execution_mode: 'template',
+        skill_tools: JSON.stringify(['list:agent_skill']),
+        prompt_template: '只读核对技能目录，不执行业务写入。',
+        skill_input_schema: JSON.stringify({
+          type: 'object',
+          properties: { keyword: { type: 'string', title: '查找技能' } },
+          required: ['keyword'],
+        }),
+      },
+    },
+  });
+  const created = await create.json();
+  expect(created.code, JSON.stringify(created)).toBe('0');
+  const pid = created.data.data.recordPid as string;
+  const api = `/api/agent/skill-definitions/${pid}`;
+  const initialContract = await (
+    await page.request.get(`/api/agent/skills/${suffix}/trial-definition`)
+  ).json();
+  expect(initialContract.data.available).toBe(false);
+  await page.goto('/home');
+  const menu = page.getByRole('link', { name: '技能管理', exact: true });
+  if (!(await menu.isVisible()))
+    await page.getByRole('button', { name: 'AI 中心', exact: true }).click();
+  await menu.click();
+  // The existing editor deep link opens the owned API-provisioned fixture after menu discovery.
+  await page.goto(`/p/agent_skill/edit/${pid}`);
+  const editor = page.getByTestId('skill-definition-editor');
+  const governance = editor.getByTestId('skill-governance');
+  const publish = governance.getByRole('button', { name: '发布已评审草稿', exact: true });
+  await expect(publish).toBeDisabled();
+  await governance.getByText(/草稿与生效版本差异/).click();
+  await expect(governance).toContainText('只读核对技能目录');
+  await governance.screenshot({ path: path.join(shots, 'G01-publication-review.png') });
+  await governance.getByLabel('我已核对草稿差异和校验结果，确认发布供后续运行使用。').check();
+  await publish.click();
+  await expect(governance).toContainText('当前生效：版本 1');
+  const first = await (await page.request.get(`${api}/governance`)).json();
+  expect(first.code).toBe('0');
+  expect(first.data.validationErrors).toEqual([]);
+  const firstPid = first.data.publication.versionPid;
+  const firstHash = first.data.publication.hash;
+  const run = editor.getByRole('button', { name: '执行一次', exact: true });
+  await editor.getByLabel('查找技能', { exact: true }).fill(suffix);
+  await editor.getByLabel('我已核对输入，允许本次真实执行。').check();
+  const response = page.waitForResponse(
+    (r) => r.url().includes(`/skills/${suffix}/execute`) && r.request().method() === 'POST',
+  );
+  await run.click();
+  const receipt = await (await response).json();
+  expect(receipt.code).toBe('0');
+  expect(receipt.data.status).toBe('SUCCESS');
+  expect(receipt.data.skillVersionPid).toBe(firstPid);
+  expect(receipt.data.skillVersionHash).toBe(firstHash);
+  expect(receipt.data.trialAuditStatus).toBe('recorded');
+  expect(receipt.data.actionCount).toBe(0);
+  await expect(editor.getByTestId('skill-trial-result')).toBeVisible();
+  await expect(governance).toContainText('执行成功');
+  await governance.screenshot({ path: path.join(shots, 'G02-published-trial.png') });
+  await editor.getByLabel('技能名称', { exact: true }).fill('技能发布验收·第二稿');
+  await editor.getByLabel('操作规程', { exact: true }).fill('第二稿：仅查询当前授权目录。');
+  await expect(publish).toBeDisabled();
+  await editor.getByRole('button', { name: '保存技能', exact: true }).click();
+  await expect(editor.getByRole('status').filter({ hasText: '技能已保存' })).toBeVisible();
+  const unchanged = await (await page.request.get(`${api}/governance`)).json();
+  expect(unchanged.data.publication.versionPid).toBe(firstPid);
+  expect(unchanged.data.changes.prompt_template.draft).toBe('第二稿：仅查询当前授权目录。');
+  await governance.getByLabel('我已核对草稿差异和校验结果，确认发布供后续运行使用。').check();
+  await publish.click();
+  await expect(governance).toContainText('当前生效：版本 2');
+  const second = await (await page.request.get(`${api}/governance`)).json();
+  expect(second.data.publication.hash).not.toBe(firstHash);
+  await governance
+    .locator('li')
+    .filter({ hasText: /版本\s*1.*发布/ })
+    .getByRole('button', { name: '查看并评审此版本' })
+    .click();
+  await expect(governance.getByTestId('skill-version-preview')).toContainText('只读核对技能目录');
+  await governance.screenshot({ path: path.join(shots, 'G03-rollback-review.png') });
+  await governance.getByLabel('我已核对目标历史版本，确认切换生效版本并保留草稿。').check();
+  await governance.getByRole('button', { name: '回退到已评审版本' }).click();
+  await expect(governance).toContainText('当前生效：版本 3');
+  const restored = await (await page.request.get(`${api}/governance`)).json();
+  expect(restored.data.publication.hash).toBe(firstHash);
+  expect(restored.data.publication.versionPid).not.toBe(firstPid);
+  const draft = await (await page.request.get(`/api/dynamic/agent-skill/${pid}`)).json();
+  expect(draft.data.skill_name).toBe('技能发布验收·第二稿');
+  expect(draft.data.prompt_template).toBe('第二稿：仅查询当前授权目录。');
+  await page.reload();
+  await expect(governance).toContainText('当前生效：版本 3');
+  await expect(governance).toContainText('执行成功');
+  await expect(editor.getByLabel('技能名称', { exact: true })).toHaveValue('技能发布验收·第二稿');
+  await governance.screenshot({ path: path.join(shots, 'G04-retained-draft-and-history.png') });
+  // Two actual simultaneous decisions from one reviewed version: exactly one can win.
+  const decision = {
+    expectedDraftHash: restored.data.draftHash,
+    expectedPublishedVersion: restored.data.publication.versionPid,
+    description: 'Owned concurrent publication check',
+  };
+  const decisions = await Promise.all([
+    page.request.post(`${api}/publish`, { data: decision }),
+    page.request.post(`${api}/publish`, { data: decision }),
+  ]);
+  expect(decisions.map((r) => r.status()).sort()).toEqual([200, 409]);
+  const final = await (await page.request.get(`${api}/governance`)).json();
+  expect(final.data.versions).toHaveLength(4);
+  expect(final.data.trials).toHaveLength(1);
+  expect(final.data.trials[0].schemaSnapshot.versionPid).toBe(firstPid);
+  expect(final.data.trials[0].schemaSnapshot).not.toHaveProperty('input');
+  expect(final.data.trials[0].schemaSnapshot).not.toHaveProperty('output');
+  await test
+    .info()
+    .attach('publication-identity', {
+      body: JSON.stringify(
+        { pid, firstPid, firstHash, first: first.data, restored: restored.data, final: final.data },
+        null,
+        2,
+      ),
+      contentType: 'application/json',
+    });
+});

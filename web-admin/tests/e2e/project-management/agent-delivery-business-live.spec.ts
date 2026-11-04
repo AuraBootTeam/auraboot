@@ -144,7 +144,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await navigateToMenuByClick(page, ['AI 中心', 'AI 同事']);
   await page.getByTestId('create-agent-btn').click();
   await expect(page.getByTestId('wizard-template-project_delivery')).toBeVisible();
-  await page.screenshot({ path: join(shots, 'D01-delivery-template.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D01-delivery-template.png'), fullPage: true });
   await page.getByTestId('wizard-template-project_delivery').click();
   const name = `交付助手-${fixture.suffix}`;
   await page.getByTestId('wizard-input-name').fill(name);
@@ -152,7 +152,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await page.getByTestId('wizard-btn-next').click();
   await page.getByTestId('review-provider-select').selectOption('deepseek');
   await expect(page.getByTestId('review-tool-scope')).toContainText('不会授予角色');
-  await page.screenshot({ path: join(shots, 'D02-delivery-review.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D02-delivery-review.png'), fullPage: true });
   const created = page.waitForResponse(
     (r) => r.url().includes('/agent-definition/create') && r.request().method() === 'POST',
   );
@@ -237,7 +237,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     ),
   ).toBe(true);
 
-  await page.screenshot({ path: join(shots, 'D03-grounded-progress.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D03-grounded-progress.png'), fullPage: true });
   const title = `交付材料复核-${fixture.suffix}`;
   expect(await taskRows(page.request, title)).toHaveLength(0);
   await send(
@@ -252,7 +252,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(confirmation).toContainText(fixture.projectName);
   await expect(confirmation).not.toContainText(/tpm_|Tpm Ts/);
   expect(await taskRows(page.request, title)).toHaveLength(0);
-  await page.screenshot({ path: join(shots, 'D04-before-confirmation.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D04-before-confirmation.png'), fullPage: true });
   // Keep the denial fixture independent of successful multi-turn history.
   const beforeRevoke = await businessSnapshot(page.request, fixture.project);
   await body(
@@ -271,7 +271,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
     await expect(chat).toContainText(/操作未完成|未完成|创建.*失败|无权|权限/);
     expect(await taskRows(page.request, title)).toHaveLength(0);
     expect(await businessSnapshot(page.request, fixture.project)).toEqual(beforeRevoke);
-    await page.screenshot({
+    await page.screenshot({ animations: 'disabled',
       path: join(shots, 'D10-revoked-before-confirmation.png'),
       fullPage: true,
     });
@@ -311,7 +311,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   expect(saved.tpm_ts_assignee).toBe('林晓');
   expect(saved.tpm_ts_status).toBe('todo');
   await expect(chat).toContainText(title);
-  await page.screenshot({ path: join(shots, 'D05-confirmed-task.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D05-confirmed-task.png'), fullPage: true });
   await page.reload();
   await expect(chat).toBeVisible();
   await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(
@@ -321,7 +321,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(chat.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
   expect(await taskRows(page.request, title)).toHaveLength(1);
   await chat.getByTestId('chat-msg-agent').filter({ hasText: title }).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: join(shots, 'D06-history-restored.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D06-history-restored.png'), fullPage: true });
 });
 
 test('D2: customer notes create a reviewed task draft without saving or replacing the selected project', async ({
@@ -350,9 +350,9 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
     fixture.projectName,
   );
   expect(await taskRows(page.request, title)).toHaveLength(0);
-  await page.screenshot({ path: join(shots, 'D07-reviewed-task-draft.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D07-reviewed-task-draft.png'), fullPage: true });
   await page.locator('#tpm_ts_description').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: join(shots, 'D07b-draft-scope-and-date.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D07b-draft-scope-and-date.png'), fullPage: true });
   const persisted = page.waitForResponse(
     (r) => r.url().includes('/execute/tpm:create_task') && r.request().method() === 'POST',
   );
@@ -362,5 +362,5 @@ test('D2: customer notes create a reviewed task draft without saving or replacin
   await expect(page).toHaveURL(/\/p\/tpm_task$/);
   await page.reload();
   await expect(page.getByRole('row').filter({ hasText: title })).toBeVisible();
-  await page.screenshot({ path: join(shots, 'D08-task-saved.png'), fullPage: true });
+  await page.screenshot({ animations: 'disabled', path: join(shots, 'D08-task-saved.png'), fullPage: true });
 });

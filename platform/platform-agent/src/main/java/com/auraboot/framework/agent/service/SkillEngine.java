@@ -44,6 +44,7 @@ public class SkillEngine {
     private final ToolLoopService toolLoopService;
     private final StepLoopService stepLoopService;
     private final ObjectMapper objectMapper;
+    private final SkillDefinitionGovernanceService governance;
 
     // =========================================================================
     // Public API
@@ -64,10 +65,40 @@ public class SkillEngine {
     public SkillResult execute(Long tenantId, String runPid, String skillCode,
                                SkillInput input, TraceContext traceCtx,
                                LlmProvider provider, LlmProviderFactory.ProviderConfig config) {
-        long startMs = System.currentTimeMillis();
+        return execute(tenantId, runPid, skillCode, input, traceCtx, provider, config, null);
+    }
 
-        // 1. Load skill definition
+    /** A trial may pin the reviewed effective contract; existing callers retain their original API. */
+    public SkillResult execute(Long tenantId, String runPid, String skillCode,
+                               SkillInput input, TraceContext traceCtx,
+                               LlmProvider provider, LlmProviderFactory.ProviderConfig config, String expectedDefinitionHash) {
         Map<String, Object> skill = agentSkillService.loadSkill(tenantId, skillCode);
+        SkillResult result;
+        if (expectedDefinitionHash != null && (skill == null || !expectedDefinitionHash.equals(agentSkillService.definitionHash(skill))))
+            result = SkillResult.builder().skillCode(skillCode).status(SkillResult.Status.FAILED)
+                    .errorMessage("Skill definition changed; reload the effective contract before running").build();
+        else result = executeDefinition(tenantId, runPid, skillCode, input, traceCtx, provider, config, skill);
+        result.setSkillRunPid(runPid);
+        if (skill != null) {
+            result.setSkillVersionPid((String) skill.get("skill_version_pid"));
+            result.setSkillVersionHash((String) skill.get("skill_version_hash"));
+            result.setSkillVersionLabel(Objects.toString(skill.get("skill_version_label"), null));
+            try {
+                governance.recordTrial((String) skill.get("pid"), result);
+                result.setTrialAuditStatus("recorded");
+            } catch (RuntimeException e) {
+                // Never turn an acknowledged write into a retry because its diagnostics failed.
+                result.setTrialAuditStatus("unavailable");
+                log.error("Skill trial receipt unavailable: run={}, errorType={}", runPid, e.getClass().getSimpleName());
+            }
+        }
+        return result;
+    }
+
+    private SkillResult executeDefinition(Long tenantId, String runPid, String skillCode,
+                               SkillInput input, TraceContext traceCtx,
+                               LlmProvider provider, LlmProviderFactory.ProviderConfig config, Map<String, Object> skill) {
+        long startMs = System.currentTimeMillis();
         if (skill == null) {
             return SkillResult.builder()
                     .skillCode(skillCode)
@@ -103,7 +134,8 @@ public class SkillEngine {
                     .build();
         }
 
-        List<AgentToolDefinition> tools = agentSkillService.resolveSkillTools(tenantId, skillCode);
+        List<AgentToolDefinition> tools = "dsl_dispatch".equals(executionMode)
+                ? List.of() : agentSkillService.resolveToolCodes(tenantId, toolCodes);
 
         if (tools.isEmpty() && !"dsl_dispatch".equals(executionMode)) {
             return SkillResult.builder()
@@ -133,6 +165,7 @@ public class SkillEngine {
         long durationMs = System.currentTimeMillis() - startMs;
         result.setDurationMs(durationMs);
         result.setSkillCode(skillCode);
+
         if (result.getOutputType() == null) {
             result.setOutputType(resolveString(skill.get("output_type"), "text"));
         }
