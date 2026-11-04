@@ -319,13 +319,16 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(savedForm.schemaVersion).toBe(4);
   expect(savedForm.blocks.find((block: { id: string }) => block.id === `block_${code}_form`).title)
     .toMatchObject({ 'zh-CN': '客户商机与跟进信息' });
+  const designerUrl = page.url();
   await page.goto(`${listUrl}/edit/${recordPid}`);
   await expect(page.getByText('客户商机与跟进信息', { exact: true })).toBeVisible();
   await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(customerName);
   await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('68000');
   await screenshot(page, info, 'SC02-schema-adjusted-runtime');
   await page.getByTestId('form-btn-cancel').click();
-  await expect(page).toHaveURL(listUrl);
+  await expect(page).toHaveURL(designerUrl);
+  await page.goto(listUrl);
+  await expect(row).toBeVisible();
 
   // Provision a task-owned read-only role. API use here is setup and a negative
   // authorization probe; the successful create/update path above is browser-only.

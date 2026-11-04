@@ -37,7 +37,7 @@ JDBC_URL="jdbc:postgresql://$DB_HOST:$DB_PORT/$DB_NAME"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "missing dependency: $1" >&2; exit 2; }; }
 preflight() {
-  need node; need pnpm; need tar; need java; need curl; need python3; need flyway; need psql
+  need lsof; need node; need pnpm; need tar; need java; need curl; need python3; need flyway; need psql
   test -f "$ARTIFACT_ROOT/application.lock"
   test -f "$ARTIFACT_ROOT/release-receipt.json"
   test -f "$ARTIFACT_ROOT/runtime/AuraBoot-1.0.0-boot.jar"
@@ -84,18 +84,25 @@ start_backend() {
   source_commit="$(node -e "const r=require(process.argv[1]); process.stdout.write(r.source.commit)" "$ARTIFACT_ROOT/release-receipt.json")"
   image_digest="$(node -e "const r=require(process.argv[1]); process.stdout.write((r.image&&r.image.digest)||'')" "$ARTIFACT_ROOT/release-receipt.json")"
   mkdir -p "$STATE_ROOT/empty-plugins"
-  if [[ -f "$STATE_ROOT/runtime.pid" ]] && kill -0 "$(cat "$STATE_ROOT/runtime.pid")" 2>/dev/null; then
+  native_owner_init
+  if [[ -f "$(aura_reset_service_record_file backend)" ]]; then
+    aura_reset_assert_service_owned backend "$APP_PORT" "$ARTIFACT_ROOT" AuraBoot-1.0.0-boot.jar
     echo 'backend runtime already active'; return
   fi
+  reject_unowned_pid_file runtime
+  aura_reset_assert_service_absent backend "$APP_PORT" "$ARTIFACT_ROOT" AuraBoot-1.0.0-boot.jar
+  local pid
+  pid="$(aura_reset_spawn_detached "$ARTIFACT_ROOT" "$STATE_ROOT/runtime.log" env \
   AURA_APPLICATION_MODE=core-only AURABOOT_BOOTSTRAP_ENABLED=false AURABOOT_DEMO_SEED=false JWT_SECRET="$JWT_SECRET" \
-  nohup java -Daura.plugins.dir="$STATE_ROOT/empty-plugins" -jar "$ARTIFACT_ROOT/runtime/AuraBoot-1.0.0-boot.jar" \
+  java -Daura.plugins.dir="$STATE_ROOT/empty-plugins" -jar "$ARTIFACT_ROOT/runtime/AuraBoot-1.0.0-boot.jar" \
     --server.port="$APP_PORT" --spring.profiles.active="$SPRING_PROFILES_ACTIVE" --spring.datasource.url="$JDBC_URL" \
     --spring.datasource.username="$DB_USER" --spring.datasource.password="$DB_PASSWORD" \
     --aura.application.id="$application_id" --aura.application.version="$application_version" \
     --aura.application.lock-identity="$lock_identity" --aura.application.source-commit="$source_commit" \
     --aura.application.image-digest="$image_digest" \
-    >"$STATE_ROOT/runtime.log" 2>&1 &
-  echo $! > "$STATE_ROOT/runtime.pid"
+  )"
+  aura_reset_register_process backend "$pid" "$APP_PORT" "$ARTIFACT_ROOT" AuraBoot-1.0.0-boot.jar
+  printf '%s\n' "$pid" > "$STATE_ROOT/runtime.pid"
 }
 wait_ready() {
   for _ in $(seq 1 90); do
@@ -121,16 +128,20 @@ start_web() {
     materialize_locked_npm_packages "$web_root"
     touch "$web_root/.ready"
   fi
-  if [[ -f "$STATE_ROOT/web.pid" ]] && kill -0 "$(cat "$STATE_ROOT/web.pid")" 2>/dev/null; then
+  native_owner_init
+  if [[ -f "$(aura_reset_service_record_file web)" ]]; then
+    aura_reset_assert_service_owned web "$WEB_PORT" "$web_root/web-admin" app/server/bff.server.ts
     echo 'Web BFF already active'; return
   fi
-  (
-    cd "$web_root/web-admin"
-    nohup env NODE_ENV=production BFF_PORT="$WEB_PORT" SPRING_BOOT_URL="$BASE_URL" \
+  reject_unowned_pid_file web
+  aura_reset_assert_service_absent web "$WEB_PORT" "$web_root/web-admin" app/server/bff.server.ts
+  local pid
+  pid="$(aura_reset_spawn_detached "$web_root/web-admin" "$STATE_ROOT/web.log" \
+    env NODE_ENV=production BFF_PORT="$WEB_PORT" SPRING_BOOT_URL="$BASE_URL" \
       SESSION_SECRET="$SESSION_SECRET" PUBLIC_URL="$PUBLIC_URL" SESSION_COOKIE_SECURE="$SESSION_COOKIE_SECURE" \
-      ./node_modules/.bin/tsx app/server/bff.server.ts >"$STATE_ROOT/web.log" 2>&1 &
-    echo $! > "$STATE_ROOT/web.pid"
-  )
+      ./node_modules/.bin/tsx app/server/bff.server.ts)"
+  aura_reset_register_process web "$pid" "$WEB_PORT" "$web_root/web-admin" app/server/bff.server.ts
+  printf '%s\n' "$pid" > "$STATE_ROOT/web.pid"
 }
 wait_web() {
   for _ in $(seq 1 90); do
@@ -180,9 +191,43 @@ verify() {
   curl -fsS "$WEB_URL/" >/dev/null
   echo "PASS auraboot-core artifact=$ARTIFACT_ROOT backend=$APP_PORT web=$WEB_PORT database=$DB_NAME"
 }
+# Reuse the same ownership contract as managed development runtimes. Native
+# packages have two listeners (the production BFF also serves the client).
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../lib" && pwd)/runtime-process-owner.sh"
+native_owner_init() {
+  [[ "${NATIVE_OWNER_READY:-0}" == 1 ]] && return
+  mkdir -p "$STATE_ROOT"
+  STATE_ROOT="$(cd "$STATE_ROOT" && pwd -P)"
+  AURA_RESET_OWNER_STATE_DIR="$STATE_ROOT/owners"
+  aura_reset_owner_init auraboot-core "$ARTIFACT_ROOT" "core-$SLOT" \
+    "$DB_HOST" "$DB_PORT" "$DB_NAME" "$APP_PORT" "$WEB_PORT"
+  aura_reset_acquire_locks
+  NATIVE_OWNER_READY=1
+}
+reject_unowned_pid_file() {
+  [[ ! -f "$STATE_ROOT/$1.pid" ]] || {
+    echo 'Unregistered legacy PID file: refusing to attach or stop an unverified process. Retain the state and inspect ownership.' >&2
+    return 2
+  }
+}
 stop_app() {
-  if [[ -f "$STATE_ROOT/web.pid" ]]; then kill "$(cat "$STATE_ROOT/web.pid")" 2>/dev/null || true; fi
-  if [[ -f "$STATE_ROOT/runtime.pid" ]]; then kill "$(cat "$STATE_ROOT/runtime.pid")" 2>/dev/null || true; fi
+  native_owner_init
+  local identity web_root
+  identity="$(node -e "const l=JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(l.identity.replace(/^sha256:/,''))" "$ARTIFACT_ROOT/application.lock")"
+  web_root="$STATE_ROOT/web-$identity/web-admin"
+  if [[ -f "$(aura_reset_service_record_file web)" ]]; then
+    aura_reset_stop_service web "$WEB_PORT" "$web_root" app/server/bff.server.ts
+  else
+    reject_unowned_pid_file web
+    aura_reset_assert_port_available web "$WEB_PORT"
+  fi
+  if [[ -f "$(aura_reset_service_record_file backend)" ]]; then
+    aura_reset_stop_service backend "$APP_PORT" "$ARTIFACT_ROOT" AuraBoot-1.0.0-boot.jar
+  else
+    reject_unowned_pid_file runtime
+    aura_reset_assert_port_available backend "$APP_PORT"
+  fi
+  rm -f "$STATE_ROOT/web.pid" "$STATE_ROOT/runtime.pid"
 }
 destroy() { stop_app; dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --if-exists "$DB_NAME"; }
 

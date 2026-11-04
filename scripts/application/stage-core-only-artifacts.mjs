@@ -481,6 +481,8 @@ async function main() {
   copyFileSync(manifestPath, resolve(output, 'app.yaml'));
   copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(output, 'LICENSE.txt'));
   copyFileSync(resolve(repoRoot, 'NOTICE'), resolve(output, 'NOTICE'));
+  mkdirSync(resolve(output, 'bin/lib'), { recursive: true });
+  copyFileSync(resolve(repoRoot, 'scripts/lib/runtime-process-owner.sh'), resolve(output, 'bin/lib/runtime-process-owner.sh'));
 
   const runtime = copyArtifact(
     resolve(repoRoot, `platform/build/libs/AuraBoot-${version}-boot.jar`),
