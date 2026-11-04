@@ -112,8 +112,11 @@ retain the matching private encryption configuration in the protected backup.
 Database-only recovery does not recover local attachment bytes.
 
 Restore into a separate, empty database using compatible `pg_restore` with
-`--exit-on-error`. Restore the file directory to the new state's `files` path,
-reuse the encryption keys, and set the restored database coordinates. Run
+`--exit-on-error`. Restore the file directory to the **same configured persistent storage path**
+used when the backup was taken, reuse the encryption keys, and set the restored
+database coordinates. Existing local-file metadata retains absolute paths;
+changing the storage root requires a separately validated metadata migration,
+not a directory copy or removal of path-containment checks. Run
 `migrate`, `start`, `publish` and `verify`, then independently check records,
 attachment download hashes, role permissions, rejected writes and command audit
 history. Retain the previous database and evidence until recovery is accepted.

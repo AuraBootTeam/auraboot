@@ -58,7 +58,7 @@ def main():
     def cli(action, package, database):
         settings = dict(env, AURA_APP_ARTIFACT_ROOT=str(package), PGDATABASE=database,
                         AURA_STATE_ROOT=str(private / ('state-' + database)),
-                        AURA_FILE_STORAGE_PATH=str(private / ('state-' + database) / 'files'))
+                        AURA_FILE_STORAGE_PATH=str(private / 'persistent-files'))
         run(['bash', lifecycle, action], database + '-' + package.name + '-' + action, settings)
     def request(path, method='GET', body=None, headers=None):
         data = None if body is None else json.dumps(body).encode()
@@ -227,7 +227,7 @@ def main():
         require(backup.returncode == 0, 'source-major PostgreSQL backup failed')
         require(dump.stat().st_size > 0, 'empty backup rejected')
         files_backup = private / 'files-backup'
-        shutil.copytree(private / 'state-aura_candidate_upgrade/files', files_backup)
+        shutil.copytree(private / 'persistent-files', files_backup)
         api(token, f'/api/dynamic/{code}/{pid}', 'PUT', {code + '_amount': 999999})
         record_probe(token, code, pid, 999999)
         stop()
@@ -235,15 +235,18 @@ def main():
         with dump.open('rb') as backup_stream, (private / 'restore.log').open('ab') as restore_log:
             restore = subprocess.run(['docker', 'exec', '-i', container, 'pg_restore', '--exit-on-error', '-U', 'auraboot', '-d', 'aura_candidate_restore'], stdin=backup_stream, stdout=restore_log, stderr=subprocess.STDOUT, timeout=900)
         require(restore.returncode == 0, 'source-major PostgreSQL restore failed')
-        restore_files = private / 'state-aura_candidate_restore/files'
-        restore_files.parent.mkdir(exist_ok=True)
+        # Existing local metadata retains absolute paths. Preserve the configured
+        # storage root, and remove the original from that path before proving recovery.
+        restore_files = private / 'persistent-files'
+        restore_files.rename(private / 'files-before-recovery')
+        require(not restore_files.exists(), 'old attachment root still present')
         shutil.copytree(files_backup, restore_files)
         start(current, 'aura_candidate_restore')
         token = login()
         record_probe(token, code, pid, 68000)
         assert_permissions_and_audit()
         assert_attachment()
-        check('backup-restore-recovers-record', observedBeforeRecovery=999999, restoredAmount=68000, backupSha256=hashlib.sha256(dump.read_bytes()).hexdigest())
+        check('backup-restore-recovers-record', observedBeforeRecovery=999999, restoredAmount=68000, attachmentSha256=hashlib.sha256(attachment_bytes).hexdigest(), originalAttachmentRootRetainedOutsideServingPath=True, backupSha256=hashlib.sha256(dump.read_bytes()).hexdigest())
         # The original unpack verifier must reject corrupt bytes before creating an active target.
         corrupt = output / 'corrupt-candidate.tar'
         corrupt.write_bytes(b'invalid archived candidate')
