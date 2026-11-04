@@ -42,6 +42,42 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
         """)
     List<Role> findWildcardRoles(@Param("tenantId") Long tenantId);
 
+    /** Active bindings for one declared business permission, including its explicit wildcard owner. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT DISTINCT rp.id, rp.role_id, p.code AS permission_code, rp.grant_type,
+               rp.data_scope_ast::text AS data_scope_ast_json
+        FROM ab_role_permission rp
+        JOIN ab_permission p ON p.id=rp.permission_id
+        JOIN ab_role r ON r.id=rp.role_id
+        JOIN ab_user_role ur ON ur.role_id=r.id AND ur.tenant_id=rp.tenant_id
+        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+        JOIN ab_user u ON u.id=m.user_id
+        WHERE rp.tenant_id=#{tenantId} AND ur.member_id=#{memberId} AND m.user_id=#{userId}
+          AND (p.code=#{permissionCode} OR p.code='*')
+          AND (p.tenant_id=#{tenantId} OR p.tenant_id IS NULL) AND p.status='active' AND p.deleted_flag=FALSE
+          AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL) AND r.status='active' AND r.deleted_flag=FALSE
+          AND rp.status='active' AND rp.deleted_flag=FALSE
+          AND (rp.effective_date IS NULL OR rp.effective_date<=CURRENT_DATE)
+          AND (rp.expiry_date IS NULL OR rp.expiry_date>=CURRENT_DATE)
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+        ORDER BY rp.id
+        """)
+    List<BusinessGrantRow> findBusinessGrants(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+            @Param("memberId") Long memberId, @Param("permissionCode") String permissionCode);
+
+    @lombok.Data
+    class BusinessGrantRow {
+        private Long id;
+        private Long roleId;
+        private String permissionCode;
+        private String grantType;
+        private String dataScopeAstJson;
+    }
+
     /**
      * Find all permission bindings for a role
      *

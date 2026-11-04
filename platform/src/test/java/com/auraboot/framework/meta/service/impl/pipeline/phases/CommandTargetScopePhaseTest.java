@@ -610,4 +610,54 @@ class CommandTargetScopePhaseTest {
         ctx.setCommand(command);
         return ctx;
     }
+    @Test void businessTargetUsesCompleteDutyGrantWithoutGenericModelRead() {
+        var ctx = businessTarget();
+        var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        when(authorizer.evaluate(99L, List.of("inventory.receipt.confirm"), "inv_inbound", RECORD))
+                .thenReturn(PermissionResult.allow(List.of()));
+        var phase = phase(); org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
+        phase.execute(ctx);
+        assertThat(ctx.getTargetRecordReadable()).isTrue();
+        assertThat(ctx.getBusinessTargetAuthorization().targetRecordId()).isEqualTo("REC-1");
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(13L);
+        verifyNoInteractions(permissionFacade);
+        verify(transactionManager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ
+                && definition.isReadOnly() && definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW));
+    }
+
+    @Test void deniedBusinessTargetCannotReachCachedReplay() {
+        var ctx = businessTarget();
+        var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        when(authorizer.evaluate(any(), any(), any(), any())).thenReturn(PermissionResult.deny("outside grant scope", List.of()));
+        var phase = phase(); org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
+        var pipeline = new CommandPipeline(List.of(phase), List.of(new IdempotencyPhase(idempotencyService)));
+        assertThatThrownBy(() -> {
+            if (pipeline.executePreGuardPhases(ctx) == null) pipeline.executeGuardedPhases(ctx);
+        }).isInstanceOf(BusinessException.class);
+        assertThat(ctx.getBusinessTargetAuthorization()).isNull();
+        verifyNoInteractions(idempotencyService, permissionFacade);
+    }
+
+    @Test void businessPolicyCannotSkipItsMissingTargetOrVersion() {
+        var ctx = businessTarget(); ctx.getRequest().setTargetRecordId(null);
+        assertThatThrownBy(() -> phase().shouldSkip(ctx)).isInstanceOf(BusinessException.class);
+        ctx.getRequest().setTargetRecordId("REC-1");
+        when(dynamicDataService.getById(anyString(), anyString())).thenReturn(Map.of("pid", "REC-1"));
+        var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        var phase = phase(); org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(permissionFacade, authorizer);
+    }
+
+    private CommandPipelineContext businessTarget() {
+        givenMember(); when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
+        var ctx = context("inv_inbound", "REC-1");
+        ctx.setExecConfig(Map.of("permissions", List.of("inventory.receipt.confirm"), "handlerParams", Map.of(
+                "targetRecordAuthorization", "business", "targetRecordAction", "update", "dslPersistence", false)));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("inventory.receipt.confirm"));
+        when(extensionRegistry.getCommandHandler(ctx.getCommandCode())).thenReturn(Optional.of(commandHandler));
+        MetaContext.setContext(1L, 42L, "actor", "actor"); MetaContext.setMemberId(99L);
+        return ctx;
+    }
+
 }

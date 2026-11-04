@@ -42,6 +42,7 @@ public class PermissionFieldVocabulary {
 
     private final UserRoleService userRoleService;
     private final RoleService roleService;
+    private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
 
     /**
      * Build the {@link DecisionContext} for guarding {@code memberId}'s operation on {@code record}.
@@ -79,6 +80,28 @@ public class PermissionFieldVocabulary {
      * Fact Catalog metadata to DecisionOps traces.
      */
     public Map<Scope, Map<String, Object>> buildScopes(Long memberId, String resourceCode, Object record) {
+        return assembleScopes(resourceCode, record, buildActorScope(memberId));
+    }
+
+    /** Current database actor facts; never legacy role contributors or expired assignments. */
+    public Map<Scope, Map<String, Object>> buildBusinessScopes(Long memberId, String resourceCode, Object record) {
+        if (!MetaContext.exists() || memberId == null || !memberId.equals(MetaContext.getCurrentMemberId())
+                || !org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new org.springframework.security.access.AccessDeniedException("Business actor snapshot is unavailable");
+        }
+        var roles = roleMapper.findEffectiveActorRoleCodes(MetaContext.getCurrentTenantId(),
+                MetaContext.getCurrentUserId(), memberId);
+        return assembleScopes(resourceCode, record, Map.of("memberId", memberId, "roles", List.copyOf(roles)));
+    }
+
+    public DecisionContext buildBusinessContext(Long memberId, String resourceCode, Object record) {
+        DecisionContext.Builder builder = DecisionContext.builder();
+        buildBusinessScopes(memberId, resourceCode, record).forEach(builder::scope);
+        return builder.build();
+    }
+
+    private Map<Scope, Map<String, Object>> assembleScopes(String resourceCode, Object record,
+                                                         Map<String, Object> actor) {
         Map<String, Object> recordData = extractRecordData(record);
         Map<String, Object> meta = extractMeta(record);
         String modelCode = resolveModelCode(resourceCode, record, meta);
@@ -92,7 +115,7 @@ public class PermissionFieldVocabulary {
 
         Map<Scope, Map<String, Object>> scopes = new EnumMap<>(Scope.class);
         scopes.put(Scope.RECORD, Collections.unmodifiableMap(recordScope));
-        scopes.put(Scope.ACTOR, buildActorScope(memberId));
+        scopes.put(Scope.ACTOR, actor);
         if (!meta.isEmpty()) {
             scopes.put(Scope.META, meta);
         }

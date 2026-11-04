@@ -48,6 +48,15 @@ public class DataScopeEvaluator {
                 memberId, resource, action, record, false);
     }
 
+    /** One complete business-grant scope; no cross-role/share enrichment or legacy approximations. */
+    public EvaluationStep evaluateGrantScope(DataScopeCondition condition, Long memberId,
+                                              String model, String action, Map<String, Object> record) {
+        if (record == null || condition == null || condition.scopeType() == null || !java.util.Set.of("all", "none", "self", "dept", "dept_and_sub", "team").contains(condition.scopeType())) {
+            return new EvaluationStep(NAME, EvaluationVerdict.DENY, "Business target scope is unavailable");
+        }
+        return evaluateCondition(condition, memberId, model, action, record, true);
+    }
+
     public DataScopeCondition getHistoricalCondition(Long memberId, String resource, String action) {
         return dataScopeService.resolveHistoricalScope(memberId, resource, action);
     }

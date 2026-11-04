@@ -51,6 +51,7 @@ public class DataScopeServiceImpl implements DataScopeService {
 
 
     private final RoleDataScopeMapper roleDataScopeMapper;
+    private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
     private final TenantMemberMapper tenantMemberMapper;
 
@@ -69,6 +70,37 @@ public class DataScopeServiceImpl implements DataScopeService {
             key = "#memberId + ':' + #resourceCode + ':' + #actionCode")
     public DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode) {
         return resolveScopeInternal(memberId, resourceCode, actionCode, false);
+    }
+
+    @Override
+    public DataScopeCondition resolveScopeForRole(Long memberId, Long roleId, String permissionResource,
+                                                  String action, String recordModel) {
+        if (!MetaContext.exists() || memberId == null || roleId == null
+                || !java.util.Objects.equals(memberId, MetaContext.getCurrentMemberId())
+                || MetaContext.getCurrentTenantId() == null || MetaContext.getCurrentUserId() == null
+                || permissionResource == null || permissionResource.isBlank()
+                || action == null || action.isBlank() || recordModel == null || recordModel.isBlank()) {
+            return DataScopeCondition.none();
+        }
+        Long tenant = MetaContext.getCurrentTenantId();
+        var role = roleMapper.findEffectiveGrantOwner(tenant, MetaContext.getCurrentUserId(), memberId, roleId);
+        if (role == null) return DataScopeCondition.none();
+        var entries = roleDataScopeMapper.findByTenantAndRole(tenant, roleId).stream()
+                .filter(entry -> permissionResource.equals(entry.getResourceCode()) && action.equals(entry.getActionCode()))
+                .toList();
+        // Never silently discard a custom restriction that this scope resolver cannot interpret.
+        if (entries.size() > 1 || entries.stream().anyMatch(entry -> entry.getScopeConfig() != null
+                && !(entry.getScopeConfig() instanceof Map<?, ?> config && config.isEmpty()))) {
+            return DataScopeCondition.none();
+        }
+        String type = entries.isEmpty() ? role.getDefaultDataScopeType() : entries.getFirst().getScopeType();
+        if (type == null) return DataScopeCondition.none();
+        try {
+            return resolveCondition(memberId, DataScopeType.fromCode(type), recordModel, true);
+        } catch (IllegalArgumentException invalid) {
+            // CATCH: corrupt authoring metadata cannot manufacture an unrestricted business grant.
+            return DataScopeCondition.none();
+        }
     }
 
     @Override

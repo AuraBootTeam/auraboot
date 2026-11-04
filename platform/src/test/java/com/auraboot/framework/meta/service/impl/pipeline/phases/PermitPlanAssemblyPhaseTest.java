@@ -18,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -468,4 +469,30 @@ class PermitPlanAssemblyPhaseTest {
         }
         return ctx;
     }
+    @Test void businessDecisionPinsTheTargetForReadAndWriteWithoutConsultingGenericScope() {
+        var engine = Mockito.mock(DataPermissionEngine.class); ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        for (String action : java.util.List.of("read", "update")) {
+            var ctx = ctxWithModel("receipt-1", "inv_inbound");
+            ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("inventory.receipt.confirm"));
+            ctx.setTargetRecordReadable(true); ctx.setTargetRecordVersion(0L);
+            ctx.setExecConfig(java.util.Map.of("handlerParams", java.util.Map.of("targetRecordAuthorization", "business", "targetRecordAction", action)));
+            ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
+                    ctx.getCommandCode(), "inv_inbound", "receipt-1", action, ctx.getTenantId(), ctx.getUserId(), 17L));
+            ctx.recordPhaseDecision(PhaseDecision.permit("authorization")); phase.execute(ctx);
+            assertThat(ctx.getPermitPlan().scope()).isEqualTo(ScopeGrade.TARGET);
+        }
+        Mockito.verifyNoInteractions(engine);
+    }
+
+    @Test void businessMetadataAndForgedOtherTargetCannotFallBackToGenericAll() {
+        var ctx = ctxWithModel("receipt-1", "inv_inbound"); ctx.setTargetRecordReadable(true); ctx.setTargetRecordVersion(0L);
+        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized("inventory.receipt.confirm"));
+        ctx.setExecConfig(java.util.Map.of("handlerParams", java.util.Map.of("targetRecordAuthorization", "business", "targetRecordAction", "update")));
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
+                ctx.getCommandCode(), "inv_inbound", "other-receipt", "update", ctx.getTenantId(), ctx.getUserId(), 17L));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
 }

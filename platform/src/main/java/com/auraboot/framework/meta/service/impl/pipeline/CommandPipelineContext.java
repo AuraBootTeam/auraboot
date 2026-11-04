@@ -103,6 +103,13 @@ public class CommandPipelineContext {
      */
     private Boolean targetRecordReadable;
 
+    /** Host-only completed business-target decision; never parsed from command payload/settings. */
+    private BusinessTargetAuthorization businessTargetAuthorization;
+
+    public record BusinessTargetAuthorization(String commandCode, String modelCode, String targetRecordId,
+                                               String action, Long tenantId, Long userId, Long memberId) {}
+
+
     /** Host-only evidence from a completed domain invocation callback; never a request flag. */
     private HandlerInvocationAuthorization handlerInvocationAuthorization;
 

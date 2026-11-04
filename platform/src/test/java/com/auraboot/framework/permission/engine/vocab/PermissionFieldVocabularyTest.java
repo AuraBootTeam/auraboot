@@ -32,7 +32,7 @@ class PermissionFieldVocabularyTest {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(21L, 99L, "user-99", "tester");
-        vocabulary = new PermissionFieldVocabulary(userRoleService, roleService);
+        vocabulary = new PermissionFieldVocabulary(userRoleService, roleService, org.mockito.Mockito.mock(com.auraboot.framework.rbac.mapper.RoleMapper.class));
     }
 
     @AfterEach

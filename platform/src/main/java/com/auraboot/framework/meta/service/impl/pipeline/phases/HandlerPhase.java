@@ -666,6 +666,12 @@ public class HandlerPhase implements CommandPhase {
                 String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
                 Map<String, Object> pluginSettings = new HashMap<>();
                 pluginSettings.putAll(resolveHandlerParams(execConfig));
+                if ("business".equals(pluginSettings.get("targetRecordAuthorization"))) {
+                    // A root decision alone cannot authorize undeclared related reads/writes.
+                    // Keep the new boundary closed until its resource contract is installed.
+                    throw new AccessDeniedException("Business target authorization requires an internal resource contract");
+                }
+
                 pluginSettings.put("__commandCode", commandCode);
                 pluginSettings.put("__handlerCode", handlerCode);
                 // Authenticated actor identity is a server-owned setting, never a client payload
