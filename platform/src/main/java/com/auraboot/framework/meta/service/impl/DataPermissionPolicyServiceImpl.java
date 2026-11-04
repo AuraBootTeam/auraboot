@@ -234,8 +234,12 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
                 || request.getModelCode()==null || request.getModelCode().isBlank() || request.getPriority()==null)
             throw new BusinessException(ResponseCode.BadParam,"Invalid data permission policy");
         String type=DataPermissionPolicyVocabulary.type(request.getPolicyType());
-        if("row".equals(type)) DataPermissionPolicyVocabulary.scope(request.getScopeType());
-        else {
+        if("row".equals(type)) {
+            String scope=DataPermissionPolicyVocabulary.scope(request.getScopeType());
+            if("custom".equals(scope) && request.getConditionAst()==null
+                    && (request.getScopeExpression()==null || request.getScopeExpression().isBlank()))
+                throw new BusinessException(ResponseCode.BadParam,"Custom row policy requires a condition");
+        } else {
             if(request.getFieldCode()==null || request.getFieldCode().isBlank())
                 throw new BusinessException(ResponseCode.BadParam,"Field policy requires a target field");
             if("column".equals(type)) DataPermissionPolicyVocabulary.mask(request.getMaskType());

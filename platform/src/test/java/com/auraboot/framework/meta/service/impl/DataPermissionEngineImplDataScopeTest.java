@@ -181,6 +181,18 @@ class DataPermissionEngineImplDataScopeTest {
         assertThat(engine.canAccessHistoricalRecord(TENANT_ID,MODEL_CODE,USER_ID,MEMBER_ID,own)).isFalse();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    void emptyLegacyCustomPolicyDoesNotAllowAllOrApproximateSelf(String expression) {
+        var policy=new com.auraboot.framework.meta.entity.DataPermissionPolicy();policy.setPolicyType("row");
+        policy.setScopeType("CUSTOM");policy.setScopeExpression(expression);
+        when(policyMapper.findEffectivePolicies(TENANT_ID,MODEL_CODE,MEMBER_ID)).thenReturn(List.of(policy));
+        var own=Map.<String,Object>of("created_by",USER_ID);
+        assertThat(engine.buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID)).contains("1=0");
+        assertThat(engine.filterRecords(TENANT_ID,MODEL_CODE,USER_ID,List.of(own))).isEmpty();
+        assertThat(engine.canAccessRecord(TENANT_ID,MODEL_CODE,USER_ID,own)).isFalse();
+    }
+
     @Test void unsupportedStoredPolicyTypeCannotDisappearFromAuthorization() {
         var policy=new com.auraboot.framework.meta.entity.DataPermissionPolicy();policy.setPolicyType("unsupported");policy.setScopeType("all");
         when(policyMapper.findEffectivePolicies(TENANT_ID,MODEL_CODE,MEMBER_ID)).thenReturn(List.of(policy));

@@ -46,7 +46,7 @@ class DataPermissionPolicyServiceBoundaryTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.NullAndEmptySource
-    @org.junit.jupiter.params.provider.ValueSource(strings={"unknown","SELF_TYPO"})
+    @org.junit.jupiter.params.provider.ValueSource(strings={"unknown","SELF_TYPO","CUSTOM"})
     void invalidRowScopeCannotBeSavedAsAnIgnoredRestriction(String scope) {
         assertThatThrownBy(()->service.create(request(scope))).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
         verifyNoInteractions(policies,bindings,engine);

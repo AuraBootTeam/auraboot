@@ -824,7 +824,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     private String buildLegacyExpressionFilter(DataPermissionPolicy policy, Long userId) {
         String expr = policy.getScopeExpression();
         if (expr == null || expr.isBlank()) {
-            return "";
+            return "1=0";
         }
 
         // Variable substitution
@@ -912,6 +912,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
      */
     private boolean matchesCustom(DataPermissionPolicy policy, Long userId, Map<String, Object> record) {
         if (policy.getConditionAst() == null) {
+            if(policy.getScopeExpression()==null || policy.getScopeExpression().isBlank()) return false;
             log.debug("Legacy CUSTOM expression not evaluable post-query, falling back to SELF for policy pid={}",
                     policy.getPid());
             return matchesSelf(userId, record);
