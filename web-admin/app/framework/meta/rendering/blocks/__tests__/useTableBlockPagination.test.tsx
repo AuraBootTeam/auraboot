@@ -78,6 +78,33 @@ describe('data-source table server pagination', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid pagination data');
     expect(screen.queryByTestId('pagination-next')).not.toBeInTheDocument();
   });
+  it('resets a hidden child table when its parent changes before remount', () => {
+    const f = fixture();
+    const view = render(<Harness f={f} />);
+    view.unmount();
+    f.context.state.store = 'second';
+    render(<Harness f={f} />);
+    expect(f.context.state.page).toBe(1);
+    expect(f.notifyStateChanged).toHaveBeenCalledWith('page');
+  });
+  it('retains the chosen page when a hidden table remounts for the same parent', () => {
+    const f = fixture();
+    const view = render(<Harness f={f} />);
+    view.unmount();
+    render(<Harness f={f} />);
+    expect(f.context.state.page).toBe(2);
+    expect(f.notifyStateChanged).not.toHaveBeenCalled();
+  });
+  it('does not share remembered parent identities between page runtimes', () => {
+    const first = fixture();
+    const view = render(<Harness f={first} />);
+    view.unmount();
+    const next = fixture();
+    next.context.state.store = 'different-runtime-parent';
+    render(<Harness f={next} />);
+    expect(next.context.state.page).toBe(2);
+    expect(next.notifyStateChanged).not.toHaveBeenCalled();
+  });
   it('keeps a zero-result page visible and its next action disabled', () => {
     const f = fixture();
     f.state.data = { records: [], total: 0, current: 1, pageSize: 10 };
