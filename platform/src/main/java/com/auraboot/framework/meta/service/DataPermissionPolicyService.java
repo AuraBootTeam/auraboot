@@ -51,4 +51,8 @@ public interface DataPermissionPolicyService {
      * @return the SQL WHERE fragment or empty string
      */
     String previewRowFilter(String modelCode, Long userId);
+
+    /** Filter and policy list evaluated for one local member in the same read snapshot. */
+    record Preview(Long userId, String rowFilter, List<DataPermissionPolicy> effectivePolicies) { }
+    Preview preview(String modelCode, Long userId);
 }
