@@ -20,7 +20,8 @@ export type DeliveryNodeStatus = 'pending' | 'running' | 'completed' | 'failed' 
 type NodeConfig = {
   key: string
   label: string | Record<string, string>
-  /** Conditional gate: the node renders with status 'skipped' unless the field matches one of values. */
+  /** Conditional gate: with whenValues the node requires the field to match one of
+   * them; without them the field merely has to be non-empty. Otherwise 'skipped'. */
   whenField?: string
   whenValues?: string[]
   /** Field-based completion: the node is complete when this record field equals doneValue. */
@@ -64,7 +65,10 @@ export function deriveDeliveryNodeStatuses(
   for (const node of nodes) {
     if (node.whenField) {
       const value = String(readPath(record, node.whenField) ?? '')
-      if (!(node.whenValues ?? []).includes(value)) {
+      const passes = node.whenValues
+        ? node.whenValues.includes(value)
+        : value !== '' && value !== 'null'
+      if (!passes) {
         map[node.key] = 'skipped'
         continue
       }

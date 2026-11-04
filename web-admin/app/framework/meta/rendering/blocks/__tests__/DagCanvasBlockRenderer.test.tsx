@@ -151,6 +151,25 @@ describe('deriveDeliveryNodeStatuses', () => {
     expect(map.migration).toBe('completed')
   })
 
+  it('gate-non-empty: whenValues omitted requires a non-empty field', () => {
+    const map = deriveDeliveryNodeStatuses(
+      [
+        { key: 'migration', label: {}, whenField: 'migration_summary' },
+      ] as never,
+      'status',
+      { status: 'succeeded', migration_summary: 'applied=x' },
+    )
+    expect(map.migration).toBe('pending')
+    const empty = deriveDeliveryNodeStatuses(
+      [
+        { key: 'migration', label: {}, whenField: 'migration_summary' },
+      ] as never,
+      'status',
+      { status: 'succeeded', migration_summary: '' },
+    )
+    expect(empty.migration).toBe('skipped')
+  })
+
   it('always-complete: unconditional fact nodes are complete', () => {
     const map = deriveDeliveryNodeStatuses(nodes as never, 'status', { status: 'planned' })
     expect(map.register).toBe('completed')
