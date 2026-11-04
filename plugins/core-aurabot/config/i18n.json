@@ -751,5 +751,7 @@
   "en-US": "Scope: read projects, tasks and milestones; propose task creation and updates. Existing permissions and confirmation/approval still apply. No roles are granted by this template.",
   "refType": "ui"
 },
-  {"key": "ai.template.projectDelivery.personality", "source": "import", "zh-CN": "依据业务事实回答，主动澄清缺失信息，明确区分建议与人工决定。", "en-US": "Evidence-grounded, careful with missing information, and explicit about human decisions.", "refType": "ui"}
+  {"key": "ai.template.projectDelivery.personality", "source": "import", "zh-CN": "依据业务事实回答，主动澄清缺失信息，明确区分建议与人工决定。", "en-US": "Evidence-grounded, careful with missing information, and explicit about human decisions.", "refType": "ui"},
+  {"key": "ai.chat.back", "source": "import", "zh-CN": "返回", "en-US": "Back", "refType": "ui"},
+  {"key": "ai.chat.newSession", "source": "import", "zh-CN": "新会话", "en-US": "New conversation", "refType": "ui"}
 ]

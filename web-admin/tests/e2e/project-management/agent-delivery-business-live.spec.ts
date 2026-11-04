@@ -253,7 +253,11 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await expect(confirmation).not.toContainText(/tpm_|Tpm Ts/);
   expect(await taskRows(page.request, title)).toHaveLength(0);
   await page.screenshot({ path: join(shots, 'D04-before-confirmation.png'), fullPage: true });
+  const continuation = page.waitForResponse((response) => response.url().includes('/api/ai/aurabot/execute') && response.request().method() === 'POST');
   await confirmation.getByTestId('aurabot-confirm-approve').click();
+  expect((await continuation).ok()).toBe(true);
+  expect(await (await continuation).finished()).toBeNull();
+  await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(/已创建|已保存|创建成功/, { timeout: 90_000 });
   await expect
     .poll(async () => (await taskRows(page.request, title)).length, { timeout: 90_000 })
     .toBe(1);
@@ -265,6 +269,7 @@ test('D1: create a scoped delivery colleague, read facts, approve a task and rel
   await page.screenshot({ path: join(shots, 'D05-confirmed-task.png'), fullPage: true });
   await page.reload();
   await expect(chat).toBeVisible();
+  await expect(chat.getByTestId('chat-msg-agent').filter({ hasText: title })).toContainText(/已创建|已保存|创建成功/, { timeout: 30_000 });
   await expect(chat.getByTestId('aurabot-confirm-approve')).toHaveCount(0);
   expect(await taskRows(page.request, title)).toHaveLength(1);
   await page.screenshot({ path: join(shots, 'D06-history-restored.png'), fullPage: true });
