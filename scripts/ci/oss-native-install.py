@@ -163,7 +163,8 @@ def main():
                     'path': str(current / 'config' / owner), 'conflictStrategy': 'OVERWRITE',
                     'autoPublishModels': True, 'autoPublishFields': True, 'autoPublishCommands': True,
                     'autoPublishPages': True, 'deferReferenceValidation': True})
-        security_module.verify(base, request, login, login(), password, check, require, publish_security_tenant)
+        security_module.verify(base, request, login, login(), password, check, require, publish_security_tenant,
+                               f'http://127.0.0.1:{web_port}')
         stop()
         start(previous, 'aura_candidate_upgrade', True)
         token = login()

@@ -31,6 +31,23 @@ function blocksWithId(blocks: PageTreeBlock[], id: string): PageTreeBlock[] {
   ]);
 }
 
+function findAuthoringList(value: unknown): { id: string } | null {
+  if (Array.isArray(value)) {
+    for (const child of value) {
+      const found = findAuthoringList(child);
+      if (found) return found;
+    }
+  } else if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if ((record.blockType ?? record.type) === 'list' && typeof record.id === 'string') return { id: record.id };
+    for (const child of Object.values(record)) {
+      const found = findAuthoringList(child);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 test('SC02: create a model, bind fields, publish and generate CRUD from the real menus', async ({
   page,
   browser,
@@ -486,6 +503,9 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(sessionResponse.ok()).toBe(true);
   const authoringSession = (await sessionResponse.json()).data;
   expect(authoringSession.sessionPid).toMatch(/^[0-9A-Z]{26}$/);
+  const recoverableList = findAuthoringList(authoringSession.snapshot);
+  expect(recoverableList, 'real authoring snapshot must identify the generated list').not.toBeNull();
+  const recoveryOutline = page.getByTestId(`outline-item-${recoverableList!.id}`);
   await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
   await page.getByTestId('authoring-inspector-open').click();
   await page.getByRole('button', { name: '高级设置' }).click();
@@ -493,7 +513,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
     .getByRole('button', { name: '继续到应用设计中心' }).click();
   await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
   const recoveredTitle = '客户跟进 · 恢复后保存';
-  await page.getByTestId(`outline-item-block_${code}_list`).click();
+  await recoveryOutline.click();
   await page.getByTestId('inspector-field-title').fill(recoveredTitle);
   await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
   const recoveryPresent = () => page.evaluate((sessionPid) => Object.keys(localStorage).some((key) =>
@@ -503,7 +523,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
   await page.reload();
   await expect(page.getByTestId('studio-save-reconciliation-feedback')).toContainText('尚未写入权威草稿');
-  await page.getByTestId(`outline-item-block_${code}_list`).click();
+  await recoveryOutline.click();
   await expect(page.getByTestId('inspector-field-title')).toHaveValue(recoveredTitle);
   const saveRecovery = page.waitForResponse((response) =>
     new URL(response.url()).pathname === `/api/authoring/sessions/${authoringSession.sessionPid}/studio-batches`
@@ -519,7 +539,7 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await expect.poll(recoveryPresent).toBe(false);
   expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
   await page.reload();
-  await page.getByTestId(`outline-item-block_${code}_list`).click();
+  await recoveryOutline.click();
   await expect(page.getByTestId('inspector-field-title')).toHaveValue(recoveredTitle);
   expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
   await screenshot(page, info, 'SC02-server-studio-recovery-isolated-from-sample');

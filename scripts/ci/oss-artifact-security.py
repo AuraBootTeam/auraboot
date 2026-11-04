@@ -105,7 +105,35 @@ def main():
     image = package / receipt['image']['layout']
     if not (image / 'index.json').is_file():
         raise RuntimeError('actual OCI layout required')
-    targets = [('native', ['fs', str(package)]), ('oci', ['image', '--input', str(image)])]
+    # rootfs enables post-build JAR analysis; fs deliberately does not analyze
+    # Java archives. Expand the delivered npm tarballs as a separately inventoried
+    # target so their exact capsule manifests/locks are visible to library analysis.
+    expanded = private / 'expanded-npm'
+    expanded.mkdir(mode=0o700)
+    npm_inputs = []
+    catalog = json.loads((package / 'artifact-catalog.json').read_text())
+    for artifact in catalog['artifacts']:
+        if artifact['type'] != 'npm':
+            continue
+        source = (package / artifact['localPath']).resolve()
+        if not source.is_relative_to(package) or not source.is_file():
+            raise RuntimeError('invalid packaged npm artifact')
+        sha = digest(source)
+        if 'sha256:' + sha != artifact['digest']:
+            raise RuntimeError('packaged npm artifact digest differs')
+        destination = expanded / hashlib.sha256(artifact['id'].encode()).hexdigest()[:16]
+        destination.mkdir(mode=0o700)
+        with tarfile.open(source) as snapshot:
+            if any(not (member.isfile() or member.isdir()) for member in snapshot.getmembers()):
+                raise RuntimeError('npm artifact has a nonregular entry')
+            snapshot.extractall(destination, filter='data')
+        npm_inputs.append({'id': artifact['id'], 'path': artifact['localPath'], 'sha256': sha,
+                           'expandedDirectory': destination.name})
+    if not npm_inputs or not list(expanded.rglob('pnpm-lock.yaml')):
+        raise RuntimeError('delivered npm capsule/lock inventory missing')
+    (output / 'expanded-npm-inventory.json').write_text(json.dumps(npm_inputs, indent=2))
+    targets = [('native', ['rootfs', str(package)]), ('npm-capsules', ['fs', str(expanded)]),
+               ('oci', ['image', '--input', str(image)])]
     findings, blockers = [], []
     for label, command in targets:
         raw = private / (label + '-scan.json')

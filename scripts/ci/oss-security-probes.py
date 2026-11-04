@@ -7,10 +7,11 @@ import hashlib
 import json
 import secrets
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
-def verify(base, request, login, admin, password, check, require, publish_tenant):
+def verify(base, request, login, admin, password, check, require, publish_tenant, web_base):
     def call(token, path, method='GET', body=None, extra=None):
         headers = dict(extra or {})
         if token:
@@ -207,6 +208,26 @@ def verify(base, request, login, admin, password, check, require, publish_tenant
                 and not (value.get('data') or {}).get('jwt'), 'invalid login unexpectedly succeeded or errored')
         return 'Too many login attempts' in str(value.get('message'))
 
+    class KeepRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    def bff_login():
+        data = urllib.parse.urlencode({'identifier': 'security-alice@auraboot.local', 'password': password,
+            'channelCode': 'email_password', 'redirectTo': '/home'}).encode()
+        req = urllib.request.Request(web_base + '/login', data=data,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        try:
+            with urllib.request.build_opener(KeepRedirect()).open(req, timeout=60) as response:
+                raise RuntimeError('BFF login did not return its defined redirect')
+        except urllib.error.HTTPError as response:
+            with response:
+                return response.code, response.headers.get('Location', ''), bool(response.headers.get_all('Set-Cookie'))
+
+    bff_before = bff_login()
+    require(bff_before[0] == 302 and bff_before[2] and 'invalidCredentials' not in bff_before[1],
+            'BFF correct-credential positive control failed')
+
     identifier = 'limit-' + secrets.token_hex(8) + '@example.invalid'
     attempts = [login_attempt(identifier if index % 2 else identifier.upper(), index) for index in range(11)]
     require(attempts == [False] * 10 + [True], 'real login identifier window/normalization differs')
@@ -215,7 +236,11 @@ def verify(base, request, login, admin, password, check, require, publish_tenant
     client_limits = [login_attempt('peer-limit-' + secrets.token_hex(8) + '@example.invalid', index)
                      for index in range(61)]
     require(any(client_limits) and client_limits[-1], 'spoofed forwarding headers bypassed client limit')
+    bff_after = bff_login()
+    require(bff_after[0] == 303 and 'invalidCredentials' in bff_after[1] and not bff_after[2],
+            'BFF bypassed the backend login budget or issued a cookie after rejection')
     require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated',
             'login burst affected authenticated business operations')
     check('security-real-login-windows-and-forwarded-header-spoof', identifierAttempts=11,
-          uniqueIdentifierClientAttempts=61, authenticatedBusinessContinues=True)
+          uniqueIdentifierClientAttempts=61, authenticatedBusinessContinues=True,
+          correctCredentialBffControl=True, throttledBffIssuedNoCookie=True)
