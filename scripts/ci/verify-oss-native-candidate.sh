@@ -19,13 +19,13 @@ freeze() {
     > "$ARTIFACTS/native-frozen-$1.json"
 }
 freeze before
+CI=1 pnpm install --frozen-lockfile --ignore-scripts
 if [[ -n "${AURA_PRODUCT_PLATFORM_ARCHIVE:-}" ]]; then
   : "${AURA_CI_DATASET_INPUTS:?original previous-candidate dataset receipt required}"
   node scripts/application/platform-artifact-package.mjs consume \
     "$AURA_PRODUCT_PLATFORM_ARCHIVE" "$AURA_CI_DATASET_INPUTS" "$ARTIFACTS/previous" \
     640057f2a3ee08c7cc581202781a3be49bb409ae > "$ARTIFACTS/previous-consumption.json"
 fi
-CI=1 pnpm install --frozen-lockfile --ignore-scripts
 AURA_OCI_BUILDER=docker node scripts/application/stage-core-only-artifacts.mjs \
   --repo-root "$ROOT" --output "$ARTIFACTS/platform"
 cmp LICENSE.txt "$ARTIFACTS/platform/LICENSE.txt"
@@ -41,7 +41,7 @@ node scripts/application/platform-artifact-package.mjs unpack \
 cmp LICENSE.txt "$ARTIFACTS/unpacked/LICENSE.txt"
 cmp NOTICE "$ARTIFACTS/unpacked/NOTICE"
 if [[ -n "${AURA_PRODUCT_PLATFORM_ARCHIVE:-}" ]]; then
-  python3 scripts/ci/oss-native-install.py "$ARTIFACTS/unpacked" "$ARTIFACTS/previous" "$ARTIFACTS/installation"
+  python3 -B scripts/ci/oss-native-install.py "$ARTIFACTS/unpacked" "$ARTIFACTS/previous" "$ARTIFACTS/installation"
 fi
 freeze after
 cmp "$ARTIFACTS/native-frozen-before.json" "$ARTIFACTS/native-frozen-after.json"

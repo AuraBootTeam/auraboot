@@ -116,6 +116,29 @@ def main():
         env['PGPORT'] = port
         start(current, 'aura_candidate_cold', True)
         check('cold-install-initialize-publish', packageSource=json.loads((current / 'release-receipt.json').read_text())['source']['commit'], initialized=True)
+        # Reuse the existing first-user browser case against the installed package.
+        # Its denominator includes Schema refinement, persistence and a real read-only user.
+        browser_output = output / 'onboarding'
+        browser_output.mkdir()
+        auth_script = private / 'authenticate.mts'
+        auth_script.write_text("import {createRequire} from 'node:module';\n"
+            + "const require=createRequire(" + json.dumps(str(root / 'web-admin/package.json')) + ");\n"
+            + "const {request}=require('@playwright/test');\n"
+            + "const {authenticateBffSession}=await import(" + json.dumps(str(root / 'web-admin/tests/helpers/bff-auth-session.ts')) + ");\n"
+            + "const context=await request.newContext();try{await authenticateBffSession(context,process.env.PLAYWRIGHT_BASE_URL,process.env.ADMIN_EMAIL,process.env.ADMIN_PASSWORD);await context.storageState({path:process.env.PW_ADMIN_STORAGE_STATE});}finally{await context.dispose();}\n")
+        browser_env = dict(env, PLAYWRIGHT_BASE_URL=f'http://127.0.0.1:{web_port}', BACKEND_URL=base,
+            BE_PORT=str(backend_port), BFF_PORT=str(web_port), VITE_PORT=str(web_port), PG_DB='aura_candidate_cold',
+            PW_SKIP_WEBSERVER='1', PW_PROFILE='full', PW_WORKERS='1', CI='1',
+            PW_ADMIN_STORAGE_STATE=str(private / 'admin.json'), PW_ARTIFACT_DIR=str(browser_output / 'artifacts'),
+            PLAYWRIGHT_JSON_OUTPUT_NAME=str(browser_output / 'results.json'))
+        run(['pnpm', '--dir', root / 'web-admin', 'exec', 'tsx', auth_script], 'browser-authenticate', browser_env)
+        run(['pnpm', '--dir', root / 'web-admin', 'exec', 'playwright', 'test',
+             'tests/e2e/showcase/customer-designers-journey.spec.ts', '--grep', 'SC02:',
+             '--project', 'chromium', '--no-deps', '--reporter=line,json'], 'browser-onboarding', browser_env)
+        browser_results = json.loads((browser_output / 'results.json').read_text())['stats']
+        require(browser_results['expected'] == 1 and browser_results['unexpected'] == 0
+                and browser_results['skipped'] == 0 and browser_results['flaky'] == 0, 'first-user browser denominator differs')
+        check('installed-package-model-crud-schema-runtime-readonly', expected=1, passed=1, skipped=0, retries=0)
         stop()
         start(previous, 'aura_candidate_upgrade', True)
         token = login()
