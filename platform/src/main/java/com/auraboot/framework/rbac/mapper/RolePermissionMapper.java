@@ -142,14 +142,20 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
      * @return Set of permission IDs
      */
     @Select("""
-        SELECT DISTINCT permission_id
-        FROM ab_role_permission
-        WHERE role_id = #{roleId}
-          AND grant_type = 'grant'
-          AND deleted_flag = false
-          AND status = 'active'
-          AND (effective_date IS NULL OR effective_date <= CURRENT_DATE)
-          AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+        SELECT DISTINCT rp.permission_id
+        FROM ab_role_permission rp
+        JOIN ab_role r ON r.id = rp.role_id
+        JOIN ab_permission p ON p.id = rp.permission_id
+        WHERE rp.role_id = #{roleId}
+          AND (r.tenant_id = rp.tenant_id OR r.tenant_id IS NULL)
+          AND (p.tenant_id = rp.tenant_id OR p.tenant_id IS NULL)
+          AND r.status = 'active' AND r.deleted_flag = false
+          AND p.status = 'active' AND p.deleted_flag = false
+          AND rp.grant_type = 'grant'
+          AND rp.deleted_flag = false
+          AND rp.status = 'active'
+          AND (rp.effective_date IS NULL OR rp.effective_date <= CURRENT_DATE)
+          AND (rp.expiry_date IS NULL OR rp.expiry_date >= CURRENT_DATE)
         """)
     Set<Long> findPermissionIdsByRole(@Param("roleId") Long roleId);
 

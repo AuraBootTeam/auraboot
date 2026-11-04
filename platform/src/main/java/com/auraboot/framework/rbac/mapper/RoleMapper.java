@@ -199,9 +199,21 @@ public interface RoleMapper extends BaseMapper<Role> {
     /**
      * Find roles for a member in a tenant.
      */
-    @Select("SELECT r.* FROM ab_role r INNER JOIN ab_user_role ur ON r.id = ur.role_id " +
-            "WHERE ur.member_id = #{memberId} AND ur.tenant_id = #{tenantId} AND ur.status = 'active' " +
-            "AND r.deleted_flag = false AND ur.deleted_flag = false ORDER BY r.priority ASC")
+    @Select("""
+        SELECT r.* FROM ab_role r
+        JOIN ab_user_role ur ON r.id=ur.role_id
+        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+        JOIN ab_user u ON u.id=m.user_id
+        WHERE ur.member_id=#{memberId} AND ur.tenant_id=#{tenantId}
+          AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.status='active' AND r.deleted_flag=FALSE
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND m.status='active' AND m.deleted_flag=FALSE
+          AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+        ORDER BY r.priority ASC
+        """)
     List<Role> findByMemberIdAndTenantId(@Param("memberId") Long memberId, @Param("tenantId") Long tenantId);
 
 //    /**
