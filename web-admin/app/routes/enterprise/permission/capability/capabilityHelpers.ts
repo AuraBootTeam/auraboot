@@ -20,43 +20,9 @@ export interface CapabilityPrimaryViewSplit {
   advancedTotal: number;
 }
 
-/** Declared business groups follow known menu sections, with new groups kept selectable under
- * their declared names. Only convention-derived model capabilities use the advanced view. */
-const GROUP_TO_MENU_SECTION: Record<string, string> = {
-  客户管理: '客户',
-  项目管理: '项目',
-  转换作业: 'BOM 转化工具',
-  物料库: 'BOM 转化工具',
-  规则配置: 'BOM 转化工具',
-  报价单: '报价工具',
-  报价管理: '报价工具',
-  报价业务面: '报价工具',
-  来料处理: '报价工具',
-  寻源与定价: '报价工具',
-  敏感信息: '报价工具',
-  组织与权限管理: '组织管理',
-  权限管理: '组织管理',
-  团队与用户: '组织管理',
-  系统管理: '系统管理',
-};
-
-/** Section render order = sidebar menu tree order (客户 → 项目 → BOM → 报价 → 组织 → 系统). */
-const MENU_SECTION_ORDER: Record<string, number> = {
-  客户: 10,
-  项目: 20,
-  'BOM 转化工具': 30,
-  报价工具: 40,
-  组织管理: 50,
-  系统管理: 60,
-};
-
-/** The top-level menu section a capability belongs to, or null for convention-derived capabilities. */
+/** The server resolves module membership from the active navigation configuration. */
 export function menuSectionForCapability(capability: Capability): string | null {
-  if (capability.conventionDerived) return null;
-  // New declared business capabilities stay selectable without a frontend whitelist change.
-  return capability.group === null
-    ? null
-    : (GROUP_TO_MENU_SECTION[capability.group] ?? capability.group);
+  return capability.conventionDerived ? null : capability.group;
 }
 
 function isAdvancedCapability(capability: Capability): boolean {
@@ -94,7 +60,7 @@ export function splitCapabilityGroupsForPrimaryView(
       group,
       capabilities: [...capabilities].sort(compareCapabilities),
     }))
-    .sort((a, b) => menuSectionOrder(a.group) - menuSectionOrder(b.group));
+    .sort((a, b) => firstDisplayGroupOrder(a) - firstDisplayGroupOrder(b));
 
   return {
     primaryGroups,
@@ -104,10 +70,6 @@ export function splitCapabilityGroupsForPrimaryView(
     advancedGranted: countGranted(advancedGroups),
     advancedTotal: allCapabilities(advancedGroups).length,
   };
-}
-
-function menuSectionOrder(section: string | null): number {
-  return section === null ? 9999 : (MENU_SECTION_ORDER[section] ?? 9999);
 }
 
 function sortCapabilityGroups(groups: CapabilityGroup[]): CapabilityGroup[] {

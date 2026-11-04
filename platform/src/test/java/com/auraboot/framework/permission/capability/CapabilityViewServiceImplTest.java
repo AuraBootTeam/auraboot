@@ -106,7 +106,7 @@ class CapabilityViewServiceImplTest {
 
         MetaContext.setContext(1L, 1L, "p", "u");
         Capability cap = service.resolveForRole(5L).stream()
-                .filter(g -> "客户管理".equals(g.getGroup())).findFirst().orElseThrow()
+                .filter(g -> "客户".equals(g.getGroup())).findFirst().orElseThrow()
                 .getCapabilities().get(0);
 
         assertThat(cap.getUnlockedMenus()).containsExactly("客户");

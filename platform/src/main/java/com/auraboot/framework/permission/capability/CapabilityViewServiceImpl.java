@@ -49,8 +49,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
         Set<String> granted = roleCodes(roleId);
         List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
         List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, allCodes, granted, names, extensions);
-        annotateUnlockedMenus(groups);
-        return groups;
+        return annotateNavigation(groups);
     }
 
     /**
@@ -58,18 +57,16 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
      * the menu's permissionCode is one of the capability's included codes. Pure read-side decoration
      * so the v2 page can render "解锁菜单: …"; never affects authorization.
      */
-    private void annotateUnlockedMenus(List<CapabilityGroup> groups) {
+    private List<CapabilityGroup> annotateNavigation(List<CapabilityGroup> groups) {
+        List<Menu> menus = menuMapper.findAllActiveMenus();
         Map<String, List<String>> menusByPermission = new LinkedHashMap<>();
-        for (Menu menu : menuMapper.findAllActiveMenus()) {
+        for (Menu menu : menus) {
             String code = menu.getPermissionCode();
             String name = menu.getName();
             if (code == null || code.isBlank() || name == null || name.isBlank()) {
                 continue;
             }
             menusByPermission.computeIfAbsent(code, k -> new ArrayList<>()).add(name);
-        }
-        if (menusByPermission.isEmpty()) {
-            return;
         }
         for (CapabilityGroup group : groups) {
             for (Capability cap : group.getCapabilities()) {
@@ -89,6 +86,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
                 }
             }
         }
+        return CapabilityNavigationGroups.regroup(groups, menus);
     }
 
     @Override
@@ -161,7 +159,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
         resulting.removeAll(revoke);
         resulting.addAll(grant);
         List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, new ArrayList<>(available), resulting);
-        annotateUnlockedMenus(groups);
+        groups = annotateNavigation(groups);
         List<Capability> affected = groups.stream().flatMap(group -> group.getCapabilities().stream())
                 .filter(cap -> !cap.isConventionDerived())
                 .filter(cap -> cap.getIncludes().stream().anyMatch(code -> grant.contains(code) || revoke.contains(code)))
