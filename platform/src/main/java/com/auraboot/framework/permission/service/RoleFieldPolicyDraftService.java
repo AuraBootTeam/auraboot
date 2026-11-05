@@ -7,12 +7,10 @@ import com.auraboot.framework.meta.entity.DataPermissionPolicy;
 import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
 import com.auraboot.framework.meta.mapper.DataPermissionRoleBindingMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
-import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.dto.RoleFieldPolicyPreview;
 import com.auraboot.framework.permission.dto.RoleFieldPolicyView;
 import com.auraboot.framework.rbac.entity.Role;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -24,7 +22,7 @@ public class RoleFieldPolicyDraftService {
     private final DataPermissionPolicyMapper policies;
     private final DataPermissionRoleBindingMapper bindings;
     private final MetaModelService models;
-    private final UserPermissionService permissions;
+    private final DataPermissionAuthoringAccess authoringAccess;
 
     public List<RoleFieldPolicyView> snapshot(Role role) {
         return current(role).values().stream().map(RoleFieldPolicyDraftService::view).toList();
@@ -32,9 +30,7 @@ public class RoleFieldPolicyDraftService {
 
     public RoleFieldPolicyPreview preview(Role role, Set<String> selected, Set<String> resultingModels) {
         if (selected == null) return new RoleFieldPolicyPreview(List.of(), List.of());
-        if (MetaContext.getCurrentUserId() == null || !permissions.hasPermission(
-                MetaContext.getCurrentUserId(), MetaPermission.PERMISSION_MANAGE))
-            throw new AccessDeniedException("Field policy authoring requires permission management authority");
+        authoringAccess.requireRead();
         if (selected.size() > 1000 || selected.stream().anyMatch(pid -> pid == null || pid.isBlank() || pid.length() > 64))
             throw invalid();
         var current = current(role);

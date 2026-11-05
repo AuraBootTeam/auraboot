@@ -18,11 +18,13 @@ class RoleAuthorizationAuthoringAccessTest {
     private final AdminRoleChecker administrators = mock(AdminRoleChecker.class);
     private final UserPermissionService permissions = mock(UserPermissionService.class);
     private final RoleMapper roles = mock(RoleMapper.class);
-    private final RoleAuthorizationAuthoringAccess access = new RoleAuthorizationAuthoringAccess(administrators, permissions, roles);
+    private final com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots = mock(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class);
+    private final RoleAuthorizationAuthoringAccess access = new RoleAuthorizationAuthoringAccess(administrators, permissions, roles, snapshots);
 
     @BeforeEach void context() {
         MetaContext.setContext(7L, 20L, "user", "test");
         MetaContext.setMemberId(30L);
+        when(snapshots.withFreshReads(any())).thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(0)).get());
     }
     @AfterEach void cleanup() { MetaContext.clear(); }
 

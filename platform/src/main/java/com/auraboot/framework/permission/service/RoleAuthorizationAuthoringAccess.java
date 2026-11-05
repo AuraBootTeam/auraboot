@@ -16,6 +16,7 @@ public class RoleAuthorizationAuthoringAccess {
     private final AdminRoleChecker administrators;
     private final UserPermissionService permissions;
     private final RoleMapper roles;
+    private final com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots;
 
     /** Call inside the tenant authoring lock, before resolving or changing the requested grants. */
     public void requireWrite() {
@@ -25,7 +26,7 @@ public class RoleAuthorizationAuthoringAccess {
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || tenant == null || user == null || MetaContext.getCurrentMemberId() == null
                 || !administrators.hasRole(tenant, user, RoleCodes.TENANT_ADMIN)
-                || !permissions.hasPermission(user, MetaPermission.ROLE_MANAGE)) {
+                || !snapshots.withFreshReads(() -> permissions.hasPermission(user, MetaPermission.ROLE_MANAGE))) {
             throw new AccessDeniedException("Current tenant administrator and role authoring permission required");
         }
     }

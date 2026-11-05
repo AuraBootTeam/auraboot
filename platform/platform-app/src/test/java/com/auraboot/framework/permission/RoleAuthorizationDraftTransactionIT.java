@@ -209,6 +209,57 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         }
     }
 
+    private List<Long> revokeOnlyFixturePermission(String code) {
+        var ids = jdbc.queryForList("""
+                SELECT rp.id FROM ab_role_permission rp JOIN ab_permission p ON p.id=rp.permission_id
+                WHERE rp.tenant_id=? AND rp.role_id=? AND p.code=? AND rp.status='active' AND rp.deleted_flag=FALSE
+                """, Long.class, getTestTenant().getId(), getTestRole().getId(), code);
+        assertThat(ids).isNotEmpty();
+        for (Long id : ids) jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE id=? AND tenant_id=?", id, getTestTenant().getId());
+        return ids;
+    }
+
+    private void restoreFixturePermission(List<Long> ids) {
+        for (Long id : ids) jdbc.update("UPDATE ab_role_permission SET status='active' WHERE id=? AND tenant_id=?", id, getTestTenant().getId());
+        applicationContext.getBean(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class).clearAll();
+    }
+
+    @Test void aWarmRoleManagementPermissionCannotAuthorizeDraftOrLegacyScopeWritesAfterRevocation() throws Exception {
+        migrationSource(); var baseline = drafts.snapshot(rolePid); String before = migrationBindingBytes();
+        assertThat(applicationContext.getBean(com.auraboot.framework.permission.service.UserPermissionService.class)
+                .hasPermission(getTestUser().getId(), com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE)).isTrue();
+        var revoked = revokeOnlyFixturePermission(com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE);
+        try {
+            assertThat(applicationContext.getBean(com.auraboot.framework.permission.service.UserPermissionService.class)
+                    .hasPermission(getTestUser().getId(), com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE)).isTrue();
+            assertThatThrownBy(() -> drafts.apply(rolePid, new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(),
+                    false, null, false, List.of(new DataScopeUpdateRequest(resource, "update", "self", "MAX")))))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(() -> matrix.setRoleScope(getTestTenant().getId(), roleId,
+                    new DataScopeUpdateRequest(resource, "update", "self", "MAX")))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThat(migrationBindingBytes()).isEqualTo(before); assertThat(persistedScopes()).isEmpty();
+        } finally { restoreFixturePermission(revoked); }
+    }
+
+    @Test void aWarmPolicyManagementPermissionCannotRemoveFieldBindingsAfterRevocation() {
+        String policy = fieldPolicy();
+        var baseline = drafts.apply(rolePid, fieldsRequest(drafts.snapshot(rolePid), Set.of(policy)));
+        var beforeScopes = persistedScopes(); String beforeGrants = migrationBindingBytes();
+        assertThat(applicationContext.getBean(com.auraboot.framework.permission.service.UserPermissionService.class)
+                .hasPermission(getTestUser().getId(), com.auraboot.framework.permission.constants.MetaPermission.PERMISSION_MANAGE)).isTrue();
+        var revoked = revokeOnlyFixturePermission(com.auraboot.framework.permission.constants.MetaPermission.PERMISSION_MANAGE);
+        try {
+            assertThat(applicationContext.getBean(com.auraboot.framework.permission.service.UserPermissionService.class)
+                    .hasPermission(getTestUser().getId(), com.auraboot.framework.permission.constants.MetaPermission.PERMISSION_MANAGE)).isTrue();
+            assertThatThrownBy(() -> drafts.apply(rolePid, fieldsRequest(baseline, Set.of())))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_data_permission_role_binding WHERE tenant_id=? AND role_pid=? AND policy_pid=?",
+                    Integer.class, getTestTenant().getId(), rolePid, policy)).isEqualTo(1);
+            assertThat(migrationBindingBytes()).isEqualTo(beforeGrants); assertThat(persistedScopes()).isEqualTo(beforeScopes);
+        } finally { restoreFixturePermission(revoked); }
+    }
+
     @Test void directServiceCallsDenyARealDelegatedRoleManagerWithoutChangingTheDraft() {
         long user = IdWorker.getId(), member = IdWorker.getId(), assignment = IdWorker.getId();
         String userPid = UniqueIdGenerator.generate();

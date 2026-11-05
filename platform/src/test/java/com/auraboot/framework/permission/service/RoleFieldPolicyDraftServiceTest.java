@@ -7,7 +7,6 @@ import com.auraboot.framework.meta.entity.DataPermissionRoleBinding;
 import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
 import com.auraboot.framework.meta.mapper.DataPermissionRoleBindingMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
-import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.rbac.entity.Role;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,14 +20,13 @@ class RoleFieldPolicyDraftServiceTest {
     final DataPermissionPolicyMapper policies = mock(DataPermissionPolicyMapper.class);
     final DataPermissionRoleBindingMapper bindings = mock(DataPermissionRoleBindingMapper.class);
     final MetaModelService models = mock(MetaModelService.class);
-    final UserPermissionService permissions = mock(UserPermissionService.class);
-    final RoleFieldPolicyDraftService service = new RoleFieldPolicyDraftService(policies, bindings, models, permissions);
+    final DataPermissionAuthoringAccess authoringAccess = mock(DataPermissionAuthoringAccess.class);
+    final RoleFieldPolicyDraftService service = new RoleFieldPolicyDraftService(policies, bindings, models, authoringAccess);
     final Role role = new Role();
 
     @BeforeEach void prepare() {
         MetaContext.setCurrentTenantId(7L); MetaContext.setCurrentUserId(20L);
         role.setPid("role-a"); role.setTenantId(7L);
-        when(permissions.hasPermission(20L, MetaPermission.PERMISSION_MANAGE)).thenReturn(true);
         when(models.getModelFields("orders")).thenReturn(List.of(FieldDefinition.builder().code("cost").build()));
     }
     @AfterEach void clear() { MetaContext.clear(); }
@@ -55,13 +53,13 @@ class RoleFieldPolicyDraftServiceTest {
         verify(bindings, never()).deleteBinding(any(),any(),any());
     }
     @Test void omissionPreservesAllBindingsWithoutRequiringNewManagementAuthority() {
-        when(permissions.hasPermission(20L, MetaPermission.PERMISSION_MANAGE)).thenReturn(false);
+        doThrow(new AccessDeniedException("Current policy management required")).when(authoringAccess).requireRead();
         var preview = service.preview(role, null, Set.of());
         assertThat(preview.added()).isEmpty(); assertThat(preview.removed()).isEmpty();
-        verifyNoInteractions(bindings, policies);
+        verifyNoInteractions(authoringAccess, bindings, policies);
     }
     @Test void roleManagementAloneCannotAlterFieldRestrictions() {
-        when(permissions.hasPermission(20L, MetaPermission.PERMISSION_MANAGE)).thenReturn(false);
+        doThrow(new AccessDeniedException("Current policy management required")).when(authoringAccess).requireRead();
         assertThatThrownBy(() -> service.preview(role, Set.of(), Set.of()))
                 .isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(bindings, policies);
