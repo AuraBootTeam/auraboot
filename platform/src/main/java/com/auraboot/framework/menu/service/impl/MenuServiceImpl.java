@@ -419,7 +419,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     @Override
     public Menu getByPath(Long tenantId, String path) {
-        Menu menu = navigationConfiguration.effectiveMenus(tenantId).stream().filter(entry -> java.util.Objects.equals(entry.getPath(),path)).findFirst().orElse(null);
+        Menu menu = navigationConfiguration.targetAccessMenu(tenantId, path);
         return MenuEnvironmentScopeService.isVisibleIn(
                 menu, MetaContext.getCurrentEnvironmentId()) ? menu : null;
     }

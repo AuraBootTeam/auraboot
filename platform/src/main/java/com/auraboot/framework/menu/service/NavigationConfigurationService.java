@@ -21,8 +21,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -115,7 +113,8 @@ public class NavigationConfigurationService {
             }
             if (effectiveMenus(tenant()).stream().anyMatch(menu -> Objects.equals(menu.getParentId(), base.getId())))
                 throw invalid("Move or delete child menus first");
-            base.setDeletedFlag(true);base.setUpdatedAt(Instant.now());menus.updateById(base);
+            // deletedFlag is the configured MyBatis logic-delete field. An ordinary update omits it.
+            if(menus.deleteById(base.getId())!=1)throw new IllegalStateException("Navigation removal did not update exactly one owned menu");
             jdbc.update("DELETE FROM ab_navigation_customization WHERE tenant_id=? AND menu_pid=?", tenant(), pid);
             audit(pid, "DELETE", before, null);
         }
@@ -132,7 +131,23 @@ public class NavigationConfigurationService {
             if (override != null) apply(menu, override, base);
         }
         base.sort(Comparator.comparing((Menu menu) -> menu.getOrderNo()==null?0:menu.getOrderNo()).thenComparing(Menu::getPid));
+        Set<String> published=publishedKeys(tenant);
+        for(Menu menu:base)if(menu.getPageKey()!=null && !published.contains(menu.getPageKey()))menu.setVisible(false);
         return base;
+    }
+
+    /** Preserve legacy target protection independently of navigation ordering and overrides. */
+    public Menu targetAccessMenu(Long tenant, String path) {
+        return selectTargetAccessMenu(defaults(tenant), path);
+    }
+
+    static Menu selectTargetAccessMenu(List<Menu> defaults, String path) {
+        String pageKey = path != null && path.startsWith("/p/c/") ? path.substring(5)
+                : path != null && path.startsWith("/p/") ? path.substring(3) : null;
+        return defaults.stream().filter(menu -> !custom(menu))
+                .filter(menu -> Objects.equals(path, menu.getPath())
+                        || (pageKey != null && Objects.equals(pageKey, menu.getPageKey())))
+                .findFirst().orElse(null);
     }
 
     private void begin(String revision) {
@@ -146,7 +161,9 @@ public class NavigationConfigurationService {
 
     private void requireManager() {
         Long user = MetaContext.getCurrentUserId();
-        if (user == null || MetaContext.getCurrentMemberId() == null
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                || user == null || MetaContext.getCurrentMemberId() == null
                 || !snapshots.withFreshReads(() -> permissions.hasPermission(user, MetaPermission.MENU_MANAGE)))
             throw new AccessDeniedException("Navigation management permission required");
     }
@@ -181,26 +198,42 @@ public class NavigationConfigurationService {
     private Snapshot snapshot() {
         var base = defaults();
         var overrides = overrides(tenant());
+        Set<String> published=publishedKeys(tenant());
         var entries = new ArrayList<>(base.stream().map(menu -> new Entry(menu.getPid(), overrides.getOrDefault(menu.getPid(), definition(menu,base)),
-                custom(menu) ? "custom" : "default", overrides.containsKey(menu.getPid()), true)).toList());
+                custom(menu) ? "custom" : "default", overrides.containsKey(menu.getPid()), targetAvailable(menu,overrides.getOrDefault(menu.getPid(),definition(menu,base)),published))).toList());
         overrides.forEach((pid,definition) -> {if(base.stream().noneMatch(menu -> pid.equals(menu.getPid()))) entries.add(new Entry(pid,definition,"missing",true,false));});
         List<Option> pages = jdbc.query("""
-                SELECT DISTINCT page_key,name FROM ab_page_schema
-                WHERE tenant_id=? AND deleted_flag=FALSE AND status='published'
-                  AND (env_id=? OR env_id IS NULL) ORDER BY name,page_key
+                SELECT page_key,name FROM (
+                    SELECT DISTINCT ON(page_key) page_key,name FROM ab_page_schema
+                    WHERE tenant_id=? AND deleted_flag=FALSE AND status='published'
+                      AND (env_id=? OR env_id IS NULL)
+                    ORDER BY page_key,(env_id IS NOT NULL) DESC,is_current DESC,published_at DESC,id DESC
+                ) current_pages ORDER BY name,page_key
                 """, (rs,i) -> new Option(rs.getString(1),rs.getString(2)), tenant(), MetaContext.getCurrentEnvironmentId());
-        var availablePermissions = permissionDefinitions.findResolvableDefinitions(tenant()).stream()
-                .filter(p -> p.getTenantId() == null || Objects.equals(tenant(),p.getTenantId()))
-                .filter(p -> "active".equals(p.getStatus()) && !"*".equals(p.getCode())).sorted(Comparator.comparing(p -> p.getCode())).map(p -> new Option(p.getCode(),p.getName())).toList();
+        // Navigation audiences reference existing page-entry requirements, not technical model CRUD.
+        Map<String,Option> audienceOptions=new TreeMap<>();
+        for(Menu menu:base)if(!custom(menu) && Integer.valueOf(1).equals(menu.getType())
+                && menu.getPermissionCode()!=null && !menu.getPermissionCode().isBlank())
+            audienceOptions.putIfAbsent(menu.getPermissionCode(),new Option(menu.getPermissionCode(),menu.getName()));
+        var availablePermissions=audienceOptions.values().stream().sorted(Comparator.comparing(Option::label)).toList();
         List<Audit> audit = jdbc.query("""
                 SELECT a.pid,a.menu_pid,COALESCE(a.after_definition->>'name',a.before_definition->>'name'),
-                       u.email,a.action,a.created_at FROM ab_navigation_audit a
+                       COALESCE(u.email,''),a.action,a.created_at FROM ab_navigation_audit a
                 LEFT JOIN ab_user u ON u.id=a.actor_id
                 WHERE a.tenant_id=? ORDER BY a.created_at DESC,a.pid DESC LIMIT 30
                 """, (rs,i) -> new Audit(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getTimestamp(6).toInstant().toString()), tenant());
         // Defaults and overlays both participate; a plugin update invalidates an old editor.
         String revision = digest(encode(List.of(base, new TreeMap<>(overrides), pages, availablePermissions)));
         return new Snapshot(revision, entries, pages, availablePermissions, audit);
+    }
+
+    private static boolean targetAvailable(Menu menu,Definition definition,Set<String> published) {
+        String page="page".equals(definition.kind())?definition.target():"internal".equals(definition.kind())&&Objects.equals(definition.target(),menu.getPath())?menu.getPageKey():null;
+        return page==null || published.contains(page);
+    }
+
+    private Set<String> publishedKeys(Long tenant) {
+        return new HashSet<>(jdbc.queryForList("SELECT page_key FROM ab_page_schema WHERE tenant_id=? AND deleted_flag=FALSE AND status='published' AND (env_id=? OR env_id IS NULL)",String.class,tenant,MetaContext.getCurrentEnvironmentId()));
     }
 
     private Definition definition(Menu menu, List<Menu> all) {
@@ -215,7 +248,7 @@ public class NavigationConfigurationService {
     }
 
     private Definition validate(Definition d, Menu base) {
-        if (d == null || !validator.validate(d).isEmpty() || d.kind()==null || d.opening()==null || d.name()==null || d.name().isBlank() || d.name().length()>120 || !KINDS.contains(d.kind())
+        if (d == null || !validator.validate(d).isEmpty() || d.kind()==null || d.opening()==null || d.target()==null || d.name()==null || d.name().isBlank() || d.name().length()>120 || !KINDS.contains(d.kind())
                 || !Set.of("same","new").contains(d.opening()) || d.orderNo()<0 || d.orderNo()>100000)
             throw invalid("Invalid navigation definition");
         if (!"directory".equals(d.kind())) {
@@ -261,7 +294,14 @@ public class NavigationConfigurationService {
         var base = defaults();
         var overrides = overrides(tenant());
         for (Menu menu:base) entries.put(menu.getPid(),overrides.getOrDefault(menu.getPid(),definition(menu,base)));
+        validateTopology(pid,proposed,entries);
+    }
+
+    static void validateTopology(String pid,Definition proposed,Map<String,Definition> existing) {
+        var entries=new HashMap<>(existing);
         entries.put(pid,proposed);
+        if(!"directory".equals(proposed.kind()) && entries.values().stream().anyMatch(entry -> Objects.equals(entry.parentPid(),pid)))
+            throw invalid("Move child menus before changing directory type");
         if (proposed.parentPid()!=null && !proposed.parentPid().isBlank()) {
             var parent = entries.get(proposed.parentPid());
             if (parent==null || !"directory".equals(parent.kind())) throw invalid("Select an existing directory");
@@ -277,7 +317,7 @@ public class NavigationConfigurationService {
         String previousPath=menu.getPath();String previousPage=menu.getPageKey();
         menu.setName(d.name());menu.setIcon(d.icon());menu.setType("directory".equals(d.kind())?0:1);
         menu.setParentId(d.parentPid()==null || d.parentPid().isBlank()?null:base.stream().filter(m -> Objects.equals(m.getPid(),d.parentPid())).map(Menu::getId).findFirst().orElse(-1L));
-        menu.setPath("embedded".equals(d.kind())?"/navigation/"+menu.getPid():"page".equals(d.kind())?"/p/"+d.target():d.target());
+        menu.setPath("embedded".equals(d.kind())?"/navigation/"+menu.getPid():"page".equals(d.kind())?"/p/c/"+d.target():d.target());
         menu.setPageKey("page".equals(d.kind())?d.target():!custom(menu)&&"internal".equals(d.kind())&&Objects.equals(d.target(),previousPath)?previousPage:null);
         menu.setPermissionCode(d.permissionCode());menu.setVisible(d.visible());menu.setStatus(d.enabled()?MenuStatus.ACTIVE:MenuStatus.INACTIVE);
         menu.setOrderNo(d.orderNo());menu.setI18nKey(null);

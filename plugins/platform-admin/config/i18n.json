@@ -6357,8 +6357,8 @@
   },
   {
     "key": "navigation.missing",
-    "zh-CN": "默认菜单来源已移除，请清除失效定制，或选择其他有效入口。",
-    "en-US": "The source menu is no longer available. Clear this customization or select a new valid entry.",
+    "zh-CN": "菜单来源或目标页面当前不可用，请选择有效页面，或清除失效定制。",
+    "en-US": "The menu source or target page is unavailable. Choose a valid page or clear the orphaned customization.",
     "source": "platform-admin",
     "refType": "ui"
   },
@@ -6730,6 +6730,55 @@
     "key": "navigation.inherited",
     "zh-CN": "继承目标访问要求",
     "en-US": "Inherited target requirement",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.audit.removed",
+    "zh-CN": "账号已移除",
+    "en-US": "Removed account",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.directory.help",
+    "zh-CN": "目录下没有当前用户可见的子菜单时，不会出现在侧边栏。",
+    "en-US": "Directories appear in the sidebar only when they contain an entry visible to the user.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.audit.empty",
+    "zh-CN": "尚无菜单变更记录。",
+    "en-US": "No menu changes yet.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.expand",
+    "zh-CN": "展开目录",
+    "en-US": "Expand directory",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.collapse",
+    "zh-CN": "收起目录",
+    "en-US": "Collapse directory",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.failed",
+    "zh-CN": "外部网页未能在此显示，请使用“在外部打开”。",
+    "en-US": "The external page could not be displayed here. Use Open externally.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.sameAudience",
+    "zh-CN": "与「{name}」入口相同",
+    "en-US": "Same audience as {name}",
     "source": "import",
     "refType": "ui"
   }

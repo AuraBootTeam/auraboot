@@ -3161,6 +3161,32 @@
         },
         "type": "object"
       },
+      "ApiResponseAsyncImportStatus": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AsyncImportStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseAsyncTaskDTO": {
         "properties": {
           "code": {
@@ -3431,6 +3457,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/BehaviorQuarantineReplayResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseBiTemporalRecord": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BiTemporalRecord"
               },
               {
                 "type": "null"
@@ -5988,6 +6040,32 @@
         },
         "type": "object"
       },
+      "ApiResponseExcelImportResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExcelImportResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseExchangeRateResponse": {
         "properties": {
           "code": {
@@ -6180,6 +6258,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/FileUploadResponseDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseGanttData": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GanttData"
               },
               {
                 "type": "null"
@@ -7460,6 +7564,31 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/BatchPasswordResetItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListBiTemporalRecord": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BiTemporalRecord"
             },
             "type": [
               "array",
@@ -8785,6 +8914,31 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/ExchangeRateResponse"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListExecutionJobDTO": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionJobDTO"
             },
             "type": [
               "array",
@@ -12123,6 +12277,32 @@
         },
         "type": "object"
       },
+      "ApiResponseMrpResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MrpResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseNamedQueryBatchResult": {
         "properties": {
           "code": {
@@ -12305,6 +12485,58 @@
         },
         "type": "object"
       },
+      "ApiResponseNavigationSnapshot": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseNavigationTarget": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseNewPageWorkspaceOptions": {
         "properties": {
           "code": {
@@ -12417,6 +12649,32 @@
           "context": {},
           "data": {
             "type": "null"
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseOeeResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OeeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "message": {
             "type": "string"
@@ -15028,6 +15286,32 @@
         },
         "type": "object"
       },
+      "ApiResponseScheduleResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduleResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseScheduledTask": {
         "properties": {
           "code": {
@@ -16194,6 +16478,32 @@
         },
         "type": "object"
       },
+      "ApiResponseValidationReport": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidationReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseValidationResult": {
         "properties": {
           "code": {
@@ -16775,6 +17085,37 @@
         },
         "type": "object"
       },
+      "Artifact": {
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "checksumSha256": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "Asset": {
         "properties": {
           "url": {
@@ -16823,6 +17164,31 @@
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "AsyncImportStatus": {
+        "properties": {
+          "modelCode": {
+            "type": "string"
+          },
+          "processedRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ExcelImportResult"
+          },
+          "status": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "totalRows": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -18215,6 +18581,79 @@
         },
         "type": "object"
       },
+      "BiTemporalRecord": {
+        "properties": {
+          "createdAt": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "deletedFlag": {
+            "type": "boolean"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "tenantId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "txFrom": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "txTo": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "validTo": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "versionNo": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "BiTemporalRequest": {
+        "properties": {
+          "payload": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "validFrom": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "validTo": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Binding": {
         "properties": {
           "applicationId": {
@@ -18601,6 +19040,26 @@
           "expireTime": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CalendarEntry": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "endTime": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "holiday": {
+            "type": "boolean"
+          },
+          "startTime": {
+            "format": "time-local",
+            "type": "string"
           }
         },
         "type": "object"
@@ -24120,6 +24579,25 @@
         },
         "type": "object"
       },
+      "DemandEntry": {
+        "properties": {
+          "materialId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "needDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "DepartmentTreeNode": {
         "properties": {
           "children": {
@@ -27703,6 +28181,55 @@
         ],
         "type": "object"
       },
+      "ExcelImportResult": {
+        "properties": {
+          "asyncTask": {
+            "type": "boolean"
+          },
+          "createdCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "errorCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "errorReportExpired": {
+            "type": "boolean"
+          },
+          "errorReportFailed": {
+            "type": "boolean"
+          },
+          "errorReportUrl": {
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ImportValidationError"
+            },
+            "type": "array"
+          },
+          "hasErrors": {
+            "type": "boolean"
+          },
+          "successCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "totalRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedCount": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ExchangeRateRequest": {
         "properties": {
           "baseCurrency": {
@@ -27776,6 +28303,69 @@
             "type": "string"
           },
           "toolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ExecutionJobDTO": {
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            },
+            "type": "array"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "definitionCode": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "failedUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "format": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "processedUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "progress": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "succeededUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "totalUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "type": {
             "type": "string"
           }
         },
@@ -29496,6 +30086,109 @@
         },
         "type": "object"
       },
+      "GanttData": {
+        "properties": {
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleConflict"
+            },
+            "type": "array"
+          },
+          "milestones": {
+            "items": {
+              "$ref": "#/components/schemas/GanttMilestone"
+            },
+            "type": "array"
+          },
+          "resourceUtilization": {
+            "additionalProperties": {
+              "format": "double",
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/GanttRow"
+            },
+            "type": "array"
+          },
+          "strategy": {
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/GanttTask"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "GanttMilestone": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "time": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GanttRow": {
+        "properties": {
+          "resourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "resourceName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GanttTask": {
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "endTime": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobCode": {
+            "type": "string"
+          },
+          "operationName": {
+            "type": "string"
+          },
+          "processingTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "resourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "setupTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "GenAiUsageSummary": {
         "properties": {
           "callCount": {
@@ -31045,6 +31738,21 @@
             "type": "integer"
           },
           "updated": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ImportValidationError": {
+        "properties": {
+          "fieldCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rowNumber": {
             "format": "int32",
             "type": "integer"
           }
@@ -34443,6 +35151,79 @@
         ],
         "type": "object"
       },
+      "MrpExceptionMessage": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "materialId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "suggestedAction": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MrpResult": {
+        "properties": {
+          "exceptions": {
+            "items": {
+              "$ref": "#/components/schemas/MrpExceptionMessage"
+            },
+            "type": "array"
+          },
+          "plannedOrders": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedOrderDto"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "MrpRunRequest": {
+        "properties": {
+          "demands": {
+            "items": {
+              "$ref": "#/components/schemas/DemandEntry"
+            },
+            "type": "array"
+          },
+          "horizonDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "materialIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "orderIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "NamedQueryBatchResult": {
         "properties": {
           "allFailure": {
@@ -36005,6 +36786,244 @@
         },
         "type": "object"
       },
+      "NavigationAudit": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "menuPid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "actor",
+          "createdAt",
+          "menuPid",
+          "name",
+          "pid"
+        ],
+        "type": "object"
+      },
+      "NavigationDefinition": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "icon": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string"
+          },
+          "opening": {
+            "type": "string"
+          },
+          "orderNo": {
+            "format": "int32",
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "parentPid": {
+            "maxLength": 26,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "maxLength": 150,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "maxLength": 2048,
+            "minLength": 0,
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "authenticated",
+          "enabled",
+          "kind",
+          "name",
+          "opening",
+          "orderNo",
+          "target",
+          "visible"
+        ],
+        "type": "object"
+      },
+      "NavigationEntry": {
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "customized": {
+            "type": "boolean"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/NavigationDefinition"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "customized",
+          "definition",
+          "pid",
+          "source"
+        ],
+        "type": "object"
+      },
+      "NavigationOption": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "type": "object"
+      },
+      "NavigationRevision": {
+        "properties": {
+          "expectedRevision": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
+      "NavigationSnapshot": {
+        "properties": {
+          "audit": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationAudit"
+            },
+            "type": "array"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationEntry"
+            },
+            "type": "array"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationOption"
+            },
+            "type": "array"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationOption"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "audit",
+          "entries",
+          "pages",
+          "permissions",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "NavigationTarget": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "opening": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "opening",
+          "pid",
+          "target"
+        ],
+        "type": "object"
+      },
+      "NavigationWrite": {
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/NavigationDefinition"
+          },
+          "expectedRevision": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition",
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
       "NbaSuggestion": {
         "properties": {
           "category": {
@@ -36495,6 +37514,29 @@
         "properties": {
           "interactionContext": {
             "$ref": "#/components/schemas/JsonNode"
+          }
+        },
+        "type": "object"
+      },
+      "OeeResult": {
+        "properties": {
+          "availability": {
+            "type": "number"
+          },
+          "losses": {
+            "$ref": "#/components/schemas/SixBigLosses"
+          },
+          "oee": {
+            "type": "number"
+          },
+          "performance": {
+            "type": "number"
+          },
+          "quality": {
+            "type": "number"
+          },
+          "teep": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -41240,6 +42282,46 @@
             "type": "integer"
           },
           "valueField": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PlannedOrderDto": {
+        "properties": {
+          "leadTimeDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lotSizingPolicy": {
+            "type": "string"
+          },
+          "materialId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "mrpRunId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "needDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "orderDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "orderQty": {
+            "type": "number"
+          },
+          "orderType": {
+            "type": "string"
+          },
+          "sourceDemandJson": {
             "type": "string"
           }
         },
@@ -46614,6 +47696,39 @@
         },
         "type": "object"
       },
+      "RowError": {
+        "properties": {
+          "fieldCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RowWarning": {
+        "properties": {
+          "fieldCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "Rule": {
         "properties": {
           "departmentPids": {
@@ -47313,6 +48428,180 @@
               "string",
               "null"
             ]
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleConflict": {
+        "properties": {
+          "achievableBy": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "jobId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedBy": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleJob": {
+        "properties": {
+          "arrivalTime": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "dueDate": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "operationName": {
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "processingTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "requiredResourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "requiredResourceType": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleRequest": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleJob"
+            },
+            "type": "array"
+          },
+          "resourceCalendars": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/CalendarEntry"
+              },
+              "type": "array"
+            },
+            "type": "object"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceInfo"
+            },
+            "type": "array"
+          },
+          "scheduleStart": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "setupTimes": {
+            "additionalProperties": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleResult": {
+        "properties": {
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleConflict"
+            },
+            "type": "array"
+          },
+          "earliestCompletion": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduledOperation"
+            },
+            "type": "array"
+          },
+          "resourceUtilization": {
+            "additionalProperties": {
+              "format": "double",
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "strategy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduledOperation": {
+        "properties": {
+          "endTime": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "jobCode": {
+            "type": "string"
+          },
+          "jobId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "operationName": {
+            "type": "string"
+          },
+          "processingTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "resourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "resourceName": {
+            "type": "string"
+          },
+          "setupTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "local-date-time",
+            "type": "string"
           }
         },
         "type": "object"
@@ -48195,6 +49484,29 @@
           },
           "pid": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SixBigLosses": {
+        "properties": {
+          "breakdownHours": {
+            "type": "number"
+          },
+          "minorStopHours": {
+            "type": "number"
+          },
+          "processDefectUnits": {
+            "type": "number"
+          },
+          "setupHours": {
+            "type": "number"
+          },
+          "speedLossUnits": {
+            "type": "number"
+          },
+          "startupDefectUnits": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -51753,6 +53065,43 @@
           },
           "severity": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ValidationReport": {
+        "properties": {
+          "errorReportFailed": {
+            "type": "boolean"
+          },
+          "errorReportUrl": {
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/RowError"
+            },
+            "type": "array"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "totalRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "validRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RowWarning"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -62897,6 +64246,136 @@
         ]
       }
     },
+    "/api/aps/gantt/{strategy}": {
+      "post": {
+        "operationId": "gantt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGanttData"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
+    "/api/aps/schedule": {
+      "post": {
+        "operationId": "schedule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseScheduleResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
+    "/api/aps/schedule/{strategy}": {
+      "post": {
+        "operationId": "scheduleWithStrategy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseScheduleResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
+    "/api/aps/strategies": {
+      "get": {
+        "operationId": "strategies",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
     "/api/async-tasks": {
       "get": {
         "operationId": "listTasks",
@@ -67385,6 +68864,281 @@
         "summary": "Get a usage event by event code",
         "tags": [
           "Billing Metering"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}": {
+      "post": {
+        "operationId": "put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BiTemporalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/asOf": {
+      "get": {
+        "operationId": "getAsOf",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "validTime",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "txTime",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/correct": {
+      "put": {
+        "operationId": "correct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BiTemporalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/history": {
+      "get": {
+        "operationId": "getHistory_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/terminate": {
+      "delete": {
+        "operationId": "terminate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "validTime",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
         ]
       }
     },
@@ -76059,6 +77813,41 @@
         ]
       }
     },
+    "/api/exchange/jobs": {
+      "get": {
+        "operationId": "recent",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListExecutionJobDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List recent data exchange and document jobs",
+        "tags": [
+          "Exchange Jobs"
+        ]
+      }
+    },
     "/api/exports/domain/{taskPid}": {
       "get": {
         "operationId": "status_1",
@@ -80194,6 +81983,128 @@
         },
         "tags": [
           "aps-scheduling-controller"
+        ]
+      }
+    },
+    "/api/manufacturing/oee/equipment/{equipmentId}": {
+      "get": {
+        "operationId": "equipmentOee",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "equipmentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOeeResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "oee-controller"
+        ]
+      }
+    },
+    "/api/manufacturing/oee/fleet": {
+      "get": {
+        "operationId": "fleetOee",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "oee-controller"
+        ]
+      }
+    },
+    "/api/manufacturing/oee/fleet/summary": {
+      "get": {
+        "operationId": "fleetSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "oee-controller"
         ]
       }
     },
@@ -86826,6 +88737,444 @@
         ]
       }
     },
+    "/api/meta/excel/document-import/{modelCode}": {
+      "post": {
+        "operationId": "importDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dryRun",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skipErrors",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExcelImportResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/document-template/{modelCode}": {
+      "get": {
+        "operationId": "downloadDocumentTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}": {
+      "post": {
+        "operationId": "importExcel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skipErrors",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dryRun",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "insert",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "matchKey",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExcelImportResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/cancel/{taskId}": {
+      "post": {
+        "operationId": "cancelImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAsyncImportStatus"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/error-report/{taskId}": {
+      "get": {
+        "operationId": "downloadErrorReport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/status/{taskId}": {
+      "get": {
+        "operationId": "getImportStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAsyncImportStatus"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/{taskId}/progress": {
+      "get": {
+        "operationId": "streamProgress_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEmitter"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/template/{modelCode}": {
+      "get": {
+        "operationId": "downloadTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "insert",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/validate/{modelCode}": {
+      "post": {
+        "operationId": "validateFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "insert",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "matchKey",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseValidationReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
     "/api/meta/field-library": {
       "get": {
         "operationId": "listFieldsBySemanticType",
@@ -91985,6 +94334,232 @@
         "summary": "Validate ViewModel config",
         "tags": [
           "ViewModel Management"
+        ]
+      }
+    },
+    "/api/mrp/run": {
+      "post": {
+        "operationId": "runMrp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MrpRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMrpResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mrp-controller"
+        ]
+      }
+    },
+    "/api/navigation/configuration": {
+      "get": {
+        "operationId": "readNavigationConfiguration",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries": {
+      "post": {
+        "operationId": "createNavigationEntry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries/{pid}": {
+      "delete": {
+        "operationId": "removeNavigationEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      },
+      "get": {
+        "operationId": "readCurrentNavigationTarget",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationTarget"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      },
+      "put": {
+        "operationId": "updateNavigationEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries/{pid}/restore": {
+      "post": {
+        "operationId": "restoreNavigationEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
         ]
       }
     },
@@ -111852,6 +114427,10 @@
     {
       "description": "引用字段自动填充 - 根据引用记录 PID 查询并返回字段值",
       "name": "自动填充"
+    },
+    {
+      "description": "Owner-scoped import, export, and document jobs",
+      "name": "Exchange Jobs"
     },
     {
       "description": "Category tree management",
