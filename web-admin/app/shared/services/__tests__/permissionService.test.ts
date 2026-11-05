@@ -213,6 +213,24 @@ describe('permissionService', () => {
   // ── getPolicy ────────────────────────────────────────────────────────────────
 
   describe('getPolicy', () => {
+    it('treats a successful null policy as an unconfigured editable policy', async () => {
+      getMock.mockResolvedValue(ok(null));
+      await expect(permissionService.getPolicy('role-1', 'perm-1')).resolves.toEqual({});
+      expect(getMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not turn a failed null policy response into an empty policy', async () => {
+      getMock.mockResolvedValue(fail('Policy read denied'));
+      await expect(permissionService.getPolicy('role-1', 'perm-1')).rejects.toThrow('Policy read denied');
+      expect(getMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates policy transport failure without retrying or initializing a policy', async () => {
+      getMock.mockRejectedValue(new Error('Policy transport unavailable'));
+      await expect(permissionService.getPolicy('role-1', 'perm-1')).rejects.toThrow('Policy transport unavailable');
+      expect(getMock).toHaveBeenCalledTimes(1);
+    });
+
     it('GETs /api/permissions/matrix/:rolePid/policy/:permPid', async () => {
       const policy = { maxAmount: 10000 };
       getMock.mockResolvedValue(ok(policy));
