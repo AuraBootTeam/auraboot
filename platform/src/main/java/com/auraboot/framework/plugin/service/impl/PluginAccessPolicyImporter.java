@@ -97,7 +97,7 @@ final class PluginAccessPolicyImporter {
 
     public boolean checkPermissionExists(Long tenantId, String code) {
         try {
-            PermissionDTO perm = permissionService.findByCode(code);
+            PermissionDTO perm = permissionService.findByTenantIdAndCode(tenantId, code);
             return perm != null;
         } catch (Exception e) {
             log.debug("checkPermissionExists treating exception as 'not exists' for code={}: {}",
@@ -131,7 +131,7 @@ final class PluginAccessPolicyImporter {
 
         if (exists) {
             // Update existing permission
-            PermissionDTO existingPerm = permissionService.findByCode(dto.getCode());
+            PermissionDTO existingPerm = permissionService.findByTenantIdAndCode(tenantId, dto.getCode());
 
             String dataScopeConfigJson = dto.getDataScopeConfig() != null ? support.toJson(dto.getDataScopeConfig()) : null;
             String extensionJson = dto.getExtension() != null ? support.toJson(dto.getExtension()) : null;
@@ -328,7 +328,7 @@ final class PluginAccessPolicyImporter {
             if (role == null) throw new PluginException("Imported role not found: " + declaration.getCode());
             List<PermissionDTO> permissions = new ArrayList<>();
             for (String code : Optional.ofNullable(declaration.getPermissions()).orElse(List.of())) {
-                PermissionDTO permission = permissionService.findByCode(code);
+                PermissionDTO permission = permissionService.findByTenantIdAndCode(tenantId, code);
                 if (permission == null || permission.getId() == null) {
                     throw new PluginException("Unresolved declared permission: " + declaration.getCode() + ":" + code);
                 }
@@ -405,7 +405,7 @@ final class PluginAccessPolicyImporter {
 
         List<String> deferred = new ArrayList<>();
         for (String permCode : permissionCodes) {
-            PermissionDTO perm = findRegisteredPermissionOrNull(permCode);
+            PermissionDTO perm = findRegisteredPermissionOrNull(tenantId, permCode);
             if (perm == null || perm.getId() == null) {
                 if (strictResolution) {
                     throw new PluginException(unresolvedDeclaredPermissionMessage(dto.getCode(), permCode, tenantId));
@@ -454,9 +454,9 @@ final class PluginAccessPolicyImporter {
      * way, so the strict reconcile reports the declaration as unresolvable (with the
      * provider analysis) instead of aborting with a bare service error.
      */
-    private PermissionDTO findRegisteredPermissionOrNull(String permCode) {
+    private PermissionDTO findRegisteredPermissionOrNull(Long tenantId, String permCode) {
         try {
-            return permissionService.findByCode(permCode);
+            return permissionService.findByTenantIdAndCode(tenantId, permCode);
         } catch (Exception absent) {
             return null;
         }
@@ -539,7 +539,7 @@ final class PluginAccessPolicyImporter {
             if (definition == null || !definition.isValid()) {
                 throw new PluginException("Invalid data scope declaration for role " + dto.getCode());
             }
-            PermissionDTO permission = permissionService.findByCode(definition.getPermissionCode());
+            PermissionDTO permission = permissionService.findByTenantIdAndCode(tenantId, definition.getPermissionCode());
             if (permission == null || permission.getId() == null
                     || permission.getResourceCode() == null || permission.getAction() == null) {
                 throw new PluginException("Role " + dto.getCode()
