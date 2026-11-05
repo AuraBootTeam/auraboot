@@ -1780,6 +1780,7 @@ export function StrategyStudioWorkbench({
               block={{
                 props: {
                   mode: 'combined',
+                  authoringTarget: 'condition-fragment',
                   consumerType: activeScenario.key,
                   consumerCode: activeScenario.ruleCode,
                   fieldCatalogMode: 'disabled',

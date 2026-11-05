@@ -8,6 +8,17 @@ status: active
 条件编辑复用 `ConditionBuilder` 和既有 Condition AST，不增加页面专用规则格式。
 条件片段库、规则绑定等使用方传入事实目录和受控 AST；使用方继续负责版本和保存。
 
+## 条件片段与消费者绑定
+
+共享 `DecisionRuleBindingBlock` 的 `authoringTarget` 默认是 `consumer-binding`。
+消费者按既有 `bindingKind` 二选一执行本地条件或决策引用；选择决策时，本地条件保留但不参与判定，
+界面须说明此语义并禁止编辑，切回仅条件后恢复原 AST 与编辑。
+
+Strategy Studio 编辑条件片段时显式传入 `authoringTarget: condition-fragment`。
+片段草稿的根条件和所引用决策都属于待保存的片段定义，不能因为存在决策引用就禁止编辑根条件。
+此用途声明只区分编辑语义，不改变消费者求值、授权、版本或发布契约，也不绕过调用方的 `readOnly`。
+条件片段的持久化仍由原 draft API 和调用方负责。
+
 ## 元数据与值
 
 模型、属性来自租户权限过滤后的 `/api/decision/facts/catalog`，以 scope、modelCode 和 path 区分字段。

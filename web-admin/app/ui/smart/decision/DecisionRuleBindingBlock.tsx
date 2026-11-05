@@ -184,6 +184,7 @@ interface DecisionRuleBindingBlockProps {
   block?: {
     props?: {
       mode?: 'condition' | 'decision' | 'combined';
+      authoringTarget?: 'consumer-binding' | 'condition-fragment';
       valueField?: string;
       value?: BindingValueInput;
       initialValue?: BindingValueInput;
@@ -1660,7 +1661,9 @@ export function DecisionRuleBindingBlock({
   const showDecision = mode === 'decision' || mode === 'combined';
   const showImpactPreview = showDecision && props.showImpactPreview !== false;
   const showTestRunner = showDecision && props.showTestRunner !== false;
-  const conditionInactive = showCondition && showDecision && Boolean(binding.decisionCode.trim());
+  const conditionInactive =
+    props.authoringTarget !== 'condition-fragment' &&
+    showCondition && showDecision && Boolean(binding.decisionCode.trim());
   const showStandaloneImpactPreview = !readOnly && showImpactPreview;
   const showStandaloneTestRunner = !readOnly && showTestRunner;
   const conditionCount = conditionLeaves(condition).length;
