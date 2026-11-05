@@ -1,12 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadPlugin } from '../../src/utils/plugin-loader.js';
 import { buildExtendedManifest } from '../../src/commands/publish.js';
+import { pluginImportCommand } from '../../src/commands/plugin-import.js';
 
 const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'aura-contribution-')); roots.push(root);
   mkdirSync(join(root, 'config'));
@@ -30,5 +31,31 @@ describe('published page contributions', () => {
     writeFileSync(join(outside, 'secret.json'), '[]');
     symlinkSync(join(outside, 'secret.json'), join(root, 'contributions.json'));
     expect(() => loadPlugin(root)).toThrow(/escapes plugin/);
+  });
+});
+
+// Both public CLI entry points must preserve declarations before the platform importer can apply them.
+describe('capability declarations in CLI manifests', () => {
+  const capability = { code: 'demo.refund_finance', group: 'commerce', 'name:zh-CN': '退款管理', 'name:en': 'Refund finance',
+    includes: ['demo_refund.read', 'demo_refund.create'], tier: 'admin', sensitive: true };
+  function capabilityFixture() {
+    const root = fixture();
+    writeFileSync(join(root, 'contributions.json'), '[]');
+    writeFileSync(join(root, 'config/capabilities.json'), JSON.stringify([capability]));
+    return root;
+  }
+  it('preserves declared business actions, sensitivity and localization in the publish manifest', () => {
+    expect(buildExtendedManifest(loadPlugin(capabilityFixture())).capabilities).toEqual([capability]);
+  });
+  it('uploads capability declarations through the actual plugin import command', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: '0', data: { success: true } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('Unexpected CLI exit'); });
+    await pluginImportCommand(capabilityFixture(), { target: 'http://fixture.invalid', token: 'fixture-token', yes: true });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(new URL(url).pathname).toBe('/api/plugins/import/execute-direct');
+    expect(JSON.parse(options.body).capabilities).toEqual([capability]);
   });
 });
