@@ -56,12 +56,25 @@ public interface PermissionService {
     
     /**
      * Find permission by code
-     * 
+     *
      * @param code Permission code
      * @return Permission DTO
      * @throws com.auraboot.framework.application.exception.ResourceNotFoundException when absent
      */
     PermissionDTO findByCode(String code);
+
+    /**
+     * Tenant-scoped lookup: {@link #findByCode(String)} searches across ALL tenants, so a
+     * per-tenant permission row of another tenant shadows this tenant's absent row and a
+     * binder would attach a foreign permission id. Importers and bootstrap paths must
+     * resolve candidates through this method.
+     *
+     * @param tenantId tenant owning the permission row
+     * @param code     Permission code
+     * @return Permission DTO of exactly this tenant
+     * @throws com.auraboot.framework.application.exception.ResourceNotFoundException when absent in this tenant
+     */
+    PermissionDTO findByTenantIdAndCode(Long tenantId, String code);
     
     /**
      * Find permissions by resource type

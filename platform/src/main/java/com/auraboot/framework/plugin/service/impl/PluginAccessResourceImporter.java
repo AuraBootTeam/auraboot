@@ -155,7 +155,7 @@ final class PluginAccessResourceImporter {
             try {
                 Long permissionId = resource.getResourceId();
                 if (permissionId == null) {
-                    permissionId = Optional.ofNullable(permissionService.findByCode(resource.getResourceCode()))
+                    permissionId = Optional.ofNullable(permissionService.findByTenantIdAndCode(tenantId, resource.getResourceCode()))
                             .map(PermissionDTO::getId)
                             .orElse(null);
                 }
