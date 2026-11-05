@@ -68,7 +68,136 @@ class RoleAuthorizationDraftServiceTest {
                 .thenReturn(new CapabilitySelectionPreview(List.of(), List.of(), List.of("model.order.read"), List.of(), List.of()));
     }
 
-    @AfterEach void cleanup() { MetaContext.clear(); }
+    @AfterEach void cleanup() { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.clear(); }
+
+    private void migrationFixture() {
+        MetaContext.setCurrentUserId(7L);
+        var permissionChecks = mock(DataPermissionAuthoringAccess.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "migrationAccess", permissionChecks);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(java.sql.Connection.TRANSACTION_REPEATABLE_READ);
+        businessOwner(Set.of("sales.manage"));
+        var sales = permission("sales.manage", "sales.manage", "execute");
+        sales.setId(3L); sales.setPid("permission-sales"); sales.setResourceType("operation");
+        when(permissions.findAllActive()).thenReturn(List.of(sales));
+        when(permissions.findRolePermissions(1L)).thenReturn(List.of(sales));
+        grant.setPid("binding-sales"); grant.setTenantId(100L); grant.setStatus("active");
+    }
+
+    @Test void migrationReportsAnUnconfiguredScopeWithoutAddingAnAllGrant() {
+        migrationFixture();
+        var result = service.migrationPreview("role-a");
+        var operation = result.boundaries().getFirst().operations().getFirst();
+        assertThat(operation.scopeStatus()).isEqualTo("REQUIRES_EXPLICIT_SCOPE_DECISION");
+        assertThat(operation.currentScopeType()).isNull();
+        assertThat(operation.bindingPids()).containsExactly("binding-sales");
+        assertThat(result.equivalentMigrationProven()).isFalse();
+        assertThat(result.revision()).isEqualTo(service.snapshot("role-a").revision());
+        verify(writes, never()).mutate();
+        verify(roles, never()).setDefaultDataScopeType(any(), any());
+        verify(matrix, never()).setRoleScope(any(), any(), any());
+    }
+
+    @Test void migrationRetainsDenyDatesConditionsFieldsAndIndependentSourceWithoutActivatingThem() {
+        migrationFixture();
+        grant.setGrantType("deny"); grant.setPriority(99); grant.setStatus("inactive");
+        grant.setEffectiveDate(LocalDate.of(2030, 1, 1)); grant.setExpiryDate(LocalDate.of(2031, 1, 1));
+        grant.setConditions(java.util.Map.of("legacy", true)); grant.setConditionAst(java.util.Map.of("condition", "restricted"));
+        grant.setDataScopeAst(java.util.Map.of("row", "restricted")); grant.setFieldScope(java.util.Map.of("fields", List.of("amount")));
+        grant.setSourceRef("independent:manual");
+        var binding = service.migrationPreview("role-a").bindings().getFirst();
+        assertThat(binding.grantType()).isEqualTo("deny"); assertThat(binding.status()).isEqualTo("inactive");
+        assertThat(binding.priority()).isEqualTo(99); assertThat(binding.effectiveDate()).isEqualTo(grant.getEffectiveDate());
+        assertThat(binding.expiryDate()).isEqualTo(grant.getExpiryDate()); assertThat(binding.sourceRef()).isEqualTo("independent:manual");
+        assertThat(binding.conditions().get("legacy").asBoolean()).isTrue();
+        assertThat(binding.conditionAst().get("condition").asText()).isEqualTo("restricted");
+        assertThat(binding.dataScopeAst().get("row").asText()).isEqualTo("restricted");
+        assertThat(binding.fieldScope().get("fields").get(0).asText()).isEqualTo("amount");
+        verify(writes, never()).mutate();
+    }
+
+    @Test void migrationKeepsExplicitNoneAndLegacyModelScopesSeparate() {
+        migrationFixture(); role.setDefaultDataScopeType("all");
+        var operation = new RoleDataScope(); operation.setResourceCode("sales.manage"); operation.setActionCode("execute"); operation.setScopeType("none"); operation.setRoleId(1L); operation.setTenantId(100L);
+        var legacy = new RoleDataScope(); legacy.setResourceCode("sales_order"); legacy.setActionCode("update"); legacy.setScopeType("self"); legacy.setRoleId(1L); legacy.setTenantId(100L);
+        when(scopes.getScopesByRole(100L, 1L)).thenReturn(List.of(operation, legacy));
+        var result = service.migrationPreview("role-a"); var view = result.boundaries().getFirst().operations().getFirst();
+        assertThat(view.currentScopeType()).isEqualTo("none"); assertThat(view.scopeOrigin()).isEqualTo("EXPLICIT_ACTION");
+        assertThat(result.scopes()).hasSize(2); assertThat(result.equivalentMigrationProven()).isFalse();
+        operation.setScopeConfig(java.util.Map.of("custom", true));
+        assertThat(service.migrationPreview("role-a").boundaries().getFirst().operations().getFirst().scopeStatus())
+                .isEqualTo("UNSUPPORTED_SCOPE_CONFIGURATION");
+    }
+
+    @Test void missingBusinessAuthorityIsNotInferredFromAnUnrelatedLegacyCode() {
+        migrationFixture();
+        var legacy = permission("legacy.manage", "legacy.manage", "view"); legacy.setId(4L); legacy.setPid("legacy-permission");
+        var sales = permissions.findAllActive().getFirst(); when(permissions.findAllActive()).thenReturn(List.of(sales, legacy));
+        grant.setPermissionId(4L);
+        var result = service.migrationPreview("role-a");
+        assertThat(result.boundaries().getFirst().operations().getFirst().scopeStatus()).isEqualTo("MISSING_BUSINESS_GRANT");
+        assertThat(result.unmappedPermissionCodes()).containsExactly("legacy.manage");
+    }
+
+    @Test void changingCapturedConstraintsRejectsTheMigrationDraftBeforeWriting() {
+        migrationFixture(); grant.setConditionAst(new java.util.HashMap<>(java.util.Map.of("guard", "before")));
+        var inspected = service.migrationPreview("role-a"); grant.setConditionAst(java.util.Map.of("guard", "after"));
+        assertThat(inspected.bindings().getFirst().conditionAst().get("guard").asText()).isEqualTo("before");
+        assertThatThrownBy(() -> service.apply("role-a", request(inspected.revision(), false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate();
+    }
+
+    @Test void migrationRequiresManagementAndAConsistentServiceTransaction() {
+        migrationFixture();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(java.sql.Connection.TRANSACTION_READ_COMMITTED);
+        assertThatThrownBy(() -> service.migrationPreview("role-a")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(roles, never()).findByPid(any());
+    }
+
+    @Test void migrationRejectsForeignBindingRowsBeforeReturningTheirConditions() {
+        migrationFixture(); grant.setTenantId(200L);
+        assertThatThrownBy(() -> service.migrationPreview("role-a")).isInstanceOf(RootUnCheckedException.class);
+        verify(writes, never()).mutate();
+    }
+
+    @Test void migrationDoesNotExposeBindingsWithoutCurrentPermissionManagement() {
+        migrationFixture();
+        var checks = (DataPermissionAuthoringAccess) org.springframework.test.util.ReflectionTestUtils.getField(service, "migrationAccess");
+        doThrow(new org.springframework.security.access.AccessDeniedException("revoked")).when(checks).requireRead();
+        assertThatThrownBy(() -> service.migrationPreview("role-a")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(roles, never()).findByPid(any());
+    }
+
+    @Test void migrationUsesTheTenantDefinitionInsteadOfAnUnrelatedGlobalMapping() {
+        migrationFixture();
+        var local = permissions.findAllActive().getFirst(); local.setTenantId(100L);
+        var global = permission("sales.manage", "wrong-global-resource", "view"); global.setId(8L); global.setPid("global-permission");
+        when(permissions.findAllActive()).thenReturn(List.of(global, local));
+        assertThat(service.migrationPreview("role-a").boundaries().getFirst().operations().getFirst().resourceCode()).isEqualTo("sales.manage");
+        local.setAction("view");
+        assertThat(service.migrationPreview("role-a").boundaries().getFirst().operations().getFirst().scopeStatus())
+                .isEqualTo("ENTRY_FALLBACK_REQUIRES_MAPPING");
+    }
+
+    @Test void migrationShowsBoundRowPoliciesIncludingDisabledRestrictionsAndRejectsForeignDefinitions() {
+        migrationFixture();
+        var binding = new com.auraboot.framework.meta.entity.DataPermissionRoleBinding();
+        binding.setPolicyPid("row-policy"); binding.setRolePid("role-a"); binding.setTenantId(100L);
+        var policy = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        policy.setPid("row-policy"); policy.setTenantId(100L); policy.setModelCode("sales_order");
+        policy.setPolicyType("row"); policy.setScopeType("custom"); policy.setEnabled(false);
+        policy.setConditionAst(java.util.Map.of("guard", "restricted")); policy.setScopeExpression("legacy restriction");
+        when(bindings.findByRolePid(100L, "role-a")).thenReturn(List.of(binding));
+        when(policies.findByPid(100L, "row-policy")).thenReturn(policy);
+        var inspected = service.migrationPreview("role-a"); var captured = inspected.boundPolicies().getFirst();
+        assertThat(captured.enabled()).isFalse(); assertThat(captured.scopeExpression()).isEqualTo("legacy restriction");
+        assertThat(captured.conditionAst().get("guard").asText()).isEqualTo("restricted");
+        policy.setTenantId(200L);
+        assertThatThrownBy(() -> service.migrationPreview("role-a")).isInstanceOf(RootUnCheckedException.class);
+        verify(writes, never()).mutate();
+    }
 
     private com.auraboot.framework.plugin.extension.BusinessResourceAuthorization businessOwner(Set<String> codes) {
         var registry = mock(com.auraboot.framework.plugin.pf4j.ExtensionRegistry.class);

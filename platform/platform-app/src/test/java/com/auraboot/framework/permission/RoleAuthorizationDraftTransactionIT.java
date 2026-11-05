@@ -42,6 +42,9 @@ import static org.mockito.Mockito.reset;
 @Transactional(propagation = Propagation.NEVER)
 class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private RoleAuthorizationDraftService drafts;
+    @Autowired private com.auraboot.framework.plugin.pf4j.ExtensionRegistry originalExtensions;
+    @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired private CapabilityRegistryService catalog;
     @Autowired private com.auraboot.framework.permission.service.PermissionMatrixService matrix;
     @Autowired private com.auraboot.framework.rbac.service.RoleService roleAuthoring;
@@ -94,6 +97,7 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
 
     @AfterEach void cleanup() {
         reset(scopes, fieldBindings);
+        org.springframework.test.util.ReflectionTestUtils.setField(drafts, "extensions", originalExtensions);
         if (administrator != null) administrator.close();
         if (modelId != null) {
             jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?", getTestTenant().getId(), modelId);
@@ -110,6 +114,98 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             jdbc.update("DELETE FROM ab_permission_capability WHERE tenant_id=? AND code LIKE ?", getTestTenant().getId(), resource + ".%");
             jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND resource_code=?", getTestTenant().getId(), resource);
             jdbc.update("DELETE FROM ab_data_permission_policy WHERE tenant_id=? AND model_code=?", getTestTenant().getId(), resource);
+        }
+    }
+
+    private void migrationSource() throws Exception {
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.PERMISSION_MANAGE,
+                "operation", "permission", "update", "Migration inspection fixture");
+        jdbc.update("UPDATE ab_permission SET resource_type='operation' WHERE tenant_id=? AND code=?", getTestTenant().getId(), updateCode);
+        var registry = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.ExtensionRegistry.class);
+        var handler = org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.CommandHandlerExtension.class,
+                org.mockito.Mockito.withSettings().extraInterfaces(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.class));
+        var owner = (com.auraboot.framework.plugin.extension.BusinessResourceAuthorization) handler;
+        String command = "test:" + resource;
+        org.mockito.Mockito.when(owner.businessBoundary()).thenReturn(
+                new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.Boundary(command, resource, "update", Set.of(updateCode)));
+        org.mockito.Mockito.when(registry.getAllCommandHandlers()).thenReturn(List.of(handler));
+        org.mockito.Mockito.when(registry.getBusinessResourceOwner(command)).thenReturn(java.util.Optional.of(handler));
+        org.springframework.test.util.ReflectionTestUtils.setField(drafts, "extensions", registry);
+        var start = drafts.snapshot(rolePid);
+        drafts.apply(rolePid, new RoleAuthorizationDraftRequest(start.revision(), Set.of(editCapability), Set.of(), false, null, false, List.of()));
+        String ast = json.writeValueAsString(com.auraboot.framework.decision.ast.ConditionNode.CompareNode.of(
+                new com.auraboot.framework.decision.ast.Operand.PathOperand(com.auraboot.framework.decision.ast.Scope.RECORD,
+                    "data.status", com.auraboot.framework.decision.ast.DataType.STRING), com.auraboot.framework.decision.ast.Operator.EQ,
+                new com.auraboot.framework.decision.ast.Operand.LiteralOperand("approved", com.auraboot.framework.decision.ast.DataType.STRING)));
+        String fields = json.writeValueAsString(Map.of("modelCode", resource, "readFields", List.of(), "writeFields", List.of()));
+        jdbc.update("""
+                UPDATE ab_role_permission SET priority=37,conditions='{"maxApprovalAmount":12}'::jsonb,
+                  condition_ast=?::jsonb,data_scope_ast=?::jsonb,field_scope=?::jsonb,source_ref='independent:migration-fixture',
+                  effective_date=CURRENT_DATE-1,expiry_date=CURRENT_DATE+30
+                WHERE tenant_id=? AND role_id=? AND permission_id=(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)
+                """, ast, ast, fields, getTestTenant().getId(), roleId, getTestTenant().getId(), updateCode);
+    }
+
+    private String migrationBindingBytes() {
+        return jdbc.queryForObject("""
+                SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.id),'[]'::jsonb)::text
+                FROM ab_role_permission r WHERE tenant_id=? AND role_id=?
+                """, String.class, getTestTenant().getId(), roleId);
+    }
+
+    @Test void explicitMigrationScopeUsesTheDraftWithoutRewritingAnySourceBinding() throws Exception {
+        migrationSource(); String before = migrationBindingBytes();
+        var inspected = drafts.migrationPreview(rolePid);
+        assertThat(inspected.boundaries().getFirst().operations().getFirst().scopeStatus()).isEqualTo("REQUIRES_EXPLICIT_SCOPE_DECISION");
+        assertThat(inspected.bindings()).anySatisfy(binding -> {
+            assertThat(binding.sourceRef()).isEqualTo("independent:migration-fixture");
+            assertThat(binding.priority()).isEqualTo(37); assertThat(binding.conditions().get("maxApprovalAmount").asInt()).isEqualTo(12);
+            assertThat(binding.conditionAst()).isNotNull(); assertThat(binding.dataScopeAst()).isNotNull(); assertThat(binding.fieldScope()).isNotNull();
+        });
+        assertThat(migrationBindingBytes()).isEqualTo(before); assertThat(persistedScopes()).isEmpty();
+        drafts.apply(rolePid, new RoleAuthorizationDraftRequest(inspected.revision(), Set.of(editCapability), Set.of(), false, null, false,
+                List.of(new DataScopeUpdateRequest(resource, "update", "self", "MAX"))));
+        assertThat(defaultScope()).isNull(); assertThat(migrationBindingBytes()).isEqualTo(before);
+        var after = drafts.migrationPreview(rolePid);
+        assertThat(after.boundaries().getFirst().operations().getFirst().currentScopeType()).isEqualTo("self");
+        assertThat(after.equivalentMigrationProven()).isFalse();
+    }
+
+    @Test void changedSourceConditionsInvalidateTheMigrationRevisionBeforeScopeWrites() throws Exception {
+        migrationSource(); var inspected = drafts.migrationPreview(rolePid);
+        jdbc.update("UPDATE ab_role_permission SET priority=priority+1 WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);
+        String changed = migrationBindingBytes();
+        assertThatThrownBy(() -> drafts.apply(rolePid, new RoleAuthorizationDraftRequest(inspected.revision(), Set.of(editCapability), Set.of(),
+                false, null, false, List.of(new DataScopeUpdateRequest(resource, "update", "all", "MAX")))))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                    error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        assertThat(migrationBindingBytes()).isEqualTo(changed); assertThat(persistedScopes()).isEmpty(); assertThat(defaultScope()).isNull();
+    }
+
+    @Test void migrationInspectionCannotJoinAWeakerCallerTransaction() throws Exception {
+        migrationSource(); String before = migrationBindingBytes();
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        assertThatThrownBy(() -> transaction.execute(status -> drafts.migrationPreview(rolePid)))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(migrationBindingBytes()).isEqualTo(before); assertThat(persistedScopes()).isEmpty();
+    }
+
+    @Test void migrationInspectionRejectsRevokedPolicyManagementWithoutUsingItsWarmPermissionCache() throws Exception {
+        migrationSource(); drafts.migrationPreview(rolePid);
+        var ids = jdbc.queryForList("""
+                SELECT rp.id FROM ab_role_permission rp JOIN ab_permission p ON p.id=rp.permission_id
+                WHERE rp.tenant_id=? AND rp.role_id=? AND p.code=? AND rp.status='active' AND rp.deleted_flag=FALSE
+                """, Long.class, getTestTenant().getId(), getTestRole().getId(),
+                com.auraboot.framework.permission.constants.MetaPermission.PERMISSION_MANAGE);
+        assertThat(ids).isNotEmpty(); String before = migrationBindingBytes();
+        try {
+            for (Long id : ids) jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE id=? AND tenant_id=?", id, getTestTenant().getId());
+            assertThatThrownBy(() -> drafts.migrationPreview(rolePid)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThat(migrationBindingBytes()).isEqualTo(before); assertThat(persistedScopes()).isEmpty();
+        } finally {
+            for (Long id : ids) jdbc.update("UPDATE ab_role_permission SET status='active' WHERE id=? AND tenant_id=?", id, getTestTenant().getId());
+            applicationContext.getBean(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class).clearAll();
         }
     }
 

@@ -11,6 +11,11 @@ import com.auraboot.framework.permission.dto.DataScopeUpdateRequest;
 import com.auraboot.framework.permission.dto.RoleAuthorizationDraftPreview;
 import com.auraboot.framework.permission.dto.RoleAuthorizationDraftRequest;
 import com.auraboot.framework.permission.dto.RoleAuthorizationDraftSnapshot;
+import com.auraboot.framework.permission.dto.RoleBoundaryMigrationPreview;
+import com.auraboot.framework.permission.dto.PermissionDTO;
+import com.auraboot.framework.permission.entity.RoleDataScope;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.auraboot.framework.permission.enums.DataScopeType;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.RolePermission;
@@ -55,10 +60,102 @@ public class RoleAuthorizationDraftService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.ExtensionRegistry extensions;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DataPermissionAuthoringAccess migrationAccess;
+
     @Transactional
     public RoleAuthorizationDraftSnapshot snapshot(String rolePid) {
         writes.lock();
         return snapshot(resolve(rolePid));
+    }
+
+    /** Inspect complete source bindings; explicit migration edits still use apply and its revision. */
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public RoleBoundaryMigrationPreview migrationPreview(String rolePid) {
+        writes.lock();
+        authoringAccess.requireWrite();
+        if (migrationAccess == null || !TransactionSynchronizationManager.isActualTransactionActive()
+                || !Objects.equals(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel(), java.sql.Connection.TRANSACTION_REPEATABLE_READ)) {
+            throw new AccessDeniedException("Migration inspection requires permission management and a consistent transaction");
+        }
+        migrationAccess.requireRead();
+        Role role = resolve(rolePid);
+        authoringAccess.requireTarget(role.getId());
+        var definitions = permissions.findAllActive().stream()
+                .filter(permission -> permission.getTenantId() == null || Objects.equals(role.getTenantId(), permission.getTenantId()))
+                .collect(java.util.stream.Collectors.toMap(
+                permission -> permission.getId(), java.util.function.Function.identity()));
+        var source = grants.findByRole(role.getId());
+        if (source.stream().anyMatch(binding -> !Objects.equals(role.getTenantId(), binding.getTenantId())
+                || !Objects.equals(role.getId(), binding.getRoleId()) || binding.getPid() == null || binding.getPid().isBlank())) throw invalid();
+        var scoped = scopes.getScopesByRole(role.getTenantId(), role.getId());
+        if (scoped.stream().anyMatch(scope -> !Objects.equals(scope.getTenantId(), role.getTenantId())
+                || !Objects.equals(scope.getRoleId(), role.getId()))) throw invalid();
+        var roots = businessFieldRoots();
+        var views = source.stream().sorted(Comparator.comparing(RolePermission::getPid)).map(binding -> {
+            var definition = definitions.get(binding.getPermissionId());
+            return new RoleBoundaryMigrationPreview.Binding(
+                    binding.getPid(), definition == null ? null : definition.getPid(),
+                    definition == null ? null : definition.getCode(), binding.getGrantType(), binding.getPriority(),
+                    binding.getEffectiveDate(), binding.getExpiryDate(), binding.getStatus(),
+                    json.valueToTree(binding.getConditions()), json.valueToTree(binding.getConditionAst()),
+                    json.valueToTree(binding.getDataScopeAst()), json.valueToTree(binding.getFieldScope()), binding.getSourceRef());
+        }).toList();
+        var boundaries = roots.stream().map(root -> new RoleBoundaryMigrationPreview.Boundary(
+                root.command(), root.model(), root.action(), root.permissions().stream().map(code -> {
+                    var definition = migrationDefinition(definitions.values(), role.getTenantId(), code);
+                    var owners = views.stream().filter(binding -> code.equals(binding.permissionCode())
+                            || "*".equals(binding.permissionCode())).map(binding -> binding.bindingPid()).toList();
+                    var matching = definition == null ? List.<RoleDataScope>of()
+                            : scoped.stream().filter(scope -> Objects.equals(definition.getResourceCode(), scope.getResourceCode())
+                                && Objects.equals(definition.getAction(), scope.getActionCode())).toList();
+                    String type = matching.isEmpty() ? role.getDefaultDataScopeType() : matching.getFirst().getScopeType();
+                    String status = "SCOPE_CONFIGURED_REVIEW_REQUIRED";
+                    if (definition == null || definition.getResourceCode() == null || definition.getAction() == null
+                            || definition.getResourceCode().isBlank() || definition.getAction().isBlank()
+                            || !("operation".equalsIgnoreCase(definition.getResourceType()) || "data".equalsIgnoreCase(definition.getResourceType())))
+                        status = "PERMISSION_MAPPING_UNAVAILABLE";
+                    else if ("view".equals(definition.getAction()) && code.equals(definition.getResourceCode()))
+                        status = "ENTRY_FALLBACK_REQUIRES_MAPPING";
+                    else if (owners.isEmpty()) status = "MISSING_BUSINESS_GRANT";
+                    else if (matching.size() > 1 || matching.stream().anyMatch(scope -> scope.getScopeConfig() != null
+                            && !(scope.getScopeConfig() instanceof Map<?, ?> config && config.isEmpty())))
+                        status = "UNSUPPORTED_SCOPE_CONFIGURATION";
+                    else if (type == null || type.isBlank()) status = "REQUIRES_EXPLICIT_SCOPE_DECISION";
+                    else if (!Set.of("all", "none", "self", "dept", "dept_and_sub", "team").contains(type.toLowerCase(java.util.Locale.ROOT)))
+                        status = "UNSUPPORTED_SCOPE_CONFIGURATION";
+                    return new RoleBoundaryMigrationPreview.Operation(code,
+                            definition == null ? null : definition.getPid(), definition == null ? null : definition.getResourceCode(),
+                            definition == null ? null : definition.getAction(), type, matching.isEmpty() ? (role.getDefaultDataScopeType() == null ? "UNCONFIGURED" : "ROLE_DEFAULT") : "EXPLICIT_ACTION",
+                            status, owners);
+                }).toList())).toList();
+        var policies = policyBindings.findByRolePid(role.getTenantId(), role.getPid()).stream()
+                .map(binding -> dataPolicies.findByPid(role.getTenantId(), binding.getPolicyPid()))
+                .map(policy -> {
+                    if (policy == null || !Objects.equals(policy.getTenantId(), role.getTenantId())) throw invalid();
+                    return new RoleBoundaryMigrationPreview.Policy(policy.getPid(), policy.getModelCode(), policy.getPolicyType(),
+                            policy.getScopeType(), policy.getScopeExpression(), json.valueToTree(policy.getConditionAst()),
+                            policy.getFieldCode(), policy.getMaskType(), policy.getMaskExpression(), policy.getPriority(), policy.getEnabled());
+                }).sorted(Comparator.comparing(RoleBoundaryMigrationPreview.Policy::policyPid)).toList();
+        var referenced = roots.stream().flatMap(root -> root.permissions().stream()).collect(java.util.stream.Collectors.toSet());
+        return new RoleBoundaryMigrationPreview(role.getPid(), revision(role),
+                role.getDefaultDataScopeType(), boundaries, views, scoped.stream()
+                    .sorted(Comparator.comparing(scope -> scope.getResourceCode() + ":" + scope.getActionCode()))
+                    .map(scope -> new RoleBoundaryMigrationPreview.Scope(scope.getPid(),
+                            scope.getResourceCode(), scope.getActionCode(), scope.getScopeType(), scope.getMergeStrategy(),
+                            json.valueToTree(scope.getScopeConfig()))).toList(), fieldPolicies.snapshot(role), policies, views.stream()
+                    .map(binding -> binding.permissionCode()).filter(Objects::nonNull)
+                    .filter(code -> !referenced.contains(code) && !"meta.command.execute".equals(code)).distinct().sorted().toList(), views.stream().filter(binding -> binding.permissionCode() == null)
+                    .map(RoleBoundaryMigrationPreview.Binding::bindingPid).sorted().toList(), false);
+    }
+
+    private PermissionDTO migrationDefinition(java.util.Collection<PermissionDTO> definitions, Long tenant, String code) {
+        var local = definitions.stream().filter(permission -> code.equals(permission.getCode())
+                && Objects.equals(tenant, permission.getTenantId())).toList();
+        var candidates = local.isEmpty() ? definitions.stream().filter(permission -> code.equals(permission.getCode())
+                && permission.getTenantId() == null).toList() : local;
+        if (candidates.size() > 1) throw invalid();
+        return candidates.isEmpty() ? null : candidates.getFirst();
     }
 
     @Transactional

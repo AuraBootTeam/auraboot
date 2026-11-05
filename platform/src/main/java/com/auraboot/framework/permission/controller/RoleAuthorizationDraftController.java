@@ -34,6 +34,13 @@ public class RoleAuthorizationDraftController {
         return ApiResponse.success(drafts.snapshot(rolePid));
     }
 
+    @GetMapping("/migration")
+    @RequirePermission(MetaPermission.PERMISSION_MANAGE)
+    @Operation(operationId = "inspectRoleBoundaryMigration", summary = "Inspect role bindings and explicit scope decisions before migration")
+    public ApiResponse<com.auraboot.framework.permission.dto.RoleBoundaryMigrationPreview> migration(@PathVariable String rolePid) {
+        return ApiResponse.success(drafts.migrationPreview(rolePid));
+    }
+
     @PostMapping("/preview")
     @RequirePermission(MetaPermission.ROLE_READ)
     @Operation(operationId = "previewRoleAuthorizationDraft", summary = "Preview role duties and record scopes against an exact revision")
