@@ -78,6 +78,12 @@ Options:
 - `-p, --password <password>` — Login password (or `AURA_PASSWORD` env var)
 - `--yes` — Skip confirmation prompts
 
+`aura plugin import` and `aura plugin publish` include business capability declarations
+from `config/capabilities.json` in the extended manifest sent to the existing platform
+importer. Names, included permission codes, tiers and sensitivity are preserved.
+Importing a declaration does not assign roles or grant capabilities to members;
+role selection, record scope and parameterized policy rules remain separate operations.
+
 ### `aura plugin diff [dir]`
 
 Compare local plugin configuration vs remote platform state.
