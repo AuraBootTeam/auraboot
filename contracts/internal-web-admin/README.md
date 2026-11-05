@@ -1,5 +1,13 @@
 # Internal Web Admin API contracts
 
+Policy editing reads the native `PolicySnapshot` and submits `PolicySaveRequest`
+with the original `expectedRevision` and `values`. Missing or stale grant versions
+return 409. The current producer refresh also inventories 24 existing platform
+operations absent from the older catalog; their presence does not certify their
+functional, browser or release acceptance. Authenticated host capture and session
+revocation do not certify a Linux release image. Release gates still compare the
+exact built runtime document against the generated catalog.
+
 `openapi.json` is the normalized `internal-web-admin` Springdoc catalog. It is
 derived from backend controllers, DTOs and serialization annotations. It is a
 producer catalog, including operations whose frontend consumers still need

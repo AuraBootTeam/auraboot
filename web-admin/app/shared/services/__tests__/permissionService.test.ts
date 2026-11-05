@@ -290,6 +290,36 @@ describe('permissionService', () => {
 
   // ── setPolicy ────────────────────────────────────────────────────────────────
 
+  describe('getPolicySnapshot', () => {
+    it('reads the grant revision with the same policy values', async () => {
+      const snapshot = { revision: 'grant:7', values: { maxAmount: 400 } };
+      getMock.mockResolvedValue(ok(snapshot));
+      await expect(permissionService.getPolicySnapshot('role-1', 'perm-1')).resolves.toEqual(
+        snapshot,
+      );
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/permissions/matrix/role-1/policy/perm-1/snapshot',
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+
+    it.each([
+      null,
+      { revision: '', values: {} },
+      { revision: 7, values: {} },
+      { revision: 'grant:7', values: null },
+      { revision: 'grant:7', values: [] },
+    ])(
+      'rejects an invalid snapshot rather than opening an unversioned editor: %j',
+      async (snapshot) => {
+        getMock.mockResolvedValue(ok(snapshot));
+        await expect(permissionService.getPolicySnapshot('role-1', 'perm-1')).rejects.toThrow();
+      },
+    );
+  });
+
   describe('setPolicy', () => {
     it('reports a version conflict distinctly without retrying', async () => {
       putMock.mockResolvedValue({ ...fail('Policy changed'), httpStatus: 409 });

@@ -1,5 +1,6 @@
 import { get, post, put, del, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import type { components } from '~/generated/internal-api/schema';
 import {
   roleMemberService,
   type RoleMember,
@@ -12,10 +13,7 @@ import type {
   PermissionGrantRequest,
 } from '~/routes/enterprise/permission/types';
 
-export interface PermissionPolicySnapshot {
-  revision: string;
-  values: Record<string, unknown>;
-}
+export type PermissionPolicySnapshot = components['schemas']['PolicySnapshot'];
 
 /**
  * Helper function to handle API responses
@@ -254,9 +252,10 @@ export class PermissionService implements IPermissionService {
     expectedRevision: string,
     request?: Request,
   ): Promise<void> {
+    const body: components['schemas']['PolicySaveRequest'] = { expectedRevision, values };
     const result = await put<void>(
       `${this.baseUrl}/matrix/${rolePid}/policy/${permissionPid}`,
-      { expectedRevision, values },
+      body,
       undefined,
       request,
     );
@@ -280,7 +279,8 @@ export class PermissionService implements IPermissionService {
     );
     const snapshot = handleResponse(result, 'Failed to read policy revision');
     if (
-      !snapshot.revision ||
+      typeof snapshot.revision !== 'string' ||
+      !snapshot.revision.trim() ||
       !snapshot.values ||
       typeof snapshot.values !== 'object' ||
       Array.isArray(snapshot.values)

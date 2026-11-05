@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 6956a0465747c85012b531ff2cc27c5261efe2a3c2ce8f967e61bd2b18e43b06
+ * Contract SHA-256: f4ed6d9773f17fdaa27eb89eef3b576fe7c2885249a40555082a27ed2f86b001
  */
 export interface paths {
     "/api/activities": {
@@ -4408,6 +4408,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/aps/gantt/{strategy}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["gantt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/aps/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["schedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/aps/schedule/{strategy}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["scheduleWithStrategy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/aps/strategies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["strategies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/async-tasks": {
         parameters: {
             query?: never;
@@ -6443,6 +6507,102 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["put"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/asOf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAsOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["correct"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getHistory_4"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/terminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["terminate"];
         options?: never;
         head?: never;
         patch?: never;
@@ -10036,6 +10196,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/exchange/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent data exchange and document jobs */
+        get: operations["recent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/exports/domain/{taskPid}": {
         parameters: {
             query?: never;
@@ -11646,6 +11823,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["runScheduleV2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manufacturing/oee/equipment/{equipmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["equipmentOee"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manufacturing/oee/fleet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["fleetOee"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manufacturing/oee/fleet/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["fleetSummary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13734,6 +13959,150 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["createSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/document-import/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/document-template/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadDocumentTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importExcel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/{taskId}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["streamProgress_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/cancel/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/error-report/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadErrorReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/status/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getImportStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/template/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/validate/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["validateFile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16039,6 +16408,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mrp/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["runMrp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notification-rules": {
         parameters: {
             query?: never;
@@ -18331,6 +18716,23 @@ export interface paths {
         get: operations["getPolicy"];
         /** Set policy values for role+permission */
         put: operations["setPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permissions/matrix/{rolePid}/policy/{permissionPid}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read policy values and the grant revision required for saving */
+        get: operations["getPolicySnapshot"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -24394,6 +24796,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseAsyncImportStatus: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["AsyncImportStatus"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseAsyncTaskDTO: {
             code?: string;
             context?: unknown;
@@ -24502,6 +24912,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["BindingRuleDTO"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseBiTemporalRecord: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["BiTemporalRecord"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25267,6 +25685,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseExcelImportResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ExcelImportResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseExchangeRateResponse: {
             code?: string;
             context?: unknown;
@@ -25327,6 +25753,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["FileUploadResponseDTO"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseGanttData: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["GanttData"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25748,6 +26182,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseListBiTemporalRecord: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["BiTemporalRecord"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseListCallAuditView: {
             code?: string;
             context?: unknown;
@@ -26152,6 +26594,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["ExchangeRateResponse"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseListExecutionJobDTO: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ExecutionJobDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27243,6 +27693,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseMrpResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["MrpResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseNamedQueryBatchResult: {
             code?: string;
             context?: unknown;
@@ -27335,6 +27793,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseOeeResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["OeeResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27811,6 +28277,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponsePolicySnapshot: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PolicySnapshot"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponsePromotionResponse: {
             code?: string;
             context?: unknown;
@@ -28119,6 +28593,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["ScheduledTask"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseScheduleResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ScheduleResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -28475,6 +28957,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseValidationReport: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ValidationReport"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseValidationResult: {
             code?: string;
             context?: unknown;
@@ -28665,6 +29155,18 @@ export interface components {
             /** Format: int32 */
             version?: number;
         };
+        Artifact: {
+            available?: boolean;
+            checksumSha256?: string;
+            downloadUrl?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            filename?: string;
+            format?: string;
+            kind?: string;
+            /** Format: int64 */
+            size?: number;
+        };
         Asset: {
             url?: string;
         };
@@ -28683,6 +29185,16 @@ export interface components {
             expiryDate?: string;
             memberPid?: string;
             rolePids?: string[];
+        };
+        AsyncImportStatus: {
+            modelCode?: string;
+            /** Format: int32 */
+            processedRows?: number;
+            result?: components["schemas"]["ExcelImportResult"];
+            status?: string;
+            taskId?: string;
+            /** Format: int32 */
+            totalRows?: number;
         };
         AsyncTaskDTO: {
             /** Format: local-date-time */
@@ -29275,6 +29787,39 @@ export interface components {
             /** Format: local-date-time */
             updatedAt?: string;
         };
+        BiTemporalRecord: {
+            /** Format: local-date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            createdBy?: number;
+            deletedFlag?: boolean;
+            entityId?: string;
+            entityType?: string;
+            /** Format: int64 */
+            id?: number;
+            payload?: components["schemas"]["JsonNode"];
+            /** Format: int64 */
+            tenantId?: number;
+            /** Format: local-date-time */
+            txFrom?: string;
+            /** Format: local-date-time */
+            txTo?: string;
+            /** Format: local-date-time */
+            updatedAt?: string;
+            /** Format: local-date-time */
+            validFrom?: string;
+            /** Format: local-date-time */
+            validTo?: string;
+            /** Format: int32 */
+            versionNo?: number;
+        };
+        BiTemporalRequest: {
+            payload?: components["schemas"]["JsonNode"];
+            /** Format: local-date-time */
+            validFrom?: string;
+            /** Format: local-date-time */
+            validTo?: string;
+        };
         BootstrapProgressResponse: {
             /** Format: int32 */
             completedSteps?: number;
@@ -29335,6 +29880,15 @@ export interface components {
             cacheTime?: number;
             /** Format: int64 */
             expireTime?: number;
+        };
+        CalendarEntry: {
+            /** Format: date */
+            date?: string;
+            /** Format: time-local */
+            endTime?: string;
+            holiday?: boolean;
+            /** Format: time-local */
+            startTime?: string;
         };
         CallAuditView: {
             actorKind?: string;
@@ -31187,6 +31741,14 @@ export interface components {
             blockers?: components["schemas"]["DeleteBlocker"][];
             canDelete?: boolean;
         };
+        DemandEntry: {
+            /** Format: int64 */
+            materialId?: number;
+            materialName?: string;
+            /** Format: date */
+            needDate?: string;
+            quantity?: number;
+        };
         DepartmentTreeNode: {
             children: components["schemas"]["DepartmentTreeNode"][];
             /** Format: int32 */
@@ -32427,6 +32989,25 @@ export interface components {
             subjectId: string;
             subjectType: string;
         };
+        ExcelImportResult: {
+            asyncTask?: boolean;
+            /** Format: int32 */
+            createdCount?: number;
+            /** Format: int32 */
+            errorCount?: number;
+            errorReportExpired?: boolean;
+            errorReportFailed?: boolean;
+            errorReportUrl?: string;
+            errors?: components["schemas"]["ImportValidationError"][];
+            hasErrors?: boolean;
+            /** Format: int32 */
+            successCount?: number;
+            taskId?: string;
+            /** Format: int32 */
+            totalRows?: number;
+            /** Format: int32 */
+            updatedCount?: number;
+        };
         ExchangeRateRequest: {
             baseCurrency: string;
             /** Format: date */
@@ -32452,6 +33033,31 @@ export interface components {
             confirmed?: boolean;
             pendingTurnId?: string;
             toolId?: string;
+        };
+        ExecutionJobDTO: {
+            artifact?: components["schemas"]["Artifact"];
+            artifacts?: components["schemas"]["Artifact"][];
+            /** Format: date-time */
+            completedAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            definitionCode?: string;
+            downloadUrl?: string;
+            /** Format: int64 */
+            failedUnits?: number;
+            format?: string;
+            pid?: string;
+            /** Format: int64 */
+            processedUnits?: number;
+            /** Format: int32 */
+            progress?: number;
+            status?: string;
+            /** Format: int64 */
+            succeededUnits?: number;
+            summary?: string;
+            /** Format: int64 */
+            totalUnits?: number;
+            type?: string;
         };
         ExportTaskDTO: {
             /** Format: local-date-time */
@@ -33079,6 +33685,43 @@ export interface components {
             example?: string;
             name?: string;
         };
+        GanttData: {
+            conflicts?: components["schemas"]["ScheduleConflict"][];
+            milestones?: components["schemas"]["GanttMilestone"][];
+            resourceUtilization?: {
+                [key: string]: number;
+            };
+            rows?: components["schemas"]["GanttRow"][];
+            strategy?: string;
+            tasks?: components["schemas"]["GanttTask"][];
+        };
+        GanttMilestone: {
+            label?: string;
+            /** Format: local-date-time */
+            time?: string;
+        };
+        GanttRow: {
+            /** Format: int64 */
+            resourceId?: number;
+            resourceName?: string;
+        };
+        GanttTask: {
+            color?: string;
+            /** Format: local-date-time */
+            endTime?: string;
+            id?: string;
+            jobCode?: string;
+            operationName?: string;
+            /** Format: int32 */
+            processingTimeMin?: number;
+            productName?: string;
+            /** Format: int64 */
+            resourceId?: number;
+            /** Format: int32 */
+            setupTimeMin?: number;
+            /** Format: local-date-time */
+            startTime?: string;
+        };
         GenAiUsageSummary: {
             /** Format: int64 */
             callCount?: number;
@@ -33575,6 +34218,12 @@ export interface components {
             totalFiles?: number;
             /** Format: int32 */
             updated?: number;
+        };
+        ImportValidationError: {
+            fieldCode?: string;
+            message?: string;
+            /** Format: int32 */
+            rowNumber?: number;
         };
         InboxItemResponse: {
             /** Format: date-time */
@@ -34883,6 +35532,27 @@ export interface components {
             expectedRevision?: number;
             manifestChecksum: string;
         };
+        MrpExceptionMessage: {
+            description?: string;
+            /** Format: int64 */
+            materialId?: number;
+            materialName?: string;
+            severity?: string;
+            suggestedAction?: string;
+            type?: string;
+        };
+        MrpResult: {
+            exceptions?: components["schemas"]["MrpExceptionMessage"][];
+            plannedOrders?: components["schemas"]["PlannedOrderDto"][];
+        };
+        MrpRunRequest: {
+            demands?: components["schemas"]["DemandEntry"][];
+            /** Format: int32 */
+            horizonDays?: number;
+            materialIds?: number[];
+            orderIds?: number[];
+            scope?: string;
+        };
         NamedQueryBatchResult: {
             allFailure?: boolean;
             allSuccess?: boolean;
@@ -35560,6 +36230,14 @@ export interface components {
         });
         ObserveChangeSetRequest: {
             interactionContext?: components["schemas"]["JsonNode"];
+        };
+        OeeResult: {
+            availability?: number;
+            losses?: components["schemas"]["SixBigLosses"];
+            oee?: number;
+            performance?: number;
+            quality?: number;
+            teep?: number;
         };
         OnlineEvalSummary: {
             attribution?: components["schemas"]["AttributionSummary"];
@@ -37366,6 +38044,23 @@ export interface components {
             totalRecords?: number;
             valueField?: string;
         };
+        PlannedOrderDto: {
+            /** Format: int32 */
+            leadTimeDays?: number;
+            lotSizingPolicy?: string;
+            /** Format: int64 */
+            materialId?: number;
+            materialName?: string;
+            /** Format: int64 */
+            mrpRunId?: number;
+            /** Format: date */
+            needDate?: string;
+            /** Format: date */
+            orderDate?: string;
+            orderQty?: number;
+            orderType?: string;
+            sourceDemandJson?: string;
+        };
         PlatformAiScoreRequest: {
             /** Format: int32 */
             batchSize?: number;
@@ -37708,6 +38403,18 @@ export interface components {
             requireApproval?: boolean;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        PolicySaveRequest: {
+            expectedRevision: string;
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        PolicySnapshot: {
+            revision: string;
+            values: {
+                [key: string]: unknown;
+            };
         };
         PreferencesDTO: {
             dateFormat?: string;
@@ -39012,6 +39719,19 @@ export interface components {
             field?: string;
             values?: string[];
         };
+        RowError: {
+            fieldCode?: string;
+            message?: string;
+            /** Format: int32 */
+            rowNumber?: number;
+            value?: string;
+        };
+        RowWarning: {
+            fieldCode?: string;
+            message?: string;
+            /** Format: int32 */
+            rowNumber?: number;
+        };
         Rule: {
             departmentPids?: string[];
             kind?: string;
@@ -39181,6 +39901,33 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        ScheduleConflict: {
+            /** Format: local-date-time */
+            achievableBy?: string;
+            /** Format: int64 */
+            jobId?: number;
+            reason?: string;
+            /** Format: local-date-time */
+            requestedBy?: string;
+        };
+        ScheduledOperation: {
+            /** Format: local-date-time */
+            endTime?: string;
+            jobCode?: string;
+            /** Format: int64 */
+            jobId?: number;
+            operationName?: string;
+            /** Format: int32 */
+            processingTimeMin?: number;
+            productName?: string;
+            /** Format: int64 */
+            resourceId?: number;
+            resourceName?: string;
+            /** Format: int32 */
+            setupTimeMin?: number;
+            /** Format: local-date-time */
+            startTime?: string;
+        };
         ScheduledTask: {
             blockStrategy?: string;
             /** Format: date-time */
@@ -39257,6 +40004,48 @@ export interface components {
             /** Format: int64 */
             tenantId?: number;
             triggerType?: string;
+        };
+        ScheduleJob: {
+            /** Format: local-date-time */
+            arrivalTime?: string;
+            code?: string;
+            /** Format: local-date-time */
+            dueDate?: string;
+            /** Format: int64 */
+            id?: number;
+            operationName?: string;
+            /** Format: int32 */
+            priority?: number;
+            /** Format: int32 */
+            processingTimeMin?: number;
+            /** Format: int64 */
+            productId?: number;
+            productName?: string;
+            /** Format: int64 */
+            requiredResourceId?: number;
+            requiredResourceType?: string;
+        };
+        ScheduleRequest: {
+            jobs?: components["schemas"]["ScheduleJob"][];
+            resourceCalendars?: {
+                [key: string]: components["schemas"]["CalendarEntry"][];
+            };
+            resources?: components["schemas"]["ResourceInfo"][];
+            /** Format: local-date-time */
+            scheduleStart?: string;
+            setupTimes?: {
+                [key: string]: number;
+            };
+        };
+        ScheduleResult: {
+            conflicts?: components["schemas"]["ScheduleConflict"][];
+            /** Format: local-date-time */
+            earliestCompletion?: string;
+            operations?: components["schemas"]["ScheduledOperation"][];
+            resourceUtilization?: {
+                [key: string]: number;
+            };
+            strategy?: string;
         };
         SchemaOperationResult: {
             affectedFields?: string[];
@@ -39499,6 +40288,14 @@ export interface components {
             code?: string;
             name?: string;
             pid?: string;
+        };
+        SixBigLosses: {
+            breakdownHours?: number;
+            minorStopHours?: number;
+            processDefectUnits?: number;
+            setupHours?: number;
+            speedLossUnits?: number;
+            startupDefectUnits?: number;
         };
         SkillMeta: {
             category?: string;
@@ -40698,6 +41495,18 @@ export interface components {
             messageKey?: string;
             propertyPath?: string;
             severity?: string;
+        };
+        ValidationReport: {
+            errorReportFailed?: boolean;
+            errorReportUrl?: string;
+            errors?: components["schemas"]["RowError"][];
+            taskId?: string;
+            /** Format: int32 */
+            totalRows?: number;
+            valid?: boolean;
+            /** Format: int32 */
+            validRows?: number;
+            warnings?: components["schemas"]["RowWarning"][];
         };
         ValidationResult: {
             error?: string;
@@ -48187,6 +48996,102 @@ export interface operations {
             };
         };
     };
+    gantt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseGanttData"];
+                };
+            };
+        };
+    };
+    schedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseScheduleResult"];
+                };
+            };
+        };
+    };
+    scheduleWithStrategy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseScheduleResult"];
+                };
+            };
+        };
+    };
+    strategies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListString"];
+                };
+            };
+        };
+    };
     listTasks: {
         parameters: {
             query?: {
@@ -51201,6 +52106,157 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseUsageEvent"];
+                };
+            };
+        };
+    };
+    put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BiTemporalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    getAsOf: {
+        parameters: {
+            query: {
+                txTime?: string;
+                validTime: string;
+            };
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    correct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BiTemporalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    getCurrent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    getHistory_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    terminate: {
+        parameters: {
+            query: {
+                validTime: string;
+            };
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };
@@ -56902,6 +57958,28 @@ export interface operations {
             };
         };
     };
+    recent: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListExecutionJobDTO"];
+                };
+            };
+        };
+    };
     status_1: {
         parameters: {
             query?: never;
@@ -59793,6 +60871,77 @@ export interface operations {
             query?: {
                 horizon?: number;
                 strategy?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    equipmentOee: {
+        parameters: {
+            query: {
+                end: string;
+                start: string;
+            };
+            header?: never;
+            path: {
+                equipmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseOeeResult"];
+                };
+            };
+        };
+    };
+    fleetOee: {
+        parameters: {
+            query: {
+                end: string;
+                start: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    fleetSummary: {
+        parameters: {
+            query: {
+                end: string;
+                start: string;
             };
             header?: never;
             path?: never;
@@ -64791,6 +65940,242 @@ export interface operations {
             };
         };
     };
+    importDocument: {
+        parameters: {
+            query?: {
+                dryRun?: boolean;
+                skipErrors?: boolean;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: Blob;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExcelImportResult"];
+                };
+            };
+        };
+    };
+    downloadDocumentTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Blob;
+                };
+            };
+        };
+    };
+    importExcel: {
+        parameters: {
+            query?: {
+                dryRun?: boolean;
+                matchKey?: string;
+                mode?: string;
+                skipErrors?: boolean;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: Blob;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExcelImportResult"];
+                };
+            };
+        };
+    };
+    streamProgress_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["SseEmitter"];
+                };
+            };
+        };
+    };
+    cancelImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAsyncImportStatus"];
+                };
+            };
+        };
+    };
+    downloadErrorReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Blob;
+                };
+            };
+        };
+    };
+    getImportStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAsyncImportStatus"];
+                };
+            };
+        };
+    };
+    downloadTemplate: {
+        parameters: {
+            query?: {
+                mode?: string;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Blob;
+                };
+            };
+        };
+    };
+    validateFile: {
+        parameters: {
+            query?: {
+                matchKey?: string;
+                mode?: string;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: Blob;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseValidationReport"];
+                };
+            };
+        };
+    };
     listFieldsBySemanticType: {
         parameters: {
             query?: never;
@@ -68273,6 +69658,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+        };
+    };
+    runMrp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MrpRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMrpResult"];
                 };
             };
         };
@@ -72244,9 +73653,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["PolicySaveRequest"];
             };
         };
         responses: {
@@ -72257,6 +73664,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+        };
+    };
+    getPolicySnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                permissionPid: string;
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicySnapshot"];
                 };
             };
         };
