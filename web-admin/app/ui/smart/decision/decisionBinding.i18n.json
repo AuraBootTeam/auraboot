@@ -450,5 +450,9 @@
   "noDecisionAvailable": {
     "zh-CN": "暂无可用决策，请先在规则中心配置。",
     "en": "No decisions available. Configure one in Rule Center first."
+  },
+  "conditionOnly": {
+    "zh-CN": "不引用决策（仅使用条件）",
+    "en": "Conditions only (no decision reference)"
   }
 }

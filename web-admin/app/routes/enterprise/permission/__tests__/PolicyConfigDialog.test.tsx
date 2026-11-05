@@ -31,15 +31,63 @@ vi.mock('~/shared/services/permissionService', () => ({
 
 describe('PolicyConfigDialog', () => {
   it('saves an authored permission condition without an implicit decision reference', async () => {
-    const decisionApi = { getDecisionImpact: vi.fn(), evaluate: vi.fn(), listDefinitions: vi.fn(async () => ({ records: [] })) };
-    render(<PolicyConfigDialog open onClose={vi.fn()} onSuccess={vi.fn()} rolePid="role-refund" permissionPid="permission-create-refund" permissionLabel="Create refund" initialValues={{}} decisionApi={decisionApi}
-      schema={{ dynamicAbac: { type: 'rule-center', label: 'Business conditions', fields: [{ scope: 'record', path: 'data.amountMinor', label: 'Amount', dataType: 'integer' }] } }} />);
+    const decisionApi = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({ records: [] })),
+    };
+    render(
+      <PolicyConfigDialog
+        open
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        rolePid="role-refund"
+        permissionPid="permission-create-refund"
+        permissionLabel="Create refund"
+        initialValues={{}}
+        decisionApi={decisionApi}
+        schema={{
+          dynamicAbac: {
+            type: 'rule-center',
+            label: 'Business conditions',
+            fields: [
+              { scope: 'record', path: 'data.amountMinor', label: 'Amount', dataType: 'integer' },
+            ],
+          },
+        }}
+      />,
+    );
     fireEvent.click(screen.getByTestId('cb-add'));
     fireEvent.change(screen.getByLabelText('operator-0'), { target: { value: 'LTE' } });
     fireEvent.change(screen.getByLabelText('value-0'), { target: { value: '500' } });
     fireEvent.click(screen.getByTestId('policy-save-button'));
-    await waitFor(() => expect(permissionService.setPolicy).toHaveBeenCalledWith('role-refund', 'permission-create-refund', expect.objectContaining({ dynamicAbac: expect.objectContaining({ ruleBinding: expect.objectContaining({ bindingKind: 'CONDITION', conditionSpec: { root: expect.objectContaining({ children: [expect.objectContaining({ operator: 'LTE', right: expect.objectContaining({ value: 500 }) })] }), decisionBindings: [] } }) }) })));
-    const payload = vi.mocked(permissionService.setPolicy).mock.calls.find(call => call[0] === 'role-refund')?.[2];
+    await waitFor(() =>
+      expect(permissionService.setPolicy).toHaveBeenCalledWith(
+        'role-refund',
+        'permission-create-refund',
+        expect.objectContaining({
+          dynamicAbac: expect.objectContaining({
+            ruleBinding: expect.objectContaining({
+              bindingKind: 'CONDITION',
+              conditionSpec: {
+                root: expect.objectContaining({
+                  children: [
+                    expect.objectContaining({
+                      operator: 'LTE',
+                      right: expect.objectContaining({ value: 500 }),
+                    }),
+                  ],
+                }),
+                decisionBindings: [],
+              },
+            }),
+          }),
+        }),
+      ),
+    );
+    const payload = vi
+      .mocked(permissionService.setPolicy)
+      .mock.calls.find((call) => call[0] === 'role-refund')?.[2];
     expect(payload?.dynamicAbac.ruleBinding.decisionBinding).toBeUndefined();
   });
 

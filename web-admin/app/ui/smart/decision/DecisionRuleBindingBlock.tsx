@@ -543,18 +543,20 @@ function buildRuleConsumerBinding(
     consumerNodeId?: string;
   },
 ): RuleConsumerBindingDraft {
+  const useDecision =
+    options.showDecision && (!options.showCondition || Boolean(binding.decisionCode.trim()));
   return {
     consumerType: options.consumerType,
     consumerCode: options.consumerCode,
     consumerNodeId: options.consumerNodeId,
-    bindingKind: options.showDecision ? 'DECISION_REF' : 'CONDITION',
+    bindingKind: useDecision ? 'DECISION_REF' : 'CONDITION',
     conditionSpec: options.showCondition
       ? {
           root: condition,
           decisionBindings: [],
         }
       : undefined,
-    decisionBinding: options.showDecision
+    decisionBinding: useDecision
       ? {
           decisionCode: binding.decisionCode,
           versionPolicy: binding.versionPolicy,
@@ -1593,13 +1595,14 @@ export function DecisionRuleBindingBlock({
     (props.valueField ? runtime?.getFieldValue?.(props.valueField) : undefined) ??
     props.initialValue;
   const initialRuleBinding = parseBindingValue(incomingRawBindingValue);
+  const defaultDecisionCode = props.initialDecisionCode ?? (mode === 'combined' ? '' : undefined);
   const [condition, setCondition] = useState<GroupNode>(
     () => initialRuleBinding?.conditionSpec?.root ?? defaultCondition(),
   );
   const [binding, setBinding] = useState<DecisionBindingDraft>(() =>
     buildInitialBinding(
       decisions,
-      props.initialDecisionCode,
+      defaultDecisionCode,
       props.initialVersionPolicy,
       initialRuleBinding,
     ),
@@ -1793,12 +1796,12 @@ export function DecisionRuleBindingBlock({
     setBinding(
       buildInitialBinding(
         decisions,
-        props.initialDecisionCode,
+        defaultDecisionCode,
         props.initialVersionPolicy,
         nextRuleBinding,
       ),
     );
-  }, [decisions, incomingRawBindingValue, props.initialDecisionCode, props.initialVersionPolicy]);
+  }, [decisions, incomingRawBindingValue, defaultDecisionCode, props.initialVersionPolicy]);
 
   const effectiveConsumerType = props.consumerType ?? initialRuleBinding?.consumerType;
   const effectiveConsumerCode = resolveConsumerCode(props, runtime, initialRuleBinding);
@@ -2066,6 +2069,9 @@ export function DecisionRuleBindingBlock({
                       })
                     }
                   >
+                    {showCondition && decisions.length > 0 && (
+                      <option value="">{bindingText('conditionOnly', locale)}</option>
+                    )}
                     {decisions.length === 0 && (
                       <option value="">{bindingText('noDecisionAvailable', locale)}</option>
                     )}
