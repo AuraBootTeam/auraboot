@@ -331,7 +331,7 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
       (r) => r.url().includes('/api/ai/aurabot/chat/stream') && r.request().method() === 'POST',
       { timeout: 120_000 },
     );
-    await bot.getByTestId('aurabot-input').fill('只解释当前表单的用途，不要填写、创建或保存记录。');
+    await bot.getByTestId('aurabot-input').fill('请用一句话说明任务标题应如何命名，只说业务建议，不展示字段编码或表名；不要填写、创建或保存记录。');
     await bot.getByTestId('aurabot-send').click();
     const consulted = await consultation;
     expect(consulted.request().postDataJSON().formFill).toBeUndefined();
