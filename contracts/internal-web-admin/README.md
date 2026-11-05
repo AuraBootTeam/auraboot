@@ -2,11 +2,13 @@
 
 Policy editing reads the native `PolicySnapshot` and submits `PolicySaveRequest`
 with the original `expectedRevision` and `values`. Missing or stale grant versions
-return 409. The current producer refresh also inventories 24 existing platform
-operations absent from the older catalog; their presence does not certify their
-functional, browser or release acceptance. Authenticated host capture and session
-revocation do not certify a Linux release image. Release gates still compare the
-exact built runtime document against the generated catalog.
+return 409. This catalog is generated from the default Core runtime, including
+its exact built-image producer capture. A product composition may expose more
+module operations: the native Commerce capture contains 24 additional paths.
+Those remain product inventory and must not replace the default Core catalog.
+The existing product `--core-operations` comparison checks every registered Core
+operation and its full reference closure while retaining additional product
+operations separately. Default Core image checks retain exact-document comparison.
 
 `openapi.json` is the normalized `internal-web-admin` Springdoc catalog. It is
 derived from backend controllers, DTOs and serialization annotations. It is a
