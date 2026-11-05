@@ -4,21 +4,52 @@ import { DecisionRuleBindingBlock } from '../DecisionRuleBindingBlock';
 
 describe('DecisionRuleBindingBlock', () => {
   it('honors an explicit empty decision list without substituting example decisions', async () => {
-    const api = { getDecisionImpact: vi.fn(), evaluate: vi.fn(), listDefinitions: vi.fn(async () => ({ records: [] })) };
-    render(<DecisionRuleBindingBlock api={api} block={{ props: { mode: 'decision', consumerType: 'PERMISSION', decisions: [] } }} />);
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({ records: [] })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{ props: { mode: 'decision', consumerType: 'PERMISSION', decisions: [] } }}
+      />,
+    );
     await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
     const picker = screen.getByLabelText('decision-code') as HTMLSelectElement;
-    expect(Array.from(picker.options).filter(option => option.value)).toEqual([]);
+    expect(Array.from(picker.options).filter((option) => option.value)).toEqual([]);
     expect(picker).toBeDisabled();
     expect(picker).toHaveTextContent('暂无可用决策');
   });
 
   it('offers only configured and runtime decisions when choices are explicitly declared', async () => {
-    const api = { getDecisionImpact: vi.fn(), evaluate: vi.fn(), listDefinitions: vi.fn(async () => ({ records: [{ decisionCode: 'live_finance_guard', decisionName: '财务规则', enabled: true }] })) };
-    render(<DecisionRuleBindingBlock api={api} block={{ props: { mode: 'decision', consumerType: 'PERMISSION', decisions: [{ code: 'configured_guard', name: '已配置规则' }] } }} />);
-    await waitFor(() => expect(screen.getByLabelText('decision-code')).toHaveTextContent('财务规则'));
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({
+        records: [{ decisionCode: 'live_finance_guard', decisionName: '财务规则', enabled: true }],
+      })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{
+          props: {
+            mode: 'decision',
+            consumerType: 'PERMISSION',
+            decisions: [{ code: 'configured_guard', name: '已配置规则' }],
+          },
+        }}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('decision-code')).toHaveTextContent('财务规则'),
+    );
     const picker = screen.getByLabelText('decision-code') as HTMLSelectElement;
-    expect(Array.from(picker.options).map(option => option.value)).toEqual(['configured_guard', 'live_finance_guard']);
+    expect(Array.from(picker.options).map((option) => option.value)).toEqual([
+      'configured_guard',
+      'live_finance_guard',
+    ]);
   });
 
   it('hosts condition and decision binding editors in one DSL custom block', () => {

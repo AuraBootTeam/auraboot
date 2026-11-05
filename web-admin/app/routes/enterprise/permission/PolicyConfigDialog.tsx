@@ -356,7 +356,7 @@ function FieldRenderer({
                 fieldCatalogMode: fieldSchema.fieldCatalogMode,
                 fieldCatalogModelCode: fieldSchema.fieldCatalogModelCode,
                 fieldCatalogModelCodeField: fieldSchema.fieldCatalogModelCodeField,
-                decisions: fieldSchema.decisions,
+                decisions: fieldSchema.decisions ?? [],
                 initialDecisionCode:
                   fieldSchema.initialDecisionCode ?? fieldSchema.decisions?.[0]?.code,
                 initialContextJson: fieldSchema.initialContextJson,

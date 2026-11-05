@@ -215,13 +215,16 @@ const STALE_DECISION_NAMES = new Set(['投诉 SLA 截止时间', '审批路由',
 function mergeDecisionOptions(
   configured?: DecisionOption[],
   locale: string = 'zh-CN',
+  includeExamples = true,
 ): DecisionOption[] {
-  if (!configured || configured.length === 0) return bindingPresentation(locale).DEFAULT_DECISIONS;
-  const byCode = new Map(
+  const defaults = new Map(
     bindingPresentation(locale).DEFAULT_DECISIONS.map((decision) => [decision.code, decision]),
   );
+  const examples = includeExamples ? Array.from(defaults.values()) : [];
+  if (!configured || configured.length === 0) return examples;
+  const byCode = new Map(examples.map((decision) => [decision.code, decision]));
   configured.forEach((decision) => {
-    const fallback = byCode.get(decision.code);
+    const fallback = byCode.get(decision.code) ?? defaults.get(decision.code);
     byCode.set(decision.code, {
       ...fallback,
       ...decision,
@@ -1575,7 +1578,12 @@ export function DecisionRuleBindingBlock({
       : (configuredFields ??
         mergeFieldOptions(catalogFields, bindingPresentation(locale).DEFAULT_FIELDS));
   const decisions = useMemo(
-    () => mergeDecisionOptions([...(props.decisions ?? []), ...definitionDecisionOptions], locale),
+    () =>
+      mergeDecisionOptions(
+        [...(props.decisions ?? []), ...definitionDecisionOptions],
+        locale,
+        props.decisions === undefined,
+      ),
     [definitionDecisionOptions, props.decisions, locale],
   );
   const defaultApiRef = useRef<RuleBindingDecisionApi | null>(null);
@@ -2045,6 +2053,7 @@ export function DecisionRuleBindingBlock({
                   {bindingText('decision', locale)}
                   <select
                     aria-label="decision-code"
+                    disabled={decisions.length === 0}
                     value={binding.decisionCode}
                     onChange={(event) =>
                       setBinding((current) => {
@@ -2057,6 +2066,9 @@ export function DecisionRuleBindingBlock({
                       })
                     }
                   >
+                    {decisions.length === 0 && (
+                      <option value="">{bindingText('noDecisionAvailable', locale)}</option>
+                    )}
                     {decisions.map((decision) => (
                       <option key={decision.code} value={decision.code} title={decision.code}>
                         {decisionDisplayName(decision.code, decision.name, locale)}
