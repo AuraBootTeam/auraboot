@@ -300,7 +300,7 @@ function FieldRenderer({
           className="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40"
           data-testid={`policy-field-${fieldKey}`}
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="mb-2 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <div>
               {labelEl}
               <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -311,7 +311,7 @@ function FieldRenderer({
                 )}
               </p>
             </div>
-            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+            <label className="flex shrink-0 items-center gap-2 text-xs whitespace-nowrap text-gray-600 dark:text-gray-300">
               <input
                 type="checkbox"
                 checked={expectedMatched}
