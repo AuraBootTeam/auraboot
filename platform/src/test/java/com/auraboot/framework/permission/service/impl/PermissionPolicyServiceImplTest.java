@@ -240,6 +240,24 @@ class PermissionPolicyServiceImplTest {
     }
 
     @Test
+    void snapshotRejectsMalformedStoredValuesButAcceptsAnUnconfiguredGrant() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        for (Object value : List.of(List.of("invalid"), "[]")) {
+            rp.setConditions(value);
+            assertThatThrownBy(() -> service.getPolicySnapshot(7L, 50L))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        rp.setConditions(null);
+        assertThat(service.getPolicySnapshot(7L, 50L).values()).isEmpty();
+        assertThat(service.getPolicySnapshot(7L, 50L).revision()).isEqualTo("grant-900:1");
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
+    }
+
+    @Test
     void staleOrForeignSnapshotCannotWritePolicyOrUsageReferences() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);

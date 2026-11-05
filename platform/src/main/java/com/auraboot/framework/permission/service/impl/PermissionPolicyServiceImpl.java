@@ -165,6 +165,9 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             throw new ConflictException("The role permission grant no longer exists; reload permissions");
         }
         Map<String, Object> values = convertToMap(rp.getConditions());
+        if (rp.getConditions() != null && values == null) {
+            throw new IllegalStateException("Stored policy values are invalid; an editable snapshot cannot be read");
+        }
         return new PolicySnapshot(revisionOf(rp), values == null ? Map.of() : values);
     }
 
