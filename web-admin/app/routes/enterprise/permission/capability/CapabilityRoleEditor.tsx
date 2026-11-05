@@ -26,6 +26,7 @@ import { scopeOption } from '../scopeConfig';
 import CapabilityDiagnostics from './CapabilityDiagnostics';
 import CapabilityScopeSettings from './CapabilityScopeSettings';
 import ConfirmDialog from '~/ui/ConfirmDialog';
+import FieldPolicyChecklist from './FieldPolicyChecklist';
 
 interface CapabilityRoleEditorProps {
   /** Role pid (all role-scoped endpoints key on the PID — role ids exceed JS safe-int range). */
@@ -66,6 +67,7 @@ export default function CapabilityRoleEditor({
   const [baselineSnapshot, setBaselineSnapshot] = useState<AuthorizationSnapshot | null>(null);
   const [defaultScope, setDefaultScope] = useState<string | null>(null);
   const [applyDefault, setApplyDefault] = useState(false);
+  const [fieldSelection, setFieldSelection] = useState<string[] | null>(null);
   const [scopeChanges, setScopeChanges] = useState<ScopeChange[]>([]);
   const [scopeOpen, setScopeOpen] = useState(false);
   const [scopeLabels, setScopeLabels] = useState<Record<string, string>>({});
@@ -152,11 +154,30 @@ export default function CapabilityRoleEditor({
     );
   }, [projectedMatrix, capabilityView.primaryGroups]);
   const primarySelected = selected.filter((code) => primaryCodes.has(code));
+  const boundFields = baselineSnapshot?.fieldPolicies;
+  const fieldBaseline = (boundFields ?? []).flatMap((policy) =>
+    typeof policy.policyPid === 'string' ? [policy.policyPid] : [],
+  );
+  const selectedFields = fieldSelection ?? fieldBaseline;
+  const fieldsDirty =
+    fieldSelection !== null &&
+    JSON.stringify([...fieldSelection].sort()) !== JSON.stringify([...fieldBaseline].sort());
+  const fieldModels = new Set(
+    (projectedMatrix?.modules ?? []).flatMap((module) =>
+      module.resources
+        .filter((resource) =>
+          resource.actions.some((action) => action.granted && action.code.startsWith('model.')),
+        )
+        .map((resource) => resource.resourceCode),
+    ),
+  );
+
   const dirty =
     isDirty(capabilityView.primaryGroups, primarySelected) ||
     revokedPartial.length > 0 ||
     defaultChanged ||
-    activeScopeChanges.length > 0;
+    activeScopeChanges.length > 0 ||
+    fieldsDirty;
   useEffect(() => {
     onDirtyChange?.(dirty || saving || previewLoading || scopeCapability !== null || scopeOpen);
   }, [dirty, saving, previewLoading, scopeCapability, scopeOpen, onDirtyChange]);
@@ -168,6 +189,7 @@ export default function CapabilityRoleEditor({
     setDefaultScope(snapshot.defaultScopeType);
     setApplyDefault(false);
     setScopeChanges([]);
+    setFieldSelection(null);
     setScopeLabels({});
     setConflict(false);
     setDraftPreview(null);
@@ -190,6 +212,7 @@ export default function CapabilityRoleEditor({
     defaultScopeType: defaultChanged ? defaultScope : null,
     applyDefaultToCurrentGrants: applyDefault,
     scopeChanges: activeScopeChanges,
+    ...(fieldsDirty ? { fieldPolicyPids: selectedFields } : {}),
   });
 
   const load = useCallback(async () => {
@@ -512,6 +535,25 @@ export default function CapabilityRoleEditor({
           </ul>
         </div>
       )}
+      {((draftPreview?.fieldPolicies?.added?.length ?? 0) > 0 ||
+        (draftPreview?.fieldPolicies?.removed?.length ?? 0) > 0) && (
+        <div data-testid="draft-preview-fields">
+          <p>{t('admin.permission.fields.preview', undefined, 'Field restriction changes')}</p>
+          <ul>
+            {draftPreview?.fieldPolicies?.added?.map((policy) => (
+              <li key={policy.policyPid}>
+                {t('admin.permission.fields.apply', undefined, 'Apply restriction')}: {policy.name}
+              </li>
+            ))}
+            {draftPreview?.fieldPolicies?.removed?.map((policy) => (
+              <li key={policy.policyPid}>
+                {t('admin.permission.fields.remove', undefined, 'Remove restriction')}:{' '}
+                {policy.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="text-text-3">
         {t(
           'admin.permission.editor.roleLocalV2',
@@ -634,6 +676,16 @@ export default function CapabilityRoleEditor({
           scopeConfigurableCodes={scopeConfigurableCodes}
           disabled={readOnly || saving || previewLoading}
         />
+        <FieldPolicyChecklist
+          key={rolePid}
+          rolePid={rolePid}
+          bound={boundFields}
+          selected={selectedFields}
+          models={fieldModels}
+          readOnly={readOnly}
+          disabled={readOnly || saving || previewLoading || conflict}
+          onChange={setFieldSelection}
+        />
         {filteredGroups.length === 0 && (
           <p data-testid="capability-search-empty" className="text-text-2 py-4 text-sm">
             {t('admin.permission.editor.empty', undefined, 'No matching business capabilities')}
@@ -650,6 +702,15 @@ export default function CapabilityRoleEditor({
               `${changes.length} duty changes and ${activeScopeChanges.length} record scope overrides pending. Review and save together.`,
             )}
           </div>
+        )}
+        {fieldsDirty && (
+          <p data-testid="field-policies-pending" className="text-text-2 text-sm">
+            {t(
+              'admin.permission.fields.pending',
+              { count: selectedFields.length },
+              `${selectedFields.length} field restrictions selected; review and save with this draft.`,
+            )}
+          </p>
         )}
         <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">

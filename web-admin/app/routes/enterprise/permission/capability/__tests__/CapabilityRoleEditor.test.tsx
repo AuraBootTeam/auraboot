@@ -18,7 +18,12 @@ vi.mock('~/shared/services/modelService', () => ({
 }));
 vi.mock('../authorizationDraftService', async (original) => ({
   ...(await original<typeof import('../authorizationDraftService')>()),
-  authorizationDraftService: { read: vi.fn(), preview: vi.fn(), save: vi.fn() },
+  authorizationDraftService: {
+    read: vi.fn(),
+    preview: vi.fn(),
+    save: vi.fn(),
+    fieldPolicies: vi.fn(),
+  },
 }));
 function baseline(): AuthorizationSnapshot {
   const capability = (code: string, granted: boolean, includes: string[]) => ({
@@ -40,6 +45,7 @@ function baseline(): AuthorizationSnapshot {
     unlockedMenus: null,
   });
   return {
+    fieldPolicies: [],
     rolePid: 'role-1',
     revision: 'a'.repeat(64),
     defaultScopeType: 'self',
@@ -92,6 +98,7 @@ async function review() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([]);
   vi.mocked(authorizationDraftService.read).mockResolvedValue(baseline());
   vi.mocked(authorizationDraftService.save).mockResolvedValue(baseline());
   vi.mocked(authorizationDraftService.preview).mockImplementation(async (_, body) => ({
@@ -365,5 +372,168 @@ describe('CapabilityRoleEditor retained permission safeguards', () => {
     );
     expect(screen.queryByTestId('capability-draft')).not.toBeInTheDocument();
     expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('field restrictions participate in the same role draft', () => {
+  const definition = {
+    pid: 'hide-cost',
+    name: 'Hide quote cost',
+    modelCode: 'order',
+    fieldCode: 'cost',
+    policyType: 'column',
+    maskType: 'hide',
+    enabled: true,
+  };
+  const binding = {
+    policyPid: 'hide-cost',
+    name: 'Hide quote cost',
+    modelCode: 'order',
+    fieldCode: 'cost',
+    policyType: 'column',
+    maskType: 'hide',
+    enabled: true,
+  };
+  it('previews and atomically saves field selection together with duty changes', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
+    vi.mocked(authorizationDraftService.preview).mockImplementation(async (_, body) => ({
+      revision: body.expectedRevision,
+      capabilities: {
+        grantedCodes: [],
+        revokedCodes: [],
+        preservedCodes: [],
+        relatedMenus: [],
+        resultingCapabilities: [],
+      },
+      defaultScopeChanged: false,
+      defaultScopeType: null,
+      applyDefaultToCurrentGrants: false,
+      scopeChanges: [],
+      fieldPolicies: { added: [binding], removed: [] },
+    }));
+    vi.mocked(authorizationDraftService.save).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    await open();
+    fireEvent.click(await screen.findByTestId('field-policy-hide-cost'));
+    await toggleEdit();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    await review();
+    expect(screen.getByTestId('draft-preview-fields')).toHaveTextContent('Hide quote cost');
+    const body = vi.mocked(authorizationDraftService.preview).mock.calls[0][1];
+    expect(body.fieldPolicyPids).toEqual(['hide-cost']);
+    expect(body.selectedCapabilityCodes).toContain('order.edit');
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() =>
+      expect(authorizationDraftService.save).toHaveBeenCalledWith('role-1', body),
+    );
+    await waitFor(() => expect(screen.getByTestId('field-policy-hide-cost')).toBeChecked());
+  });
+  it('cancels a field preview and discards the local selection without writes', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
+    await open();
+    fireEvent.click(await screen.findByTestId('field-policy-hide-cost'));
+    await review();
+    fireEvent.click(screen.getByTestId('confirm-cancel'));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    expect(screen.getByTestId('field-policy-hide-cost')).toBeChecked();
+    fireEvent.click(screen.getByTestId('capability-discard'));
+    await waitFor(() => expect(screen.getByTestId('field-policy-hide-cost')).not.toBeChecked());
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+  });
+  it('fails a malformed field catalog without manufacturing an empty binding change', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([
+      { ...definition, enabled: undefined },
+    ]);
+    await open();
+    await screen.findByTestId('field-policies-retry');
+    expect(screen.queryByTestId('field-policy-hide-cost')).not.toBeInTheDocument();
+    await toggleEdit();
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1]).not.toHaveProperty(
+      'fieldPolicyPids',
+    );
+  });
+  it('retries policy loading without throwing away the staged duty draft', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies)
+      .mockRejectedValueOnce(new Error('Unavailable'))
+      .mockResolvedValue([definition]);
+    await open();
+    await screen.findByTestId('field-policies-retry');
+    await toggleEdit();
+    fireEvent.click(screen.getByTestId('field-policies-retry'));
+    await screen.findByTestId('field-policy-hide-cost');
+    expect(screen.getByTestId('capability-checkbox-order.edit')).toBeChecked();
+    expect(authorizationDraftService.read).toHaveBeenCalledTimes(1);
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('removes the last binding explicitly rather than omitting field changes', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
+    await open();
+    fireEvent.click(await screen.findByTestId('field-policy-hide-cost'));
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1].fieldPolicyPids).toEqual(
+      [],
+    );
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('preserves existing bindings when the policy catalog is denied', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    vi.mocked(authorizationDraftService.fieldPolicies).mockRejectedValue(new Error('Forbidden'));
+    await open();
+    await screen.findByTestId('field-policies-retry');
+    expect(screen.getByTestId('bound-field-policy-summary')).toHaveTextContent('Hide quote cost');
+    await toggleEdit();
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1]).not.toHaveProperty(
+      'fieldPolicyPids',
+    );
+  });
+  it('does not turn an unknown historical binding snapshot into an empty selection', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: undefined,
+    });
+    await open();
+    expect(screen.getByTestId('role-field-policies')).toHaveTextContent('unavailable');
+    expect(authorizationDraftService.fieldPolicies).not.toHaveBeenCalled();
+    await toggleEdit();
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1]).not.toHaveProperty(
+      'fieldPolicyPids',
+    );
+  });
+  it('does not fetch privileged policy definitions for a read-only editor', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    render(<CapabilityRoleEditor rolePid="role-1" readOnly />);
+    await screen.findByTestId('capability-role-editor');
+    expect(await screen.findByTestId('field-policy-hide-cost')).toBeDisabled();
+    expect(authorizationDraftService.fieldPolicies).not.toHaveBeenCalled();
+  });
+  it('allows removing an inactive restriction but never newly selecting it', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [{ ...binding, enabled: false }],
+    });
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([
+      { ...definition, enabled: false },
+    ]);
+    await open();
+    const checkbox = await screen.findByTestId('field-policy-hide-cost');
+    expect(checkbox).toBeEnabled();
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox).toBeDisabled();
   });
 });

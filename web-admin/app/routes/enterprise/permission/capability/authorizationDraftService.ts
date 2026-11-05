@@ -55,6 +55,9 @@ export function draftMatrix(matrix: AuthorizationSnapshot['matrix']): Permission
 }
 
 export const authorizationDraftService = {
+  async fieldPolicies() {
+    return unwrap(await internalRequest('get', '/api/meta/data-permissions', {}));
+  },
   async read(rolePid: string) {
     return unwrap(await internalRequest('get', path, { path: { rolePid } }));
   },

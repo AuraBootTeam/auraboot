@@ -6109,5 +6109,103 @@
     "en-US": "Full event types, e.g. [\"external.erp.materials.received.v1\"]. Match the sender source, event and version.",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.title",
+    "zh-CN": "字段与敏感信息",
+    "en-US": "Fields and sensitive information",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.help",
+    "zh-CN": "为本角色选择已有字段限制，与职责、记录范围一起预览和保存。字段限制不授予业务访问权。",
+    "en-US": "Select existing field restrictions for this role. They do not grant business access and are saved with duties and record scopes.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.unknown",
+    "zh-CN": "当前字段限制不可读取，原有绑定将保留。",
+    "en-US": "Current field restrictions are unavailable. Existing bindings will be preserved.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.loading",
+    "zh-CN": "正在读取字段限制…",
+    "en-US": "Loading field restrictions…",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.loadError",
+    "zh-CN": "无法读取字段限制，请检查策略管理权限或重试。原有绑定将保留。",
+    "en-US": "Field restrictions could not be loaded. Check policy-management access or try again. Existing bindings will be preserved.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.empty",
+    "zh-CN": "本角色已授权的资源暂无可选字段限制。",
+    "en-US": "No field restrictions are available for this role’s authorized resources.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.readOnly",
+    "zh-CN": "只读限制",
+    "en-US": "Read-only restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.masked",
+    "zh-CN": "隐藏或脱敏限制",
+    "en-US": "Visibility or masking restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.inactive",
+    "zh-CN": "已停用",
+    "en-US": "Inactive",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.noResource",
+    "zh-CN": "本角色已无对应资源访问权，请在保存字段变更前检查此绑定。",
+    "en-US": "This role no longer has access to the associated resource. Review this binding before saving field changes.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.preview",
+    "zh-CN": "字段限制变更",
+    "en-US": "Field restriction changes",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.apply",
+    "zh-CN": "应用限制",
+    "en-US": "Apply restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.remove",
+    "zh-CN": "移除限制",
+    "en-US": "Remove restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.pending",
+    "zh-CN": "已选择 {count} 项字段限制，请与本次草稿一起预览和保存。",
+    "en-US": "{count} field restrictions selected; review and save with this draft.",
+    "source": "import",
+    "refType": "ui"
   }
 ]
