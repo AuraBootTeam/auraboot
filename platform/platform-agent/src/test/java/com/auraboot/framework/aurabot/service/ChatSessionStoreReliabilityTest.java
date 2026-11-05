@@ -47,6 +47,18 @@ class ChatSessionStoreReliabilityTest {
     }
 
     @Test
+    void routingPeekIsOwnerScopedAndDoesNotConsumeTheSnapshot() {
+        ChatSessionStore local = new ChatSessionStore(new ObjectMapper(), null);
+        var pending = com.auraboot.framework.agent.runtime.PendingToolSnapshot.builder()
+                .turnId("routing").tenantId(1L).userId(2L).conversationId(8L).channel("web").toolId("tool").build();
+        local.storePending("routing",pending);
+        assertThat(local.peekRouting("routing",1L,2L).conversationId()).isEqualTo(8L);
+        assertThat(local.peekRouting("routing",9L,2L)).isNull();
+        assertThat(local.peekRouting("routing",1L,9L)).isNull();
+        assertThat(local.consumePendingForOwner("routing",1L,2L)).isNotNull();
+    }
+
+    @Test
     @DisplayName("storePending fails closed when Redis write fails")
     void storePendingFailsClosedWhenRedisWriteFails() {
         doThrow(new RuntimeException("redis down"))

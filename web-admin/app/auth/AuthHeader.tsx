@@ -72,7 +72,7 @@ export default function AuthHeader() {
 
   return (
     <header
-      className={`fixed top-0 right-0 left-0 z-50 ${
+      className={`auth-header fixed top-0 right-0 left-0 z-50 ${
         onLoginCardPage
           ? 'bg-transparent'
           : 'border-b border-gray-200/50 bg-white/80 backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-900/80'
@@ -93,7 +93,7 @@ export default function AuthHeader() {
         )}
 
         {/* Right: Toolbar */}
-        <div className="ml-auto flex items-center space-x-2">
+        <div className="auth-toolbar ml-auto flex items-center space-x-2">
           {/* Language toggle */}
           <div className="relative" ref={langDropdownRef}>
             <button

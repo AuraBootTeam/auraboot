@@ -118,6 +118,7 @@ the original review behavior; pause idle services through their product owner.
 | `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |
 | `lib/golden-resume-state.mjs` | 0 | 2026-10-05 | Validate saved golden state before resume. |
 | `lib/golden-runtime-identity.sh` | 0 | 2026-10-05 | Register declared golden source roots in workspace control. |
+| `lib/golden-file-storage.mjs` | 0 | 2026-11-04 | Retain owned golden file storage outside disposable source and validate its identity. |
 | `lib/golden-stack-state.mjs` | 0 | 2026-10-05 | Resolve owned current or legacy golden stack state. |
 | `oss-golden-lifecycle.sh` | 0 | 2026-10-05 | Workspace suspend/resume lifecycle adapter for OSS golden stacks. |
 

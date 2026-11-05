@@ -35,6 +35,11 @@ public class AgentSkillService {
     private final ObjectMapper objectMapper;
     private final DeclaredAgentToolResolver declaredAgentToolResolver;
 
+    /** Fingerprint the actual resolved definition, independent of mutable usage counters. */
+    public String definitionHash(Map<String, Object> skill) {
+        return SkillDefinitionSnapshot.hash(SkillDefinitionSnapshot.capture(skill, objectMapper), objectMapper);
+    }
+
     /**
      * Load a skill definition by code.
      */
@@ -42,7 +47,7 @@ public class AgentSkillService {
         // First try tenant-specific skill, then fall back to platform built-in skills.
         String sql = "SELECT * FROM ab_agent_skill " +
                 "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = #{params.platformTenantId} AND is_builtin = TRUE)) " +
-                "AND skill_code = #{params.skillCode} AND skill_status = 'active' " +
+                "AND skill_code = #{params.skillCode} AND (skill_status = 'active' OR execution_config->'_skill_publication_v1' IS NOT NULL) " +
                 "AND deleted_flag = FALSE " +
                 "ORDER BY tenant_id DESC LIMIT 1";
         // selectByQueryWithoutTenant: the MyBatis TenantLineInnerInterceptor would
@@ -54,7 +59,7 @@ public class AgentSkillService {
         // platform builtin), so bypassing the interceptor is correct and safe.
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql,
                 Map.of("tenantId", tenantId, "platformTenantId", PLATFORM_TENANT_ID, "skillCode", skillCode));
-        return rows.isEmpty() ? null : rows.get(0);
+        return rows.isEmpty() ? null : SkillDefinitionSnapshot.resolve(rows.get(0), dynamicDataMapper, objectMapper);
     }
 
     /**
@@ -65,29 +70,31 @@ public class AgentSkillService {
     public List<Map<String, Object>> listSkills(Long tenantId, String category, String level) {
         StringBuilder sql = new StringBuilder(
                 "SELECT DISTINCT ON (skill_code) " +
-                "pid, skill_code, skill_name, skill_description, skill_level, " +
-                "skill_category, skill_icon, skill_tools, skill_input_schema, usage_count, avg_rating, is_builtin " +
+                "* " +
                 "FROM ab_agent_skill " +
                 "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = #{params.platformTenantId} AND is_builtin = TRUE)) " +
-                "AND skill_status = 'active' AND deleted_flag = FALSE");
+                "AND (skill_status = 'active' OR execution_config->'_skill_publication_v1' IS NOT NULL) AND deleted_flag = FALSE");
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
         params.put("platformTenantId", PLATFORM_TENANT_ID);
 
-        if (category != null && !category.isBlank()) {
-            sql.append(" AND skill_category = #{params.category}");
-            params.put("category", category);
-        }
-        if (level != null && !level.isBlank()) {
-            sql.append(" AND skill_level = #{params.level}");
-            params.put("level", level);
-        }
         // DISTINCT ON requires ORDER BY to start with the distinct column; tenant-specific wins over built-in
         sql.append(" ORDER BY skill_code, tenant_id DESC, usage_count DESC");
         // Bypass the tenant interceptor: same reason as loadSkill — otherwise the
         // "OR tenant_id = platform AND is_builtin" fallback is AND'd away and no
         // platform builtin skill is listed from a tenant context. WHERE enforces scope.
-        return dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params);
+        return dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params).stream()
+                .map(row -> SkillDefinitionSnapshot.resolve(row, dynamicDataMapper, objectMapper))
+                .filter(row -> category == null || category.isBlank() || category.equals(row.get("skill_category")))
+                .filter(row -> level == null || level.isBlank() || level.equals(row.get("skill_level")))
+                .map(row -> {
+                    Map<String, Object> listed = new LinkedHashMap<>();
+                    for (String field : List.of("pid", "skill_code", "skill_name", "skill_description", "skill_level",
+                            "skill_category", "skill_icon", "skill_tools", "skill_input_schema", "usage_count",
+                            "avg_rating", "is_builtin", "skill_version_pid", "skill_version_hash", "skill_version_label"))
+                        if (row.containsKey(field)) listed.put(field, row.get(field));
+                    return listed;
+                }).toList();
     }
 
     /**
@@ -426,17 +433,14 @@ public class AgentSkillService {
      * Returns null if skill not found.
      */
     public Map<String, Object> loadSkillContract(Long tenantId, String skillCode) {
-        String sql = "SELECT skill_code, execution_mode, failure_mode, max_retry, max_steps, timeout_sec, " +
-                "output_type, output_schema, render_hint, actionability, " +
-                "produced_action_types, idempotency_mode, skill_input_schema, step_input_mappings, " +
-                "skill_tools, prompt_template " +
-                "FROM ab_agent_skill " +
-                "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = 0 AND is_builtin = TRUE)) " +
-                "AND skill_code = #{params.skillCode} AND skill_status = 'active' AND deleted_flag = FALSE " +
-                "ORDER BY tenant_id DESC LIMIT 1";
-        // Bypass the tenant interceptor: same reason as loadSkill (WHERE enforces scope).
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql,
-                Map.of("tenantId", tenantId, "skillCode", skillCode));
-        return rows.isEmpty() ? null : rows.get(0);
+        Map<String, Object> skill = loadSkill(tenantId, skillCode);
+        if (skill == null) return null;
+        Map<String, Object> contract = new LinkedHashMap<>();
+        for (String field : List.of("skill_code", "execution_mode", "failure_mode", "max_retry", "max_steps",
+                "timeout_sec", "output_type", "output_schema", "render_hint", "actionability", "produced_action_types",
+                "idempotency_mode", "skill_input_schema", "step_input_mappings", "skill_tools", "prompt_template",
+                "skill_version_pid", "skill_version_hash", "skill_version_label"))
+            if (skill.containsKey(field)) contract.put(field, skill.get(field));
+        return contract;
     }
 }

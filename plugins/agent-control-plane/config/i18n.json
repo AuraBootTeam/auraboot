@@ -716,8 +716,8 @@
   },
   {
     "key": "ai.skills.editor.trialHelp",
-    "zh-CN": "使用已保存且启用的版本。可能产生模型费用和真实业务操作；原有权限、确认与审批继续生效。本次结果在离开页面后清空。",
-    "en-US": "Uses the saved active definition. Model costs and real effects are possible. Permissions, confirmation and approval remain enforced. Results clear when leaving this page.",
+    "zh-CN": "使用当前生效快照；尚未纳管的技能沿用已保存且启用的定义。可能产生模型费用和真实业务操作；原有权限、确认与审批继续生效。运行身份和状态保留在上方回执中，不保存敏感输入与输出。",
+    "en-US": "Uses the active snapshot, or the saved active legacy definition. Model costs and real effects are possible. Permissions, confirmation and approval remain enforced. Version and status receipts persist above without sensitive inputs or outputs.",
     "source": "import",
     "refType": "message"
   },

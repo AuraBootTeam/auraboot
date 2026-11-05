@@ -1018,6 +1018,24 @@ END $_$;
 
 
 --
+-- Name: agent_task_metadata_v1(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.agent_task_metadata_v1(value text) RETURNS jsonb
+    LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+DECLARE parsed JSONB;
+BEGIN
+    parsed := value::JSONB;
+    IF jsonb_typeof(parsed) <> 'object' THEN RETURN NULL; END IF;
+    RETURN parsed;
+EXCEPTION WHEN data_exception THEN
+    RETURN NULL;
+END;
+$$;
+
+
+--
 -- Name: check_group_logic_type_consistency(); Type: FUNCTION; Schema: public; Owner: -
 --
 

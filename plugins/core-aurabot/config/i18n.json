@@ -726,5 +726,141 @@
     "zh-CN": "AI 操作未完成，请检查网络后重新发送。",
     "en-US": "The AI action could not complete. Check your connection and send again.",
     "refType": "ui"
+  },
+  {
+    "key": "ai.template.projectDelivery.name",
+    "zh-CN": "项目交付助手",
+    "en-US": "Project Delivery Assistant",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.projectDelivery.desc",
+    "zh-CN": "查询项目事实、整理任务提案，经确认后执行受控操作。",
+    "en-US": "Review project facts, prepare task proposals and perform governed writes after confirmation.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.projectDelivery.unavailable",
+    "zh-CN": "项目交付工具尚不可用。请先安装项目管理插件并核查访问权限，再创建该同事。",
+    "en-US": "Project delivery tools are unavailable. Install Project Management and verify your access before creating this colleague.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.projectDelivery.scope",
+    "zh-CN": "业务范围：读取项目、任务和里程碑；提议创建或更新任务。现有权限与确认、审批继续生效，模板不会授予角色。",
+    "en-US": "Scope: read projects, tasks and milestones; propose task creation and updates. Existing permissions and confirmation/approval still apply. No roles are granted by this template.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.projectDelivery.personality",
+    "source": "import",
+    "zh-CN": "依据业务事实回答，主动澄清缺失信息，明确区分建议与人工决定。",
+    "en-US": "Evidence-grounded, careful with missing information, and explicit about human decisions.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.back",
+    "source": "import",
+    "zh-CN": "返回",
+    "en-US": "Back",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.newSession",
+    "source": "import",
+    "zh-CN": "新会话",
+    "en-US": "New conversation",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.conversation_busy",
+    "source": "import",
+    "zh-CN": "本会话上一轮仍在执行，请等待完成后再发送。请勿重复提交业务操作。",
+    "en-US": "This conversation is still executing its previous turn. Wait before sending another request; do not duplicate a business operation.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.restoring",
+    "source": "import",
+    "zh-CN": "上一轮仍在执行，完成后将自动恢复消息；不会重试业务操作。",
+    "en-US": "The previous turn is still running. History will restore when it finishes; no business operation is retried.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.unavailable",
+    "source": "import",
+    "zh-CN": "暂时无法核对会话运行状态，请重新核对后再发送。",
+    "en-US": "Execution state could not be checked. Reload before sending another request.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.checking",
+    "source": "import",
+    "zh-CN": "正在核对会话运行状态…",
+    "en-US": "Checking whether this conversation is still running…",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.reload",
+    "source": "import",
+    "zh-CN": "重新核对",
+    "en-US": "Check again",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.pending_decision",
+    "source": "import",
+    "zh-CN": "系统状态：有待确认事项，请使用系统确认卡处理。",
+    "en-US": "System status: a confirmation is pending. Use the system card to decide.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.no_pending_decision",
+    "source": "import",
+    "zh-CN": "系统状态：当前无待确认事项，操作结果以执行回执为准。",
+    "en-US": "System status: no confirmation is pending. Operation outcomes are shown in the execution receipts.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.tool_denied",
+    "source": "import",
+    "zh-CN": "AI 同事当前没有此操作权限。请由管理员核对业务角色；人工确认不会授予权限，请勿调整参数绕过。",
+    "en-US": "The AI colleague currently lacks access. Ask an administrator to review its business roles. Confirmation does not grant access; do not change arguments to bypass this denial.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.execution.tool_failed",
+    "source": "import",
+    "zh-CN": "工具执行未完成，请查看诊断并核对实际结果，勿盲目重复写入。",
+    "en-US": "Tool execution did not complete. Review diagnostics and the actual outcome before repeating any write.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.error.conversationUnavailable",
+    "source": "import",
+    "zh-CN": "无法打开该会话，请确认你仍是会话成员，并重新选择 AI 同事。",
+    "en-US": "Conversation unavailable. Confirm your membership and select the colleague again.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.backToColleagues",
+    "source": "import",
+    "zh-CN": "返回 AI 同事",
+    "en-US": "Back to AI Colleagues",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.error.notFound",
+    "source": "import",
+    "zh-CN": "AI 同事不存在或当前不可访问。",
+    "en-US": "AI colleague does not exist or is unavailable.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.chat.error.loadFailed",
+    "source": "import",
+    "zh-CN": "无法读取 AI 同事，请返回后重新选择。",
+    "en-US": "Unable to load the AI colleague. Return and select it again.",
+    "refType": "ui"
   }
 ]

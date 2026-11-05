@@ -172,6 +172,40 @@ describe('BffProxyService — Origin as a security input', () => {
 });
 
 describe('BffProxyService — recognising a stream', () => {
+  it('declares UTF-8 and preserves Chinese SSE bytes from a real HTTP upstream', async () => {
+    const body = 'event: chunk\ndata: {"content":"交付材料核对 🧭"}\n\n';
+    const backend = await startBackend('text/event-stream', body);
+    const service = new BffProxyService({ target: `http://127.0.0.1:${backend.port}` });
+    const headers: Record<string, string> = {};
+    const chunks: string[] = [];
+    const res: any = {
+      writableEnded: false,
+      setHeader: (key: string, value: string) => {
+        headers[key.toLowerCase()] = value;
+      },
+      write: (chunk: string) => chunks.push(chunk),
+      end: () => {
+        res.writableEnded = true;
+      },
+    };
+    const req: any = {
+      method: 'GET',
+      url: '/api/public/utf8-stream',
+      originalUrl: '/api/public/utf8-stream',
+      headers: { accept: 'text/event-stream' },
+      on: () => {},
+      ip: '127.0.0.1',
+      connection: { remoteAddress: '127.0.0.1' },
+    };
+    try {
+      await service.handleApiRequest(req, res);
+      expect(headers['content-type']).toBe('text/event-stream; charset=utf-8');
+      expect(chunks.join('')).toBe(body);
+    } finally {
+      backend.close();
+    }
+  });
+
   it('🚨 treats any request that asks for an event stream as one, not just the five listed paths', async () => {
     // A never-ending body. If the BFF proxies this as an ordinary request, axios waits for an end
     // that by construction never comes — which is exactly what happened to the visitor's live

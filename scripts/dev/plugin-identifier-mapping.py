@@ -30,7 +30,7 @@ def plan(global_path, selected, specifications):
 
 def request(path, mapping_plan):
     data = dict(path=path, conflictStrategy="OVERWRITE", autoPublishModels=True,
-                autoPublishFields=True, autoPublishCommands=True, autoPublishPages=False,
+                autoPublishFields=True, autoPublishCommands=True, autoPublishPages=True,
                 deferReferenceValidation=True)
     mappings = mapping_plan["plugins"]
     if mappings and path not in mapping_plan["selected"]:

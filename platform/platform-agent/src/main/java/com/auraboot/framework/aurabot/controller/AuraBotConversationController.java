@@ -20,6 +20,7 @@ import java.util.List;
 public class AuraBotConversationController {
 
     private final AuraBotConversationService conversationService;
+    private final com.auraboot.framework.conversation.WebConversationTurnCoordinator webTurns;
 
     @GetMapping
     public ApiResponse<List<AuraBotConversationItem>> listConversations() {
@@ -51,6 +52,13 @@ public class AuraBotConversationController {
                 currentHumanMemberId(),
                 limit
         ));
+    }
+
+    /** Owner-checked, read-only process state; this is not a distributed execution SLA. */
+    @GetMapping("/{conversationId}/execution")
+    public ApiResponse<java.util.Map<String,Object>> execution(@PathVariable Long conversationId) {
+        conversationService.assertMember(conversationId, MetaContext.getCurrentTenantId(), currentHumanMemberId());
+        return ApiResponse.success(webTurns.status(MetaContext.getCurrentTenantId(), conversationId));
     }
 
     // Phase B.1 deletion: POST /{id}/messages/user and POST /{id}/messages/assistant

@@ -14,6 +14,8 @@ import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
 import { TraceStatusBadge } from '~/plugins/core-aurabot/pages/ai-trace/components/TraceStatusBadge';
+import { usePermissions } from '~/contexts/AuthContext';
+import { ConversationTaskOperations } from '../../components-internal/ConversationTaskOperations';
 import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
 // ============================================================================
@@ -316,14 +318,16 @@ function RunStatusIcon({ status }: { status: string }) {
 // Tabbed Page (top-level export)
 // ============================================================================
 
-type TabKey = 'runs' | 'traces';
+type TabKey = 'runs' | 'traces' | 'tasks';
 
 export default function RunLogsPage() {
+  const { hasPermission } = usePermissions();
+  const canObserve = hasPermission('acp.agent_run.admin');
   const { locale } = useI18n();
   const l = useCallback((zh: string, en: string) => (locale === 'zh-CN' ? zh : en), [locale]);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabKey) ?? 'runs';
+  const initialTab = (['runs','traces','tasks'].includes(searchParams.get('tab') ?? '') ? searchParams.get('tab') : 'runs') as TabKey;
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
   const sseKey = useAgentSse();
@@ -375,6 +379,7 @@ export default function RunLogsPage() {
             <div className="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-700/50">
               {tabBtn('runs', l('运行记录', 'Run Log'))}
               {tabBtn('traces', l('调用追踪', 'Call Traces'))}
+              {canObserve && tabBtn('tasks', l('会话任务', 'Conversation tasks'))}
             </div>
           </div>
         </div>
@@ -382,7 +387,7 @@ export default function RunLogsPage() {
 
       {/* Content */}
       <div className={workspacePageClassName('content')}>
-        {activeTab === 'runs' ? (
+        {activeTab === 'tasks' ? <ConversationTaskOperations allowed={canObserve} /> : activeTab === 'runs' ? (
           <RunLogContent l={l} refreshKey={refreshKey} />
         ) : (
           <TraceContent l={l} />

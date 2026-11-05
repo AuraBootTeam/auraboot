@@ -165,9 +165,11 @@ public class DeclaredAgentToolResolver {
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelCode)
+                    .modelCode(modelCode)
+                    .operationKind("query")
                     .riskLevel("L0")
                     .confirmationPolicy("none")
-                    .parameterSchema(listParameterSchema())
+                    .parameterSchema(listParameterSchema(tenantId, modelCode))
                     .build();
         }
         if (toolCode.startsWith("get:")) {
@@ -182,6 +184,8 @@ public class DeclaredAgentToolResolver {
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelCode)
+                    .modelCode(modelCode)
+                    .operationKind("query")
                     .riskLevel("L0")
                     .confirmationPolicy("none")
                     .parameterSchema(getParameterSchema())
@@ -490,12 +494,12 @@ public class DeclaredAgentToolResolver {
         }
     }
 
-    private Map<String, Object> listParameterSchema() {
+    private Map<String, Object> listParameterSchema(Long tenantId, String modelCode) {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("pageNum", Map.of("type", "integer", "minimum", 1));
         properties.put("pageSize", Map.of("type", "integer", "minimum", 1, "maximum", 1000));
         properties.put("keyword", Map.of("type", "string"));
-        properties.put("filters", com.auraboot.framework.agent.util.DslListFilterSchema.filters());
+        properties.put("filters", com.auraboot.framework.agent.util.DslListFilterSchema.forModel(dynamicDataMapper, tenantId, modelCode));
         return objectSchema(properties, List.of());
     }
 

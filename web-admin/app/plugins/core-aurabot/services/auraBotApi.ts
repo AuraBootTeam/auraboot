@@ -211,6 +211,14 @@ export const auraBotApi = {
     return result.data;
   },
 
+  async getConversationExecution(conversationId: number): Promise<{ state: 'idle' | 'running'; startedAt?: string; phase?: string }> {
+    const response = await agentFetch(`${API_BASE_URL}/conversations/${conversationId}/execution`, { method: 'get', credentials: 'include' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    if (String(result.code) !== '0' || !['idle', 'running'].includes(result.data?.state)) throw new Error('Execution state unavailable');
+    return result.data;
+  },
+
   async getConversationMessages(conversationId: number): Promise<AuraBotConversationMessage[]> {
     const response = await agentFetch(
       `${API_BASE_URL}/conversations/${conversationId}/messages?limit=100`,
