@@ -55,6 +55,7 @@ describe('DecisionRuleBindingBlock', () => {
             decisions: [{ code: 'configured_guard', name: '已配置规则' }],
             initialValue: {
               bindingKind: 'DECISION_REF',
+              conditionSpec: { root: group('AND', [cmp(path('record', 'data.amountMinor', 'integer'), 'LTE', lit(500, 'integer'))]), decisionBindings: [] },
               enabled: true,
               decisionBinding: {
                 decisionCode: 'configured_guard',
@@ -71,10 +72,21 @@ describe('DecisionRuleBindingBlock', () => {
       />,
     );
     expect(screen.getByLabelText('decision-code')).toHaveValue('configured_guard');
+    expect(screen.getByTestId('condition-binding-inactive')).toHaveTextContent('不参与判定');
+    expect(screen.getByLabelText('value-0')).toBeDisabled();
     expect(screen.getByRole('option', { name: '不引用决策（仅使用条件）' })).toHaveValue('');
     fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: '' } });
     expect(onChange.mock.calls.at(-1)?.[0].bindingKind).toBe('CONDITION');
     expect(onChange.mock.calls.at(-1)?.[0].decisionBinding).toBeUndefined();
+    expect(screen.queryByTestId('condition-binding-inactive')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('value-0')).toBeEnabled();
+    expect(screen.getByLabelText('value-0')).toHaveValue(500);
+    fireEvent.change(screen.getByLabelText('value-0'), { target: { value: '600' } });
+    expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({ bindingKind: 'CONDITION', conditionSpec: { root: { children: [{ right: { value: 600 } }] } } });
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: 'configured_guard' } });
+    expect(screen.getByTestId('condition-binding-inactive')).toHaveTextContent('不参与判定');
+    expect(screen.getByLabelText('value-0')).toBeDisabled();
+    expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({ bindingKind: 'DECISION_REF', conditionSpec: { root: { children: [{ right: { value: 600 } }] } } });
     await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
   });
 
@@ -839,6 +851,7 @@ describe('DecisionRuleBindingBlock', () => {
 
     await waitFor(() => expect(api.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
     expect(api.getModelFields).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: '' } });
 
     const addConditionButton = screen.getByTestId('cb-add');
     await waitFor(() => expect(addConditionButton).toBeEnabled());
@@ -849,6 +862,7 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
     expect(screen.getByLabelText('value-0')).toHaveTextContent('病假');
 
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: 'leave_request_automation' } });
     fireEvent.click(screen.getByTestId('decision-rule-section-tab-decision'));
     fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
     const fieldPicker = screen.getByLabelText('mapping-field-0') as HTMLSelectElement;
@@ -1060,6 +1074,7 @@ describe('DecisionRuleBindingBlock', () => {
 
     await waitFor(() => expect(api.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
     expect(api.getModelFields).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: '' } });
 
     fireEvent.click(screen.getByTestId('cb-add'));
     await act(async () => { releaseCatalog(); });
@@ -1073,6 +1088,7 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
     expect(screen.getByLabelText('value-0')).toHaveTextContent('病假');
 
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: 'leave_request_automation' } });
     fireEvent.click(screen.getByTestId('decision-rule-section-tab-decision'));
     fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
     expect(screen.getByLabelText('mapping-field-0')).toHaveTextContent('请假类型');

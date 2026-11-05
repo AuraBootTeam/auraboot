@@ -1660,6 +1660,7 @@ export function DecisionRuleBindingBlock({
   const showDecision = mode === 'decision' || mode === 'combined';
   const showImpactPreview = showDecision && props.showImpactPreview !== false;
   const showTestRunner = showDecision && props.showTestRunner !== false;
+  const conditionInactive = showCondition && showDecision && Boolean(binding.decisionCode.trim());
   const showStandaloneImpactPreview = !readOnly && showImpactPreview;
   const showStandaloneTestRunner = !readOnly && showTestRunner;
   const conditionCount = conditionLeaves(condition).length;
@@ -2020,9 +2021,14 @@ export function DecisionRuleBindingBlock({
                 {conditionCount} {bindingText('entries', locale)}
               </span>
             </div>
+            {conditionInactive && (
+              <p className="decision-rule-condition-notice" data-testid="condition-binding-inactive">
+                {bindingText('inactiveConditionHint', locale)}
+              </p>
+            )}
             <ConditionBuilder
               value={condition}
-              readOnly={readOnly}
+              readOnly={readOnly || conditionInactive}
               fields={ruleInputFields}
               onChange={updateCondition}
             />

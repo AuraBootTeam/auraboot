@@ -454,5 +454,9 @@
   "conditionOnly": {
     "zh-CN": "不引用决策（仅使用条件）",
     "en": "Conditions only (no decision reference)"
+  },
+  "inactiveConditionHint": {
+    "zh-CN": "当前已引用规则中心决策，本地条件保留但不参与判定。选择“不引用决策（仅使用条件）”可恢复。",
+    "en": "A Rule Center decision is selected. Local conditions are preserved and do not participate in evaluation. Select “Conditions only (no decision reference)” to use them again."
   }
 }
