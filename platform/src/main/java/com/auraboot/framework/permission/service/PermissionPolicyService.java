@@ -20,7 +20,11 @@ import java.util.Map;
 public interface PermissionPolicyService {
 
     /** Revision belongs to one grant identity and must be retained from the original read. */
-    record PolicySnapshot(String revision, Map<String, Object> values) {}
+    record PolicySnapshot(
+            @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+            String revision,
+            @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+            Map<String, Object> values) {}
 
     PolicySnapshot getPolicySnapshot(Long roleId, Long permissionId);
 

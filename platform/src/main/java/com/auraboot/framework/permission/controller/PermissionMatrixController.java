@@ -214,7 +214,11 @@ public class PermissionMatrixController {
         return ApiResponse.success();
     }
 
-    public record PolicySaveRequest(String expectedRevision, Map<String, Object> values) {}
+    public record PolicySaveRequest(
+            @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+            String expectedRevision,
+            @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+            Map<String, Object> values) {}
 
     @GetMapping("/{rolePid}/policy/{permissionPid}/snapshot")
     @Operation(summary = "Read policy values and the grant revision required for saving")
