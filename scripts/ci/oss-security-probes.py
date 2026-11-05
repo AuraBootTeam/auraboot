@@ -221,7 +221,24 @@ def verify(base, request, login, admin, password, check, require, publish_tenant
                      path + '/list', path + '/' + pid_a, '/api/file/list']:
         denied(None, endpoint)
     require(ok(alice, path + '/' + pid_a)['org_dept_name'] == name_a + '-updated', 'anonymous probes changed business state')
-    check('security-anonymous-bootstrap-and-protected-defaults', publicStatus=True, protectedEndpoints=7)
+    # Exercise the maintained documentation adapter and its actual packaged assets.
+    api_status, api_bytes = raw(admin, '/v3/api-docs/internal-web-admin')
+    require(api_status == 200, 'authenticated OpenAPI endpoint is unavailable')
+    api_document = json.loads(api_bytes)
+    require(str(api_document.get('openapi', '')).startswith('3.')
+            and '/api/auth/login' in api_document.get('paths', {}),
+            'OpenAPI output lost the real authentication contract')
+    ui_status, ui_bytes = raw(admin, '/swagger-ui/index.html')
+    require(ui_status == 200 and b'swagger-ui-bundle.js' in ui_bytes,
+            'packaged Swagger UI is unavailable or returned a non-UI response')
+    swagger_assets = []
+    for asset, marker in [('swagger-ui.css', b'.swagger-ui'), ('swagger-ui-bundle.js', b'SwaggerUIBundle')]:
+        asset_status, asset_bytes = raw(admin, '/swagger-ui/' + asset)
+        require(asset_status == 200 and marker in asset_bytes, 'packaged Swagger asset is unresolved')
+        swagger_assets.append({'asset': asset, 'bytes': len(asset_bytes),
+                               'sha256': hashlib.sha256(asset_bytes).hexdigest()})
+    check('security-anonymous-bootstrap-and-protected-defaults', publicStatus=True, protectedEndpoints=7,
+          openApiVersion=api_document['openapi'], swaggerAssets=swagger_assets)
 
     def login_attempt(identifier, index):
         value = call(None, '/api/auth/login', 'POST', {'email': identifier, 'password': 'Deliberately-Invalid-Only'},

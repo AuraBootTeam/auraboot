@@ -41,6 +41,11 @@ public final class PublishedArtifactProbe {
         System.out.println("PUBLISHED_ARTIFACT_PROBE_PASS mode=" + mode + " checks=" + checks);
     }
 
+    // javac must resolve the exposed service superinterface from the published API.
+    static Object publicServiceSignature(com.auraboot.framework.tenant.service.TenantMemberService service) {
+        return service.findByTenantIdAndUserId(1L, 1L);
+    }
+
     private static void unique(String type, int expected) throws Exception {
         var loader = Thread.currentThread().getContextClassLoader();
         var origins = Collections.list(loader.getResources(type.replace('.', '/') + ".class"));

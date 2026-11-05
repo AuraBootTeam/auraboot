@@ -22,6 +22,7 @@ dependencies {
 
     // Spring Boot (conditional annotations, configuration properties)
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure:4.1.2'
+    compileOnly 'org.springframework.boot:spring-boot-restclient:4.1.2'
     compileOnly 'org.springframework:spring-beans:7.0.10'
     compileOnly 'org.springframework:spring-context:7.0.10'
     compileOnly 'org.springframework:spring-web:7.0.10'
@@ -53,6 +54,7 @@ dependencies {
     }
     testImplementation 'org.springframework:spring-beans:7.0.10'
     testImplementation 'org.springframework.boot:spring-boot:4.1.2'
+    testImplementation 'org.springframework.boot:spring-boot-restclient:4.1.2'
     testImplementation 'org.slf4j:slf4j-api:2.0.20'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
     testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'

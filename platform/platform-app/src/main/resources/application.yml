@@ -208,6 +208,8 @@ spring:
 #            certificate: file:../certs/_wildcard.metaochan.com+5.pem
 #            private-code: file:../certs/_wildcard.metaochan.com+5-code.pem
   http:
+    codecs:
+      preferred-json-mapper: jackson2
     converters:
       preferred-json-mapper: jackson2
   jackson2:

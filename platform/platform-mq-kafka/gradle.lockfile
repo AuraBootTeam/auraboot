@@ -2,7 +2,11 @@
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
 at.yawk.lz4:lz4-java:1.11.2=runtimeClasspath,testRuntimeClasspath
+com.baomidou:mybatis-plus-annotation:3.5.18=compileClasspath
 com.baomidou:mybatis-plus-bom:3.5.18=compileClasspath
+com.baomidou:mybatis-plus-core:3.5.18=compileClasspath
+com.baomidou:mybatis-plus-extension:3.5.18=compileClasspath
+com.baomidou:mybatis-plus-spring:3.5.18=compileClasspath
 com.fasterxml.jackson.core:jackson-annotations:2.10.3=testCompileClasspath,testRuntimeClasspath
 com.fasterxml.jackson.core:jackson-annotations:2.22=compileClasspath
 com.fasterxml.jackson:jackson-bom:2.22.3=compileClasspath
@@ -41,6 +45,7 @@ org.junit.platform:junit-platform-launcher:6.0.3=testRuntimeClasspath
 org.junit:junit-bom:6.0.3=testCompileClasspath,testRuntimeClasspath
 org.mockito:mockito-core:5.24.0=testCompileClasspath,testRuntimeClasspath
 org.mockito:mockito-junit-jupiter:5.24.0=testCompileClasspath,testRuntimeClasspath
+org.mybatis:mybatis:3.5.19=compileClasspath
 org.objenesis:objenesis:3.3=testRuntimeClasspath
 org.opentest4j:opentest4j:1.3.0=testCompileClasspath,testRuntimeClasspath
 org.postgresql:postgresql:42.7.14=testRuntimeClasspath

@@ -19,6 +19,14 @@ settings now use `spring.jackson2.*`; migrate any deployment-owned
 `spring.jackson.*` overrides before upgrading. Startup does not install a
 property migrator or repair application data.
 
+Tracing remains local by default. Configure
+`management.opentelemetry.tracing.export.otlp.endpoint` or
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` to add a collector. The explicit export flag
+is `management.tracing.export.otlp.enabled`; legacy endpoint/export-enable
+settings are adapted with the new namespace taking precedence. Migrate other
+legacy OTLP overrides to the Boot 4 namespace. Prometheus remains available;
+the default package does not add an OTLP metrics exporter.
+
 Build Java extensions against the matching published AuraBoot platform BOM.
 MyBatis-Plus 3.5.18 moves its Spring services, factory and SQL runner into
 `com.baomidou.mybatisplus.spring.*`. Recompile extensions that import the old

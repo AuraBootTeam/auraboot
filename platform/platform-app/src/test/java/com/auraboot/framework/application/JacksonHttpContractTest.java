@@ -40,6 +40,54 @@ class JacksonHttpContractTest {
         verifyRoundTrip(runner().withUserConfiguration(CacheConfig.class));
     }
 
+    @Test
+    void retainsAdvertisedWebClientAutoConfigurationAndReactiveJson2RoundTrips() throws Exception {
+        String webClientConfig = "org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration";
+        String codecsConfig = "org.springframework.boot.http.codec.autoconfigure.CodecsAutoConfiguration";
+        var candidates = org.springframework.boot.context.annotation.ImportCandidates.load(
+                org.springframework.boot.autoconfigure.AutoConfiguration.class, getClass().getClassLoader());
+        assertThat(candidates.getCandidates()).contains(webClientConfig, codecsConfig);
+        runner().withConfiguration(AutoConfigurations.of(Class.forName(webClientConfig),
+                        Class.forName(codecsConfig),
+                        Class.forName("org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration")))
+                .withUserConfiguration(CacheConfig.class)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    var mapper = context.getBean(ObjectMapper.class);
+                    var builder = context.getBean(org.springframework.web.reactive.function.client.WebClient.Builder.class);
+                    assertThat(context.getBean(org.springframework.web.reactive.function.client.WebClient.Builder.class))
+                            .isNotSameAs(builder);
+                    var received = new java.util.concurrent.atomic.AtomicReference<byte[]>();
+                    var server = com.sun.net.httpserver.HttpServer.create(
+                            new java.net.InetSocketAddress(java.net.InetAddress.getByName("127.0.0.1"), 0), 0);
+                    server.createContext("/echo", exchange -> {
+                        byte[] bytes = exchange.getRequestBody().readAllBytes();
+                        received.set(bytes);
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        exchange.sendResponseHeaders(200, bytes.length);
+                        exchange.getResponseBody().write(bytes);
+                        exchange.close();
+                    });
+                    server.start();
+                    try {
+                        var payload = new Payload(new BigDecimal("68000.25"),
+                                LocalDateTime.of(2026, 11, 5, 8, 30),
+                                mapper.readTree("{\"type\":\"form\",\"children\":[{\"type\":\"text\",\"value\":\"<b>customer</b>\"}]}"));
+                        var actual = builder.build().post()
+                                .uri("http://127.0.0.1:" + server.getAddress().getPort() + "/echo")
+                                .contentType(MediaType.APPLICATION_JSON).bodyValue(payload)
+                                .retrieve().bodyToMono(Payload.class).block(java.time.Duration.ofSeconds(10));
+                        assertThat(actual).isEqualTo(payload);
+                        var wire = mapper.readTree(received.get());
+                        assertThat(wire.get("amount").decimalValue()).isEqualByComparingTo(payload.amount());
+                        assertThat(wire.get("acceptedAt").asText()).isEqualTo("2026-11-05T08:30:00");
+                        assertThat(wire.get("definition")).isEqualTo(payload.definition());
+                    } finally {
+                        server.stop(0);
+                    }
+                });
+    }
+
     private WebApplicationContextRunner runner() {
         var yaml = new YamlPropertiesFactoryBean();
         yaml.setResources(new ClassPathResource("application.yml"));
@@ -47,11 +95,12 @@ class JacksonHttpContractTest {
         assertThat(properties).isNotNull();
         String[] jsonSettings = properties.entrySet().stream()
                 .filter(entry -> entry.getKey().toString().startsWith("spring.jackson2.")
-                        || entry.getKey().toString().startsWith("spring.http.converters."))
+                        || entry.getKey().toString().startsWith("spring.http."))
                 .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .toArray(String[]::new);
         assertThat(jsonSettings).contains("spring.http.converters.preferred-json-mapper=jackson2",
-                "spring.jackson2.serialization.write-dates-as-timestamps=false");
+                "spring.jackson2.serialization.write-dates-as-timestamps=false",
+                "spring.http.codecs.preferred-json-mapper=jackson2");
         return new WebApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(Jackson2AutoConfiguration.class,
                         HttpMessageConvertersAutoConfiguration.class, WebMvcAutoConfiguration.class))

@@ -325,8 +325,8 @@ dependencies {
 
     // OpenTelemetry Micrometer bridge (for trace-metric correlation).
     // Do NOT pin individual otel modules to a newer version: Spring Boot's
-    // io.spring.dependency-management aligns the whole otel stack to one managed
-    // version (1.49.0 on Boot 3.5.x), and a manual newer pin on exporter-otlp
+    // io.spring.dependency-management aligns the whole otel stack with the shared
+    // reviewed BOM, and a manual newer pin on exporter-otlp
     // alone skews it against the transitively-managed sdk-common — crashing
     // startup with NoClassDefFoundError ...StandardComponentId$ExporterType
     // (a class that only exists in the newer exporter). Leave it unversioned so
@@ -341,7 +341,9 @@ dependencies {
     // Spring Boot 核心
     implementation 'org.springframework.boot:spring-boot-jackson2'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
-    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+    implementation 'org.springframework.boot:spring-boot-starter-webclient'
+    implementation 'org.springframework.boot:spring-boot-opentelemetry'
+    implementation 'org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-webflux' // For WebClient and reactive support
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -352,6 +354,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
+
+    // Public service interfaces extend MyBatis-Plus Spring types; consumers need them at compile time.
+    api 'com.baomidou:mybatis-plus-spring'
 
     // MyBatis Plus
     implementation 'com.baomidou:mybatis-plus-spring-boot4-starter'

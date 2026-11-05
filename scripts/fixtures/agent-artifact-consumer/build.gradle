@@ -39,6 +39,9 @@ modes.each { mode ->
     }
 }
 dependencies {
+    // Public service signatures must compile using producer API metadata alone.
+    compileOnly enforcedPlatform("com.auraboot:auraboot-platform:${publishedVersion}")
+    compileOnly "com.auraboot:auraboot-core:${publishedVersion}"
     base "com.auraboot:auraboot-core:${publishedVersion}"
     agent "com.auraboot:auraboot-agent:${publishedVersion}"
     full "com.auraboot:auraboot-app:${publishedVersion}"
