@@ -116,6 +116,14 @@ public final class LlmMessageTapeSupport {
         for (Object item : list) {
             if (item instanceof LlmChatRequest.ContentBlock block) {
                 blocks.add(block);
+            } else if (item instanceof Map<?, ?> map && map.get("type") instanceof String type) {
+                // Redis/JDBC snapshots rehydrate Object-valued content as maps.
+                // Protocol matching must inspect those blocks as well as live DTOs.
+                LlmChatRequest.ContentBlock block = new LlmChatRequest.ContentBlock();
+                block.setType(type);
+                if (map.get("id") instanceof String id) block.setId(id);
+                if (map.get("toolUseId") instanceof String id) block.setToolUseId(id);
+                blocks.add(block);
             }
         }
         return blocks;
@@ -123,6 +131,15 @@ public final class LlmMessageTapeSupport {
 
     public static int completeDanglingToolResults(ObjectMapper objectMapper,
                                                   List<LlmChatRequest.Message> messages) {
+        return completeDanglingToolResults(objectMapper, messages, Map.of(
+                "success", false, "notExecuted", true,
+                "error", "This tool call was not executed: the turn was suspended for "
+                        + "confirmation/approval and only the confirmed call ran."));
+    }
+
+    public static int completeDanglingToolResults(ObjectMapper objectMapper,
+                                                  List<LlmChatRequest.Message> messages,
+                                                  Map<String, Object> unexecutedResult) {
         if (messages == null || messages.isEmpty()) {
             return 0;
         }
@@ -159,11 +176,7 @@ public final class LlmMessageTapeSupport {
         List<LlmChatRequest.ContentBlock> placeholders = new ArrayList<>();
         for (String id : requested) {
             if (!answered.contains(id)) {
-                placeholders.add(buildToolResultBlock(objectMapper, id, Map.of(
-                        "success", false,
-                        "notExecuted", true,
-                        "error", "This tool call was not executed: the turn was suspended for "
-                                + "confirmation/approval and only the confirmed call ran.")));
+                placeholders.add(buildToolResultBlock(objectMapper, id, unexecutedResult));
             }
         }
         if (placeholders.isEmpty()) {
