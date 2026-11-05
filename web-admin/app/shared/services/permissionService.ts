@@ -229,6 +229,8 @@ export class PermissionService implements IPermissionService {
       undefined,
       request,
     );
+    // A successful null is the platform contract for a grant without configured policy values.
+    if (ResultHelper.isSuccess(result) && result.data === null) return {};
     return handleResponse(result, 'Failed to fetch policy values');
   }
 
