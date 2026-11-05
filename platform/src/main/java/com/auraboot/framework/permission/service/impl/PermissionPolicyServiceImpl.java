@@ -150,14 +150,17 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     public void setPolicy(Long roleId, Long permissionId, Map<String, Object> policyValues) {
         RolePermission rp = findRolePermission(roleId, permissionId);
         if (rp == null) {
-            log.warn("No role-permission binding found: roleId={}, permissionId={}", roleId, permissionId);
-            return;
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "The role permission grant no longer exists; reload permissions before saving its policy");
         }
         Permission permission = permissionMapper.selectById(permissionId);
         validatePolicyValues(policyValues, permission);
 
         rp.setConditions(policyValues);
-        rolePermissionMapper.updateById(rp);
+        if (rolePermissionMapper.updateById(rp) != 1) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "The role permission grant changed; reload permissions before saving its policy");
+        }
         refreshPermissionPolicyUsageIndex(rp);
 
         log.info("Updated policy for role-permission: roleId={}, permissionId={}, keys={}",

@@ -255,6 +255,7 @@ class PermissionPolicyServiceImplTest {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(rolePermissionMapper.updateById(rp)).thenReturn(1);
 
         service.setPolicy(7L, 50L, Map.of("maxAmount", 1000));
 
@@ -271,6 +272,7 @@ class PermissionPolicyServiceImplTest {
         rp.setId(900L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(rolePermissionMapper.updateById(rp)).thenReturn(1);
         when(usageIndexServiceProvider.getIfAvailable()).thenReturn(usageIndexService);
 
         service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
@@ -310,6 +312,7 @@ class PermissionPolicyServiceImplTest {
         rp.setId(900L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(rolePermissionMapper.updateById(rp)).thenReturn(1);
         when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
         when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
                 .thenReturn(factCatalog("wd_leave_request", "record", "data.wd_req_days", true));
