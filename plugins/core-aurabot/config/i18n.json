@@ -918,5 +918,19 @@
     "zh-CN": "已撤销本次填写中未被人工改动的值，后续人工修改已保留。",
     "en-US": "Undid this fill where values were unchanged; later manual edits were preserved.",
     "refType": "ui"
+  },
+  {
+    "key": "ai.approval.parametersLoading",
+    "source": "import",
+    "zh-CN": "正在读取业务参数…",
+    "en-US": "Loading business parameters…",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.approval.parametersUnavailable",
+    "source": "import",
+    "zh-CN": "无法读取业务参数，请取消后重试或联系管理员。",
+    "en-US": "Business parameters are unavailable. Cancel and try again or contact an administrator.",
+    "refType": "ui"
   }
 ]

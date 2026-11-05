@@ -17,16 +17,26 @@ export function useBusinessFieldPresentation(modelCode?: string, records: Record
   const { locale } = useI18n();
   const [fields, setFields] = useState<Field[]>([]);
   const [references, setReferences] = useState<Record<string, string>>({});
+  const modelKey = JSON.stringify([modelCode, locale]);
+  const [fieldLoad, setFieldLoad] = useState<{key: string; status: 'loading' | 'ready' | 'error'}>({key: '', status: 'loading'});
+  const [referenceLoad, setReferenceLoad] = useState<{key: string; status: 'ready' | 'error'}>({key: '', status: 'ready'});
   useEffect(() => {
     let active = true;
     setFields([]);
+    setFieldLoad({key: modelKey, status: modelCode ? 'loading' : 'ready'});
     if (modelCode && /^[a-z][a-z0-9_]*$/.test(modelCode)) {
       get<Field[]>(`/api/dynamic/${encodeURIComponent(modelCode)}/field-meta`).then((response) => {
-        if (active && ResultHelper.isSuccess(response) && Array.isArray(response.data)) setFields(response.data);
-      }).catch(() => { /* Existing labels remain usable when metadata is not readable. */ });
+        if (!active) return;
+        if (ResultHelper.isSuccess(response) && Array.isArray(response.data)) {
+          setFields(response.data);
+          setFieldLoad({key: modelKey, status: 'ready'});
+        } else setFieldLoad({key: modelKey, status: 'error'});
+      }).catch(() => { if (active) setFieldLoad({key: modelKey, status: 'error'}); });
+    } else if (modelCode) {
+      setFieldLoad({key: modelKey, status: 'error'});
     }
     return () => { active = false; };
-  }, [modelCode, locale]);
+  }, [modelCode, locale, modelKey]);
   const byCode = useMemo(() => new Map(fields.map((field) => [field.code, field])), [fields]);
   const dictionaries = useDictCache({ dictCodes: fields.flatMap((field) => field.dictCode ? [field.dictCode] : []) });
   const referenceRequests = new Map<string, { model: string; pid: string; display: string }>();
@@ -42,6 +52,7 @@ export function useBusinessFieldPresentation(modelCode?: string, records: Record
     }
   }
   const referenceKey = JSON.stringify([...referenceRequests]);
+  const referenceLoadKey = JSON.stringify([referenceKey, locale]);
   useEffect(() => {
     let active = true;
     setReferences({});
@@ -53,11 +64,17 @@ export function useBusinessFieldPresentation(modelCode?: string, records: Record
         return typeof value === 'string' && value ? [key, value] : null;
       } catch { return null; }
     })).then((values) => {
-      if (active) setReferences(Object.fromEntries(values.filter((value): value is string[] => value !== null)));
+      if (active) {
+        setReferences(Object.fromEntries(values.filter((value): value is string[] => value !== null)));
+        setReferenceLoad({key: referenceLoadKey, status: values.some(value => value === null) ? 'error' : 'ready'});
+      }
     });
     return () => { active = false; };
-  }, [referenceKey, locale]);
+  }, [referenceKey, locale, referenceLoadKey]);
   return {
+    status: fieldLoad.key !== modelKey || fieldLoad.status === 'loading' ? 'loading'
+      : fieldLoad.status === 'error' ? 'error'
+      : referenceLoad.key !== referenceLoadKey ? 'loading' : referenceLoad.status,
     label: (code: string) => byCode.get(code)?.displayName,
     value: (code: string, value: unknown, row: Record<string, unknown>) => {
       const field = byCode.get(code);

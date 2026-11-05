@@ -29,6 +29,53 @@ function configured() {
 }
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 describe('business tool presentation', () => {
+  it('hides raw parameters and prevents confirmation until field and reference metadata have loaded', async () => {
+    type Response = {code: string; data: unknown};
+    let resolveFields!: (response: Response) => void;
+    let resolveReference!: (response: Response) => void;
+    const pendingFields = new Promise<Response>(resolve => { resolveFields = resolve; });
+    const pendingReference = new Promise<Response>(resolve => { resolveReference = resolve; });
+    get.mockImplementation((path: string) => {
+      if (path === '/api/agent/tools/registry') return Promise.resolve({code: '0', data: {tools: [{toolCode: 'cmd:tpm:create_task', toolName: '新建任务', modelCode: 'tpm_task'}]}});
+      if (path === '/api/dynamic/tpm_task/field-meta') return pendingFields;
+      if (path === `/api/dynamic/tpm_project/${project}`) return pendingReference;
+      throw new Error('Unexpected metadata request');
+    });
+    const confirm = vi.fn(), cancel = vi.fn();
+    const input = Object.freeze({tpm_ts_assignee: '林晓', tpm_ts_project_id: project});
+    render(<ConfirmCard toolId="pending" toolName="cmd_tpm_create_task" description="" input={input} onConfirm={confirm} onCancel={cancel} />);
+    const card = screen.getByTestId('aurabot-confirm-card');
+    expect(screen.getByRole('status')).toHaveTextContent('正在读取业务参数');
+    expect(card).not.toHaveTextContent(/Tpm Ts|tpm_|01M6J/);
+    expect(screen.getByTestId('aurabot-confirm-approve')).toBeDisabled();
+    expect(screen.getByTestId('aurabot-confirm-cancel')).toBeEnabled();
+    resolveFields({code: '0', data: fields});
+    await waitFor(() => expect(get).toHaveBeenCalledWith(`/api/dynamic/tpm_project/${project}`));
+    expect(screen.getByTestId('aurabot-confirm-approve')).toBeDisabled();
+    expect(card).not.toHaveTextContent(project);
+    resolveReference({code: '0', data: {tpm_pj_name: '华辰门户交付'}});
+    await screen.findByText('华辰门户交付');
+    expect(card).toHaveTextContent('负责人');
+    expect(screen.getByTestId('aurabot-confirm-approve')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('aurabot-confirm-approve'));
+    expect(confirm).toHaveBeenCalledExactlyOnceWith('pending');
+    expect(input.tpm_ts_project_id).toBe(project);
+  });
+
+  it('keeps cancellation available and refuses blind confirmation when business metadata is denied', async () => {
+    get.mockImplementation(async (path: string) => path === '/api/agent/tools/registry'
+      ? {code: '0', data: {tools: [{toolCode: 'cmd:tpm:create_task', modelCode: 'tpm_task'}]}}
+      : {code: '403', data: null});
+    const confirm = vi.fn(), cancel = vi.fn();
+    render(<ConfirmCard toolId="denied" toolName="cmd_tpm_create_task" description="" input={{tpm_ts_project_id: project}} onConfirm={confirm} onCancel={cancel} />);
+    await screen.findByRole('alert');
+    expect(screen.getByTestId('aurabot-confirm-card')).not.toHaveTextContent(project);
+    expect(screen.getByTestId('aurabot-confirm-approve')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('aurabot-confirm-approve'));
+    expect(confirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('aurabot-confirm-cancel'));
+    expect(cancel).toHaveBeenCalledExactlyOnceWith('denied');
+  });
   it('reads actual tool and field metadata while confirming the original operation once', async () => {
     configured();
     const input = Object.freeze({ tpm_ts_title: '交付材料复核', tpm_ts_assignee: '林晓', tpm_ts_project_id: project });
