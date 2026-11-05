@@ -506,8 +506,24 @@ class DataScopeServiceImplTest {
         assertThat(c.scopeType()).isEqualTo("none");
     }
 
+    private void ownedWriteTarget() {
+        var role=new com.auraboot.framework.rbac.entity.Role();role.setId(7L);role.setTenantId(100L);
+        when(roleMapper.selectById(7L)).thenReturn(role);
+    }
+
+    @Test void internalWriterCannotSelectAnotherTenantOrRole() {
+        assertThatThrownBy(()->service.removeScope(101L,7L,"orders","read"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var role=new com.auraboot.framework.rbac.entity.Role();role.setTenantId(101L);
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        assertThatThrownBy(()->service.setScope(100L,7L,"orders","read","all","MAX"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(roleDataScopeMapper);
+    }
+
     @Test
     void setScopeUpdatesExistingRow() {
+        ownedWriteTarget();
         RoleDataScope existing = new RoleDataScope();
         existing.setId(900L);
         existing.setScopeType("self");
@@ -523,6 +539,7 @@ class DataScopeServiceImplTest {
 
     @Test
     void setScopeInsertsWhenNoRowExists() {
+        ownedWriteTarget();
         when(roleDataScopeMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         service.setScope(100L, 7L, "model.user", "read", "self", null);
@@ -536,6 +553,7 @@ class DataScopeServiceImplTest {
 
     @Test
     void removeScopeDelegatesToMapper() {
+        ownedWriteTarget();
         service.removeScope(100L, 7L, "model.user", "read");
 
         verify(roleDataScopeMapper).delete(any(LambdaQueryWrapper.class));

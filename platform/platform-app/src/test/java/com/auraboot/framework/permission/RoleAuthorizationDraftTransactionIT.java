@@ -43,6 +43,8 @@ import static org.mockito.Mockito.reset;
 class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private RoleAuthorizationDraftService drafts;
     @Autowired private CapabilityRegistryService catalog;
+    @Autowired private com.auraboot.framework.permission.service.PermissionMatrixService matrix;
+    @Autowired private com.auraboot.framework.rbac.service.RoleService roleAuthoring;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
     @Autowired private com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper policyMapper;
@@ -125,6 +127,10 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             MetaContext.setMemberId(member);
             var effective = applicationContext.getBean(com.auraboot.framework.permission.service.UserPermissionService.class);
             assertThat(effective.hasPermission(user, com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE)).isTrue();
+            assertThatThrownBy(() -> roleAuthoring.setDefaultDataScopeType(roleId,"all"))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(() -> matrix.setRoleScope(getTestTenant().getId(),roleId,new DataScopeUpdateRequest(resource,"read","all","MAX")))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             assertThatThrownBy(() -> drafts.apply(rolePid, editRequest(baseline)))
                     .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             assertThatThrownBy(() -> applicationContext.getBean(com.auraboot.framework.permission.capability.CapabilityViewService.class)
@@ -140,6 +146,65 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         assertThat(persistedScopes()).isEmpty();
         assertThat(defaultScope()).isNull();
         assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
+    }
+
+    @Test void defaultScopeManagementUpdatesCurrentAndFutureGrantsInOneApplicationOperation() {
+        drafts.apply(rolePid,editRequest(drafts.snapshot(rolePid)));
+        matrix.setDefaultRoleScope(getTestTenant().getId(),roleId,"all");
+        assertThat(defaultScope()).isEqualTo("all");
+        assertThat(persistedScopes()).containsExactly(Map.of("action_code","read","scope_type","all"),Map.of("action_code","update","scope_type","all"));
+        matrix.setDefaultRoleScope(getTestTenant().getId(),roleId,null);
+        assertThat(defaultScope()).isNull();
+        assertThat(persistedScopes()).allMatch(row->"all".equals(row.get("scope_type")));
+    }
+
+    @Test void foreignRoleIdentityCannotHaveItsDefaultChangedByALocalAdministrator() {
+        long foreign=IdWorker.getId();String pid=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_role(id,pid,tenant_id,code,name,type,status,deleted_flag) VALUES(?,?,1,?,?,'custom','active',FALSE)",foreign,pid,resource+"_foreign",resource);
+        try {
+            assertThatThrownBy(()->roleAuthoring.setDefaultDataScopeType(foreign,"all"))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThat(jdbc.queryForObject("SELECT default_data_scope_type FROM ab_role WHERE id=?",String.class,foreign)).isNull();
+            assertThatThrownBy(()->scopes.setScope(getTestTenant().getId(),foreign,resource,"read","all","MAX"))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_data_scope WHERE role_id=?",Integer.class,foreign)).isZero();
+        } finally {
+            jdbc.update("DELETE FROM ab_role_data_scope WHERE role_id=?",foreign);
+            jdbc.update("DELETE FROM ab_role WHERE tenant_id=1 AND id=?",foreign);
+        }
+    }
+
+    @Test void actualActionScopeFailureRollsBackTheAlreadyWrittenDefaultAndAllScopes() {
+        drafts.apply(rolePid,editRequest(drafts.snapshot(rolePid)));
+        var before=persistedScopes();long epoch=com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current();
+        String function="reject_scope_"+roleId;
+        jdbc.execute("CREATE FUNCTION "+function+"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'scope mutation failure'; END $$");
+        jdbc.execute("CREATE TRIGGER "+function+" BEFORE INSERT OR UPDATE ON ab_role_data_scope FOR EACH ROW WHEN (NEW.role_id="+roleId+") EXECUTE FUNCTION "+function+"()");
+        try {
+            assertThatThrownBy(()->matrix.setDefaultRoleScope(getTestTenant().getId(),roleId,"all"))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+            assertThat(defaultScope()).isEqualTo("self");assertThat(persistedScopes()).isEqualTo(before);
+            assertThat(com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current()).isEqualTo(epoch);
+        } finally {jdbc.execute("DROP TRIGGER "+function+" ON ab_role_data_scope");jdbc.execute("DROP FUNCTION "+function+"()");}
+    }
+
+    @Test void scopeManagementRejectsAnExplicitForeignTenantEvenWithValidLocalRole() {
+        assertThatThrownBy(()->matrix.setDefaultRoleScope(getTestTenant().getId()+1,roleId,"all"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->matrix.setRoleScope(getTestTenant().getId()+1,roleId,new DataScopeUpdateRequest(resource,"read","all","MAX")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->scopes.removeScope(getTestTenant().getId()+1,roleId,resource,"read"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(defaultScope()).isNull();assertThat(persistedScopes()).isEmpty();
+    }
+
+    @Test void deletedRolesAndUnmappedActionsCannotAcquireScopeConfiguration() {
+        assertThatThrownBy(()->matrix.setRoleScope(getTestTenant().getId(),roleId,new DataScopeUpdateRequest(resource,"read","all","MAX")))
+                .isInstanceOf(RootUnCheckedException.class);
+        jdbc.update("UPDATE ab_role SET deleted_flag=TRUE WHERE tenant_id=? AND id=?",getTestTenant().getId(),roleId);
+        assertThatThrownBy(()->roleAuthoring.setDefaultDataScopeType(roleId,"all"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(defaultScope()).isNull();assertThat(persistedScopes()).isEmpty();
     }
 
     @Test void savesDutiesDefaultAndPerActionOverrideAsOneState() {

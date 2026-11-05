@@ -21,7 +21,9 @@ public class RoleAuthorizationAuthoringAccess {
     public void requireWrite() {
         Long tenant = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
         Long user = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
-        if (tenant == null || user == null || MetaContext.getCurrentMemberId() == null
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                || tenant == null || user == null || MetaContext.getCurrentMemberId() == null
                 || !administrators.hasRole(tenant, user, RoleCodes.TENANT_ADMIN)
                 || !permissions.hasPermission(user, MetaPermission.ROLE_MANAGE)) {
             throw new AccessDeniedException("Current tenant administrator and role authoring permission required");
@@ -31,7 +33,7 @@ public class RoleAuthorizationAuthoringAccess {
     /** Numeric role IDs are internal identities, never an exemption from tenant ownership. */
     public void requireTarget(Long roleId) {
         var role = roleId == null ? null : roles.selectById(roleId);
-        if (role == null || !java.util.Objects.equals(role.getTenantId(), MetaContext.getCurrentTenantId())) {
+        if (role == null || Boolean.TRUE.equals(role.getDeletedFlag()) || !java.util.Objects.equals(role.getTenantId(), MetaContext.getCurrentTenantId())) {
             throw new AccessDeniedException("Role authoring target is unavailable in this tenant");
         }
     }

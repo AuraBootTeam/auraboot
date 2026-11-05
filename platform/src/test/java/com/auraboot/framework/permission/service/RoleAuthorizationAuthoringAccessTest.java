@@ -55,6 +55,9 @@ class RoleAuthorizationAuthoringAccessTest {
         Role role = new Role(); role.setId(1L); role.setTenantId(7L);
         when(roles.selectById(1L)).thenReturn(role);
         assertThatCode(() -> access.requireTarget(1L)).doesNotThrowAnyException();
+        role.setDeletedFlag(true);
+        assertThatThrownBy(() -> access.requireTarget(1L)).isInstanceOf(AccessDeniedException.class);
+        role.setDeletedFlag(false);
         role.setTenantId(8L);
         assertThatThrownBy(() -> access.requireTarget(1L)).isInstanceOf(AccessDeniedException.class);
         role.setTenantId(null);

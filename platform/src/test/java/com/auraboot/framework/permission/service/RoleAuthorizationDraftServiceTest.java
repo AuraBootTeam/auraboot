@@ -102,7 +102,7 @@ class RoleAuthorizationDraftServiceTest {
         order.verify(roles).setDefaultDataScopeType(1L, "self");
         order.verify(capabilities).applyCapabilitySelection(1L, Set.of("orders.view"), Set.of());
         order.verify(matrix).applyDefaultScopeToCurrentGrants(100L, 1L, "self");
-        order.verify(scopes).setScope(100L, 1L, "order", "read", "none", "MAX");
+        order.verify(matrix).setRoleScope(100L,1L,new DataScopeUpdateRequest("order","read","none","MAX"));
         assertThat(saved.defaultScopeType()).isEqualTo("self");
         assertThat(saved.revision()).isNotEqualTo(revision);
     }

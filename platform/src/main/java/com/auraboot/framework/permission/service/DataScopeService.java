@@ -58,6 +58,8 @@ public interface DataScopeService {
     /**
      * Set a data scope for a specific role/resource/action combination (upsert).
      */
+    // Internal derivation primitive: management transports use PermissionMatrixService.setRoleScope.
+    // This writer preserves tenant/role structure but does not grant administrative authority.
     void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                   String scopeType, String mergeStrategy);
 

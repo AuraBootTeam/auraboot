@@ -79,8 +79,7 @@ public class RoleAuthorizationDraftService {
             matrix.applyDefaultScopeToCurrentGrants(tenant, role.getId(), request.defaultScopeType());
         }
         for (DataScopeUpdateRequest change : changes(request)) {
-            scopes.setScope(tenant, role.getId(), change.resourceCode(), change.actionCode(),
-                    change.scopeType(), change.mergeStrategy());
+            matrix.setRoleScope(tenant,role.getId(),change);
         }
         fieldPolicies.apply(role, reviewed.fieldPolicies());
         // A failed write or readback propagates and rolls back the entire authoring operation.

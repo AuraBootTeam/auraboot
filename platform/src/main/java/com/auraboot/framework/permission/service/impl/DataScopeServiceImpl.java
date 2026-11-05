@@ -184,6 +184,7 @@ public class DataScopeServiceImpl implements DataScopeService {
         if (mergeStrategy != null && !"MAX".equals(mergeStrategy) && !"MIN".equals(mergeStrategy)) {
             throw new RootUnCheckedException(ResponseCode.BadParam, "Invalid data scope merge strategy");
         }
+        requireWriteTarget(tenantId,roleId,resourceCode,actionCode);
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
                 .eq(RoleDataScope::getRoleId, roleId)
@@ -216,6 +217,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void removeScope(Long tenantId, Long roleId, String resourceCode, String actionCode) {
         authorizationWriteLock.mutate();
+        requireWriteTarget(tenantId,roleId,resourceCode,actionCode);
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
                 .eq(RoleDataScope::getRoleId, roleId)
@@ -227,6 +229,20 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Override
     public List<RoleDataScope> getScopesByRole(Long tenantId, Long roleId) {
         return roleDataScopeMapper.findByTenantAndRole(tenantId, roleId);
+    }
+
+    /** Structural boundary shared by administrative and code-owned metadata derivation. */
+    private void requireWriteTarget(Long tenant,Long roleId,String resource,String action) {
+        if(!MetaContext.exists() || tenant==null || !java.util.Objects.equals(tenant,MetaContext.getCurrentTenantId()))
+            throw new org.springframework.security.access.AccessDeniedException("Scope writer requires its current tenant");
+        var role=roleId==null?null:roleMapper.selectById(roleId);
+        boolean systemTemplate=role!=null && role.getTenantId()==null
+                && com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID.equals(tenant);
+        if(role==null || Boolean.TRUE.equals(role.getDeletedFlag())
+                || !systemTemplate && !java.util.Objects.equals(tenant,role.getTenantId()))
+            throw new org.springframework.security.access.AccessDeniedException("Scope role is unavailable in this tenant");
+        if(resource==null || resource.isBlank() || action==null || action.isBlank())
+            throw new RootUnCheckedException(ResponseCode.BadParam,"Scope writer requires a resource and action");
     }
 
     // ========================================================================

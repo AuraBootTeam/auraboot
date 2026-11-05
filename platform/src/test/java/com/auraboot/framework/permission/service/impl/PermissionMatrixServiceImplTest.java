@@ -42,6 +42,14 @@ class PermissionMatrixServiceImplTest {
     private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
 
 
+    @Mock private com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
+    @Mock private com.auraboot.framework.rbac.service.RoleService roles;
+    @org.junit.jupiter.api.BeforeEach void identity() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L,20L,"unit-user","Unit");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(30L);
+    }
+    @org.junit.jupiter.api.AfterEach void clear() {com.auraboot.framework.application.tenant.MetaContext.clear();}
+
     @Mock
     private PermissionService permissionService;
 
@@ -62,6 +70,45 @@ class PermissionMatrixServiceImplTest {
 
     @InjectMocks
     private PermissionMatrixServiceImpl service;
+
+    @Test void actionScopeUsesTheSameAuthoringBoundaryAndCurrentPermissionMapping() {
+        var p=permission(9L,"model.orders.read",null,null,"model","orders","read");
+        when(permissionService.findAllActive()).thenReturn(List.of(p));
+        when(rolePermissionService.getPermissionIdsByRoleId(7L)).thenReturn(Set.of(9L));
+        service.setRoleScope(100L,7L,new com.auraboot.framework.permission.dto.DataScopeUpdateRequest("orders","read","self","MAX"));
+        verify(authoringAccess).requireWrite();verify(authoringAccess).requireTarget(7L);
+        verify(dataScopeService).setScope(100L,7L,"orders","read","self","MAX");
+    }
+
+    @Test void defaultApplicationJoinsTheSameManagementOperationAndPreservesNullClear() {
+        when(rolePermissionService.getPermissionIdsByRoleId(7L)).thenReturn(Set.of());
+        service.setDefaultRoleScope(100L,7L,"self");
+        verify(roles).setDefaultDataScopeType(7L,"self");
+        service.setDefaultRoleScope(100L,7L,null);
+        verify(roles).setDefaultDataScopeType(7L,null);
+    }
+
+    @Test void foreignTenantCannotApplyDefaultEvenToAnEmptyRole() {
+        assertThatThrownBy(()->service.applyDefaultScopeToCurrentGrants(101L,7L,"all"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionService,dataScopeService,permissionService);
+    }
+
+    @Test void revokedAuthorityCannotPassAnEmptyBatch() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("Revoked"))
+                .when(authoringAccess).requireWrite();
+        assertThatThrownBy(()->service.batchUpdateRolePermissions(7L,List.of()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionService,dataScopeService);
+    }
+
+    @Test void ungrantedActionCannotBePreconfiguredToAll() {
+        when(rolePermissionService.getPermissionIdsByRoleId(7L)).thenReturn(Set.of());
+        when(permissionService.findAllActive()).thenReturn(List.of());
+        assertThatThrownBy(()->service.setRoleScope(100L,7L,new com.auraboot.framework.permission.dto.DataScopeUpdateRequest("orders","read","all","MAX")))
+                .isInstanceOf(RootUnCheckedException.class);
+        org.mockito.Mockito.verifyNoInteractions(dataScopeService);
+    }
 
     @Test
     void findPermissionIdByPidUsesThePidQuery() {

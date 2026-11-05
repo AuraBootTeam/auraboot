@@ -145,6 +145,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     @Transactional
     public void setDefaultDataScopeType(Long roleId, String scopeType) {
         authorizationWriteLock.mutate();
+        authoringAccess.requireWrite();
+        authoringAccess.requireTarget(roleId);
         if (scopeType != null) {
             try {
                 DataScopeType.fromCode(scopeType);
@@ -154,11 +156,14 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         }
         // Plain VARCHAR column — a scoped LambdaUpdate set is safe (no typeHandler concern) and
         // updates only this column (null clears the default, reverting to deny-by-default).
-        lambdaUpdate()
+        boolean updated=lambdaUpdate()
                 .eq(Role::getId, roleId)
+                .eq(Role::getTenantId, MetaContext.getCurrentTenantId())
+                .eq(Role::getDeletedFlag,false)
                 .set(Role::getDefaultDataScopeType, scopeType)
                 .set(Role::getUpdatedAt, Instant.now())
                 .update();
+        if(!updated) throw new com.auraboot.framework.exception.BusinessException(ResponseCode.CasVersionConflict,"Role scope target changed during authoring");
         log.info("Set role default data scope: roleId={}, scopeType={}", roleId, scopeType);
     }
 //

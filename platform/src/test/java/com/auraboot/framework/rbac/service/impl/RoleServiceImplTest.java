@@ -56,6 +56,13 @@ class RoleServiceImplTest {
         org.mockito.Mockito.verifyNoInteractions(roleMapper);
     }
 
+    @Test void defaultScopeRequiresCurrentAuthorityBeforeResolvingOrWritingTheRole() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("Revoked"))
+                .when(authoringAccess).requireWrite();
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.setDefaultDataScopeType(7L,"all"));
+        org.mockito.Mockito.verifyNoInteractions(roleMapper);
+    }
+
     @Mock private com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
     @Mock private RoleMapper roleMapper;
     @Mock private RolePermissionService rolePermissionService;
