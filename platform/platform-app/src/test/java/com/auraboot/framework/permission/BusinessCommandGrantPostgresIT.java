@@ -73,6 +73,30 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         if (permissionId != 0) jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND id=?", tenant(), permissionId);
     }
 
+    @Test void alternativePermissionCodesRetainOrSemanticsWithoutBorrowingOtherGrantFields() throws Exception {
+        String alternative = resource + ".alternative";
+        Long alternativeId = jdbc.queryForObject("""
+                INSERT INTO ab_permission (pid,tenant_id,code,name,resource_type,resource_code,action,source,status,deleted_flag)
+                VALUES (?,?,?,?,'operation',?,'confirm','test','active',FALSE) RETURNING id
+                """, Long.class, UniqueIdGenerator.generate(), tenant(), alternative, "Alternative receipt duty", resource);
+        try {
+            jdbc.update("UPDATE ab_role SET default_data_scope_type='none' WHERE id=?", roleA);
+            jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?", fieldScope("label"), bindingA);
+            jdbc.update("UPDATE ab_role_permission SET permission_id=?,field_scope=?::jsonb WHERE id=?", alternativeId, fieldScope("cost"), bindingB);
+            var allowed = authorization.resolve(member(), List.of(code, alternative), model, record(false, "Shanghai"));
+            assertThat(allowed.result().granted()).isTrue();
+            assertThat(allowed.grants()).extracting(com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant::permissionCode)
+                    .containsExactly(alternative);
+            assertThat(allowed.canRead("cost")).isTrue(); assertThat(allowed.canRead("label")).isFalse();
+            assertThat(authorization.resolve(member(), List.of(code, alternative), model, record(false, "Beijing")).result().granted()).isFalse();
+            jdbc.update("UPDATE ab_role_permission SET expiry_date=CURRENT_DATE-1 WHERE id=?", bindingB);
+            assertThat(authorization.resolve(member(), List.of(code, alternative), model, record(false, "Shanghai")).result().granted()).isFalse();
+        } finally {
+            jdbc.update("UPDATE ab_role_permission SET permission_id=? WHERE id=?", permissionId, bindingB);
+            jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND id=?", tenant(), alternativeId);
+        }
+    }
+
     @Test void completeGrantsDoNotCrossMultiplyRoleScopeAndCondition() {
         assertThat(allowed(false, "Beijing")).isFalse();
         assertThat(allowed(true, "Beijing")).isTrue();

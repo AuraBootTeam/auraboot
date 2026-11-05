@@ -213,7 +213,8 @@ public class RoleAuthorizationDraftService {
             }
         }
         // A duty may expose its root fields without granting generic model CRUD.
-        businessFieldRoots().stream().filter(root -> resulting.containsAll(root.permissions()))
+        businessFieldRoots().stream().filter(root -> resulting.contains("*")
+                        || root.permissions().stream().anyMatch(resulting::contains))
                 .forEach(root -> permittedModels.add(root.model()));
         Set<String> seen = new HashSet<>();
         for (DataScopeUpdateRequest change : changes(request)) {

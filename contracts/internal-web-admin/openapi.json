@@ -14820,6 +14820,32 @@
         },
         "type": "object"
       },
+      "ApiResponseRoleBoundaryMigrationPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleBoundaryMigrationPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseRoleMemberTreeResponse": {
         "properties": {
           "code": {
@@ -45595,6 +45621,377 @@
           "revision",
           "rolePid",
           "scopes"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationBinding": {
+        "properties": {
+          "bindingPid": {
+            "type": "string"
+          },
+          "conditionAst": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dataScopeAst": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effectiveDate": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiryDate": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldScope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grantType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionPid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bindingPid"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationBoundary": {
+        "properties": {
+          "commandCode": {
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationOperation"
+            },
+            "type": "array"
+          },
+          "rootModel": {
+            "type": "string"
+          },
+          "targetAction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commandCode",
+          "operations",
+          "rootModel",
+          "targetAction"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationOperation": {
+        "properties": {
+          "actionCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bindingPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "currentScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": "string"
+          },
+          "permissionPid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopeOrigin": {
+            "type": "string"
+          },
+          "scopeStatus": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bindingPids",
+          "permissionCode",
+          "scopeOrigin",
+          "scopeStatus"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationPolicy": {
+        "properties": {
+          "conditionAst": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "fieldCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maskExpression": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maskType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policyPid": {
+            "type": "string"
+          },
+          "policyType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "scopeExpression": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "policyPid"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationPreview": {
+        "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationBinding"
+            },
+            "type": "array"
+          },
+          "boundPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationPolicy"
+            },
+            "type": "array"
+          },
+          "boundaries": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationBoundary"
+            },
+            "type": "array"
+          },
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "equivalentMigrationProven": {
+            "type": "boolean"
+          },
+          "fieldPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "rolePid": {
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationScope"
+            },
+            "type": "array"
+          },
+          "unmappedPermissionCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unresolvedBindingPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "bindings",
+          "boundPolicies",
+          "boundaries",
+          "equivalentMigrationProven",
+          "fieldPolicies",
+          "revision",
+          "rolePid",
+          "scopes",
+          "unmappedPermissionCodes",
+          "unresolvedBindingPids"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationScope": {
+        "properties": {
+          "actionCode": {
+            "type": "string"
+          },
+          "mergeStrategy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceCode": {
+            "type": "string"
+          },
+          "scopeConfig": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scopePid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "actionCode",
+          "resourceCode"
         ],
         "type": "object"
       },
@@ -96948,6 +97345,37 @@
           }
         },
         "summary": "Atomically commit role duties and record scopes with conflict detection",
+        "tags": [
+          "Role Authorization Draft"
+        ]
+      }
+    },
+    "/api/permission/roles/{rolePid}/draft/migration": {
+      "get": {
+        "operationId": "inspectRoleBoundaryMigration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleBoundaryMigrationPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Inspect role bindings and explicit scope decisions before migration",
         "tags": [
           "Role Authorization Draft"
         ]

@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 51144291757de2834f3a1a326affe26ec54a2760637183a3a3dfd8a104f37743
+ * Contract SHA-256: 9cfe6d503565c2b46a42b2a9c8acf375d2d8ffb32a1fbcd50666baa174e2aa7f
  */
 export interface paths {
     "/api/activities": {
@@ -18045,6 +18045,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/permission/roles/{rolePid}/draft/migration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect role bindings and explicit scope decisions before migration */
+        get: operations["inspectRoleBoundaryMigration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/permission/roles/{rolePid}/draft/preview": {
         parameters: {
             query?: never;
@@ -27978,6 +27995,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["RoleAuthorizationDraftSnapshot"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseRoleBoundaryMigrationPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleBoundaryMigrationPreview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -38782,6 +38807,75 @@ export interface components {
             revision: string;
             rolePid: string;
             scopes: components["schemas"]["DataScopeUpdateRequest"][];
+        };
+        RoleBoundaryMigrationBinding: {
+            bindingPid: string;
+            conditionAst?: components["schemas"]["JsonNode"] | null;
+            conditions?: components["schemas"]["JsonNode"] | null;
+            dataScopeAst?: components["schemas"]["JsonNode"] | null;
+            /** Format: date */
+            effectiveDate?: string | null;
+            /** Format: date */
+            expiryDate?: string | null;
+            fieldScope?: components["schemas"]["JsonNode"] | null;
+            grantType?: string | null;
+            permissionCode?: string | null;
+            permissionPid?: string | null;
+            /** Format: int32 */
+            priority?: number | null;
+            sourceRef?: string | null;
+            status?: string | null;
+        };
+        RoleBoundaryMigrationBoundary: {
+            commandCode: string;
+            operations: components["schemas"]["RoleBoundaryMigrationOperation"][];
+            rootModel: string;
+            targetAction: string;
+        };
+        RoleBoundaryMigrationOperation: {
+            actionCode?: string | null;
+            bindingPids: string[];
+            currentScopeType?: string | null;
+            permissionCode: string;
+            permissionPid?: string | null;
+            resourceCode?: string | null;
+            scopeOrigin: string;
+            scopeStatus: string;
+        };
+        RoleBoundaryMigrationPolicy: {
+            conditionAst?: components["schemas"]["JsonNode"] | null;
+            enabled?: boolean | null;
+            fieldCode?: string | null;
+            maskExpression?: string | null;
+            maskType?: string | null;
+            modelCode?: string | null;
+            policyPid: string;
+            policyType?: string | null;
+            /** Format: int32 */
+            priority?: number | null;
+            scopeExpression?: string | null;
+            scopeType?: string | null;
+        };
+        RoleBoundaryMigrationPreview: {
+            bindings: components["schemas"]["RoleBoundaryMigrationBinding"][];
+            boundaries: components["schemas"]["RoleBoundaryMigrationBoundary"][];
+            boundPolicies: components["schemas"]["RoleBoundaryMigrationPolicy"][];
+            defaultScopeType?: string | null;
+            equivalentMigrationProven: boolean;
+            fieldPolicies: components["schemas"]["RoleFieldPolicyView"][];
+            revision: string;
+            rolePid: string;
+            scopes: components["schemas"]["RoleBoundaryMigrationScope"][];
+            unmappedPermissionCodes: string[];
+            unresolvedBindingPids: string[];
+        };
+        RoleBoundaryMigrationScope: {
+            actionCode: string;
+            mergeStrategy?: string | null;
+            resourceCode: string;
+            scopeConfig?: components["schemas"]["JsonNode"] | null;
+            scopePid?: string | null;
+            scopeType?: string | null;
         };
         RoleDataScopeDefinitionDTO: {
             mergeStrategy?: string;
@@ -71728,6 +71822,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseRoleAuthorizationDraftSnapshot"];
+                };
+            };
+        };
+    };
+    inspectRoleBoundaryMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleBoundaryMigrationPreview"];
                 };
             };
         };

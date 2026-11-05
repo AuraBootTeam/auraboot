@@ -224,15 +224,30 @@ class RoleAuthorizationDraftServiceTest {
         verify(writes, never()).mutate();
     }
 
-    @Test void everyBusinessPermissionMustRemainInTheProposedSelection() {
+    @Test void unrelatedPermissionsCannotMakeTheBusinessRootAFieldCandidate() {
         businessOwner(Set.of("sales.manage", "sales.release"));
         when(capabilities.previewCapabilitySelection(1L, Set.of("orders.view"), Set.of()))
-                .thenReturn(new CapabilitySelectionPreview(List.of("sales.manage"), List.of(), List.of(), List.of(), List.of()));
+                .thenReturn(new CapabilitySelectionPreview(List.of("unrelated.manage"), List.of(), List.of(), List.of(), List.of()));
         var baseline = service.snapshot("role-a");
         service.preview("role-a", new RoleAuthorizationDraftRequest(baseline.revision(), Set.of("orders.view"),
                 Set.of(), false, null, false, List.of(), Set.of("policy")));
         verify(fieldPolicies).preview(org.mockito.ArgumentMatchers.eq(role), org.mockito.ArgumentMatchers.eq(Set.of("policy")),
                 org.mockito.ArgumentMatchers.argThat(models -> models.equals(Set.of("order"))));
+    }
+
+    @Test void eitherCompleteDutyAlternativeOrAnExplicitWildcardCanRestrictOnlyTheBusinessRoot() {
+        businessOwner(Set.of("sales.manage", "sales.release"));
+        for (String alternative : List.of("sales.manage", "sales.release", "*")) {
+            when(capabilities.previewCapabilitySelection(1L, Set.of("orders.view"), Set.of()))
+                    .thenReturn(new CapabilitySelectionPreview(List.of(alternative), List.of(), List.of(), List.of(), List.of()));
+            var baseline = service.snapshot("role-a");
+            service.preview("role-a", new RoleAuthorizationDraftRequest(baseline.revision(), Set.of("orders.view"),
+                    Set.of(), false, null, false, List.of(), Set.of("policy")));
+        }
+        verify(fieldPolicies, org.mockito.Mockito.times(3)).preview(org.mockito.ArgumentMatchers.eq(role),
+                org.mockito.ArgumentMatchers.eq(Set.of("policy")),
+                org.mockito.ArgumentMatchers.argThat(models -> models.equals(Set.of("order", "sales_order"))));
+        verify(writes, never()).mutate();
     }
 
     @Test void changingTheCodeOwnedRootInvalidatesTheReviewedDraft() {
