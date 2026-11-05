@@ -70,6 +70,53 @@ class RoleAuthorizationDraftServiceTest {
 
     @AfterEach void cleanup() { MetaContext.clear(); }
 
+    private com.auraboot.framework.plugin.extension.BusinessResourceAuthorization businessOwner(Set<String> codes) {
+        var registry = mock(com.auraboot.framework.plugin.pf4j.ExtensionRegistry.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "extensions", registry);
+        var handler = mock(com.auraboot.framework.plugin.extension.CommandHandlerExtension.class,
+                org.mockito.Mockito.withSettings().extraInterfaces(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.class));
+        var owner = (com.auraboot.framework.plugin.extension.BusinessResourceAuthorization) handler;
+        when(owner.businessBoundary()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.Boundary(
+                "sales:release", "sales_order", "update", codes));
+        when(registry.getAllCommandHandlers()).thenReturn(List.of(handler));
+        when(registry.getBusinessResourceOwner("sales:release")).thenReturn(java.util.Optional.of(handler));
+        return owner;
+    }
+
+    @Test void aBusinessDutyMakesOnlyItsRootEligibleForFieldRestrictionsWithoutCrudGrants() {
+        businessOwner(Set.of("sales.manage"));
+        when(capabilities.previewCapabilitySelection(1L, Set.of("orders.view"), Set.of()))
+                .thenReturn(new CapabilitySelectionPreview(List.of("sales.manage"), List.of(), List.of(), List.of(), List.of()));
+        var baseline = service.snapshot("role-a");
+        service.preview("role-a", new RoleAuthorizationDraftRequest(baseline.revision(), Set.of("orders.view"),
+                Set.of(), false, null, false, List.of(), Set.of("policy")));
+        verify(fieldPolicies).preview(org.mockito.ArgumentMatchers.eq(role), org.mockito.ArgumentMatchers.eq(Set.of("policy")),
+                org.mockito.ArgumentMatchers.argThat(models -> models.equals(Set.of("order", "sales_order"))));
+        verify(writes, never()).mutate();
+    }
+
+    @Test void everyBusinessPermissionMustRemainInTheProposedSelection() {
+        businessOwner(Set.of("sales.manage", "sales.release"));
+        when(capabilities.previewCapabilitySelection(1L, Set.of("orders.view"), Set.of()))
+                .thenReturn(new CapabilitySelectionPreview(List.of("sales.manage"), List.of(), List.of(), List.of(), List.of()));
+        var baseline = service.snapshot("role-a");
+        service.preview("role-a", new RoleAuthorizationDraftRequest(baseline.revision(), Set.of("orders.view"),
+                Set.of(), false, null, false, List.of(), Set.of("policy")));
+        verify(fieldPolicies).preview(org.mockito.ArgumentMatchers.eq(role), org.mockito.ArgumentMatchers.eq(Set.of("policy")),
+                org.mockito.ArgumentMatchers.argThat(models -> models.equals(Set.of("order"))));
+    }
+
+    @Test void changingTheCodeOwnedRootInvalidatesTheReviewedDraft() {
+        var owner = businessOwner(Set.of("sales.manage"));
+        var baseline = service.snapshot("role-a");
+        when(owner.businessBoundary()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.Boundary(
+                "sales:release", "another_order", "update", Set.of("sales.manage")));
+        assertThatThrownBy(() -> service.apply("role-a", request(baseline.revision(), false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate();
+    }
+
     @Test void staleConditionsOrExpiryCannotBeOverwrittenByAnOldDraft() {
         String revision = service.snapshot("role-a").revision();
         grant.setExpiryDate(LocalDate.of(2030, 1, 1));

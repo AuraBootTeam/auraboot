@@ -52,6 +52,9 @@ public class RoleAuthorizationDraftService {
     private final com.auraboot.framework.meta.mapper.DataPermissionRoleBindingMapper policyBindings;
     private final com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper dataPolicies;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.ExtensionRegistry extensions;
+
     @Transactional
     public RoleAuthorizationDraftSnapshot snapshot(String rolePid) {
         writes.lock();
@@ -112,6 +115,9 @@ public class RoleAuthorizationDraftService {
                 permittedModels.add(permission.getResourceCode());
             }
         }
+        // A duty may expose its root fields without granting generic model CRUD.
+        businessFieldRoots().stream().filter(root -> resulting.containsAll(root.permissions()))
+                .forEach(root -> permittedModels.add(root.model()));
         Set<String> seen = new HashSet<>();
         for (DataScopeUpdateRequest change : changes(request)) {
             if (change == null || change.resourceCode() == null || change.actionCode() == null
@@ -162,10 +168,30 @@ public class RoleAuthorizationDraftService {
                 .sorted(Comparator.comparing(policy -> policy.getPid())).toList());
         state.put("catalog", catalog.listDeclarations(role.getTenantId()).stream()
                 .sorted(Comparator.comparing(declaration -> declaration.getCode())).toList());
+        state.put("businessFieldRoots", businessFieldRoots());
         state.put("permissions", permissions.findAllActive().stream()
                 .sorted(Comparator.comparing(permission -> permission.getCode())).toList());
         return digest(state);
     }
+
+    private List<BusinessFieldRoot> businessFieldRoots() {
+        if (extensions == null) return List.of();
+        List<BusinessFieldRoot> roots = new java.util.ArrayList<>();
+        for (var handler : extensions.getAllCommandHandlers()) {
+            if (!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner)) continue;
+            var boundary = owner.businessBoundary();
+            if (extensions.getBusinessResourceOwner(boundary.commandCode()).orElse(null) != handler) continue;
+            if (boundary.permissions().isEmpty() || boundary.permissions().size() > 128
+                    || boundary.permissions().stream().anyMatch(code -> code == null || code.isBlank()
+                        || !code.equals(code.strip()) || code.length() > 255 || "*".equals(code)
+                        || "meta.command.execute".equals(code))) throw invalid();
+            roots.add(new BusinessFieldRoot(boundary.commandCode(), boundary.rootModel(), boundary.targetAction(),
+                    boundary.permissions().stream().sorted().toList()));
+        }
+        return roots.stream().distinct().sorted(Comparator.comparing(BusinessFieldRoot::command)).toList();
+    }
+
+    private record BusinessFieldRoot(String command, String model, String action, List<String> permissions) {}
 
     private String digest(Map<String, Object> state) {
         try {
