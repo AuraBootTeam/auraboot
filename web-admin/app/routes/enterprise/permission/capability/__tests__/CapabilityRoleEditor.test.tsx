@@ -434,6 +434,8 @@ describe('field restrictions participate in the same role draft', () => {
     vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
     await open();
     fireEvent.click(await screen.findByTestId('field-policy-hide-cost'));
+    expect(screen.queryByTestId('capability-draft')).not.toBeInTheDocument();
+    expect(screen.getByTestId('field-policies-pending')).toBeVisible();
     await review();
     fireEvent.click(screen.getByTestId('confirm-cancel'));
     expect(authorizationDraftService.save).not.toHaveBeenCalled();

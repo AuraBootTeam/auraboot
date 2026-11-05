@@ -691,7 +691,7 @@ export default function CapabilityRoleEditor({
             {t('admin.permission.editor.empty', undefined, 'No matching business capabilities')}
           </p>
         )}
-        {dirty && (
+        {(changes.length > 0 || defaultChanged || activeScopeChanges.length > 0) && (
           <div
             data-testid="capability-draft"
             className="rounded-card border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
