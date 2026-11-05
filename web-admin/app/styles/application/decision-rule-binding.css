@@ -201,7 +201,7 @@
   margin-top: 10px;
 }
 
-.decision-rule-binding-block input,
+.decision-rule-binding-block input:not([type='checkbox']),
 .decision-rule-binding-block select,
 .decision-rule-binding-block textarea {
   min-height: 34px;
@@ -220,7 +220,7 @@
   resize: vertical;
 }
 
-.decision-rule-binding-block input:focus,
+.decision-rule-binding-block input:not([type='checkbox']):focus,
 .decision-rule-binding-block select:focus,
 .decision-rule-binding-block textarea:focus {
   border-color: var(--color-accent);
@@ -666,4 +666,3 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-

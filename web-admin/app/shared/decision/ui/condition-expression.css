@@ -628,3 +628,24 @@
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
+
+/* Keep nested condition controls usable without accumulating mobile indentation. */
+@media (max-width: 900px) {
+  .condition-expression .ce-group:not(.ce-root) {
+    margin-left: 2px;
+    padding-left: 8px;
+  }
+  .condition-expression :is(.ce-not-leaf, .ce-add-actions) {
+    flex-wrap: wrap;
+  }
+  .condition-expression :is(.ce-not-leaf, .ce-add-actions) button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .condition-expression .ce-row .ce-tokens {
+    flex: 1 1 100%;
+  }
+  .condition-expression .ce-tokens > :is(input, select) {
+    max-width: 100%;
+  }
+}
