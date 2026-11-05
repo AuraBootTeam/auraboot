@@ -490,6 +490,21 @@ function webComponentFixture(t) {
   return {...f,coreCommit:before.source.commit,repo,put,commit,before,catalog};
 }
 
+test('Core Web capture preserves every input in a large tracked source inventory',t=>{
+  const f=webComponentFixture(t);
+  const directory='web-admin/app/'+['a','b','c'].map(c=>c.repeat(180)).join('/');
+  const count=1800;
+  for(let index=0;index<count;index++)
+    f.put(`${directory}/${String(index).padStart(4,'0')}-${'d'.repeat(100)}.ts`,'export {};\n');
+  const current=f.commit();
+  const inventory=execFileSync('git',['ls-files','-z'],{cwd:f.repo,maxBuffer:16*1024*1024});
+  assert(inventory.length>1024*1024,'The real Git fixture must exceed Node default output capacity');
+  assert.equal(current.inputs.files.filter(entry=>entry.path.startsWith(directory+'/')).length,count);
+  assert.notEqual(current.inputDigest,f.before.inputDigest);
+  f.put('web-admin/untracked.ts','export {};\n');
+  assert.throws(()=>captureCoreWebInputs(f.repo),/Clean Core source required/);
+});
+
 function frozenWebSelection(f,exported) {
   const selection=join(f.directory,'core-web-selection.json'),inputs=join(f.directory,'dataset.json');
   const document={schemaVersion:1,kind:'native-core-web-selection',
