@@ -773,7 +773,7 @@ export function AuraBotChat() {
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, formFillReceipt]);
 
   // Focus input on mount
   useEffect(() => {

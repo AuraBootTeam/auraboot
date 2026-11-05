@@ -72,7 +72,8 @@ describe('Bot and real controlled form draft boundary', () => {
     await begin();
     expect(vi.mocked(auraBotApi.chatStream).mock.calls[0][0]).toMatchObject({ agentCode: 'aurabot', formFill: { modelCode: 'task' } });
     expect(vi.mocked(auraBotApi.chatStream).mock.calls[0][0].formFill?.fields.map(f => f.code)).toEqual(['name', 'description', 'date']);
-    act(() => callbacks.onToolResult('fill', output(), true));
+    act(() => { callbacks.onResultContract({ skillCode: 'platform.fill_form', data: { action: 'form_fill', instruction: 'private protocol' } }); callbacks.onToolResult('fill', output(), true); });
+    expect(screen.getByTestId('chat')).not.toHaveTextContent('private protocol');
     expect(screen.getByLabelText('Name')).toHaveValue('');
     await act(async () => { callbacks.onDone('Draft extracted'); complete(); });
     expect(screen.getByLabelText('Name')).toHaveValue('材料复核');

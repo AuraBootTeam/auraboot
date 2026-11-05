@@ -67,7 +67,7 @@ export function FormFillReceipt({
       {reviews.length > 0 && (
         <details
           className="border-border rounded-control bg-surface border p-3"
-          open={hasAmbiguity}
+          open={hasAmbiguity && !inChat}
         >
           <summary className="text-text cursor-pointer font-medium">
             {t('ai.fill.evidence_details')}

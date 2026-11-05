@@ -279,6 +279,8 @@ export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMes
     retrievalEvidence: message.retrievalEvidence,
   });
   for (const [index, contract] of (message.resultContracts ?? []).entries()) {
+    // Draft fields belong to the transient form receipt, never a raw protocol card.
+    if (contract.skillCode === 'platform.fill_form' && contract.data?.action === 'form_fill') continue;
     out.push({
       id: `db-${message.id}-result-${index}`,
       type: 'result_contract',
@@ -1031,6 +1033,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               // Ordinary conversation never authorizes draft mutation.
             },
             onResultContract: (contract) => {
+              if (explicitFormFill) return;
               dispatch({
                 type: 'add_tool_message',
                 payload: {

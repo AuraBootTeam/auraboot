@@ -344,7 +344,7 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
     const fillText = `根据纪要填写当前表单：
 任务名称：培训材料复核。
 负责人：林晓。
-完成标准：检查培训手册和验收清单。
+任务描述：检查培训手册和验收清单。
 截止日期：未确定。
 所属项目已选定，请保留。`;
     let calls = 0;
@@ -387,8 +387,13 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
     );
     expect(await taskRows(page.request, title)).toHaveLength(0);
     await expect(page.locator('[data-testid="form-ai-fill-receipt"]')).toHaveCount(1);
+    await expect(page.locator('#tpm_ts_description')).toHaveValue('检查培训手册和验收清单');
+    await expect(bot).not.toContainText('Form fill data ready');
+    await expect(bot).not.toContainText('tpm_ts_');
     await capture(page, 'DS04');
     await page.locator('#tpm_ts_description').scrollIntoViewIfNeeded();
+    await bot.getByTestId('form-ai-fill-receipt').locator('summary').click();
+    await bot.getByTestId('form-ai-fill-undo').scrollIntoViewIfNeeded();
     await capture(page, 'DS04-detail');
 
     const humanNote = '检查培训手册和验收清单；补充培训记录核对。';
@@ -409,7 +414,7 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
     await capture(page, 'DS04-refill');
     page.off('request', counter);
     await page.keyboard.press(hotkey);
-    await expect(bot).toHaveCount(0);
+    await expect(bot).toBeHidden();
     const persisted = page.waitForResponse(
       (r) => r.url().includes('/execute/tpm:create_task') && r.request().method() === 'POST',
     );

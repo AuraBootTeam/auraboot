@@ -20,6 +20,15 @@ const ASSISTANT_BASE: AuraBotConversationMessage = {
 };
 
 describe('toSimpleMessages — D.1 thinking history hydration', () => {
+  it('keeps draft protocol data out of hydrated chat while preserving other results', () => {
+    const out = toSimpleMessages({ ...ASSISTANT_BASE, resultContracts: [
+      { skillCode: 'platform.fill_form', data: { action: 'form_fill', instruction: 'private protocol' } },
+      { skillCode: 'project.query', data: { progress: 67 } },
+    ] as any });
+    expect(out).toHaveLength(2);
+    expect(out[1].resultContract?.skillCode).toBe('project.query');
+    expect(JSON.stringify(out)).not.toContain('private protocol');
+  });
   it('emits both a thinking message and the answer text when thinkingContent is present', () => {
     const out = toSimpleMessages({
       ...ASSISTANT_BASE,
