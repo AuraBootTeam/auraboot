@@ -17,6 +17,7 @@ import CapabilityChecklist from './CapabilityChecklist';
 import DataScopeBar from './DataScopeBar';
 import CapabilityDiagnostics from './CapabilityDiagnostics';
 import CapabilityScopeSettings from './CapabilityScopeSettings';
+import CapabilityPolicySettings from './CapabilityPolicySettings';
 import ConfirmDialog from '~/ui/ConfirmDialog';
 
 interface CapabilityRoleEditorProps {
@@ -57,6 +58,7 @@ export default function CapabilityRoleEditor({
   const [scopeCapability, setScopeCapability] = useState<Capability | null>(null);
   const [scopeUpdating, setScopeUpdating] = useState(false);
   const loadRequest = useRef(0);
+  const [policyCapability, setPolicyCapability] = useState<Capability | null>(null);
 
   const capabilityView = useMemo(() => splitCapabilityGroupsForPrimaryView(groups), [groups]);
   const primaryCodes = useMemo(
@@ -82,15 +84,42 @@ export default function CapabilityRoleEditor({
         .map((cap) => cap.code),
     );
   }, [matrix, capabilityView.primaryGroups]);
+  const policyConfigurableCodes = useMemo(() => {
+    const actions = (matrix?.modules ?? [])
+      .flatMap((module) => module.resources.flatMap((resource) => resource.actions))
+      .filter((action) => action.granted && action.supported && action.policySchema);
+    return new Set(
+      capabilityView.primaryGroups
+        .flatMap((group) => group.capabilities)
+        .filter((cap) => actions.some((action) => cap.includes.includes(action.code)))
+        .map((cap) => cap.code),
+    );
+  }, [matrix, capabilityView.primaryGroups]);
   const primarySelected = selected.filter((code) => primaryCodes.has(code));
   const dirty = isDirty(capabilityView.primaryGroups, primarySelected) || revokedPartial.length > 0;
   useEffect(() => {
-    onDirtyChange?.(dirty || saving || previewLoading || scopeUpdating || scopeCapability !== null);
-  }, [dirty, saving, previewLoading, scopeUpdating, scopeCapability, onDirtyChange]);
+    onDirtyChange?.(
+      dirty ||
+        saving ||
+        previewLoading ||
+        scopeUpdating ||
+        scopeCapability !== null ||
+        policyCapability !== null,
+    );
+  }, [
+    dirty,
+    saving,
+    previewLoading,
+    scopeUpdating,
+    scopeCapability,
+    policyCapability,
+    onDirtyChange,
+  ]);
 
   const loadMatrix = useCallback(async () => {
+    const current = loadRequest.current;
     const data = await permissionService.getMatrixForRole(rolePid);
-    setMatrix(data);
+    if (current === loadRequest.current) setMatrix(data);
     return data;
   }, [rolePid]);
 
@@ -99,6 +128,7 @@ export default function CapabilityRoleEditor({
     setLoading(true);
     setLoadError(false);
     setScopeCapability(null);
+    setPolicyCapability(null);
     setRevokedPartial([]);
     setPreview(false);
     setPreviewPlan(null);
@@ -503,6 +533,12 @@ export default function CapabilityRoleEditor({
           }}
           onConfigureScope={scopeReadOnly || dirty ? undefined : setScopeCapability}
           scopeConfigurableCodes={scopeConfigurableCodes}
+          policyConfigurableCodes={policyConfigurableCodes}
+          onConfigurePolicy={
+            scopeReadOnly || dirty || saving || previewLoading || scopeUpdating
+              ? undefined
+              : setPolicyCapability
+          }
           disabled={readOnly || saving || previewLoading || scopeUpdating}
         />
         {filteredGroups.length === 0 && (
@@ -562,6 +598,18 @@ export default function CapabilityRoleEditor({
           onClose={() => setScopeCapability(null)}
           onRefresh={loadMatrix}
           onBusy={setScopeUpdating}
+          onReadFailure={() => setLoadError(true)}
+        />
+      )}
+
+      {policyCapability && !scopeReadOnly && (
+        <CapabilityPolicySettings
+          key={`${rolePid}:${policyCapability.code}`}
+          rolePid={rolePid}
+          capability={policyCapability}
+          matrix={matrix}
+          onClose={() => setPolicyCapability(null)}
+          onRefresh={loadMatrix}
           onReadFailure={() => setLoadError(true)}
         />
       )}

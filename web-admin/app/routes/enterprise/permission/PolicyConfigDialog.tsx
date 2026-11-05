@@ -10,7 +10,7 @@
  *   - enum[]  → multi-select checkboxes
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/ui/ui/dialog';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -60,7 +60,7 @@ export interface PolicyConfigDialogProps {
   schema: Record<string, PolicyFieldSchema>;
   initialValues?: Record<string, any>;
   decisionApi?: RuleBindingDecisionApi;
-  onSuccess: () => void;
+  onSuccess: () => void | Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,15 +78,25 @@ interface FieldRendererProps {
   onChange: (key: string, value: any) => void;
 }
 
-function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: FieldRendererProps) {
+function FieldRenderer({
+  fieldKey,
+  fieldSchema,
+  value,
+  decisionApi,
+  onChange,
+}: FieldRendererProps) {
+  const { t, locale } = useI18n();
+  const fieldText = (key: string, zh: string, en: string) =>
+    t(key, undefined, locale?.startsWith('zh') ? zh : en);
   const fieldId = `policy-field-${fieldKey}`;
 
   const labelEl = (
     <label
       htmlFor={fieldId}
-      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+      className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
     >
-      {fieldSchema.label}
+      {fieldSchema.label ||
+        fieldText('admin.permission.policy.conditions', '业务条件', 'Business conditions')}
       {fieldSchema.required && (
         <span className="ml-1 text-red-500" aria-hidden>
           *
@@ -152,7 +162,7 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
             role="switch"
             aria-checked={checked}
             onClick={() => onChange(fieldKey, !checked)}
-            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none ${
               checked ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
             }`}
             data-testid={`policy-field-${fieldKey}`}
@@ -180,9 +190,7 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
             onChange={(e) => onChange(fieldKey, e.target.value)}
             data-testid={`policy-field-${fieldKey}`}
           >
-            {!fieldSchema.required && (
-              <option value="">—</option>
-            )}
+            {!fieldSchema.required && <option value="">—</option>}
             {options.map((opt) => (
               <option key={opt} value={opt}>
                 {opt}
@@ -219,7 +227,7 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
               <span className="text-xs text-gray-400 italic">No options defined</span>
             ) : (
               options.map((opt) => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                <label key={opt} className="flex cursor-pointer items-center gap-2">
                   <input
                     type="checkbox"
                     checked={selected.includes(opt)}
@@ -236,9 +244,10 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
     }
 
     case 'rule-center': {
-      const current = value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, any>)
-        : {};
+      const current =
+        value && typeof value === 'object' && !Array.isArray(value)
+          ? (value as Record<string, any>)
+          : {};
       const expectedMatched =
         current.expectedMatched !== undefined
           ? Boolean(current.expectedMatched)
@@ -269,8 +278,9 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
                 ? {
                     ...nextRuleBinding.decisionBinding,
                     timeoutMs: nextTimeout,
-                    fallbackPolicy:
-                      nextRuleBinding.decisionBinding.fallbackPolicy ?? { mode: 'FAIL_CLOSED' },
+                    fallbackPolicy: nextRuleBinding.decisionBinding.fallbackPolicy ?? {
+                      mode: 'FAIL_CLOSED',
+                    },
                   }
                 : nextRuleBinding.decisionBinding,
             }
@@ -294,7 +304,11 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
             <div>
               {labelEl}
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                权限 ABAC 仅读取上下文字段，超时、异常或未命中兜底时默认阻断。
+                {fieldText(
+                  'admin.permission.policy.contextOnly',
+                  '规则只读取已授权的上下文字段；超时、异常或结果不明确时拒绝操作。',
+                  'Rules read authorized context fields only. Timeouts, errors and unknown results deny the action.',
+                )}
               </p>
             </div>
             <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
@@ -304,12 +318,16 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
                 onChange={(event) => emitRuleCenterValue({ expectedMatched: event.target.checked })}
                 data-testid={`policy-rule-expected-${fieldKey}`}
               />
-              要求命中
+              {fieldText('admin.permission.policy.requireMatch', '要求命中', 'Require a match')}
             </label>
           </div>
 
           <label className="mb-3 block text-xs font-medium text-gray-600 dark:text-gray-300">
-            超时毫秒
+            {fieldText(
+              'admin.permission.policy.timeoutMillis',
+              '超时毫秒',
+              'Timeout in milliseconds',
+            )}
             <input
               id={`${fieldId}-timeout`}
               type="number"
@@ -371,17 +389,27 @@ export default function PolicyConfigDialog({
   decisionApi,
   onSuccess,
 }: PolicyConfigDialogProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
 
   const [values, setValues] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
+  const saveRequest = useRef(0);
+  const context = useRef('');
+  context.current = `${open}:${rolePid}:${permissionPid}`;
+  useEffect(() => {
+    setSaving(false);
+    return () => {
+      saveRequest.current++;
+    };
+  }, [open, rolePid, permissionPid]);
   const text = useCallback(
-    (key: string, fallback: string) => {
+    (key: string, zh: string, en: string) => {
+      const fallback = !locale || locale.startsWith('zh') ? zh : en;
       const translated = t(key, undefined, fallback);
       return translated && translated !== key ? translated : fallback;
     },
-    [t],
+    [t, locale],
   );
 
   // Build initial values from schema defaults merged with passed-in initialValues
@@ -406,13 +434,14 @@ export default function PolicyConfigDialog({
       if (field.required) {
         const v = values[key];
         const isEmpty =
-          v === null ||
-          v === undefined ||
-          v === '' ||
-          (Array.isArray(v) && v.length === 0);
+          v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
         if (isEmpty) {
           showErrorToast(
-            text('admin.permission.policy.requiredError', '必填字段缺失') +
+            text(
+              'admin.permission.policy.requiredError',
+              '必填字段缺失',
+              'Required fields are missing',
+            ) +
               ': ' +
               field.label,
           );
@@ -421,20 +450,29 @@ export default function PolicyConfigDialog({
       }
     }
 
+    const current = ++saveRequest.current;
+    const identity = context.current;
+    const isCurrent = () => current === saveRequest.current && identity === context.current;
     setSaving(true);
     try {
       await permissionService.setPolicy(rolePid, permissionPid, values);
+      if (!isCurrent()) return;
       showSuccessToast(
-        text('admin.permission.policy.saveSuccess', '策略配置已保存'),
+        text('admin.permission.policy.saveSuccess', '策略配置已保存', 'Policy settings saved'),
       );
-      onSuccess();
-      onClose();
+      await onSuccess();
+      if (isCurrent()) onClose();
     } catch (err) {
+      if (!isCurrent()) return;
       showErrorToast(
-        text('admin.permission.policy.saveError', '策略配置保存失败'),
+        text(
+          'admin.permission.policy.saveError',
+          '策略配置保存失败',
+          'Policy settings could not be saved',
+        ),
       );
     } finally {
-      setSaving(false);
+      if (isCurrent()) setSaving(false);
     }
   };
 
@@ -446,7 +484,7 @@ export default function PolicyConfigDialog({
         <DialogHeader className="px-6 pt-6 pr-12">
           <DialogTitle className="flex items-center gap-2">
             <span>
-              {text('admin.permission.policy.dialogTitle', '策略配置')}
+              {text('admin.permission.policy.dialogTitle', '策略配置', 'Policy settings')}
               {' — '}
               <span className="font-normal text-gray-600 dark:text-gray-400">
                 {permissionLabel}
@@ -455,15 +493,15 @@ export default function PolicyConfigDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <form
-          onSubmit={handleSubmit}
-          className="min-h-0"
-          data-testid="policy-config-form"
-        >
+        <form onSubmit={handleSubmit} className="min-h-0" data-testid="policy-config-form">
           <div className="max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto px-6 py-4 pb-24">
             {fieldEntries.length === 0 ? (
               <p className="text-sm text-gray-400 italic">
-                {text('admin.permission.policy.noFields', '此策略没有可配置字段。')}
+                {text(
+                  'admin.permission.policy.noFields',
+                  '此策略没有可配置字段。',
+                  'This policy has no configurable fields.',
+                )}
               </p>
             ) : (
               fieldEntries.map(([key, fieldSchema]) => (
@@ -485,14 +523,14 @@ export default function PolicyConfigDialog({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
-              {text('common.cancel', '取消')}
+              {text('common.cancel', '取消', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-60"
               data-testid="policy-save-button"
             >
               {saving ? (
@@ -517,10 +555,10 @@ export default function PolicyConfigDialog({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  {text('common.saving', '保存中...')}
+                  {text('common.saving', '保存中...', 'Saving...')}
                 </>
               ) : (
-                text('common.save', '保存')
+                text('common.save', '保存', 'Save')
               )}
             </button>
           </div>

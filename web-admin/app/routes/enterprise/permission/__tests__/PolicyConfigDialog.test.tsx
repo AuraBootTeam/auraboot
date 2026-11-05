@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import PolicyConfigDialog from '../PolicyConfigDialog';
 import { permissionService } from '~/shared/services/permissionService';
@@ -30,6 +30,35 @@ vi.mock('~/shared/services/permissionService', () => ({
 }));
 
 describe('PolicyConfigDialog', () => {
+  it('ignores a late save acknowledgement after the selected role changes', async () => {
+    let resolve!: () => void;
+    vi.mocked(permissionService.setPolicy).mockImplementationOnce(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+    );
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+    const props = {
+      open: true,
+      rolePid: 'role-a',
+      permissionPid: 'permission-a',
+      permissionLabel: 'Create record',
+      schema: {},
+      onSuccess,
+      onClose,
+    };
+    const view = render(<PolicyConfigDialog {...props} />);
+    fireEvent.click(screen.getByTestId('policy-save-button'));
+    expect(permissionService.setPolicy).toHaveBeenCalledWith('role-a', 'permission-a', {});
+    view.rerender(<PolicyConfigDialog {...props} rolePid="role-b" permissionPid="permission-b" />);
+    await act(async () => resolve());
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId('policy-save-button')).toBeEnabled();
+  });
+
   it('loads permission ABAC field choices from the Rule Center fact catalog', async () => {
     const decisionApi = {
       getFactCatalog: vi.fn().mockResolvedValue({
@@ -50,7 +79,9 @@ describe('PolicyConfigDialog', () => {
           },
         ],
       }),
-      getDecisionImpact: vi.fn().mockResolvedValue({ incoming: [], outgoing: [], risk: { summary: '无影响' } }),
+      getDecisionImpact: vi
+        .fn()
+        .mockResolvedValue({ incoming: [], outgoing: [], risk: { summary: '无影响' } }),
       evaluate: vi.fn().mockResolvedValue({ status: 'MATCHED', matched: true, outputs: {} }),
       getModelFields: vi.fn().mockResolvedValue([]),
     };
@@ -71,9 +102,7 @@ describe('PolicyConfigDialog', () => {
             fieldCatalogMode: 'merge',
             fieldCatalogModelCode: 'wd_leave_request',
             decisions: [{ code: 'permission_amount_guard', name: 'Amount Guard' }],
-            fields: [
-              { scope: 'actor', path: 'roles', label: '角色', dataType: 'collection' },
-            ],
+            fields: [{ scope: 'actor', path: 'roles', label: '角色', dataType: 'collection' }],
           },
         }}
         initialValues={{}}
@@ -81,11 +110,15 @@ describe('PolicyConfigDialog', () => {
       />,
     );
 
-    await waitFor(() => expect(decisionApi.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
+    await waitFor(() =>
+      expect(decisionApi.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'),
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
     await waitFor(() =>
-      expect(screen.getByRole('option', { name: '请假天数' })).toHaveValue('record:data.wd_req_days'),
+      expect(screen.getByRole('option', { name: '请假天数' })).toHaveValue(
+        'record:data.wd_req_days',
+      ),
     );
     fireEvent.change(screen.getByLabelText('mapping-input-0'), {
       target: { value: 'days' },
@@ -149,7 +182,12 @@ describe('PolicyConfigDialog', () => {
             ],
             fields: [
               { scope: 'record', path: 'amount', label: 'Amount', dataType: 'decimal' },
-              { scope: 'actor', path: 'departmentId', label: 'Actor Department', dataType: 'department' },
+              {
+                scope: 'actor',
+                path: 'departmentId',
+                label: 'Actor Department',
+                dataType: 'department',
+              },
             ],
           },
         }}
