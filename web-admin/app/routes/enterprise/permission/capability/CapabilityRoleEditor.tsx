@@ -27,6 +27,8 @@ import CapabilityDiagnostics from './CapabilityDiagnostics';
 import CapabilityScopeSettings from './CapabilityScopeSettings';
 import ConfirmDialog from '~/ui/ConfirmDialog';
 import FieldPolicyChecklist from './FieldPolicyChecklist';
+import RoleMenuChecklist from './RoleMenuChecklist';
+import UserNavigationPreviewDialog, { type ActiveRoleDraft } from './UserNavigationPreviewDialog';
 
 interface CapabilityRoleEditorProps {
   /** Role pid (all role-scoped endpoints key on the PID — role ids exceed JS safe-int range). */
@@ -34,6 +36,8 @@ interface CapabilityRoleEditorProps {
   onDirtyChange?: (dirty: boolean) => void;
   readOnly?: boolean;
   scopeReadOnly?: boolean;
+  activeSection?: 'menus' | 'capabilities' | 'scope';
+  onDraftChange?: (draft: ActiveRoleDraft | null) => void;
 }
 
 /**
@@ -49,9 +53,13 @@ export default function CapabilityRoleEditor({
   onDirtyChange,
   readOnly = false,
   scopeReadOnly = readOnly,
+  activeSection = 'capabilities',
+  onDraftChange,
 }: CapabilityRoleEditorProps) {
   const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const [menuSelection, setMenuSelection] = useState<string[] | null>(null);
+  const [subjectPreview, setSubjectPreview] = useState(false);
   const [groups, setGroups] = useState<CapabilityGroup[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [revokedPartial, setRevokedPartial] = useState<string[]>([]);
@@ -61,6 +69,7 @@ export default function CapabilityRoleEditor({
   const [loadError, setLoadError] = useState(false);
   const [preview, setPreview] = useState(false);
   const [query, setQuery] = useState('');
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPlan, setPreviewPlan] = useState<CapabilitySelectionPreview | null>(null);
   const [scopeCapability, setScopeCapability] = useState<Capability | null>(null);
@@ -177,7 +186,8 @@ export default function CapabilityRoleEditor({
     revokedPartial.length > 0 ||
     defaultChanged ||
     activeScopeChanges.length > 0 ||
-    fieldsDirty;
+    fieldsDirty ||
+    menuSelection !== null;
   useEffect(() => {
     onDirtyChange?.(dirty || saving || previewLoading || scopeCapability !== null || scopeOpen);
   }, [dirty, saving, previewLoading, scopeCapability, scopeOpen, onDirtyChange]);
@@ -190,6 +200,7 @@ export default function CapabilityRoleEditor({
     setApplyDefault(false);
     setScopeChanges([]);
     setFieldSelection(null);
+    setMenuSelection(null);
     setScopeLabels({});
     setConflict(false);
     setDraftPreview(null);
@@ -204,16 +215,38 @@ export default function CapabilityRoleEditor({
     );
     setMatrix(data);
   }, []);
-  const requestBody = (): AuthorizationDraft => ({
-    expectedRevision: baselineSnapshot?.revision ?? '',
-    selectedCapabilityCodes: primarySelected,
-    revokedPartialCapabilityCodes: revokedPartial,
-    defaultScopeChanged: defaultChanged,
-    defaultScopeType: defaultChanged ? defaultScope : null,
-    applyDefaultToCurrentGrants: applyDefault,
-    scopeChanges: activeScopeChanges,
-    ...(fieldsDirty ? { fieldPolicyPids: selectedFields } : {}),
-  });
+  const draftBody = useMemo<AuthorizationDraft>(
+    () => ({
+      expectedRevision: baselineSnapshot?.revision ?? '',
+      selectedCapabilityCodes: primarySelected,
+      revokedPartialCapabilityCodes: revokedPartial,
+      defaultScopeChanged: defaultChanged,
+      defaultScopeType: defaultChanged ? defaultScope : null,
+      applyDefaultToCurrentGrants: applyDefault,
+      scopeChanges: activeScopeChanges,
+      ...(fieldsDirty ? { fieldPolicyPids: selectedFields } : {}),
+      ...(menuSelection !== null ? { menuPids: menuSelection } : {}),
+    }),
+    [
+      baselineSnapshot?.revision,
+      JSON.stringify(primarySelected),
+      JSON.stringify(revokedPartial),
+      defaultChanged,
+      defaultScope,
+      applyDefault,
+      JSON.stringify(activeScopeChanges),
+      fieldsDirty,
+      JSON.stringify(selectedFields),
+      JSON.stringify(menuSelection),
+    ],
+  );
+  const requestBody = () => draftBody;
+  useEffect(() => {
+    onDraftChange?.(
+      baselineSnapshot ? { rolePid: baselineSnapshot.rolePid, draft: draftBody } : null,
+    );
+  }, [draftBody, baselineSnapshot, onDraftChange]);
+  useEffect(() => () => onDraftChange?.(null), [onDraftChange]);
 
   const load = useCallback(async () => {
     const request = ++loadRequest.current;
@@ -275,6 +308,7 @@ export default function CapabilityRoleEditor({
       const snapshot = await authorizationDraftService.save(rolePid, reviewedDraft.current);
       if (request !== loadRequest.current) return;
       acceptSnapshot(snapshot);
+      window.dispatchEvent(new Event('menu:refresh'));
       showSuccessToast(t('common.saveSuccess', undefined, 'Saved'));
     } catch (error) {
       if (request !== loadRequest.current) return;
@@ -345,6 +379,7 @@ export default function CapabilityRoleEditor({
     );
 
   const filteredGroups = capabilityView.primaryGroups
+    .filter((group) => activeGroup === null || group.group === activeGroup)
     .map((group) => ({
       ...group,
       capabilities: group.capabilities.filter((cap) =>
@@ -394,6 +429,41 @@ export default function CapabilityRoleEditor({
   );
   const previewContent = previewPlan ? (
     <div className="space-y-4" data-testid="capability-preview-summary">
+      {draftPreview?.navigation && (
+        <section
+          data-testid="draft-preview-menus"
+          className="border-border rounded-control border p-3"
+        >
+          <h3 className="text-text-1 text-sm font-medium">
+            {t('roleNavigation.reviewMenus', undefined, 'Visible menu changes')}
+          </h3>
+          <p className="text-text-2 mt-1 text-xs">
+            {t(
+              'roleNavigation.selected',
+              { count: draftPreview.navigation.selectedMenuPids.length },
+              `${draftPreview.navigation.selectedMenuPids.length} selected`,
+            )}
+          </p>
+          <ul className="mt-2 text-xs">
+            {draftPreview.navigation.menus
+              .filter(
+                (m) => !m.directory && draftPreview.navigation!.selectedMenuPids.includes(m.pid),
+              )
+              .map((m) => (
+                <li key={m.pid}>
+                  {m.name || t('roleNavigation.removed', undefined, 'Removed menu')}
+                </li>
+              ))}
+          </ul>
+          <p className="text-text-2 mt-2 text-xs">
+            {t(
+              'roleNavigation.help',
+              undefined,
+              'Selection controls navigation only. Business permissions, record scopes and fields remain independent.',
+            )}
+          </p>
+        </section>
+      )}
       <ul className="space-y-1">
         {changes.map((cap) => (
           <li key={cap.code}>
@@ -572,18 +642,29 @@ export default function CapabilityRoleEditor({
       data-role-pid={rolePid}
       className="flex flex-col gap-4"
     >
-      {/* ② data scope */}
-      <DataScopeBar
-        matrix={projectedMatrix}
-        defaultScope={defaultScope}
-        applyToCurrent={applyDefault}
-        onOpenChange={setScopeOpen}
-        onStage={(scope, applyCurrent) => {
-          setDefaultScope(scope);
-          setApplyDefault(applyCurrent);
-        }}
-        disabled={scopeReadOnly || saving || previewLoading || conflict}
-      />
+      {activeSection === 'menus' && (
+        <RoleMenuChecklist
+          selection={baselineSnapshot?.navigation}
+          selected={menuSelection ?? baselineSnapshot?.navigation?.selectedMenuPids ?? []}
+          disabled={readOnly || saving || previewLoading || conflict}
+          onChange={setMenuSelection}
+          onPreview={() => setSubjectPreview(true)}
+        />
+      )}
+      {/* Record scope shares the same draft as duties, fields and navigation. */}
+      <div hidden={activeSection !== 'scope'}>
+        <DataScopeBar
+          matrix={projectedMatrix}
+          defaultScope={defaultScope}
+          applyToCurrent={applyDefault}
+          onOpenChange={setScopeOpen}
+          onStage={(scope, applyCurrent) => {
+            setDefaultScope(scope);
+            setApplyDefault(applyCurrent);
+          }}
+          disabled={scopeReadOnly || saving || previewLoading || conflict}
+        />
+      </div>
 
       {conflict && (
         <div
@@ -610,92 +691,126 @@ export default function CapabilityRoleEditor({
       )}
       {/* ① business capabilities (primary) */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-text text-sm font-semibold">
-              {t('admin.permission.editor.capabilities', undefined, 'Business capabilities')}
-            </h3>
-            <p className="text-text-2 mt-1 text-xs">
-              {t(
-                'admin.permission.editor.selection',
-                { selected: primarySelected.length, total: capabilityView.primaryTotal },
-                `${primarySelected.length} selected of ${capabilityView.primaryTotal}`,
-              )}
-            </p>
+        <div hidden={activeSection !== 'capabilities'}>
+          <p className="bg-subtle text-text-2 rounded-control mb-4 px-3 py-2 text-xs">
+            {t(
+              'roleNavigation.businessHelp',
+              undefined,
+              'Business duties do not select menus automatically. Internal service steps are authorized by the business use case.',
+            )}
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-text text-sm font-semibold">
+                {t('admin.permission.editor.capabilities', undefined, 'Business capabilities')}
+              </h3>
+              <p className="text-text-2 mt-1 text-xs">
+                {t(
+                  'admin.permission.editor.selection',
+                  { selected: primarySelected.length, total: capabilityView.primaryTotal },
+                  `${primarySelected.length} selected of ${capabilityView.primaryTotal}`,
+                )}
+              </p>
+            </div>
+            <input
+              aria-label={t('admin.permission.editor.search', undefined, 'Search capabilities')}
+              data-testid="capability-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('admin.permission.editor.search', undefined, 'Search capabilities')}
+              className="rounded-control border-border bg-panel text-text h-8 border px-3 text-sm"
+            />
           </div>
-          <input
-            aria-label={t('admin.permission.editor.search', undefined, 'Search capabilities')}
-            data-testid="capability-search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('admin.permission.editor.search', undefined, 'Search capabilities')}
-            className="rounded-control border-border bg-panel text-text h-8 border px-3 text-sm"
+          <div data-testid="capability-module-filter" className="my-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveGroup(null)}
+              className={`rounded-control border px-2 py-1 text-xs ${activeGroup === null ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-border text-text-2'}`}
+            >
+              {t('roleNavigation.allModules', undefined, 'All modules')}
+            </button>
+            {capabilityView.primaryGroups
+              .filter((g) => g.group !== null)
+              .map((g) => (
+                <button
+                  key={g.group}
+                  type="button"
+                  onClick={() => setActiveGroup(g.group)}
+                  className={`rounded-control border px-2 py-1 text-xs ${activeGroup === g.group ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-border text-text-2'}`}
+                >
+                  {t(`permission.module.${g.group}`, undefined, g.group ?? '')}
+                </button>
+              ))}
+          </div>
+          <div data-testid="capability-presets" className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {t('permission.capability.preset.label', undefined, 'Presets')}
+            </span>
+            {[
+              {
+                tier: 'viewer',
+                label: t('permission.capability.preset.viewer', undefined, 'Viewer'),
+              },
+              {
+                tier: 'editor',
+                label: t('permission.capability.preset.editor', undefined, 'Editor'),
+              },
+              {
+                tier: 'admin',
+                label: t('permission.capability.preset.admin', undefined, 'Administrator'),
+              },
+            ].map((p) => (
+              <button
+                key={p.tier}
+                type="button"
+                data-testid={`capability-preset-${p.tier}`}
+                onClick={() => applyPreset(p.tier)}
+                disabled={readOnly || saving || previewLoading}
+                className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 hover:bg-gray-50"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <CapabilityChecklist
+            groups={filteredGroups}
+            selected={selected}
+            onToggle={onToggle}
+            revokedPartial={revokedPartial}
+            onRevokePartial={(code) => {
+              if (readOnly) return;
+              setSelected((current) => current.filter((item) => item !== code));
+              setRevokedPartial((current) => toggleCapability(current, code));
+            }}
+            onConfigureScope={scopeReadOnly || conflict ? undefined : setScopeCapability}
+            scopeConfigurableCodes={scopeConfigurableCodes}
+            disabled={readOnly || saving || previewLoading}
           />
         </div>
-        <div data-testid="capability-presets" className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gray-500">
-            {t('permission.capability.preset.label', undefined, 'Presets')}
-          </span>
-          {[
-            {
-              tier: 'viewer',
-              label: t('permission.capability.preset.viewer', undefined, 'Viewer'),
-            },
-            {
-              tier: 'editor',
-              label: t('permission.capability.preset.editor', undefined, 'Editor'),
-            },
-            {
-              tier: 'admin',
-              label: t('permission.capability.preset.admin', undefined, 'Administrator'),
-            },
-          ].map((p) => (
-            <button
-              key={p.tier}
-              type="button"
-              data-testid={`capability-preset-${p.tier}`}
-              onClick={() => applyPreset(p.tier)}
-              disabled={readOnly || saving || previewLoading}
-              className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 hover:bg-gray-50"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <CapabilityChecklist
-          groups={filteredGroups}
-          selected={selected}
-          onToggle={onToggle}
-          revokedPartial={revokedPartial}
-          onRevokePartial={(code) => {
-            if (readOnly) return;
-            setSelected((current) => current.filter((item) => item !== code));
-            setRevokedPartial((current) => toggleCapability(current, code));
-          }}
-          onConfigureScope={scopeReadOnly || conflict ? undefined : setScopeCapability}
-          scopeConfigurableCodes={scopeConfigurableCodes}
-          disabled={readOnly || saving || previewLoading}
-        />
-        <FieldPolicyChecklist
-          key={rolePid}
-          rolePid={rolePid}
-          bound={boundFields}
-          selected={selectedFields}
-          models={fieldModels}
-          grantedCodes={
-            new Set(
-              (projectedMatrix?.modules ?? []).flatMap((module) =>
-                module.resources.flatMap((resource) =>
-                  resource.actions.filter((action) => action.granted).map((action) => action.code),
+        <div hidden={activeSection !== 'scope'}>
+          <FieldPolicyChecklist
+            key={rolePid}
+            rolePid={rolePid}
+            bound={boundFields}
+            selected={selectedFields}
+            models={fieldModels}
+            grantedCodes={
+              new Set(
+                (projectedMatrix?.modules ?? []).flatMap((module) =>
+                  module.resources.flatMap((resource) =>
+                    resource.actions
+                      .filter((action) => action.granted)
+                      .map((action) => action.code),
+                  ),
                 ),
-              ),
-            )
-          }
-          readOnly={readOnly}
-          disabled={readOnly || saving || previewLoading || conflict}
-          onChange={setFieldSelection}
-        />
-        {filteredGroups.length === 0 && (
+              )
+            }
+            readOnly={readOnly}
+            disabled={readOnly || saving || previewLoading || conflict}
+            onChange={setFieldSelection}
+          />
+        </div>
+        {activeSection === 'capabilities' && filteredGroups.length === 0 && (
           <p data-testid="capability-search-empty" className="text-text-2 py-4 text-sm">
             {t('admin.permission.editor.empty', undefined, 'No matching business capabilities')}
           </p>
@@ -752,7 +867,15 @@ export default function CapabilityRoleEditor({
         </div>
       </div>
 
-      <CapabilityDiagnostics matrix={matrix} groups={groups} />
+      {activeSection === 'capabilities' && (
+        <CapabilityDiagnostics matrix={matrix} groups={groups} />
+      )}
+      <UserNavigationPreviewDialog
+        open={subjectPreview}
+        onClose={() => setSubjectPreview(false)}
+        rolePid={rolePid}
+        draft={baselineSnapshot ? { rolePid, draft: draftBody } : null}
+      />
       {scopeCapability && !scopeReadOnly && (
         <CapabilityScopeSettings
           capability={scopeCapability}

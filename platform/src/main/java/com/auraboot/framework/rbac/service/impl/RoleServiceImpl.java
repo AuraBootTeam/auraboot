@@ -43,6 +43,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     private RoleMapper roleMapper;
 
     @Autowired
+    private com.auraboot.framework.menu.service.RoleNavigationService roleNavigation;
+
+    @Autowired
     private com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
 
     @Autowired
@@ -77,6 +80,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         role.setIsSystem(RoleConstants.isPlatformOnly(role.getCode()));
         
         save(role);
+        // Bootstrap administrator/member roles retain the marked compatibility projection.
+        if(!Set.of("tenant_admin","tenant_member","platform_admin").contains(role.getCode()))roleNavigation.initialize(role);
         
         log.info("Role created successfully: {}", role.getId());
         return role;

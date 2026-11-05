@@ -115,6 +115,7 @@ public class NavigationConfigurationService {
                 throw invalid("Move or delete child menus first");
             // deletedFlag is the configured MyBatis logic-delete field. An ordinary update omits it.
             if(menus.deleteById(base.getId())!=1)throw new IllegalStateException("Navigation removal did not update exactly one owned menu");
+            jdbc.update("DELETE FROM ab_role_navigation_menu WHERE tenant_id=? AND menu_pid=?",tenant(),pid);
             jdbc.update("DELETE FROM ab_navigation_customization WHERE tenant_id=? AND menu_pid=?", tenant(), pid);
             audit(pid, "DELETE", before, null);
         }
@@ -136,9 +137,11 @@ public class NavigationConfigurationService {
         return base;
     }
 
+    public List<Menu> defaultTargetMenus(Long tenant) { return defaults(tenant).stream().filter(menu->!custom(menu)&&com.auraboot.framework.menu.service.MenuEnvironmentScopeService.isVisibleIn(menu,MetaContext.getCurrentEnvironmentId())).toList(); }
+
     /** Preserve legacy target protection independently of navigation ordering and overrides. */
     public Menu targetAccessMenu(Long tenant, String path) {
-        return selectTargetAccessMenu(defaults(tenant), path);
+        return selectTargetAccessMenu(defaultTargetMenus(tenant), path);
     }
 
     static Menu selectTargetAccessMenu(List<Menu> defaults, String path) {

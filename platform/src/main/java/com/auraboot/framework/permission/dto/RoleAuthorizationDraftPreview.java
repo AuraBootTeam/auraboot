@@ -12,5 +12,9 @@ public record RoleAuthorizationDraftPreview(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String defaultScopeType,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean applyDefaultToCurrentGrants,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopeChanges,
-        RoleFieldPolicyPreview fieldPolicies) {
+        RoleFieldPolicyPreview fieldPolicies,
+        com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation) {
+    public RoleAuthorizationDraftPreview(String revision,CapabilitySelectionPreview capabilities,boolean defaultScopeChanged,String defaultScopeType,boolean applyDefaultToCurrentGrants,List<DataScopeUpdateRequest> scopeChanges,RoleFieldPolicyPreview fieldPolicies) {
+        this(revision,capabilities,defaultScopeChanged,defaultScopeType,applyDefaultToCurrentGrants,scopeChanges,fieldPolicies,null);
+    }
 }

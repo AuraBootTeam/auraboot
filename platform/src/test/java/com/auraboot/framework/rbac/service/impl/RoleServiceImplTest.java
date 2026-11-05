@@ -80,6 +80,7 @@ class RoleServiceImplTest {
         injectField(service, "authoringAccess", authoringAccess);
         injectField(service, "baseMapper", roleMapper);
         injectField(service, "roleMapper", roleMapper);
+        injectField(service,"roleNavigation",org.mockito.Mockito.mock(com.auraboot.framework.menu.service.RoleNavigationService.class));
         injectField(service, "rolePermissionService", rolePermissionService);
         injectField(service, "userRoleService", userRoleService);
         injectField(service, "permissionService", permissionService);

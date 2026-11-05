@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import NavigationRoleAssignment from './NavigationRoleAssignment';
 import { usePermissions } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -647,38 +648,29 @@ function Editor() {
                         {t('navigation.enabled', undefined, 'Enabled')}
                       </label>
                     </div>
-                    <label className="text-text-2 block space-y-1 text-sm">
-                      <span>{t('navigation.access', undefined, 'Visibility requirement')}</span>
-                      <select
-                        data-testid="navigation-access"
-                        disabled={!!entry?.definition.permissionCode && entry.source !== 'custom'}
-                        value={draft.permissionCode || ''}
-                        onChange={(e) =>
-                          setDraft({
-                            ...draft,
-                            permissionCode: e.target.value || null,
-                            authenticated: !e.target.value,
-                          })
-                        }
-                        className={input}
-                      >
-                        <option value="">
-                          {t('navigation.authenticated', undefined, 'Signed-in users')}
-                        </option>
-                        {snapshot?.permissions.map((permission) => (
-                          <option key={permission.value} value={permission.value}>
-                            {permission.label}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="block text-xs">
+                    <p className="text-text-2 text-xs">
+                      {t(
+                        'roleNavigation.globalHelp',
+                        undefined,
+                        'Role assignment and global enabled status determine visibility. Target pages retain their own business authorization.',
+                      )}
+                    </p>
+                    {entry && draft.kind !== 'directory' && (
+                      <NavigationRoleAssignment
+                        key={entry.pid}
+                        menuPid={entry.pid}
+                        disabled={saving || conflict || dirty}
+                      />
+                    )}
+                    {!entry && draft.kind !== 'directory' && (
+                      <p className="text-text-2 text-xs">
                         {t(
-                          'navigation.access.help',
+                          'roleNavigation.afterCreate',
                           undefined,
-                          'Default target requirements remain in place. Visibility does not grant page, operation or data permissions.',
+                          'Save this menu, then assign its visible roles. New entries are not assigned automatically.',
                         )}
-                      </span>
-                    </label>
+                      </p>
+                    )}
                   </section>
                 </fieldset>
                 <div className="flex justify-end gap-3">

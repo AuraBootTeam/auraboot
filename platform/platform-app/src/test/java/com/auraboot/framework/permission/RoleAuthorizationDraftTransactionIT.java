@@ -42,6 +42,7 @@ import static org.mockito.Mockito.reset;
 @Transactional(propagation = Propagation.NEVER)
 class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private RoleAuthorizationDraftService drafts;
+    @MockitoSpyBean private com.auraboot.framework.menu.service.RoleNavigationService navigation;
     @Autowired private com.auraboot.framework.plugin.pf4j.ExtensionRegistry originalExtensions;
     @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired private org.springframework.transaction.PlatformTransactionManager transactions;
@@ -497,6 +498,43 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             case "future" -> jdbc.update("UPDATE ab_user_role SET effective_date=CURRENT_DATE+1 WHERE role_id=?",roleId);
         }
         assertThat(policyMapper.findEffectivePolicies(getTestTenant().getId(), resource, getTestTenantMember().getId())).isEmpty();
+    }
+
+    @Test void menuAssignmentDoesNotCreateBusinessGrantsAndConflictsWithAnOlderJointDraft() {
+        String menuPid=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,code,name,type,path,visible,status,deleted_flag) VALUES(?,?,?,?,?,1,'/home',TRUE,'active',FALSE)",IdWorker.getId(),menuPid,getTestTenant().getId(),resource+"_menu","Navigation fixture");
+        try {
+            var before=drafts.snapshot(rolePid);
+            long grantsBefore=jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE role_id=?",Long.class,roleId);
+            var menuOnly=new RoleAuthorizationDraftRequest(before.revision(),Set.of(),Set.of(),false,null,false,List.of(),null,Set.of(menuPid));
+            assertThat(drafts.preview(rolePid,menuOnly).navigation().selectedMenuPids()).containsExactly(menuPid);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_state WHERE role_id=?",Integer.class,roleId)).isZero();
+            var saved=drafts.apply(rolePid,menuOnly);
+            assertThat(saved.navigation().mode()).isEqualTo("explicit");
+            assertThat(saved.navigation().selectedMenuPids()).containsExactly(menuPid);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE role_id=?",Long.class,roleId)).isEqualTo(grantsBefore);
+            assertThatThrownBy(()->drafts.apply(rolePid,menuOnly)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+            var revision=saved.revision();
+            navigation.save(rolePid,new com.auraboot.framework.menu.dto.RoleNavigation.Write(saved.navigation().revision(),Set.of()));
+            assertThatThrownBy(()->drafts.apply(rolePid,new RoleAuthorizationDraftRequest(revision,Set.of(editCapability),Set.of(),false,null,false,List.of())))
+                    .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        } finally {jdbc.update("DELETE FROM ab_role_navigation_menu WHERE menu_pid=?",menuPid);jdbc.update("DELETE FROM ab_menu WHERE pid=?",menuPid);}
+    }
+
+    @Test void failureAfterActualMenuAndBusinessWritesRollsBackTheWholeJointDraft() {
+        String menuPid=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,code,name,type,path,visible,status,deleted_flag) VALUES(?,?,?,?,?,1,'/home',TRUE,'active',FALSE)",IdWorker.getId(),menuPid,getTestTenant().getId(),resource+"_rollback_menu","Navigation rollback fixture");
+        try {
+            var before=drafts.snapshot(rolePid);
+            long grantsBefore=jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE role_id=?",Long.class,roleId);
+            doAnswer(call->{call.callRealMethod();assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_menu WHERE role_id=?",Integer.class,roleId)).isEqualTo(1);throw new IllegalStateException("Fault after actual navigation write");})
+                    .when(navigation).apply(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(Set.of(menuPid)));
+            assertThatThrownBy(()->drafts.apply(rolePid,new RoleAuthorizationDraftRequest(before.revision(),Set.of(editCapability),Set.of(),true,"self",false,List.of(),null,Set.of(menuPid))))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("Fault after actual navigation write");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_state WHERE role_id=?",Integer.class,roleId)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_menu WHERE role_id=?",Integer.class,roleId)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE role_id=?",Long.class,roleId)).isEqualTo(grantsBefore);
+        } finally {reset(navigation);jdbc.update("DELETE FROM ab_role_navigation_menu WHERE menu_pid=?",menuPid);jdbc.update("DELETE FROM ab_menu WHERE pid=?",menuPid);}
     }
 
     private RoleAuthorizationDraftRequest fieldsRequest(RoleAuthorizationDraftSnapshot baseline, Set<String> selected) {

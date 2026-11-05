@@ -46,6 +46,8 @@ public class RoleAuthorizationDraftService {
     private final RoleAuthorizationWriteLock writes;
     private final RoleAuthorizationAuthoringAccess authoringAccess;
     private final RoleFieldPolicyDraftService fieldPolicies;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auraboot.framework.menu.service.RoleNavigationService roleNavigation;
     private final RoleService roles;
     private final RolePermissionMapper grants;
     private final PermissionService permissions;
@@ -182,6 +184,7 @@ public class RoleAuthorizationDraftService {
             matrix.setRoleScope(tenant,role.getId(),change);
         }
         fieldPolicies.apply(role, reviewed.fieldPolicies());
+        if(request.menuPids()!=null)roleNavigation.apply(role,request.menuPids());
         // A failed write or readback propagates and rolls back the entire authoring operation.
         return snapshot(resolve(rolePid));
     }
@@ -193,6 +196,7 @@ public class RoleAuthorizationDraftService {
                 || revoked(request).size() > 5000 || changes(request).size() > 1000) throw invalid();
         String revision = revision(role);
         if (!revision.equals(request.expectedRevision())) throw new BusinessException(ResponseCode.CasVersionConflict);
+        if(request.menuPids()!=null)roleNavigation.validate(role,request.menuPids());
         if (request.defaultScopeChanged() && request.defaultScopeType() != null) scopeType(request.defaultScopeType());
         if (!request.defaultScopeChanged() && request.defaultScopeType() != null) throw invalid();
         if (request.applyDefaultToCurrentGrants()
@@ -228,7 +232,8 @@ public class RoleAuthorizationDraftService {
         }
         return new RoleAuthorizationDraftPreview(revision, selection, request.defaultScopeChanged(),
                 request.defaultScopeType(), request.applyDefaultToCurrentGrants(), changes(request),
-                fieldPolicies.preview(role, request.fieldPolicyPids(), permittedModels));
+                fieldPolicies.preview(role, request.fieldPolicyPids(), permittedModels),
+                request.menuPids()==null?null:roleNavigation.preview(role,request.menuPids(),resulting));
     }
 
     private RoleAuthorizationDraftSnapshot snapshot(Role role) {
@@ -236,7 +241,7 @@ public class RoleAuthorizationDraftService {
                 capabilities.resolveForRole(role.getId()), matrix.getMatrixForRole(role.getTenantId(), role.getId()),
                 scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
                         .map(scope -> new DataScopeUpdateRequest(scope.getResourceCode(), scope.getActionCode(),
-                                scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role));
+                                scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role),roleNavigation.selection(role));
     }
 
     private Role resolve(String rolePid) {
@@ -248,6 +253,7 @@ public class RoleAuthorizationDraftService {
     private String revision(Role role) {
         Map<String, Object> state = new LinkedHashMap<>();
         state.put("role", role);
+        state.put("navigation",roleNavigation.selection(role));
         state.put("grants", grants.findByRole(role.getId()).stream()
                 .sorted(Comparator.comparing(RolePermission::getId, Comparator.nullsLast(Long::compareTo))).toList());
         state.put("scopes", scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()

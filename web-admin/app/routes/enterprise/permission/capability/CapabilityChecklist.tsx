@@ -191,9 +191,9 @@ export default function CapabilityChecklist({
                       >
                         <summary className="cursor-pointer hover:text-gray-700">
                           {t(
-                            'admin.permission.capability.relatedMenusV2',
+                            'roleNavigation.relatedPages',
                             undefined,
-                            'Related menus',
+                            'Related pages (reference only)',
                           )}
                           {' · '}
                           {cap.unlockedMenus.length}

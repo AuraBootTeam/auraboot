@@ -22,6 +22,10 @@ import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import ConfirmDialog from '~/ui/ConfirmDialog';
 import RoleFormDialog from './permission/RoleFormDialog';
 import CapabilityRoleEditor from './permission/capability/CapabilityRoleEditor';
+import UserNavigationPreviewDialog, {
+  type ActiveRoleDraft,
+} from './permission/capability/UserNavigationPreviewDialog';
+import RoleNavigationAudit from './permission/capability/RoleNavigationAudit';
 import RoleMemberTab from './permission/RoleMemberTab';
 import PermissionAuditTab from './permission/PermissionAuditTab';
 import type { Role } from './permission/types';
@@ -35,11 +39,8 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-// v2 IA: capability is the primary, business-language grant surface (the raw matrix is folded into
-// the capability editor as a collapsed "advanced" escape hatch); the separate flat "assignments"
-// tab is retired. The role surface keeps capabilities and members, with audit as the
-// operator-facing trace view for permission DENY decisions.
-type RightTabKey = 'capabilities' | 'members' | 'audit';
+// Menus, business duties and scopes share a draft; membership and audit remain separate.
+type RightTabKey = 'menus' | 'capabilities' | 'scope' | 'members' | 'audit';
 
 const TYPE_BADGE: Record<string, string> = {
   SYSTEM: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -93,6 +94,8 @@ function PermissionManagementContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRolePid, setSelectedRolePid] = useState<string | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [activeDraft, setActiveDraft] = useState<ActiveRoleDraft | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<{
     rolePid?: string;
     tab?: RightTabKey;
@@ -101,7 +104,7 @@ function PermissionManagementContent() {
 
   // Right panel tab state — capability editor is the default surface.
   const [activeRightTab, setActiveRightTab] = useState<RightTabKey>(
-    auditDeepLink && canManageScope ? 'audit' : 'capabilities',
+    auditDeepLink && canManageScope ? 'audit' : 'menus',
   );
 
   const selectRole = (rolePid: string) => {
@@ -112,7 +115,14 @@ function PermissionManagementContent() {
   const selectTab = (tab: RightTabKey) => {
     if (tab === 'audit' && !canManageScope) return;
     if (tab === activeRightTab) return;
-    if (editorDirty) setPendingNavigation({ tab });
+    if (
+      editorDirty &&
+      !(
+        ['menus', 'capabilities', 'scope'].includes(tab) &&
+        ['menus', 'capabilities', 'scope'].includes(activeRightTab)
+      )
+    )
+      setPendingNavigation({ tab });
     else setActiveRightTab(tab);
   };
   useEffect(() => {
@@ -173,7 +183,7 @@ function PermissionManagementContent() {
     if (auditDeepLink && canManageScope) {
       setActiveRightTab('audit');
     } else if (!canManageScope) {
-      setActiveRightTab((current) => current === 'audit' ? 'capabilities' : current);
+      setActiveRightTab((current) => (current === 'audit' ? 'capabilities' : current));
     }
   }, [auditDeepLink, canManageScope]);
 
@@ -290,7 +300,7 @@ function PermissionManagementContent() {
   const renderRolesTab = () => (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
       {/* Left — Role table */}
-      <div className="border-border flex max-h-56 w-full min-w-0 flex-shrink-0 flex-col border-b lg:max-h-none lg:w-72 lg:border-r lg:border-b-0 dark:border-gray-700">
+      <div className="border-border flex max-h-56 w-full min-w-0 flex-shrink-0 flex-col border-b lg:max-h-none lg:w-60 lg:border-r lg:border-b-0 dark:border-gray-700">
         <div className="border-b border-gray-200 p-3 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -397,7 +407,7 @@ function PermissionManagementContent() {
                         <div className="flex items-center justify-end gap-0.5">
                           <button
                             data-testid={`role-action-edit-${role.code}`}
-              disabled={!canManageRoles}
+                            disabled={!canManageRoles}
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingRole(role);
@@ -412,7 +422,7 @@ function PermissionManagementContent() {
                             <PermissionGuard permission="org.role.update">
                               <button
                                 data-testid={`role-action-toggle-${role.code}`}
-              disabled={!canManageRoles}
+                                disabled={!canManageRoles}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleRole(role);
@@ -424,7 +434,7 @@ function PermissionManagementContent() {
                               </button>
                               <button
                                 data-testid={`role-action-delete-${role.code}`}
-              disabled={!canManageRoles}
+                                disabled={!canManageRoles}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setConfirmDelete({ open: true, role });
@@ -451,12 +461,31 @@ function PermissionManagementContent() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="border-b border-gray-200 px-6 dark:border-gray-700">
           <nav className="-mb-px flex space-x-6">
+            {(['menus', 'scope'] as const).map((section) => (
+              <button
+                key={section}
+                type="button"
+                role="tab"
+                aria-selected={activeRightTab === section}
+                data-testid={`permission-right-tab-${section}`}
+                onClick={() => selectTab(section)}
+                className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium ${activeRightTab === section ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}
+                style={{ order: section === 'menus' ? 0 : 2 }}
+              >
+                {t(
+                  section === 'menus' ? 'roleNavigation.tabMenus' : 'roleNavigation.tabScope',
+                  undefined,
+                  section === 'menus' ? 'Visible menus' : 'Record scopes and fields',
+                )}
+              </button>
+            ))}
             <button
               type="button"
               role="tab"
               aria-selected={activeRightTab === 'capabilities'}
               data-testid="permission-right-tab-capabilities"
               onClick={() => selectTab('capabilities')}
+              style={{ order: 1 }}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                 activeRightTab === 'capabilities'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -464,12 +493,13 @@ function PermissionManagementContent() {
               }`}
             >
               <ShieldCheckIcon className="mr-1.5 h-4 w-4" />
-              {t('admin.permission.tab.capabilities') || 'Capabilities'}
+              {t('roleNavigation.tabBusiness', undefined, 'Business permissions')}
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={activeRightTab === 'members'}
+              style={{ order: 3 }}
               data-testid="permission-right-tab-members"
               onClick={() => selectTab('members')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
@@ -485,6 +515,7 @@ function PermissionManagementContent() {
               type="button"
               role="tab"
               aria-selected={activeRightTab === 'audit'}
+              style={{ order: 4 }}
               data-testid="permission-right-tab-audit"
               disabled={!canManageScope}
               onClick={() => selectTab('audit')}
@@ -495,7 +526,7 @@ function PermissionManagementContent() {
               }`}
             >
               <ClockIcon className="mr-1.5 h-4 w-4" />
-              {t('admin.permission.tab.audit', undefined, 'Audit')}
+              {t('roleNavigation.tabChanges', undefined, 'Changes')}
             </button>
           </nav>
         </div>
@@ -507,27 +538,36 @@ function PermissionManagementContent() {
                 {selectedRole.name}
               </h2>
               <p className="mt-1 text-xs text-gray-500">
-                {activeRightTab === 'members' ? t(
-                  canAssignMembers ? 'admin.permission.members.manageHint' : 'admin.permission.members.readOnlyHint',
-                  undefined,
-                  canAssignMembers ? 'Manage membership and access periods for this role.'
-                    : 'View members and access periods. Membership changes require permission.',
-                ) : t(
-                  canManageRoles ? 'admin.permission.editor.roleHint' : 'admin.permission.editor.readOnlyHint',
-                  undefined,
-                  canManageRoles
-                    ? 'Select business capabilities, then review and save the changes.'
-                    : 'Read-only role access. Changes require the corresponding administration permission.',
-                )}
+                {activeRightTab === 'members'
+                  ? t(
+                      canAssignMembers
+                        ? 'admin.permission.members.manageHint'
+                        : 'admin.permission.members.readOnlyHint',
+                      undefined,
+                      canAssignMembers
+                        ? 'Manage membership and access periods for this role.'
+                        : 'View members and access periods. Membership changes require permission.',
+                    )
+                  : t(
+                      canManageRoles
+                        ? 'admin.permission.editor.roleHint'
+                        : 'admin.permission.editor.readOnlyHint',
+                      undefined,
+                      canManageRoles
+                        ? 'Configure visible menus, business duties, record scopes and fields in one role draft.'
+                        : 'Read-only role access. Changes require the corresponding administration permission.',
+                    )}
               </p>
             </div>
           )}
 
-          {activeRightTab === 'capabilities' &&
+          {['menus', 'capabilities', 'scope'].includes(activeRightTab) &&
             (selectedRole ? (
               <CapabilityRoleEditor
                 key={selectedRole.pid}
                 rolePid={selectedRole.pid}
+                activeSection={activeRightTab as 'menus' | 'capabilities' | 'scope'}
+                onDraftChange={setActiveDraft}
                 readOnly={!canManageRoles}
                 scopeReadOnly={!canManageScope}
                 onDirtyChange={setEditorDirty}
@@ -537,8 +577,26 @@ function PermissionManagementContent() {
                 {t('admin.permission.selectRole') || 'Select a role'}
               </div>
             ))}
-          {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} readOnly={!canAssignMembers} />}
-          {activeRightTab === 'audit' && canManageScope && <PermissionAuditTab />}
+          {activeRightTab === 'members' && (
+            <RoleMemberTab rolePid={selectedRolePid} readOnly={!canAssignMembers} />
+          )}
+          {activeRightTab === 'audit' && canManageScope && (
+            <div className="space-y-6">
+              {selectedRolePid && <RoleNavigationAudit rolePid={selectedRolePid} />}
+              <details open={auditDeepLink}>
+                <summary className="text-text-2 cursor-pointer text-sm">
+                  {t(
+                    'roleNavigation.executionAudit',
+                    undefined,
+                    'Business permission execution audit',
+                  )}
+                </summary>
+                <div className="mt-4">
+                  <PermissionAuditTab />
+                </div>
+              </details>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -565,7 +623,7 @@ function PermissionManagementContent() {
     <div className="flex h-full flex-col" data-testid="permission-page">
       {/* Header */}
       <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-        <div className="flex items-center">
+        <div className="flex flex-wrap items-center gap-3">
           <ShieldCheckIcon className="mr-3 h-7 w-7 text-blue-600" />
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -575,8 +633,23 @@ function PermissionManagementContent() {
               {t('admin.permission.description') || 'Manage permissions, roles and assignments'}
             </p>
           </div>
+          <button
+            type="button"
+            data-testid="permission-preview-user"
+            disabled={!selectedRolePid || !canManageRoles}
+            onClick={() => setPreviewOpen(true)}
+            className="border-border text-text-1 rounded-control ml-auto border px-3 py-2 text-sm disabled:opacity-50"
+          >
+            {t('roleNavigation.userPreview', undefined, 'Preview as a user')}
+          </button>
         </div>
       </div>
+      <UserNavigationPreviewDialog
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        rolePid={selectedRolePid ?? undefined}
+        draft={activeDraft?.rolePid === selectedRolePid ? activeDraft : null}
+      />
 
       {/* Role management (role list + per-role capability / member editor) */}
       <div className="flex flex-1 overflow-hidden" data-testid="permission-tab-roles">

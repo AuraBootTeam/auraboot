@@ -36,6 +36,9 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     private com.auraboot.framework.menu.service.NavigationConfigurationService navigationConfiguration;
 
     @Resource
+    private com.auraboot.framework.menu.service.RoleNavigationService roleNavigation;
+
+    @Resource
     private SubjectPermissionService subjectPermissionService;
 
     @Resource
@@ -86,10 +89,11 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         Map<Long, Boolean> visibilityMap = subjectPermissionService
                 .batchEvaluateVisibility("menu", menuIds, userId);
 
-        // 3. 过滤出可见且满足 permission_code 的菜单
+        Set<String> assignedMenus = roleNavigation.visibleForCurrentActor(allMenus);
+        // Navigation assignment is independent of business permission.
         List<Menu> visibleMenus = allMenus.stream()
                 .filter(menu -> visibilityMap.getOrDefault(menu.getId(), true))
-                .filter(menu -> isAllowedByPermissionCode(menu, userPermissionCodes))
+                .filter(menu -> Integer.valueOf(0).equals(menu.getType()) || assignedMenus.contains(menu.getPid()))
                 .collect(Collectors.toList());
         
         // 4. 构建树结构，并移除权限过滤后没有任何可见子项的空目录
@@ -101,47 +105,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     
     @Override
     public List<Menu> getMenusByRoleId(Long roleId) {
-        if (roleId == null) {
-            log.warn("Role ID is null, returning empty menu list");
-            return Collections.emptyList();
-        }
-
-        // Get all active menus
-        List<Menu> allMenus = visibleInCurrentEnvironment(baseMapper.findAllActiveMenus());
-
-        if (allMenus.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        // Get all permission IDs for this role
-        Set<Long> rolePermissionIds = rolePermissionMapper.findPermissionIdsByRole(roleId);
-
-        if (rolePermissionIds.isEmpty()) {
-            // Role has no permissions, return only menus without permission requirements
-            return allMenus.stream()
-                    .filter(menu -> menu.getPermissionCode() == null
-                            || menu.getPermissionCode().isEmpty())
-                    .collect(Collectors.toList());
-        }
-
-        // Get permission codes for the role's permission IDs (batch query)
-        List<com.auraboot.framework.permission.entity.Permission> permissions =
-                permissionMapper.findByIds(new ArrayList<>(rolePermissionIds));
-        Set<String> rolePermissionCodes = permissions.stream()
-                .map(permission -> permission.getCode())
-                .collect(Collectors.toSet());
-
-        // Filter menus based on role permissions
-        return allMenus.stream()
-                .filter(menu -> {
-                    // If menu has no permission requirement, it's visible to all roles
-                    if (menu.getPermissionCode() == null || menu.getPermissionCode().isEmpty()) {
-                        return true;
-                    }
-                    // Check if the role has the required permission for this menu
-                    return rolePermissionCodes.contains(menu.getPermissionCode());
-                })
-                .collect(Collectors.toList());
+        return roleNavigation.readMenus(roleId);
     }
     
     @Override

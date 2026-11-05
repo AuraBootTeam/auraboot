@@ -6781,5 +6781,411 @@
     "en-US": "Same audience as {name}",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabMenus",
+    "zh-CN": "可见菜单",
+    "en-US": "Visible menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabBusiness",
+    "zh-CN": "业务权限",
+    "en-US": "Business permissions",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabScope",
+    "zh-CN": "数据范围与字段",
+    "en-US": "Record scopes and fields",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabChanges",
+    "zh-CN": "变更记录",
+    "en-US": "Changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.title",
+    "zh-CN": "选择该角色可见的菜单",
+    "en-US": "Select visible menus for this role",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.structure",
+    "zh-CN": "管理菜单结构",
+    "en-US": "Manage menu structure",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.help",
+    "zh-CN": "勾选仅控制导航可见性。业务权限、记录范围与字段限制分别配置。",
+    "en-US": "Selection controls navigation only. Business permissions, record scopes and fields remain independent.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.legacy",
+    "zh-CN": "此角色沿用历史导航规则。确认当前选择后，将按独立菜单分配管理，业务授权保持原样。",
+    "en-US": "This role follows legacy navigation rules. Confirm the current selection to manage its menus independently.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.adopt",
+    "zh-CN": "确认当前菜单选择",
+    "en-US": "Confirm current menu selection",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.selected",
+    "zh-CN": "已选 {count} 个",
+    "en-US": "{count} selected",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.search",
+    "zh-CN": "搜索菜单名称",
+    "en-US": "Search menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.emptySearch",
+    "zh-CN": "没有匹配的菜单",
+    "en-US": "No matching menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewTitle",
+    "zh-CN": "导航预览",
+    "en-US": "Navigation preview",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.currentDraft",
+    "zh-CN": "当前角色草稿",
+    "en-US": "Current role draft",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.empty",
+    "zh-CN": "尚无可见菜单",
+    "en-US": "No visible entries",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.lockHelp",
+    "zh-CN": "锁表示当前未授予目标业务访问权。用户预览会同时计算草稿中的业务变更。",
+    "en-US": "A lock indicates missing current business access. Preview the user to include draft changes.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.userPreview",
+    "zh-CN": "以用户身份预览",
+    "en-US": "Preview as a user",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.removed",
+    "zh-CN": "菜单已移除",
+    "en-US": "Removed menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.disabled",
+    "zh-CN": "全局不可用",
+    "en-US": "Unavailable globally",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.unavailable",
+    "zh-CN": "角色菜单配置暂不可用，原有分配会保留。",
+    "en-US": "Role navigation is unavailable. Existing assignments are preserved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.finishPreview",
+    "zh-CN": "完成预览",
+    "en-US": "Finish preview",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewDraft",
+    "zh-CN": "包含当前角色草稿。菜单可见性与业务访问权限独立计算。",
+    "en-US": "Includes the current role draft. Menu visibility and business access are calculated independently.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewSaved",
+    "zh-CN": "按当前已保存配置计算。",
+    "en-US": "Uses the current saved configuration.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewError",
+    "zh-CN": "预览失败或草稿已过期，请重新载入角色后重试。",
+    "en-US": "Preview failed or the draft is stale. Reload the role before retrying.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.chooseMember",
+    "zh-CN": "选择成员或模拟角色组合",
+    "en-US": "Choose a member or simulate roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.simulation",
+    "zh-CN": "模拟角色组合",
+    "en-US": "Simulated role combination",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.roleInactive",
+    "zh-CN": "已停用",
+    "en-US": "Inactive",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.calculating",
+    "zh-CN": "正在计算最终导航…",
+    "en-US": "Calculating effective navigation…",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.merged",
+    "zh-CN": "合并后的导航",
+    "en-US": "Merged navigation",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.businessAllowed",
+    "zh-CN": "具备目标业务入口权限",
+    "en-US": "Business entry permission present",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.businessDenied",
+    "zh-CN": "未授予目标业务权限",
+    "en-US": "Business permission not granted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.allowedHelp",
+    "zh-CN": "记录范围、对象检查与字段限制继续生效。本预览不读取业务记录。",
+    "en-US": "Record scopes, object checks and field restrictions still apply. This preview does not read business records.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.deniedHelp",
+    "zh-CN": "菜单可以显示，但勾选入口不会授予访问目标业务的权限。",
+    "en-US": "This menu can be shown. Selecting it does not grant permission to access the target business.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.changes",
+    "zh-CN": "角色菜单变更",
+    "en-US": "Role menu changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.auditError",
+    "zh-CN": "暂时无法载入菜单变更记录。",
+    "en-US": "Could not load role menu changes.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.noChanges",
+    "zh-CN": "该角色暂无菜单变更记录",
+    "en-US": "No menu changes for this role yet.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.menuAssignment",
+    "zh-CN": "更新可见菜单",
+    "en-US": "Updated visible menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.adopted",
+    "zh-CN": "已确认历史投影并转为独立菜单分配。",
+    "en-US": "Confirmed legacy projection and switched to independent assignments.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.added",
+    "zh-CN": "新增",
+    "en-US": "Added",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.removedEntries",
+    "zh-CN": "移除",
+    "en-US": "Removed",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignSaved",
+    "zh-CN": "菜单角色分配已保存，业务授权未改变。",
+    "en-US": "Menu roles saved. Business permissions are unchanged.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignError",
+    "zh-CN": "菜单角色分配未保存，当前选择已保留。",
+    "en-US": "Could not save menu roles. Your selection is preserved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.visibleRoles",
+    "zh-CN": "可见角色",
+    "en-US": "Visible roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.rolesError",
+    "zh-CN": "暂时无法载入可见角色。",
+    "en-US": "Could not load visible roles.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.historical",
+    "zh-CN": "历史规则",
+    "en-US": "Legacy",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.noRoles",
+    "zh-CN": "尚未分配给任何角色",
+    "en-US": "Not assigned to any role",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.globalHelp",
+    "zh-CN": "角色分配与菜单启用状态共同决定入口是否出现；目标页面继续校验业务权限。",
+    "en-US": "Role assignment and global enabled status determine visibility. Target pages retain their own business authorization.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignHelp",
+    "zh-CN": "仅分配导航入口，业务授权、记录范围与字段策略保持原有配置。",
+    "en-US": "Only navigation is assigned. Business permissions, record scopes and field policies will not change.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignConflict",
+    "zh-CN": "菜单或角色已变更，当前选择已保留；请重新载入后保存。",
+    "en-US": "Roles or menus changed. Your selection is preserved; reload before saving.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.reload",
+    "zh-CN": "重新载入当前分配",
+    "en-US": "Reload current assignments",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.afterCreate",
+    "zh-CN": "保存菜单后再分配可见角色；新入口不会自动分配。",
+    "en-US": "Save this menu, then assign its visible roles. New entries are not assigned automatically.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.reviewMenus",
+    "zh-CN": "可见菜单变更",
+    "en-US": "Visible menu changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.executionAudit",
+    "zh-CN": "业务权限执行审计",
+    "en-US": "Business permission execution audit",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.roleHint",
+    "zh-CN": "可见菜单、业务职责、记录范围与字段在一份角色草稿中配置、预览并保存。",
+    "en-US": "Configure visible menus, business duties, record scopes and fields in one role draft.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.allModules",
+    "zh-CN": "全部模块",
+    "en-US": "All modules",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.unavailable",
+    "zh-CN": "目标不可用",
+    "en-US": "Unavailable target",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.businessHelp",
+    "zh-CN": "业务职责不会自动勾选菜单；用例内部的服务步骤由业务用例统一承接授权。",
+    "en-US": "Business duties do not select menus automatically. Internal service steps are authorized by the business use case.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.relatedPages",
+    "zh-CN": "相关页面（仅供参考）",
+    "en-US": "Related pages (reference only)",
+    "source": "platform-admin",
+    "refType": "ui"
   }
 ]

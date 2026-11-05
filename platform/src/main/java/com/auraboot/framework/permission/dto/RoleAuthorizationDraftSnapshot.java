@@ -12,5 +12,9 @@ public record RoleAuthorizationDraftSnapshot(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<CapabilityGroup> groups,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PermissionMatrixDTO matrix,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopes,
-        List<RoleFieldPolicyView> fieldPolicies) {
+        List<RoleFieldPolicyView> fieldPolicies,
+        com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation) {
+    public RoleAuthorizationDraftSnapshot(String rolePid,String revision,String defaultScopeType,List<CapabilityGroup> groups,PermissionMatrixDTO matrix,List<DataScopeUpdateRequest> scopes,List<RoleFieldPolicyView> fieldPolicies) {
+        this(rolePid,revision,defaultScopeType,groups,matrix,scopes,fieldPolicies,null);
+    }
 }
