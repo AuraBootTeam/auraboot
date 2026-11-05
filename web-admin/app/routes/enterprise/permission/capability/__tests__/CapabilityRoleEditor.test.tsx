@@ -21,9 +21,18 @@ vi.mock('~/contexts/ToastContext', () => ({
 vi.mock('../capabilityService', () => ({
   capabilityService: { getForRole: vi.fn(), applySelection: vi.fn(), previewSelection: vi.fn() },
 }));
+vi.mock('../../PolicyConfigDialog', () => ({
+  default: (props: any) => props.open ? (
+    <section data-testid="shared-policy-dialog" data-role={props.rolePid} data-permission={props.permissionPid}>
+      <output data-testid="shared-policy-values">{JSON.stringify(props.initialValues)}</output>
+      <button onClick={props.onClose}>Cancel shared policy</button>
+    </section>
+  ) : null,
+}));
 vi.mock('~/shared/services/permissionService', () => ({
   permissionService: {
     getMatrixForRole: vi.fn(),
+    getPolicy: vi.fn(),
     batchUpdateRolePermissions: vi.fn(),
     updateScope: vi.fn(),
     getRoleDefaultScope: vi.fn().mockResolvedValue(null),
@@ -74,6 +83,40 @@ function mockData(g: CapabilityGroup[] = groups, m: PermissionMatrixDTO = emptyM
 }
 
 describe('CapabilityRoleEditor', () => {
+  function policyData() {
+    const capability = { ...cap('cm.cap.refund', 'Manage refunds', true), includes: ['cm_refund.create'] };
+    const matrix: PermissionMatrixDTO = { modules: [{ moduleCode: 'commerce', moduleName: 'Commerce', resources: [{
+      resourceCode: 'cm_refund', resourceName: 'Refund', actions: [{ permissionId: 5, permissionPid: 'permission-refund-create',
+        code: 'cm_refund.create', action: 'create', label: 'Create refund', granted: true, supported: true,
+        policySchema: JSON.stringify({ dynamicAbac: { type: 'rule-center', label: 'Business conditions', fields: [] } }),
+      }],
+    }] }] };
+    mockData([{ group: 'Commerce', capabilities: [capability] }], matrix);
+    vi.mocked(permissionService.getPolicy).mockResolvedValue({ dynamicAbac: { enabled: true } });
+  }
+
+  it('opens the current role business-rule policy through the shared dialog', async () => {
+    policyData();
+    render(<CapabilityRoleEditor rolePid="role-current" />);
+    fireEvent.click(await screen.findByTestId('capability-policy-configure-cm.cap.refund'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create refund', exact: true }));
+    const dialog = await screen.findByTestId('shared-policy-dialog');
+    expect(permissionService.getPolicy).toHaveBeenCalledWith('role-current', 'permission-refund-create');
+    expect(dialog).toHaveAttribute('data-role', 'role-current');
+    expect(dialog).toHaveAttribute('data-permission', 'permission-refund-create');
+    expect(screen.getByTestId('shared-policy-values')).toHaveTextContent('"enabled":true');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel shared policy' }));
+    expect(capabilityService.applySelection).not.toHaveBeenCalled();
+  });
+
+  it('keeps business rules unavailable without policy edit authority', async () => {
+    policyData();
+    render(<CapabilityRoleEditor rolePid="role-current" scopeReadOnly />);
+    await screen.findByTestId('capability-role-editor');
+    expect(screen.queryByTestId('capability-policy-configure-cm.cap.refund')).not.toBeInTheDocument();
+    expect(permissionService.getPolicy).not.toHaveBeenCalled();
+  });
+
   it('searches the displayed English declaration and retains that name in preview and impact', async () => {
     const capability = {
       ...cap('org.cap.read', '查看组织架构', false),
