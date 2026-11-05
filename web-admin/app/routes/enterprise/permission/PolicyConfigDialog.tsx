@@ -480,7 +480,10 @@ export default function PolicyConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden p-0">
+      <DialogContent
+        className="h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] overflow-hidden p-0 sm:max-w-5xl"
+        style={{ width: 'calc(100vw - 2rem)' }}
+      >
         <DialogHeader className="px-6 pt-6 pr-12">
           <DialogTitle className="flex items-center gap-2">
             <span>

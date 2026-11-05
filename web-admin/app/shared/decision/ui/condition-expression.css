@@ -73,11 +73,16 @@
 }
 .ce-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   background: var(--muted, #fafbfd);
   padding: 12px 16px;
   border-bottom: 1px solid var(--ce-border);
+}
+.ce-toolbar button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .ce-toolbar small {
   color: var(--muted-foreground, #8996a9);
