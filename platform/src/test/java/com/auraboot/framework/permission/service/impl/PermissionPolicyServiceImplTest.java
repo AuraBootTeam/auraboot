@@ -237,6 +237,20 @@ class PermissionPolicyServiceImplTest {
     }
 
     @Test
+    void setPolicyRejectsGrantRemovedBetweenReadAndUpdate() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("revoked-grant");
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(rolePermissionMapper.updateById(rp)).thenReturn(0);
+
+        assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("maxAmount", 1000)))
+                .isInstanceOf(RootUnCheckedException.class);
+
+        verify(usageIndexService, never()).refreshSource(anyString(), anyString());
+    }
+
+    @Test
     void setPolicyWritesJsonViaMapper() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
@@ -481,12 +495,14 @@ class PermissionPolicyServiceImplTest {
     }
 
     @Test
-    void setPolicySkipsWhenNoBindingFound() {
+    void setPolicyRejectsMissingGrantInsteadOfAcknowledgingAnUnappliedRule() {
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
-        service.setPolicy(7L, 50L, Map.of("k", "v"));
+        assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("k", "v")))
+                .isInstanceOf(RootUnCheckedException.class);
 
         verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
+        verify(usageIndexService, never()).refreshSource(anyString(), anyString());
     }
 
     @Test
