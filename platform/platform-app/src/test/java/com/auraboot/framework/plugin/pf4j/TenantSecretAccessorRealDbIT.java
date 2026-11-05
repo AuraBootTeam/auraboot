@@ -2,7 +2,7 @@ package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.integration.DeclaredTestInfrastructure;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.mapper.CloudConfigMapper;
@@ -28,7 +28,7 @@ class TenantSecretAccessorRealDbIT {
     @Autowired CloudConfigMapper mapper;
     @Autowired ObjectMapper json;
     @Autowired DataSource dataSource;
-    @Autowired RedisProperties redisProperties;
+    @Autowired DataRedisProperties redisProperties;
     @AfterEach void clearContext() { MetaContext.clear(); }
 
     private String provider() { return "ps_"+UUID.randomUUID().toString().replace("-","").substring(0,24); }

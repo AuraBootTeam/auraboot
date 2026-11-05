@@ -24,7 +24,7 @@ dependencyManagement {
     dependencies {
         dependency 'com.github.ben-manes.caffeine:caffeine:3.3.1'
         dependency 'com.google.http-client:google-http-client-jackson2:1.47.1'
-        dependency 'io.netty:netty-resolver-dns-native-macos:4.1.137.Final'
+        dependency 'io.netty:netty-resolver-dns-native-macos:4.2.19.Final'
         dependency 'org.postgresql:postgresql:42.7.14'
         dependency 'org.checkerframework:checker-qual:3.55.1'
     }
@@ -55,11 +55,11 @@ dependencies {
     implementation project(':')
     implementation project(':platform-plugin-api')
     implementation 'org.springframework.boot:spring-boot'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'io.swagger.core.v3:swagger-annotations-jakarta:2.2.55'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework:spring-tx'
-    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    implementation 'com.baomidou:mybatis-plus-spring-boot4-starter'
     agentRuntimeOnly project(':platform-agent')
     runtimeOnly project(':platform-mq-kafka')
     runtimeOnly project(':platform-storage-minio')

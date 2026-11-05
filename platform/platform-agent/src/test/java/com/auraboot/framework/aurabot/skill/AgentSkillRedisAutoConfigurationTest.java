@@ -4,7 +4,7 @@ import com.auraboot.autoconfigure.agent.AgentSkillRedisAutoConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
@@ -19,7 +19,7 @@ class AgentSkillRedisAutoConfigurationTest {
     void redisAutoConfigurationRegistersStoresWithoutComponentScanOrdering() {
         context.withBean(RedisConnectionFactory.class, () -> mock(RedisConnectionFactory.class))
                 .withConfiguration(AutoConfigurations.of(AgentSkillRedisAutoConfiguration.class,
-                        RedisAutoConfiguration.class))
+                        DataRedisAutoConfiguration.class))
                 .run(application -> {
                     assertThat(application).hasSingleBean(PreviewTokenStore.class);
                     assertThat(application).hasSingleBean(SkillIdempotencyStore.class);

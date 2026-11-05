@@ -620,4 +620,20 @@ public class MybatisPlusConfigTest {
         assertFalse(tenant.getTenantLineHandler().ignoreTable("se_execution_instance"));
     }
 
+    @Test
+    void optionalUpstreamFullTableGuardRejectsConstantTruePredicates() {
+        // This tests the shipped optional library, not a newly registered Core policy.
+        var guard = new com.baomidou.mybatisplus.extension.plugins.inner.BlockAttackInnerInterceptor();
+        for (String predicate : List.of("NOT 1 = 2", "1 <= 1", "1 XOR 0", "1")) {
+            for (String prefix : List.of("UPDATE tpm_project SET progress = 1", "DELETE FROM tpm_project")) {
+                assertThrows(com.baomidou.mybatisplus.core.exceptions.MybatisPlusException.class,
+                        () -> guard.parserSingle(prefix + " WHERE " + predicate, null));
+            }
+        }
+        assertDoesNotThrow(() -> guard.parserSingle(
+                "UPDATE tpm_project SET progress = 1 WHERE id = 31", null));
+        assertDoesNotThrow(() -> guard.parserSingle("DELETE FROM tpm_project WHERE id = 31", null));
+    }
+
+
 }

@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'java-test-fixtures'
-    id 'org.springframework.boot' version '3.5.16'
+    id 'org.springframework.boot' version '4.1.2'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'maven-publish'
     id 'jacoco'
@@ -264,9 +264,9 @@ ext {
     commonsLangVersion = '3.20.0'
     commonsTextVersion = '1.15.0'
     log4jVersion = '2.25.5'
-    sentryVersion = '6.34.0'
+    sentryVersion = '8.62.0'
     jwtVersion = '0.13.0'
-    mybatisPlusVersion = '3.5.16'
+    mybatisPlusVersion = '3.5.18'
     lombokVersion = '1.18.48'
     aspectjVersion = '1.9.25.1'
     reflectasmVersion = '1.11.3'
@@ -274,8 +274,8 @@ ext {
     // PF4J Plugin Framework
     pf4jVersion = '3.16.0'
     pf4jSpringVersion = '0.10.0'
-    springKafkaVersion = '3.3.16'
-    kafkaClientsVersion = '3.9.2'
+    springKafkaVersion = '4.1.2'
+    kafkaClientsVersion = '4.2.2'
     mcpSdkVersion = '2.1.0'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
@@ -335,14 +335,17 @@ dependencies {
     // re-verify the micrometer bridge — not a single-module pin.
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
-    implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
+    implementation "io.netty:netty-resolver-dns-native-macos:4.2.19.Final:osx-aarch_64"
 
 
     // Spring Boot 核心
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-jackson2'
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-webflux' // For WebClient and reactive support
     implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.3.1'
@@ -351,7 +354,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
 
     // MyBatis Plus
-    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    implementation 'com.baomidou:mybatis-plus-spring-boot4-starter'
     implementation("com.baomidou:mybatis-plus-jsqlparser")
 
     // Jackson
@@ -364,7 +367,7 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson'
 
     // Sentry
-    implementation 'io.sentry:sentry-spring-boot-starter-jakarta'
+    implementation 'io.sentry:sentry-spring-boot-4-starter'
 
     // 工具类
     implementation("com.esotericsoftware:reflectasm:${reflectasmVersion}:shaded") {
@@ -407,12 +410,13 @@ dependencies {
     // implementation 'com.auraboot.buiness.solution:bill:1.0.0-SNAPSHOT' // 注释掉不存在的依赖
     implementation 'org.springframework.boot:spring-boot'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
     // Anchor the JUnit BOM as an explicit node: whether the BOM imported by
     // spring-boot-dependencies materializes as a resolved node differs between
     // resolution environments (macOS vs Linux CI), and dependency locking
     // requires an identical node set everywhere. See CONTRIBUTING lock notes.
-    testImplementation platform('org.junit:junit-bom:5.14.4')
+    testImplementation platform('org.junit:junit-bom:6.0.3')
     // Same anchoring for the test-runtime XML validation trio: their presence
     // in the resolved graph is also environment-dependent, and the lockfile
     // lists them for testRuntimeClasspath.
@@ -421,7 +425,7 @@ dependencies {
     testRuntimeOnly 'relaxngDatatype:relaxngDatatype:20020414'
 
     // Swagger/OpenAPI 3
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
 
     // Jakarta注解
     implementation 'jakarta.annotation:jakarta.annotation-api'
@@ -474,7 +478,7 @@ dependencies {
     // JUnit 5 Platform
     // Keep the declared platform aligned with the existing locked JUnit 5.12.2 graph.
     // Otherwise Gradle rejects testCompileClasspath because the locked BOM is never requested.
-    testImplementation platform('org.junit:junit-bom:5.14.4')
+    testImplementation platform('org.junit:junit-bom:6.0.3')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'
     testImplementation 'org.junit.platform:junit-platform-launcher'

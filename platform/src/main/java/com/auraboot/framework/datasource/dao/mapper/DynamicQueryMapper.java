@@ -1,7 +1,7 @@
 package com.auraboot.framework.datasource.dao.mapper;
 
 import com.auraboot.framework.exception.BusinessException;
-import com.baomidou.mybatisplus.extension.toolkit.SqlRunner;
+import com.baomidou.mybatisplus.spring.toolkit.SqlRunner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

@@ -3,7 +3,7 @@ package com.auraboot.framework.integration;
 import java.net.URI;
 import java.util.Map;
 import javax.sql.DataSource;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,11 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 public final class DeclaredTestInfrastructure {
     private DeclaredTestInfrastructure() {}
 
-    public static void assertSelected(DataSource dataSource, RedisProperties redis) throws Exception {
+    public static void assertSelected(DataSource dataSource, DataRedisProperties redis) throws Exception {
         assertSelected(dataSource, redis, System.getenv());
     }
 
-    static void assertSelected(DataSource dataSource, RedisProperties redis, Map<String, String> environment) throws Exception {
+    static void assertSelected(DataSource dataSource, DataRedisProperties redis, Map<String, String> environment) throws Exception {
         String expectedDatabase = environment.get("TEST_EXPECTED_DATABASE");
         String jdbcUrl = environment.get("TEST_DATABASE_URL");
         String expectedRedis = environment.get("TEST_REDIS_DATABASE");

@@ -2,7 +2,7 @@ package com.auraboot.framework.organization.service;
 
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.entity.Team;
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 
 import java.util.List;
 

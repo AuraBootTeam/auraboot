@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -15,7 +15,7 @@ class DeclaredTestInfrastructureTest {
     private final DataSource source = mock(DataSource.class);
     private final Connection connection = mock(Connection.class);
     private final DatabaseMetaData metadata = mock(DatabaseMetaData.class);
-    private final RedisProperties redis = new RedisProperties();
+    private final DataRedisProperties redis = new DataRedisProperties();
     private final Map<String, String> environment = new HashMap<>(Map.of(
             "TEST_EXPECTED_DATABASE", "isolated_ci",
             "TEST_DATABASE_URL", "jdbc:postgresql://127.0.0.1:25432/isolated_ci?charSet=UTF8",

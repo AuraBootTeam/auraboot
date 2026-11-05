@@ -10,6 +10,23 @@ administration and ownership configuration. It is not the Enterprise Showcase.
 Configuration imports follow the verified lock's composition order. Older
 candidates retain their own original configuration inventory.
 
+## Framework compatibility before upgrading
+
+This candidate uses Java 21, Spring Boot 4.1 and Spring Framework 7. Existing
+JSON/DSL payloads continue to use Jackson 2 through the explicit
+`spring.http.converters.preferred-json-mapper=jackson2` setting. Jackson 2 Boot
+settings now use `spring.jackson2.*`; migrate any deployment-owned
+`spring.jackson.*` overrides before upgrading. Startup does not install a
+property migrator or repair application data.
+
+Build Java extensions against the matching published AuraBoot platform BOM.
+MyBatis-Plus 3.5.18 moves its Spring services, factory and SQL runner into
+`com.baomidou.mybatisplus.spring.*`. Recompile extensions that import the old
+packages; successful config-plugin import or newly compiled plugin tests do not
+prove that every existing third-party binary remains compatible. Keep the old
+package and a verified backup until the upgraded deployment and its extensions
+have passed their own checks.
+
 ## 1. Prepare prerequisites and persistent configuration
 
 Use Node.js 20+, the capsule's pinned pnpm (currently 9.15.9), Java 21, Python 3,

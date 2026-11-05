@@ -6,7 +6,7 @@
 <p align="center">
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-Apache_2.0_with_AuraBoot_supplements-blue.svg" alt="License"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-3.5-green.svg" alt="Spring Boot 3.5"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-4.1-green.svg" alt="Spring Boot 4.1"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
   <a href="#"><img src="https://img.shields.io/badge/PostgreSQL-16-336791.svg" alt="PostgreSQL"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/stargazers"><img src="https://img.shields.io/github/stars/AuraBootTeam/auraboot?style=social" alt="GitHub Stars"></a>
@@ -212,7 +212,7 @@ If you are working on AI features, run both `test` and `testAi`. The AI stack li
 | Layer | Technology |
 |---|---|
 | Language | Java 21, TypeScript |
-| Backend | Spring Boot 3.5, MyBatis-Plus, PF4J |
+| Backend | Spring Boot 4.1, MyBatis-Plus, PF4J |
 | Frontend | React 19, Tailwind CSS 4, React Router 7, Vite 8 |
 | Database | PostgreSQL 15+ (with pgvector) |
 | Cache | Redis 7+ |

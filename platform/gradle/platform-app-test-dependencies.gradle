@@ -1,6 +1,8 @@
 // Full-composition tests exercise the public APIs of the core and its providers.
 // These explicit test-only dependencies do not change either production runtime graph.
 dependencies {
+    testImplementation 'org.springframework.boot:spring-boot-jackson2'
+    testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
     testImplementation "org.springframework.kafka:spring-kafka:${springKafkaVersion}"
     testImplementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
     testImplementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
@@ -8,23 +10,23 @@ dependencies {
     testImplementation 'io.micrometer:micrometer-registry-prometheus'
     testImplementation 'io.micrometer:micrometer-tracing-bridge-otel'
     testImplementation 'io.opentelemetry:opentelemetry-exporter-otlp'
-    testImplementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
-    testImplementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation "io.netty:netty-resolver-dns-native-macos:4.2.19.Final:osx-aarch_64"
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc'
     testImplementation 'org.springframework.boot:spring-boot-starter-webflux'
     testImplementation 'org.springframework.boot:spring-boot-starter-security'
-    testImplementation 'org.springframework.boot:spring-boot-starter-aop'
+    testImplementation 'org.springframework.boot:spring-boot-starter-aspectj'
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-redis'
     testImplementation 'com.github.ben-manes.caffeine:caffeine:3.3.0'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     testImplementation 'org.springframework.boot:spring-boot-starter-mail'
     testImplementation 'org.springframework.boot:spring-boot-starter-websocket'
-    testImplementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    testImplementation 'com.baomidou:mybatis-plus-spring-boot4-starter'
     testImplementation "com.baomidou:mybatis-plus-jsqlparser"
     testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     testImplementation 'com.fasterxml.jackson.core:jackson-core'
     testImplementation 'io.jsonwebtoken:jjwt-api'
-    testImplementation 'io.sentry:sentry-spring-boot-starter-jakarta'
+    testImplementation 'io.sentry:sentry-spring-boot-4-starter'
     testImplementation "com.esotericsoftware:reflectasm:${reflectasmVersion}:shaded"
     testImplementation 'org.postgresql:postgresql:42.7.13'
     testImplementation 'org.apache.poi:poi:5.5.1'
@@ -37,7 +39,7 @@ dependencies {
     testImplementation 'org.jetbrains:annotations:26.1.0'
     testImplementation 'org.springframework.boot:spring-boot'
     testImplementation 'org.springframework.boot:spring-boot-starter-validation'
-    testImplementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
+    testImplementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
     testImplementation 'jakarta.annotation:jakarta.annotation-api'
     testImplementation 'org.mapstruct:mapstruct:1.6.3'
     testImplementation 'io.github.java-diff-utils:java-diff-utils:4.17'

@@ -207,7 +207,10 @@ spring:
 #          keystore:
 #            certificate: file:../certs/_wildcard.metaochan.com+5.pem
 #            private-code: file:../certs/_wildcard.metaochan.com+5-code.pem
-  jackson:
+  http:
+    converters:
+      preferred-json-mapper: jackson2
+  jackson2:
     serialization:
       write-dates-as-timestamps: false
     mapper:
