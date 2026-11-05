@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DecisionRuleBindingBlock } from '../DecisionRuleBindingBlock';
+import { cmp, group, lit, not, path } from '~/shared/decision/ast/conditionAst';
 
 describe('DecisionRuleBindingBlock', () => {
   it('emits a condition binding when a combined editor has no selected decision', async () => {
@@ -1236,6 +1237,49 @@ describe('DecisionRuleBindingBlock', () => {
     expect(fieldPicker).toHaveTextContent('请假申请 / 请假天数');
     expect(fieldPicker).toHaveTextContent('用户部门');
     expect(fieldPicker).not.toHaveTextContent('Agent 记忆 / 访问次数');
+  });
+
+  it('counts nested comparison leaves consistently in the tab, section and builder after edits', async () => {
+    const compare = (value: string) =>
+      cmp(path('record', 'data.currency', 'string'), 'EQ', lit(value, 'string'));
+    const root = group('AND', [
+      compare('CNY'),
+      group('OR', [compare('USD'), group('AND', [compare('CNY'), not(compare('USD'))])]),
+    ]);
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({ records: [] })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        value={{ bindingKind: 'CONDITION', enabled: true, conditionSpec: { root, decisionBindings: [] } }}
+        block={{
+          props: {
+            mode: 'combined',
+            decisions: [],
+            fields: [{ scope: 'record', path: 'data.currency', label: '币种', dataType: 'string' }],
+          },
+        }}
+      />,
+    );
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
+    const sectionHeading = () =>
+      screen
+        .getByTestId('decision-rule-section-condition')
+        .querySelector('.decision-rule-binding-heading');
+    expect(screen.getByTestId('decision-rule-section-tab-condition')).toHaveTextContent('4 条');
+    expect(sectionHeading()).toHaveTextContent('4 条');
+    expect(screen.getByTestId('condition-builder')).toHaveTextContent('4 条条件');
+    fireEvent.click(screen.getByRole('button', { name: 'delete-not-1-1-1', exact: true }));
+    expect(screen.getByTestId('decision-rule-section-tab-condition')).toHaveTextContent('3 条');
+    expect(sectionHeading()).toHaveTextContent('3 条');
+    expect(screen.getByTestId('condition-builder')).toHaveTextContent('3 条条件');
+    fireEvent.click(screen.getByTestId('cb-add'));
+    expect(screen.getByTestId('decision-rule-section-tab-condition')).toHaveTextContent('4 条');
+    expect(sectionHeading()).toHaveTextContent('4 条');
+    expect(screen.getByTestId('condition-builder')).toHaveTextContent('4 条条件');
   });
 
   it('writes nested AND/OR/NOT condition specs through the DSL form runtime valueField', () => {

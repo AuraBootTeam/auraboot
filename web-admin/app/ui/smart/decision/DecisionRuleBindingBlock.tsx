@@ -3,6 +3,7 @@ import { bindingText, type BindingTextKey } from './decisionBindingText';
 import { bindingPresentation } from './decisionBindingPresentation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
+import { conditionLeaves } from '~/shared/decision/ui/conditionTreeEditing';
 import { group, type GroupNode } from '~/shared/decision/ast/conditionAst';
 import { getApiService } from '~/shared/services/ApiService';
 import {
@@ -1661,12 +1662,13 @@ export function DecisionRuleBindingBlock({
   const showTestRunner = showDecision && props.showTestRunner !== false;
   const showStandaloneImpactPreview = !readOnly && showImpactPreview;
   const showStandaloneTestRunner = !readOnly && showTestRunner;
+  const conditionCount = conditionLeaves(condition).length;
   const workspaceTabs: RuleBindingWorkspaceTab[] = [];
   if (showCondition) {
     workspaceTabs.push({
       key: 'condition',
       label: bindingText('condition', locale),
-      meta: bindingText('entryCount', locale, { count: condition.children.length }),
+      meta: bindingText('entryCount', locale, { count: conditionCount }),
     });
   }
   if (showDecision) {
@@ -2015,7 +2017,7 @@ export function DecisionRuleBindingBlock({
             <div className="decision-rule-binding-heading">
               <strong>{bindingText('condition', locale)}</strong>
               <span>
-                {condition.children.length} {bindingText('entries', locale)}
+                {conditionCount} {bindingText('entries', locale)}
               </span>
             </div>
             <ConditionBuilder
