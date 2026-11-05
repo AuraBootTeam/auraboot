@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: cba760a5dd0eb34287c6b6ee917679f525edfa74758b5dc017ce42407c9a9468
+ * Contract SHA-256: 0340efe2bf910cbe6145ecf5a5d2ce9468e19c6948ebd85165e119510901e16d
  */
 export interface paths {
     "/api/activities": {
@@ -31239,6 +31239,7 @@ export interface components {
             fieldCode?: string;
             /** Format: int64 */
             id?: number;
+            managedRolePid?: string;
             maskExpression?: string;
             maskType?: string;
             modelCode?: string;
@@ -39739,11 +39740,18 @@ export interface components {
             /** Format: int64 */
             updatedBy?: number;
         };
+        RoleAuthorizationChange: {
+            after?: string;
+            before?: string;
+            kind: string;
+            target: string;
+        };
         RoleAuthorizationDraftPreview: {
             applyDefaultToCurrentGrants: boolean;
             capabilities: components["schemas"]["CapabilitySelectionPreview"];
             defaultScopeChanged: boolean;
             defaultScopeType: string | null;
+            fieldAccessChanges?: components["schemas"]["RoleFieldAccessReviewed"][];
             fieldPolicies?: components["schemas"]["RoleFieldPolicyPreview"];
             navigation?: components["schemas"]["RoleNavigationSelection"];
             revision: string;
@@ -39754,6 +39762,7 @@ export interface components {
             defaultScopeChanged?: boolean;
             defaultScopeType?: string | null;
             expectedRevision: string;
+            fieldChanges?: components["schemas"]["RoleFieldAccessChange"][];
             fieldPolicyPids?: string[];
             menuPids?: string[];
             revokedPartialCapabilityCodes?: string[];
@@ -39762,6 +39771,7 @@ export interface components {
         };
         RoleAuthorizationDraftSnapshot: {
             defaultScopeType: string | null;
+            fieldAccess?: components["schemas"]["RoleFieldAccessModel"][];
             fieldPolicies?: components["schemas"]["RoleFieldPolicyView"][];
             groups: components["schemas"]["CapabilityGroup"][];
             matrix: components["schemas"]["PermissionMatrixDTO"];
@@ -39878,6 +39888,30 @@ export interface components {
             name?: string;
             type?: string;
         };
+        RoleFieldAccessChange: {
+            access: string;
+            fieldCode: string;
+            modelCode: string;
+        };
+        RoleFieldAccessField: {
+            access: string;
+            additionalRestrictions: string[];
+            code: string;
+            label?: string | null;
+        };
+        RoleFieldAccessModel: {
+            code: string;
+            fields: components["schemas"]["RoleFieldAccessField"][];
+            label?: string | null;
+        };
+        RoleFieldAccessReviewed: {
+            access: string;
+            beforeAccess: string;
+            fieldCode: string;
+            fieldLabel: string;
+            modelCode: string;
+            modelLabel: string;
+        };
         RoleFieldPolicyPreview: {
             added?: components["schemas"]["RoleFieldPolicyView"][];
             removed?: components["schemas"]["RoleFieldPolicyView"][];
@@ -39916,6 +39950,7 @@ export interface components {
         RoleNavigationAudit: {
             actor: string;
             addedMenus: string[];
+            changes: components["schemas"]["RoleAuthorizationChange"][];
             createdAt: string;
             pid: string;
             previousMode: string;

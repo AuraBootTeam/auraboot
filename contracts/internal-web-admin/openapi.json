@@ -22919,6 +22919,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "managedRolePid": {
+            "type": "string"
+          },
           "maskExpression": {
             "type": "string"
           },
@@ -46853,6 +46856,27 @@
         },
         "type": "object"
       },
+      "RoleAuthorizationChange": {
+        "properties": {
+          "after": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "target"
+        ],
+        "type": "object"
+      },
       "RoleAuthorizationDraftPreview": {
         "properties": {
           "applyDefaultToCurrentGrants": {
@@ -46869,6 +46893,12 @@
               "string",
               "null"
             ]
+          },
+          "fieldAccessChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessReviewed"
+            },
+            "type": "array"
           },
           "fieldPolicies": {
             "$ref": "#/components/schemas/RoleFieldPolicyPreview"
@@ -46914,6 +46944,14 @@
             "minLength": 1,
             "pattern": "[a-f0-9]{64}",
             "type": "string"
+          },
+          "fieldChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessChange"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
           },
           "fieldPolicyPids": {
             "items": {
@@ -46975,6 +47013,12 @@
               "string",
               "null"
             ]
+          },
+          "fieldAccess": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessModel"
+            },
+            "type": "array"
           },
           "fieldPolicies": {
             "items": {
@@ -47504,6 +47548,114 @@
         },
         "type": "object"
       },
+      "RoleFieldAccessChange": {
+        "properties": {
+          "access": {
+            "minLength": 1,
+            "pattern": "inherit|read_only|hidden",
+            "type": "string"
+          },
+          "fieldCode": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "modelCode": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "access",
+          "fieldCode",
+          "modelCode"
+        ],
+        "type": "object"
+      },
+      "RoleFieldAccessField": {
+        "properties": {
+          "access": {
+            "type": "string"
+          },
+          "additionalRestrictions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "access",
+          "additionalRestrictions",
+          "code"
+        ],
+        "type": "object"
+      },
+      "RoleFieldAccessModel": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessField"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "fields"
+        ],
+        "type": "object"
+      },
+      "RoleFieldAccessReviewed": {
+        "properties": {
+          "access": {
+            "type": "string"
+          },
+          "beforeAccess": {
+            "type": "string"
+          },
+          "fieldCode": {
+            "type": "string"
+          },
+          "fieldLabel": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "modelLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "access",
+          "beforeAccess",
+          "fieldCode",
+          "fieldLabel",
+          "modelCode",
+          "modelLabel"
+        ],
+        "type": "object"
+      },
       "RoleFieldPolicyPreview": {
         "properties": {
           "added": {
@@ -47644,6 +47796,12 @@
             },
             "type": "array"
           },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/RoleAuthorizationChange"
+            },
+            "type": "array"
+          },
           "createdAt": {
             "type": "string"
           },
@@ -47663,6 +47821,7 @@
         "required": [
           "actor",
           "addedMenus",
+          "changes",
           "createdAt",
           "pid",
           "previousMode",
