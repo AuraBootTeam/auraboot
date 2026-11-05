@@ -134,6 +134,7 @@ async function send(page: Page, text: string) {
   await chat.getByTestId('aurabot-input').fill(text);
   const completed = page.waitForResponse(
     (r) => r.url().includes('/api/ai/aurabot/chat/stream') && r.request().method() === 'POST',
+    { timeout: 120_000 },
   );
   await chat.getByTestId('aurabot-send').click();
   const response = await completed;
@@ -328,6 +329,7 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
     await expect(bot.getByTestId('chat-form-fill-hint')).toBeVisible();
     const consultation = page.waitForResponse(
       (r) => r.url().includes('/api/ai/aurabot/chat/stream') && r.request().method() === 'POST',
+      { timeout: 120_000 },
     );
     await bot.getByTestId('aurabot-input').fill('只解释当前表单的用途，不要填写、创建或保存记录。');
     await bot.getByTestId('aurabot-send').click();
@@ -360,6 +362,7 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
       if (captureInput) await capture(page, 'DS03');
       const pending = page.waitForResponse(
         (r) => r.url().includes('/api/ai/aurabot/chat/stream') && r.request().method() === 'POST',
+        { timeout: 120_000 },
       );
       await bot.getByTestId('aurabot-send').click();
       const response = await pending;
@@ -368,12 +371,12 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
         formFill: { modelCode: 'tpm_task' },
       });
       expect(await response.finished()).toBeNull();
+      writeFileSync(join(shots, `draft-stream-${calls}.txt`), await response.text());
       await expect(
         bot.getByTestId('chat-form-fill-receipt').or(bot.getByTestId('chat-form-fill-notice')),
       ).toBeVisible({ timeout: 120_000 });
       await expect(bot.getByTestId('chat-form-fill-notice')).toHaveCount(0);
       await expect(bot.getByTestId('chat-form-fill-receipt')).toContainText('仅更新草稿');
-      writeFileSync(join(shots, `draft-stream-${calls}.txt`), await response.text());
     }
     await fillDraft(true);
     await expect(page.locator('#tpm_ts_title')).toHaveValue(title);
