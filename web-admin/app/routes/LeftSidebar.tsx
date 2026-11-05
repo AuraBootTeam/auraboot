@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { NavLink, useLocation, useRevalidator } from 'react-router';
 import { useRootLoaderData } from '~/root-data';
 import { useI18n } from '~/contexts/I18nContext';
+import NavigationLink from './NavigationLink';
 import SidebarSubmenu, { resolveMenuLabel } from '~/routes/SidebarSubmenu';
 import { XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -126,7 +127,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
     >
       {workspace && !collapsed && (
         <>
-          <NavLink
+          <NavigationLink
             to="/"
             className={`flex shrink-0 items-center gap-3 px-6 ${shell ? '' : 'h-14'}`}
             style={shell ? { height: shell.sidebar.brandHeight } : undefined}
@@ -143,7 +144,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                 rootData?.branding?.productName ||
                 COMMUNITY_BRANDING.productName}
             </span>
-          </NavLink>
+          </NavigationLink>
           <div className="border-border mx-3.5 my-5 rounded-lg border px-3 py-3">
             <div className="text-text text-xs font-semibold">
               {rootData?.user?.tenantName || t('sidebar.workspace', undefined, 'Workspace')}
@@ -208,8 +209,9 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                 onNavigate={() => setSidebarOpen(false)}
               />
             ) : (
-              <NavLink
+              <NavigationLink
                 to={menu.path}
+                opening={menu.opening}
                 className={({ isActive }) =>
                   `group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
                     isActive
@@ -232,7 +234,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                     className={`ms-auto h-2 w-2 rounded-full ${tokenized ? 'bg-accent' : 'bg-blue-500'}`}
                   />
                 )}
-              </NavLink>
+              </NavigationLink>
             )}
           </div>
         ))}
@@ -334,9 +336,9 @@ function CollapsedMenuItem({
   if (!hasSubmenu) {
     return (
       <div ref={wrapperRef} onMouseEnter={show} onMouseLeave={scheduleClose} className="relative">
-        <NavLink to={menu.path} onClick={() => setSidebarOpen(false)}>
+        <NavigationLink to={menu.path} opening={menu.opening} onClick={() => setSidebarOpen(false)}>
           {iconBtn}
-        </NavLink>
+        </NavigationLink>
         {open && (
           <div
             className={`animate-in fade-in pointer-events-none fixed z-[60] rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white shadow-lg duration-150 dark:bg-gray-200 dark:text-gray-900 ${
@@ -443,9 +445,10 @@ function PopoverSubmenu({
 
         const isActive = location.pathname === item.path;
         return (
-          <NavLink
+          <NavigationLink
             key={item.id || index}
             to={item.path}
+            opening={item.opening}
             onClick={onNavigate}
             className={`mx-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors ${
               isActive
@@ -466,7 +469,7 @@ function PopoverSubmenu({
                 className={`ms-auto h-1.5 w-1.5 flex-shrink-0 rounded-full ${tokenized ? 'bg-accent' : 'bg-blue-500'}`}
               />
             )}
-          </NavLink>
+          </NavigationLink>
         );
       })}
     </div>

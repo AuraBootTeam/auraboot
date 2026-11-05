@@ -6207,5 +6207,530 @@
     "en-US": "{count} field restrictions selected; review and save with this draft.",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "navigation.denied.title",
+    "zh-CN": "无菜单管理权限",
+    "en-US": "Menu management unavailable",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.denied.message",
+    "zh-CN": "请联系管理员开通菜单管理权限。",
+    "en-US": "Ask an administrator for menu management access.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.validation",
+    "zh-CN": "请填写菜单名称、合法目标，并选择访问规则。",
+    "en-US": "Enter a name and a valid target, and choose an access rule.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.saved",
+    "zh-CN": "菜单配置已保存",
+    "en-US": "Menu configuration saved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.saveError",
+    "zh-CN": "保存失败，请检查目标、上级目录和访问规则；配置发生变化时请重新载入。",
+    "en-US": "Could not save. Check the target, parent directory and access rule, then reload if configuration changed.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.hidden",
+    "zh-CN": "已隐藏或停用",
+    "en-US": "Hidden",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.customized",
+    "zh-CN": "已定制",
+    "en-US": "Customized",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.title",
+    "zh-CN": "菜单管理",
+    "en-US": "Menu management",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.subtitle",
+    "zh-CN": "调整导航结构并添加页面链接。菜单变更不会授予业务权限。",
+    "en-US": "Arrange navigation and add page links. Menu changes do not grant business permissions.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.add",
+    "zh-CN": "新增菜单",
+    "en-US": "Add menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.search",
+    "zh-CN": "搜索菜单名称",
+    "en-US": "Search menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.loadError",
+    "zh-CN": "菜单加载失败，现有配置未改变。",
+    "en-US": "Menus could not be loaded. Existing settings have not changed.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.empty",
+    "zh-CN": "尚无菜单，可先新增目录或页面链接。",
+    "en-US": "No menus yet. Add a directory or page link.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.conflict",
+    "zh-CN": "菜单配置已被修改，当前草稿已保留，请重新载入后再保存。",
+    "en-US": "Menus changed after you opened this editor. Your draft is preserved; reload before saving.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.reload",
+    "zh-CN": "放弃草稿并重新载入",
+    "en-US": "Discard draft and reload",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.select",
+    "zh-CN": "选择左侧菜单进行配置，或新增一个菜单入口。",
+    "en-US": "Select a menu to edit, or add a new entry.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.new",
+    "zh-CN": "新增菜单",
+    "en-US": "New menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.source.custom",
+    "zh-CN": "自建菜单",
+    "en-US": "Custom menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.source.default",
+    "zh-CN": "插件或平台默认菜单",
+    "en-US": "Plugin or platform default",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.source.missing",
+    "zh-CN": "默认来源已失效",
+    "en-US": "Default no longer available",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.restore",
+    "zh-CN": "恢复默认",
+    "en-US": "Restore default",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.missing",
+    "zh-CN": "默认菜单来源已移除，请清除失效定制，或选择其他有效入口。",
+    "en-US": "The source menu is no longer available. Clear this customization or select a new valid entry.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.section.identity",
+    "zh-CN": "名称与位置",
+    "en-US": "Name and position",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.name",
+    "zh-CN": "菜单名称",
+    "en-US": "Menu name",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.name.example",
+    "zh-CN": "例如：工程文档",
+    "en-US": "For example, Engineering documents",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.parent",
+    "zh-CN": "上级目录",
+    "en-US": "Parent directory",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.root",
+    "zh-CN": "顶层菜单",
+    "en-US": "Top level",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon",
+    "zh-CN": "图标",
+    "en-US": "Icon",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.order",
+    "zh-CN": "显示顺序",
+    "en-US": "Display order",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.order.help",
+    "zh-CN": "同一目录下，数字越小越靠前。",
+    "en-US": "Lower numbers appear first within the same directory.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.section.target",
+    "zh-CN": "内容与打开方式",
+    "en-US": "Content and opening behavior",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind",
+    "zh-CN": "菜单类型",
+    "en-US": "Menu type",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.page",
+    "zh-CN": "已发布的系统页面",
+    "en-US": "Published system page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.target",
+    "zh-CN": "目标地址",
+    "en-US": "Destination",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.page.choose",
+    "zh-CN": "请选择页面",
+    "en-US": "Select a page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.embed.help",
+    "zh-CN": "外部网站可能要求单独登录或禁止内嵌，页面始终提供外部打开入口。",
+    "en-US": "The external site may require sign-in or prevent embedding. An external-open link remains available.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.target.help",
+    "zh-CN": "这里只新增导航入口，不创建页面，也不授予目标数据的访问权限。",
+    "en-US": "This creates a navigation entry. It does not create a new page or grant access to its data.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.opening",
+    "zh-CN": "打开位置",
+    "en-US": "Open in",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.open.same",
+    "zh-CN": "当前窗口",
+    "en-US": "Current window",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.open.new",
+    "zh-CN": "新窗口",
+    "en-US": "New window",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.section.access",
+    "zh-CN": "显示与访问",
+    "en-US": "Visibility and access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.visible",
+    "zh-CN": "在导航中显示",
+    "en-US": "Show in navigation",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.enabled",
+    "zh-CN": "启用",
+    "en-US": "Enabled",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.access",
+    "zh-CN": "可见性要求",
+    "en-US": "Visibility requirement",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.authenticated",
+    "zh-CN": "已登录用户可见",
+    "en-US": "Signed-in users",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.access.help",
+    "zh-CN": "默认菜单保留目标访问要求。菜单可见不代表拥有页面、操作或数据权限。",
+    "en-US": "Default target requirements remain in place. Visibility does not grant page, operation or data permissions.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.preview",
+    "zh-CN": "预览",
+    "en-US": "Preview",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.audit",
+    "zh-CN": "最近菜单变更",
+    "en-US": "Recent menu changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.title",
+    "zh-CN": "确认菜单变更",
+    "en-US": "Confirm menu change",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.delete",
+    "zh-CN": "从当前导航移除此入口？目标页面和业务权限不受影响，默认菜单可恢复。",
+    "en-US": "Delete this custom menu? Its target page and business permissions will remain unchanged.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.restore",
+    "zh-CN": "移除当前定制并恢复为最新默认配置？",
+    "en-US": "Remove your customization and use the current default?",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.discard",
+    "zh-CN": "放弃尚未保存的菜单修改？",
+    "en-US": "Discard your unsaved changes?",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.preview.help",
+    "zh-CN": "仅预览，尚未保存，业务访问权限不变。",
+    "en-US": "Preview only. Nothing has been saved and business access is unchanged.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.preview.open",
+    "zh-CN": "打开目标页面",
+    "en-US": "Open destination",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.denied",
+    "zh-CN": "此页面不可用，或当前账号已无权访问。",
+    "en-US": "This page is unavailable or you no longer have access.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.help",
+    "zh-CN": "外部网站自行管理登录，并可能限制内嵌；若未显示，请在外部打开。",
+    "en-US": "The external site manages its own sign-in and may restrict embedding. If it does not display, open it separately.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.open",
+    "zh-CN": "在外部打开",
+    "en-US": "Open externally",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.directory",
+    "zh-CN": "目录",
+    "en-US": "Directory",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.page",
+    "zh-CN": "系统页面",
+    "en-US": "System page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.internal",
+    "zh-CN": "站内链接",
+    "en-US": "Internal link",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.external",
+    "zh-CN": "外部链接",
+    "en-US": "External link",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.embedded",
+    "zh-CN": "内嵌页面",
+    "en-US": "Embedded page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Link",
+    "zh-CN": "链接",
+    "en-US": "Link",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Folder",
+    "zh-CN": "文件夹",
+    "en-US": "Folder",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.FileText",
+    "zh-CN": "文档",
+    "en-US": "Document",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Globe",
+    "zh-CN": "网页",
+    "en-US": "Web page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Settings",
+    "zh-CN": "设置",
+    "en-US": "Settings",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.ListTree",
+    "zh-CN": "菜单树",
+    "en-US": "Menu tree",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.ShieldCheck",
+    "zh-CN": "权限",
+    "en-US": "Permissions",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.CREATE",
+    "zh-CN": "新增",
+    "en-US": "Created",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.UPDATE",
+    "zh-CN": "修改",
+    "en-US": "Updated",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.DELETE",
+    "zh-CN": "删除",
+    "en-US": "Deleted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.RESTORE",
+    "zh-CN": "恢复默认",
+    "en-US": "Restored default",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.HIDE",
+    "zh-CN": "从导航移除",
+    "en-US": "Removed from navigation",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.inherited",
+    "zh-CN": "继承目标访问要求",
+    "en-US": "Inherited target requirement",
+    "source": "import",
+    "refType": "ui"
   }
 ]

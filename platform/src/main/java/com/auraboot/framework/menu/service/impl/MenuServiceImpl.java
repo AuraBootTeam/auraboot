@@ -33,6 +33,9 @@ import java.util.stream.Collectors;
 public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements MenuService {
 
     @Resource
+    private com.auraboot.framework.menu.service.NavigationConfigurationService navigationConfiguration;
+
+    @Resource
     private SubjectPermissionService subjectPermissionService;
 
     @Resource
@@ -65,7 +68,9 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
         // 1. 查询所有可见的菜单(目录和菜单)
         List<Menu> allMenus = visibleInCurrentEnvironment(
-                baseMapper.findVisibleDirectoriesAndMenus());
+                navigationConfiguration.effectiveMenus(tenantId).stream()
+                        .filter(menu -> !Boolean.FALSE.equals(menu.getVisible()) && menu.getStatus() == com.auraboot.framework.menu.constant.MenuStatus.ACTIVE)
+                        .toList());
         
         Set<String> userPermissionCodes = userPermissionService.getUserPermissionCodes(userId);
         List<Menu> releaseMenus = releaseMenuTree(tenantId, userPermissionCodes);
@@ -286,36 +291,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         
         save(menu);
         
-        // Auto-assign permissions for menu
-        // Skip if menu already has permissionCode (pre-defined permission from bootstrap template)
-        // Only auto-assign for dynamically created menus without existing permission
-        try {
-            if (menu.getPermissionCode() != null && !menu.getPermissionCode().isEmpty()) {
-                log.debug(
-                        "Menu already has permissionCode, skipping auto-permission assignment: "
-                                + "menuId={}, permissionCode={}",
-                        menu.getId(), menu.getPermissionCode());
-            } else if (menu.getPath() != null && !menu.getPath().isEmpty()) {
-                // Convert path to valid resourceCode: /meta/models -> meta_models
-                String resourceCode = convertPathToResourceCode(menu.getPath());
-                if (resourceCode != null) {
-                    autoPermissionAssignmentService.registerPermissions(resourceCode, null, menu.getTenantId());
-                    log.info("Auto-assigned permissions for menu: menuId={}, resourceCode={}",
-                            menu.getId(), resourceCode);
-                } else {
-                    log.warn("Could not convert path to valid resourceCode: menuId={}, path={}",
-                            menu.getId(), menu.getPath());
-                }
-            } else {
-                log.warn("Menu has no permissionCode or path, skipping auto-permission assignment: menuId={}",
-                        menu.getId());
-            }
-        } catch (Exception e) {
-            log.error("Failed to auto-assign permissions for menu: menuId={}, error={}",
-                    menu.getId(), e.getMessage(), e);
-            // Don't throw exception - permission assignment failure should not block menu creation
-        }
-        
+        // Navigation is a presentation definition; creating it never registers business permissions.
         return menu;
     }
     
@@ -443,7 +419,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     @Override
     public Menu getByPath(Long tenantId, String path) {
-        Menu menu = baseMapper.findByPath(tenantId, path);
+        Menu menu = navigationConfiguration.effectiveMenus(tenantId).stream().filter(entry -> java.util.Objects.equals(entry.getPath(),path)).findFirst().orElse(null);
         return MenuEnvironmentScopeService.isVisibleIn(
                 menu, MetaContext.getCurrentEnvironmentId()) ? menu : null;
     }

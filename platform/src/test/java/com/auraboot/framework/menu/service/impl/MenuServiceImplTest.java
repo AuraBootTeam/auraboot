@@ -30,12 +30,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Unit tests for MenuServiceImpl
  */
 class MenuServiceImplTest {
+    private static void attachNavigation(MenuServiceImpl service, MenuMapper mapper) {
+        var configuration=mock(com.auraboot.framework.menu.service.NavigationConfigurationService.class);
+        when(configuration.effectiveMenus(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(invocation -> mapper.findVisibleDirectoriesAndMenus());
+        ReflectionTestUtils.setField(service,"navigationConfiguration",configuration);
+    }
+
 
     private MenuServiceImpl releaseService(com.auraboot.framework.menu.mapper.MenuMapper mapper,
                                            com.auraboot.framework.permission.service.UserPermissionService permissions,
                                            com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog catalog) {
         MenuServiceImpl service = new MenuServiceImpl();
         org.springframework.test.util.ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        attachNavigation(service,mapper);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "userPermissionService", permissions);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
@@ -177,6 +184,7 @@ class MenuServiceImplTest {
         UserPermissionService permissions = mock(UserPermissionService.class);
         ApplicationRuntimeDefinitionCatalog catalog = mock(ApplicationRuntimeDefinitionCatalog.class);
         ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        attachNavigation(service,mapper);
         ReflectionTestUtils.setField(service, "userPermissionService", permissions);
         ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
         ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
@@ -197,6 +205,7 @@ class MenuServiceImplTest {
         UserPermissionService permissions = mock(UserPermissionService.class);
         SubjectPermissionService subjects = mock(SubjectPermissionService.class);
         ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        attachNavigation(service,mapper);
         ReflectionTestUtils.setField(service, "userPermissionService", permissions);
         ReflectionTestUtils.setField(service, "subjectPermissionService", subjects);
         when(mapper.findVisibleDirectoriesAndMenus()).thenReturn(menus);

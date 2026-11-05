@@ -55,7 +55,11 @@ export function transformMenuForUI(menuData: MenuItem[]): any[] {
   return menuData.map((item) => ({
     id: item.pid, //use pid ,long id is truncated
     name: item.name,
-    nameKey: item.i18nKey || (item.code ? `menu.${item.code}` : undefined),
+    nameKey:
+      item.extension?.navigationCustomized || item.extension?.extension?.navigationCustomized
+        ? undefined
+        : item.i18nKey || (item.code ? `menu.${item.code}` : undefined),
+    opening: item.extension?.navigationOpening ?? item.extension?.extension?.navigationOpening,
     path: item.path,
     icon: item.icon,
     type: item.type,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import NavigationLink from './NavigationLink';
 import { useLocation, Link } from 'react-router';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
@@ -8,6 +9,7 @@ import { usePagePresentation } from '~/shared/layout/PagePresentationContext';
 interface SubmenuItem {
   id?: string;
   path: string;
+  opening?: string;
   name: string;
   nameKey?: string;
   icon?: any;
@@ -77,7 +79,10 @@ export default function SidebarSubmenu({
         onClick={() => setIsExpanded(!isExpanded)}
         className={`group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${tokenized ? 'text-text-2 hover:bg-hover hover:text-text' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'}`}
       >
-        <span aria-hidden="true" className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
+        <span
+          aria-hidden="true"
+          className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center"
+        >
           {resolveIcon(typeof icon === 'string' ? icon : null, name, 16)}
         </span>
         <span className="flex-1 truncate text-start">{name}</span>
@@ -118,9 +123,10 @@ export default function SidebarSubmenu({
             const itemName = resolveMenuLabel(t, item);
             const isActive = location.pathname === item.path;
             return (
-              <Link
+              <NavigationLink
                 key={item.id || index}
                 to={item.path}
+                opening={item.opening}
                 aria-current={isActive ? 'page' : undefined}
                 onClick={onNavigate}
                 className={`group flex items-center rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
@@ -133,7 +139,10 @@ export default function SidebarSubmenu({
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
                 }`}
               >
-                <span aria-hidden="true" className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center">
+                <span
+                  aria-hidden="true"
+                  className="me-3 flex h-4 w-4 flex-shrink-0 items-center justify-center"
+                >
                   {resolveIcon(typeof item.icon === 'string' ? item.icon : null, itemName, 14)}
                 </span>
                 <span className="truncate">{itemName}</span>
@@ -142,7 +151,7 @@ export default function SidebarSubmenu({
                     className={`ms-auto h-1.5 w-1.5 rounded-full ${tokenized ? 'bg-accent' : 'bg-blue-500'}`}
                   />
                 )}
-              </Link>
+              </NavigationLink>
             );
           })}
         </div>
