@@ -42,7 +42,9 @@ public class BusinessCommandDataAccessorFactory {
         } catch (SQLException failure) {
             throw new IllegalStateException("Cannot validate business resource transaction", failure);
         }
-        Scope scope = new Scope(context, Objects.requireNonNull(owner.newInvocationAuthorization()), source, holder, connection);
+        var invocationOwner = Objects.requireNonNull(owner.newInvocationAuthorization());
+        if (!Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())) throw denied();
+        Scope scope = new Scope(context, invocationOwner, source, holder, connection);
         try {
             scope.verify();
             TransactionSynchronizationManager.registerSynchronization(scope.lifetime);
@@ -64,6 +66,7 @@ public class BusinessCommandDataAccessorFactory {
         private final BusinessResourceAuthorization owner;
         private final ConnectionHolder holder;
         private final Connection connection;
+        private final BusinessResourceAuthorization.ReadIsolation readIsolation;
         private final Thread thread = Thread.currentThread();
         private final Long tenant, user, member;
         private final String actor, command, rootModel, rootPid;
@@ -85,6 +88,7 @@ public class BusinessCommandDataAccessorFactory {
                       ConnectionHolder holder, Connection connection) {
             this.context = Objects.requireNonNull(context);
             this.owner = owner; this.source = source; this.holder = holder; this.connection = connection;
+            this.readIsolation = owner.resourceReadIsolation();
             witness = context.getBusinessTargetAuthorization();
             plan = context.getPermitPlan(); authorization = context.getAuthorizationVerdict();
             tenant = MetaContext.getCurrentTenantId(); user = MetaContext.getCurrentUserId();
@@ -96,6 +100,11 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void verify() {
+            if (!Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
+            if (readIsolation != null) {
+                try { if (connection.getTransactionIsolation() != readIsolation.jdbcLevel()) throw denied(); }
+                catch (SQLException failure) { throw new IllegalStateException("Cannot validate business source isolation", failure); }
+            }
             if (!active || poisoned || Thread.currentThread() != thread || !MetaContext.exists()
                     || MetaContext.isImpersonating()
                     || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()

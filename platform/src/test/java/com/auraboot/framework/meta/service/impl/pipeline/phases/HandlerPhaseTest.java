@@ -1057,6 +1057,24 @@ class HandlerPhaseTest {
         verify(asyncTaskService, never()).submitTask(any(), any(), any());
     }
 
+    @Test void declaredOwnerIsolationIsEnforcedBeforeAnyHandlerOrAsyncSubmission() {
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation commandReadIsolation() {
+                return com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation.READ_COMMITTED;
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var guard = mock(com.auraboot.framework.plugin.pf4j.CommandHandlerTransactionGuard.class);
+        ReflectionTestUtils.setField(phase, "handlerTransactions", guard);
+        doThrow(new org.springframework.security.access.AccessDeniedException("Owner isolation rejected"))
+                .when(guard).require(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation.READ_COMMITTED);
+        var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(handler.capturedContext.get()).isNull();
+        verify(asyncTaskService, never()).submitTask(any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, dynamicDataMapper);
+    }
+
     private static final class RecordingBusinessHandler extends RecordingPluginHandler
             implements com.auraboot.framework.plugin.extension.BusinessResourceAuthorization {
         final AtomicReference<CommandContext> seen=new AtomicReference<>();

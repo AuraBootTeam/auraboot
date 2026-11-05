@@ -284,10 +284,30 @@ class BusinessCommandDataAccessorFactoryTest {
         assertThat(holder.isRollbackOnly()).isTrue();
     }
 
+    @Test void ownerIsolationIsCheckedBeforeAnySourceRead() throws Exception {
+        owner.readIsolation = BusinessResourceAuthorization.ReadIsolation.READ_COMMITTED;
+        when(connection.getTransactionIsolation()).thenReturn(java.sql.Connection.TRANSACTION_REPEATABLE_READ);
+        assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(data, never()).getByIdForAuthorization(anyString(), anyString());
+    }
+    @Test void ownerIsolationCannotChangeMidInvocation() throws Exception {
+        owner.readIsolation = BusinessResourceAuthorization.ReadIsolation.READ_COMMITTED;
+        when(connection.getTransactionIsolation()).thenReturn(java.sql.Connection.TRANSACTION_READ_COMMITTED);
+        command(scope -> {
+            assertThat(scope.accessor().getById("receipt", "root-1")).containsEntry("pid", "root-1");
+            owner.readIsolation = BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+            denied(() -> scope.accessor().getById("receipt", "root-1"));
+            return null;
+        });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
     static final class Owner implements CommandHandlerExtension, BusinessResourceAuthorization {
         RecordReadAccessor captured;
         String extraWrite;
         boolean inspectLockedLine, optionalReference;
+        ReadIsolation readIsolation;
+        public ReadIsolation resourceReadIsolation() { return readIsolation; }
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }
         public String getCommandType() { return "receipt.confirm"; }
         public Object execute(CommandContext context) { throw new AssertionError("Not called by unit fixture"); }

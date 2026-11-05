@@ -177,6 +177,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             if (p.getResourceCode() == null || p.getAction() == null) {
                 continue;
             }
+            // Registration fallback is entry metadata, not a record-scope consumer.
+            if ("view".equals(p.getAction()) && p.getResourceCode().equals(p.getCode())) continue;
             String key = p.getResourceCode() + ":" + p.getAction();
             if (existing.contains(key)) {
                 continue; // keep explicit overrides / already-inherited rows

@@ -82,6 +82,9 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory businessResources;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandHandlerTransactionGuard handlerTransactions;
+
     private final ApplicationContext applicationContext;
     private final ExtensionRegistry extensionRegistry;
     private final ObjectMapper objectMapper;
@@ -625,6 +628,15 @@ public class HandlerPhase implements CommandPhase {
             throw new AccessDeniedException("Related updates cannot execute asynchronously");
         }
 
+        var transactionOwners = new ArrayList<CommandHandlerExtension>(secondaryHandlers);
+        if (handler != null) transactionOwners.add(handler);
+        for (var transactionOwner : transactionOwners) {
+            var isolation = transactionOwner.commandReadIsolation();
+            if (isolation == null) continue;
+            if (handlerTransactions == null || isAsyncHandler(asyncHandlerParams))
+                throw new AccessDeniedException("Command owner requires a verified synchronous transaction");
+            handlerTransactions.require(isolation);
+        }
         validateBusinessResources(pipelineContext,handler,secondaryHandlers);
 
         // Opt-in async dispatch: commands declaring handlerParams.async run off the

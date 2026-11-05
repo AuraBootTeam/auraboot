@@ -158,6 +158,16 @@ class RolePermissionServiceImplTest {
         verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.isA(com.auraboot.framework.permission.event.RolePermissionChangedEvent.class));
     }
 
+    @Test void inheritedDefaultsDoNotMaterializeGenericEntryFallbackScopes() {
+        Role role = new Role(); role.setId(7L); role.setDefaultDataScopeType("all");
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        Permission fallback = perm(50L, "sl.sales.manage", "view"); fallback.setCode("sl.sales.manage");
+        when(permissionMapper.findByIds(anyList())).thenReturn(List.of(fallback));
+        service.assignPermissionsToRole(7L, List.of(50L));
+        verify(dataScopeService, never()).setScope(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyString());
+    }
+
     private Permission perm(Long id, String resourceCode, String action) {
         Permission p = new Permission();
         p.setId(id);

@@ -15,6 +15,18 @@ public interface BusinessResourceAuthorization {
     /** A fresh policy may retain locked source facts for this invocation only. */
     default BusinessResourceAuthorization newInvocationAuthorization() { return this; }
 
+    /** Optional owner lower bound for reading source facts after transaction-held locks. */
+    default ReadIsolation resourceReadIsolation() { return null; }
+
+    enum ReadIsolation {
+        READ_COMMITTED(java.sql.Connection.TRANSACTION_READ_COMMITTED),
+        REPEATABLE_READ(java.sql.Connection.TRANSACTION_REPEATABLE_READ),
+        SERIALIZABLE(java.sql.Connection.TRANSACTION_SERIALIZABLE);
+        private final int jdbcLevel;
+        ReadIsolation(int jdbcLevel) { this.jdbcLevel = jdbcLevel; }
+        public int jdbcLevel() { return jdbcLevel; }
+    }
+
     /** Optional installed dependencies may yield null only on an approved nullable read. */
     default Set<String> optionalBusinessResourceModels() { return Set.of(); }
 
