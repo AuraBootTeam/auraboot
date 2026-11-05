@@ -550,7 +550,7 @@ function PermissionManagementContent() {
                     )
                   : t(
                       canManageRoles
-                        ? 'admin.permission.editor.roleHint'
+                        ? 'roleNavigation.roleHint'
                         : 'admin.permission.editor.readOnlyHint',
                       undefined,
                       canManageRoles

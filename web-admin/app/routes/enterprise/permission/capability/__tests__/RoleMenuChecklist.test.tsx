@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { describe, it, expect, vi } from 'vitest';
 import RoleMenuChecklist from '../RoleMenuChecklist';
 import type { RoleNavigationSelection } from '../roleNavigationService';
@@ -57,13 +58,15 @@ function setup(selection = snapshot, selected: string[] = [], disabled = false) 
   const onChange = vi.fn(),
     onPreview = vi.fn();
   render(
-    <RoleMenuChecklist
-      selection={selection}
-      selected={selected}
-      disabled={disabled}
-      onChange={onChange}
-      onPreview={onPreview}
-    />,
+    <MemoryRouter>
+      <RoleMenuChecklist
+        selection={selection}
+        selected={selected}
+        disabled={disabled}
+        onChange={onChange}
+        onPreview={onPreview}
+      />
+    </MemoryRouter>,
   );
   return { onChange, onPreview };
 }

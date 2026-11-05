@@ -10685,6 +10685,31 @@
         },
         "type": "object"
       },
+      "ApiResponseListRoleNavigationAudit": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RoleNavigationAudit"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListRolePreviewTargetView": {
         "properties": {
           "code": {
@@ -12485,6 +12510,58 @@
         },
         "type": "object"
       },
+      "ApiResponseNavigationEntryRoles": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationEntryRoles"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseNavigationPreviewOptions": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationPreviewOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseNavigationSnapshot": {
         "properties": {
           "code": {
@@ -12521,6 +12598,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/NavigationTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseNavigationUserPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationUserPreview"
               },
               {
                 "type": "null"
@@ -15114,6 +15217,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RoleMemberTreeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRoleNavigationSelection": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleNavigationSelection"
               },
               {
                 "type": "null"
@@ -36915,6 +37044,53 @@
         ],
         "type": "object"
       },
+      "NavigationEntryRoles": {
+        "properties": {
+          "menuPid": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationRoleOption"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "menuPid",
+          "revision",
+          "roles"
+        ],
+        "type": "object"
+      },
+      "NavigationEntryRolesWrite": {
+        "properties": {
+          "expectedRevision": {
+            "minLength": 1,
+            "pattern": "[a-f0-9]{64}",
+            "type": "string"
+          },
+          "rolePids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "rolePids"
+        ],
+        "type": "object"
+      },
       "NavigationOption": {
         "properties": {
           "label": {
@@ -36930,6 +37106,71 @@
         ],
         "type": "object"
       },
+      "NavigationPreviewMember": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "pid"
+        ],
+        "type": "object"
+      },
+      "NavigationPreviewOptions": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationPreviewMember"
+            },
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationRoleOption"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "members",
+          "roles"
+        ],
+        "type": "object"
+      },
+      "NavigationPreviewRequest": {
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/RoleAuthorizationDraftRequest"
+          },
+          "draftRolePid": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "memberPid": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "rolePids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "type": "object"
+      },
       "NavigationRevision": {
         "properties": {
           "expectedRevision": {
@@ -36939,6 +37180,33 @@
         },
         "required": [
           "expectedRevision"
+        ],
+        "type": "object"
+      },
+      "NavigationRoleOption": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "mode",
+          "name",
+          "pid",
+          "selected"
         ],
         "type": "object"
       },
@@ -37005,6 +37273,32 @@
           "opening",
           "pid",
           "target"
+        ],
+        "type": "object"
+      },
+      "NavigationUserPreview": {
+        "properties": {
+          "menus": {
+            "items": {
+              "$ref": "#/components/schemas/RoleNavigationChoice"
+            },
+            "type": "array"
+          },
+          "rolePids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "menus",
+          "rolePids",
+          "source"
         ],
         "type": "object"
       },
@@ -46579,6 +46873,9 @@
           "fieldPolicies": {
             "$ref": "#/components/schemas/RoleFieldPolicyPreview"
           },
+          "navigation": {
+            "$ref": "#/components/schemas/RoleNavigationSelection"
+          },
           "revision": {
             "type": "string"
           },
@@ -46623,6 +46920,17 @@
               "type": "string"
             },
             "maxItems": 1000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "menuPids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
             "minItems": 0,
             "type": "array",
             "uniqueItems": true
@@ -46682,6 +46990,9 @@
           },
           "matrix": {
             "$ref": "#/components/schemas/PermissionMatrixDTO"
+          },
+          "navigation": {
+            "$ref": "#/components/schemas/RoleNavigationSelection"
           },
           "revision": {
             "type": "string"
@@ -47320,6 +47631,145 @@
             "type": "array"
           }
         },
+        "type": "object"
+      },
+      "RoleNavigationAudit": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "addedMenus": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "previousMode": {
+            "type": "string"
+          },
+          "removedMenus": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "actor",
+          "addedMenus",
+          "createdAt",
+          "pid",
+          "previousMode",
+          "removedMenus"
+        ],
+        "type": "object"
+      },
+      "RoleNavigationChoice": {
+        "properties": {
+          "businessAllowed": {
+            "type": "boolean"
+          },
+          "directory": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentPid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pid": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "businessAllowed",
+          "directory",
+          "enabled",
+          "name",
+          "pid",
+          "source"
+        ],
+        "type": "object"
+      },
+      "RoleNavigationSelection": {
+        "properties": {
+          "menus": {
+            "items": {
+              "$ref": "#/components/schemas/RoleNavigationChoice"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "rolePid": {
+            "type": "string"
+          },
+          "selectedMenuPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "menus",
+          "mode",
+          "revision",
+          "rolePid",
+          "selectedMenuPids"
+        ],
+        "type": "object"
+      },
+      "RoleNavigationWrite": {
+        "properties": {
+          "expectedRevision": {
+            "minLength": 1,
+            "pattern": "[a-f0-9]{64}",
+            "type": "string"
+          },
+          "selectedMenuPids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "selectedMenuPids"
+        ],
         "type": "object"
       },
       "RolePermissionPolicyDefinitionDTO": {
@@ -94560,6 +95010,222 @@
         },
         "tags": [
           "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries/{pid}/roles": {
+      "get": {
+        "operationId": "readNavigationEntryRoles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationEntryRoles"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      },
+      "put": {
+        "operationId": "saveNavigationEntryRoles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationEntryRolesWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationEntryRoles"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/preview": {
+      "post": {
+        "operationId": "previewUserNavigation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationUserPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/preview/options": {
+      "get": {
+        "operationId": "readNavigationPreviewOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationPreviewOptions"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/roles/{rolePid}": {
+      "get": {
+        "operationId": "readRoleNavigationSelection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleNavigationSelection"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      },
+      "put": {
+        "operationId": "saveRoleNavigationSelection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleNavigationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleNavigationSelection"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/roles/{rolePid}/audit": {
+      "get": {
+        "operationId": "readRoleNavigationAudit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRoleNavigationAudit"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
         ]
       }
     },

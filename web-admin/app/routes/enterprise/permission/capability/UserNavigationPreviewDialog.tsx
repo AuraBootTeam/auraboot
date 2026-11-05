@@ -184,7 +184,7 @@ export default function UserNavigationPreviewDialog({
               ) : (
                 <div className="border-border grid min-h-56 overflow-hidden rounded-lg border sm:grid-cols-[160px_minmax(0,1fr)]">
                   <nav
-                    className="bg-subtle space-y-1 p-3"
+                    className="bg-subtle max-h-80 space-y-1 overflow-y-auto p-3"
                     aria-label={t('roleNavigation.merged', undefined, 'Merged navigation')}
                   >
                     {result?.menus.map((m) => (

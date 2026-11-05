@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: a107609ee5dd4332009f2374ebdbdc0c4b2290917224c8000a05fb098868b15d
+ * Contract SHA-256: cba760a5dd0eb34287c6b6ee917679f525edfa74758b5dc017ce42407c9a9468
  */
 export interface paths {
     "/api/activities": {
@@ -16360,6 +16360,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/navigation/entries/{pid}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readNavigationEntryRoles"];
+        put: operations["saveNavigationEntryRoles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewUserNavigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/preview/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readNavigationPreviewOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/roles/{rolePid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readRoleNavigationSelection"];
+        put: operations["saveRoleNavigationSelection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/roles/{rolePid}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readRoleNavigationAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notification-rules": {
         parameters: {
             query?: never;
@@ -27133,6 +27213,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseListRoleNavigationAudit: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleNavigationAudit"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseListRolePreviewTargetView: {
             code?: string;
             context?: unknown;
@@ -27728,6 +27816,22 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseNavigationEntryRoles: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationEntryRoles"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseNavigationPreviewOptions: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationPreviewOptions"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseNavigationSnapshot: {
             code?: string;
             context?: unknown;
@@ -27740,6 +27844,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["NavigationTarget"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseNavigationUserPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationUserPreview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -28540,6 +28652,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["RoleMemberTreeResponse"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseRoleNavigationSelection: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleNavigationSelection"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -36098,12 +36218,42 @@ export interface components {
             pid: string;
             source: string;
         };
+        NavigationEntryRoles: {
+            menuPid: string;
+            revision: string;
+            roles: components["schemas"]["NavigationRoleOption"][];
+        };
+        NavigationEntryRolesWrite: {
+            expectedRevision: string;
+            rolePids: string[];
+        };
         NavigationOption: {
             label: string;
             value: string;
         };
+        NavigationPreviewMember: {
+            name: string;
+            pid: string;
+        };
+        NavigationPreviewOptions: {
+            members: components["schemas"]["NavigationPreviewMember"][];
+            roles: components["schemas"]["NavigationRoleOption"][];
+        };
+        NavigationPreviewRequest: {
+            draft?: components["schemas"]["RoleAuthorizationDraftRequest"];
+            draftRolePid?: string;
+            memberPid?: string;
+            rolePids?: string[];
+        };
         NavigationRevision: {
             expectedRevision: string;
+        };
+        NavigationRoleOption: {
+            enabled: boolean;
+            mode: string;
+            name: string;
+            pid: string;
+            selected: boolean;
         };
         NavigationSnapshot: {
             audit: components["schemas"]["NavigationAudit"][];
@@ -36118,6 +36268,11 @@ export interface components {
             opening: string;
             pid: string;
             target: string;
+        };
+        NavigationUserPreview: {
+            menus: components["schemas"]["RoleNavigationChoice"][];
+            rolePids: string[];
+            source: string;
         };
         NavigationWrite: {
             definition: components["schemas"]["NavigationDefinition"];
@@ -39590,6 +39745,7 @@ export interface components {
             defaultScopeChanged: boolean;
             defaultScopeType: string | null;
             fieldPolicies?: components["schemas"]["RoleFieldPolicyPreview"];
+            navigation?: components["schemas"]["RoleNavigationSelection"];
             revision: string;
             scopeChanges: components["schemas"]["DataScopeUpdateRequest"][];
         };
@@ -39599,6 +39755,7 @@ export interface components {
             defaultScopeType?: string | null;
             expectedRevision: string;
             fieldPolicyPids?: string[];
+            menuPids?: string[];
             revokedPartialCapabilityCodes?: string[];
             scopeChanges?: components["schemas"]["DataScopeUpdateRequest"][];
             selectedCapabilityCodes: string[];
@@ -39608,6 +39765,7 @@ export interface components {
             fieldPolicies?: components["schemas"]["RoleFieldPolicyView"][];
             groups: components["schemas"]["CapabilityGroup"][];
             matrix: components["schemas"]["PermissionMatrixDTO"];
+            navigation?: components["schemas"]["RoleNavigationSelection"];
             revision: string;
             rolePid: string;
             scopes: components["schemas"]["DataScopeUpdateRequest"][];
@@ -39754,6 +39912,35 @@ export interface components {
         RoleMemberTreeResponse: {
             departments?: components["schemas"]["DeptUserTreeNode"][];
             ungrouped?: components["schemas"]["DeptUserNodeUser"][];
+        };
+        RoleNavigationAudit: {
+            actor: string;
+            addedMenus: string[];
+            createdAt: string;
+            pid: string;
+            previousMode: string;
+            removedMenus: string[];
+        };
+        RoleNavigationChoice: {
+            businessAllowed: boolean;
+            directory: boolean;
+            enabled: boolean;
+            name: string;
+            parentPid?: string | null;
+            permissionCode?: string | null;
+            pid: string;
+            source: string;
+        };
+        RoleNavigationSelection: {
+            menus: components["schemas"]["RoleNavigationChoice"][];
+            mode: string;
+            revision: string;
+            rolePid: string;
+            selectedMenuPids: string[];
+        };
+        RoleNavigationWrite: {
+            expectedRevision: string;
+            selectedMenuPids: string[];
         };
         RolePermissionPolicyDefinitionDTO: {
             conditions?: {
@@ -69793,6 +69980,168 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseNavigationSnapshot"];
+                };
+            };
+        };
+    };
+    readNavigationEntryRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationEntryRoles"];
+                };
+            };
+        };
+    };
+    saveNavigationEntryRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationEntryRolesWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationEntryRoles"];
+                };
+            };
+        };
+    };
+    previewUserNavigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationUserPreview"];
+                };
+            };
+        };
+    };
+    readNavigationPreviewOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationPreviewOptions"];
+                };
+            };
+        };
+    };
+    readRoleNavigationSelection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleNavigationSelection"];
+                };
+            };
+        };
+    };
+    saveRoleNavigationSelection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleNavigationWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleNavigationSelection"];
+                };
+            };
+        };
+    };
+    readRoleNavigationAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListRoleNavigationAudit"];
                 };
             };
         };

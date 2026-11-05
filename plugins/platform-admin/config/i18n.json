@@ -7187,5 +7187,12 @@
     "en-US": "Related pages (reference only)",
     "source": "platform-admin",
     "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.morePreview",
+    "zh-CN": "另有 {count} 个入口，可打开用户预览查看。",
+    "en-US": "{count} more entries. Open user preview to inspect all.",
+    "source": "platform-admin",
+    "refType": "ui"
   }
 ]

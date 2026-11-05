@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router';
 import { ChevronRightIcon, ChevronDownIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import type { RoleNavigationSelection, RoleNavigationChoice } from './roleNavigationService';
@@ -161,9 +162,9 @@ export default function RoleMenuChecklist({
         <h3 className="text-text-1 text-sm font-medium">
           {t('roleNavigation.title', undefined, 'Select visible menus for this role')}
         </h3>
-        <a href="/settings/navigation" className="text-accent text-xs underline">
+        <Link to="/settings/navigation" className="text-accent text-xs underline">
           {t('roleNavigation.structure', undefined, 'Manage menu structure')}
-        </a>
+        </Link>
       </div>
       <p className="bg-subtle text-text-2 rounded-control px-3 py-2 text-xs">
         {t(
@@ -236,7 +237,7 @@ export default function RoleMenuChecklist({
             {t('roleNavigation.currentDraft', undefined, 'Current role draft')}
           </p>
           <div className="mt-3 space-y-1">
-            {preview.map((m) => (
+            {preview.slice(0, 12).map((m) => (
               <div
                 key={m.pid}
                 className="bg-panel text-text-1 flex items-center justify-between gap-2 rounded px-2 py-2 text-xs"
@@ -249,6 +250,15 @@ export default function RoleMenuChecklist({
                 )}
               </div>
             ))}
+            {preview.length > 12 && (
+              <p className="text-text-2 py-2 text-xs">
+                {t(
+                  'roleNavigation.morePreview',
+                  { count: preview.length - 12 },
+                  `${preview.length - 12} more entries. Open user preview to inspect all.`,
+                )}
+              </p>
+            )}
             {!preview.length && (
               <p className="text-text-2 py-5 text-center text-xs">
                 {t('roleNavigation.empty', undefined, 'No visible entries')}
