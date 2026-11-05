@@ -26,6 +26,7 @@ import { ModelSuggestionCard } from './ModelSuggestionCard';
 import { ResultContractView } from './ResultContractView';
 import { ThinkingBlock } from './ThinkingBlock';
 import { currentTurnNarrative } from './analysisReportDraft';
+import { FormFillReceipt } from '~/framework/meta/rendering/pages/form/FormFillReceipt';
 
 // ============================================================================
 // Icons
@@ -751,6 +752,11 @@ export function AuraBotChat() {
     cancelTool,
     executionState,
     reloadExecutionState,
+    hasActiveForm,
+    formFillNotice,
+    formFillNoticeRole,
+    formFillReceipt,
+    undoFormFill,
   } = useAuraBot();
   const { t } = useI18n();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -942,6 +948,12 @@ export function AuraBotChat() {
               />
             ))}
 
+            {formFillReceipt && (
+              <div data-testid="chat-form-fill-receipt">
+                <FormFillReceipt receipt={formFillReceipt.result} fields={formFillReceipt.fields}
+                  t={t} onUndo={() => undoFormFill?.()} inChat />
+              </div>
+            )}
             {/* Loading indicator */}
             {isLoading && (
               <div className="mb-3 flex justify-start">
@@ -960,6 +972,14 @@ export function AuraBotChat() {
 
       {/* Input Area */}
       <div className="border-t border-gray-200 bg-gray-50">
+        {hasActiveForm && (
+          <p className="px-4 pt-2 text-xs text-gray-600" data-testid="chat-form-fill-hint">
+            {t('aurabot.formFill.hint', undefined, 'To update only this draft, say “Fill the current form:” followed by your notes.')}
+          </p>
+        )}
+        {formFillNotice && (
+          <p role={formFillNoticeRole ?? 'alert'} className={`px-4 pt-2 text-sm ${formFillNoticeRole === 'status' ? 'text-gray-600' : 'text-amber-800'}`} data-testid="chat-form-fill-notice">{formFillNotice}</p>
+        )}
         {/* Selected KB chips */}
         <SelectedKbChips />
 

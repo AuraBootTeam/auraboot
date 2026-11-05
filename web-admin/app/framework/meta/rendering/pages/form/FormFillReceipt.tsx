@@ -5,16 +5,22 @@ export function FormFillReceipt({
   fields,
   t,
   onUndo,
+  inChat = false,
 }: {
   receipt: FormFillResult;
   fields: FormFillField[];
   onUndo: () => void;
+  inChat?: boolean;
   t: (key: string, params?: Record<string, any>, fallback?: string) => string;
 }) {
   const labels = new Map(fields.map((field) => [field.code, field.label]));
   const count = Object.keys(receipt.applied).length;
   const reviews = Object.entries(receipt.reviews ?? {});
   const hasAmbiguity = reviews.some(([, review]) => review.status === 'ambiguous');
+  const empty = fields.filter(
+    (field) =>
+      !field.locked && (receipt.values[field.code] == null || receipt.values[field.code] === ''),
+  );
   return (
     <div
       role="status"
@@ -31,6 +37,21 @@ export function FormFillReceipt({
           {Object.keys(receipt.applied)
             .map((code) => labels.get(code))
             .join('、')}
+        </p>
+      )}
+      {inChat && (
+        <p className="text-text-2">
+          {t(
+            'aurabot.formFill.draftOnly',
+            undefined,
+            'Only the draft changed. Existing values are preserved; save from the page after review.',
+          )}
+        </p>
+      )}
+      {inChat && empty.length > 0 && (
+        <p className="text-text-2" data-testid="chat-form-fill-empty">
+          {t('aurabot.formFill.empty', undefined, 'Still empty')}:{' '}
+          {empty.map((field) => field.label).join('、')}
         </p>
       )}
       {receipt.conflicts.length > 0 && (

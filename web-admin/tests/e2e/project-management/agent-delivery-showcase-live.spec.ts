@@ -1,6 +1,6 @@
 /** Real project delivery through existing colleague, draft and approval surfaces. */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { authenticateBffSession } from '../../helpers/bff-auth-session';
@@ -28,7 +28,17 @@ async function command(api: APIRequestContext, code: string, payload: Record<str
   expect(value.data.data.recordPid).toBeTruthy();
   return value.data.data.recordPid as string;
 }
-async function setup(page: Page, base: string) {
+interface ShowcaseFixture {
+  suffix: string;
+  projectName: string;
+  project: string;
+  customer: string;
+  owner: string;
+  tenantId: string;
+  preparedAgentPid?: string;
+  preparedAgentCode?: string;
+}
+async function setup(page: Page, base: string): Promise<ShowcaseFixture> {
   expect(process.env.PW_REQUIRE_LIVE_LLM).toBe('1');
   expect(process.env.PW_DELIVERY_SHOWCASE).toBe('1');
   mkdirSync(shots, { recursive: true });
@@ -39,6 +49,20 @@ async function setup(page: Page, base: string) {
     DEFAULT_TEST_ACCOUNT.password,
   );
   const suffix = randomUUID().slice(0, 8);
+  if (process.env.PW_SHOWCASE_FIXTURE_FILE) {
+    const prepared = JSON.parse(readFileSync(process.env.PW_SHOWCASE_FIXTURE_FILE, 'utf8'));
+    expect(prepared.baseURL).toBe(base);
+    expect(prepared.tenantId).toBe(identity.tenantId);
+    expect(prepared.projectName).toBe('供应链协同平台一期（演示）');
+    expect(prepared.preparedAgentPid).toBeTruthy();
+    const saved = await businessSnapshot(page.request, prepared.project);
+    expect(saved.project.tpm_pj_name).toBe(prepared.projectName);
+    expect(saved.project.tpm_pj_progress).toBe(67);
+    expect(saved.project.tpm_pj_customer_id).toBe(prepared.customer);
+    expect(saved.tasks).toHaveLength(1);
+    expect(saved.tasks[0].tpm_ts_title).toBe('接口联调准备');
+    return { ...prepared, owner: identity.userPid };
+  }
   const customer = await command(page.request, 'tpm:create_customer', {
     tpm_cu_name: '澄川制造（演示）',
     tpm_cu_contact: '虚构联系人',
@@ -49,7 +73,6 @@ async function setup(page: Page, base: string) {
     tpm_pj_customer_id: customer,
     tpm_pj_owner_user: identity.userPid,
     tpm_pj_progress: 67,
-    tpm_pj_status: 'active',
     tpm_pj_risk_summary: '客户测试环境尚未开放',
     tpm_pj_next_action: '联系客户开放测试环境',
   });
@@ -132,98 +155,111 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
     join(shots, 'fixture.json'),
     JSON.stringify({ ...fixture, baseURL, fictional: true }, null, 2),
   );
-  const department = (
-    await body(
-      await page.request.post('/api/org/departments', {
-        data: {
-          org_dept_name: '项目交付演示部',
-          org_dept_code: `delivery_${fixture.suffix}`,
-          org_dept_status: 'active',
-          org_dept_order: 1,
-        },
-      }),
-    )
-  ).data.pid;
-  const position = (
-    await body(
-      await page.request.post('/api/dynamic/org_position/create', {
-        data: {
-          org_pos_name: '项目交付负责人',
-          org_pos_code: `delivery_${fixture.suffix}`,
-          org_pos_dept_id: department,
-          org_pos_level: 'P5',
-          org_pos_status: 'active',
-        },
-      }),
-    )
-  ).data.pid;
-  await page.goto('/home');
-  await navigateToMenuByClick(page, ['AI 中心', 'AI 同事']);
-  await page.getByTestId('create-agent-btn').click();
-  await expect(page.getByTestId('wizard-template-project_delivery')).toBeVisible();
-  await page.getByTestId('wizard-template-project_delivery').click();
-  const name = '项目交付助理';
-  await page.getByTestId('wizard-input-name').fill(name);
-  await page.getByTestId('wizard-btn-next').click();
-  await page.getByTestId('wizard-btn-next').click();
-  await page.getByTestId('review-provider-select').selectOption('deepseek');
-  await expect(page.getByTestId('review-tool-scope')).toContainText('不会授予角色');
-  const created = page.waitForResponse(
-    (r) => r.url().includes('/agent-definition/create') && r.request().method() === 'POST',
-  );
-  await page.getByTestId('wizard-btn-create').click();
-  const receipt = await body(await created);
-  const agentPid = receipt.data.pid;
-  await expect(page).toHaveURL(/ai_colleague_detail\?agentPid=/);
-  const stored = (await body(await page.request.get(`/api/dynamic/agent-definition/${agentPid}`)))
-    .data;
-  expect(JSON.parse(stored.allowed_models)).toEqual(['tpm_project', 'tpm_task', 'tpm_milestone']);
-  expect(JSON.parse(stored.tools)).toContain('cmd:tpm:create_task');
-  await page.getByTestId('enroll-as-employee-btn').click();
-  await page.getByTestId('enroll-dept-select').selectOption(department);
-  await page.getByTestId('enroll-position-select').selectOption(position);
-  const enrolled = page.waitForResponse(
-    (r) => r.url().endsWith('/enroll-employee') && r.request().method() === 'POST',
-  );
-  await page.getByTestId('enroll-confirm-btn').click();
-  await body(await enrolled);
-  // Administrator fixture configuration is explicit; templates and enrollment grant no roles.
-  const placement = (
-    await body(await page.request.get(`/api/agent/definitions/${agentPid}/org-placement`))
-  ).data;
-  const employee = (
-    await body(await page.request.get(`/api/dynamic/org_employee/${placement.employeePid}`))
-  ).data;
-  const memberPid = employee.org_emp_member_id;
-  expect(memberPid).toBeTruthy();
-  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual(
-    [],
-  );
-  const roles = (await body(await page.request.get('/api/roles/all'))).data;
-  const deliveryRoles = roles.filter(
-    (role: { code: string }) => role.code === 'tpm_delivery_manager',
-  );
-  expect(deliveryRoles).toHaveLength(1);
-  const rolePids = deliveryRoles.map((role: { pid: string }) => role.pid);
-  await body(
-    await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }),
-  );
-  expect((await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data).toEqual(
-    rolePids,
-  );
-  await page.getByTestId('tab-releases').click();
-  await page.getByTestId('publish-agent-release').click();
-  const published = page.waitForResponse(
-    (r) =>
-      r.url().endsWith(`/api/agent/definitions/${agentPid}/publish`) &&
-      r.request().method() === 'POST',
-  );
-  await page.getByTestId('confirm-publish-agent-release').click();
-  await body(await published);
-  await page.getByTestId('back-to-colleagues').click();
-  await page.getByTestId(`agent-chat-${stored.agent_code}`).click();
 
+  let agentPid: string;
+  let stored: { agent_code: string; allowed_models: string; tools: string };
+  if (fixture.preparedAgentPid) {
+    agentPid = fixture.preparedAgentPid;
+    stored = (await body(await page.request.get(`/api/dynamic/agent-definition/${agentPid}`))).data;
+    expect(stored.agent_code).toBe(fixture.preparedAgentCode);
+    await page.goto('/home');
+    await navigateToMenuByClick(page, ['AI 中心', 'AI 同事']);
+    await page.getByTestId(`agent-chat-${stored.agent_code}`).click();
+  } else {
+    const department = (
+      await body(
+        await page.request.post('/api/org/departments', {
+          data: {
+            org_dept_name: '项目交付演示部',
+            org_dept_code: `delivery_${fixture.suffix}`,
+            org_dept_status: 'active',
+            org_dept_order: 1,
+          },
+        }),
+      )
+    ).data.pid;
+    const position = (
+      await body(
+        await page.request.post('/api/dynamic/org_position/create', {
+          data: {
+            org_pos_name: '项目交付负责人',
+            org_pos_code: `delivery_${fixture.suffix}`,
+            org_pos_dept_id: department,
+            org_pos_level: 'P5',
+            org_pos_status: 'active',
+          },
+        }),
+      )
+    ).data.pid;
+    await page.goto('/home');
+    await navigateToMenuByClick(page, ['AI 中心', 'AI 同事']);
+    await page.getByTestId('create-agent-btn').click();
+    await expect(page.getByTestId('wizard-template-project_delivery')).toBeVisible();
+    await page.getByTestId('wizard-template-project_delivery').click();
+    const name = '项目交付助理';
+    await page.getByTestId('wizard-input-name').fill(name);
+    await page.getByTestId('wizard-btn-next').click();
+    await page.getByTestId('wizard-btn-next').click();
+    await page.getByTestId('review-provider-select').selectOption('deepseek');
+    await expect(page.getByTestId('review-tool-scope')).toContainText('不会授予角色');
+    const created = page.waitForResponse(
+      (r) => r.url().includes('/agent-definition/create') && r.request().method() === 'POST',
+    );
+    await page.getByTestId('wizard-btn-create').click();
+    const receipt = await body(await created);
+    agentPid = receipt.data.pid;
+    await expect(page).toHaveURL(/ai_colleague_detail\?agentPid=/);
+    stored = (await body(await page.request.get(`/api/dynamic/agent-definition/${agentPid}`))).data;
+    expect(JSON.parse(stored.allowed_models)).toEqual(['tpm_project', 'tpm_task', 'tpm_milestone']);
+    expect(JSON.parse(stored.tools)).toContain('cmd:tpm:create_task');
+    await page.getByTestId('enroll-as-employee-btn').click();
+    await page.getByTestId('enroll-dept-select').selectOption(department);
+    await page.getByTestId('enroll-position-select').selectOption(position);
+    const enrolled = page.waitForResponse(
+      (r) => r.url().endsWith('/enroll-employee') && r.request().method() === 'POST',
+    );
+    await page.getByTestId('enroll-confirm-btn').click();
+    await body(await enrolled);
+    // Administrator fixture configuration is explicit; templates and enrollment grant no roles.
+    const placement = (
+      await body(await page.request.get(`/api/agent/definitions/${agentPid}/org-placement`))
+    ).data;
+    const employee = (
+      await body(await page.request.get(`/api/dynamic/org_employee/${placement.employeePid}`))
+    ).data;
+    const memberPid = employee.org_emp_member_id;
+    expect(memberPid).toBeTruthy();
+    expect(
+      (await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data,
+    ).toEqual([]);
+    const roles = (await body(await page.request.get('/api/roles/all'))).data;
+    const deliveryRoles = roles.filter(
+      (role: { code: string }) => role.code === 'tpm_delivery_manager',
+    );
+    expect(deliveryRoles).toHaveLength(1);
+    const rolePids = deliveryRoles.map((role: { pid: string }) => role.pid);
+    await body(
+      await page.request.put('/api/user-roles/sync-by-pid', { data: { memberPid, rolePids } }),
+    );
+    expect(
+      (await body(await page.request.get(`/api/user-roles/member/${memberPid}`))).data,
+    ).toEqual(rolePids);
+    await page.getByTestId('tab-releases').click();
+    await page.getByTestId('publish-agent-release').click();
+    const published = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/agent/definitions/${agentPid}/publish`) &&
+        r.request().method() === 'POST',
+    );
+    await page.getByTestId('confirm-publish-agent-release').click();
+    await body(await published);
+    await page.getByTestId('back-to-colleagues').click();
+    await page.getByTestId(`agent-chat-${stored.agent_code}`).click();
+  }
   await expect(page.getByTestId('agent-chat-page')).toBeVisible();
+  await expect(page.getByText('已发布并部署不可变版本', { exact: true })).toBeHidden({
+    timeout: 15_000,
+  });
   await capture(page, 'DS00');
   await navigateToMenuByClick(page, ['项目交付', '项目']);
   await expect(page.getByRole('row').filter({ hasText: fixture.projectName })).toBeVisible();
@@ -233,7 +269,7 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
   const beforeRead = await businessSnapshot(page.request, fixture.project);
   const summary = await send(
     page,
-    `请查询项目“${fixture.projectName}”，用三到五条简短要点，只读汇总已记录的进度、风险和已有任务，不创建或更新记录，不推测未记录的事实。`,
+    `请查询项目“${fixture.projectName}”，只列三项：已记录的进度、风险原文和已有任务。不讨论项目阶段，不推断实际实施状态，不创建或更新记录。`,
   );
   const stream = await summary.text();
   expect(stream).not.toContain('No LLM provider configured');
@@ -266,21 +302,80 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
     fullPage: true,
   });
   writeFileSync(join(shots, 'query-stream.txt'), stream);
+
   {
-    await page.goto('/home');
-    await navigateToMenuByClick(page, ['项目交付', 'AI整理交付任务']);
+    await navigateToMenuByClick(page, ['项目交付', '任务']);
+    await page.getByRole('button', { name: /^新建(?:任务)?$/ }).click();
+    await expect(page.getByTestId('ai-fill-trigger')).toHaveCount(0);
+    await expect(page.getByTestId('ai-fill-dialog')).toHaveCount(0);
     await page.getByTestId('select-trigger-tpm_ts_project_id').click();
     await page.getByRole('option', { name: fixture.projectName, exact: true }).click();
     const title = '培训材料复核';
-    await page.getByTestId('ai-fill-trigger').click();
-    await page
-      .getByTestId('ai-fill-input')
-      .fill(
-        `只整理一项任务：名称“${title}”，负责人林晓，完成标准“检查培训手册和验收清单”。截止日期未确定，不得猜测。所属项目已经选好，不能改动。`,
+    const hotkey = process.platform === 'darwin' ? 'Meta+j' : 'Control+j';
+    await page.keyboard.press(hotkey);
+    const bot = page.getByTestId('aurabot-panel');
+    await expect(bot).toBeVisible();
+    await expect(bot.getByTestId('agent-selector-trigger')).toContainText('项目交付助理', {
+      timeout: 15_000,
+    });
+    await bot.getByTestId('agent-selector-trigger').click();
+    await expect(bot.getByTestId('agent-selector-dropdown')).toBeVisible();
+    await bot
+      .getByTestId('agent-selector-dropdown')
+      .getByRole('button', { name: /AuraBot/ })
+      .click();
+    await expect(bot.getByTestId('agent-selector-trigger')).toContainText('AuraBot');
+    await expect(bot.getByTestId('chat-form-fill-hint')).toBeVisible();
+    const consultation = page.waitForResponse(
+      (r) => r.url().includes('/api/ai/aurabot/chat/stream') && r.request().method() === 'POST',
+    );
+    await bot.getByTestId('aurabot-input').fill('只解释当前表单的用途，不要填写、创建或保存记录。');
+    await bot.getByTestId('aurabot-send').click();
+    const consulted = await consultation;
+    expect(consulted.request().postDataJSON().formFill).toBeUndefined();
+    expect(await consulted.finished()).toBeNull();
+    await expect(bot.getByTestId('aurabot-input')).toBeEnabled();
+    await expect(page.locator('#tpm_ts_title')).toHaveValue('');
+    expect(await taskRows(page.request, title)).toHaveLength(0);
+    await capture(page, 'DS03-consult');
+
+    const fillText = `根据纪要填写当前表单：
+任务名称：培训材料复核。
+负责人：林晓。
+完成标准：检查培训手册和验收清单。
+截止日期：未确定。
+所属项目已选定，请保留。`;
+    let calls = 0;
+    const counter = (request: import('@playwright/test').Request) => {
+      if (
+        request.url().includes('/api/ai/aurabot/chat/stream') &&
+        request.method() === 'POST' &&
+        request.postDataJSON()?.formFill
+      )
+        calls++;
+    };
+    page.on('request', counter);
+    async function fillDraft(captureInput: boolean) {
+      await bot.getByTestId('aurabot-input').fill(fillText);
+      if (captureInput) await capture(page, 'DS03');
+      const pending = page.waitForResponse(
+        (r) => r.url().includes('/api/ai/aurabot/chat/stream') && r.request().method() === 'POST',
       );
-    await capture(page, 'DS03');
-    await page.getByTestId('ai-fill-confirm').click();
-    await expect(page.getByTestId('ai-fill-dialog')).toBeHidden({ timeout: 120_000 });
+      await bot.getByTestId('aurabot-send').click();
+      const response = await pending;
+      expect(response.request().postDataJSON()).toMatchObject({
+        agentCode: 'aurabot',
+        formFill: { modelCode: 'tpm_task' },
+      });
+      expect(await response.finished()).toBeNull();
+      await expect(
+        bot.getByTestId('chat-form-fill-receipt').or(bot.getByTestId('chat-form-fill-notice')),
+      ).toBeVisible({ timeout: 120_000 });
+      await expect(bot.getByTestId('chat-form-fill-notice')).toHaveCount(0);
+      await expect(bot.getByTestId('chat-form-fill-receipt')).toContainText('仅更新草稿');
+      writeFileSync(join(shots, `draft-stream-${calls}.txt`), await response.text());
+    }
+    await fillDraft(true);
     await expect(page.locator('#tpm_ts_title')).toHaveValue(title);
     await expect(page.locator('#tpm_ts_assignee')).toHaveValue('林晓');
     await expect(page.locator('#tpm_ts_due_date')).toHaveValue('');
@@ -288,31 +383,41 @@ test('SHOWCASE: one fictional project from current facts through reviewed writes
       fixture.projectName,
     );
     expect(await taskRows(page.request, title)).toHaveLength(0);
-    await page.screenshot({
-      animations: 'disabled',
-      path: join(shots, 'DS04.png'),
-      fullPage: true,
-    });
+    await expect(page.locator('[data-testid="form-ai-fill-receipt"]')).toHaveCount(1);
+    await capture(page, 'DS04');
     await page.locator('#tpm_ts_description').scrollIntoViewIfNeeded();
-    await page.screenshot({
-      animations: 'disabled',
-      path: join(shots, 'DS04-detail.png'),
-      fullPage: true,
-    });
+    await capture(page, 'DS04-detail');
+
+    const humanNote = '检查培训手册和验收清单；补充培训记录核对。';
+    await page.locator('#tpm_ts_description').fill(humanNote);
+    await bot.getByTestId('form-ai-fill-undo').click();
+    await expect(page.locator('#tpm_ts_title')).toHaveValue('');
+    await expect(page.locator('#tpm_ts_assignee')).toHaveValue('');
+    await expect(page.locator('#tpm_ts_description')).toHaveValue(humanNote);
+    await expect(bot.getByTestId('chat-form-fill-notice')).toContainText('已撤销');
+    expect(calls).toBe(1);
+    expect(await taskRows(page.request, title)).toHaveLength(0);
+    await capture(page, 'DS04-undo');
+    await fillDraft(false);
+    expect(calls).toBe(2);
+    await expect(page.locator('#tpm_ts_title')).toHaveValue(title);
+    await expect(page.locator('#tpm_ts_description')).toHaveValue(humanNote);
+    await expect(page.locator('#tpm_ts_due_date')).toHaveValue('');
+    await capture(page, 'DS04-refill');
+    page.off('request', counter);
+    await page.keyboard.press(hotkey);
+    await expect(bot).toHaveCount(0);
     const persisted = page.waitForResponse(
       (r) => r.url().includes('/execute/tpm:create_task') && r.request().method() === 'POST',
     );
     await page.getByTestId('form-btn-submit').click();
     await body(await persisted);
     expect(await taskRows(page.request, title)).toHaveLength(1);
+    expect((await taskRows(page.request, title))[0].tpm_ts_description).toBe(humanNote);
     await expect(page).toHaveURL(/\/p\/tpm_task$/);
     await page.reload();
     await expect(page.getByRole('row').filter({ hasText: title })).toBeVisible();
-    await page.screenshot({
-      animations: 'disabled',
-      path: join(shots, 'DS05.png'),
-      fullPage: true,
-    });
+    await capture(page, 'DS05');
   }
 
   await navigateToMenuByClick(page, ['AI 中心', 'AI 同事']);
