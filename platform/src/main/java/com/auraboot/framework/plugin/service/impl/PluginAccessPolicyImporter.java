@@ -359,6 +359,11 @@ final class PluginAccessPolicyImporter {
         }
         int before = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
         facadeReceiver.updateRolePermissions(roleId, dto, tenantId, null, true);
+        // The role-declaration contract carries top-level dataScopes (e.g. homeroom
+        // teachers reading only their own score-import batches); the strict
+        // post-publication reconcile must reapply them exactly like the role-import
+        // stage does, otherwise a re-imported plugin silently loses row filters.
+        applyRoleDataScopes(roleId, dto, tenantId);
         int after = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
         if (after > before) {
             log.info("Role permission reconciliation bound {} additional codes for role {}",
