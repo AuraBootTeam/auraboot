@@ -23,6 +23,7 @@ vi.mock('../authorizationDraftService', async (original) => ({
     preview: vi.fn(),
     save: vi.fn(),
     fieldPolicies: vi.fn(),
+    fieldPolicyRoots: vi.fn(),
   },
 }));
 function baseline(): AuthorizationSnapshot {
@@ -98,6 +99,7 @@ async function review() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(authorizationDraftService.fieldPolicyRoots).mockResolvedValue([]);
   vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([]);
   vi.mocked(authorizationDraftService.read).mockResolvedValue(baseline());
   vi.mocked(authorizationDraftService.save).mockResolvedValue(baseline());
@@ -394,6 +396,36 @@ describe('field restrictions participate in the same role draft', () => {
     maskType: 'hide',
     enabled: true,
   };
+  it('discovers business root restrictions without requiring generic model access', async () => {
+    const state = baseline();
+    state.groups[0].capabilities = [
+      { ...state.groups[0].capabilities[0], includes: ['order.manage'] },
+    ];
+    state.matrix.modules![0].resources![0].resourceCode = 'business.order';
+    state.matrix.modules![0].resources![0].actions = [
+      {
+        ...state.matrix.modules![0].resources![0].actions![0],
+        code: 'order.manage',
+        action: 'execute',
+      },
+    ];
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(state);
+    vi.mocked(authorizationDraftService.fieldPolicyRoots).mockResolvedValue([
+      { model: 'order', permissions: ['order.manage'] },
+    ]);
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([
+      definition,
+      { ...definition, pid: 'internal-policy', modelCode: 'internal_dependency' },
+    ]);
+    await open();
+    expect(await screen.findByTestId('field-policy-hide-cost')).not.toBeDisabled();
+    expect(screen.queryByTestId('field-policy-internal-policy')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('field-policy-hide-cost'));
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1].fieldPolicyPids).toEqual([
+      'hide-cost',
+    ]);
+  });
   it('previews and atomically saves field selection together with duty changes', async () => {
     vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
     vi.mocked(authorizationDraftService.preview).mockImplementation(async (_, body) => ({

@@ -15,6 +15,7 @@ interface Props {
   bound: BoundPolicy[] | undefined;
   selected: string[];
   models: Set<string>;
+  grantedCodes: Set<string>;
   disabled: boolean;
   readOnly?: boolean;
   onChange: (selected: string[]) => void;
@@ -26,12 +27,14 @@ export default function FieldPolicyChecklist({
   bound,
   selected,
   models,
+  grantedCodes,
   disabled,
   readOnly = false,
   onChange,
 }: Props) {
   const { t } = useI18n();
   const [catalog, setCatalog] = useState<PolicyOption[]>([]);
+  const [roots, setRoots] = useState<Array<{ model: string; permissions: string[] }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -56,14 +59,28 @@ export default function FieldPolicyChecklist({
       setLoading(false);
       setError(false);
       setCatalog([]);
+      setRoots([]);
       return;
     }
     setLoading(true);
     setError(false);
     setCatalog([]);
-    authorizationDraftService
-      .fieldPolicies()
-      .then((policies) => {
+    setRoots([]);
+    Promise.all([
+      authorizationDraftService.fieldPolicies(),
+      authorizationDraftService.fieldPolicyRoots(rolePid),
+    ])
+      .then(([policies, businessRoots]) => {
+        if (
+          !businessRoots.every(
+            (root) =>
+              typeof root.model === 'string' &&
+              root.model.trim() &&
+              Array.isArray(root.permissions) &&
+              root.permissions.every((code) => typeof code === 'string' && code.trim()),
+          )
+        )
+          throw new Error('Incomplete business field roots');
         const options: PolicyOption[] = [];
         for (const policy of policies) {
           const kind = policy.policyType?.toLowerCase();
@@ -86,7 +103,10 @@ export default function FieldPolicyChecklist({
         }
         if (new Set(options.map((p) => p.pid)).size !== options.length)
           throw new Error('Duplicate field policies');
-        if (active) setCatalog(options);
+        if (active) {
+          setCatalog(options);
+          setRoots(businessRoots);
+        }
       })
       .catch(() => {
         if (active) setError(true);
@@ -110,8 +130,16 @@ export default function FieldPolicyChecklist({
       });
     }
   }
+  // Client hints expose only the owner's root, never the internal dependency reach.
+  // Preview/save revalidate against the current server catalog and complete role grants.
+  const applicableModels = new Set(models);
+  roots
+    .filter(
+      (root) => grantedCodes.has('*') || root.permissions.some((code) => grantedCodes.has(code)),
+    )
+    .forEach((root) => applicableModels.add(root.model));
   const visible = [...options.values()]
-    .filter((p) => selected.includes(p.pid) || models.has(p.model))
+    .filter((p) => selected.includes(p.pid) || applicableModels.has(p.model))
     .sort((a, b) => a.name.localeCompare(b.name));
   return (
     <section
@@ -179,7 +207,7 @@ export default function FieldPolicyChecklist({
         <ul className="space-y-2">
           {visible.map((policy) => {
             const checked = selected.includes(policy.pid);
-            const applicable = models.has(policy.model);
+            const applicable = applicableModels.has(policy.model);
             return (
               <li key={policy.pid}>
                 <label className="text-text-1 flex items-start gap-2 text-sm">

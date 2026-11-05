@@ -55,6 +55,17 @@ export function draftMatrix(matrix: AuthorizationSnapshot['matrix']): Permission
 }
 
 export const authorizationDraftService = {
+  async fieldPolicyRoots(rolePid: string) {
+    const inspection = unwrap(
+      await internalRequest('get', '/api/permission/roles/{rolePid}/draft/migration', {
+        path: { rolePid },
+      }),
+    );
+    return inspection.boundaries.map((boundary) => ({
+      model: boundary.rootModel,
+      permissions: boundary.operations.map((operation) => operation.permissionCode),
+    }));
+  },
   async fieldPolicies() {
     return unwrap(await internalRequest('get', '/api/meta/data-permissions', {}));
   },

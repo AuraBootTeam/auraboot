@@ -682,6 +682,15 @@ export default function CapabilityRoleEditor({
           bound={boundFields}
           selected={selectedFields}
           models={fieldModels}
+          grantedCodes={
+            new Set(
+              (projectedMatrix?.modules ?? []).flatMap((module) =>
+                module.resources.flatMap((resource) =>
+                  resource.actions.filter((action) => action.granted).map((action) => action.code),
+                ),
+              ),
+            )
+          }
           readOnly={readOnly}
           disabled={readOnly || saving || previewLoading || conflict}
           onChange={setFieldSelection}
