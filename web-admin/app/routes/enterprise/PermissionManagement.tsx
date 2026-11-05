@@ -265,9 +265,9 @@ function PermissionManagementContent() {
 
   const handleToggleRole = async (role: Role) => {
     if (!canManageRoles) return;
-    const disabled = role.status === 'disabled';
+    const disabled = role.status === 'inactive';
     const action = disabled ? 'enable' : 'disable';
-    const nextStatus = disabled ? 'active' : 'disabled';
+    const nextStatus = disabled ? 'active' : 'inactive';
     const result = await fetchResult<boolean>(`/api/roles/${role.pid}/${action}`, {
       method: 'put',
     });
@@ -364,7 +364,7 @@ function PermissionManagementContent() {
               <tbody>
                 {filteredRoles.map((role) => {
                   const isSelected = selectedRolePid === role.pid;
-                  const isDisabled = role.status === 'disabled';
+                  const isDisabled = role.status === 'inactive';
                   return (
                     <tr
                       key={role.pid}

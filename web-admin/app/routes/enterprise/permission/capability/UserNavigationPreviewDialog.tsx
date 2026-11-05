@@ -27,6 +27,7 @@ export default function UserNavigationPreviewDialog({
   const [options, setOptions] = useState<NavigationPreviewOptions | null>(null),
     [selectedRoles, setSelectedRoles] = useState<string[]>([]),
     [member, setMember] = useState(''),
+    [roleSearch, setRoleSearch] = useState(''),
     [result, setResult] = useState<NavigationUserPreview | null>(null),
     [activeMenu, setActiveMenu] = useState(''),
     [failed, setFailed] = useState(false),
@@ -39,6 +40,7 @@ export default function UserNavigationPreviewDialog({
     setResult(null);
     setFailed(false);
     setMember('');
+    setRoleSearch('');
     setSelectedRoles(rolePid ? [rolePid] : []);
     roleNavigationService
       .options()
@@ -152,30 +154,43 @@ export default function UserNavigationPreviewDialog({
                   ))}
                 </select>
               </label>
-              <div className="flex flex-wrap gap-2">
-                {options.roles.map((r) => (
-                  <label
-                    key={r.pid}
-                    className="border-border rounded-control flex items-center gap-2 border px-2 py-1.5 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      data-testid={`role-preview-role-${r.pid}`}
-                      disabled={!r.enabled || loading}
-                      checked={selectedRoles.includes(r.pid)}
-                      onChange={(e) => {
-                        setMember('');
-                        setSelectedRoles((old) =>
-                          e.target.checked
-                            ? [...new Set([...old, r.pid])]
-                            : old.filter((id) => id !== r.pid),
-                        );
-                      }}
-                    />
-                    {r.name}
-                    {!r.enabled && ` · ${t('roleNavigation.roleInactive', undefined, 'Inactive')}`}
-                  </label>
-                ))}
+              <input
+                data-testid="role-preview-search"
+                aria-label={t('roleNavigation.searchRoles', undefined, 'Search preview roles')}
+                placeholder={t('roleNavigation.searchRoles', undefined, 'Search preview roles')}
+                value={roleSearch}
+                onChange={(event) => setRoleSearch(event.target.value)}
+                className="border-border bg-panel rounded-control w-full border px-3 py-2 text-sm"
+              />
+              <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+                {options.roles
+                  .filter((role) =>
+                    role.name.toLowerCase().includes(roleSearch.trim().toLowerCase()),
+                  )
+                  .map((r) => (
+                    <label
+                      key={r.pid}
+                      className="border-border rounded-control flex items-center gap-2 border px-2 py-1.5 text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        data-testid={`role-preview-role-${r.pid}`}
+                        disabled={!r.enabled || loading}
+                        checked={selectedRoles.includes(r.pid)}
+                        onChange={(e) => {
+                          setMember('');
+                          setSelectedRoles((old) =>
+                            e.target.checked
+                              ? [...new Set([...old, r.pid])]
+                              : old.filter((id) => id !== r.pid),
+                          );
+                        }}
+                      />
+                      {r.name}
+                      {!r.enabled &&
+                        ` · ${t('roleNavigation.roleInactive', undefined, 'Inactive')}`}
+                    </label>
+                  ))}
               </div>
               {loading ? (
                 <p role="status" className="text-text-2 text-sm">

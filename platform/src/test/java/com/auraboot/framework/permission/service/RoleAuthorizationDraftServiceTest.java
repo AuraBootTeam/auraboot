@@ -58,6 +58,8 @@ class RoleAuthorizationDraftServiceTest {
 
     @BeforeEach void setup() {
         org.springframework.test.util.ReflectionTestUtils.setField(service,"roleNavigation",mock(com.auraboot.framework.menu.service.RoleNavigationService.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"fieldAccess",mock(RoleFieldAccessService.class));
+        when(fieldPolicies.preview(any(),any(),any())).thenReturn(new com.auraboot.framework.permission.dto.RoleFieldPolicyPreview(List.of(),List.of()));
         MetaContext.setCurrentTenantId(100L);
         role.setId(1L); role.setPid("role-a"); role.setTenantId(100L);
         grant.setId(10L); grant.setRoleId(1L); grant.setPermissionId(3L); grant.setGrantType("GRANT");

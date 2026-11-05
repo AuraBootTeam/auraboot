@@ -61,6 +61,13 @@ class DataPermissionEngineImplDataScopeTest {
         MetaContext.clear();
     }
 
+    @Test void hidingAFieldCannotBeWeakenedByAHigherPrioritySharedMask() {
+        var partial=com.auraboot.framework.meta.dto.FieldMaskRule.builder().fieldCode("cost").maskType("partial").build();
+        var hidden=com.auraboot.framework.meta.dto.FieldMaskRule.builder().fieldCode("cost").maskType("hide").build();
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost","sensitive")),List.of(partial,hidden)).getFirst().get("cost")).isNull();
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost","sensitive")),List.of(hidden,partial)).getFirst().get("cost")).isNull();
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.NullAndEmptySource
     @org.junit.jupiter.params.provider.ValueSource(strings={"unknown"})

@@ -1,3 +1,4 @@
+import RoleFieldAccessGrid, { type FieldAccessChange } from './RoleFieldAccessGrid';
 import { getLocalizedText } from '~/utils/i18n';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
@@ -58,6 +59,7 @@ export default function CapabilityRoleEditor({
 }: CapabilityRoleEditorProps) {
   const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const [fieldAccessChanges, setFieldAccessChanges] = useState<FieldAccessChange[]>([]);
   const [menuSelection, setMenuSelection] = useState<string[] | null>(null);
   const [subjectPreview, setSubjectPreview] = useState(false);
   const [groups, setGroups] = useState<CapabilityGroup[]>([]);
@@ -187,6 +189,7 @@ export default function CapabilityRoleEditor({
     defaultChanged ||
     activeScopeChanges.length > 0 ||
     fieldsDirty ||
+    fieldAccessChanges.length > 0 ||
     menuSelection !== null;
   useEffect(() => {
     onDirtyChange?.(dirty || saving || previewLoading || scopeCapability !== null || scopeOpen);
@@ -200,6 +203,7 @@ export default function CapabilityRoleEditor({
     setApplyDefault(false);
     setScopeChanges([]);
     setFieldSelection(null);
+    setFieldAccessChanges([]);
     setMenuSelection(null);
     setScopeLabels({});
     setConflict(false);
@@ -224,6 +228,7 @@ export default function CapabilityRoleEditor({
       defaultScopeType: defaultChanged ? defaultScope : null,
       applyDefaultToCurrentGrants: applyDefault,
       scopeChanges: activeScopeChanges,
+      ...(fieldAccessChanges.length ? { fieldChanges: fieldAccessChanges } : {}),
       ...(fieldsDirty ? { fieldPolicyPids: selectedFields } : {}),
       ...(menuSelection !== null ? { menuPids: menuSelection } : {}),
     }),
@@ -238,6 +243,7 @@ export default function CapabilityRoleEditor({
       fieldsDirty,
       JSON.stringify(selectedFields),
       JSON.stringify(menuSelection),
+      JSON.stringify(fieldAccessChanges),
     ],
   );
   const requestBody = () => draftBody;
@@ -429,6 +435,22 @@ export default function CapabilityRoleEditor({
   );
   const previewContent = previewPlan ? (
     <div className="space-y-4" data-testid="capability-preview-summary">
+      {!!draftPreview?.fieldAccessChanges?.length && (
+        <section
+          data-testid="draft-preview-field-access"
+          className="border-border rounded-control border p-3 text-xs"
+        >
+          <h3 className="mb-2 font-medium">{t('roleFields.title', undefined, 'Field access')}</h3>
+          {draftPreview.fieldAccessChanges.map((change) => (
+            <p key={change.modelCode + ':' + change.fieldCode}>
+              {change.modelLabel} · {change.fieldLabel}:{' '}
+              {t('roleFields.' + change.beforeAccess, undefined, change.beforeAccess)} →{' '}
+              {t('roleFields.' + change.access, undefined, change.access)}
+            </p>
+          ))}
+        </section>
+      )}
+
       {draftPreview?.navigation && (
         <section
           data-testid="draft-preview-menus"
@@ -787,12 +809,11 @@ export default function CapabilityRoleEditor({
             disabled={readOnly || saving || previewLoading}
           />
         </div>
-        <div hidden={activeSection !== 'scope'}>
-          <FieldPolicyChecklist
-            key={rolePid}
+        <div hidden={activeSection !== 'scope'} className="space-y-4">
+          <RoleFieldAccessGrid
             rolePid={rolePid}
-            bound={boundFields}
-            selected={selectedFields}
+            catalog={baselineSnapshot?.fieldAccess}
+            changes={fieldAccessChanges}
             models={fieldModels}
             grantedCodes={
               new Set(
@@ -805,10 +826,35 @@ export default function CapabilityRoleEditor({
                 ),
               )
             }
-            readOnly={readOnly}
             disabled={readOnly || saving || previewLoading || conflict}
-            onChange={setFieldSelection}
+            onChange={setFieldAccessChanges}
           />
+          <details data-testid="role-shared-field-policies">
+            <summary className="text-text-2 cursor-pointer text-sm">
+              {t('roleFields.sharedPolicies', undefined, 'Shared field policies')}
+            </summary>
+            <FieldPolicyChecklist
+              key={rolePid}
+              rolePid={rolePid}
+              bound={boundFields}
+              selected={selectedFields}
+              models={fieldModels}
+              grantedCodes={
+                new Set(
+                  (projectedMatrix?.modules ?? []).flatMap((module) =>
+                    module.resources.flatMap((resource) =>
+                      resource.actions
+                        .filter((action) => action.granted)
+                        .map((action) => action.code),
+                    ),
+                  ),
+                )
+              }
+              readOnly={readOnly}
+              disabled={readOnly || saving || previewLoading || conflict}
+              onChange={setFieldSelection}
+            />
+          </details>
         </div>
         {activeSection === 'capabilities' && filteredGroups.length === 0 && (
           <p data-testid="capability-search-empty" className="text-text-2 py-4 text-sm">

@@ -44,6 +44,9 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
 
     @Autowired
     private com.auraboot.framework.menu.service.RoleNavigationService roleNavigation;
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.permission.service.RoleFieldAccessService roleFieldAccess;
 
     @Autowired
     private com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
@@ -341,6 +344,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         // 同时删除角色Permission关联
         rolePermissionService.removeAllPermissionsByRoleId(roleId);
 
+        roleFieldAccess.deleteOwned(role);
+
         return getBaseMapper().deleteById(role.getId()) > 0;
     }
 
@@ -465,6 +470,7 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
         newRole.setDeletedFlag(false);
         
         if (!save(newRole)) throw new IllegalStateException("Copied role was not persisted");
+        roleNavigation.initialize(newRole);
         
         // Copy complete bindings and shared role constraints in this same transaction.
         if (!rolePermissionService.copyRolePermissions(roleId,newRole.getId()))

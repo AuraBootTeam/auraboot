@@ -7693,7 +7693,8 @@ CREATE TABLE public.ab_data_permission_policy (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     created_by bigint,
-    updated_by bigint
+    updated_by bigint,
+    managed_role_pid character varying(32)
 );
 
 
@@ -7702,6 +7703,13 @@ CREATE TABLE public.ab_data_permission_policy (
 --
 
 COMMENT ON TABLE public.ab_data_permission_policy IS 'Data permission policies for row-level filtering and column-level masking';
+
+
+--
+-- Name: COLUMN ab_data_permission_policy.managed_role_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_data_permission_policy.managed_role_pid IS 'Role-local field restriction authored by the atomic role draft; never a shared policy definition.';
 
 
 --
@@ -31895,6 +31903,13 @@ CREATE UNIQUE INDEX ux_ab_watch_record_pid ON public.ab_watch USING btree (tenan
 
 
 --
+-- Name: ux_data_policy_managed_field; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_data_policy_managed_field ON public.ab_data_permission_policy USING btree (tenant_id, managed_role_pid, model_code, field_code, policy_type) WHERE (managed_role_pid IS NOT NULL);
+
+
+--
 -- Name: ux_dict_current; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -31920,6 +31935,13 @@ CREATE UNIQUE INDEX ux_meta_field_current ON public.ab_meta_field USING btree (t
 --
 
 CREATE UNIQUE INDEX ux_meta_model_current ON public.ab_meta_model USING btree (tenant_id, code) WHERE (is_current AND (deleted_flag = false));
+
+
+--
+-- Name: ux_role_managed_field_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_role_managed_field_owner ON public.ab_role USING btree (tenant_id, pid);
 
 
 --
@@ -33415,6 +33437,14 @@ ALTER TABLE ONLY public.ab_business_network
 
 ALTER TABLE ONLY public.ab_dashboard_module
     ADD CONSTRAINT fk_dashboard_module_parent FOREIGN KEY (parent_id) REFERENCES public.ab_dashboard_module(id);
+
+
+--
+-- Name: ab_data_permission_policy fk_data_policy_managed_role; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_data_permission_policy
+    ADD CONSTRAINT fk_data_policy_managed_role FOREIGN KEY (tenant_id, managed_role_pid) REFERENCES public.ab_role(tenant_id, pid) ON DELETE CASCADE;
 
 
 --

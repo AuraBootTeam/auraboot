@@ -307,8 +307,9 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     }
 
     @Test void foreignRoleIdentityCannotHaveItsDefaultChangedByALocalAdministrator() {
-        long foreign=IdWorker.getId();String pid=UniqueIdGenerator.generate();
-        jdbc.update("INSERT INTO ab_role(id,pid,tenant_id,code,name,type,status,deleted_flag) VALUES(?,?,1,?,?,'custom','active',FALSE)",foreign,pid,resource+"_foreign",resource);
+        long foreign=IdWorker.getId(),foreignTenant=IdWorker.getId();String pid=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_tenant(id,pid,name) VALUES(?,?,?)",foreignTenant,UniqueIdGenerator.generate(),"Foreign role fixture");
+        jdbc.update("INSERT INTO ab_role(id,pid,tenant_id,code,name,type,status,deleted_flag) VALUES(?,?,?,?,?,'custom','active',FALSE)",foreign,pid,foreignTenant,resource+"_foreign",resource);
         try {
             assertThatThrownBy(()->roleAuthoring.setDefaultDataScopeType(foreign,"all"))
                     .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
@@ -318,7 +319,8 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_data_scope WHERE role_id=?",Integer.class,foreign)).isZero();
         } finally {
             jdbc.update("DELETE FROM ab_role_data_scope WHERE role_id=?",foreign);
-            jdbc.update("DELETE FROM ab_role WHERE tenant_id=1 AND id=?",foreign);
+            jdbc.update("DELETE FROM ab_role WHERE id=?",foreign);
+            jdbc.update("DELETE FROM ab_tenant WHERE id=?",foreignTenant);
         }
     }
 
@@ -446,6 +448,45 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                 Long.class, getTestTenant().getId(), policy)).isEqualTo(1L);
     }
 
+    @Test void fieldGridCompilesHiddenAndReadOnlyWithoutChangingExistingGrants() {
+        fieldPolicy();
+        var baseline=drafts.apply(rolePid,editRequest(drafts.snapshot(rolePid)));
+        var original=persistedCodes();
+        var request=gridRequest(baseline,"hidden");
+        assertThat(drafts.preview(rolePid,request).fieldAccessChanges()).singleElement().satisfies(c->assertThat(c.access()).isEqualTo("hidden"));
+        assertThat(policyMapper.findManagedByRole(getTestTenant().getId(),rolePid)).isEmpty();
+        var hidden=drafts.apply(rolePid,request);
+        assertThat(navigation.auditLog(rolePid)).anySatisfy(a->assertThat(a.changes()).anySatisfy(c->{assertThat(c.kind()).isEqualTo("field");assertThat(c.after()).isEqualTo("hidden");}));
+        assertThat(policyMapper.findManagedByRole(getTestTenant().getId(),rolePid)).extracting(p->p.getPolicyType()).containsExactlyInAnyOrder("column","field_write");
+        assertThat(hidden.fieldPolicies()).isEmpty();
+        assertThat(persistedCodes()).isEqualTo(original);
+        var readonly=drafts.apply(rolePid,gridRequest(hidden,"read_only"));
+        assertThat(policyMapper.findManagedByRole(getTestTenant().getId(),rolePid)).extracting(p->p.getPolicyType()).containsExactly("field_write");
+        drafts.apply(rolePid,gridRequest(readonly,"inherit"));
+        assertThat(policyMapper.findManagedByRole(getTestTenant().getId(),rolePid)).isEmpty();
+        assertThat(persistedCodes()).isEqualTo(original);
+    }
+
+    @Test void faultAfterActualManagedFieldWriteRollsBackTheWholeRoleDraft() {
+        fieldPolicy();
+        var baseline=drafts.snapshot(rolePid);
+        var nativeBindings=sqlSession.getMapper(com.auraboot.framework.meta.mapper.DataPermissionRoleBindingMapper.class);
+        doAnswer(call->{
+            nativeBindings.insertBinding(call.getArgument(0),call.getArgument(1),call.getArgument(2));
+            assertThat(policyMapper.findManagedByRole(getTestTenant().getId(),rolePid)).hasSize(1);
+            throw new IllegalStateException("Fault after role-managed field policy insert");
+        }).when(fieldBindings).insertBinding(eq(getTestTenant().getId()),org.mockito.ArgumentMatchers.anyString(),eq(rolePid));
+        assertThatThrownBy(()->drafts.apply(rolePid,gridRequest(baseline,"hidden"))).isInstanceOf(IllegalStateException.class);
+        assertThat(policyMapper.findManagedByRole(getTestTenant().getId(),rolePid)).isEmpty();
+        assertThat(persistedCodes()).isEmpty();
+        assertThat(defaultScope()).isNull();
+    }
+
+    private RoleAuthorizationDraftRequest gridRequest(RoleAuthorizationDraftSnapshot baseline,String access) {
+        return new RoleAuthorizationDraftRequest(baseline.revision(),Set.of(editCapability),Set.of(),true,"self",true,List.of(),null,null,
+                List.of(new com.auraboot.framework.permission.dto.RoleFieldAccess.Change(resource,resource+"_secret",access)));
+    }
+
     @Test void failureAfterActualFieldBindingRollsBackDutiesDefaultsScopesAndFieldChanges() {
         String policy = fieldPolicy();
         var baseline = drafts.snapshot(rolePid);
@@ -549,13 +590,15 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         model.setTenantId(getTestTenant().getId()); model.setPid(UniqueIdGenerator.generate()); model.setCode(resource);
         model.setVersion(1); model.setIsCurrent(true); model.setStatus("published"); model.setDeletedFlag(false);
         var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
-        extension.setExtension(new java.util.HashMap<>(Map.of("modelType","entity")));
+        extension.setExtension(new java.util.HashMap<>(Map.of("modelType","entity","displayName","Draft transaction project")));
         model.setExtension(extension);
         models.insert(model); modelId = model.getId();
         var field = new com.auraboot.framework.meta.entity.Field();
         field.setTenantId(getTestTenant().getId()); field.setPid(UniqueIdGenerator.generate()); field.setCode(resource+"_secret");
         field.setDataType("string"); field.setVersion(1); field.setIsCurrent(true); field.setStatus("published"); field.setDeletedFlag(false);
         field.setFeature(new com.auraboot.framework.meta.entity.payload.FieldFeatureBean());
+        var fieldExtension=new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        fieldExtension.setExtension(new java.util.HashMap<>(Map.of("displayName","Engineering remark")));field.setExtension(fieldExtension);
         fields.insert(field); fieldId = field.getId();
         var binding = new com.auraboot.framework.meta.entity.ModelFieldBinding();
         binding.setTenantId(getTestTenant().getId()); binding.setModelId(modelId); binding.setFieldId(fieldId); binding.setFieldOrder(0);

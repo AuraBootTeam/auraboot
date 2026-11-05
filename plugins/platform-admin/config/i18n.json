@@ -6224,8 +6224,8 @@
   },
   {
     "key": "navigation.validation",
-    "zh-CN": "请填写菜单名称、合法目标，并选择访问规则。",
-    "en-US": "Enter a name and a valid target, and choose an access rule.",
+    "zh-CN": "请填写菜单名称和合法目标。",
+    "en-US": "Enter a menu name and a valid target.",
     "source": "platform-admin",
     "refType": "ui"
   },
@@ -7192,6 +7192,342 @@
     "key": "roleNavigation.morePreview",
     "zh-CN": "另有 {count} 个入口，可打开用户预览查看。",
     "en-US": "{count} more entries. Open user preview to inspect all.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.searchRoles",
+    "zh-CN": "搜索预览角色",
+    "en-US": "Search preview roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.configureRoles",
+    "zh-CN": "配置角色",
+    "en-US": "Configure roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.title",
+    "zh-CN": "字段权限",
+    "en-US": "Field access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.help",
+    "zh-CN": "选择业务对象并限制字段访问。业务授权、记录范围和共享策略仍会共同生效。",
+    "en-US": "Choose a business object and restrict its fields. Business access, record scopes and shared policies still apply.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.unnamedModel",
+    "zh-CN": "业务对象定义待完善",
+    "en-US": "Business object definition unavailable",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.unnamedField",
+    "zh-CN": "字段定义待完善",
+    "en-US": "Field definition unavailable",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.inherit",
+    "zh-CN": "随业务权限",
+    "en-US": "Use business access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.read_only",
+    "zh-CN": "只读",
+    "en-US": "Read only",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.hidden",
+    "zh-CN": "不可见",
+    "en-US": "Hidden",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.unavailable",
+    "zh-CN": "字段定义暂不可用，现有字段限制将保留。",
+    "en-US": "Field definitions are unavailable. Existing restrictions will be preserved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.empty",
+    "zh-CN": "暂无可配置的字段定义。",
+    "en-US": "No field definitions are available for this role.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.model",
+    "zh-CN": "业务对象",
+    "en-US": "Business object",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.search",
+    "zh-CN": "搜索字段",
+    "en-US": "Search fields",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.authorityError",
+    "zh-CN": "无法确认此角色的业务资源，字段修改已禁用，现有配置将保留。",
+    "en-US": "Could not verify this role’s business resources. Existing restrictions are preserved; changes are disabled.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.noBusiness",
+    "zh-CN": "当前角色未获此业务对象的访问权。字段设置不会授予访问权；可明确移除已有的字段限制。",
+    "en-US": "This role has no business access to this object. Field settings cannot grant access; existing restrictions may be removed explicitly.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.field",
+    "zh-CN": "字段",
+    "en-US": "Field",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.access",
+    "zh-CN": "访问方式",
+    "en-US": "Access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.other",
+    "zh-CN": "其他限制",
+    "en-US": "Other restrictions",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.noAdditional",
+    "zh-CN": "无共享字段限制",
+    "en-US": "No shared field restriction",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.inheritHelp",
+    "zh-CN": "“随业务权限”仅解除本角色在此表格设置的限制，不增加写入权、不移除共享策略。“不可见”同时限制写入。",
+    "en-US": "Use business access removes only this role’s grid restriction. It does not grant write access or remove shared restrictions. Hidden fields are also read only.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.sharedPolicies",
+    "zh-CN": "共享字段策略",
+    "en-US": "Shared field policies",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.title",
+    "zh-CN": "角色授权变更",
+    "en-US": "Role authorization changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.error",
+    "zh-CN": "授权变更记录加载失败。",
+    "en-US": "Could not load role authorization changes.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.empty",
+    "zh-CN": "此角色暂无授权变更记录。",
+    "en-US": "No authorization changes for this role yet.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.updated",
+    "zh-CN": "更新角色授权",
+    "en-US": "Updated role authorization",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.duty",
+    "zh-CN": "业务职责",
+    "en-US": "Business duty",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.default_scope",
+    "zh-CN": "角色默认范围",
+    "en-US": "Role default scope",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.apply_default",
+    "zh-CN": "应用到当前授权",
+    "en-US": "Apply to current grants",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.scope",
+    "zh-CN": "记录范围",
+    "en-US": "Record scope",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.scope_merge",
+    "zh-CN": "范围合并方式",
+    "en-US": "Scope merge",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.shared_field",
+    "zh-CN": "共享字段策略",
+    "en-US": "Shared field policy",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.field",
+    "zh-CN": "字段访问",
+    "en-US": "Field access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.not_configured",
+    "zh-CN": "未配置",
+    "en-US": "Not configured",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.none",
+    "zh-CN": "无权限",
+    "en-US": "No access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.partial",
+    "zh-CN": "部分授权",
+    "en-US": "Partially granted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.full",
+    "zh-CN": "已授权",
+    "en-US": "Granted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.all",
+    "zh-CN": "全部记录",
+    "en-US": "All records",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.self",
+    "zh-CN": "本人记录",
+    "en-US": "Own records",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.dept",
+    "zh-CN": "本部门",
+    "en-US": "Department",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.dept_and_sub",
+    "zh-CN": "本部门及下级",
+    "en-US": "Department and subdepartments",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.team",
+    "zh-CN": "本团队",
+    "en-US": "Team",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.MAX",
+    "zh-CN": "合并可访问记录",
+    "en-US": "Union of accessible records",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.MIN",
+    "zh-CN": "交集限制",
+    "en-US": "Intersection",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.inherit",
+    "zh-CN": "随业务权限",
+    "en-US": "Use business access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.read_only",
+    "zh-CN": "只读",
+    "en-US": "Read only",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.hidden",
+    "zh-CN": "不可见",
+    "en-US": "Hidden",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.applied",
+    "zh-CN": "已应用",
+    "en-US": "Applied",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.not_applied",
+    "zh-CN": "未应用",
+    "en-US": "Not applied",
     "source": "platform-admin",
     "refType": "ui"
   }

@@ -26,11 +26,11 @@ export default function RoleNavigationAudit({ rolePid }: { rolePid: string }) {
   return (
     <section data-testid="role-navigation-audit" className="space-y-4">
       <h3 className="text-text-1 text-sm font-medium">
-        {t('roleNavigation.changes', undefined, 'Role menu changes')}
+        {t('roleChanges.title', undefined, 'Role authorization changes')}
       </h3>
       {error ? (
         <div role="alert">
-          <p>{t('roleNavigation.auditError', undefined, 'Could not load role menu changes.')}</p>
+          <p>{t('roleChanges.error', undefined, 'Could not load role authorization changes.')}</p>
           <button
             type="button"
             onClick={() => setAttempt((a) => a + 1)}
@@ -43,13 +43,17 @@ export default function RoleNavigationAudit({ rolePid }: { rolePid: string }) {
         <p role="status">{t('common.loading', undefined, 'Loading…')}</p>
       ) : rows.length === 0 ? (
         <p className="text-text-2 text-sm">
-          {t('roleNavigation.noChanges', undefined, 'No menu changes for this role yet.')}
+          {t('roleChanges.empty', undefined, 'No authorization changes for this role yet.')}
         </p>
       ) : (
         rows.map((row) => (
           <article key={row.pid} className="border-border border-b pb-4">
             <div className="flex flex-wrap justify-between gap-2 text-sm">
-              <span>{t('roleNavigation.menuAssignment', undefined, 'Updated visible menus')}</span>
+              <span>
+                {row.changes?.length
+                  ? t('roleChanges.updated', undefined, 'Updated role authorization')
+                  : t('roleNavigation.menuAssignment', undefined, 'Updated visible menus')}
+              </span>
               <time className="text-text-2 text-xs">
                 {new Date(row.createdAt).toLocaleString()}
               </time>
@@ -82,6 +86,24 @@ export default function RoleNavigationAudit({ rolePid }: { rolePid: string }) {
                   .join('、')}
               </p>
             )}
+            {row.changes?.map((change, index) => (
+              <p key={index} className="text-text-2 mt-2 text-xs">
+                {t('roleChanges.kind.' + change.kind, undefined, 'Authorization')} {change.target}:{' '}
+                {t(
+                  'roleChanges.value.' + (change.before ?? 'not_configured'),
+                  undefined,
+                  change.before ??
+                    t('roleChanges.value.not_configured', undefined, 'Not configured'),
+                )}{' '}
+                →{' '}
+                {t(
+                  'roleChanges.value.' + (change.after ?? 'not_configured'),
+                  undefined,
+                  change.after ??
+                    t('roleChanges.value.not_configured', undefined, 'Not configured'),
+                )}
+              </p>
+            ))}
           </article>
         ))
       )}

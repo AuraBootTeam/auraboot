@@ -19,6 +19,16 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class DataPermissionPolicyServiceBoundaryTest {
+    @Test void sharedPolicyEndpointsCannotMutateOrBindRoleOwnedRestrictions() {
+        var policy=new DataPermissionPolicy();policy.setPid("owned");policy.setTenantId(7L);policy.setManagedRolePid("role-a");
+        when(policies.findByPid(any(),eq("owned"))).thenReturn(policy);
+        assertThatThrownBy(()->service.delete("owned")).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.disable("owned")).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.bindToRole("owned","role-b")).isInstanceOf(AccessDeniedException.class);
+        verify(bindings,never()).deleteByPolicyPid(any(),any());
+        verify(bindings,never()).insertBinding(any(),any(),any());
+        verify(policies,never()).deleteByPid(any(),any());
+    }
     private final RoleAuthorizationWriteLock writes=mock(RoleAuthorizationWriteLock.class);
     private final DataPermissionAuthoringAccess access=mock(DataPermissionAuthoringAccess.class);
     private final DataPermissionPolicyMapper policies=mock(DataPermissionPolicyMapper.class);

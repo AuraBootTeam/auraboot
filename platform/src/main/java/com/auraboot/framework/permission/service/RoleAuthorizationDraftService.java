@@ -48,6 +48,8 @@ public class RoleAuthorizationDraftService {
     private final RoleFieldPolicyDraftService fieldPolicies;
     @org.springframework.beans.factory.annotation.Autowired
     private com.auraboot.framework.menu.service.RoleNavigationService roleNavigation;
+    @org.springframework.beans.factory.annotation.Autowired
+    private RoleFieldAccessService fieldAccess;
     private final RoleService roles;
     private final RolePermissionMapper grants;
     private final PermissionService permissions;
@@ -173,6 +175,7 @@ public class RoleAuthorizationDraftService {
         authoringAccess.requireWrite();
         Role role = resolve(rolePid);
         var reviewed = validate(role, request);
+        var auditChanges=authorizationChanges(role,reviewed);
         writes.mutate();
         if (request.defaultScopeChanged()) roles.setDefaultDataScopeType(role.getId(), request.defaultScopeType());
         capabilities.applyCapabilitySelection(role.getId(), request.selectedCapabilityCodes(), revoked(request));
@@ -184,7 +187,9 @@ public class RoleAuthorizationDraftService {
             matrix.setRoleScope(tenant,role.getId(),change);
         }
         fieldPolicies.apply(role, reviewed.fieldPolicies());
+        fieldAccess.apply(role,reviewed.fieldAccessChanges());
         if(request.menuPids()!=null)roleNavigation.apply(role,request.menuPids());
+        roleNavigation.auditAuthorization(role,auditChanges);
         // A failed write or readback propagates and rolls back the entire authoring operation.
         return snapshot(resolve(rolePid));
     }
@@ -233,7 +238,8 @@ public class RoleAuthorizationDraftService {
         return new RoleAuthorizationDraftPreview(revision, selection, request.defaultScopeChanged(),
                 request.defaultScopeType(), request.applyDefaultToCurrentGrants(), changes(request),
                 fieldPolicies.preview(role, request.fieldPolicyPids(), permittedModels),
-                request.menuPids()==null?null:roleNavigation.preview(role,request.menuPids(),resulting));
+                request.menuPids()==null?null:roleNavigation.preview(role,request.menuPids(),resulting),
+                fieldAccess.preview(role,request.fieldChanges(),permittedModels));
     }
 
     private RoleAuthorizationDraftSnapshot snapshot(Role role) {
@@ -241,7 +247,8 @@ public class RoleAuthorizationDraftService {
                 capabilities.resolveForRole(role.getId()), matrix.getMatrixForRole(role.getTenantId(), role.getId()),
                 scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
                         .map(scope -> new DataScopeUpdateRequest(scope.getResourceCode(), scope.getActionCode(),
-                                scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role),roleNavigation.selection(role));
+                                scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role),roleNavigation.selection(role),
+                fieldAccess.catalog(role,fieldCandidates(role)));
     }
 
     private Role resolve(String rolePid) {
@@ -254,6 +261,7 @@ public class RoleAuthorizationDraftService {
         Map<String, Object> state = new LinkedHashMap<>();
         state.put("role", role);
         state.put("navigation",roleNavigation.selection(role));
+        state.put("fieldAccess",fieldAccess.catalog(role,fieldCandidates(role)));
         state.put("grants", grants.findByRole(role.getId()).stream()
                 .sorted(Comparator.comparing(RolePermission::getId, Comparator.nullsLast(Long::compareTo))).toList());
         state.put("scopes", scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
@@ -293,6 +301,38 @@ public class RoleAuthorizationDraftService {
                     boundary.permissions().stream().sorted().toList()));
         }
         return roots.stream().distinct().sorted(Comparator.comparing(BusinessFieldRoot::command)).toList();
+    }
+
+    private Set<String> fieldCandidates(Role role) {
+        Set<String> result=new HashSet<>();
+        businessFieldRoots().forEach(root->result.add(root.model()));
+        permissions.findRolePermissions(role.getId()).stream().map(permission->permission.getResourceCode())
+                .filter(Objects::nonNull).forEach(result::add);
+        return result;
+    }
+
+    private List<com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange> authorizationChanges(Role role,RoleAuthorizationDraftPreview reviewed) {
+        var result=new java.util.ArrayList<com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange>();
+        var before=new java.util.HashMap<String,String>();
+        capabilities.resolveForRole(role.getId()).forEach(group->group.getCapabilities().forEach(cap->before.put(cap.getCode(),cap.getAuthorizationState())));
+        for(var cap:reviewed.capabilities().resultingCapabilities()) {
+            if(!cap.isConventionDerived()&&!Objects.equals(before.getOrDefault(cap.getCode(),"none"),cap.getAuthorizationState()))
+                result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("duty",cap.getLabel(),before.getOrDefault(cap.getCode(),"none"),cap.getAuthorizationState()));
+        }
+        if(reviewed.defaultScopeChanged())result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("default_scope","",role.getDefaultDataScopeType(),reviewed.defaultScopeType()));
+        if(reviewed.applyDefaultToCurrentGrants())result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("apply_default","",null,reviewed.defaultScopeType()));
+        var previousScopes=scopes.getScopesByRole(role.getTenantId(),role.getId());
+        for(var change:reviewed.scopeChanges()) {
+            var prior=previousScopes.stream().filter(scope->Objects.equals(scope.getResourceCode(),change.resourceCode())&&Objects.equals(scope.getActionCode(),change.actionCode())).findFirst();
+            String name=permissions.findAllActive().stream().filter(permission->Objects.equals(permission.getResourceCode(),change.resourceCode())&&Objects.equals(permission.getAction(),change.actionCode())).map(PermissionDTO::getName).filter(Objects::nonNull).findFirst().orElse("");
+            result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("scope",name,prior.map(RoleDataScope::getScopeType).orElse(null),change.scopeType()));
+            String merge=change.mergeStrategy()==null?"MAX":change.mergeStrategy();
+            if(!Objects.equals(prior.map(RoleDataScope::getMergeStrategy).orElse("MAX"),merge))result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("scope_merge",name,prior.map(RoleDataScope::getMergeStrategy).orElse("MAX"),merge));
+        }
+        reviewed.fieldPolicies().added().forEach(policy->result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("shared_field",policy.name(),"not_applied","applied")));
+        reviewed.fieldPolicies().removed().forEach(policy->result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("shared_field",policy.name(),"applied","not_applied")));
+        reviewed.fieldAccessChanges().forEach(change->result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("field",change.modelLabel()+" · "+change.fieldLabel(),change.beforeAccess(),change.access())));
+        return List.copyOf(result);
     }
 
     private record BusinessFieldRoot(String command, String model, String action, List<String> permissions) {}

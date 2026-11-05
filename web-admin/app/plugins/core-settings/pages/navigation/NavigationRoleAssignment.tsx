@@ -92,7 +92,7 @@ export default function NavigationRoleAssignment({
           }}
           className="text-accent text-xs underline disabled:opacity-50"
         >
-          {t('common.configure', undefined, 'Configure')}
+          {t('roleNavigation.configureRoles', undefined, 'Configure roles')}
         </button>
       </div>
       {error ? (

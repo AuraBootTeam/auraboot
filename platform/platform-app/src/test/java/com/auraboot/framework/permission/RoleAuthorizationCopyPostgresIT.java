@@ -104,6 +104,19 @@ class RoleAuthorizationCopyPostgresIT extends BaseIntegrationTest {
         assertThat(contracts(target)).isEqualTo(original);assertThat(contracts(source)).isEqualTo(original);
         assertThat(jdbc.queryForObject("SELECT enabled FROM ab_data_permission_policy WHERE tenant_id=? AND pid=?",Boolean.class,tenant(),policy)).isFalse();
     }
+
+    @Test void copyingRoleManagedFieldRestrictionsCreatesIndependentIdempotentDefinitions() {
+        String managed=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_data_permission_policy(pid,tenant_id,managed_role_pid,name,model_code,policy_type,field_code,priority,enabled) VALUES(?,?,?,?,?,'field_write','price',100,TRUE)",managed,tenant(),sourcePid,"Read only price",resource);
+        jdbc.update("INSERT INTO ab_data_permission_role_binding(tenant_id,policy_pid,role_pid) VALUES(?,?,?)",tenant(),managed,sourcePid);
+        permissions.copyRolePermissions(source,target);
+        var copied=jdbc.queryForList("SELECT pid FROM ab_data_permission_policy WHERE tenant_id=? AND managed_role_pid=?",String.class,tenant(),targetPid);
+        assertThat(copied).singleElement().isNotEqualTo(managed);
+        assertThat(jdbc.queryForList("SELECT policy_pid FROM ab_data_permission_role_binding WHERE tenant_id=? AND role_pid=?",String.class,tenant(),targetPid)).containsExactlyInAnyOrder(policy,copied.getFirst());
+        permissions.copyRolePermissions(source,target);
+        assertThat(jdbc.queryForList("SELECT pid FROM ab_data_permission_policy WHERE tenant_id=? AND managed_role_pid=?",String.class,tenant(),targetPid)).isEqualTo(copied);
+        assertThat(jdbc.queryForObject("SELECT managed_role_pid FROM ab_data_permission_policy WHERE pid=?",String.class,managed)).isEqualTo(sourcePid);
+    }
     @Test void compatibleCopyAddsDisjointGrantsWithoutChangingExistingConstraints() {
         long inspection=permission("inspect");
         jdbc.update("""

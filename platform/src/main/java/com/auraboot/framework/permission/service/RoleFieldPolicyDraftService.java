@@ -38,6 +38,7 @@ public class RoleFieldPolicyDraftService {
         for (String pid : selected.stream().sorted().toList()) {
             var policy = policies.findByPid(role.getTenantId(), pid);
             if (policy == null || !Objects.equals(role.getTenantId(), policy.getTenantId())
+                    || policy.getManagedRolePid() != null
                     || !isFieldPolicy(policy) || !Boolean.TRUE.equals(policy.getEnabled())
                     || !resultingModels.contains(policy.getModelCode()) || policy.getFieldCode() == null
                     || models.getModelFields(policy.getModelCode()).stream()
@@ -68,6 +69,10 @@ public class RoleFieldPolicyDraftService {
         for (var binding : bindings.findByRolePid(role.getTenantId(), role.getPid())) {
             var policy = policies.findByPid(role.getTenantId(), binding.getPolicyPid());
             if (policy == null || !Objects.equals(role.getTenantId(), policy.getTenantId())) throw invalid();
+            if (policy.getManagedRolePid() != null) {
+                if (!role.getPid().equals(policy.getManagedRolePid())) throw invalid();
+                continue;
+            }
             if (isFieldPolicy(policy)) result.put(policy.getPid(), policy);
         }
         return result;

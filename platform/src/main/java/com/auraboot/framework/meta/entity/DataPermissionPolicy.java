@@ -27,6 +27,9 @@ public class DataPermissionPolicy {
     @TableField("pid")
     private String pid;
 
+    @TableField("managed_role_pid")
+    private String managedRolePid;
+
     @TableField("name")
     private String name;
 

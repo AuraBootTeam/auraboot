@@ -14,6 +14,9 @@ import java.util.List;
 @Mapper
 public interface DataPermissionPolicyMapper extends BaseMapper<DataPermissionPolicy> {
 
+    @Select("SELECT * FROM ab_data_permission_policy WHERE tenant_id=#{tenantId} AND managed_role_pid=#{rolePid} ORDER BY model_code,field_code,policy_type")
+    List<DataPermissionPolicy> findManagedByRole(@Param("tenantId") Long tenantId, @Param("rolePid") String rolePid);
+
     @Select("""
         SELECT * FROM ab_data_permission_policy
         WHERE tenant_id = #{tenantId} AND pid = #{pid}
@@ -47,6 +50,7 @@ public interface DataPermissionPolicyMapper extends BaseMapper<DataPermissionPol
         INNER JOIN ab_user u ON u.id=m.user_id
         WHERE p.tenant_id = #{tenantId}
           AND r.status='active' AND r.deleted_flag=FALSE
+          AND (p.managed_role_pid IS NULL OR p.managed_role_pid=r.pid)
           AND ur.status='active' AND ur.deleted_flag=FALSE
           AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
           AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)

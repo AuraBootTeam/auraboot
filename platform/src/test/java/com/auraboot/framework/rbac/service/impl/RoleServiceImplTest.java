@@ -76,6 +76,7 @@ class RoleServiceImplTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new RoleServiceImpl();
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"roleFieldAccess",org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RoleFieldAccessService.class));
         injectField(service, "authorizationWriteLock", authorizationWriteLock);
         injectField(service, "authoringAccess", authoringAccess);
         injectField(service, "baseMapper", roleMapper);

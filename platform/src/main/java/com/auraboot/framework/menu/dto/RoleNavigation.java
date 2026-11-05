@@ -32,6 +32,8 @@ public final class RoleNavigation {
             @Size(max=32) String draftRolePid,@jakarta.validation.Valid com.auraboot.framework.permission.dto.RoleAuthorizationDraftRequest draft) {}
     @Schema(name="NavigationUserPreview",requiredProperties={"rolePids","menus","source"})
     public record UserPreview(Set<String> rolePids,List<Choice> menus,String source) {}
-    @Schema(name="RoleNavigationAudit",requiredProperties={"pid","actor","createdAt","addedMenus","removedMenus","previousMode"})
-    public record Audit(String pid,String actor,String createdAt,List<String> addedMenus,List<String> removedMenus,String previousMode) {}
+    @Schema(name="RoleAuthorizationChange",requiredProperties={"kind","target"})
+    public record AuthorizationChange(String kind,String target,String before,String after) {}
+    @Schema(name="RoleNavigationAudit",requiredProperties={"pid","actor","createdAt","addedMenus","removedMenus","previousMode","changes"})
+    public record Audit(String pid,String actor,String createdAt,List<String> addedMenus,List<String> removedMenus,String previousMode,List<AuthorizationChange> changes) {}
 }

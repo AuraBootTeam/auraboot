@@ -13,8 +13,12 @@ public record RoleAuthorizationDraftPreview(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean applyDefaultToCurrentGrants,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopeChanges,
         RoleFieldPolicyPreview fieldPolicies,
-        com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation) {
+        com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,
+        List<RoleFieldAccess.Reviewed> fieldAccessChanges) {
+    public RoleAuthorizationDraftPreview(String revision,CapabilitySelectionPreview capabilities,boolean changed,String scope,boolean apply,List<DataScopeUpdateRequest> changes,RoleFieldPolicyPreview fields,com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation){
+        this(revision,capabilities,changed,scope,apply,changes,fields,navigation,null);
+    }
     public RoleAuthorizationDraftPreview(String revision,CapabilitySelectionPreview capabilities,boolean defaultScopeChanged,String defaultScopeType,boolean applyDefaultToCurrentGrants,List<DataScopeUpdateRequest> scopeChanges,RoleFieldPolicyPreview fieldPolicies) {
-        this(revision,capabilities,defaultScopeChanged,defaultScopeType,applyDefaultToCurrentGrants,scopeChanges,fieldPolicies,null);
+        this(revision,capabilities,defaultScopeChanged,defaultScopeType,applyDefaultToCurrentGrants,scopeChanges,fieldPolicies,null,null);
     }
 }

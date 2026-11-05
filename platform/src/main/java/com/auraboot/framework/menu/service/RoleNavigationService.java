@@ -155,7 +155,7 @@ public class RoleNavigationService {
     public List<Audit> auditLog(String rolePid){
         writes.lock();requireManager();owned(rolePid);
         return jdbc.query("SELECT a.pid,COALESCE(NULLIF(u.nick_name,''),u.email,''),a.created_at,a.after_selection::text FROM ab_role_navigation_audit a LEFT JOIN ab_user u ON u.id=a.actor_id WHERE a.tenant_id=? AND a.role_pid=? ORDER BY a.created_at DESC,a.pid DESC LIMIT 100",(rs,i)->{
-            try {var row=json.readTree(rs.getString(4));return new Audit(rs.getString(1),rs.getString(2),rs.getTimestamp(3).toInstant().toString(),json.convertValue(row.path("addedMenus"),new com.fasterxml.jackson.core.type.TypeReference<List<String>>(){}),json.convertValue(row.path("removedMenus"),new com.fasterxml.jackson.core.type.TypeReference<List<String>>(){}),row.path("previousMode").asText());}
+            try {var row=json.readTree(rs.getString(4));return new Audit(rs.getString(1),rs.getString(2),rs.getTimestamp(3).toInstant().toString(),json.convertValue(row.path("addedMenus"),new com.fasterxml.jackson.core.type.TypeReference<List<String>>(){}),json.convertValue(row.path("removedMenus"),new com.fasterxml.jackson.core.type.TypeReference<List<String>>(){}),row.path("previousMode").asText(),row.path("changes").isArray()?json.convertValue(row.path("changes"),new com.fasterxml.jackson.core.type.TypeReference<List<AuthorizationChange>>(){}):List.of());}
             catch(java.io.IOException e){throw new IllegalStateException("Invalid role navigation audit",e);}
         },MetaContext.getCurrentTenantId(),rolePid);
     }
@@ -171,6 +171,13 @@ public class RoleNavigationService {
         var added=after.stream().filter(pid->!before.selectedMenuPids().contains(pid)).map(pid->names.getOrDefault(pid,"")).sorted().toList();
         var removed=before.selectedMenuPids().stream().filter(pid->!after.contains(pid)).map(pid->names.getOrDefault(pid,"")).sorted().toList();
         jdbc.update("INSERT INTO ab_role_navigation_audit(pid,tenant_id,role_pid,actor_id,before_selection,after_selection) VALUES(?,?,?,?,?::jsonb,?::jsonb)",UlidGenerator.generate(),role.getTenantId(),role.getPid(),MetaContext.getCurrentUserId(),encode(Map.of("name",role.getName(),"menuPids",before.selectedMenuPids())),encode(Map.of("name",role.getName(),"menuPids",after,"addedMenus",added,"removedMenus",removed,"previousMode",before.mode())));
+    }
+    public void auditAuthorization(Role role,List<AuthorizationChange> changes) {
+        if(changes.isEmpty())return;
+        if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                ||!Objects.equals(role.getTenantId(),MetaContext.getCurrentTenantId()))throw new AccessDeniedException("Owned role authorization transaction required");
+        requireManager();
+        jdbc.update("INSERT INTO ab_role_navigation_audit(pid,tenant_id,role_pid,actor_id,before_selection,after_selection) VALUES(?,?,?,?,?::jsonb,?::jsonb)",UlidGenerator.generate(),role.getTenantId(),role.getPid(),MetaContext.getCurrentUserId(),encode(Map.of("name",role.getName())),encode(Map.of("name",role.getName(),"addedMenus",List.of(),"removedMenus",List.of(),"previousMode","explicit","changes",changes)));
     }
     private void checkRevision(String current,String expected){if(!Objects.equals(current,expected))throw new BusinessException(ResponseCode.CasVersionConflict);}
     private String encode(Object value){try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException("Cannot encode navigation state",e);}}

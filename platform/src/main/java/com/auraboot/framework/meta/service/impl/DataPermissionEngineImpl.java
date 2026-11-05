@@ -432,7 +432,8 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
 
         Map<String, FieldMaskRule> ruleMap = rules.stream()
-                .collect(Collectors.toMap(FieldMaskRule::getFieldCode, r -> r, (a, b) -> a));
+                .collect(Collectors.toMap(FieldMaskRule::getFieldCode, r -> r,
+                        (a, b) -> "hide".equalsIgnoreCase(b.getMaskType()) ? b : a));
 
         List<Map<String, Object>> result = new ArrayList<>(records.size());
         for (Map<String, Object> record : records) {

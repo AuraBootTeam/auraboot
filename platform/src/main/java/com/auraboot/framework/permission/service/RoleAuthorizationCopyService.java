@@ -99,12 +99,20 @@ public class RoleAuthorizationCopyService {
             }
         }
         Set<String> sourcePolicies=policyIds(source), targetPolicies=policyIds(target);
-        if((!targetGrants.isEmpty() || !targetPolicies.isEmpty()) && !sourcePolicies.equals(targetPolicies))throw conflict();
-        Set<String> pendingPolicies=new HashSet<>(sourcePolicies);pendingPolicies.removeAll(targetPolicies);
+        var sourceByKey=policyKeys(source,sourcePolicies);var targetByKey=policyKeys(target,targetPolicies);
+        if((!targetGrants.isEmpty() || !targetPolicies.isEmpty()) && !sourceByKey.keySet().equals(targetByKey.keySet()))throw conflict();
+        for(var key:targetByKey.keySet()) {
+            var left=policies.findByPid(source.getTenantId(),sourceByKey.get(key));
+            var right=policies.findByPid(target.getTenantId(),targetByKey.get(key));
+            if(left.getManagedRolePid()!=null&&!sameManagedPolicy(left,right))throw conflict();
+        }
+        Set<String> pendingPolicies=sourceByKey.entrySet().stream().filter(e->!targetByKey.containsKey(e.getKey()))
+                .map(Map.Entry::getValue).collect(java.util.stream.Collectors.toSet());
         if(!pendingPolicies.isEmpty() && !users.hasPermission(MetaContext.getCurrentUserId(),MetaPermission.PERMISSION_MANAGE))throw denied();
         for(String pid:sourcePolicies) {
             var policy=policies.findByPid(source.getTenantId(),pid);
             if(policy==null || !Objects.equals(policy.getTenantId(),source.getTenantId()))throw denied();
+            if(policy.getManagedRolePid()!=null&&!source.getPid().equals(policy.getManagedRolePid()))throw denied();
         }
         // All comparisons precede writes. Explicit SQL copies every JSONB constraint verbatim.
         for(var grant:pending) {
@@ -129,10 +137,41 @@ public class RoleAuthorizationCopyService {
                     FROM ab_role_data_scope WHERE id=? AND tenant_id=? AND role_id=?
                     """,UniqueIdGenerator.generate(),targetId,scope.getId(),source.getTenantId(),sourceId)!=1)throw conflict();
         }
-        for(String pid:pendingPolicies)
+        for(String pid:pendingPolicies) {
+            var policy=policies.findByPid(source.getTenantId(),pid);
+            if(policy.getManagedRolePid()!=null){
+                var clone=new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+                org.springframework.beans.BeanUtils.copyProperties(policy,clone);
+                clone.setId(null);clone.setPid(UniqueIdGenerator.generate());clone.setManagedRolePid(target.getPid());
+                clone.setCreatedAt(null);clone.setUpdatedAt(null);
+                if(policies.insert(clone)!=1)throw conflict();
+                pid=clone.getPid();
+            }
             if(bindings.insertBinding(source.getTenantId(),pid,target.getPid())!=1)throw conflict();
+        }
         events.publishEvent(new RolePermissionChangedEvent(this,source.getTenantId(),targetId,null,"UPDATE"));
         return true;
+    }
+
+    private Map<String,String> policyKeys(Role role,Set<String> pids) {
+        var result=new HashMap<String,String>();
+        for(String pid:pids){
+            var p=policies.findByPid(role.getTenantId(),pid);
+            if(p==null||!Objects.equals(p.getTenantId(),role.getTenantId())
+                    ||(p.getManagedRolePid()!=null&&!role.getPid().equals(p.getManagedRolePid())))throw denied();
+            String key=p.getManagedRolePid()==null?"shared:"+pid:"managed:"+p.getModelCode()+":"+p.getFieldCode()+":"+p.getPolicyType();
+            if(result.putIfAbsent(key,pid)!=null)throw conflict();
+        }
+        return result;
+    }
+    private boolean sameManagedPolicy(com.auraboot.framework.meta.entity.DataPermissionPolicy left,
+            com.auraboot.framework.meta.entity.DataPermissionPolicy right) {
+        var a=json.valueToTree(left);var b=json.valueToTree(right);
+        for(String key:List.of("id","pid","managedRolePid","createdAt","updatedAt")){
+            ((com.fasterxml.jackson.databind.node.ObjectNode)a).remove(key);
+            ((com.fasterxml.jackson.databind.node.ObjectNode)b).remove(key);
+        }
+        return a.equals(b);
     }
 
     private Role owned(Long id) {

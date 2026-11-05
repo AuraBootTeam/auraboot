@@ -85,7 +85,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     public List<DataPermissionPolicy> listByModelCode(String modelCode) {
         authoringAccess.requireRead();
         Long tenantId = MetaContext.getCurrentTenantId();
-        return policyMapper.findByModelCode(tenantId, modelCode);
+        return policyMapper.findByModelCode(tenantId, modelCode).stream().filter(p -> p.getManagedRolePid()==null).toList();
     }
 
     @Override
@@ -93,7 +93,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     public List<DataPermissionPolicy> listAll() {
         authoringAccess.requireRead();
         Long tenantId = MetaContext.getCurrentTenantId();
-        return policyMapper.findAllEnabled(tenantId);
+        return policyMapper.findAllEnabled(tenantId).stream().filter(p -> p.getManagedRolePid()==null).toList();
     }
 
     @Override
@@ -107,6 +107,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         if (existing == null) {
             throw missing(pid);
         }
+        requireUnmanaged(existing);
 
         validateRequest(request);
         existing.setName(request.getName());
@@ -134,7 +135,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         authorizationWriteLock.mutate();
         authoringAccess.requireWrite();
         Long tenantId = MetaContext.getCurrentTenantId();
-        requirePolicy(tenantId,pid);
+        requireUnmanaged(requirePolicy(tenantId,pid));
         bindingMapper.deleteByPolicyPid(tenantId, pid);
         policyMapper.deleteByPid(tenantId, pid);
         log.info("Deleted data permission policy and bindings: pid={}", pid);
@@ -147,7 +148,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         authorizationWriteLock.mutate();
         authoringAccess.requireWrite();
         Long tenantId = MetaContext.getCurrentTenantId();
-        requirePolicy(tenantId,pid);
+        requireUnmanaged(requirePolicy(tenantId,pid));
         policyMapper.updateEnabled(tenantId, pid, true);
         log.info("Enabled data permission policy: pid={}", pid);
     }
@@ -159,7 +160,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         authorizationWriteLock.mutate();
         authoringAccess.requireWrite();
         Long tenantId = MetaContext.getCurrentTenantId();
-        requirePolicy(tenantId,pid);
+        requireUnmanaged(requirePolicy(tenantId,pid));
         policyMapper.updateEnabled(tenantId, pid, false);
         log.info("Disabled data permission policy: pid={}", pid);
     }
@@ -171,7 +172,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         authorizationWriteLock.mutate();
         authoringAccess.requireWrite();
         Long tenantId = MetaContext.getCurrentTenantId();
-        requirePolicy(tenantId,policyPid);
+        requireUnmanaged(requirePolicy(tenantId,policyPid));
         authoringAccess.requireRole(rolePid);
         bindingMapper.insertBinding(tenantId, policyPid, rolePid);
         log.info("Bound policy to role: policyPid={}, rolePid={}", policyPid, rolePid);
@@ -184,7 +185,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         authorizationWriteLock.mutate();
         authoringAccess.requireWrite();
         Long tenantId = MetaContext.getCurrentTenantId();
-        requirePolicy(tenantId,policyPid);
+        requireUnmanaged(requirePolicy(tenantId,policyPid));
         authoringAccess.requireRole(rolePid);
         bindingMapper.deleteBinding(tenantId, policyPid, rolePid);
         log.info("Unbound policy from role: policyPid={}, rolePid={}", policyPid, rolePid);
@@ -250,6 +251,10 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
         var policy=policyMapper.findByPid(tenant,pid);
         if(policy==null) throw missing(pid);
         return policy;
+    }
+
+    private static void requireUnmanaged(DataPermissionPolicy policy) {
+        if(policy.getManagedRolePid()!=null)throw new org.springframework.security.access.AccessDeniedException("Role-managed field restrictions must be changed through the owning role draft");
     }
 
     private static BusinessException missing(String pid) {

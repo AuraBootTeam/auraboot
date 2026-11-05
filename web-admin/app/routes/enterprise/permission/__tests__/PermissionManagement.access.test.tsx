@@ -71,6 +71,24 @@ beforeEach(() => {
   mocks.fetchResult.mockResolvedValue({ code: '0', data: { records: [role] } });
 });
 describe('PermissionManagement access feedback', () => {
+  it('reenables a role reloaded with the backend inactive status', async () => {
+    mocks.permissions.add('org.role.read');
+    mocks.permissions.add('org.role.update');
+    mocks.roles.add('tenant_admin');
+    mocks.fetchResult.mockImplementation((url: string) =>
+      Promise.resolve(
+        url === '/api/roles/role-1/enable'
+          ? { code: '0', data: true }
+          : { code: '0', data: { records: [{ ...role, status: 'inactive' }] } },
+      ),
+    );
+    showPage();
+    const toggle = await screen.findByTestId('role-action-toggle-warehouse');
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(mocks.fetchResult).toHaveBeenCalledWith('/api/roles/role-1/enable', { method: 'put' }),
+    );
+  });
   it('keeps the actual creation action available to an authorized role manager', async () => {
     mocks.permissions.add('org.role.read');
     mocks.permissions.add('org.role.update');

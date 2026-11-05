@@ -107,7 +107,7 @@ describe('CapabilityChecklist', () => {
     render(<CapabilityChecklist groups={withMenus} selected={[]} onToggle={() => {}} />);
     const menus = screen.getByTestId('capability-menus-crm.cap.account_view') as HTMLDetailsElement;
     expect(menus.open).toBe(false);
-    expect(menus.querySelector('summary')?.textContent).toBe('Related menus · 2');
+    expect(menus.querySelector('summary')?.textContent).toBe('Related pages (reference only) · 2');
     expect(Array.from(menus.querySelectorAll('li'), (menu) => menu.textContent)).toEqual([
       '客户',
       '客户联系人',
