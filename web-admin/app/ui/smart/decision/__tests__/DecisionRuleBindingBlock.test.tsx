@@ -3,6 +3,29 @@ import { describe, expect, it, vi } from 'vitest';
 import { DecisionRuleBindingBlock } from '../DecisionRuleBindingBlock';
 
 describe('DecisionRuleBindingBlock', () => {
+  it('emits a condition binding when a combined editor has no selected decision', async () => {
+    const onChange = vi.fn();
+    const api = { getDecisionImpact: vi.fn(), evaluate: vi.fn(), listDefinitions: vi.fn(async () => ({ records: [] })) };
+    render(<DecisionRuleBindingBlock onChange={onChange} api={api} block={{ props: { mode: 'combined', consumerType: 'PERMISSION', decisions: [], fields: [{ scope: 'record', path: 'data.amountMinor', label: '金额', dataType: 'integer' }] } }} />);
+    fireEvent.click(screen.getByTestId('cb-add'));
+    fireEvent.change(screen.getByLabelText('value-0'), { target: { value: '500' } });
+    expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({ bindingKind: 'CONDITION', conditionSpec: { root: { children: [{ right: { value: 500 } }] } } });
+    expect(onChange.mock.calls.at(-1)?.[0].decisionBinding).toBeUndefined();
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
+  });
+
+  it('preserves an explicit decision reference and allows returning to condition-only authoring', async () => {
+    const onChange = vi.fn();
+    const api = { getDecisionImpact: vi.fn(), evaluate: vi.fn(), listDefinitions: vi.fn(async () => ({ records: [] })) };
+    render(<DecisionRuleBindingBlock onChange={onChange} api={api} block={{ props: { mode: 'combined', consumerType: 'PERMISSION', decisions: [{ code: 'configured_guard', name: '已配置规则' }], initialValue: { bindingKind: 'DECISION_REF', enabled: true, decisionBinding: { decisionCode: 'configured_guard', versionPolicy: 'LATEST_PUBLISHED', enabled: true } } } }} />);
+    expect(screen.getByLabelText('decision-code')).toHaveValue('configured_guard');
+    expect(screen.getByRole('option', { name: '不引用决策（仅使用条件）' })).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: '' } });
+    expect(onChange.mock.calls.at(-1)?.[0].bindingKind).toBe('CONDITION');
+    expect(onChange.mock.calls.at(-1)?.[0].decisionBinding).toBeUndefined();
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
+  });
+
   it('honors an explicit empty decision list without substituting example decisions', async () => {
     const api = {
       getDecisionImpact: vi.fn(),
