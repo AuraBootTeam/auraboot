@@ -7,6 +7,7 @@ import com.auraboot.framework.decision.dto.DecisionFactEntityDTO;
 import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.rbac.entity.RolePermission;
@@ -118,6 +119,8 @@ class PermissionPolicyServiceImplTest {
 
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
         rp.setConditions(Map.of("maxAmount", 1000));
 
@@ -237,15 +240,44 @@ class PermissionPolicyServiceImplTest {
     }
 
     @Test
+    void staleOrForeignSnapshotCannotWritePolicyOrUsageReferences() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(3L);
+        rp.setConditions(Map.of("maxAmount", 400));
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+
+        for (String revision : List.of("grant-900:2", "other-grant:3", "invalid")) {
+            assertThatThrownBy(() -> service.savePolicySnapshot(7L, 50L, revision, Map.of("maxAmount", 999)))
+                    .isInstanceOf(ConflictException.class);
+        }
+        assertThat(service.getPolicySnapshot(7L, 50L).values()).containsEntry("maxAmount", 400);
+        assertThat(service.getPolicySnapshot(7L, 50L).revision()).isEqualTo("grant-900:3");
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
+        verify(usageIndexService, never()).refreshSource(anyString(), anyString());
+    }
+
+    @Test
+    void missingSnapshotCannotReadOrWriteGrant() {
+        assertThatThrownBy(() -> service.savePolicySnapshot(7L, 50L, null, Map.of()))
+                .isInstanceOf(ConflictException.class);
+        verify(rolePermissionMapper, never()).selectOne(any(LambdaQueryWrapper.class));
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
+    }
+
+    @Test
     void setPolicyRejectsGrantRemovedBetweenReadAndUpdate() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         rp.setPid("revoked-grant");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
-        when(rolePermissionMapper.updateById(rp)).thenReturn(0);
+        when(rolePermissionMapper.update(eq(rp), any())).thenReturn(0);
 
         assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("maxAmount", 1000)))
-                .isInstanceOf(RootUnCheckedException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(usageIndexService, never()).refreshSource(anyString(), anyString());
     }
@@ -254,12 +286,14 @@ class PermissionPolicyServiceImplTest {
     void setPolicyWritesJsonViaMapper() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
-        when(rolePermissionMapper.updateById(rp)).thenReturn(1);
+        when(rolePermissionMapper.update(eq(rp), any())).thenReturn(1);
 
         service.setPolicy(7L, 50L, Map.of("maxAmount", 1000));
 
-        verify(rolePermissionMapper).updateById(rp);
+        verify(rolePermissionMapper).update(eq(rp), any());
         assertThat(rp.getConditions())
                 .isInstanceOf(Map.class)
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
@@ -270,9 +304,11 @@ class PermissionPolicyServiceImplTest {
     void setPolicyValidatesRuleCenterAbacAndRefreshesPermissionPolicyUsageIndex() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
-        when(rolePermissionMapper.updateById(rp)).thenReturn(1);
+        when(rolePermissionMapper.update(eq(rp), any())).thenReturn(1);
         when(usageIndexServiceProvider.getIfAvailable()).thenReturn(usageIndexService);
 
         service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
@@ -283,7 +319,7 @@ class PermissionPolicyServiceImplTest {
                         "fallbackPolicy", Map.of("mode", "FAIL_CLOSED")),
                 "expectedMatched", true)));
 
-        verify(rolePermissionMapper).updateById(rp);
+        verify(rolePermissionMapper).update(eq(rp), any());
         assertThat(rp.getConditions())
                 .isInstanceOf(Map.class)
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
@@ -295,6 +331,8 @@ class PermissionPolicyServiceImplTest {
     void setPolicyRejectsInvalidRuleCenterAbacShape() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
 
@@ -303,16 +341,18 @@ class PermissionPolicyServiceImplTest {
                 .isInstanceOf(RootUnCheckedException.class)
                 .hasMessageContaining("decisionCode is required");
 
-        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
     }
 
     @Test
     void setPolicyAcceptsRuleCenterInputMappingFromFactCatalog() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
-        when(rolePermissionMapper.updateById(rp)).thenReturn(1);
+        when(rolePermissionMapper.update(eq(rp), any())).thenReturn(1);
         when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
         when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
                 .thenReturn(factCatalog("wd_leave_request", "record", "data.wd_req_days", true));
@@ -329,13 +369,15 @@ class PermissionPolicyServiceImplTest {
                                                 "scope", "record",
                                                 "path", "data.wd_req_days"))))))));
 
-        verify(rolePermissionMapper).updateById(rp);
+        verify(rolePermissionMapper).update(eq(rp), any());
     }
 
     @Test
     void setPolicyRejectsRuleCenterInputMappingOutsideFactCatalog() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
         when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
@@ -356,13 +398,15 @@ class PermissionPolicyServiceImplTest {
                 .isInstanceOf(RootUnCheckedException.class)
                 .hasMessageContaining("not available in permission ABAC fact catalog");
 
-        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
     }
 
     @Test
     void setPolicyRejectsRuleCenterInputMappingFromMaskedFactCatalogField() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
         when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
@@ -384,13 +428,15 @@ class PermissionPolicyServiceImplTest {
                 .hasMessageContaining("masked")
                 .hasMessageContaining("record.data.salary");
 
-        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
     }
 
     @Test
     void setPolicyRejectsRuleCenterFieldSourceWhenDeclaredFactCatalogHasNoFields() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         rp.setPid("rp-abac-900");
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
         when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
@@ -410,7 +456,7 @@ class PermissionPolicyServiceImplTest {
                 .isInstanceOf(RootUnCheckedException.class)
                 .hasMessageContaining("not available in permission ABAC fact catalog");
 
-        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
     }
 
     @Test
@@ -504,7 +550,7 @@ class PermissionPolicyServiceImplTest {
         assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("k", "v")))
                 .isInstanceOf(RootUnCheckedException.class);
 
-        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
+        verify(rolePermissionMapper, never()).update(any(RolePermission.class), any());
         verify(usageIndexService, never()).refreshSource(anyString(), anyString());
     }
 
@@ -512,6 +558,8 @@ class PermissionPolicyServiceImplTest {
     void getPolicyReturnsNullWhenConditionsBlank() {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
+        rp.setPid("grant-900");
+        rp.setPolicyRevision(1L);
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
         rp.setConditions(null);
 

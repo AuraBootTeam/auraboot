@@ -195,23 +195,37 @@ public class PermissionMatrixController {
      *
      * @param rolePid       Role PID
      * @param permissionPid Permission PID
-     * @param policyValues  Policy parameter values
+     * @param request       Original revision and policy parameter values
      */
     @PutMapping("/{rolePid}/policy/{permissionPid}")
     @Operation(summary = "Set policy values for role+permission")
     public ApiResponse<Void> setPolicy(
             @PathVariable String rolePid,
             @PathVariable String permissionPid,
-            @RequestBody Map<String, Object> policyValues) {
+            @RequestBody PolicySaveRequest request) {
         Role role = roleService.findByPid(rolePid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
         }
         Long permissionId = matrixService.findPermissionIdByPid(permissionPid);
         log.info("Setting policy for role+permission: rolePid={}, permissionPid={}, keys={}",
-                rolePid, permissionPid, policyValues.keySet());
-        policyService.setPolicy(role.getId(), permissionId, policyValues);
+                rolePid, permissionPid, request.values() == null ? java.util.Set.of() : request.values().keySet());
+        policyService.savePolicySnapshot(role.getId(), permissionId, request.expectedRevision(), request.values());
         return ApiResponse.success();
+    }
+
+    public record PolicySaveRequest(String expectedRevision, Map<String, Object> values) {}
+
+    @GetMapping("/{rolePid}/policy/{permissionPid}/snapshot")
+    @Operation(summary = "Read policy values and the grant revision required for saving")
+    public ApiResponse<PermissionPolicyService.PolicySnapshot> getPolicySnapshot(
+            @PathVariable String rolePid, @PathVariable String permissionPid) {
+        Role role = roleService.findByPid(rolePid);
+        if (role == null) {
+            throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
+        }
+        Long permissionId = matrixService.findPermissionIdByPid(permissionPid);
+        return ApiResponse.success(policyService.getPolicySnapshot(role.getId(), permissionId));
     }
 
     /**

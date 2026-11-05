@@ -12,6 +12,8 @@ import com.auraboot.framework.decision.dto.DecisionFactEntityDTO;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.exception.ConflictException;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
@@ -153,18 +155,64 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             throw new RootUnCheckedException(ResponseCode.BadParam,
                     "The role permission grant no longer exists; reload permissions before saving its policy");
         }
+        writePolicy(rp, permissionId, policyValues);
+    }
+
+    @Override
+    public PolicySnapshot getPolicySnapshot(Long roleId, Long permissionId) {
+        RolePermission rp = findRolePermission(roleId, permissionId);
+        if (rp == null) {
+            throw new ConflictException("The role permission grant no longer exists; reload permissions");
+        }
+        Map<String, Object> values = convertToMap(rp.getConditions());
+        return new PolicySnapshot(revisionOf(rp), values == null ? Map.of() : values);
+    }
+
+    @Override
+    @Transactional
+    public void savePolicySnapshot(Long roleId, Long permissionId, String expectedRevision,
+                                   Map<String, Object> policyValues) {
+        if (expectedRevision == null || expectedRevision.isBlank()) {
+            throw new ConflictException(ConflictException.ConflictCodes.CAS_VERSION_REQUIRED,
+                    "Read the current policy before saving", Map.of());
+        }
+        RolePermission rp = findRolePermission(roleId, permissionId);
+        if (rp == null || !expectedRevision.equals(revisionOf(rp))) {
+            throw new ConflictException(ConflictException.ConflictCodes.CAS_VERSION_CONFLICT,
+                    "The role permission policy changed; reload permissions before saving", Map.of());
+        }
+        writePolicy(rp, permissionId, policyValues);
+    }
+
+    private String revisionOf(RolePermission rp) {
+        if (rp.getPid() == null || rp.getPid().isBlank()
+                || rp.getPolicyRevision() == null || rp.getPolicyRevision() < 1) {
+            throw new IllegalStateException("Role permission revision is unavailable");
+        }
+        return rp.getPid() + ":" + rp.getPolicyRevision();
+    }
+
+    private void writePolicy(RolePermission rp, Long permissionId, Map<String, Object> policyValues) {
+        revisionOf(rp);
+        if (policyValues == null) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Policy values are required");
+        }
         Permission permission = permissionMapper.selectById(permissionId);
         validatePolicyValues(policyValues, permission);
 
         rp.setConditions(policyValues);
-        if (rolePermissionMapper.updateById(rp) != 1) {
-            throw new RootUnCheckedException(ResponseCode.BadParam,
-                    "The role permission grant changed; reload permissions before saving its policy");
+        if (rolePermissionMapper.update(rp, new LambdaUpdateWrapper<RolePermission>()
+                .eq(RolePermission::getId, rp.getId())
+                .eq(RolePermission::getTenantId, MetaContext.getCurrentTenantId())
+                .eq(RolePermission::getPid, rp.getPid())
+                .eq(RolePermission::getPolicyRevision, rp.getPolicyRevision())) != 1) {
+            throw new ConflictException(ConflictException.ConflictCodes.CAS_VERSION_CONFLICT,
+                    "The role permission grant changed; reload permissions before saving its policy", Map.of());
         }
         refreshPermissionPolicyUsageIndex(rp);
 
         log.info("Updated policy for role-permission: roleId={}, permissionId={}, keys={}",
-                roleId, permissionId, policyValues.keySet());
+                rp.getRoleId(), permissionId, policyValues.keySet());
     }
 
     @Override

@@ -59,6 +59,7 @@ export interface PolicyConfigDialogProps {
   permissionLabel: string;
   schema: Record<string, PolicyFieldSchema>;
   initialValues?: Record<string, any>;
+  initialRevision: string;
   decisionApi?: RuleBindingDecisionApi;
   onSuccess: () => void | Promise<void>;
 }
@@ -386,6 +387,7 @@ export default function PolicyConfigDialog({
   permissionLabel,
   schema,
   initialValues,
+  initialRevision,
   decisionApi,
   onSuccess,
 }: PolicyConfigDialogProps) {
@@ -394,11 +396,13 @@ export default function PolicyConfigDialog({
 
   const [values, setValues] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
+  const [conflicted, setConflicted] = useState(false);
   const saveRequest = useRef(0);
   const context = useRef('');
   context.current = `${open}:${rolePid}:${permissionPid}`;
   useEffect(() => {
     setSaving(false);
+    setConflicted(false);
     return () => {
       saveRequest.current++;
     };
@@ -428,6 +432,7 @@ export default function PolicyConfigDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving || conflicted || !initialRevision) return;
 
     // Required field validation
     for (const [key, field] of Object.entries(schema)) {
@@ -455,7 +460,7 @@ export default function PolicyConfigDialog({
     const isCurrent = () => current === saveRequest.current && identity === context.current;
     setSaving(true);
     try {
-      await permissionService.setPolicy(rolePid, permissionPid, values);
+      await permissionService.setPolicy(rolePid, permissionPid, values, initialRevision);
       if (!isCurrent()) return;
       showSuccessToast(
         text('admin.permission.policy.saveSuccess', '策略配置已保存', 'Policy settings saved'),
@@ -464,6 +469,17 @@ export default function PolicyConfigDialog({
       if (isCurrent()) onClose();
     } catch (err) {
       if (!isCurrent()) return;
+      if (err instanceof Error && err.name === 'PolicyConflictError') {
+        setConflicted(true);
+        showErrorToast(
+          text(
+            'admin.permission.policy.conflict',
+            '权限或规则已被其他操作修改。当前编辑内容已保留，请关闭并重新打开后核对，勿直接覆盖。',
+            'Permissions or rules changed. Your edits are retained. Close and reopen to review the current policy before saving.',
+          ),
+        );
+        return;
+      }
       showErrorToast(
         text(
           'admin.permission.policy.saveError',
@@ -498,6 +514,15 @@ export default function PolicyConfigDialog({
 
         <form onSubmit={handleSubmit} className="min-h-0" data-testid="policy-config-form">
           <div className="max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto px-6 py-4 pb-24">
+            {conflicted && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {text(
+                  'admin.permission.policy.conflict',
+                  '权限或规则已被其他操作修改。当前编辑内容已保留，请关闭并重新打开后核对，勿直接覆盖。',
+                  'Permissions or rules changed. Your edits are retained. Close and reopen to review the current policy before saving.',
+                )}
+              </p>
+            )}
             {fieldEntries.length === 0 ? (
               <p className="text-sm text-gray-400 italic">
                 {text(
@@ -532,7 +557,7 @@ export default function PolicyConfigDialog({
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || conflicted || !initialRevision}
               className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-60"
               data-testid="policy-save-button"
             >

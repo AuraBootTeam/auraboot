@@ -47,7 +47,12 @@ describe('permissionService', () => {
 
       const result = await permissionService.getModelPermissions('order');
 
-      expect(getMock).toHaveBeenCalledWith('/api/permissions/model/order', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/permissions/model/order',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(perms);
     });
 
@@ -81,14 +86,21 @@ describe('permissionService', () => {
 
       const result = await permissionService.getRolePermissions('role-1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/permissions/role/role-1', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/permissions/role/role-1',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(perms);
     });
 
     it('throws default message when desc is empty', async () => {
       getMock.mockResolvedValue({ code: '500', desc: '', data: null });
 
-      await expect(permissionService.getRolePermissions('role-1')).rejects.toThrow('Failed to fetch role permissions');
+      await expect(permissionService.getRolePermissions('role-1')).rejects.toThrow(
+        'Failed to fetch role permissions',
+      );
     });
   });
 
@@ -111,7 +123,9 @@ describe('permissionService', () => {
     it('throws when not success', async () => {
       postMock.mockResolvedValue(fail('Bind failed'));
 
-      await expect(permissionService.bindPermissionToRole('role-1', 'perm-1')).rejects.toThrow('Bind failed');
+      await expect(permissionService.bindPermissionToRole('role-1', 'perm-1')).rejects.toThrow(
+        'Bind failed',
+      );
     });
   });
 
@@ -134,7 +148,9 @@ describe('permissionService', () => {
     it('throws when not success', async () => {
       postMock.mockResolvedValue(fail('Unbind failed'));
 
-      await expect(permissionService.unbindPermissionFromRole('role-1', 'perm-1')).rejects.toThrow('Unbind failed');
+      await expect(permissionService.unbindPermissionFromRole('role-1', 'perm-1')).rejects.toThrow(
+        'Unbind failed',
+      );
     });
   });
 
@@ -147,7 +163,12 @@ describe('permissionService', () => {
 
       const result = await permissionService.getPermissionReferences('perm-1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/permissions/perm-1/references', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/permissions/perm-1/references',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(refs);
     });
   });
@@ -161,7 +182,12 @@ describe('permissionService', () => {
 
       const result = await permissionService.getMatrixForRole('role-1');
 
-      expect(getMock).toHaveBeenCalledWith('/api/permissions/matrix/role-1', undefined, undefined, undefined);
+      expect(getMock).toHaveBeenCalledWith(
+        '/api/permissions/matrix/role-1',
+        undefined,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(matrix);
     });
   });
@@ -185,7 +211,9 @@ describe('permissionService', () => {
     it('throws when fetchResult indicates failure', async () => {
       fetchResultMock.mockResolvedValue(fail('Update failed'));
 
-      await expect(permissionService.batchUpdateRolePermissions('role-1', [])).rejects.toThrow('Update failed');
+      await expect(permissionService.batchUpdateRolePermissions('role-1', [])).rejects.toThrow(
+        'Update failed',
+      );
     });
   });
 
@@ -198,14 +226,23 @@ describe('permissionService', () => {
       const data = { resourceCode: 'order', actionCode: 'read', scopeType: 'all' };
       await permissionService.updateScope('role-1', data);
 
-      expect(putMock).toHaveBeenCalledWith('/api/permissions/matrix/role-1/scope', data, undefined, undefined);
+      expect(putMock).toHaveBeenCalledWith(
+        '/api/permissions/matrix/role-1/scope',
+        data,
+        undefined,
+        undefined,
+      );
     });
 
     it('throws on failure', async () => {
       putMock.mockResolvedValue(fail('Scope update failed'));
 
       await expect(
-        permissionService.updateScope('role-1', { resourceCode: 'order', actionCode: 'read', scopeType: 'own' }),
+        permissionService.updateScope('role-1', {
+          resourceCode: 'order',
+          actionCode: 'read',
+          scopeType: 'own',
+        }),
       ).rejects.toThrow('Scope update failed');
     });
   });
@@ -221,13 +258,17 @@ describe('permissionService', () => {
 
     it('does not turn a failed null policy response into an empty policy', async () => {
       getMock.mockResolvedValue(fail('Policy read denied'));
-      await expect(permissionService.getPolicy('role-1', 'perm-1')).rejects.toThrow('Policy read denied');
+      await expect(permissionService.getPolicy('role-1', 'perm-1')).rejects.toThrow(
+        'Policy read denied',
+      );
       expect(getMock).toHaveBeenCalledTimes(1);
     });
 
     it('propagates policy transport failure without retrying or initializing a policy', async () => {
       getMock.mockRejectedValue(new Error('Policy transport unavailable'));
-      await expect(permissionService.getPolicy('role-1', 'perm-1')).rejects.toThrow('Policy transport unavailable');
+      await expect(permissionService.getPolicy('role-1', 'perm-1')).rejects.toThrow(
+        'Policy transport unavailable',
+      );
       expect(getMock).toHaveBeenCalledTimes(1);
     });
 
@@ -250,14 +291,21 @@ describe('permissionService', () => {
   // ── setPolicy ────────────────────────────────────────────────────────────────
 
   describe('setPolicy', () => {
+    it('reports a version conflict distinctly without retrying', async () => {
+      putMock.mockResolvedValue({ ...fail('Policy changed'), httpStatus: 409 });
+      await expect(
+        permissionService.setPolicy('role-1', 'perm-1', {}, 'grant:1'),
+      ).rejects.toMatchObject({ name: 'PolicyConflictError' });
+      expect(putMock).toHaveBeenCalledTimes(1);
+    });
     it('PUTs /api/permissions/matrix/:rolePid/policy/:permPid with values', async () => {
       putMock.mockResolvedValue(ok(null));
 
-      await permissionService.setPolicy('role-1', 'perm-1', { maxAmount: 5000 });
+      await permissionService.setPolicy('role-1', 'perm-1', { maxAmount: 5000 }, 'grant:1');
 
       expect(putMock).toHaveBeenCalledWith(
         '/api/permissions/matrix/role-1/policy/perm-1',
-        { maxAmount: 5000 },
+        { expectedRevision: 'grant:1', values: { maxAmount: 5000 } },
         undefined,
         undefined,
       );
@@ -266,8 +314,9 @@ describe('permissionService', () => {
     it('throws on failure', async () => {
       putMock.mockResolvedValue(fail('Policy save failed'));
 
-      await expect(permissionService.setPolicy('role-1', 'perm-1', {})).rejects.toThrow('Policy save failed');
+      await expect(permissionService.setPolicy('role-1', 'perm-1', {}, 'grant:1')).rejects.toThrow(
+        'Policy save failed',
+      );
     });
   });
-
 });

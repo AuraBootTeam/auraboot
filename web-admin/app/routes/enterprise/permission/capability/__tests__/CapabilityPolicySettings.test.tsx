@@ -12,7 +12,7 @@ vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showErrorToast: vi.fn() }),
 }));
 vi.mock('~/shared/services/permissionService', () => ({
-  permissionService: { getPolicy: vi.fn() },
+  permissionService: { getPolicySnapshot: vi.fn() },
 }));
 vi.mock('../../PolicyConfigDialog', () => ({
   default: (p: any) => (
@@ -82,7 +82,10 @@ function props(rolePid = 'role-a') {
 describe('CapabilityPolicySettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(permissionService.getPolicy).mockResolvedValue({ dynamicAbac: { enabled: true } });
+    vi.mocked(permissionService.getPolicySnapshot).mockResolvedValue({
+      revision: 'grant:1',
+      values: { dynamicAbac: { enabled: true } },
+    });
   });
   it('offers only granted supported actions and reads the exact role and permission', async () => {
     const p = props();
@@ -91,10 +94,10 @@ describe('CapabilityPolicySettings', () => {
     expect(screen.queryByRole('button', { name: 'Unsupported action' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create record' }));
     expect(await screen.findByTestId('policy-target')).toHaveAttribute('data-role', 'role-a');
-    expect(permissionService.getPolicy).toHaveBeenCalledWith('role-a', 'permission-create');
+    expect(permissionService.getPolicySnapshot).toHaveBeenCalledWith('role-a', 'permission-create');
   });
   it('keeps a failed read distinct from an empty policy and retries explicitly', async () => {
-    vi.mocked(permissionService.getPolicy).mockRejectedValueOnce(new Error('offline'));
+    vi.mocked(permissionService.getPolicySnapshot).mockRejectedValueOnce(new Error('offline'));
     render(<CapabilityPolicySettings {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create record' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be loaded');
@@ -103,8 +106,8 @@ describe('CapabilityPolicySettings', () => {
     expect(await screen.findByTestId('policy-target')).toHaveTextContent('"enabled":true');
   });
   it('blocks duplicate selections while a current read is pending', async () => {
-    let resolve!: (value: Record<string, unknown>) => void;
-    vi.mocked(permissionService.getPolicy).mockImplementation(
+    let resolve!: (value: { revision: string; values: Record<string, unknown> }) => void;
+    vi.mocked(permissionService.getPolicySnapshot).mockImplementation(
       () =>
         new Promise((done) => {
           resolve = done;
@@ -113,12 +116,12 @@ describe('CapabilityPolicySettings', () => {
     render(<CapabilityPolicySettings {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create record' }));
     expect(screen.getByRole('button', { name: 'Create record' })).toBeDisabled();
-    await act(async () => resolve({}));
+    await act(async () => resolve({ revision: 'grant:1', values: {} }));
     expect(await screen.findByTestId('policy-target')).toBeInTheDocument();
   });
   it('ignores a late policy response from the previous role', async () => {
-    let resolve!: (value: Record<string, unknown>) => void;
-    vi.mocked(permissionService.getPolicy).mockImplementationOnce(
+    let resolve!: (value: { revision: string; values: Record<string, unknown> }) => void;
+    vi.mocked(permissionService.getPolicySnapshot).mockImplementationOnce(
       () =>
         new Promise((done) => {
           resolve = done;
@@ -127,7 +130,7 @@ describe('CapabilityPolicySettings', () => {
     const view = render(<CapabilityPolicySettings {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create record' }));
     view.rerender(<CapabilityPolicySettings {...props('role-b')} />);
-    await act(async () => resolve({ previous: true }));
+    await act(async () => resolve({ revision: 'old:1', values: { previous: true } }));
     expect(screen.queryByTestId('policy-target')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create record' }));
     expect(await screen.findByTestId('policy-target')).toHaveAttribute('data-role', 'role-b');
@@ -139,7 +142,7 @@ describe('CapabilityPolicySettings', () => {
     render(<CapabilityPolicySettings {...props()} matrix={invalid} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create record' }));
     expect(await screen.findByRole('alert')).toBeVisible();
-    expect(permissionService.getPolicy).not.toHaveBeenCalled();
+    expect(permissionService.getPolicySnapshot).not.toHaveBeenCalled();
   });
   it('blocks continued editing if the saved policy matrix cannot be read back', async () => {
     const p = props();

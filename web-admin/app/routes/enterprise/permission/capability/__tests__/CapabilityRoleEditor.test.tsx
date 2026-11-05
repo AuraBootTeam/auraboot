@@ -37,7 +37,7 @@ vi.mock('../../PolicyConfigDialog', () => ({
 vi.mock('~/shared/services/permissionService', () => ({
   permissionService: {
     getMatrixForRole: vi.fn(),
-    getPolicy: vi.fn(),
+    getPolicySnapshot: vi.fn(),
     batchUpdateRolePermissions: vi.fn(),
     updateScope: vi.fn(),
     getRoleDefaultScope: vi.fn().mockResolvedValue(null),
@@ -122,7 +122,10 @@ describe('CapabilityRoleEditor', () => {
       ],
     };
     mockData([{ group: 'Commerce', capabilities: [capability] }], matrix);
-    vi.mocked(permissionService.getPolicy).mockResolvedValue({ dynamicAbac: { enabled: true } });
+    vi.mocked(permissionService.getPolicySnapshot).mockResolvedValue({
+      revision: 'grant:1',
+      values: { dynamicAbac: { enabled: true } },
+    });
   }
 
   it('opens the current role business-rule policy through the shared dialog', async () => {
@@ -131,7 +134,7 @@ describe('CapabilityRoleEditor', () => {
     fireEvent.click(await screen.findByTestId('capability-policy-configure-cm.cap.refund'));
     fireEvent.click(await screen.findByRole('button', { name: 'Create refund', exact: true }));
     const dialog = await screen.findByTestId('shared-policy-dialog');
-    expect(permissionService.getPolicy).toHaveBeenCalledWith(
+    expect(permissionService.getPolicySnapshot).toHaveBeenCalledWith(
       'role-current',
       'permission-refund-create',
     );
@@ -149,7 +152,7 @@ describe('CapabilityRoleEditor', () => {
     expect(
       screen.queryByTestId('capability-policy-configure-cm.cap.refund'),
     ).not.toBeInTheDocument();
-    expect(permissionService.getPolicy).not.toHaveBeenCalled();
+    expect(permissionService.getPolicySnapshot).not.toHaveBeenCalled();
   });
 
   it('searches the displayed English declaration and retains that name in preview and impact', async () => {

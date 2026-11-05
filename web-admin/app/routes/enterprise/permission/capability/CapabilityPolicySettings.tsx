@@ -37,6 +37,7 @@ export default function CapabilityPolicySettings({
     label: string;
     schema: PolicyConfigDialogProps['schema'];
     values: Record<string, unknown>;
+    revision: string;
   } | null>(null);
   useEffect(() => {
     alive.current = true;
@@ -77,13 +78,14 @@ export default function CapabilityPolicySettings({
         )
           throw new Error('Invalid policy field');
       }
-      const values = await permissionService.getPolicy(rolePid, action.permissionPid);
+      const snapshot = await permissionService.getPolicySnapshot(rolePid, action.permissionPid);
       if (!alive.current || current !== request.current) return;
       setTarget({
         permissionPid: action.permissionPid,
         label: label(action),
         schema: schema as PolicyConfigDialogProps['schema'],
-        values: values ?? {},
+        values: snapshot.values,
+        revision: snapshot.revision,
       });
     } catch {
       if (alive.current && current === request.current) setFailed(true);
@@ -117,6 +119,7 @@ export default function CapabilityPolicySettings({
         permissionLabel={target.label}
         schema={target.schema}
         initialValues={target.values}
+        initialRevision={target.revision}
         onClose={onClose}
         onSuccess={saved}
       />

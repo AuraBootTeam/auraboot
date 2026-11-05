@@ -30,6 +30,43 @@ vi.mock('~/shared/services/permissionService', () => ({
 }));
 
 describe('PolicyConfigDialog', () => {
+  it('retains the original revision and edits after a conflict without retrying the write', async () => {
+    const error = new Error('Policy revision changed');
+    error.name = 'PolicyConflictError';
+    vi.mocked(permissionService.setPolicy).mockRejectedValueOnce(error);
+    const onClose = vi.fn();
+    const onSuccess = vi.fn();
+    render(
+      <PolicyConfigDialog
+        open
+        rolePid="role-a"
+        permissionPid="permission-a"
+        permissionLabel="Refund rules"
+        initialRevision="original-grant:2"
+        initialValues={{ maxAmount: 400 }}
+        schema={{ maxAmount: { type: 'number', label: 'Amount' } }}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+    fireEvent.change(screen.getByTestId('policy-field-maxAmount'), { target: { value: '999' } });
+    fireEvent.click(screen.getByTestId('policy-save-button'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('当前编辑内容已保留');
+    expect(screen.getByTestId('policy-field-maxAmount')).toHaveValue(999);
+    expect(screen.getByTestId('policy-save-button')).toBeDisabled();
+    expect(permissionService.setPolicy).toHaveBeenLastCalledWith(
+      'role-a',
+      'permission-a',
+      { maxAmount: 999 },
+      'original-grant:2',
+    );
+    const writes = vi.mocked(permissionService.setPolicy).mock.calls.length;
+    fireEvent.submit(screen.getByTestId('policy-config-form'));
+    expect(permissionService.setPolicy).toHaveBeenCalledTimes(writes);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
   it('saves an authored permission condition without an implicit decision reference', async () => {
     const decisionApi = {
       getDecisionImpact: vi.fn(),
@@ -38,6 +75,7 @@ describe('PolicyConfigDialog', () => {
     };
     render(
       <PolicyConfigDialog
+        initialRevision="grant:1"
         open
         onClose={vi.fn()}
         onSuccess={vi.fn()}
@@ -83,6 +121,7 @@ describe('PolicyConfigDialog', () => {
             }),
           }),
         }),
+        'grant:1',
       ),
     );
     const payload = vi
@@ -110,10 +149,22 @@ describe('PolicyConfigDialog', () => {
       onSuccess,
       onClose,
     };
-    const view = render(<PolicyConfigDialog {...props} />);
+    const view = render(<PolicyConfigDialog initialRevision="grant:1" {...props} />);
     fireEvent.click(screen.getByTestId('policy-save-button'));
-    expect(permissionService.setPolicy).toHaveBeenCalledWith('role-a', 'permission-a', {});
-    view.rerender(<PolicyConfigDialog {...props} rolePid="role-b" permissionPid="permission-b" />);
+    expect(permissionService.setPolicy).toHaveBeenCalledWith(
+      'role-a',
+      'permission-a',
+      {},
+      'grant:1',
+    );
+    view.rerender(
+      <PolicyConfigDialog
+        initialRevision="grant:1"
+        {...props}
+        rolePid="role-b"
+        permissionPid="permission-b"
+      />,
+    );
     await act(async () => resolve());
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
@@ -149,6 +200,7 @@ describe('PolicyConfigDialog', () => {
 
     render(
       <PolicyConfigDialog
+        initialRevision="grant:1"
         open
         onClose={vi.fn()}
         rolePid="role-admin"
@@ -209,6 +261,7 @@ describe('PolicyConfigDialog', () => {
             }),
           }),
         }),
+        'grant:1',
       );
     });
   });
@@ -219,6 +272,7 @@ describe('PolicyConfigDialog', () => {
 
     render(
       <PolicyConfigDialog
+        initialRevision="grant:1"
         open
         onClose={onClose}
         rolePid="role-admin"
@@ -318,6 +372,7 @@ describe('PolicyConfigDialog', () => {
             }),
           }),
         }),
+        'grant:1',
       );
     });
     expect(onSuccess).toHaveBeenCalled();
@@ -327,6 +382,7 @@ describe('PolicyConfigDialog', () => {
   it('uses the policy schema decision as the initial rule binding decision', () => {
     render(
       <PolicyConfigDialog
+        initialRevision="grant:1"
         open
         onClose={vi.fn()}
         rolePid="role-admin"
