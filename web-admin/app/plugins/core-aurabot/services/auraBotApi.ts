@@ -509,7 +509,7 @@ export const auraBotApi = {
       let fullContent = '';
       let buffer = '';
 
-      await processSSEStream(reader, decoder, buffer, fullContent, callbacks);
+      await processSSEStream(reader, decoder, buffer, fullContent, callbacks, Boolean(request.formFill));
     } catch (error) {
       callbacks.onError(formatFetchError(error, 'chat'));
     }
@@ -574,7 +574,9 @@ async function processSSEStream(
   buffer: string,
   fullContent: string,
   callbacks: ChatStreamOptions,
+  requireTerminal = false,
 ): Promise<void> {
+  let terminalReceived = false;
   let currentEvent = '';
   let traceId: string | undefined;
 
@@ -673,6 +675,7 @@ async function processSSEStream(
                 );
                 break;
               case 'done':
+                terminalReceived = true;
                 if (typeof data.content === 'string' && data.content) {
                   fullContent = fullContent || data.content;
                 }
@@ -706,6 +709,10 @@ async function processSSEStream(
     reader.releaseLock();
   }
 
+  if (requireTerminal && !terminalReceived) {
+    callbacks.onError('$i18n:aurabot.formFill.failed', traceId);
+    return;
+  }
   callbacks.onDone(fullContent, traceId);
 }
 
