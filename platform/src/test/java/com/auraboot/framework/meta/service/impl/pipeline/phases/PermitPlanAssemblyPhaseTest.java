@@ -37,6 +37,16 @@ class PermitPlanAssemblyPhaseTest {
 
     private final PermitPlanAssemblyPhase phase = new PermitPlanAssemblyPhase();
 
+    @Test void nativeCreationNeverPublishesAModelWideExecutionScope() {
+        var ctx = ctxWithModel(null, "orders"); ctx.setExecConfig(java.util.Map.of("type", "create", "handlerParams",
+                java.util.Map.of("targetRecordAuthorization", "business", "targetRecordAction", "create")));
+        ctx.setNativeCreationContract(new com.auraboot.framework.meta.security.NativeBusinessCommandContract(
+                ctx.getCommand().getModelCode(), "create", java.util.List.of("orders.manage")));
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization")); phase.execute(ctx);
+        assertThat(ctx.getPermitPlan().isPermitted()).isTrue();
+        assertThat(ctx.getPermitPlan().scope()).isNull(); assertThat(ctx.getPermitPlan().aggregateId()).isNull();
+    }
+
     @Test
     @DisplayName("a granted boundary with only abstaining gates assembles to PERMIT")
     void assemblesPermitWhenGranterPermittedAndGatesAbstained() {

@@ -77,6 +77,13 @@ public class CommandTargetScopePhase implements CommandPhase {
     public boolean shouldSkip(CommandPipelineContext ctx) {
         CommandDefinition command = ctx.getCommand();
         requireBusinessOwnerBinding(ctx);
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)) {
+            var contract = com.auraboot.framework.meta.security.NativeBusinessCommandContract.require(ctx, extensionRegistry);
+            if (ctx.getRequest().getTargetRecordId() != null)
+                throw new BusinessException(ResponseCode.FORBIDDEN, "Native creation cannot name an existing target");
+            ctx.setNativeCreationContract(contract);
+            return true;
+        }
         if (businessTargetAuthorization(ctx) && (command == null || !StringUtils.hasText(command.getModelCode())
                 || ctx.getRequest() == null || !StringUtils.hasText(ctx.getRequest().getTargetRecordId()))) {
             throw new BusinessException(ResponseCode.FORBIDDEN, "Business target policy requires a named record");

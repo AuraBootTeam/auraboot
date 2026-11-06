@@ -133,6 +133,9 @@ public class CommandPipelineContext {
     /** Complete grant alternatives captured by the host target authorization snapshot. */
     private com.auraboot.framework.permission.engine.model.BusinessGrantDecision businessGrantDecision;
 
+    /** Validated server-owned native creation contract; not an insert permit. */
+    private com.auraboot.framework.meta.security.NativeBusinessCommandContract nativeCreationContract;
+
     /** Immutable public projection captured by the host authorization snapshot, not a request flag. */
     private com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan businessResultProjection;
 

@@ -30,7 +30,12 @@ public class CommandResultProjectionService {
         if (!Objects.equals(contract.model(), ctx.getBusinessTargetAuthorization().modelCode())
                 || !Objects.equals(contract.action(), ctx.getBusinessTargetAuthorization().action()))
             throw BusinessResultProjectionPlan.denied();
-        String count = contract.model() + ("update".equals(contract.action()) ? "_updated" : "_deleted");
+        String count = contract.model() + switch (contract.action()) {
+            case "create" -> "_inserted";
+            case "update" -> "_updated";
+            case "delete" -> "_deleted";
+            default -> throw BusinessResultProjectionPlan.denied();
+        };
         return new BusinessResultProjectionPlan(ctx.getBusinessTargetAuthorization(), ctx.getBusinessGrantDecision(),
                 Map.of("recordPid", BusinessResultField.rootIdentity(), count, BusinessResultField.count(1)),
                 Map.of(), Set.of(), List.of(), List.of());

@@ -114,7 +114,14 @@ public class CommandExecutorImpl implements CommandExecutor {
     private static final int COLUMN_CACHE_MAX_SIZE = 1024;
     private final ConcurrentHashMap<String, Boolean> columnExistsCache = new ConcurrentHashMap<>();
 
+    @Autowired(required = false)
+    private NativeBusinessCreateBoundary nativeCreation;
+
     private CommandExecuteResult projectForCaller(CommandPipelineContext context, CommandExecuteResult result) {
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(context)) {
+            if (nativeCreation == null) throw new AccessDeniedException("Native creation boundary is unavailable");
+            nativeCreation.authorizeOutcome(context, result.getData());
+        }
         if (context.getBusinessTargetAuthorization() == null) return result;
         if (resultProjection == null) throw new AccessDeniedException("Business result projection service is unavailable");
         result.setData(resultProjection.project(context,result.getData()));

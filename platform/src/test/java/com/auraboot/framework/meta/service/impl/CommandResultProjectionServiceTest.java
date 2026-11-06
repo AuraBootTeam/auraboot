@@ -58,11 +58,11 @@ class CommandResultProjectionServiceTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings={"update", "delete"})
+    @org.junit.jupiter.params.provider.ValueSource(strings={"create", "update", "delete"})
     void nativeWriterOnlyReturnsTheExactRootAndAtMostOneAffectedRow(String action) {
         context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization("orders:inspect", "orders", "root", action, 7L, 20L, 30L));
         var contract = new com.auraboot.framework.meta.security.NativeBusinessCommandContract("orders", action, List.of("orders.inspect"));
-        String count = "orders_" + ("update".equals(action) ? "updated" : "deleted");
+        String count = "orders_" + ("create".equals(action) ? "inserted" : "update".equals(action) ? "updated" : "deleted");
         context.setBusinessResultProjection(service.prepareNative(context, contract));
         assertThat(service.project(context, Map.of("recordPid", "root", count, 1)))
                 .containsEntry("recordPid", "root").containsEntry(count, 1);

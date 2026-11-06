@@ -78,10 +78,16 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         CommandExecuteRequest request = ctx.getRequest();
         Object rawParams = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
         if (rawParams instanceof java.util.Map<?, ?> params
-                && "business".equals(params.get("targetRecordAuthorization")) && !hasAuthorizedTarget(ctx)) {
+                && "business".equals(params.get("targetRecordAuthorization"))
+                && !com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)
+                && !hasAuthorizedTarget(ctx)) {
             ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.deny("business_target_decision_missing", name()));
             throw new org.springframework.security.access.AccessDeniedException("A completed business target decision is required");
         }
+
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)
+                && (ctx.getNativeCreationContract() == null || ctx.getRequest().getTargetRecordId() != null))
+            throw new org.springframework.security.access.AccessDeniedException("Native creation contract is missing");
 
         // The aggregate root is the master document the request named — the same id HandlerPhase pins
         // the handler stage to. Derived writes inherit authorization from it (D4). Null when the
@@ -135,6 +141,8 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * authority.</p>
      */
     private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        // A new root is checked inside its insert transaction; never publish model-wide authority.
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)) return null;
         // A trusted handler checked this exact target at the boundary. Keep that decision
         // resource-scoped even when the actor's generic row policy would resolve to ALL.
         if (hasAuthorizedTarget(ctx)) {

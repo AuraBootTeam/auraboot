@@ -12,7 +12,7 @@ import java.util.Set;
 
 /** The native writer owns one named root; it cannot inherit authority for arbitrary handlers. */
 public record NativeBusinessCommandContract(String model, String action, List<String> permissions) {
-    private static final Set<String> OPERATIONS = Set.of("update", "delete");
+    private static final Set<String> OPERATIONS = Set.of("create", "update", "delete");
     private static final Set<String> CONFIG_KEYS = Set.of("type", "permissions", "inputFields", "handlerParams");
     private static final Set<String> PARAM_KEYS = Set.of("targetRecordAuthorization", "targetRecordAction");
 
@@ -49,13 +49,15 @@ public record NativeBusinessCommandContract(String model, String action, List<St
         String model = command.getModelCode();
         if (model == null || !model.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) throw denied();
         Object rawInputs = config.get("inputFields");
-        if ("update".equals(action) && (!(rawInputs instanceof List<?> inputs) || inputs.isEmpty())) throw denied();
+        if (!"delete".equals(action) && (!(rawInputs instanceof List<?> inputs) || inputs.isEmpty())) throw denied();
         if (rawInputs != null) {
             if (!(rawInputs instanceof List<?> inputs) || inputs.size() > 256
                     || new java.util.HashSet<>(inputs).size() != inputs.size()) throw denied();
             for (Object input : inputs) {
                 if (!(input instanceof String field)) throw denied();
                 if (!field.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) throw denied();
+                if ("create".equals(action) && Set.of("id", "pid", "tenant_id", "created_by", "updated_by",
+                        "created_at", "updated_at", "row_version", "deleted_flag").contains(field)) throw denied();
             }
             if ("delete".equals(action) && !inputs.isEmpty()) throw denied();
         }
@@ -67,6 +69,13 @@ public record NativeBusinessCommandContract(String model, String action, List<St
                     || value.startsWith("model.")) throw denied();
         }
         return new NativeBusinessCommandContract(model, action, codes.stream().map(String.class::cast).toList());
+    }
+
+    public static boolean declaresCreation(CommandPipelineContext context) {
+        if (context == null || context.getExecConfig() == null
+                || !"create".equals(context.getExecConfig().get("type"))) return false;
+        Object params = context.getExecConfig().get("handlerParams");
+        return params instanceof Map<?, ?> values && "business".equals(values.get("targetRecordAuthorization"));
     }
 
     private static BusinessException denied() {

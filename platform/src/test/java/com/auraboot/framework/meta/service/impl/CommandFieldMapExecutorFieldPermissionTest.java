@@ -74,6 +74,26 @@ class CommandFieldMapExecutorFieldPermissionTest {
         MetaContext.clear();
     }
 
+    @Test void refusedNativeInsertCannotReachModelMutationObservers() {
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(modelDefinition()));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("name", "gross_margin")));
+        when(dynamicDataMapper.insert(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap())).thenReturn(1);
+        var definition = new CommandDefinition(); definition.setModelCode(MODEL); definition.setCode("quote:create");
+        var request = new CommandExecuteRequest(); request.setOperationType("create");
+        var configuration = Map.<String, Object>of("type", "create", "inputFields", List.of("name"),
+                "handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "create"));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertThatThrownBy(() -> executor.executeImplicitFieldMapPhase(configuration, Map.of("name", "denied"),
+                    TENANT_ID, request, definition, Set.of("name"), pid -> {
+                        throw new org.springframework.security.access.AccessDeniedException("Rejected actual insert");
+                    })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            verify(dynamicDataMapper).insert(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+            org.mockito.Mockito.verifyNoInteractions(modelMutations);
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clear(); }
+    }
+
     @Test
     void implicitUpdatePreservesExplicitNullAndLeavesOmittedFieldsUnchanged() {
         assertUpdateClearsOnlySubmittedField(false);

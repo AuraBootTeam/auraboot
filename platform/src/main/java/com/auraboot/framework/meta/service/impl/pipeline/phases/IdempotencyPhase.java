@@ -27,6 +27,9 @@ public class IdempotencyPhase implements CommandPhase {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory recordScopeFactory;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.NativeBusinessCreateBoundary nativeCreation;
+
     private static final int MAX_COLLECTION_ITEMS=1000, MAX_CACHED_RECORDS=4096;
     record CachedRead(String model, java.util.List<String> path, int maxItems, java.util.List<String> countPath) { }
 
@@ -144,6 +147,10 @@ public class IdempotencyPhase implements CommandPhase {
                 intent,
                 ctx.getTenantId());
         if (cachedResult != null) {
+            if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)) {
+                if (nativeCreation == null) throw cachedReadDenied();
+                nativeCreation.authorizeOutcome(ctx, cachedResult);
+            }
             requireCachedReads(ctx,cachedResult,reads);
             log.info("Idempotent replay for command {} with clientRequestId {}",
                     ctx.getCommandCode(), ctx.getRequest().getClientRequestId());

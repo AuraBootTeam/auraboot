@@ -337,6 +337,81 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         }
     }
 
+    @Test void nativeBusinessCreationChecksTheRealInsertRollsBackClaimsAndReauthorizesReplay() throws Exception {
+        String code = model + ":native_create", permission = "fixture." + model + ".manage";
+        grantCommittedPermissionToTestRole(permission, "operation", model, "manage", "Bounded native creation");
+        long permissionId = jdbc.queryForObject("SELECT id FROM ab_permission WHERE tenant_id=? AND code=?", Long.class,
+                testTenant.getId(), permission); permissionIds.add(permissionId);
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
+                "API", "command", "execute", "Native creation invocation");
+        scopes.setScope(testTenant.getId(), testRole.getId(), model, "manage", "all", "MAX");
+        String predicate = json.writeValueAsString(com.auraboot.framework.decision.ast.ConditionNode.CompareNode.of(
+                new com.auraboot.framework.decision.ast.Operand.PathOperand(com.auraboot.framework.decision.ast.Scope.RECORD,
+                        "data." + quantity, com.auraboot.framework.decision.ast.DataType.INTEGER),
+                com.auraboot.framework.decision.ast.Operator.EQ,
+                new com.auraboot.framework.decision.ast.Operand.LiteralOperand(3, com.auraboot.framework.decision.ast.DataType.INTEGER)));
+        jdbc.execute("ALTER TABLE " + table + " ALTER COLUMN " + secret + " SET DEFAULT 10");
+        var defaultPredicate = com.auraboot.framework.decision.ast.ConditionNode.CompareNode.of(
+                new com.auraboot.framework.decision.ast.Operand.PathOperand(com.auraboot.framework.decision.ast.Scope.RECORD,
+                        "data." + secret, com.auraboot.framework.decision.ast.DataType.INTEGER),
+                com.auraboot.framework.decision.ast.Operator.EQ,
+                new com.auraboot.framework.decision.ast.Operand.LiteralOperand(10, com.auraboot.framework.decision.ast.DataType.INTEGER));
+        predicate = json.writeValueAsString(new com.auraboot.framework.decision.ast.ConditionNode.GroupNode(
+                com.auraboot.framework.decision.ast.ConditionNode.BoolOp.AND,
+                List.of(json.readValue(predicate, com.auraboot.framework.decision.ast.ConditionNode.class), defaultPredicate)));
+        String fieldScope = json.writeValueAsString(Map.of("modelCode", model, "readFields", List.of(),
+                "writeFields", List.of(label, quantity)));
+        jdbc.update("UPDATE ab_role_permission SET condition_ast=?::jsonb,field_scope=?::jsonb,priority=37,source_ref=? WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                predicate, fieldScope, code + ":source", testTenant.getId(), testRole.getId(), permissionId);
+        var definition = new com.auraboot.framework.meta.entity.CommandDefinition();
+        definition.setTenantId(testTenant.getId()); definition.setPid(UniqueIdGenerator.generate()); definition.setCode(code);
+        definition.setModelCode(model); definition.setDisplayName("Native creation boundary"); definition.setVersion(1);
+        definition.setIsCurrent(true); definition.setStatus("published"); definition.setDeletedFlag(false);
+        definition.setInputSchema("{}"); definition.setTargetModels("[]"); definition.setCmdRiskLevel("L1");
+        definition.setExecutionConfig(json.writeValueAsString(Map.of("type", "create", "permissions", List.of(permission),
+                "inputFields", List.of(label, quantity), "handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "create"))));
+        commands.insert(definition); commandIds.add(definition.getId());
+        String originalGrant = jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                String.class, testTenant.getId(), testRole.getId(), permissionId);
+        long before = count();
+        var denied = request(Map.of(label, "denied-native", quantity, 4));
+        assertThatThrownBy(() -> commandExecutor.execute(code, denied)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(count()).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                Long.class, testTenant.getId(), code, denied.getClientRequestId())).isZero();
+        jdbc.execute("ALTER TABLE " + table + " ALTER COLUMN " + secret + " SET DEFAULT 11");
+        assertThatThrownBy(() -> commandExecutor.execute(code, request(Map.of(label, "default-denied", quantity, 3))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(count()).isEqualTo(before);
+        jdbc.execute("ALTER TABLE " + table + " ALTER COLUMN " + secret + " SET DEFAULT 10");
+        var allowed = request(Map.of(label, "allowed-native", quantity, "3"));
+        allowed.setClientRequestId(denied.getClientRequestId());
+        var result = commandExecutor.execute(code, allowed);
+        String created = Objects.toString(result.getData().get("recordPid"));
+        assertThat(result.getData()).containsOnlyKeys("recordPid", model + "_inserted");
+        assertThat(stored(quantity, created)).isEqualTo(3);
+        assertThat(stored(secret, created)).isEqualTo(10);
+        assertThat(count()).isEqualTo(before + 1);
+        assertThat(jdbc.queryForObject("SELECT created_by FROM " + table + " WHERE pid=?", Long.class, created)).isEqualTo(testUser.getId());
+        assertThat(commandExecutor.execute(code, allowed).isIdempotentReplay()).isTrue();
+        assertThat(count()).isEqualTo(before + 1);
+        scopes.setScope(testTenant.getId(), testRole.getId(), model, "manage", "none", "MAX");
+        assertThatThrownBy(() -> commandExecutor.execute(code, allowed)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(count()).isEqualTo(before + 1);
+        scopes.setScope(testTenant.getId(), testRole.getId(), model, "manage", "all", "MAX");
+        String blockedFields = json.writeValueAsString(Map.of("modelCode", model, "readFields", List.of(), "writeFields", List.of(label)));
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                blockedFields, testTenant.getId(), testRole.getId(), permissionId);
+        assertThatThrownBy(() -> commandExecutor.execute(code, request(Map.of(label, "field-denied", quantity, 3))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(count()).isEqualTo(before + 1);
+        assertThatThrownBy(() -> commandExecutor.execute(code, allowed)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                fieldScope, testTenant.getId(), testRole.getId(), permissionId);
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                String.class, testTenant.getId(), testRole.getId(), permissionId)).isEqualTo(originalGrant);
+    }
+
     private String derivedCommand(boolean explicitInputs,boolean preserveInput) throws Exception {
         grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
                 "API","command","execute","Command fixture invocation");

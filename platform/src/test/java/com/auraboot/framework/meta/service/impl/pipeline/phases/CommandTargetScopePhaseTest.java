@@ -689,6 +689,16 @@ class CommandTargetScopePhaseTest {
         return ctx;
     }
 
+    @Test void nativeCreationDefersRecordAuthorizationToTheTransactionalInsertBoundary() {
+        var ctx = nativeBusinessTarget(); ctx.getRequest().setTargetRecordId(null);
+        ctx.setExecConfig(Map.of("type", "create", "inputFields", List.of("remark"),
+                "permissions", List.of("inventory.receipt.confirm"), "handlerParams", Map.of(
+                        "targetRecordAuthorization", "business", "targetRecordAction", "create")));
+        assertThat(phase().shouldSkip(ctx)).isTrue();
+        assertThat(ctx.getBusinessTargetAuthorization()).isNull();
+        verify(dynamicDataService, org.mockito.Mockito.never()).getById(anyString(), anyString());
+    }
+
     @Test void deniedBusinessTargetCannotReachCachedReplay() {
         var ctx = businessTarget();
         var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);

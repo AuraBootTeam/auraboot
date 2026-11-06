@@ -218,6 +218,21 @@ public class CommandFieldMapExecutor {
                                                       CommandExecuteRequest request,
                                                       CommandDefinition command,
                                                       Set<String> submittedInputKeys) {
+        return executeImplicitFieldMapPhase(execConfig, payload, tenantId, request, command, submittedInputKeys, null);
+    }
+
+    public Map<String, Object> executeImplicitFieldMapPhase(Map<String, Object> execConfig,
+            Map<String, Object> payload, Long tenantId, CommandExecuteRequest request,
+            CommandDefinition command, Set<String> submittedInputKeys,
+            java.util.function.Consumer<String> authorizeInserted) {
+        Object parameters = execConfig.get("handlerParams");
+        boolean businessCreate = "create".equals(execConfig.get("type"))
+                && parameters instanceof Map<?, ?> values && "business".equals(values.get("targetRecordAuthorization"));
+        if (businessCreate != (authorizeInserted != null))
+            throw new org.springframework.security.access.AccessDeniedException("Native business insert boundary is required");
+        if (businessCreate && (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                || org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()))
+            throw new org.springframework.security.access.AccessDeniedException("Native business insert requires a write transaction");
         Map<String, Object> results = new HashMap<>();
         String modelCode = command.getModelCode();
         if (!StringUtils.hasText(modelCode)) {
@@ -389,6 +404,9 @@ public class CommandFieldMapExecutor {
                 throw new BusinessException(ResponseCode.BadParam, "$i18n:meta_record.duplicate", duplicate);
             }
             if (inserted != 1) throw new BusinessException(ResponseCode.BadParam, "Command create affected an unexpected row count");
+            // The row and its database defaults are now real, but remain uncommitted.
+            // A refusal must escape before observers and roll back the caller's insert/claim.
+            if (authorizeInserted != null) authorizeInserted.accept(newPid);
             modelMutations.observe(modelCode, Map.entry("pid", newPid), tenantId,
                     com.auraboot.framework.meta.service.ModelMutationObserver.Operation.CREATED);
             results.put(modelCode + "_inserted", inserted);
