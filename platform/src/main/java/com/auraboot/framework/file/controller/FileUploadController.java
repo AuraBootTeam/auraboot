@@ -304,6 +304,10 @@ public class FileUploadController {
         if (file == null) {
             return;
         }
+        if (file.getArtifactAuthorization() != null) {
+            fileService.assertFileReadAllowed(file);
+            return;
+        }
         List<FileRelationEntity> relations = fileService.getFileRelations(fileId);
         if (relations.isEmpty()) {
             if (userId == null || file.getCreatedBy() == null || !file.getCreatedBy().equals(userId)) {

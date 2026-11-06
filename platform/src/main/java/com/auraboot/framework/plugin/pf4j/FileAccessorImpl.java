@@ -181,6 +181,7 @@ public class FileAccessorImpl implements FileAccessor {
         if (Boolean.TRUE.equals(entity.getDeletedFlag()) || "deleted".equalsIgnoreCase(entity.getStatus())) {
             throw new IllegalArgumentException("File is not active: " + fileId);
         }
+        if (entity.getArtifactAuthorization() != null) fileService.assertFileReadAllowed(entity);
         return entity;
     }
 

@@ -35,6 +35,11 @@ public class BusinessCommandDataAccessorFactory {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.file.service.FileService artifactFiles;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.file.dao.mapper.FileRelationMapper artifactRelations;
+
     public Scope open(CommandPipelineContext context, CommandHandlerExtension handler) {
         if (!(handler instanceof BusinessResourceAuthorization owner)) throw denied();
         var source = sessions.getConfiguration().getEnvironment().getDataSource();
@@ -49,6 +54,7 @@ public class BusinessCommandDataAccessorFactory {
         var invocationOwner = Objects.requireNonNull(owner.newInvocationAuthorization());
         if (!Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
+                || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
                 || !Objects.equals(owner.pagedBusinessResourceRowLimits(), invocationOwner.pagedBusinessResourceRowLimits())) throw denied();
         Scope scope = new Scope(context, invocationOwner, source, holder, connection);
         try {
@@ -90,6 +96,9 @@ public class BusinessCommandDataAccessorFactory {
         private record OutputSource(Map<String,Object> raw, Map<String,Object> projected) {}
         private final Map<SourceKey,OutputSource> outputSources = new HashMap<>();
         private Map<String,Set<String>> publicDeclarations;
+        private Map<String,Integer> artifactFields;
+        private final Set<String> projectedModels = new HashSet<>();
+        private boolean artifactSaved;
         private Map<String, Object> root;
         private volatile boolean active = true;
         private boolean registered;
@@ -117,6 +126,7 @@ public class BusinessCommandDataAccessorFactory {
         private void verify() {
             if (!Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
             if (context.getPublicOutputProjection() != outputPlan
+                    || artifactFields != null && !artifactFields.equals(owner.businessArtifactFields())
                     || publicDeclarations != null && !publicDeclarations.equals(owner.publicBusinessResourceFields())) throw denied();
             if (readIsolation != null) {
                 try { if (connection.getTransactionIsolation() != readIsolation.jdbcLevel()) throw denied(); }
@@ -170,6 +180,10 @@ public class BusinessCommandDataAccessorFactory {
             pagedLimits = Map.copyOf(owner.pagedBusinessResourceRowLimits());
             publicDeclarations = owner.publicBusinessResourceFields().entrySet().stream().collect(
                     java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+            artifactFields = Map.copyOf(owner.businessArtifactFields());
+            if (artifactFields.size() > 8 || artifactFields.values().stream().anyMatch(limit -> limit < 1 || limit > 67_108_864)
+                    || !artifactFields.isEmpty() && (publicDeclarations.isEmpty() || !"update".equals(witness.action())
+                        || !publicDeclarations.getOrDefault(rootModel, Set.of()).containsAll(artifactFields.keySet()))) throw denied();
             if (!publicDeclarations.isEmpty()) {
                 if (publicProjection == null || outputPlan == null || outputPlan.grant() != context.getBusinessGrantDecision()
                         || !Objects.equals(outputPlan.target(), witness)
@@ -491,7 +505,55 @@ public class BusinessCommandDataAccessorFactory {
                                 model, pid, row.raw(), null, null));
                         result.put(pid, publicProjection.project(context, model, project(row.projected(), grant)));
                     }
+                    projectedModels.add(model);
                     return Collections.unmodifiableMap(result);
+                });
+            }
+            @Override public FileAccessor.SavedFile savePublicArtifact(String field, String filename, String contentType,
+                    byte[] bytes, Map<String,Object> rootChanges) {
+                return operation(() -> {
+                    try {
+                        Integer budget = artifactFields.get(field);
+                        if (artifactFiles == null || artifactRelations == null || artifactSaved || budget == null
+                                || bytes == null || bytes.length < 1 || bytes.length > budget
+                                || filename == null || filename.isBlank() || contentType == null || contentType.isBlank()
+                                || rootChanges == null || rootChanges.containsKey(field)
+                                || !projectedModels.containsAll(publicDeclarations.keySet())) throw denied();
+                        var intendedChanges = BusinessResourceAuthorization.snapshot(rootChanges);
+                        var view = outputPlan.models().get(rootModel);
+                        if (view == null || !view.readable().contains(field)
+                                || view.policyMasks().stream().anyMatch(mask -> field.equals(mask.field()))
+                                || view.detailMasks().stream().anyMatch(mask -> field.equals(mask.field()))) throw denied();
+                        var definition = models.getModelDefinition(rootModel).orElseThrow(BusinessCommandDataAccessorFactory::denied);
+                        var fields = models.getModelFields(rootModel);
+                        if (!"published".equalsIgnoreCase(definition.getStatus()) || fields == null) throw denied();
+                        var metadata = fields.stream().filter(candidate -> candidate != null && field.equals(candidate.getCode()))
+                                .findFirst().orElseThrow(BusinessCommandDataAccessorFactory::denied);
+                        if (!"file".equalsIgnoreCase(metadata.getDataType()) || metadata.isVirtual() || metadata.isJsonbVirtual()
+                                || metadata.getExtraProps() != null && Boolean.TRUE.equals(metadata.getExtraProps().get("multiple"))) throw denied();
+                        com.auraboot.framework.file.service.impl.FileRelationMutationGuard.assertWritableMetadata(definition, metadata, root);
+                        artifactSaved = true;
+                        var saved = artifactFiles.persistBusinessArtifact(
+                                new com.auraboot.framework.file.support.GeneratedArtifactMultipartFile(filename, contentType, bytes), user,
+                                com.auraboot.framework.file.security.BusinessArtifactAuthorization.capture(outputPlan, field));
+                        if (saved == null || saved.getId() == null || saved.getPid() == null
+                                || !saved.getPid().matches("[0-9A-HJKMNP-TV-Z]{26}")
+                                || !tenant.equals(saved.getTenantId()) || !user.equals(saved.getCreatedBy())
+                                || !Boolean.TRUE.equals(saved.getRetentionLocked()) || !"success".equals(saved.getStatus())
+                                || !Long.valueOf(bytes.length).equals(saved.getFileSize())) throw denied();
+                        var changes = new LinkedHashMap<>(intendedChanges); changes.put(field, saved.getPid());
+                        var updated = update(rootModel, rootPid, changes);
+                        if (!saved.getPid().equals(updated.get(field))) throw denied();
+                        var relation = new com.auraboot.framework.file.entity.FileRelationEntity().setTenantId(tenant)
+                                .setEntityType(rootModel).setEntityId(rootPid).setFieldName(field)
+                                .setFileId(String.valueOf(saved.getId())).setSortOrder(0).setDeletedFlag(false);
+                        if (artifactRelations.insert(relation) != 1) throw new IllegalStateException("Business artifact relation was not persisted");
+                        return new FileAccessor.SavedFile(saved.getPid(), saved.getOriginalName(), saved.getFileSize(),
+                                "/api/file/download/" + saved.getPid());
+                    } catch (RuntimeException failure) {
+                        reject();
+                        throw failure;
+                    }
                 });
             }
             @Override public Map<String, Object> create(String model, Map<String, Object> changes) {

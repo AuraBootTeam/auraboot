@@ -636,6 +636,28 @@ END $$;
 
 
 --
+-- Name: ab_guard_business_artifact_provenance(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_guard_business_artifact_provenance() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.artifact_authorization IS NOT NULL AND
+       ROW(NEW.artifact_authorization, NEW.tenant_id, NEW.pid, NEW.file_name,
+           NEW.local_path, NEW.cloud_key, NEW.file_size, NEW.mime_type, NEW.created_by)
+       IS DISTINCT FROM
+       ROW(OLD.artifact_authorization, OLD.tenant_id, OLD.pid, OLD.file_name,
+           OLD.local_path, OLD.cloud_key, OLD.file_size, OLD.mime_type, OLD.created_by) THEN
+        RAISE EXCEPTION 'Business artifact provenance and storage identity are immutable'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: ab_guard_domain_export_attempt(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -10262,8 +10284,16 @@ CREATE TABLE public.ab_file (
     created_time timestamp with time zone,
     updated_time timestamp with time zone,
     deleted_flag boolean DEFAULT false NOT NULL,
-    retention_locked boolean DEFAULT false NOT NULL
+    retention_locked boolean DEFAULT false NOT NULL,
+    artifact_authorization text
 );
+
+
+--
+-- Name: COLUMN ab_file.artifact_authorization; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_file.artifact_authorization IS 'Host-owned business artifact provenance and generated public field view; NULL retains ordinary upload authorization.';
 
 
 --
@@ -32033,6 +32063,13 @@ CREATE TRIGGER ab_application_release_require_actor BEFORE INSERT ON public.ab_a
 --
 
 CREATE TRIGGER ab_domain_export_attempt_guard BEFORE INSERT OR DELETE OR UPDATE ON public.ab_domain_export_attempt FOR EACH ROW EXECUTE FUNCTION public.ab_guard_domain_export_attempt();
+
+
+--
+-- Name: ab_file ab_file_business_artifact_provenance; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ab_file_business_artifact_provenance BEFORE UPDATE ON public.ab_file FOR EACH ROW EXECUTE FUNCTION public.ab_guard_business_artifact_provenance();
 
 
 --

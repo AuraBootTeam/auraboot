@@ -469,6 +469,26 @@ class BusinessCommandDataAccessorFactoryTest {
         assertThat(holder.isRollbackOnly()).isTrue();
     }
 
+    @Test void publicArtifactPersistenceIsClosedByDefaultAndPoisonsTheOriginalTransaction() {
+        command(scope -> {
+            denied(() -> scope.accessor().savePublicArtifact("file", "report.txt", "text/plain", new byte[]{1}, Map.of()));
+            return null;
+        });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void artifactFieldsCannotBeDeclaredWithoutTheirRootPublicView() {
+        owner.artifactFields = Map.of("file", 16);
+        assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void aFreshInvocationCannotRaiseTheRegisteredArtifactBudget() {
+        owner.artifactFields = Map.of("file", 16);
+        var replacement = new Owner(); replacement.artifactFields = Map.of("file", 32); owner.invocation = replacement;
+        assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
     @Test void publicOutputPlanCannotBeReplacedDuringAnInvocation() throws Exception {
         publicOwner();
         command(scope -> {
@@ -486,11 +506,13 @@ class BusinessCommandDataAccessorFactoryTest {
         ReadIsolation readIsolation;
         Map<String,Integer> pagedLimits = Map.of();
         Map<String,Set<String>> publicFields = Map.of();
+        Map<String,Integer> artifactFields = Map.of();
         boolean denyLineRead;
         BusinessResourceAuthorization invocation;
         public BusinessResourceAuthorization newInvocationAuthorization() { return invocation == null ? this : invocation; }
         public Map<String,Integer> pagedBusinessResourceRowLimits() { return pagedLimits; }
         public Map<String,Set<String>> publicBusinessResourceFields() { return publicFields; }
+        public Map<String,Integer> businessArtifactFields() { return artifactFields; }
         public ReadIsolation resourceReadIsolation() { return readIsolation; }
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }
         public String getCommandType() { return "receipt.confirm"; }

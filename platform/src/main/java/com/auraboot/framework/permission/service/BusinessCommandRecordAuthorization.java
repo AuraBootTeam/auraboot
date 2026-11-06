@@ -67,6 +67,12 @@ public class BusinessCommandRecordAuthorization {
         return resolveInternal(memberId, declaredPermissions, recordModel, record, action);
     }
 
+    /** Resolve a complete generated model-read grant for an artifact reader, without an execution permit. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveModelRead(Long memberId, String model, Map<String,Object> record) {
+        return resolveInternal(memberId, List.of("model." + model + ".read"), model, record, "read");
+    }
+
     private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
                                                   String recordModel, Map<String, Object> record, String nativeAction) {
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
@@ -104,15 +110,18 @@ public class BusinessCommandRecordAuthorization {
         Map<String, Map<Long, PermissionPolicyService.ConditionGuard>> guardsByCode = new HashMap<>();
         for (String code : new java.util.LinkedHashSet<>(codes)) {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
-            if (nativeAction != null && (code.startsWith("model.") || permission == null
+            boolean modelRead = "read".equals(nativeAction);
+            if (nativeAction != null && ((!modelRead && code.startsWith("model."))
+                    || modelRead && !code.equals("model." + model + ".read") || permission == null
                     || !model.equals(permission.getResourceCode())
-                    || !(nativeAction.equals(permission.getAction()) || "manage".equals(permission.getAction())))) {
+                    || !(nativeAction.equals(permission.getAction()) || !modelRead && "manage".equals(permission.getAction())))) {
                 trace.add(step(EvaluationVerdict.DENY, "Native business permission does not own this root/action", code, null, null));
                 continue;
             }
             if (permission == null || permission.getResourceCode() == null || permission.getAction() == null
                     || !("operation".equalsIgnoreCase(permission.getResourceType())
-                         || "data".equalsIgnoreCase(permission.getResourceType()))) {
+                         || "data".equalsIgnoreCase(permission.getResourceType())
+                         || modelRead && "model".equalsIgnoreCase(permission.getResourceType()))) {
                 trace.add(step(EvaluationVerdict.DENY, "Declared business permission is unavailable", code, null, null));
                 continue;
             }

@@ -242,6 +242,22 @@ class BusinessCommandRecordAuthorizationTest {
         return json.writeValueAsString(Map.of("modelCode",MODEL,"readFields",List.of(field),"writeFields",List.of(field)));
     }
 
+    @Test void generatedModelReadUsesTheSameCompleteScopeConditionAndFieldGrant() throws Exception {
+        String code = "model.receipt.read";
+        var definition = permission(code); definition.setResourceType("model"); definition.setResourceCode(MODEL); definition.setAction("read");
+        when(snapshots.resolvePermissionDefinition(100L, code)).thenReturn(definition);
+        var row = grant(11,101,code); row.setFieldScopeJson(json.writeValueAsString(Map.of("modelCode",MODEL,"readFields",List.of("label"),"writeFields",List.of())));
+        when(bindings.findBusinessGrants(100L,1L,5L,code)).thenReturn(List.of(row));
+        when(scopes.resolveScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        guards(code, guard(11,"Shanghai"));
+        var allowed = authorization.resolveModelRead(5L,MODEL,record(1,"Shanghai"));
+        assertThat(allowed.result().granted()).isTrue(); assertThat(allowed.canRead("label")).isTrue();
+        assertThat(allowed.canRead("cost")).isFalse(); assertThat(allowed.canWrite("label")).isFalse();
+        assertThat(authorization.resolveModelRead(5L,MODEL,record(999,"Shanghai")).result().granted()).isFalse();
+        assertThat(authorization.resolveModelRead(5L,MODEL,record(1,"Beijing")).result().granted()).isFalse();
+        assertThat(authorization.resolveNative(5L,List.of(code),MODEL,record(1,"Shanghai"),"update").result().granted()).isFalse();
+    }
+
     private com.auraboot.framework.permission.engine.model.PermissionResult evaluate(Map<String, Object> record) {
         return authorization.evaluate(5L, List.of(CODE), MODEL, record);
     }

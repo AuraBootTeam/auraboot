@@ -88,6 +88,18 @@ public interface DataAccessor extends RecordReadAccessor {
     }
 
     /**
+     * Save one generated artifact to an owner-declared file field of this command's exact root.
+     * Atomically updates that field together with the supplied root changes, retains the bytes,
+     * and establishes their relation. Requires prior public projection of every declared source.
+     * No caller-selected model/PID, arbitrary file reads, or cloud URL signing is exposed.
+     * One artifact per invocation; the capability has the same lifetime as this DataAccessor.
+     */
+    default FileAccessor.SavedFile savePublicArtifact(String fieldCode, String originalName, String contentType,
+                                                     byte[] bytes, Map<String, Object> rootChanges) {
+        throw new UnsupportedOperationException("DataAccessor public artifact persistence is unavailable");
+    }
+
+    /**
      * Query records where a single field is in the provided value set.
      *
      * <p>The default implementation preserves binary/source compatibility for

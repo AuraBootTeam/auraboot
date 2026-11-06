@@ -42,6 +42,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class FileUploadControllerTest {
 
+    @Test
+    void artifact_creator_cannot_bypass_current_read_guard_before_storage_access() {
+        var file = storedFile("generated.txt", "text/plain", "/tmp/generated.txt");
+        file.setCreatedBy(42L); file.setArtifactAuthorization("host-owned-provenance");
+        when(fileService.getFileById("file-pid")).thenReturn(file);
+        org.mockito.Mockito.lenient().when(storageProvider.download("/tmp/generated.txt"))
+                .thenReturn(new ByteArrayInputStream("secret".getBytes(StandardCharsets.UTF_8)));
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("revoked"))
+                .when(fileService).assertFileReadAllowed(file);
+        assertThatThrownBy(() -> controller.downloadFile("file-pid",42L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(() -> controller.getFile("file-pid",42L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(storageProvider, dataAccessAuthorizationHelper);
+    }
+
     @Mock
     private FileService fileService;
 

@@ -44,6 +44,9 @@ public interface BusinessResourceAuthorization {
      */
     default Map<String, Set<String>> publicBusinessResourceFields() { return Map.of(); }
 
+    /** Finite root file fields and maximum artifact bytes; no arbitrary file capability by default. */
+    default Map<String, Integer> businessArtifactFields() { return Map.of(); }
+
     /** Immutable owner lower bound; mutable command metadata cannot substitute a weaker duty. */
     Boundary businessBoundary();
 
