@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.pf4j;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.QueryCondition;
+import com.auraboot.framework.meta.dto.SortField;
 import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -43,7 +44,8 @@ public class BusinessCommandDataAccessorFactory {
             throw new IllegalStateException("Cannot validate business resource transaction", failure);
         }
         var invocationOwner = Objects.requireNonNull(owner.newInvocationAuthorization());
-        if (!Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())) throw denied();
+        if (!Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
+                || !Objects.equals(owner.pagedBusinessResourceRowLimits(), invocationOwner.pagedBusinessResourceRowLimits())) throw denied();
         Scope scope = new Scope(context, invocationOwner, source, holder, connection);
         try {
             scope.verify();
@@ -74,6 +76,9 @@ public class BusinessCommandDataAccessorFactory {
         private final TransactionSynchronization lifetime = new TransactionSynchronization() {};
         private final Accessor accessor = new Accessor();
         private Set<String> dependencies, optionalModels, resultFields;
+        private Map<String,Integer> pagedLimits;
+        private final Map<List<Object>,List<Map<String,Object>>> pagedSnapshots = new HashMap<>();
+        private boolean pagedReadsDirty;
         private record SourceKey(String model, String pid) {}
         private final Map<SourceKey,Long> lockedSources = new HashMap<>();
         private Map<String, Object> root;
@@ -150,6 +155,10 @@ public class BusinessCommandDataAccessorFactory {
             dependencies = Set.copyOf(owner.businessResourceModels());
             resultFields = Set.copyOf(owner.businessResultFields());
             optionalModels = Set.copyOf(owner.optionalBusinessResourceModels());
+            pagedLimits = Map.copyOf(owner.pagedBusinessResourceRowLimits());
+            if (!dependencies.containsAll(pagedLimits.keySet()) || pagedLimits.values().stream().anyMatch(limit -> limit < 1 || limit > 10_000)
+                    || !pagedLimits.isEmpty() && readIsolation != BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ
+                        && readIsolation != BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE) throw denied();
             if (!dependencies.containsAll(optionalModels)) throw denied();
             if (dependencies.isEmpty() || dependencies.size() > 32 || !dependencies.contains(rootModel)
                     || resultFields.isEmpty() || resultFields.size() > 128) throw denied();
@@ -177,7 +186,7 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void reject() { poisoned = true; holder.setRollbackOnly(); }
-        @Override public void close() { active = false; }
+        @Override public void close() { active = false; pagedSnapshots.clear(); }
 
         private <T> T operation(Supplier<T> body) {
             try {
@@ -225,6 +234,8 @@ public class BusinessCommandDataAccessorFactory {
                                  Long expected, Object input, Supplier<T> body) {
             model(model);
             verify();
+            if (action == BusinessResourceAuthorization.Action.CREATE || action == BusinessResourceAuthorization.Action.UPDATE
+                    || action == BusinessResourceAuthorization.Action.DELETE) pagedReadsDirty |= !pagedSnapshots.isEmpty();
             return MetaContext.runWithCommandPermitPlan(pid == null ? "ALL" : "TARGET", expected, model, pid, () -> {
                 var loan = new Loan(model, pid);
                 loans.push(loan);
@@ -308,6 +319,69 @@ public class BusinessCommandDataAccessorFactory {
                         || filters.entrySet().stream().anyMatch(filter -> !equal(row.get(filter.getKey()), filter.getValue()))) throw denied();
             }
             return page.getRecords().stream().map(BusinessResourceAuthorization::snapshot).toList();
+        }
+
+        /** Validate the complete finite set before exposing its count or any requested page. */
+        private DataPage pagedQuery(String model, DataPageQuery query) {
+            model(model);
+            Integer limit = pagedLimits.get(model);
+            if (limit == null || pagedReadsDirty || query == null || query.exactFilters().isEmpty()
+                    || query.exactFilters().size() > 32 || !query.anyOfFilters().isEmpty()
+                    || !query.sorts().isEmpty() || !query.keyword().isEmpty()) throw denied();
+            var request = new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.QUERY,
+                    model, null, null, null, query.exactFilters());
+            var grant = authorize(request);
+            if (query.size() > grant.maximumRows() || !grant.readableFields().containsAll(request.filters().keySet())) throw denied();
+            var key = List.<Object>of(model, request.filters());
+            var rows = pagedSnapshots.get(key);
+            if (rows == null) {
+                List<Map<String,Object>> collected = new ArrayList<>();
+                Set<String> identities = new HashSet<>();
+                Long total = null;
+                int pageNumber = 1;
+                do {
+                    var conditions = request.filters().entrySet().stream().map(entry -> QueryCondition.builder()
+                            .fieldName(entry.getKey()).operator(entry.getValue() == null ? QueryCondition.Operator.IS_NULL : QueryCondition.Operator.EQ)
+                            .value(entry.getValue()).build()).toList();
+                    var nativeRequest = DynamicQueryRequest.builder().pageNum(pageNumber).pageSize(grant.maximumRows())
+                            .conditions(conditions).sortFields(List.of(SortField.builder().fieldName("pid").build())).build();
+                    var page = nativeCall(BusinessResourceAuthorization.Action.QUERY, model, null, null, nativeRequest,
+                            () -> data.list(model, nativeRequest));
+                    if (page == null || page.getRecords() == null || page.getTotal() == null
+                            || page.getTotal() < 0 || page.getTotal() > limit
+                            || !Objects.equals(page.getPage(), pageNumber) || !Objects.equals(page.getPageSize(), grant.maximumRows())
+                            || total != null && !total.equals(page.getTotal())) throw denied();
+                    total = page.getTotal();
+                    long expected = Math.min(grant.maximumRows(), Math.max(0L, total - (long)(pageNumber - 1) * grant.maximumRows()));
+                    if (page.getRecords().size() != expected) throw denied();
+                    rowsRead += page.getRecords().size();
+                    if (rowsRead > 10_000) throw denied();
+                    for (var row : page.getRecords()) {
+                        if (!tenant.toString().equals(String.valueOf(row.get("tenant_id")))
+                                || !(row.get("pid") instanceof String pid) || !identities.add(pid)
+                                || Boolean.TRUE.equals(row.get("deleted_flag"))
+                                || request.filters().entrySet().stream().anyMatch(filter -> !equal(row.get(filter.getKey()), filter.getValue()))) throw denied();
+                        var snapshot = BusinessResourceAuthorization.snapshot(row);
+                        authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.READ,
+                                model, pid, snapshot, null, null));
+                        collected.add(snapshot);
+                    }
+                    pageNumber++;
+                } while (collected.size() < total);
+                rows = List.copyOf(collected);
+                pagedSnapshots.put(key, rows);
+            }
+            long offset = (long)(query.page() - 1) * query.size();
+            List<Map<String,Object>> result = new ArrayList<>();
+            for (long index = offset; index < Math.min((long)rows.size(), offset + query.size()); index++) {
+                var row = rows.get((int)index);
+                var individual = authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.READ,
+                        model, (String)row.get("pid"), row, null, null));
+                Set<String> intersection = new HashSet<>(grant.readableFields());
+                intersection.retainAll(individual.readableFields());
+                result.add(project(row, new BusinessResourceAuthorization.Grant(intersection, Set.of(), 1)));
+            }
+            return new DataPage(List.copyOf(result), rows.size(), query.page(), query.size());
         }
 
         private Map<String, Object> project(Map<String, Object> row, BusinessResourceAuthorization.Grant grant) {
@@ -416,7 +490,7 @@ public class BusinessCommandDataAccessorFactory {
                 });
             }
             @Override public DataPage queryPage(String model, DataPageQuery query) {
-                return operation(() -> { throw denied(); });
+                return operation(() -> pagedQuery(model, query));
             }
             @Override public boolean compareAndSet(String model, String pid, String field, Object expected, Object next) {
                 return operation(() -> { throw denied(); });

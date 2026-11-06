@@ -30,6 +30,13 @@ public interface BusinessResourceAuthorization {
     /** Optional installed dependencies may yield null only on an approved nullable read. */
     default Set<String> optionalBusinessResourceModels() { return Set.of(); }
 
+    /**
+     * Explicit total result-set limits for paged dependency reads (1..10,000 per model).
+     * Default closed. Page size still obeys each operation grant; the shared invocation budget
+     * remains independent. Paged owners must request repeatable-read or serializable isolation.
+     */
+    default Map<String, Integer> pagedBusinessResourceRowLimits() { return Map.of(); }
+
     /** Immutable owner lower bound; mutable command metadata cannot substitute a weaker duty. */
     Boundary businessBoundary();
 

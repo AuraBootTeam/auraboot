@@ -117,7 +117,9 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
                 .permitPlan(new CommandPermitPlan(CommandPermitPlan.Decision.PERMIT,null,null,rootPid,CommandPermitPlan.ScopeGrade.TARGET,rootVersion)).build();
     }
     <T> T command(Function<BusinessCommandDataAccessorFactory.Scope,T> operation) {
-        return new TransactionTemplate(transactions).execute(tx->MetaContext.runWithCommandPermitPlan("TARGET",rootVersion,rootModel,rootPid,()->
+        var template = new TransactionTemplate(transactions);
+        if (owner.paged) template.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        return template.execute(tx->MetaContext.runWithCommandPermitPlan("TARGET",rootVersion,rootModel,rootPid,()->
                 MetaContext.runWithAuthorizedCommandCode("fixture:receipt_confirm",()->{
                     try(var scope=factory.open(context(),owner)) {return operation.apply(scope);}
                 })));
@@ -211,8 +213,54 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         assertThat(failure).isInstanceOf(UnexpectedRollbackException.class);
     }
 
+    @Test void moreThanOneThousandRowsPageWithoutModelGrantsOrSecretFields() {
+        owner.paged = true;
+        jdbc.update("INSERT INTO " + physicalTables.get(lineModel)
+                + " (id,pid,tenant_id," + parent + "," + qty + "," + cost + ",row_version,deleted_flag,created_by,created_at,updated_at)"
+                + " SELECT ?+g,'paged-'||lpad(g::text,6,'0'),?,?,?,'PAGED-SECRET',0,false,?,now(),now() FROM generate_series(1,1004) g",
+                com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),getTestTenant().getId(),rootPid,"5",getTestUser().getId());
+        command(scope -> {
+            var identities = new HashSet<String>();
+            for(int number=1;number<=3;number++) {
+                var page=scope.accessor().queryPage(lineModel,new DataPageQuery(Map.of(parent,rootPid),Map.of(),List.of(),number,500));
+                assertThat(page.total()).isEqualTo(1005);
+                assertThat(page.records()).hasSize(number<3 ? 500 : 5).allSatisfy(row -> {
+                    assertThat(row).containsEntry(parent,rootPid).doesNotContainKey(cost);
+                    assertThat(identities.add((String)row.get("pid"))).isTrue();
+                });
+            }
+            assertThat(identities).hasSize(1005);return null;
+        });
+        assertThat(permissions.canAction(getTestTenantMember().getId(),lineModel,"read")).isFalse();
+    }
+    @Test void aDeniedRowBeyondTheRequestedPageRollsBackEarlierWrites() {
+        owner.paged=true;
+        var forbidden=seed(lineModel,Map.of(parent,rootPid,qty,"9",cost,"FORBIDDEN-SECRET"));
+        owner.deniedLine=(String)forbidden.get("pid");
+        assertThatThrownBy(()->command(scope->{
+            scope.accessor().update(lineModel,linePid,Map.of(qty,"3"));
+            scope.accessor().queryPage(lineModel,new DataPageQuery(Map.of(parent,rootPid),Map.of(),List.of(),1,1));return null;
+        })).isInstanceOf(DataAccessorException.class);
+        assertThat(storedQty()).isEqualTo("2");assertThat(ledgerCount()).isZero();
+    }
+    @Test void writesInvalidateAnAlreadyReadPagedSnapshotAndRollBack() {
+        owner.paged=true;
+        assertThatThrownBy(()->command(scope->{
+            var query=new DataPageQuery(Map.of(parent,rootPid),Map.of(),List.of(),1,1);
+            scope.accessor().queryPage(lineModel,query);
+            scope.accessor().update(lineModel,linePid,Map.of(qty,"3"));
+            scope.accessor().queryPage(lineModel,query);return null;
+        })).isInstanceOf(DataAccessorException.class);
+        assertThat(storedQty()).isEqualTo("2");
+    }
+
     class Owner implements CommandHandlerExtension,BusinessResourceAuthorization {
         Runnable onUpdate;
+        boolean paged;
+        int pagedLimit = 2000;
+        String deniedLine;
+        public ReadIsolation resourceReadIsolation(){return paged ? ReadIsolation.REPEATABLE_READ : null;}
+        public Map<String,Integer> pagedBusinessResourceRowLimits(){return paged ? Map.of(lineModel,pagedLimit) : Map.of();}
         public String getCommandType(){return "fixture:receipt_confirm";}
         public Object execute(CommandContext context){throw new AssertionError("Not a product handler fixture");}
         public Boundary businessBoundary(){return new Boundary("fixture:receipt_confirm",rootModel,"update",Set.of("fixture.receipt.confirm"));}
@@ -221,7 +269,8 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         Set<String> read(String... fields){var set=new HashSet<>(Set.of("pid","tenant_id","row_version"));set.addAll(List.of(fields));return set;}
         public Grant authorizeResource(TargetAuthorizationContext root,Request request){
             if(request.action()==Action.READ && rootModel.equals(request.modelCode()) && rootPid.equals(request.recordId()))return new Grant(read(rootLabel),Set.of(),1);
-            if(request.action()==Action.QUERY && lineModel.equals(request.modelCode()) && Map.of(parent,rootPid).equals(request.filters()))return new Grant(read(parent,qty),Set.of(),10);
+            if(request.action()==Action.QUERY && lineModel.equals(request.modelCode()) && Map.of(parent,rootPid).equals(request.filters()))return new Grant(read(parent,qty),Set.of(),paged ? 500 : 10);
+            if(request.action()==Action.READ && request.recordId()!=null && request.recordId().equals(deniedLine)) return null;
             if(lineModel.equals(request.modelCode()) && rootPid.equals(request.record().get(parent))){
                 if(request.action()==Action.READ)return new Grant(read(parent,qty),Set.of(),1);
                 if(request.action()==Action.UPDATE){if(onUpdate!=null){var task=onUpdate;onUpdate=null;task.run();}return new Grant(read(parent,qty),Set.of(qty),1);}

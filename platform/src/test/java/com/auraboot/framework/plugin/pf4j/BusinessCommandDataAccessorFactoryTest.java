@@ -302,11 +302,99 @@ class BusinessCommandDataAccessorFactoryTest {
         assertThat(holder.isRollbackOnly()).isTrue();
     }
 
+    private void pagedOwner() throws Exception {
+        owner.pagedLimits = Map.of("line", 4);
+        owner.readIsolation = BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+        when(connection.getTransactionIsolation()).thenReturn(Connection.TRANSACTION_REPEATABLE_READ);
+    }
+    private DataPageQuery page(int number) {
+        return new DataPageQuery(Map.of("parent", "root-1"), Map.of(), List.of(), number, 2);
+    }
+    @Test void explicitlyBoundedPagesRetainCompleteCountsAndProjectEveryRow() throws Exception {
+        pagedOwner();
+        var second = row("line-2", Map.of("parent", "root-1", "qty", 3, "secret_cost", 81));
+        var third = row("line-3", Map.of("parent", "root-1", "qty", 4, "secret_cost", 82));
+        when(data.list(eq("line"), any())).thenAnswer(call -> {
+            DynamicQueryRequest request = call.getArgument(1);
+            assertThat(request.getSortFields()).singleElement().satisfies(sort -> assertThat(sort.getFieldName()).isEqualTo("pid"));
+            return request.getPageNum() == 1 ? new PaginationResult<>(List.of(line, second), 3L, 1, 2)
+                    : new PaginationResult<>(List.of(third), 3L, 2, 2);
+        });
+        command(scope -> {
+            var first = scope.accessor().queryPage("line", page(1));
+            var next = scope.accessor().queryPage("line", page(2));
+            assertThat(first.total()).isEqualTo(3); assertThat(next.total()).isEqualTo(3);
+            assertThat(first.records()).hasSize(2).allSatisfy(row -> assertThat(row).doesNotContainKey("secret_cost"));
+            assertThat(next.records()).singleElement().satisfies(row -> assertThat(row).containsEntry("qty", 4).doesNotContainKey("secret_cost"));
+            return null;
+        });
+        assertThat(holder.isRollbackOnly()).isFalse();
+    }
+    @Test void pagedTotalsCannotExceedTheOwnerLimit() throws Exception {
+        pagedOwner();
+        when(data.list(eq("line"), any())).thenReturn(new PaginationResult<>(List.of(line), 5L, 1, 2));
+        command(scope -> { denied(() -> scope.accessor().queryPage("line", page(1))); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void foreignRowsCannotLeakThroughAnApprovedPagedFilter() throws Exception {
+        pagedOwner();
+        when(data.list(eq("line"), any())).thenReturn(new PaginationResult<>(List.of(row("other", Map.of("parent", "other-root"))), 1L, 1, 2));
+        command(scope -> { denied(() -> scope.accessor().queryPage("line", page(1))); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void anUnrequestedForeignPagePreventsReturningEvenTheFirstPageAndCount() throws Exception {
+        pagedOwner();
+        when(data.list(eq("line"), any())).thenReturn(
+                new PaginationResult<>(List.of(line, row("line-2", Map.of("parent", "root-1"))), 3L, 1, 2),
+                new PaginationResult<>(List.of(row("line-3", Map.of("parent", "foreign"))), 3L, 2, 2));
+        command(scope -> { denied(() -> scope.accessor().queryPage("line", page(1))); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void inconsistentTotalsCannotCreateAPartialSnapshot() throws Exception {
+        pagedOwner();
+        when(data.list(eq("line"), any())).thenReturn(
+                new PaginationResult<>(List.of(line, row("line-2", Map.of("parent", "root-1"))), 3L, 1, 2),
+                new PaginationResult<>(List.of(row("line-3", Map.of("parent", "root-1"))), 4L, 2, 2));
+        command(scope -> { denied(() -> scope.accessor().queryPage("line", page(1))); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void pagedReadsAreClosedByDefaultBeforeAnyNativeList() {
+        command(scope -> { denied(() -> scope.accessor().queryPage("line", page(1))); return null; });
+        verify(data, never()).list(anyString(), any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"empty", "sort", "keyword", "any", "oversize"})
+    void pagedReadsRejectUnreviewedQueryDimensionsBeforeNativeExecution(String variant) throws Exception {
+        pagedOwner();
+        var query = new DataPageQuery(variant.equals("empty") ? Map.of() : Map.of("parent", "root-1"),
+                variant.equals("any") ? Map.of("qty", List.<Object>of(1,2)) : Map.of(),
+                variant.equals("sort") ? List.of(new DataPageQuery.Sort("pid",false)) : List.of(),
+                1,variant.equals("oversize") ? 3 : 2,variant.equals("keyword") ? "secret" : "");
+        command(scope -> { denied(() -> scope.accessor().queryPage("line", query)); return null; });
+        verify(data,never()).list(anyString(),any());
+    }
+    @Test void pagedOwnersCannotUseReadCommittedOrBroadenTheInvocationDeclaration() throws Exception {
+        owner.pagedLimits=Map.of("line",4);
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void aFreshInvocationCannotRaiseTheRegisteredPagedBudget() throws Exception {
+        pagedOwner();
+        var replacement=new Owner();replacement.readIsolation=owner.readIsolation;replacement.pagedLimits=Map.of("line",8);
+        owner.invocation=replacement;
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
     static final class Owner implements CommandHandlerExtension, BusinessResourceAuthorization {
         RecordReadAccessor captured;
         String extraWrite;
         boolean inspectLockedLine, optionalReference;
         ReadIsolation readIsolation;
+        Map<String,Integer> pagedLimits = Map.of();
+        BusinessResourceAuthorization invocation;
+        public BusinessResourceAuthorization newInvocationAuthorization() { return invocation == null ? this : invocation; }
+        public Map<String,Integer> pagedBusinessResourceRowLimits() { return pagedLimits; }
         public ReadIsolation resourceReadIsolation() { return readIsolation; }
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }
         public String getCommandType() { return "receipt.confirm"; }
