@@ -9,6 +9,9 @@ import com.auraboot.framework.conversation.TurnOutcome;
  */
 public interface PendingContinuationService {
 
+    /** Persist truthful terminal tool results before acknowledging a denial or cancellation. */
+    void completeRejectedChatTool(PendingToolSnapshot pending, String reason);
+
     TurnOutcome resumeApprovedChatTool(TurnContext ctx,
                                        PendingToolSnapshot pending,
                                        ResponseSink sink);

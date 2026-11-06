@@ -629,11 +629,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                         ctx, pending, capturingSink);
                 case DENIED -> {
                     String reason = "User denied the operation";
+                    pendingContinuationService.completeRejectedChatTool(pending, reason);
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted(reason, "user_denied");
                 }
                 case CANCELLED -> {
                     String reason = "User cancelled the operation";
+                    pendingContinuationService.completeRejectedChatTool(pending, reason);
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted(reason, "user_cancelled");
                 }

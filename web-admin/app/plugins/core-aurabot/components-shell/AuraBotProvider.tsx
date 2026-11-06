@@ -20,7 +20,8 @@ import React, {
 } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
-import type { FormFillTarget } from '~/framework/meta/rendering/formFill';
+import type { FormFillTarget, FormFillField, FormFillResult, FormFillReview } from '~/framework/meta/rendering/formFill';
+import { isExplicitFormFillRequest } from '~/framework/meta/rendering/formFillIntent';
 import type { PageContext } from '../hooks/usePageContext';
 import {
   auraBotApi,
@@ -278,6 +279,8 @@ export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMes
     retrievalEvidence: message.retrievalEvidence,
   });
   for (const [index, contract] of (message.resultContracts ?? []).entries()) {
+    // Draft fields belong to the transient form receipt, never a raw protocol card.
+    if (contract.skillCode === 'platform.fill_form' && contract.data?.action === 'form_fill') continue;
     out.push({
       id: `db-${message.id}-result-${index}`,
       type: 'result_contract',
@@ -451,6 +454,11 @@ export interface ChatImageAttachment {
 }
 
 interface AuraBotContextValue {
+  hasActiveForm?: boolean;
+  formFillNotice?: string;
+  formFillNoticeRole?: 'status' | 'alert';
+  formFillReceipt?: { result: FormFillResult; fields: FormFillField[] };
+  undoFormFill?: () => void;
   executionState?: 'idle' | 'checking' | 'running' | 'unavailable';
   reloadExecutionState?: () => void;
   state: AuraBotState;
@@ -586,6 +594,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const params = useParams();
   const formFillTargetRef = useRef<FormFillTarget | null>(null);
   const formFillTargetsRef = useRef<FormFillTarget[]>([]);
+  const [activeFormTarget, setActiveFormTarget] = React.useState<FormFillTarget | null>(null);
+  const [formFillNotice, setFormFillNotice] = React.useState('');
+  const [formFillNoticeRole, setFormFillNoticeRole] = React.useState<'status' | 'alert'>('alert');
+  const [formFillReceipt, setFormFillReceipt] = React.useState<{
+    target: FormFillTarget; sessionId: string; result: FormFillResult; fields: FormFillField[];
+  } | null>(null);
+  useEffect(() => { setFormFillReceipt(null); setFormFillNotice(''); }, [state.sessionId]);
 
   // History responses may arrive after a new turn, agent selection or explicit reset.
   // Read the live session as well as the eager conversation ref before hydrating.
@@ -712,6 +727,8 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
   // Message actions
   const clearMessages = useCallback(() => {
+    setFormFillReceipt(null);
+    setFormFillNotice('');
     dispatch({ type: 'clear_messages' });
   }, []);
 
@@ -864,6 +881,33 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
 
       const fillTarget = formFillTargetRef.current;
       const fillTargetId = fillTarget?.snapshot().targetId;
+      const explicitFormFill = isExplicitFormFillRequest(content);
+      const feedback = (key: string, zh: string, en: string) => t(key, undefined, locale.startsWith('zh') ? zh : en);
+      setFormFillNotice('');
+      setFormFillNoticeRole('alert');
+      if (explicitFormFill) setFormFillReceipt(null);
+      if (explicitFormFill && (!fillTarget || !fillTarget.undo)) {
+        setFormFillNotice(feedback('aurabot.formFill.noForm', '请先打开可编辑表单，再要求填写当前表单。', 'Open an editable form before requesting a draft fill.'));
+        return;
+      }
+      if (explicitFormFill && state.selectedAgentCode !== 'aurabot') {
+        setFormFillNotice(feedback('aurabot.formFill.platformOnly', '当前表单填写使用平台助手，请在上方选择 AuraBot 后重新发送。', 'Select AuraBot above to fill the current form draft.'));
+        return;
+      }
+      const formFill = explicitFormFill ? fillTarget!.snapshot() : undefined;
+      if (formFill) {
+        formFill.fields = formFill.fields.filter(field => !field.locked);
+        if (!formFill.fields.length || hasAttachments || analyticsExecution) {
+          setFormFillNotice(feedback('aurabot.formFill.unavailable', '当前无法填写草稿，请确认有可编辑字段并提供文字纪要。', 'Draft fill requires editable fields and text notes.'));
+          return;
+        }
+      }
+      const proposals: Record<string, unknown> = Object.create(null);
+      const reviews: Record<string, FormFillReview> = Object.create(null);
+      const seenFillTools = new Set<string>();
+      let fillFailed = false;
+      let receivedFill = false;
+      const fillError = () => feedback('aurabot.formFill.failed', '本次未填写草稿。请核对原文依据后重新发起，已有内容保持不变。', 'The draft was not filled. Check the source text and send a new request; existing values are unchanged.');
       const { conversationId } = await ensureConversation();
 
       // userMsgId doubles as the server-side dedup key (clientMsgId on
@@ -894,6 +938,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             conversationId,
             clientMsgId: userMsgId,
             analyticsExecution,
+            formFill,
             knowledgeBaseIds:
               state.selectedKnowledgeBaseIds.length > 0
                 ? state.selectedKnowledgeBaseIds
@@ -930,12 +975,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               refreshConversations().catch(() => {});
             },
             onError: (error: string, traceId?: string) => {
+              if (explicitFormFill) fillFailed = true;
               dispatch({
                 type: 'update_message',
                 payload: {
                   id: botMsgId,
                   type: 'error',
-                  content: analyticsExecution ? analyticsError : error,
+                  content: explicitFormFill ? fillError() : analyticsExecution ? analyticsError : error,
                   traceId,
                 },
               });
@@ -943,6 +989,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               refreshConversations().catch(() => {});
             },
             onToolStart: (toolId: string, toolName: string, input: Record<string, any>) => {
+              if (explicitFormFill) return;
               dispatch({
                 type: 'add_tool_message',
                 payload: {
@@ -958,6 +1005,24 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               });
             },
             onToolResult: (toolId: string, result: Record<string, any>, _success: boolean) => {
+              const data = result?.data || result;
+              if (explicitFormFill) {
+                if (seenFillTools.has(toolId)) return;
+                seenFillTools.add(toolId);
+                const allowed = new Set(formFill!.fields.map(field => field.code));
+                if (!_success || data?.action !== 'form_fill' || !data.fields || !data.reviews
+                    || !Object.keys(data.fields).every(code => allowed.has(code) && data.reviews[code]?.status === 'supported')
+                    || !Object.entries(data.reviews).every(([code, review]: [string, any]) => allowed.has(code)
+                      && ['supported', 'ambiguous'].includes(review?.status)
+                      && typeof review?.quote === 'string' && review.quote.trim() && content.includes(review.quote))) {
+                  fillFailed = true;
+                  return;
+                }
+                Object.assign(proposals, data.fields);
+                Object.assign(reviews, data.reviews);
+                receivedFill = Object.keys(proposals).length > 0 || Object.keys(reviews).length > 0;
+                return;
+              }
               dispatch({
                 type: 'update_tool_message',
                 payload: {
@@ -965,15 +1030,10 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   updates: { type: 'tool_result', content: '', toolResult: result, toolSuccess: _success },
                 },
               });
-              // Handle form_fill action — populate the current page's form
-              const data = result?.data || result;
-              if (_success && data?.action === 'form_fill' && data?.fields
-                  && fillTarget && formFillTargetRef.current === fillTarget
-                  && fillTarget.snapshot().targetId === fillTargetId) {
-                fillTarget.apply(data.fields);
-              }
+              // Ordinary conversation never authorizes draft mutation.
             },
             onResultContract: (contract) => {
+              if (explicitFormFill) return;
               dispatch({
                 type: 'add_tool_message',
                 payload: {
@@ -1019,6 +1079,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
               pendingTurnId: string,
               extension?: Record<string, any>,
             ) => {
+              if (explicitFormFill) { fillFailed = true; return; }
               // C-5 T7: detect skill confirmations and route to
               // SkillPreviewCard instead of generic ConfirmCard. Backend
               // sets extension._aurabot_skill=true; we treat a colon in the
@@ -1069,13 +1130,24 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             },
           },
         );
+        if (explicitFormFill) {
+          if (fillFailed || !receivedFill) {
+            setFormFillNotice(fillError());
+          } else if (formFillTargetRef.current !== fillTarget || fillTarget!.snapshot().targetId !== fillTargetId
+              || stateRef.current.sessionId !== state.sessionId) {
+            setFormFillNotice(feedback('ai.fill.target_changed', '页面或会话已切换，本次结果未填入。', 'The page or conversation changed; no fields were filled.'));
+          } else {
+            const result = fillTarget!.apply(proposals, reviews, 'chat');
+            setFormFillReceipt({ target: fillTarget!, sessionId: state.sessionId, result, fields: formFill!.fields });
+          }
+        }
       } catch (e: any) {
         dispatch({
           type: 'update_message',
           payload: {
             id: botMsgId,
             type: 'error',
-            content: analyticsExecution ? analyticsError : e.message || 'Chat failed',
+            content: explicitFormFill ? fillError() : analyticsExecution ? analyticsError : e.message || 'Chat failed',
           },
         });
         dispatch({ type: 'set_loading', payload: false });
@@ -1089,6 +1161,7 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       ensureConversation,
       refreshConversations,
       locale,
+      t,
       state.isLoading,
       state.sessionId,
       state.selectedAgentCode,
@@ -1328,13 +1401,33 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
   const registerFormFillTarget = useCallback((target: FormFillTarget) => {
     formFillTargetsRef.current = [...formFillTargetsRef.current.filter((item) => item !== target), target];
     formFillTargetRef.current = target;
+    setActiveFormTarget(target);
+    setFormFillReceipt(null);
+    setFormFillNotice('');
     return () => {
       formFillTargetsRef.current = formFillTargetsRef.current.filter((item) => item !== target);
       formFillTargetRef.current = formFillTargetsRef.current.at(-1) ?? null;
+      setActiveFormTarget(formFillTargetRef.current);
+      setFormFillReceipt(null);
+      setFormFillNotice('');
     };
   }, []);
 
   const value: AuraBotContextValue = {
+    hasActiveForm: Boolean(activeFormTarget),
+    formFillNotice,
+    formFillNoticeRole,
+    formFillReceipt: formFillReceipt?.target === activeFormTarget && formFillReceipt?.sessionId === state.sessionId
+      ? { result: formFillReceipt.result, fields: formFillReceipt.fields } : undefined,
+    undoFormFill: () => {
+      if (formFillReceipt?.target !== formFillTargetRef.current || formFillReceipt?.sessionId !== state.sessionId) return;
+      formFillReceipt.target.undo?.();
+      setFormFillReceipt(null);
+      setFormFillNoticeRole('status');
+      setFormFillNotice(t('aurabot.formFill.undone', undefined, locale.startsWith('zh')
+        ? '已撤销本次填写中未被人工改动的值，后续人工修改已保留。'
+        : 'Undid this fill where values were unchanged; later manual edits were preserved.'));
+    },
     state: { ...state, isLoading: state.isLoading || executionState !== 'idle' },
     executionState,
     reloadExecutionState: () => setExecutionCheck(n => n + 1),

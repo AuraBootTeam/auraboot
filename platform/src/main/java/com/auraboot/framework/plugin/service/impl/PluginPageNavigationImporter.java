@@ -142,6 +142,18 @@ final class PluginPageNavigationImporter {
                     "Menu '" + dto.getCode() + "' has dynamic path '" + path
                     + "' but missing pageKey. Add pageKey to menus.json.");
         }
+        // Validate: a declared pageKey is the routing contract. The web runtime serves DSL
+        // pages at /p/<pageKey>; a menu path that disagrees silently 404s for everyone the
+        // menu reaches (the 2026-11-05 score-import finding). Fail the import instead.
+        if (dto.getPageKey() != null && !dto.getPageKey().isBlank()
+                && path != null && !path.isBlank()
+                && dto.getType() != null && dto.getType() == 2
+                && !path.equals("/p/" + dto.getPageKey())) {
+            throw new PluginException(
+                    "Menu '" + dto.getCode() + "' declares pageKey '" + dto.getPageKey()
+                    + "' but path '" + path + "' does not match the page route '/p/"
+                    + dto.getPageKey() + "'. Align the menu path with its pageKey in menus.json.");
+        }
 
         boolean exists = facadeReceiver.checkMenuExists(tenantId, dto.getCode());
 

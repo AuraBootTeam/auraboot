@@ -1,8 +1,20 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { ConfirmCard } from '../ConfirmCard';
+
+const {get} = vi.hoisted(() => ({get: vi.fn()}));
+vi.mock('~/shared/services/http-client', () => ({get}));
+get.mockImplementation(async (path: string) => {
+  if (path === '/api/agent/tools/registry') return {code: '0', data: {tools: [
+    {toolCode: 'cmd:crm:update_account', modelCode: 'crm_account'},
+    {toolCode: 'cmd:private:create_record', modelCode: 'private_record'},
+  ]}};
+  if (path === '/api/dynamic/crm_account/field-meta') return {code: '0', data: [{code: 'crm_acc_name', displayName: '名称'}]};
+  if (path === '/api/dynamic/private_record/field-meta') return {code: '0', data: [{code: 'private_name', displayName: '名称'}]};
+  throw new Error('Unexpected metadata request');
+});
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -61,7 +73,7 @@ describe('ConfirmCard', () => {
     expect(card).not.toHaveTextContent('private_model');
   });
 
-  it('keepsConfirmationCallbacksAndLocalizedLabels', () => {
+  it('keepsConfirmationCallbacksAndLocalizedLabels', async () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
     render(
@@ -75,6 +87,7 @@ describe('ConfirmCard', () => {
       />,
     );
 
+    await waitFor(() => expect(screen.getByTestId('aurabot-confirm-approve')).toBeEnabled());
     fireEvent.click(screen.getByTestId('aurabot-confirm-approve'));
     fireEvent.click(screen.getByTestId('aurabot-confirm-cancel'));
     expect(onConfirm).toHaveBeenCalledWith('tool-2');
@@ -86,13 +99,14 @@ describe('ConfirmCard', () => {
 
 
 describe('L3 approval envelope', () => {
-  it('shows business parameters without exposing approval transport metadata', () => {
+  it('shows business parameters without exposing approval transport metadata', async () => {
     const confirm = vi.fn();
     render(<ConfirmCard toolId="approval-secret" toolName="agent_approval_gate"
       description="This tool requires human approval. Approval request approval-secret has been created."
       input={{ toolName: 'cmd_private_create_record', input: { private_name: '验收记录' } }}
       onConfirm={confirm} onCancel={() => {}} />);
     const card = screen.getByTestId('aurabot-confirm-card');
+    await screen.findByText('验收记录');
     expect(card).toHaveTextContent('审批业务操作');
     expect(card).toHaveTextContent('名称');
     expect(card).toHaveTextContent('验收记录');
