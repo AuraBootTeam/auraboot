@@ -17,6 +17,8 @@ export interface DagCanvasBlockRendererProps {
 
 export type DeliveryNodeStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
 
+type Localized = string | Record<string, string>
+
 type NodeConfig = {
   key: string
   label: string | Record<string, string>
@@ -35,6 +37,21 @@ type NodeConfig = {
   failedStatuses?: string[]
   /** The node is complete unconditionally (a fact completed before the run started). */
   alwaysComplete?: boolean
+  // ---- Node detail panel (contract facts; static per node key) ----
+  /** What kind of task this node represents (TaskType row). */
+  taskType?: Localized
+  /** What the node may touch (副作用 row). */
+  effect?: Localized
+  /** Record field paths resolved as the node's 输入 row. */
+  inputFields?: string[]
+  /** Record field paths resolved as the node's 输出 row. */
+  outputFields?: string[]
+  /** Who may retry this node (重试 owner row). */
+  retryOwner?: Localized
+  /** The retry boundary contract (重试边界 row). */
+  retryBoundary?: Localized
+  /** Persistent note under the facts (e.g. an approval wait occupies no worker). */
+  notice?: Localized
 }
 
 type TerminalConfig = {
@@ -48,7 +65,38 @@ type DagCanvasConfig = {
   statusField?: string
   nodes?: NodeConfig[]
   terminal?: TerminalConfig[]
+  /** Record field holding worker-attested per-phase timings (orb_drun_phases); entries
+   * are matched to nodes by their phase/name/key field and shown as the 耗时 row. */
+  phasesField?: string
+  /** Shown in the side-panel area while no node is selected. */
+  hint?: Localized
 }
+
+const STATUS_WORD: Record<DeliveryNodeStatus, Localized> = {
+  pending: { 'zh-CN': '待触发', en: 'Pending' },
+  running: { 'zh-CN': '运行中', en: 'Running' },
+  completed: { 'zh-CN': '已完成', en: 'Completed' },
+  failed: { 'zh-CN': '失败', en: 'Failed' },
+  skipped: { 'zh-CN': '跳过', en: 'Skipped' },
+}
+
+const NODE_STATUS_PILL: Record<DeliveryNodeStatus, string> = {
+  pending: 'border-border bg-panel text-text-2',
+  running: 'border-status-blue bg-status-blue-bg text-status-blue',
+  completed: 'border-status-green bg-status-green-bg text-status-green',
+  failed: 'border-status-red bg-status-red-bg text-status-red',
+  skipped: 'border-border bg-panel text-text-2',
+}
+
+const ROW_LABELS = {
+  taskType: { 'zh-CN': 'TaskType', en: 'TaskType' },
+  effect: { 'zh-CN': '副作用', en: 'Effect' },
+  inputs: { 'zh-CN': '输入', en: 'Inputs' },
+  outputs: { 'zh-CN': '输出', en: 'Outputs' },
+  retryOwner: { 'zh-CN': '重试 owner', en: 'Retry owner' },
+  retryBoundary: { 'zh-CN': '重试边界', en: 'Retry boundary' },
+  duration: { 'zh-CN': '耗时', en: 'Duration' },
+} satisfies Record<string, Localized>
 
 /**
  * Derives per-node runtime statuses from the record, honoring conditional
@@ -97,6 +145,44 @@ export function deriveDeliveryNodeStatuses(
   return map
 }
 
+/** Parses the worker-attested phases list (JSON string or already-decoded array). */
+export function parsePhasesList(value: unknown): Record<string, unknown>[] {
+  let parsed = value
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed)
+    } catch {
+      return []
+    }
+  }
+  return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : []
+}
+
+/** Seconds attested by a phase entry; worker entries carry `seconds`, ms fields are normalized. */
+export function phaseSeconds(entry: Record<string, unknown> | null): number | null {
+  if (!entry) return null
+  const direct = entry.seconds ?? entry.elapsedSeconds
+  if (direct !== undefined && direct !== null && direct !== '') {
+    const n = Number(direct)
+    if (!Number.isNaN(n)) return n
+  }
+  const ms = entry.elapsedMs ?? entry.durationMs
+  if (ms !== undefined && ms !== null && ms !== '') {
+    const n = Number(ms)
+    if (!Number.isNaN(n)) return Math.round(n / 1000)
+  }
+  return null
+}
+
+function phaseForEntry(
+  phases: Record<string, unknown>[],
+  key: string,
+): Record<string, unknown> | null {
+  return (
+    phases.find((entry) => String(entry.phase ?? entry.name ?? entry.key ?? '') === key) || null
+  )
+}
+
 /** The card seeds the shared designer store, then renders the readonly canvas. */
 function FlowCanvasCard({
   nodes,
@@ -122,8 +208,86 @@ function FlowCanvasCard({
   )
 }
 
+/** Side panel: contract facts per node + live values resolved from the run record. */
+function NodeDetailPanel({
+  node,
+  status,
+  phases,
+  record,
+  locale,
+  t,
+}: {
+  node: NodeConfig
+  status: DeliveryNodeStatus
+  phases: Record<string, unknown>[]
+  record: Record<string, unknown>
+  locale: string
+  t: (key: string) => string
+}) {
+  const localizedLabel = (label: Localized | undefined) =>
+    label === undefined ? '-' : getLocalizedText(label, locale, t)
+  const fieldList = (fields: string[] | undefined) => {
+    if (!fields || fields.length === 0) return '-'
+    const parts = fields
+      .map((field) => {
+        const value = readPath(record, field)
+        return value === null || value === undefined || value === '' ? null : `${field}=${String(value)}`
+      })
+      .filter(Boolean)
+    return parts.length > 0 ? parts.join('，') : '-'
+  }
+  const seconds = phaseSeconds(phaseForEntry(phases, node.key))
+  const rows: Array<{ label: Localized; value: string }> = [
+    { label: ROW_LABELS.taskType, value: node.taskType ? localizedLabel(node.taskType) : '-' },
+    { label: ROW_LABELS.effect, value: node.effect ? localizedLabel(node.effect) : '-' },
+    { label: ROW_LABELS.inputs, value: fieldList(node.inputFields) },
+    { label: ROW_LABELS.outputs, value: fieldList(node.outputFields) },
+    {
+      label: ROW_LABELS.retryOwner,
+      value: node.retryOwner ? localizedLabel(node.retryOwner) : '-',
+    },
+    {
+      label: ROW_LABELS.retryBoundary,
+      value: node.retryBoundary ? localizedLabel(node.retryBoundary) : '-',
+    },
+    { label: ROW_LABELS.duration, value: seconds === null ? '—' : `${seconds}s` },
+  ]
+  return (
+    <aside
+      className="rounded-card border-border bg-panel border lg:w-80 lg:shrink-0"
+      data-testid="dag-node-panel"
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+        <h4 className="text-text text-sm font-semibold">{getLocalizedText(node.label, locale, t)}</h4>
+        <span
+          className={`rounded-pill inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold ${NODE_STATUS_PILL[status]}`}
+        >
+          {getLocalizedText(STATUS_WORD[status] ?? status, locale, t)}
+        </span>
+      </div>
+      <dl className="space-y-2.5 p-3">
+        {rows.map((row) => (
+          <div key={String(row.label)}>
+            <dt className="text-text-2 text-xs font-medium">{getLocalizedText(row.label, locale, t)}</dt>
+            <dd className="text-text mt-0.5 text-sm break-words">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {node.notice ? (
+        <p className="text-text-2 border-t border-border px-4 py-3 text-xs leading-5">
+          {getLocalizedText(node.notice, locale, t)}
+        </p>
+      ) : null}
+    </aside>
+  )
+}
+
 export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ block, runtime }) => {
   useRuntimeStateSubscription(runtime)
+  // The readonly canvas routes clicks into the shared designer store; the panel
+  // mirrors whatever node is selected there (FlowCanvas clears it on unmount).
+  // Hooks stay above the empty-nodes early return.
+  const selectedNodeId = useFlowStore((store) => store.selectedNodeId)
   const context = runtime.getContext()
   const locale = context.locale || 'zh-CN'
   const t = context.t || ((key: string) => key)
@@ -156,6 +320,8 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
   const activeTerminal = (config.terminal ?? []).find(
     (terminal) => String(readPath(record, terminal.field) ?? '') === terminal.value,
   )
+  const selectedNode = nodes.find((node) => node.key === selectedNodeId) || null
+  const phases = config.phasesField ? parsePhasesList(readPath(record, config.phasesField)) : []
 
   return (
     <section
@@ -175,12 +341,41 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
           </span>
         ) : null}
       </div>
-      <FlowCanvasCard
-        nodes={flowNodes}
-        edges={flowEdges}
-        statusMap={statusMap}
-        className="h-44 rounded-control border-border border"
-      />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+        <div className="min-w-0 lg:flex-1">
+          <FlowCanvasCard
+            nodes={flowNodes}
+            edges={flowEdges}
+            statusMap={statusMap}
+            className="h-44 rounded-control border-border border"
+          />
+        </div>
+        {selectedNode ? (
+          <NodeDetailPanel
+            key={selectedNode.key}
+            node={selectedNode}
+            status={statusMap[selectedNode.key] || 'pending'}
+            phases={phases}
+            record={record}
+            locale={locale}
+            t={t}
+          />
+        ) : (
+          <aside
+            className="rounded-card border-border bg-panel text-text-2 flex items-center border border-dashed p-4 text-xs leading-5 lg:w-80 lg:shrink-0"
+            data-testid="dag-node-panel-empty"
+          >
+            {getLocalizedText(
+              config.hint || {
+                'zh-CN': '点击节点查看输入、合同与结果',
+                en: 'Select a node to inspect inputs, contract and result',
+              },
+              locale,
+              t,
+            )}
+          </aside>
+        )}
+      </div>
     </section>
   )
 }
