@@ -236,6 +236,33 @@ class PluginDirectoryLoaderTest {
     // ==================== Invalid JSON Files ====================
 
     @Test
+    @DisplayName("Page files fail closed: one malformed page aborts the load instead of silently dropping it")
+    void shouldFailClosedOnMalformedPageFile() throws IOException {
+        Path pagesDir = tempDir.resolve("config/pages");
+        Files.createDirectories(pagesDir);
+        Files.writeString(tempDir.resolve("plugin.json"), """
+                {"pluginId":"com.test.pages","namespace":"pgt","version":"1.0.0",
+                 "resourceDirs":{"pages":"config/pages"}}
+                """);
+        Files.writeString(pagesDir.resolve("01_valid.json"), """
+                {"pageKey":"pgt_valid","modelCode":"pgt_thing","kind":"list","schemaVersion":4,
+                 "name":"Valid page","title":{"zh-CN":"有效页","en":"Valid page"},
+                 "layout":{"type":"stack"},"blocks":[{"blockType":"table","columns":[]}]}
+                """);
+        // Localized description object on the import DTO's string field — the exact
+        // 2026-11-06 orbit finding that silently dropped four pages behind a green import.
+        Files.writeString(pagesDir.resolve("02_bad.json"), """
+                {"pageKey":"pgt_bad","modelCode":"pgt_thing","kind":"list","schemaVersion":4,
+                 "name":"Bad page","title":{"zh-CN":"坏页","en":"Bad page"},
+                 "description":{"zh-CN":"本地化对象落进字符串字段"},
+                 "layout":{"type":"stack"},"blocks":[{"blockType":"table","columns":[]}]}
+                """);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> loader.loadFromDirectory(tempDir))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("pages must not be silently dropped");
+    }
+
+    @Test
     @DisplayName("Should skip invalid JSON files and load valid ones")
     void shouldSkipInvalidJsonAndLoadValidOnes() throws IOException {
         Path modelsDir = tempDir.resolve("config/models");
