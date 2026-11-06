@@ -487,16 +487,17 @@ function FormDialogHost() {
         const groupKey = field.props?.groupField || 'group';
         const valuesKey = field.props?.valuesField || 'values';
         const selections = Array.isArray(value) ? value : [];
+        const allowEmpty = field.props?.allowEmptyGroups === true;
         const valid =
           groups.length > 0 &&
           selections.length === groups.length &&
+          (!allowEmpty || selections.some((item: any) => Array.isArray(item?.[valuesKey]) && item[valuesKey].length > 0)) &&
           groups.every((group) => {
             const matching = selections.filter((item: any) => item?.[groupKey] === group.value);
             if (matching.length !== 1 || !Array.isArray(matching[0][valuesKey])) return false;
             const values = matching[0][valuesKey];
             return (
-              !group.disabled &&
-              values.length > 0 &&
+              (allowEmpty && values.length === 0 || !group.disabled && values.length > 0) &&
               new Set(values).size === values.length &&
               values.every((selected: unknown) =>
                 (group.options || []).some(
@@ -513,6 +514,9 @@ function FormDialogHost() {
             t,
           });
         }
+      }
+      if (field.type === 'multiselect' && field.props?.selectionMode === 'single' && (!Array.isArray(value) || value.length !== 1)) {
+        newErrors[field.field] = buildRequiredFieldMessage(getLocalizedText(field.label, locale, t), { dataType: 'text', locale, t });
       }
       if (field.type === 'bom-upload-review') {
         const review = value as BomUploadReviewValue | undefined;
@@ -1098,6 +1102,7 @@ function FormDialogHost() {
                       <div data-testid={`form-dialog-field-${field.field}`}>
                         <PagedChoiceField
                           endpoint={field.dataSource.endpoint}
+                          multiple={field.props?.selectionMode !== 'single'}
                           label={getLocalizedText(field.label, locale, t)}
                           value={Array.isArray(formData[field.field]) ? formData[field.field] : []}
                           onChange={(value) => updateField(field.field, value)}
