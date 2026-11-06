@@ -261,6 +261,10 @@ public interface RoleMapper extends BaseMapper<Role> {
     @Select("SELECT pid FROM ab_role WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = false")
     String findPidByCode(@Param("tenantId") Long tenantId, @Param("code") String code);
 
+    /** A tenant's retired role identity prevents template re-import from resurrecting it. */
+    @Select("SELECT id,pid,tenant_id,code,deleted_flag FROM ab_role WHERE tenant_id=#{tenantId} AND code=#{code} AND deleted_flag=TRUE ORDER BY id DESC LIMIT 1")
+    Role findRetiredByTenantIdAndCode(@Param("tenantId") Long tenantId, @Param("code") String code);
+
     // ==================== Plugin Import Support ====================
 
     /**

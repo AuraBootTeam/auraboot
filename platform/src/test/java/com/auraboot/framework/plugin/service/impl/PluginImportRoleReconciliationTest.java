@@ -26,6 +26,7 @@ class PluginImportRoleReconciliationTest {
             .code("warehouse_operator").permissions(List.of("model.work_order.read")).build();
 
     PluginImportRoleReconciliationTest() {
+        ReflectionTestUtils.setField(service, "roleMapper", mock(com.auraboot.framework.rbac.mapper.RoleMapper.class));
         ReflectionTestUtils.setField(service, "roleService", roles);
         ReflectionTestUtils.setField(service, "permissionService", permissions);
         ReflectionTestUtils.setField(service, "rolePermissionMapper", bindings);

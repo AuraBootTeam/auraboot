@@ -144,6 +144,17 @@ class PluginRoleModelPermissionReconciliationIT extends BaseIntegrationTest {
         assertThat(snapshot()).isEqualTo(before);assertThat(codes()).isEmpty();
     }
 
+    @Test void aDeletedRoleIsNotRecreatedOrReseededByUpgrade() throws Exception {
+        install();Long tenant=getTestTenant().getId();
+        jdbc.update("UPDATE ab_role SET deleted_flag=TRUE,status='inactive' WHERE tenant_id=? AND id=?",tenant,roleId);
+        var before=snapshot();template(true,false);
+        assertThat(execute().isSuccess()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role WHERE tenant_id=? AND code=? AND deleted_flag=FALSE",Integer.class,tenant,roleCode)).isZero();
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(imports.reconcileDirectoryRolePermissions(directory.toString())).isEqualTo(1);
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
     @Test void unresolvedUpgradeDeclarationIsRejectedBeforeExistingRoleWrites() throws Exception {
         install();var before=snapshot();template(true,true);
         var preview=imports.parseDirectory(directory.toString());

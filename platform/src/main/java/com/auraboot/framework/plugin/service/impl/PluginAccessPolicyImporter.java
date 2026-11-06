@@ -199,6 +199,14 @@ final class PluginAccessPolicyImporter {
 
         boolean exists = facadeReceiver.checkRoleExists(tenantId, dto.getCode());
 
+        Role retired = exists ? null : roleMapper.findRetiredByTenantIdAndCode(tenantId, dto.getCode());
+        if (retired != null) {
+            // A deleted template role is an administrator decision, not a fresh install.
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
+                    retired.getPid(), retired.getId(), dto.getCode(), dto.getEffectiveName(),
+                    ResourceAction.SKIP, null, null);
+        }
+
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Role already exists: " + dto.getCode());
         }
@@ -314,7 +322,8 @@ final class PluginAccessPolicyImporter {
                 throw new PluginException("Invalid role declaration during batch reconciliation");
             }
             Role role = roles.get(declaration.getCode());
-            if (role == null) throw new PluginException("Imported role not found: " + declaration.getCode());
+            if (role == null && roleMapper.findRetiredByTenantIdAndCode(tenantId, declaration.getCode()) == null)
+                throw new PluginException("Imported role not found: " + declaration.getCode());
             List<PermissionDTO> permissions = new ArrayList<>();
             for (String code : Optional.ofNullable(declaration.getPermissions()).orElse(List.of())) {
                 PermissionDTO permission = permissionService.findByCode(code);
@@ -340,6 +349,7 @@ final class PluginAccessPolicyImporter {
     public boolean reconcileImportedRolePermissions(RoleDefinitionDTO dto, Long tenantId,
                                                     String pluginPid, String importId) {
         Long roleId = validateRolePermissions(dto, tenantId);
+        if (roleId == null) throw new PluginException("Retired role cannot receive initial grants");
         if (pluginPid == null || importId == null) {
             throw new PluginException("Current role import identity is required");
         }
@@ -374,7 +384,7 @@ final class PluginAccessPolicyImporter {
             throw new PluginException("Valid role declaration is required");
         }
         Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
-        if (roleId == null) {
+        if (roleId == null && roleMapper.findRetiredByTenantIdAndCode(tenantId, dto.getCode()) == null) {
             throw new PluginException("Role permission reconciliation failed: declared role '"
                     + dto.getCode() + "' does not exist in this tenant");
         }

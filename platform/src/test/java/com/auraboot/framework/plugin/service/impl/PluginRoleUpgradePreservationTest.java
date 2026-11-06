@@ -109,4 +109,15 @@ class PluginRoleUpgradePreservationTest {
         verifyNoInteractions(grants, bindings, scopes, members);
     }
 
+    @Test void deletedRoleIsSkippedWithoutRecreationOrSeeding() {
+        when(importer.checkRoleExists(7L, "quote_reader")).thenReturn(false);
+        var retired=new com.auraboot.framework.rbac.entity.Role();
+        retired.setId(3L);retired.setPid("retired-role");retired.setTenantId(7L);retired.setDeletedFlag(true);
+        when(roles.findRetiredByTenantIdAndCode(7L,"quote_reader")).thenReturn(retired);
+        var result=importer.importRole(template(),"plugin","upgrade",7L,ImportRequest.ConflictStrategy.OVERWRITE);
+        assertThat(result.getActionEnum()).isEqualTo(ResourceAction.SKIP);
+        assertThat(result.getResourcePid()).isEqualTo("retired-role");
+        verifyNoInteractions(grants,bindings,scopes,members);
+    }
+
 }

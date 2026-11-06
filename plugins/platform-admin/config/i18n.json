@@ -7530,5 +7530,12 @@
     "en-US": "Not applied",
     "source": "platform-admin",
     "refType": "ui"
+  },
+  {
+    "key": "admin.permission.role.searchEmpty",
+    "zh-CN": "没有匹配的角色",
+    "en-US": "No matching roles",
+    "source": "platform-admin",
+    "refType": "ui"
   }
 ]
