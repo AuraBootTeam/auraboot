@@ -302,6 +302,7 @@ public final class DslRegistry {
         CARD_GRID("card-grid", "Card grid block (responsive catalog of cards with per-card actions)", "1.6"),
         CODE_SNIPPET("code-snippet", "Code snippet block (record-interpolated read-only snippet with copy-to-clipboard)", "1.6"),
         CONVERSATION_PANEL("conversation-panel", "Live two-way conversation panel (transcript + SSE stream + reply)", "1.7"),
+        PREREQUISITE_TABLE("prerequisite-table", "Prerequisite status table (declared inputs with first-match status rules)", "1.9"),
         CUSTOM("custom", "Custom block", "1.0");
 
         private final String code, label, since;

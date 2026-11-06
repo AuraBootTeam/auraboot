@@ -16,14 +16,24 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime'
 import type { BlockConfig } from '~/framework/meta/schemas/types'
 
 const statusMapSpy = vi.fn()
 
+/** Nodes seeded into the shared designer store — the canvas mock renders them clickable. */
+let seededNodes: Array<{ id: string; data: { label: string } }> = []
+
 vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
   FlowCanvas: ({ className }: { className?: string }) => (
-    <div data-testid="flow-canvas" className={className} />
+    <div data-testid="flow-canvas" className={className}>
+      {seededNodes.map((n) => (
+        <button key={n.id} className="react-flow__node" data-id={n.id}>
+          {n.data.label}
+        </button>
+      ))}
+    </div>
   ),
   NodeRuntimeStatusProvider: ({
     statuses,
@@ -35,9 +45,13 @@ vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
     statusMapSpy(statuses)
     return <div data-testid="status-provider">{children}</div>
   },
-  useFlowStore: () => (data: unknown) => {
-    void data
-  },
+  useFlowStore: (selector: (store: { selectedNodeId: string | null; importData: unknown }) => unknown) =>
+    selector({
+      selectedNodeId: null,
+      importData: (data: { nodes: Array<{ id: string; data: { label: string } }> }) => {
+        seededNodes = data.nodes
+      },
+    }),
 }))
 
 import { DagCanvasBlockRenderer, deriveDeliveryNodeStatuses } from '../DagCanvasBlockRenderer'
@@ -209,5 +223,127 @@ describe('DagCanvasBlockRenderer card', () => {
       />,
     )
     expect(screen.getByTestId('dag-canvas-terminal').textContent).toBe('失败')
+  })
+})
+
+describe('DagCanvasBlockRenderer node panel', () => {
+  const panelNodes = [
+    {
+      key: 'register',
+      label: { 'zh-CN': '登记' },
+      alwaysComplete: true,
+      taskType: 'register_run',
+      effect: { 'zh-CN': '控制面记录', en: 'Control-plane record' },
+      inputFields: ['release_pid'],
+      outputFields: ['pid'],
+      retryOwner: { 'zh-CN': '交付执行服务', en: 'Delivery execution service' },
+    },
+    {
+      key: 'deploy',
+      label: { 'zh-CN': '部署' },
+      failedStatuses: ['failed'],
+      runningStatuses: ['applying'],
+      doneStatuses: ['verifying', 'succeeded'],
+      retryBoundary: { 'zh-CN': '失败不重投', en: 'No re-delivery on failure' },
+    },
+  ]
+
+  const panelBlock = (): BlockConfig =>
+    ({
+      id: 'delivery',
+      blockType: 'dag-canvas',
+      title: { 'zh-CN': '执行图' },
+      statusField: 'status',
+      nodes: panelNodes as never,
+      phasesField: 'orb_drun_phases',
+      hint: { 'zh-CN': '点击节点查看输入、合同与结果' },
+    }) as unknown as BlockConfig
+
+  beforeEach(() => {
+    seededNodes = []
+    statusMapSpy.mockClear()
+  })
+
+  it('hint shows while no node is selected', () => {
+    render(
+      <DagCanvasBlockRenderer
+        block={panelBlock()}
+        runtime={runtimeWithRecord({ status: 'succeeded' })}
+      />,
+    )
+    expect(screen.getByTestId('dag-node-panel-empty').textContent).toContain('点击节点查看')
+    expect(screen.queryByTestId('dag-node-panel')).toBeNull()
+  })
+
+  it('clicking a node renders contract facts with record-derived inputs and outputs', async () => {
+    render(
+      <DagCanvasBlockRenderer
+        block={panelBlock()}
+        runtime={runtimeWithRecord({
+          status: 'succeeded',
+          release_pid: 'RL-01HZX',
+          pid: 'RUN-777',
+        })}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '登记' }))
+    const panel = screen.getByTestId('dag-node-panel')
+    expect(panel.textContent).toContain('登记')
+    expect(panel.textContent).toContain('register_run')
+    expect(panel.textContent).toContain('控制面记录')
+    expect(panel.textContent).toContain('release_pid=RL-01HZX')
+    expect(panel.textContent).toContain('pid=RUN-777')
+    expect(panel.textContent).toContain('交付执行服务')
+    // register has no attested phase entry — duration stays honest (—)
+    expect(panel.textContent).toContain('—')
+  })
+
+  it('phase durations join by node key and the panel reflects derived status', async () => {
+    render(
+      <DagCanvasBlockRenderer
+        block={panelBlock()}
+        runtime={runtimeWithRecord({
+          status: 'succeeded',
+          orb_drun_phases: JSON.stringify([
+            { phase: 'deploy', seconds: 41 },
+            { phase: 'verify', seconds: 5 },
+          ]),
+        })}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '部署' }))
+    const panel = screen.getByTestId('dag-node-panel')
+    expect(panel.textContent).toContain('41s')
+    expect(panel.textContent).not.toContain('5s')
+    expect(panel.textContent).toContain('已完成')
+    expect(panel.textContent).toContain('失败不重投')
+  })
+
+  it('an unparsable phases field degrades to a dash instead of crashing', async () => {
+    render(
+      <DagCanvasBlockRenderer
+        block={panelBlock()}
+        runtime={runtimeWithRecord({ status: 'succeeded', orb_drun_phases: 'not-json' })}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '部署' }))
+    expect(screen.getByTestId('dag-node-panel').textContent).toContain('—')
+  })
+
+  it('clicking the pane clears an existing selection', async () => {
+    render(
+      <DagCanvasBlockRenderer
+        block={panelBlock()}
+        runtime={runtimeWithRecord({ status: 'succeeded' })}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '登记' }))
+    expect(screen.getByTestId('dag-node-panel')).toBeDefined()
+    await user.click(screen.getByTestId('flow-canvas'))
+    expect(screen.queryByTestId('dag-node-panel')).toBeNull()
   })
 })

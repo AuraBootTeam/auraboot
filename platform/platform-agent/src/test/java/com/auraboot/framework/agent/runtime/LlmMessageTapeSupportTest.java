@@ -18,6 +18,26 @@ class LlmMessageTapeSupportTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void completesRejectedToolsAfterJsonStorageWithoutOverwritingExistingResults() throws Exception {
+        List<LlmChatRequest.Message> original = new ArrayList<>();
+        original.add(LlmMessageTapeSupport.buildAssistantMessage(List.of(
+                LlmChatResponse.ContentBlock.builder().type("tool_use").id("read").name("list:tpm_project").build(),
+                LlmChatResponse.ContentBlock.builder().type("tool_use").id("write").name("cmd:tpm:create_task").build())));
+        original.add(LlmMessageTapeSupport.buildToolResultMessage(List.of(
+                LlmMessageTapeSupport.buildToolResultBlock(objectMapper, "read", Map.of("success", true)))));
+        List<Map<String, Object>> stored = objectMapper.readValue(
+                objectMapper.writeValueAsString(LlmMessageTapeSupport.serializeMessages(original)),
+                new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        List<LlmChatRequest.Message> tape = LlmMessageTapeSupport.deserializeMessages(stored);
+        int count = LlmMessageTapeSupport.completeDanglingToolResults(objectMapper, tape,
+                Map.of("success", false, "notExecuted", true, "error", "User denied the operation"));
+        assertThat(count).isEqualTo(1);
+        assertThat(tape).hasSize(3);
+        assertThat(tape.get(2).getContent().toString()).contains("User denied", "notExecuted", "write");
+        assertThat(LlmMessageTapeSupport.completeDanglingToolResults(objectMapper, tape)).isZero();
+    }
+
+    @Test
     @DisplayName("M3: tool results are framed as untrusted data, matching the <user-data>/<retrieved-data> convention")
     void buildToolResultBlock_wrapsPayloadAsUntrustedContent() {
         // Record and RAG context already carry an untrusted-content frame; the

@@ -862,5 +862,75 @@
     "zh-CN": "无法读取 AI 同事，请返回后重新选择。",
     "en-US": "Unable to load the AI colleague. Return and select it again.",
     "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.noForm",
+    "source": "import",
+    "zh-CN": "请先打开可编辑表单，再要求填写当前表单。",
+    "en-US": "Open an editable form before requesting a draft fill.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.platformOnly",
+    "source": "import",
+    "zh-CN": "当前表单填写使用平台助手，请在上方选择 AuraBot 后重新发送。",
+    "en-US": "Select AuraBot above to fill the current form draft.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.unavailable",
+    "source": "import",
+    "zh-CN": "当前无法填写草稿，请确认有可编辑字段并提供文字纪要。",
+    "en-US": "Draft fill requires editable fields and text notes.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.failed",
+    "source": "import",
+    "zh-CN": "本次未填写草稿。请核对原文依据后重新发起，已有内容保持不变。",
+    "en-US": "The draft was not filled. Check the source text and send a new request; existing values are unchanged.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.draftOnly",
+    "source": "import",
+    "zh-CN": "仅更新草稿，已有内容保持不变；请在页面核对后保存。",
+    "en-US": "Only the draft changed. Existing values are preserved; save from the page after review.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.empty",
+    "source": "import",
+    "zh-CN": "仍留空",
+    "en-US": "Still empty",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.hint",
+    "source": "import",
+    "zh-CN": "如需填入草稿，请说“填写当前表单：”并粘贴纪要。",
+    "en-US": "To update only this draft, say “Fill the current form:” followed by your notes.",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.formFill.undone",
+    "source": "import",
+    "zh-CN": "已撤销本次填写中未被人工改动的值，后续人工修改已保留。",
+    "en-US": "Undid this fill where values were unchanged; later manual edits were preserved.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.approval.parametersLoading",
+    "source": "import",
+    "zh-CN": "正在读取业务参数…",
+    "en-US": "Loading business parameters…",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.approval.parametersUnavailable",
+    "source": "import",
+    "zh-CN": "无法读取业务参数，请取消后重试或联系管理员。",
+    "en-US": "Business parameters are unavailable. Cancel and try again or contact an administrator.",
+    "refType": "ui"
   }
 ]

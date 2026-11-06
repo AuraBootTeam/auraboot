@@ -7,6 +7,7 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
 import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.LlmMessageTapeSupport;
 import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
 import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
 import com.auraboot.framework.agent.service.ToolLoopService;
@@ -53,6 +54,25 @@ class AuraBotChatServiceResumeSnapshotTest {
     @Mock private LlmProvider provider;
     @Mock private ResponseSink sink;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void deniedToolClosesPersistedTapeWithoutCallingToolOrModel() throws Exception {
+        var assistant = LlmMessageTapeSupport.buildAssistantMessage(List.of(
+                LlmChatResponse.ContentBlock.builder().type("tool_use").id("denied-call")
+                        .name("cmd:tpm:create_task").input(Map.of("title", "Proposal")).build()));
+        List<Map<String, Object>> stored = objectMapper.readValue(
+                objectMapper.writeValueAsString(LlmMessageTapeSupport.serializeMessages(List.of(assistant))),
+                new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        PendingToolSnapshot pending = PendingToolSnapshot.builder().sessionId("owned-session")
+                .toolId("denied-call").messages(stored).build();
+        newService().completeRejectedChatTool(pending, "User denied the operation");
+        @SuppressWarnings("unchecked") ArgumentCaptor<List<Map<String, Object>>> captured = ArgumentCaptor.forClass(List.class);
+        verify(chatSessionStore).storeConversationMessages(eq("owned-session"), captured.capture());
+        var tape = LlmMessageTapeSupport.deserializeMessages(captured.getValue());
+        assertThat(LlmMessageTapeSupport.completeDanglingToolResults(objectMapper, tape)).isZero();
+        assertThat(captured.getValue().toString()).contains("User denied", "notExecuted");
+        org.mockito.Mockito.verifyNoInteractions(toolLoopService, chatToolExecutor, llmProviderFactory);
+    }
 
     @AfterEach
     void tearDown() {
@@ -580,6 +600,7 @@ class AuraBotChatServiceResumeSnapshotTest {
                 llmProviderFactory,
                 chatToolResolver,
                 chatToolExecutor,
+                chatSessionStore,
                 chatSessionStore,
                 objectMapper,
                 aiTraceService,

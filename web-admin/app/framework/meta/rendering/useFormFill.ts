@@ -17,7 +17,22 @@ export function useFormFill(
 ) {
   const latest = useRef({ identity, fields, values, setValues, ready });
   latest.current = { identity, fields, values, setValues, ready };
-  const [receipt, setReceipt] = useState<{ identity: string; result: FormFillResult } | null>(null);
+  const [receipt, setReceipt] = useState<{
+    identity: string;
+    result: FormFillResult;
+    placement?: 'form' | 'chat';
+  } | null>(null);
+  const receiptRef = useRef(receipt);
+  const undo = useCallback(() => {
+    const current = latest.current;
+    const previous = receiptRef.current;
+    if (!previous || previous.identity !== current.identity) return;
+    const next = undoFormFill(current.values, previous.result.applied);
+    current.values = next;
+    current.setValues(next);
+    receiptRef.current = null;
+    setReceipt(null);
+  }, []);
   const target = useMemo<FormFillTarget>(() => {
     const targetId = crypto.randomUUID();
     return {
@@ -32,7 +47,7 @@ export function useFormFill(
         }).format(new Date()),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
-      apply: (patch, reviews) => {
+      apply: (patch, reviews, placement = 'form') => {
         const current = latest.current;
         if (current.identity !== identity) throw new Error('ai.fill.target_changed');
         const result = applyFormFill(
@@ -43,26 +58,30 @@ export function useFormFill(
         );
         current.values = result.values;
         current.setValues(result.values);
-        setReceipt((previous) => ({
+        const previous = receiptRef.current;
+        const nextReceipt = {
           identity,
+          placement,
           result: {
             ...result,
             applied: {
-              ...(previous?.identity === identity ? previous.result.applied : {}),
+              ...(placement !== 'chat' && previous?.identity === identity
+                ? previous.result.applied
+                : {}),
               ...result.applied,
             },
           },
-        }));
+        };
+        receiptRef.current = nextReceipt;
+        setReceipt(nextReceipt);
         return result;
       },
+      undo,
     };
-  }, [identity, modelCode]);
-  const undo = useCallback(() => {
-    if (!receipt || receipt.identity !== identity) return;
-    const next = undoFormFill(latest.current.values, receipt.result.applied);
-    latest.current.values = next;
-    latest.current.setValues(next);
-    setReceipt(null);
-  }, [receipt, identity]);
-  return { target, receipt: receipt?.identity === identity ? receipt.result : null, undo };
+  }, [identity, modelCode, undo]);
+  return {
+    target,
+    receipt: receipt?.identity === identity && receipt.placement !== 'chat' ? receipt.result : null,
+    undo,
+  };
 }
