@@ -47999,6 +47999,21 @@
               "null"
             ]
           },
+          "managementRole": {
+            "description": "Presentation group only, not management qualification",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "memberCount": {
+            "description": "Assigned tenant members, not effective access",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "name": {
             "type": "string"
           },

@@ -778,10 +778,11 @@ function PermissionManagementContent() {
       <ConfirmDialog
         open={confirmDelete.open && canManageRoles}
         title={t('admin.permission.role.delete.title') || 'Delete Role'}
-        content={
-          t('admin.permission.role.delete.content') ||
-          `Are you sure you want to delete role "${confirmDelete.role?.name}"?`
-        }
+        content={t(
+          'rbacExperience.deleteRoleConfirmation',
+          { name: confirmDelete.role?.name ?? '' },
+          `Delete role "${confirmDelete.role?.name}"? This cannot be undone.`,
+        )}
         variant="danger"
         onConfirm={handleDeleteRole}
         onCancel={() => setConfirmDelete({ open: false, role: null })}

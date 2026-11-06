@@ -7747,5 +7747,10 @@
     "key": "rbacExperience.roleIdentifierHelp",
     "zh-CN": "系统自动生成标识，集成可引用；创建后不能修改。新角色初始没有菜单和业务授权。",
     "en-US": "An identifier is generated automatically. Integrations may reference it; it cannot change after creation. New roles start without menus or business grants."
+  },
+  {
+    "key": "rbacExperience.deleteRoleConfirmation",
+    "zh-CN": "确定删除角色“{name}”吗？此操作不可撤销。",
+    "en-US": "Delete role \"{name}\"? This cannot be undone."
   }
 ]

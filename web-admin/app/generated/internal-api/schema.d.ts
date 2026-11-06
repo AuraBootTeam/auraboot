@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 0340efe2bf910cbe6145ecf5a5d2ce9468e19c6948ebd85165e119510901e16d
+ * Contract SHA-256: 91dee3c6a2671ebdf2b7dbecb6078a2ca9fa96755ce3c65b48b4762357ff9b65
  */
 export interface paths {
     "/api/activities": {
@@ -39997,6 +39997,13 @@ export interface components {
             description: string | null;
             isDefault: boolean | null;
             isSystem: boolean | null;
+            /** @description Presentation group only, not management qualification */
+            managementRole?: boolean | null;
+            /**
+             * Format: int64
+             * @description Assigned tenant members, not effective access
+             */
+            memberCount?: number | null;
             name: string;
             pid: string;
             /** Format: int32 */

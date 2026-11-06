@@ -1,3 +1,5 @@
+import type { InternalResponseData } from '~/shared/services/http-client/internal-api';
+
 export interface Permission {
   id: number;
   pid: string;
@@ -17,9 +19,12 @@ export interface Permission {
   updatedAt: string;
 }
 
-export interface Role {
-  memberCount?: number | null;
-  managementRole?: boolean | null;
+type RolePresentation = Pick<
+  InternalResponseData<'get', '/api/roles/{pid}'>,
+  'memberCount' | 'managementRole'
+>;
+
+export interface Role extends RolePresentation {
   id: number;
   pid: string;
   code: string;
