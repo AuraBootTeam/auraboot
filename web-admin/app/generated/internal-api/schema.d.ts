@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: a6ef638c795aaa80d76408c93ded611f7114a2b685b933a89333d8b740a21c2e
+ * Contract SHA-256: c35eaa5992eac12a7e8bcee4d46c643ab115b6239f873ed704d562737465bbc5
  */
 export interface paths {
     "/api/activities": {
@@ -18117,6 +18117,26 @@ export interface paths {
         get: operations["getVersionsSince"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permission-cache/evict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evict permission caches
+         * @description Manual trigger for permission snapshot eviction after out-of-band changes
+         */
+        post: operations["evict"];
         delete?: never;
         options?: never;
         head?: never;
@@ -71865,6 +71885,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListPageSchemaSyncVersionDTO"];
+                };
+            };
+        };
+    };
+    evict: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseString"];
                 };
             };
         };
