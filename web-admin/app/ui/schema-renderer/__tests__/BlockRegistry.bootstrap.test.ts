@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
@@ -51,7 +52,8 @@ describe('BlockRegistry bootstrap', () => {
       'conversation-panel',
     ];
     // Optional renderer assets must agree with registration across supported source baselines.
-    if (existsSync(new URL('../../../framework/meta/rendering/blocks/PrerequisiteTableBlockRenderer.tsx', import.meta.url))) {
+    expect(existsSync(resolve(process.cwd(), 'app/ui/schema-renderer/BlockRegistry.ts'))).toBe(true);
+    if (existsSync(resolve(process.cwd(), 'app/framework/meta/rendering/blocks/PrerequisiteTableBlockRenderer.tsx'))) {
       expected.push('prerequisite-table');
     }
     expect(BlockRegistry.list().map(([type]) => type).sort()).toEqual([...expected].sort());
