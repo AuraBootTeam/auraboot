@@ -1,9 +1,14 @@
 import { getLocalizedText } from '~/utils/i18n';
 import { useI18n } from '~/contexts/I18nContext';
 import type { CapabilityGroup, Capability } from './types';
+import type { PermissionMatrixDTO } from '../types';
+import CapabilityPermissionDetails from './CapabilityPermissionDetails';
 
 interface CapabilityChecklistProps {
   groups: CapabilityGroup[];
+  catalog?: CapabilityGroup[];
+  matrix?: PermissionMatrixDTO | null;
+  projectedMatrix?: PermissionMatrixDTO | null;
   /** Currently selected capability codes. */
   selected: string[];
   /** Called with a capability code when its checkbox is toggled. */
@@ -23,6 +28,9 @@ interface CapabilityChecklistProps {
  */
 export default function CapabilityChecklist({
   groups,
+  catalog = groups,
+  matrix,
+  projectedMatrix,
   selected,
   onToggle,
   disabled = false,
@@ -36,6 +44,13 @@ export default function CapabilityChecklist({
 
   return (
     <div data-testid="capability-checklist" className="flex flex-col gap-5">
+      <p className="text-text-2 text-xs leading-5">
+        {t(
+          'permission.capability.details.guidance',
+          undefined,
+          'Select duties for authorization. Permission counts describe configuration coverage; actual access also depends on record scope, fields and runtime conditions.',
+        )}
+      </p>
       {groups.some((group) =>
         group.capabilities.some(
           (cap) =>
@@ -49,9 +64,9 @@ export default function CapabilityChecklist({
           className="text-text-2 col-span-full text-xs leading-5"
         >
           {t(
-            'admin.permission.capability.partialGuidanceV2',
+            'permission.capability.details.partialGuidance',
             undefined,
-            'Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving.',
+            'Permission items may be shared by other duties. Partial configuration does not grant the complete duty. Select to complete; review revocation effects before saving.',
           )}
         </p>
       )}
@@ -72,7 +87,11 @@ export default function CapabilityChecklist({
                 ? t('permission.capability.ungrouped', undefined, 'Other capabilities')
                 : t(`permission.module.${group.group}`, undefined, group.group)}
               <span className="ml-2 text-xs font-normal text-gray-400">
-                {t('permission.capability.groupSummary', { granted, total }, `${granted}/${total}`)}
+                {t(
+                  'permission.capability.details.groupSummary',
+                  { granted, total },
+                  `Selected duties ${granted}/${total}`,
+                )}
               </span>
             </legend>
             <div className="divide-border flex flex-col divide-y">
@@ -111,7 +130,7 @@ export default function CapabilityChecklist({
                     aria-label={getLocalizedText(cap.localizedLabels, locale, t) || cap.label}
                     onChange={() => onToggle(cap.code)}
                   />
-                  <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <label htmlFor={`capability-input-${cap.code}`} className="cursor-pointer">
                         {getLocalizedText(cap.localizedLabels, locale, t) || cap.label}
@@ -124,12 +143,12 @@ export default function CapabilityChecklist({
                             className="text-text-2 text-xs"
                           >
                             {t(
-                              'admin.permission.capability.partialActionsV2',
+                              'permission.capability.details.coverage',
                               {
                                 granted: cap.includes.length - (cap.missingCodes?.length ?? 0),
                                 total: cap.includes.length,
                               },
-                              `Actions ${cap.includes.length - (cap.missingCodes?.length ?? 0)}/${cap.includes.length}`,
+                              `Permission items ${cap.includes.length - (cap.missingCodes?.length ?? 0)}/${cap.includes.length}`,
                             )}
                           </span>
                         )}
@@ -188,6 +207,12 @@ export default function CapabilityChecklist({
                         {t('admin.permission.capability.scopeV2', undefined, 'Record scope')}
                       </button>
                     )}
+                    <CapabilityPermissionDetails
+                      capability={cap}
+                      catalog={catalog}
+                      matrix={matrix}
+                      projectedMatrix={projectedMatrix}
+                    />
                     {cap.unlockedMenus && cap.unlockedMenus.length > 0 && (
                       <details
                         data-testid={`capability-menus-${cap.code}`}

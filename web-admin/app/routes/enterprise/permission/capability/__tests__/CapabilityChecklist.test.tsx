@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CapabilityChecklist from '../CapabilityChecklist';
 import type { Capability, CapabilityGroup } from '../types';
+import type { PermissionMatrixDTO } from '../../types';
 
 const i18n = vi.hoisted(() => ({ locale: 'zh-CN' }));
 vi.mock('~/contexts/I18nContext', () => ({
@@ -144,10 +145,10 @@ describe('CapabilityChecklist', () => {
     const { rerender } = render(<CapabilityChecklist {...props} />);
     expect(screen.getAllByTestId('capability-partial-guidance')).toHaveLength(1);
     expect(screen.getByTestId('capability-partial-crm.cap.account').textContent).toBe(
-      'Actions 1/3',
+      'Permission items 1/3',
     );
     expect(screen.getByTestId('capability-partial-crm.cap.contact').textContent).toBe(
-      'Actions 1/2',
+      'Permission items 1/2',
     );
     expect(
       screen.getByTestId('capability-checkbox-crm.cap.account').getAttribute('aria-checked'),
@@ -279,5 +280,150 @@ describe('CapabilityChecklist', () => {
       'Legacy description',
     );
     expect(screen.getByTestId('capability-empty.cap.read')).not.toHaveAttribute('title');
+  });
+});
+
+describe('permission disclosure contract', () => {
+  it('exposes included permission codes without changing role selection', () => {
+    const onToggle = vi.fn();
+    render(
+      <CapabilityChecklist
+        groups={[
+          {
+            group: 'Quote',
+            capabilities: [
+              {
+                ...cap('quote.view', false),
+                includes: ['quote.read'],
+                missingCodes: ['quote.read'],
+              },
+            ],
+          },
+        ]}
+        selected={[]}
+        onToggle={onToggle}
+        disabled
+      />,
+    );
+    const disclosure = screen.getByTestId('capability-permissions-quote.view');
+    (disclosure as HTMLDetailsElement).open = true;
+    fireEvent(disclosure, new Event('toggle'));
+    expect(screen.getByText('quote.read')).toBeVisible();
+    expect(screen.getByText('Definition unavailable; verify this permission')).toBeVisible();
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+});
+
+function matrixFixture(grants: boolean[]): PermissionMatrixDTO {
+  return {
+    modules: [
+      {
+        moduleCode: 'quote',
+        moduleName: 'Quote',
+        resources: [
+          {
+            resourceCode: 'quote',
+            resourceName: 'Quotation',
+            actions: grants.map((granted, index) => ({
+              permissionId: index + 1,
+              permissionPid: `p${index}`,
+              code: `quote.permission.${index}`,
+              action: `read${index}`,
+              label: `Read quotation ${index}`,
+              granted,
+              supported: true,
+            })),
+          },
+        ],
+      },
+    ],
+  };
+}
+function openDetails(code: string) {
+  const node = screen.getByTestId(`capability-permissions-${code}`) as HTMLDetailsElement;
+  node.open = true;
+  fireEvent(node, new Event('toggle'));
+  return node;
+}
+describe('saved and draft permission coverage', () => {
+  it('distinguishes saved 2/4 from pending grants, revocation and shared preservation', () => {
+    const duty = {
+      ...cap('quote.view', false),
+      authorizationState: 'partial' as const,
+      includes: [0, 1, 2, 3].map((n) => `quote.permission.${n}`),
+      missingCodes: ['quote.permission.2', 'quote.permission.3'],
+    };
+    const visible = [{ group: 'Quote', capabilities: [duty] }];
+    const catalog = [
+      ...visible,
+      {
+        group: 'Hidden by search',
+        capabilities: [
+          {
+            ...cap('other.view', true),
+            label: 'Other reading duty',
+            includes: ['quote.permission.1'],
+          },
+        ],
+      },
+    ];
+    const onToggle = vi.fn();
+    render(
+      <CapabilityChecklist
+        groups={visible}
+        catalog={catalog}
+        selected={[]}
+        onToggle={onToggle}
+        matrix={matrixFixture([true, true, false, false])}
+        projectedMatrix={matrixFixture([false, true, true, false])}
+      />,
+    );
+    expect(screen.getByText('Permission items 2/4')).toBeVisible();
+    expect(screen.queryByText('Read quotation 0')).toBeNull();
+    const details = openDetails('quote.view');
+    expect(details.textContent).toContain('Read quotation 0');
+    expect(
+      screen.getByTestId('capability-permission-quote.view-quote.permission.0'),
+    ).toHaveTextContent('Will revoke');
+    expect(
+      screen.getByTestId('capability-permission-quote.view-quote.permission.1'),
+    ).toHaveTextContent('Unchanged');
+    expect(
+      screen.getByTestId('capability-permission-quote.view-quote.permission.2'),
+    ).toHaveTextContent('Will grant');
+    const shared = screen
+      .getByText('Also included by 1 duties (declarations, not grant provenance)')
+      .closest('details') as HTMLDetailsElement;
+    shared.open = true;
+    expect(screen.getByText('Other reading duty')).toBeVisible();
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+  it('filters names and exact long codes, explains empty results, and remains readable when editing is disabled', () => {
+    const duty = {
+      ...cap('quote.view', true),
+      includes: [0, 1, 2, 3].map((n) => `quote.permission.${n}`),
+    };
+    render(
+      <CapabilityChecklist
+        groups={[{ group: 'Quote', capabilities: [duty] }]}
+        selected={['quote.view']}
+        disabled
+        onToggle={() => {
+          throw new Error('read-only interaction wrote selection');
+        }}
+        matrix={matrixFixture([true, true, true, true])}
+        projectedMatrix={matrixFixture([true, true, true, true])}
+      />,
+    );
+    openDetails('quote.view');
+    const search = screen.getByRole('searchbox', { name: 'Filter by name or permission code' });
+    fireEvent.change(search, { target: { value: 'quotation 2' } });
+    expect(screen.getByText('quote.permission.2')).toBeVisible();
+    expect(screen.queryByText('quote.permission.0')).toBeNull();
+    fireEvent.change(search, { target: { value: 'does-not-exist' } });
+    expect(screen.getByRole('status')).toHaveTextContent('No matching permission items');
+    fireEvent.change(search, { target: { value: 'quote.permission.3' } });
+    expect(screen.getByText('Read quotation 3')).toBeVisible();
+    expect(screen.getByRole('checkbox')).toBeDisabled();
   });
 });

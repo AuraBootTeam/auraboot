@@ -544,13 +544,13 @@ export default function CapabilityRoleEditor({
       </ul>
       <p>
         {t(
-          'admin.permission.editor.atomicDiffV2',
+          'permission.capability.details.permissionDiff',
           {
             added: previewPlan.grantedCodes.length,
             removed: previewPlan.revokedCodes.length,
             preserved: previewPlan.preservedCodes.length,
           },
-          `Add ${previewPlan.grantedCodes.length} actions, remove ${previewPlan.revokedCodes.length}; ${previewPlan.preservedCodes.length} existing actions outside the selection remain unchanged.`,
+          `Add ${previewPlan.grantedCodes.length} permission items, remove ${previewPlan.revokedCodes.length}; ${previewPlan.preservedCodes.length} existing permission items remain unchanged.`,
         )}
       </p>
       {resulting.length > 0 && (
@@ -560,9 +560,9 @@ export default function CapabilityRoleEditor({
             className="text-text-2 text-xs leading-5"
           >
             {t(
-              'admin.permission.capability.partialGuidanceV2',
+              'permission.capability.details.partialGuidance',
               undefined,
-              'Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving.',
+              'Permission items may be shared by other duties. Partial configuration does not grant the complete duty. Select to complete; review revocation effects before saving.',
             )}
           </p>
         </div>
@@ -573,9 +573,9 @@ export default function CapabilityRoleEditor({
       >
         <summary className="cursor-pointer font-medium">
           {t(
-            'admin.permission.editor.impactStateDetailsV2',
+            'permission.capability.details.impactDetails',
             undefined,
-            'Review related capability states, menus and action details',
+            'Review related duty states, menus and permission details',
           )}
         </summary>
         <div className="mt-3 space-y-3">
@@ -587,9 +587,9 @@ export default function CapabilityRoleEditor({
             className="text-text text-sm font-medium"
           >
             {t(
-              'admin.permission.editor.previewStateCountsV2',
+              'permission.capability.details.previewCounts',
               { full: fullCount, partial: partialCount, none: noneCount },
-              `Related capabilities after saving: ${fullCount} fully granted · ${partialCount} with partial actions · ${noneCount} not granted`,
+              `Related capabilities after saving: ${fullCount} fully granted · ${partialCount} partially configured · ${noneCount} not granted`,
             )}
           </p>
           <div data-testid="capability-preview-resulting" className="space-y-3">
@@ -599,15 +599,19 @@ export default function CapabilityRoleEditor({
             {secondaryPartial.length > 0 && (
               <details data-testid="capability-preview-partial-impact">
                 <summary className="text-text-2 cursor-pointer">
-                  {t('admin.permission.capability.partialV2', undefined, 'Partial actions')}
+                  {t(
+                    'permission.capability.details.partial',
+                    undefined,
+                    'Partial permission items',
+                  )}
                   {' · '}
                   {secondaryPartial.length}
                 </summary>
                 <p className="text-text-2 mt-2 text-xs leading-5">
                   {t(
-                    'admin.permission.capability.partialGuidanceV2',
+                    'permission.capability.details.partialGuidance',
                     undefined,
-                    'Some actions may be shared dependencies of other capabilities. Partial actions do not grant the complete capability. Select to complete; review revocation effects before saving.',
+                    'Permission items may be shared by other duties. Partial configuration does not grant the complete duty. Select to complete; review revocation effects before saving.',
                   )}
                 </p>
                 <ul className="mt-2 space-y-1">{secondaryPartial.map(renderImpact)}</ul>
@@ -862,6 +866,9 @@ export default function CapabilityRoleEditor({
             </p>
             <CapabilityChecklist
               groups={filteredGroups}
+              catalog={groups}
+              matrix={matrix}
+              projectedMatrix={projectedMatrix}
               selected={selected}
               onToggle={onToggle}
               revokedPartial={revokedPartial}

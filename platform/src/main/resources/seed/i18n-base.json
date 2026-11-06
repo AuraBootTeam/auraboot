@@ -6553,5 +6553,115 @@
     "key": "admin.permission.editor.scopeChangeCount",
     "zh-CN": "{count} 项记录范围例外",
     "en-US": "{count} record scope overrides"
+  },
+  {
+    "key": "permission.capability.details.title",
+    "zh-CN": "权限明细",
+    "en-US": "Permission details"
+  },
+  {
+    "key": "permission.capability.details.guidance",
+    "zh-CN": "按业务职责授权。权限项数量表示配置覆盖，实际访问仍受记录范围、字段和运行条件限制。",
+    "en-US": "Select duties for authorization. Permission counts describe configuration coverage; actual access also depends on record scope, fields and runtime conditions."
+  },
+  {
+    "key": "permission.capability.details.groupSummary",
+    "zh-CN": "已选职责 {granted}/{total}",
+    "en-US": "Selected duties {granted}/{total}"
+  },
+  {
+    "key": "permission.capability.details.draftNote",
+    "zh-CN": "分别展示已保存配置和本地草稿。草稿变化以保存前服务端预览为准；配置齐备不代表实际可执行。",
+    "en-US": "Saved configuration and local draft are shown separately. The server confirms draft changes before saving; these counts do not prove runtime access."
+  },
+  {
+    "key": "permission.capability.details.search",
+    "zh-CN": "按名称或权限码筛选",
+    "en-US": "Filter by name or permission code"
+  },
+  {
+    "key": "permission.capability.details.undefined",
+    "zh-CN": "定义未提供，请核实此权限项",
+    "en-US": "Definition unavailable; verify this permission"
+  },
+  {
+    "key": "permission.capability.details.saved",
+    "zh-CN": "已保存",
+    "en-US": "Saved"
+  },
+  {
+    "key": "permission.capability.details.draft",
+    "zh-CN": "草稿",
+    "en-US": "Draft"
+  },
+  {
+    "key": "permission.capability.details.unknown",
+    "zh-CN": "待核实",
+    "en-US": "Unresolved"
+  },
+  {
+    "key": "permission.capability.details.configured",
+    "zh-CN": "已配置",
+    "en-US": "Configured"
+  },
+  {
+    "key": "permission.capability.details.missing",
+    "zh-CN": "未配置",
+    "en-US": "Not configured"
+  },
+  {
+    "key": "permission.capability.details.unchanged",
+    "zh-CN": "保持",
+    "en-US": "Unchanged"
+  },
+  {
+    "key": "permission.capability.details.add",
+    "zh-CN": "拟授予",
+    "en-US": "Will grant"
+  },
+  {
+    "key": "permission.capability.details.remove",
+    "zh-CN": "拟撤销",
+    "en-US": "Will revoke"
+  },
+  {
+    "key": "permission.capability.details.shared",
+    "zh-CN": "也被 {count} 个职责包含（声明关系，非授权来源）",
+    "en-US": "Also included by {count} duties (declarations, not grant provenance)"
+  },
+  {
+    "key": "permission.capability.details.empty",
+    "zh-CN": "没有匹配的权限项",
+    "en-US": "No matching permission items"
+  },
+  {
+    "key": "permission.capability.details.partial",
+    "zh-CN": "部分权限项已配置",
+    "en-US": "Some permission items configured"
+  },
+  {
+    "key": "permission.capability.details.coverage",
+    "zh-CN": "权限项已配置 {granted}/{total}",
+    "en-US": "Permission items {granted}/{total}"
+  },
+  {
+    "key": "permission.capability.details.partialGuidance",
+    "zh-CN": "权限项可被多个职责共用；部分配置不代表职责完整可用。勾选可补齐，撤销影响以保存前预览为准。",
+    "en-US": "Permission items may be shared by other duties. Partial configuration does not grant the complete duty. Select to complete; review revocation effects before saving."
+  },
+  {
+    "key": "permission.capability.details.permissionDiff",
+    "zh-CN": "新增 {added} 个权限项，移除 {removed} 个权限项；另有 {preserved} 个现有权限项保持不变。",
+    "en-US": "Add {added} permission items, remove {removed}; {preserved} existing permission items remain unchanged."
+  },
+  {
+    "key": "permission.capability.details.impactDetails",
+    "zh-CN": "查看关联职责状态、菜单及权限明细",
+    "en-US": "Review related duty states, menus and permission details"
+  },
+  {
+    "key": "permission.capability.details.previewCounts",
+    "zh-CN": "关联职责保存后配置：齐备 {full} 项 · 部分权限项 {partial} 项 · 未配置 {none} 项",
+    "en-US": "Related duties after saving: {full} complete · {partial} partially configured · {none} not configured"
   }
 ]
