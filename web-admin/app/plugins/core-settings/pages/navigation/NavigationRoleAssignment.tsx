@@ -19,6 +19,7 @@ export default function NavigationRoleAssignment({
   const [snapshot, setSnapshot] = useState<EntryRoles | null>(null),
     [selected, setSelected] = useState<string[]>([]),
     [open, setOpen] = useState(false),
+    [query, setQuery] = useState(''),
     [error, setError] = useState(false),
     [saving, setSaving] = useState(false),
     [conflict, setConflict] = useState(false),
@@ -88,6 +89,7 @@ export default function NavigationRoleAssignment({
           disabled={disabled || !snapshot}
           onClick={() => {
             setSelected(snapshot!.roles.filter((r) => r.selected).map((r) => r.pid));
+            setQuery('');
             setOpen(true);
           }}
           className="text-accent text-xs underline disabled:opacity-50"
@@ -175,28 +177,50 @@ export default function NavigationRoleAssignment({
                 </button>
               </div>
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {snapshot?.roles.map((r) => (
-                <label key={r.pid} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    data-testid={`navigation-role-${r.pid}`}
-                    disabled={saving || conflict}
-                    checked={selected.includes(r.pid)}
-                    onChange={(e) =>
-                      setSelected((old) =>
-                        e.target.checked ? [...old, r.pid] : old.filter((pid) => pid !== r.pid),
-                      )
-                    }
-                  />
-                  {r.name}
-                  {!r.enabled && (
-                    <span className="text-text-2 text-xs">
-                      {t('roleNavigation.roleInactive', undefined, 'Inactive')}
-                    </span>
-                  )}
-                </label>
-              ))}
+            <input
+              data-testid="navigation-role-search"
+              aria-label={t('rbacExperience.searchVisibleRoles', undefined, 'Search roles')}
+              placeholder={t('rbacExperience.searchVisibleRoles', undefined, 'Search roles')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="border-border bg-bg w-full rounded-md border px-3 py-2 text-sm"
+            />
+            <div
+              data-testid="navigation-role-options"
+              className="grid max-h-[40vh] gap-3 overflow-y-auto sm:grid-cols-2"
+            >
+              {!snapshot?.roles.some((role) =>
+                role.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+              ) && (
+                <p className="text-text-2 text-sm">
+                  {t('rbacExperience.noMatchingRoles', undefined, 'No matching roles')}
+                </p>
+              )}
+              {snapshot?.roles
+                .filter((role) =>
+                  role.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+                )
+                .map((r) => (
+                  <label key={r.pid} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      data-testid={`navigation-role-${r.pid}`}
+                      disabled={saving || conflict}
+                      checked={selected.includes(r.pid)}
+                      onChange={(e) =>
+                        setSelected((old) =>
+                          e.target.checked ? [...old, r.pid] : old.filter((pid) => pid !== r.pid),
+                        )
+                      }
+                    />
+                    {r.name}
+                    {!r.enabled && (
+                      <span className="text-text-2 text-xs">
+                        {t('roleNavigation.roleInactive', undefined, 'Inactive')}
+                      </span>
+                    )}
+                  </label>
+                ))}
             </div>
           </div>
         }

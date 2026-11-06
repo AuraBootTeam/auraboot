@@ -7757,5 +7757,15 @@
     "key": "rbacExperience.removeMemberConfirmation",
     "zh-CN": "确定将“{name}”从此角色中移除吗？",
     "en-US": "Remove \"{name}\" from this role?"
+  },
+  {
+    "key": "rbacExperience.searchVisibleRoles",
+    "zh-CN": "搜索可见角色",
+    "en-US": "Search roles"
+  },
+  {
+    "key": "rbacExperience.noMatchingRoles",
+    "zh-CN": "没有匹配的角色",
+    "en-US": "No matching roles"
   }
 ]

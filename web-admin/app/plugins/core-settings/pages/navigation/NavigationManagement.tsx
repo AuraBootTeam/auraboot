@@ -793,9 +793,6 @@ function Editor() {
                 <summary className="text-text-2 cursor-pointer text-sm">
                   {t('navigation.audit', undefined, 'Recent menu changes')}
                 </summary>
-                <h3 className="text-text-1 text-sm font-medium">
-                  {t('navigation.audit', undefined, 'Recent menu changes')}
-                </h3>
                 <ul className="text-text-2 mt-3 space-y-2 text-xs">
                   {snapshot?.audit.length === 0 && (
                     <li>{t('navigation.audit.empty', undefined, 'No menu changes yet.')}</li>
