@@ -14,7 +14,7 @@
  */
 
 import React from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime'
 import type { BlockConfig } from '~/framework/meta/schemas/types'
