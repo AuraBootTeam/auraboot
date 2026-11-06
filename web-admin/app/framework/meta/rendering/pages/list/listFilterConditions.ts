@@ -294,3 +294,29 @@ export function applyApiTabCondition(query: Record<string, unknown>, condition: 
   }
   query[condition.fieldName] = String(condition.value);
 }
+
+
+/** API tab fields may describe queues rather than response properties; the server owns them. */
+export function filterListTabDisplayData<T extends Record<string, any>>(
+  records: T[],
+  condition: ListQueryFilterCondition | null,
+  apiDatasource: boolean,
+): T[] {
+  if (apiDatasource || !condition) return records;
+  const operator = String(condition.operator || 'EQ').toUpperCase();
+  const expected = String(condition.value ?? '');
+  const candidates = (condition.values ?? (Array.isArray(condition.value) ? condition.value : [condition.value]))
+    .filter(value => value != null).map(String);
+  return records.filter(record => {
+    const actual = String(record[condition.fieldName] ?? '');
+    switch (operator) {
+      case 'EQ': return actual === expected;
+      case 'NE':
+      case 'NEQ': return actual !== expected;
+      case 'IN': return candidates.includes(actual);
+      case 'NOT_IN':
+      case 'NOTIN': return !candidates.includes(actual);
+      default: return true;
+    }
+  });
+}
