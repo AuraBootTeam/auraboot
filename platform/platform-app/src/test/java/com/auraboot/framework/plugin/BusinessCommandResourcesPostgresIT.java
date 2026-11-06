@@ -42,6 +42,9 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     @Autowired PermissionFacade permissions;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
+    @Autowired FieldMaskService masks;
+    final List<Long> maskIds = new ArrayList<>();
     final List<Model> ownedModels = new ArrayList<>();
     final List<Long> ownedFields = new ArrayList<>();
     final Map<String,String> physicalTables = new HashMap<>();
@@ -74,6 +77,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     }
     @AfterEach void cleanup() {
         nestedEffect.set(null);
+        maskIds.forEach(masks::deleteConfig);
         for (var model:ownedModels) {
             assertThat(model.getCode()).matches("br_(root|line|ledger)_[0-9]+");
             String table=physicalTables.get(model.getCode());
@@ -108,17 +112,24 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     CommandPipelineContext context() {
         var command=new CommandDefinition();command.setCode("fixture:receipt_confirm");command.setModelCode(rootModel);
         var request=new CommandExecuteRequest();request.setTargetRecordId(rootPid);
-        return CommandPipelineContext.builder().commandCode(command.getCode()).command(command).request(request)
+        var context = CommandPipelineContext.builder().commandCode(command.getCode()).command(command).request(request)
                 .tenantId(getTestTenant().getId()).userId(getTestUser().getId()).targetRecordReadable(true).targetRecordVersion(rootVersion)
                 .execConfig(Map.of("type","custom","permissions",List.of("fixture.receipt.confirm"),"handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false)))
                 .authorizationVerdict(CommandAuthorizationVerdict.authorized("fixture.receipt.confirm"))
                 .businessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(command.getCode(),rootModel,rootPid,"update",
                         getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getId()))
                 .permitPlan(new CommandPermitPlan(CommandPermitPlan.Decision.PERMIT,null,null,rootPid,CommandPermitPlan.ScopeGrade.TARGET,rootVersion)).build();
+        if (owner.publicOutput) {
+            context.setBusinessGrantDecision(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                    com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),
+                    getTestTenant().getId(), getTestUser().getId(), getTestTenantMember().getId(), rootModel, rootPid, List.of()));
+            context.setPublicOutputProjection(publicProjection.prepare(context, owner));
+        }
+        return context;
     }
     <T> T command(Function<BusinessCommandDataAccessorFactory.Scope,T> operation) {
         var template = new TransactionTemplate(transactions);
-        if (owner.paged) template.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        if (owner.paged || owner.publicOutput) template.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
         return template.execute(tx->MetaContext.runWithCommandPermitPlan("TARGET",rootVersion,rootModel,rootPid,()->
                 MetaContext.runWithAuthorizedCommandCode("fixture:receipt_confirm",()->{
                     try(var scope=factory.open(context(),owner)) {return operation.apply(scope);}
@@ -254,12 +265,73 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         assertThat(storedQty()).isEqualTo("2");
     }
 
+    void exportOnlyMask() {
+        var config = new FieldMaskConfig(); config.setModelCode(lineModel); config.setFieldCode(qty);
+        config.setEnabled(true); config.setApplyToDetail(false); config.setApplyToList(false); config.setApplyToExport(true);
+        config.setMaskType("FULL"); config.setReplacementChar("*"); masks.saveConfig(config); maskIds.add(config.getId());
+        assertThat(masks.getEffectiveConfigs(lineModel, getTestUser().getId(), "detail")).isEmpty();
+        assertThat(masks.getEffectiveConfigs(lineModel, getTestUser().getId(), "export")).hasSize(1);
+    }
+
+    @Test void publicExportProjectionMasksRealSourceWithoutChangingDerivedBusinessWrites() {
+        owner.publicOutput = true; exportOnlyMask();
+        command(scope -> {
+            var internal = scope.accessor().getById(lineModel, linePid);
+            assertThat(internal).containsEntry(qty, "2");
+            var output = scope.accessor().projectForPublicOutput(lineModel, List.of(linePid));
+            assertThat(output.get(linePid)).containsOnlyKeys(qty).containsEntry(qty, "*");
+            assertThat(internal).containsEntry(qty, "2");
+            scope.accessor().update(lineModel, linePid, Map.of(qty, "3"));
+            return null;
+        });
+        assertThat(storedQty()).isEqualTo("3");
+        assertThat(permissions.canAction(getTestTenantMember().getId(), lineModel, "read")).isFalse();
+        assertThat(permissions.canAction(getTestTenantMember().getId(), lineModel, "update")).isFalse();
+    }
+
+    @Test void publicViewsOfMoreThanOneThousandRowsRemainCompleteAndMaskedWithoutModelGrants() {
+        owner.publicOutput = true; owner.paged = true; exportOnlyMask();
+        jdbc.update("INSERT INTO " + physicalTables.get(lineModel)
+                + " (id,pid,tenant_id," + parent + "," + qty + "," + cost + ",row_version,deleted_flag,created_by,created_at,updated_at)"
+                + " SELECT ?+g,'output-'||lpad(g::text,6,'0'),?,?,?,'OUTPUT-SECRET',0,false,?,now(),now() FROM generate_series(1,1004) g",
+                com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(), getTestTenant().getId(), rootPid, "5", getTestUser().getId());
+        command(scope -> {
+            var identities = new HashSet<String>();
+            for (int number = 1; number <= 3; number++) {
+                var page = scope.accessor().queryPage(lineModel, new DataPageQuery(Map.of(parent, rootPid), Map.of(), List.of(), number, 500));
+                assertThat(page.total()).isEqualTo(1005);
+                var output = scope.accessor().projectForPublicOutput(lineModel, page.records().stream().map(row -> (String) row.get("pid")).toList());
+                assertThat(output).hasSize(number < 3 ? 500 : 5);
+                output.forEach((pid, row) -> {
+                    assertThat(identities.add(pid)).isTrue();
+                    assertThat(row).containsOnlyKeys(qty).containsEntry(qty, "*");
+                });
+                assertThat(page.records()).allSatisfy(row -> assertThat(row.get(qty)).isIn("2", "5"));
+            }
+            assertThat(identities).hasSize(1005); return null;
+        });
+        assertThat(permissions.canAction(getTestTenantMember().getId(), lineModel, "read")).isFalse();
+    }
+
+    @Test void projectingAnInvalidatedSourceRollsBackActualWritesEvenWhenTheHandlerCatchesDenial() {
+        owner.publicOutput = true;
+        assertThatThrownBy(() -> command(scope -> {
+            scope.accessor().getById(lineModel, linePid);
+            scope.accessor().update(lineModel, linePid, Map.of(qty, "3"));
+            assertThatThrownBy(() -> scope.accessor().projectForPublicOutput(lineModel, List.of(linePid))).isInstanceOf(DataAccessorException.class);
+            return null;
+        })).isInstanceOf(UnexpectedRollbackException.class);
+        assertThat(storedQty()).isEqualTo("2");
+    }
+
     class Owner implements CommandHandlerExtension,BusinessResourceAuthorization {
         Runnable onUpdate;
         boolean paged;
+        boolean publicOutput;
         int pagedLimit = 2000;
         String deniedLine;
-        public ReadIsolation resourceReadIsolation(){return paged ? ReadIsolation.REPEATABLE_READ : null;}
+        public ReadIsolation resourceReadIsolation(){return paged || publicOutput ? ReadIsolation.REPEATABLE_READ : null;}
+        public Map<String,Set<String>> publicBusinessResourceFields(){return publicOutput ? Map.of(lineModel, Set.of(qty)) : Map.of();}
         public Map<String,Integer> pagedBusinessResourceRowLimits(){return paged ? Map.of(lineModel,pagedLimit) : Map.of();}
         public String getCommandType(){return "fixture:receipt_confirm";}
         public Object execute(CommandContext context){throw new AssertionError("Not a product handler fixture");}

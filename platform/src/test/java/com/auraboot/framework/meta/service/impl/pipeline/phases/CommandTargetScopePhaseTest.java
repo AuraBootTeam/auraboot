@@ -753,6 +753,29 @@ class CommandTargetScopePhaseTest {
         assertThat(ctx.getBusinessTargetAuthorization()).isNull();
     }
 
+    @Test void declaredPublicOutputPolicyIsCapturedAtTheTargetGateBeforeIdempotency() {
+        var ctx = businessTarget();
+        var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        var grant = new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                PermissionResult.allow(List.of()),1L,42L,99L,"inv_inbound","REC-1",List.of());
+        when(authorizer.resolve(99L, List.of("inventory.receipt.confirm"), "inv_inbound", RECORD)).thenReturn(grant);
+        var owner = (com.auraboot.framework.plugin.extension.BusinessResourceAuthorization) commandHandler;
+        when(owner.publicBusinessResourceFields()).thenReturn(Map.of("inv_inbound", java.util.Set.of("status")));
+        var service = org.mockito.Mockito.mock(com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService.class);
+        var target = new CommandPipelineContext.BusinessTargetAuthorization(ctx.getCommandCode(), "inv_inbound", "REC-1", "update", 1L, 42L, 99L);
+        var plan = new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan(target, grant, Map.of("inv_inbound",
+                new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan.ModelFields(java.util.Set.of("status"), java.util.Set.of("status"), List.of(), List.of())));
+        when(service.prepare(ctx, owner)).thenReturn(plan);
+        var phase = phase();
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "publicOutputProjection", service);
+        phase.execute(ctx);
+        assertThat(ctx.getPublicOutputProjection()).isSameAs(plan);
+        assertThat(com.auraboot.framework.meta.service.impl.pipeline.CommandIdempotencyIntent.snapshot(ctx))
+                .containsEntry("publicOutputPolicy", plan.fingerprint());
+        verify(service).prepare(ctx, owner);
+    }
+
     private CommandPipelineContext businessTarget() {
         givenMember(); when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
         var ctx = context("inv_inbound", "REC-1");

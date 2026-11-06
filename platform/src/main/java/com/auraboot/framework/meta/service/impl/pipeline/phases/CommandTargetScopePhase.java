@@ -67,6 +67,9 @@ public class CommandTargetScopePhase implements CommandPhase {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicOutputProjection;
+
 
     @Override
     public String name() {
@@ -332,6 +335,10 @@ public class CommandTargetScopePhase implements CommandPhase {
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
             if (resultProjection != null) ctx.setBusinessResultProjection(nativeContract != null
                     ? resultProjection.prepareNative(ctx, nativeContract) : resultProjection.prepare(ctx,owner));
+            if (owner != null && !owner.publicBusinessResourceFields().isEmpty()) {
+                if (publicOutputProjection == null) throw new org.springframework.security.access.AccessDeniedException("Public output policy service is unavailable");
+                ctx.setPublicOutputProjection(publicOutputProjection.prepare(ctx, owner));
+            }
             return true;
         }
 

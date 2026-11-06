@@ -386,15 +386,111 @@ class BusinessCommandDataAccessorFactoryTest {
         assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
+    private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicOwner() throws Exception {
+        owner.readIsolation = BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+        owner.publicFields = Map.of("line", Set.of("qty"));
+        when(connection.getTransactionIsolation()).thenReturn(Connection.TRANSACTION_REPEATABLE_READ);
+        var grant = new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()), 7L, 20L, 30L, "receipt", "root-1", List.of());
+        context.setBusinessGrantDecision(grant);
+        context.setPublicOutputProjection(new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan(
+                context.getBusinessTargetAuthorization(), grant, Map.of("line",
+                new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan.ModelFields(Set.of("qty"), Set.of("qty"), List.of(), List.of()))));
+        var projection = mock(com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "publicProjection", projection);
+        when(projection.project(eq(context), eq("line"), anyMap())).thenAnswer(call -> {
+            Map<String,Object> trusted = call.getArgument(2);
+            assertThat(trusted).containsEntry("qty", 2).doesNotContainKey("secret_cost");
+            return Map.of("qty", "masked");
+        });
+        return projection;
+    }
+
+    @Test void publicOutputUsesOnlyAnAlreadyReadHostRecordAndLeavesInternalFactsUnmasked() throws Exception {
+        var projection = publicOwner();
+        command(scope -> {
+            var internal = scope.accessor().getById("line", "line-1");
+            assertThat(internal).containsEntry("qty", 2);
+            var output = scope.accessor().projectForPublicOutput("line", List.of("line-1"));
+            assertThat(output).containsEntry("line-1", Map.of("qty", "masked"));
+            assertThat(internal).containsEntry("qty", 2);
+            assertThatThrownBy(() -> output.put("other", Map.of())).isInstanceOf(UnsupportedOperationException.class);
+            return null;
+        });
+        verify(projection).project(eq(context), eq("line"), anyMap());
+        verify(data, times(1)).getByIdForAuthorization("line", "line-1");
+        assertThat(holder.isRollbackOnly()).isFalse();
+    }
+
+    @Test void publicOutputCannotInventARecordOrBorrowUnrequestedRows() throws Exception {
+        var projection = publicOwner();
+        command(scope -> {
+            scope.accessor().getById("line", "line-1");
+            denied(() -> scope.accessor().projectForPublicOutput("line", List.of("line-2")));
+            return null;
+        });
+        verifyNoInteractions(projection);
+        verify(data, never()).getByIdForAuthorization("line", "line-2");
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void publicOutputRechecksOwnerMembershipBeforeProjection() throws Exception {
+        var projection = publicOwner();
+        command(scope -> {
+            scope.accessor().getById("line", "line-1"); owner.denyLineRead = true;
+            denied(() -> scope.accessor().projectForPublicOutput("line", List.of("line-1")));
+            return null;
+        });
+        verifyNoInteractions(projection);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void publicOutputRejectsSnapshotReadsAfterAnyBusinessWrite() throws Exception {
+        var projection = publicOwner();
+        when(data.create(eq("ledger"), anyMap())).thenReturn(row("ledger-1", Map.of("parent", "root-1", "qty", 1)));
+        command(scope -> {
+            scope.accessor().getById("line", "line-1");
+            scope.accessor().create("ledger", Map.of("parent", "root-1", "qty", 1));
+            denied(() -> scope.accessor().projectForPublicOutput("line", List.of("line-1")));
+            return null;
+        });
+        verifyNoInteractions(projection);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void publicOutputRequiresThePreparedDeclarationAndHostService() throws Exception {
+        publicOwner(); context.setPublicOutputProjection(null);
+        assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void publicOutputIsClosedByDefault() {
+        command(scope -> { denied(() -> scope.accessor().projectForPublicOutput("line", List.of("line-1"))); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
+    @Test void publicOutputPlanCannotBeReplacedDuringAnInvocation() throws Exception {
+        publicOwner();
+        command(scope -> {
+            scope.accessor().getById("line", "line-1"); context.setPublicOutputProjection(null);
+            denied(() -> scope.accessor().projectForPublicOutput("line", List.of("line-1")));
+            return null;
+        });
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+
     static final class Owner implements CommandHandlerExtension, BusinessResourceAuthorization {
         RecordReadAccessor captured;
         String extraWrite;
         boolean inspectLockedLine, optionalReference;
         ReadIsolation readIsolation;
         Map<String,Integer> pagedLimits = Map.of();
+        Map<String,Set<String>> publicFields = Map.of();
+        boolean denyLineRead;
         BusinessResourceAuthorization invocation;
         public BusinessResourceAuthorization newInvocationAuthorization() { return invocation == null ? this : invocation; }
         public Map<String,Integer> pagedBusinessResourceRowLimits() { return pagedLimits; }
+        public Map<String,Set<String>> publicBusinessResourceFields() { return publicFields; }
         public ReadIsolation resourceReadIsolation() { return readIsolation; }
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }
         public String getCommandType() { return "receipt.confirm"; }
@@ -403,6 +499,7 @@ class BusinessCommandDataAccessorFactoryTest {
         public Set<String> businessResourceModels() { return Set.of("receipt", "line", "ledger", "reference"); }
         public Set<String> businessResultFields() { return Set.of("status"); }
         public Grant authorizeResource(TargetAuthorizationContext root, Request request) {
+            if (denyLineRead && request.action() == Action.READ && "line".equals(request.modelCode())) return null;
             captured = root.records();
             if (inspectLockedLine) ((BusinessResourceSourceReader) root.records()).getLockedById("line", "line-1");
             if (optionalReference && request.action() == Action.READ && "reference".equals(request.modelCode())

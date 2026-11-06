@@ -32,6 +32,9 @@ public class BusinessCommandDataAccessorFactory {
     private final SqlSessionFactory sessions;
     private final com.auraboot.framework.meta.mapper.DynamicDataMapper mapper;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
+
     public Scope open(CommandPipelineContext context, CommandHandlerExtension handler) {
         if (!(handler instanceof BusinessResourceAuthorization owner)) throw denied();
         var source = sessions.getConfiguration().getEnvironment().getDataSource();
@@ -45,6 +48,7 @@ public class BusinessCommandDataAccessorFactory {
         }
         var invocationOwner = Objects.requireNonNull(owner.newInvocationAuthorization());
         if (!Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
+                || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
                 || !Objects.equals(owner.pagedBusinessResourceRowLimits(), invocationOwner.pagedBusinessResourceRowLimits())) throw denied();
         Scope scope = new Scope(context, invocationOwner, source, holder, connection);
         try {
@@ -65,6 +69,7 @@ public class BusinessCommandDataAccessorFactory {
         private final CommandPipelineContext context;
         private final CommandPipelineContext.BusinessTargetAuthorization witness;
         private final Object plan, authorization, source;
+        private final com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan outputPlan;
         private final BusinessResourceAuthorization owner;
         private final ConnectionHolder holder;
         private final Connection connection;
@@ -79,8 +84,12 @@ public class BusinessCommandDataAccessorFactory {
         private Map<String,Integer> pagedLimits;
         private final Map<List<Object>,List<Map<String,Object>>> pagedSnapshots = new HashMap<>();
         private boolean pagedReadsDirty;
+        private boolean outputReadsDirty;
         private record SourceKey(String model, String pid) {}
         private final Map<SourceKey,Long> lockedSources = new HashMap<>();
+        private record OutputSource(Map<String,Object> raw, Map<String,Object> projected) {}
+        private final Map<SourceKey,OutputSource> outputSources = new HashMap<>();
+        private Map<String,Set<String>> publicDeclarations;
         private Map<String, Object> root;
         private volatile boolean active = true;
         private boolean registered;
@@ -96,6 +105,7 @@ public class BusinessCommandDataAccessorFactory {
             this.readIsolation = owner.resourceReadIsolation();
             witness = context.getBusinessTargetAuthorization();
             plan = context.getPermitPlan(); authorization = context.getAuthorizationVerdict();
+            outputPlan = context.getPublicOutputProjection();
             tenant = MetaContext.getCurrentTenantId(); user = MetaContext.getCurrentUserId();
             member = MetaContext.getCurrentMemberId(); actor = MetaContext.getCurrentUserPid();
             command = context.getCommandCode();
@@ -106,6 +116,8 @@ public class BusinessCommandDataAccessorFactory {
 
         private void verify() {
             if (!Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
+            if (context.getPublicOutputProjection() != outputPlan
+                    || publicDeclarations != null && !publicDeclarations.equals(owner.publicBusinessResourceFields())) throw denied();
             if (readIsolation != null) {
                 try { if (connection.getTransactionIsolation() != readIsolation.jdbcLevel()) throw denied(); }
                 catch (SQLException failure) { throw new IllegalStateException("Cannot validate business source isolation", failure); }
@@ -156,6 +168,17 @@ public class BusinessCommandDataAccessorFactory {
             resultFields = Set.copyOf(owner.businessResultFields());
             optionalModels = Set.copyOf(owner.optionalBusinessResourceModels());
             pagedLimits = Map.copyOf(owner.pagedBusinessResourceRowLimits());
+            publicDeclarations = owner.publicBusinessResourceFields().entrySet().stream().collect(
+                    java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+            if (!publicDeclarations.isEmpty()) {
+                if (publicProjection == null || outputPlan == null || outputPlan.grant() != context.getBusinessGrantDecision()
+                        || !Objects.equals(outputPlan.target(), witness)
+                        || !publicDeclarations.keySet().equals(outputPlan.models().keySet())
+                        || publicDeclarations.entrySet().stream().anyMatch(entry -> !entry.getValue().equals(outputPlan.models().get(entry.getKey()).declared()))
+                        || !dependencies.containsAll(publicDeclarations.keySet())
+                        || readIsolation != BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ
+                            && readIsolation != BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE) throw denied();
+            } else if (outputPlan != null && !outputPlan.models().isEmpty()) throw denied();
             if (!dependencies.containsAll(pagedLimits.keySet()) || pagedLimits.values().stream().anyMatch(limit -> limit < 1 || limit > 10_000)
                     || !pagedLimits.isEmpty() && readIsolation != BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ
                         && readIsolation != BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE) throw denied();
@@ -186,7 +209,7 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void reject() { poisoned = true; holder.setRollbackOnly(); }
-        @Override public void close() { active = false; pagedSnapshots.clear(); }
+        @Override public void close() { active = false; pagedSnapshots.clear(); outputSources.clear(); }
 
         private <T> T operation(Supplier<T> body) {
             try {
@@ -235,7 +258,10 @@ public class BusinessCommandDataAccessorFactory {
             model(model);
             verify();
             if (action == BusinessResourceAuthorization.Action.CREATE || action == BusinessResourceAuthorization.Action.UPDATE
-                    || action == BusinessResourceAuthorization.Action.DELETE) pagedReadsDirty |= !pagedSnapshots.isEmpty();
+                    || action == BusinessResourceAuthorization.Action.DELETE) {
+                pagedReadsDirty |= !pagedSnapshots.isEmpty();
+                outputReadsDirty = true;
+            }
             return MetaContext.runWithCommandPermitPlan(pid == null ? "ALL" : "TARGET", expected, model, pid, () -> {
                 var loan = new Loan(model, pid);
                 loans.push(loan);
@@ -379,7 +405,7 @@ public class BusinessCommandDataAccessorFactory {
                         model, (String)row.get("pid"), row, null, null));
                 Set<String> intersection = new HashSet<>(grant.readableFields());
                 intersection.retainAll(individual.readableFields());
-                result.add(project(row, new BusinessResourceAuthorization.Grant(intersection, Set.of(), 1)));
+                result.add(remember(model, row, new BusinessResourceAuthorization.Grant(intersection, Set.of(), 1)));
             }
             return new DataPage(List.copyOf(result), rows.size(), query.page(), query.size());
         }
@@ -388,6 +414,13 @@ public class BusinessCommandDataAccessorFactory {
             Map<String, Object> result = new LinkedHashMap<>();
             row.forEach((field, value) -> { if (grant.readableFields().contains(field)) result.put(field, value); });
             return BusinessResourceAuthorization.snapshot(result);
+        }
+
+        private Map<String,Object> remember(String model, Map<String,Object> row, BusinessResourceAuthorization.Grant grant) {
+            var projected = project(row, grant);
+            if (publicDeclarations.containsKey(model)) outputSources.put(new SourceKey(model, (String) row.get("pid")),
+                    new OutputSource(BusinessResourceAuthorization.snapshot(row), projected));
+            return projected;
         }
 
         private void writable(Map<String, Object> changes, BusinessResourceAuthorization.Grant grant) {
@@ -422,7 +455,7 @@ public class BusinessCommandDataAccessorFactory {
                         if (nullable) return null;
                         throw new MetaRecordNotFoundException(model, pid);
                     }
-                    return project(row, grant);
+                    return remember(model, row, grant);
                 });
             }
             @Override public List<Map<String, Object>> query(String model, Map<String, Object> filters) {
@@ -438,9 +471,27 @@ public class BusinessCommandDataAccessorFactory {
                                 model, (String) row.get("pid"), row, null, null));
                         Set<String> intersection = new HashSet<>(individual.readableFields());
                         intersection.retainAll(grant.readableFields());
-                        result.add(project(row, new BusinessResourceAuthorization.Grant(intersection, Set.of(), 1)));
+                        result.add(remember(model, row, new BusinessResourceAuthorization.Grant(intersection, Set.of(), 1)));
                     }
                     return List.copyOf(result);
+                });
+            }
+            @Override public Map<String,Map<String,Object>> projectForPublicOutput(String model, List<String> pids) {
+                return operation(() -> {
+                    model(model);
+                    if (outputReadsDirty || outputPlan == null || publicProjection == null || !publicDeclarations.containsKey(model)
+                            || pids == null || pids.isEmpty() || pids.size() > 1_000
+                            || pids.stream().anyMatch(pid -> pid == null || pid.isBlank()) || new HashSet<>(pids).size() != pids.size()) throw denied();
+                    Map<String,Map<String,Object>> result = new LinkedHashMap<>();
+                    for (String pid : pids) {
+                        var row = outputSources.get(new SourceKey(model, pid));
+                        if (row == null) throw denied();
+                        // Recheck membership against the trusted source, never a caller-supplied row.
+                        var grant = authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.READ,
+                                model, pid, row.raw(), null, null));
+                        result.put(pid, publicProjection.project(context, model, project(row.projected(), grant)));
+                    }
+                    return Collections.unmodifiableMap(result);
                 });
             }
             @Override public Map<String, Object> create(String model, Map<String, Object> changes) {

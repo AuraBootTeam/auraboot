@@ -79,6 +79,15 @@ public interface DataAccessor extends RecordReadAccessor {
     }
 
     /**
+     * Public scalar views of already-read, owner-authorized records, keyed by the requested PIDs.
+     * No row data is accepted from the handler. Requires an explicit host output policy and must
+     * run before business writes. Internal reads and derived writes retain their canonical values.
+     */
+    default Map<String, Map<String, Object>> projectForPublicOutput(String modelCode, List<String> recordIds) {
+        throw new UnsupportedOperationException("DataAccessor public output projection is unavailable");
+    }
+
+    /**
      * Query records where a single field is in the provided value set.
      *
      * <p>The default implementation preserves binary/source compatibility for

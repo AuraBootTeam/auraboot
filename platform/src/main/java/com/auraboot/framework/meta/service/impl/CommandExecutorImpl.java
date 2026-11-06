@@ -34,7 +34,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipeline;
@@ -92,6 +91,9 @@ public class CommandExecutorImpl implements CommandExecutor {
     @org.springframework.context.annotation.Lazy
     private CommandPipeline commandPipeline;
 
+    @Autowired
+    private CommandExecutionTransaction executionTransaction;
+
     @Autowired(required = false)
     private I18nService i18nService;
 
@@ -129,9 +131,12 @@ public class CommandExecutorImpl implements CommandExecutor {
     }
 
     @Override
-    @Transactional
     @Observed(name = "command.execute", contextualName = "command-pipeline")
     public CommandExecuteResult execute(String commandCode, CommandExecuteRequest request) {
+        return executionTransaction.execute(commandCode, request.isDryRun(), () -> executeInTransaction(commandCode, request));
+    }
+
+    private CommandExecuteResult executeInTransaction(String commandCode, CommandExecuteRequest request) {
         log.info("Executing command: {}", commandCode);
         long startTime = System.currentTimeMillis();
         io.micrometer.core.instrument.Timer.Sample metricsSample = commandMetrics != null ? commandMetrics.startTimer() : null;
@@ -147,19 +152,7 @@ public class CommandExecutorImpl implements CommandExecutor {
                 .startTime(startTime)
                 .build();
 
-        // Shadow Mode dry-run (learning-loop.md §6, PR-56): mark rollback
-        // BEFORE any phase runs so that even if a phase tries to commit
-        // something intra-transactionally, the flag is already set. Any
-        // AFTER_COMMIT TransactionSynchronization registered downstream
-        // (webhook dispatch, audit trail listener, api-call) will also be
-        // short-circuited by the Spring tx manager once rollback-only is
-        // set, removing the remaining side-effect leakage vectors.
-        if (request.isDryRun()) {
-            org.springframework.transaction.interceptor.TransactionAspectSupport
-                    .currentTransactionStatus().setRollbackOnly();
-            log.info("Dry-run mode: transaction marked for rollback at pipeline entry (command={})",
-                    commandCode);
-        }
+        // The command transaction marks dry-run rollback-only before entering this pipeline.
 
         try {
             // Pre-guard phases: Load, SchemaValidate, Idempotency, Entitlement

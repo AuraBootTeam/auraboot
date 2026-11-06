@@ -240,13 +240,16 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         return resultCommand(executions,false);
     }
     private String resultCommand(java.util.concurrent.atomic.AtomicInteger executions,boolean invalidResult) throws Exception {
+        return resultCommand(executions, invalidResult, false);
+    }
+    private String resultCommand(java.util.concurrent.atomic.AtomicInteger executions,boolean invalidResult,boolean publicOutput) throws Exception {
         String code=model+":inspect_result",permission="model."+model+".inspect";
         grantCommittedPermissionToTestRole(permission,"operation",model,"inspect","Business output fixture");
         permissionIds.add(jdbc.queryForObject("SELECT id FROM ab_permission WHERE tenant_id=? AND code=?",Long.class,testTenant.getId(),permission));
         grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
                 "API","command","execute","Command fixture invocation");
         scopes.setScope(testTenant.getId(),testRole.getId(),model,"inspect","all","MAX");
-        var handler=new ResultOwner(code,permission,model,label,secret,hidden,quantity,executions,invalidResult);
+        var handler=new ResultOwner(code,permission,model,label,secret,hidden,quantity,executions,invalidResult,publicOutput);
         org.mockito.Mockito.doReturn(Optional.of(handler)).when(extensions).getCommandHandler(code);
         var definition=new com.auraboot.framework.meta.entity.CommandDefinition();
         definition.setTenantId(testTenant.getId());definition.setPid(UniqueIdGenerator.generate());definition.setCode(code);
@@ -298,6 +301,42 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
                 Integer.class,testTenant.getId(),command,command+":"+request.getClientRequestId())).isEqualTo(10);
     }
 
+    @Test void artifactPolicyChangeConflictsBeforeReplayAndRestorationReusesTheOriginalOutcome() throws Exception {
+        var executions = new java.util.concurrent.atomic.AtomicInteger(); String command = resultCommand(executions, false, true);
+        resultReadFields(List.of(secret)); var request = resultRequest();
+        var first = commandExecutor.execute(command, request);
+        assertThat(first.isIdempotentReplay()).isFalse();
+        assertThat(first.getData()).containsEntry("visibleValue", 10);
+        String outcome = jdbc.queryForObject("SELECT outcome::text FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                String.class, testTenant.getId(), command, command + ":" + request.getClientRequestId());
+        var config = new com.auraboot.framework.meta.entity.FieldMaskConfig(); config.setModelCode(model); config.setFieldCode(secret);
+        config.setEnabled(true); config.setApplyToDetail(false); config.setApplyToList(false); config.setApplyToExport(true);
+        config.setMaskType("FULL"); config.setReplacementChar("*"); masks.saveConfig(config); maskIds.add(config.getId());
+        assertThatThrownBy(() -> commandExecutor.execute(command, request))
+                .isInstanceOf(com.auraboot.framework.exception.RequestIntentConflictException.class);
+        assertThat(executions).hasValue(1);
+        assertThat(stored(label, pid)).isEqualTo("executed-1");
+        assertThat(jdbc.queryForObject("SELECT outcome::text FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                String.class, testTenant.getId(), command, command + ":" + request.getClientRequestId())).isEqualTo(outcome);
+        masks.deleteConfig(config.getId()); maskIds.remove(config.getId());
+        var replay = commandExecutor.execute(command, request);
+        assertThat(replay.isIdempotentReplay()).isTrue();
+        assertThat(replay.getData()).containsEntry("visibleValue", 10);
+        assertThat(executions).hasValue(1);
+    }
+
+    @Test void strongIsolationDryRunRollsBackTheRealMutationAndIdempotencyClaim() throws Exception {
+        var executions = new java.util.concurrent.atomic.AtomicInteger(); String command = resultCommand(executions, false, true);
+        resultReadFields(List.of(secret)); var request = resultRequest(); request.setDryRun(true);
+        var result = commandExecutor.execute(command, request);
+        assertThat(result.getPhaseReached()).isEqualTo("completed_dry_run");
+        assertThat(executions).hasValue(1);
+        assertThat(stored(label, pid)).isEqualTo("before");
+        assertThat(stored(secret, pid)).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                Long.class, testTenant.getId(), command, command + ":" + request.getClientRequestId())).isZero();
+    }
+
     @Test void invalidAcknowledgementRollsBackMutationAndScopedOutcomeClaim() throws Exception {
         var executions=new java.util.concurrent.atomic.AtomicInteger();String command=resultCommand(executions,true);resultReadFields(List.of(secret));
         var request=resultRequest();
@@ -309,12 +348,15 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
     }
 
     private record ResultOwner(String code,String permission,String model,String label,String secret,String hidden,String quantity,
-            java.util.concurrent.atomic.AtomicInteger executions,boolean invalidResult)
+            java.util.concurrent.atomic.AtomicInteger executions,boolean invalidResult,boolean publicOutput)
             implements com.auraboot.framework.plugin.extension.CommandHandlerExtension,
                        com.auraboot.framework.plugin.extension.BusinessResourceAuthorization {
         @Override public String getCommandType(){return code;}
+        @Override public boolean supportsDryRun(){return true;}
         @Override public Boundary businessBoundary(){return new Boundary(code,model,"update",Set.of(permission));}
         @Override public Set<String> businessResourceModels(){return Set.of(model);}
+        @Override public ReadIsolation resourceReadIsolation(){return publicOutput ? ReadIsolation.REPEATABLE_READ : null;}
+        @Override public Map<String,Set<String>> publicBusinessResourceFields(){return publicOutput ? Map.of(model,Set.of(secret)) : Map.of();}
         @Override public Set<String> businessResultFields(){return Set.of("success","visibleValue","hiddenValue");}
         @Override public Map<String,com.auraboot.framework.plugin.extension.BusinessResultField> businessResultProjection(){
             return Map.of("success",com.auraboot.framework.plugin.extension.BusinessResultField.constant(true),
@@ -332,6 +374,8 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         }
         @Override public Object execute(CommandContext context) {
             var record=context.dataAccessor().getById(model,context.recordId());
+            if (publicOutput) assertThat(context.dataAccessor().projectForPublicOutput(model, List.of(context.recordId())).get(context.recordId()))
+                    .containsOnlyKeys(secret).containsEntry(secret, record.get(secret));
             context.dataAccessor().update(model,context.recordId(),Map.of(label,"executed-"+executions.incrementAndGet()));
             return Map.of("success",!invalidResult,"visibleValue",record.get(secret),"hiddenValue",record.get(hidden));
         }

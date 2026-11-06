@@ -37,6 +37,13 @@ public interface BusinessResourceAuthorization {
      */
     default Map<String, Integer> pagedBusinessResourceRowLimits() { return Map.of(); }
 
+    /**
+     * Finite scalar source fields that may contribute to a public artifact. This declaration
+     * does not grant user field visibility: the host separately applies the current public
+     * field policy. Empty by default; internal raw resource reads remain separate.
+     */
+    default Map<String, Set<String>> publicBusinessResourceFields() { return Map.of(); }
+
     /** Immutable owner lower bound; mutable command metadata cannot substitute a weaker duty. */
     Boundary businessBoundary();
 

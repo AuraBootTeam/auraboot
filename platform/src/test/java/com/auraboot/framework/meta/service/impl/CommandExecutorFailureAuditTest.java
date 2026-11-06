@@ -164,6 +164,9 @@ class CommandExecutorFailureAuditTest {
     @Mock
     private CommandPipeline commandPipeline;
 
+    @Mock
+    private CommandExecutionTransaction executionTransaction;
+
     @InjectMocks
     private CommandExecutorImpl commandExecutor;
 
@@ -173,6 +176,9 @@ class CommandExecutorFailureAuditTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(commandExecutor, "commandPipeline", commandPipeline);
+        ReflectionTestUtils.setField(commandExecutor, "executionTransaction", executionTransaction);
+        org.mockito.Mockito.lenient().when(executionTransaction.execute(any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
+                .thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(2)).get());
     }
 
     @AfterEach

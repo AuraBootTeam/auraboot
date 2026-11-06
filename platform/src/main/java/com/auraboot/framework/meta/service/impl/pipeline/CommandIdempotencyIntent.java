@@ -39,6 +39,9 @@ public final class CommandIdempotencyIntent {
         intent.put("expectedVersion", request == null ? null : request.getExpectedVersion());
         intent.put("payload", immutableValue(ctx.getPayload()));
         intent.put("dryRun", request != null && request.isDryRun());
+        if (ctx.getPublicOutputProjection() != null && !ctx.getPublicOutputProjection().models().isEmpty()) {
+            intent.put("publicOutputPolicy", ctx.getPublicOutputProjection().fingerprint());
+        }
         return Collections.unmodifiableMap(intent);
     }
 

@@ -139,6 +139,9 @@ public class CommandPipelineContext {
     /** Immutable public projection captured by the host authorization snapshot, not a request flag. */
     private com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan businessResultProjection;
 
+    /** Host-captured current public field view for explicitly declared artifact sources. */
+    private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan publicOutputProjection;
+
     public record BusinessTargetAuthorization(String commandCode, String modelCode, String targetRecordId,
                                                String action, Long tenantId, Long userId, Long memberId) {}
 

@@ -133,7 +133,7 @@ public class CommandResultProjectionService {
         return BusinessResourceAuthorization.snapshot(result);
     }
 
-    private static void requireActor(CommandPipelineContext ctx) {
+    static void requireActor(CommandPipelineContext ctx) {
         var target=ctx.getBusinessTargetAuthorization();var grant=ctx.getBusinessGrantDecision();
         if(target==null || grant==null || !grant.result().granted() || !MetaContext.exists()
                 || ctx.getAuthorizationVerdict()==null || !ctx.getAuthorizationVerdict().isAuthorized()
