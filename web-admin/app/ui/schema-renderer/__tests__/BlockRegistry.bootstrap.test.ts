@@ -1,11 +1,11 @@
+import { existsSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers all 35 runtime block types', () => {
+  it('initBlockRegistry registers the exact runtime block set for this source baseline', () => {
     initBlockRegistry();
 
-    expect(BlockRegistry.size()).toBe(35);
 
     // Must mirror the dispatch table in
     // web-admin/app/framework/meta/rendering/BlockRenderer.tsx — every
@@ -48,7 +48,13 @@ describe('BlockRegistry bootstrap', () => {
       'trace-graph',
       'card-grid',
       'code-snippet',
+      'conversation-panel',
     ];
+    // Optional renderer assets must agree with registration across supported source baselines.
+    if (existsSync(new URL('../../../framework/meta/rendering/blocks/PrerequisiteTableBlockRenderer.tsx', import.meta.url))) {
+      expected.push('prerequisite-table');
+    }
+    expect(BlockRegistry.list().map(([type]) => type).sort()).toEqual([...expected].sort());
     for (const type of expected) {
       const spec = BlockRegistry.get(type);
       expect(spec, `blockType "${type}" must be registered`).toBeDefined();
