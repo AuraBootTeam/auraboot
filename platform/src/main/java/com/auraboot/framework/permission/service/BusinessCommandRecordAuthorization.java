@@ -54,8 +54,16 @@ public class BusinessCommandRecordAuthorization {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveNative(Long memberId, List<String> declaredPermissions,
                                                String recordModel, Map<String, Object> record, String action) {
-        if (action == null || !List.of("update", "delete").contains(action))
+        if (action == null || !List.of("create", "update", "delete").contains(action))
             return decision(denied("Unsupported native business action", List.of()), memberId, recordModel, record, List.of());
+        // For create, the host supplies the normalized prospective row, including server-owned
+        // tenant and creator. This decision alone is not an insert permit or a command contract.
+        if ("create".equals(action) && (!MetaContext.exists() || record == null
+                || MetaContext.getCurrentUserId() == null
+                || !Objects.equals(MetaContext.getCurrentUserId(), record.get("created_by")))) {
+            return decision(denied("Native creation ownership is unavailable", List.of()),
+                    memberId, recordModel, record, List.of());
+        }
         return resolveInternal(memberId, declaredPermissions, recordModel, record, action);
     }
 

@@ -113,6 +113,60 @@ class BusinessCommandRecordAuthorizationTest {
                 .result().granted()).isFalse();
     }
 
+    @Test void nativeCreationUsesItsOwnRootAndCompleteScopeConditionAndFields() throws Exception {
+        var definition = permission(CODE); definition.setResourceCode(MODEL); definition.setAction("create");
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        var own = grant(11, 101, CODE); own.setFieldScopeJson(fieldScope("label"));
+        var conditional = grant(22, 202, CODE); conditional.setFieldScopeJson(fieldScope("cost"));
+        grants(own, conditional);
+        when(scopes.resolveScopeForRole(5L, 101L, MODEL, "create", MODEL)).thenReturn(new DataScopeCondition("none", null, null, null, List.of(), List.of()));
+        when(scopes.resolveScopeForRole(5L, 202L, MODEL, "create", MODEL)).thenReturn(DataScopeCondition.all());
+        guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null), guard(22, "Shanghai"));
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Beijing"), "create")
+                .result().granted()).isFalse();
+        var candidate = authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "create");
+        assertThat(candidate.result().granted()).isTrue();
+        assertThat(candidate.grants()).extracting(com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant::grantId)
+                .containsExactly(22L);
+        assertThat(candidate.canWrite("cost")).isTrue(); assertThat(candidate.canWrite("label")).isFalse();
+        conditional.setDataScopeAstJson(warehouseAst("Beijing"));
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "create")
+                .result().granted()).isFalse();
+    }
+
+    @Test void nativeCreationDoesNotInferAllFromManageOrMissingScope() {
+        var definition = permission(CODE); definition.setResourceCode(MODEL); definition.setAction("manage");
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        grants(grant(11, 101, CODE)); guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        when(scopes.resolveScopeForRole(5L, 101L, MODEL, "manage", MODEL)).thenReturn(DataScopeCondition.notConfigured());
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        when(scopes.resolveScopeForRole(5L, 101L, MODEL, "manage", MODEL)).thenReturn(
+                new DataScopeCondition("self", "created_by", 1L, null, List.of(), List.of()));
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "create")
+                .result().granted()).isTrue();
+        definition.setAction("update");
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "create")
+                .result().granted()).isFalse();
+    }
+
+    @Test void nativeCreationRejectsForeignOrUnresolvedOwnershipBeforeReadingGrants() {
+        var definition = permission(CODE); definition.setResourceCode(MODEL); definition.setAction("create");
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        grants(grant(11, 101, CODE)); guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        when(scopes.resolveScopeForRole(5L, 101L, MODEL, "create", MODEL)).thenReturn(DataScopeCondition.all());
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(999, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        var candidate = new java.util.HashMap<>(record(1, "Shanghai")); candidate.remove("created_by");
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, candidate, "create").result().granted()).isFalse();
+        candidate.put("created_by", 1L); candidate.put("tenant_id", 200L);
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, candidate, "create").result().granted()).isFalse();
+        MetaContext.clear();
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        verifyNoInteractions(bindings, scopes, policies);
+    }
+
     @Test void explicitWildcardStillUsesItsOwnRoleScopeAndGuard() throws Exception {
         grants(grant(11, 101, "*")); scope(101, DataScopeCondition.all()); guards("*", guard(11, "Shanghai"));
         assertThat(evaluate(record(999, "Beijing")).granted()).isFalse();

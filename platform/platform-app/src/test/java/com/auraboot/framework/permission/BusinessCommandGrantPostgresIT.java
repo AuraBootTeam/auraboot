@@ -73,6 +73,56 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         if (permissionId != 0) jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND id=?", tenant(), permissionId);
     }
 
+    @Test void nativeCreationReadsCompleteSourceGrantsAndDoesNotRewriteThem() throws Exception {
+        jdbc.update("UPDATE ab_permission SET resource_code=?,action='create' WHERE id=?", model, permissionId);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type='none' WHERE id=?", roleA);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE id=?", roleB);
+        jdbc.update("""
+                UPDATE ab_role_permission SET priority=37,field_scope=?::jsonb,source_ref=?,
+                  effective_date=CURRENT_DATE-1,expiry_date=CURRENT_DATE+30 WHERE id=?
+                """, fieldScope("cost"), resource + ":creation-source", bindingB);
+        String before = jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE id=?", String.class, bindingB);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        jdbc.update("UPDATE ab_role SET default_data_scope_type='all' WHERE id=?", roleB);
+        var candidate = authorization.resolveNative(member(), List.of(code), model, record(true, "Shanghai"), "create");
+        assertThat(candidate.result().granted()).isTrue();
+        assertThat(candidate.grants()).extracting(com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant::grantId)
+                .containsExactly(bindingB);
+        assertThat(candidate.canWrite("cost")).isTrue(); assertThat(candidate.canWrite("label")).isFalse();
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Beijing"), "create")
+                .result().granted()).isFalse();
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(false, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE id=?", String.class, bindingB))
+                .isEqualTo(before);
+        jdbc.update("UPDATE ab_role_permission SET condition_ast=NULL,data_scope_ast=?::jsonb WHERE id=?", warehouseAst("Beijing"), bindingB);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Beijing"), "create")
+                .result().granted()).isTrue();
+        jdbc.update("UPDATE ab_role_permission SET expiry_date=CURRENT_DATE-1 WHERE id=?", bindingB);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Beijing"), "create")
+                .result().granted()).isFalse();
+    }
+
+    @Test void nativeCreationCannotUseUpdateOnlyMetadataOrARevokedAssignment() {
+        jdbc.update("UPDATE ab_permission SET resource_code=?,action='manage' WHERE id=?", model, permissionId);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type='none' WHERE id=?", roleA);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Shanghai"), "create")
+                .result().granted()).isTrue();
+        jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE role_id=? AND tenant_id=?", roleB, tenant());
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        jdbc.update("UPDATE ab_user_role SET status='active' WHERE role_id=? AND tenant_id=?", roleB, tenant());
+        jdbc.update("UPDATE ab_permission SET action='update' WHERE id=?", permissionId);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Shanghai"), "create")
+                .result().granted()).isFalse();
+        jdbc.update("UPDATE ab_permission SET resource_code=?,action='create' WHERE id=?", resource, permissionId);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true, "Shanghai"), "create")
+                .result().granted()).isFalse();
+    }
+
     @Test void alternativePermissionCodesRetainOrSemanticsWithoutBorrowingOtherGrantFields() throws Exception {
         String alternative = resource + ".alternative";
         Long alternativeId = jdbc.queryForObject("""
