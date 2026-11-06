@@ -241,6 +241,13 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     @Override
+    public boolean reconcileImportedRolePermissions(RoleDefinitionDTO dto, Long tenantId,
+                                                   String pluginPid, String importId) {
+        return accessPolicies().reconcileImportedRolePermissions(dto, tenantId, pluginPid, importId);
+    }
+
+
+    @Override
     public PluginResource importMenu(MenuDefinitionDTO dto, String pluginPid, String importId,
                                       Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
         return pageNavigationResources().importMenu(dto, pluginPid, importId, tenantId, conflictStrategy);
@@ -380,6 +387,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 permissionMapper,
                 rolePermissionMapper,
                 pluginRecordMapper,
+                pluginResourceMapper,
                 log,
                 sharedSupport());
     }

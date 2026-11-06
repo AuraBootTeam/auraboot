@@ -1,264 +1,186 @@
 package com.auraboot.framework.integration.plugin;
 
 import com.auraboot.framework.application.TestApplication;
-import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
-import com.auraboot.framework.plugin.dto.imports.ImportRequest;
-import com.auraboot.framework.plugin.service.PluginImportService;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
-import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestMethodOrder;
+import com.auraboot.framework.integration.TenantAdministrationFixture;
+import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.plugin.dto.imports.*;
+import com.auraboot.framework.plugin.service.PluginImportService;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
+import java.nio.file.*;
+import java.util.*;
+import static org.assertj.core.api.Assertions.*;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-
-/**
- * A plugin role declaring generated model actions must end up holding them after a
- * SINGLE plugin import.
- *
- * Baseline CRUD actions (model.&lt;code&gt;.create/update/...) are created at model-create
- * time, so the ROLE import stage can resolve them. Command-verb actions
- * (model.&lt;code&gt;.&lt;verb&gt;, e.g. a state_transition command) are only derived during
- * post-import processing, AFTER the ROLE stage — the binding was silently skipped
- * ("Permission not found for role binding") and plugin business roles ended up without
- * the verbs their own roles.json declares. The post-import reconciliation must bind
- * every declared code once it exists.
- */
-@Slf4j
-@SpringBootTest(classes = TestApplication.class)
-@ActiveProfiles({"integration-test", "test"})
-@DisplayName("Plugin role model-action permissions resolve on first import")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Transactional(propagation = Propagation.NOT_SUPPORTED)
+/** Real plugin import transactions: first-install seeds and preservation of tenant-owned roles. */
+@SpringBootTest(classes=TestApplication.class, properties="spring.data.redis.host=")
+@Transactional(propagation=Propagation.NOT_SUPPORTED)
 class PluginRoleModelPermissionReconciliationIT extends BaseIntegrationTest {
+    @Autowired JdbcTemplate jdbc;
+    @Autowired PluginImportService imports;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    com.auraboot.framework.plugin.service.impl.PluginResourceImporterImpl resourceImporter;
+    String namespace, model, roleCode, rolePid;
+    Path directory;
+    Long roleId;
+    TenantAdministrationFixture administrator;
 
-    private static final String MODEL_CODE = "pfx_widget";
-    private static final String ROLE_CODE = "pfx_clerk";
-    private static final String PLUGIN_DIR_NAME = "pfx-plugin";
-
-    @Autowired
-    private WebApplicationContext webApplicationContext;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private PluginImportService pluginImportService;
-
-    private MockMvc mockMvc;
-    private Long tenantId;
-    private Long userId;
-
-    @BeforeEach
-    void setup() throws Exception {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
-
-        MvcResult seed = mockMvc.perform(post("/api/test/seed")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andReturn();
-        // The seed enforces showcase-plugin preconditions irrelevant to this IT; all we
-        // need is the tenant/user pair it guarantees.
-        tenantId = jdbcTemplate.queryForObject(
-                "SELECT id FROM ab_tenant WHERE name = 'e2e_test' ORDER BY id DESC LIMIT 1", Long.class);
-        userId = jdbcTemplate.queryForObject(
-                "SELECT id FROM ab_user WHERE email = 'e2e@test.local' ORDER BY id DESC LIMIT 1", Long.class);
-        Assertions.assertTrue(seed.getResponse().getStatus() == 200 || tenantId != null,
-                "seed must succeed or an e2e_test tenant must already exist");
+    @BeforeEach void fixture() throws Exception {
+        namespace="rup"+UniqueIdGenerator.generate().substring(18).toLowerCase(Locale.ROOT);
+        model=namespace+"_widget";roleCode=namespace+"_reader";
+        directory=Files.createTempDirectory("role-upgrade-");
+        administrator=TenantAdministrationFixture.grant(jdbc,getTestTenant().getId(),getTestTenantMember().getId());
+        for(String code:List.of(MetaPermission.ROLE_MANAGE,MetaPermission.PERMISSION_MANAGE,MetaPermission.USER_ROLE_MANAGE))
+            grantCommittedPermissionToTestRole(code,"API","role","update","Role upgrade fixture");
+        write("plugin.json","""
+            {"pluginId":"com.auraboot.%s","namespace":"%s","version":"1.0.0","dslVersion":1,
+             "pluginType":"config","displayName":"Role Upgrade Fixture","minPlatformVersion":"1.0.0",
+             "dependencies":[],"provides":[],"requires":[],"resourceDirs":{
+               "models":"config/models.json","fields":"config/fields","modelFieldBindings":"config/bindings",
+               "commands":"config/commands","permissions":"config/permissions.json","roles":"config/roles.json"}}
+            """.formatted(namespace,namespace));
+        write("config/models.json","""
+            [{"code":"%s","displayName:en":"Widget","modelType":"entity","modelCategory":"entity"}]
+            """.formatted(model));
+        write("config/fields/widget.json","""
+            [{"code":"%s_name","displayName:en":"Widget name","dataType":"string","constraints":{"maxLength":100}}]
+            """.formatted(model));
+        write("config/bindings/widget.json","""
+            [{"modelCode":"%s","fieldCode":"%s_name","sequence":1,"visible":true,"editable":true}]
+            """.formatted(model,model));
+        write("config/commands/widget.json","""
+            [{"code":"%s:archive_widget","displayName:en":"Archive","type":"state_transition","modelCode":"%s"}]
+            """.formatted(namespace,model));
+        write("config/permissions.json","""
+            [{"code":"model.%s.read","name:en":"Read widgets","resourceType":"model","resourceCode":"%s","action":"read"}]
+            """.formatted(model,model));
+        template(false,false);
     }
 
-    @Test
-    @Order(1)
-    @DisplayName("single import binds baseline CRUD and command-verb actions to the plugin role")
-    void singleImportBindsAllDeclaredModelActions() throws Exception {
-        importPlugin(PLUGIN_DIR_NAME);
-
-        List<String> bound = rolePermissionCodes();
-        assertThat(bound)
-                .as("plugin role %s must hold baseline model actions after first import", ROLE_CODE)
-                .contains(
-                        "model." + MODEL_CODE + ".read",
-                        "model." + MODEL_CODE + ".create",
-                        "model." + MODEL_CODE + ".update",
-                        "model." + MODEL_CODE + ".delete",
-                        "model." + MODEL_CODE + ".export",
-                        // state_transition command pfx:archive_widget derives this verb
-                        // during post-import processing, after the ROLE stage ran.
-                        "model." + MODEL_CODE + ".archive");
+    void template(boolean upgrade, boolean broken) throws Exception {
+        write("config/roles.json","""
+            [{"code":"%s","name:en":"%s","defaultDataScopeType":"%s",
+              "permissions":["model.%s.read","model.%s.archive"%s],
+              "seedMembers":["CURRENT_MEMBER"],
+              "permissionPolicies":[{"permissionCode":"model.%s.read","conditions":{"limit":%d}}],
+              "dataScopes":[{"permissionCode":"model.%s.read","scopeType":"%s","mergeStrategy":"MIN"}]}]
+            """.formatted(roleCode,upgrade?"Updated template":"Widget reader",upgrade?"all":"self",model,model,
+                broken?",\"missing.upgrade.permission\"":upgrade?",\"model."+model+".delete\"":"",
+                model,upgrade?999:7,model,upgrade?"all":"self"));
     }
 
-    @Test
-    @Order(2)
-    @DisplayName("re-import keeps the binding set stable (idempotent reconciliation)")
-    void reImportKeepsBindingsStable() throws Exception {
-        importPlugin(PLUGIN_DIR_NAME);
-        List<String> afterFirst = rolePermissionCodes();
-
-        importPlugin(PLUGIN_DIR_NAME);
-        List<String> afterSecond = rolePermissionCodes();
-
-        assertThat(afterSecond).containsExactlyInAnyOrderElementsOf(afterFirst);
+    ImportExecuteResult execute() {
+        var preview=imports.parseDirectory(directory.toString());
+        assertThat(preview.isValid()).as("Fixture parse: %s",preview.getErrors()).isTrue();
+        return imports.execute(preview.getImportId(),ImportRequest.builder().importId(preview.getImportId())
+                .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE).autoPublishModels(true)
+                .autoPublishFields(true).autoPublishCommands(true).autoPublishPages(true).build());
     }
 
-    private List<String> rolePermissionCodes() {
-        return jdbcTemplate.queryForList("""
-                SELECT p.code
-                FROM ab_role_permission rp
-                JOIN ab_role r ON r.id = rp.role_id
-                JOIN ab_permission p ON p.id = rp.permission_id
-                WHERE r.code = ? AND rp.deleted_flag = false
-                """, String.class, ROLE_CODE);
+    void install() {
+        var result=execute();assertThat(result.isSuccess()).as("Import: %s",result.getErrorMessage()).isTrue();
+        var row=jdbc.queryForMap("SELECT id,pid FROM ab_role WHERE tenant_id=? AND code=? AND deleted_flag=FALSE",getTestTenant().getId(),roleCode);
+        roleId=((Number)row.get("id")).longValue();rolePid=(String)row.get("pid");
     }
 
-    /** Materialize a minimal plugin whose role declares baseline + verb model actions. */
-    private void importPlugin(String dirName) throws Exception {
-        Path pluginDir = Path.of(System.getProperty("java.io.tmpdir"), "pfx-it", dirName);
-        Files.createDirectories(pluginDir.resolve("config/commands"));
-
-        write(pluginDir, "plugin.json", """
-                {
-                  "pluginId": "com.auraboot.pfx",
-                  "namespace": "pfxw",
-                  "version": "1.0.0",
-                  "dslVersion": 1,
-                  "pluginType": "config",
-                  "displayName": "Permission Reconciliation Fixture",
-                  "minPlatformVersion": "1.0.0",
-                  "dependencies": [],
-                  "provides": [],
-                  "requires": [],
-                  "resourceDirs": {
-                    "models": "config/models.json",
-                    "fields": "config/fields",
-                    "modelFieldBindings": "config/bindings",
-                    "commands": "config/commands",
-                    "permissions": "config/permissions.json",
-                    "roles": "config/roles.json"
-                  }
-                }
-                """);
-
-        write(pluginDir, "config/models.json", """
-                [
-                  {
-                    "code": "%s",
-                    "displayName:zh-CN": "组件",
-                    "displayName:en": "Widget",
-                    "modelType": "entity",
-                    "modelCategory": "entity"
-                  }
-                ]
-                """.formatted(MODEL_CODE));
-
-        write(pluginDir, "config/fields/%s.json".formatted(MODEL_CODE), """
-                [
-                  {
-                    "code": "%s_name",
-                    "displayName:en": "Widget name",
-                    "dataType": "string",
-                    "constraints": {"required": true, "maxLength": 100}
-                  }
-                ]
-                """.formatted(MODEL_CODE));
-
-        write(pluginDir, "config/bindings/%s.json".formatted(MODEL_CODE), """
-                [
-                  {
-                    "modelCode": "%s",
-                    "fieldCode": "%s_name",
-                    "sequence": 1,
-                    "required": true,
-                    "visible": true,
-                    "editable": true
-                  }
-                ]
-                """.formatted(MODEL_CODE, MODEL_CODE));
-
-        write(pluginDir, "config/commands/commands.json", """
-                [
-                  {"code": "pfxw:create_%s", "displayName:en": "Create", "type": "create", "modelCode": "%s"},
-                  {"code": "pfxw:archive_%s", "displayName:en": "Archive", "type": "state_transition", "modelCode": "%s"}
-                ]
-                """.formatted(MODEL_CODE, MODEL_CODE, MODEL_CODE, MODEL_CODE));
-
-        write(pluginDir, "config/permissions.json", """
-                [
-                  {
-                    "code": "model.%s.read",
-                    "name:en": "Read widgets",
-                    "resourceType": "model",
-                    "resourceCode": "%s",
-                    "action": "read",
-                    "module": "pfxw"
-                  }
-                ]
-                """.formatted(MODEL_CODE, MODEL_CODE));
-
-        write(pluginDir, "config/roles.json", """
-                [
-                  {
-                    "code": "%s",
-                    "name:en": "Widget Clerk",
-                    "description": "Runs the full widget lifecycle",
-                    "permissions": [
-                      "model.%s.read",
-                      "model.%s.create",
-                      "model.%s.update",
-                      "model.%s.delete",
-                      "model.%s.export",
-                      "model.%s.archive"
-                    ]
-                  }
-                ]
-                """.formatted(ROLE_CODE, MODEL_CODE, MODEL_CODE, MODEL_CODE, MODEL_CODE, MODEL_CODE, MODEL_CODE));
-
-        MetaContext.setContext(tenantId, userId, "e2e-test-user", "e2e@test.local");
-        try {
-            ImportPreviewResult preview = pluginImportService.parseDirectory(pluginDir.toString());
-            Assertions.assertTrue(preview.isValid(),
-                    "synthetic plugin parse must be valid: " + preview.getErrors());
-            ImportRequest request = ImportRequest.builder()
-                    .importId(preview.getImportId())
-                    .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE)
-                    .autoPublishModels(true)
-                    .autoPublishFields(true)
-                    .autoPublishCommands(true)
-                    .autoPublishPages(true)
-                    .autoDeployProcesses(true)
-                    .build();
-            var result = pluginImportService.execute(preview.getImportId(), request);
-            Assertions.assertTrue(result.isSuccess(),
-                    "synthetic plugin import must succeed: " + result.getErrorMessage());
-        } finally {
-            MetaContext.clear();
-        }
+    List<String> codes() {
+        return jdbc.queryForList("SELECT p.code FROM ab_role_permission rp JOIN ab_permission p ON p.id=rp.permission_id WHERE rp.tenant_id=? AND rp.role_id=? ORDER BY p.code",String.class,getTestTenant().getId(),roleId);
     }
 
-    private void write(Path pluginDir, String relative, String content) throws Exception {
-        Path target = pluginDir.resolve(relative);
-        Files.createDirectories(target.getParent());
-        Files.writeString(target, content);
+    Map<String,Object> snapshot() {
+        Long tenant=getTestTenant().getId();var result=new TreeMap<String,Object>();
+        result.put("role",jdbc.queryForList("SELECT row_to_json(r)::text FROM ab_role r WHERE tenant_id=? AND id=?",tenant,roleId));
+        for(String table:List.of("ab_role_permission","ab_role_data_scope","ab_user_role","ab_role_navigation_state","ab_role_navigation_menu"))
+            result.put(table,jdbc.queryForList("SELECT row_to_json(x)::text AS data FROM "+table+" x WHERE tenant_id=? AND role_id=? ORDER BY row_to_json(x)::text",tenant,roleId));
+        result.put("fieldBindings",jdbc.queryForList("SELECT row_to_json(x)::text FROM ab_data_permission_role_binding x WHERE tenant_id=? AND role_pid=? ORDER BY id",tenant,rolePid));
+        result.put("fieldPolicies",jdbc.queryForList("SELECT row_to_json(x)::text FROM ab_data_permission_policy x WHERE tenant_id=? AND managed_role_pid=? ORDER BY id",tenant,rolePid));
+        result.put("audit",jdbc.queryForList("SELECT row_to_json(x)::text FROM ab_role_navigation_audit x WHERE tenant_id=? AND role_pid=? ORDER BY pid",tenant,rolePid));
+        return result;
+    }
+
+    @Test void firstInstallCompletesGeneratedCommandActionsAndExplicitScopes() {
+        install();
+        assertThat(codes()).contains("model."+model+".read","model."+model+".archive");
+        assertThat(jdbc.queryForObject("SELECT scope_type FROM ab_role_data_scope WHERE tenant_id=? AND role_id=? AND action_code='read'",String.class,getTestTenant().getId(),roleId)).isEqualTo("self");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_user_role WHERE tenant_id=? AND role_id=? AND member_id=?",Integer.class,getTestTenant().getId(),roleId,getTestTenantMember().getId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_state WHERE tenant_id=? AND role_id=?",Integer.class,getTestTenant().getId(),roleId)).isEqualTo(1);
+    }
+
+    @Test void repeatedImportPreservesAllPhysicalRoleConfiguration() {
+        install();var before=snapshot();
+        assertThat(execute().isSuccess()).isTrue();assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test void upgradePreservesNullDefaultRestrictionsFieldsMenusAndExpiredMembership() throws Exception {
+        install();Long tenant=getTestTenant().getId();
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL,name='Tenant-owned role' WHERE tenant_id=? AND id=?",tenant,roleId);
+        jdbc.update("UPDATE ab_role_permission SET grant_type='deny',priority=39,effective_date=CURRENT_DATE-7,expiry_date=CURRENT_DATE-1,field_scope='{\"readFields\":[\"name\"]}'::jsonb,source_ref='tenant-owned' WHERE tenant_id=? AND role_id=?",tenant,roleId);
+        jdbc.update("UPDATE ab_user_role SET expiry_date=CURRENT_DATE-1 WHERE tenant_id=? AND role_id=?",tenant,roleId);
+        String policy=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_data_permission_policy(id,pid,tenant_id,name,model_code,policy_type,field_code,mask_type,managed_role_pid) VALUES(?,?,?,?,?,'COLUMN',?,'HIDE',?)",IdWorker.getId(),policy,tenant,"Role-owned hidden name",model,model+"_name",rolePid);
+        jdbc.update("INSERT INTO ab_data_permission_role_binding(tenant_id,policy_pid,role_pid) VALUES(?,?,?)",tenant,policy,rolePid);
+        jdbc.update("INSERT INTO ab_role_navigation_menu(tenant_id,role_id,menu_pid) VALUES(?,?,?)",tenant,roleId,UniqueIdGenerator.generate());
+        var before=snapshot();template(true,false);
+        assertThat(execute().isSuccess()).isTrue();
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(codes()).doesNotContain("model."+model+".delete");
+        assertThat(imports.reconcileDirectoryRolePermissions(directory.toString())).isEqualTo(1);
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test void anExplicitEmptyLegacyRoleDoesNotRegainTemplateGrants() throws Exception {
+        install();Long tenant=getTestTenant().getId();
+        jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?",tenant,roleId);
+        jdbc.update("DELETE FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?",tenant,roleId);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE tenant_id=? AND id=?",tenant,roleId);
+        var before=snapshot();template(true,false);
+        assertThat(execute().isSuccess()).isTrue();
+        assertThat(snapshot()).isEqualTo(before);assertThat(codes()).isEmpty();
+    }
+
+    @Test void unresolvedUpgradeDeclarationIsRejectedBeforeExistingRoleWrites() throws Exception {
+        install();var before=snapshot();template(true,true);
+        var preview=imports.parseDirectory(directory.toString());
+        assertThat(preview.isValid()).isFalse();assertThat(preview.getErrors().toString()).contains("missing.upgrade.permission");
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test void unresolvedFirstInstallIsRejectedBeforeRoleCreation() throws Exception {
+        template(false,true);assertThat(imports.parseDirectory(directory.toString()).isValid()).isFalse();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role WHERE tenant_id=? AND code=?",Integer.class,getTestTenant().getId(),roleCode)).isZero();
+    }
+
+    @Test void failureAfterRealInitialGrantsRollsBackTheNewRoleAndBindings() {
+        long[] insertedRole={0};
+        org.mockito.Mockito.doAnswer(call -> {
+            call.callRealMethod();
+            long id=jdbc.queryForObject("SELECT id FROM ab_role WHERE tenant_id=? AND code=?",Long.class,getTestTenant().getId(),roleCode);
+            insertedRole[0]=id;
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE tenant_id=? AND role_id=?",Integer.class,getTestTenant().getId(),id)).isGreaterThan(0);
+            throw new com.auraboot.framework.plugin.exception.PluginException("Injected fault after actual role initialization");
+        }).when(resourceImporter).reconcileImportedRolePermissions(
+                org.mockito.ArgumentMatchers.argThat(role -> roleCode.equals(role.getCode())),
+                org.mockito.ArgumentMatchers.eq(getTestTenant().getId()),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+        assertThatThrownBy(this::execute).isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasStackTraceContaining("Injected fault after actual role initialization");
+        assertThat(insertedRole[0]).isPositive();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role WHERE tenant_id=? AND code=?",Integer.class,getTestTenant().getId(),roleCode)).isZero();
+        for(String table:List.of("ab_role_permission","ab_role_data_scope","ab_user_role","ab_role_navigation_state"))
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE tenant_id=? AND role_id=?",Integer.class,getTestTenant().getId(),insertedRole[0])).isZero();
+    }
+
+    void write(String path,String value) throws Exception {
+        Path target=directory.resolve(path);Files.createDirectories(target.getParent());Files.writeString(target,value);
+    }
+
+    @AfterEach void restoreAdministrator() {
+        org.mockito.Mockito.reset(resourceImporter);
+        if(administrator!=null)administrator.close();
     }
 }

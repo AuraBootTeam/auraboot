@@ -1134,8 +1134,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         // stage. Role declarations referencing them were silently skipped at that stage
         // ("Permission not found for role binding"), so plugin business roles ended up
         // without model write access on first import. Reconcile now that every generated
-        // action resolves; binding is idempotent.
-        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest, tenantId);
+        // action resolves. Only roles created by this batch receive deferred seed grants;
+        // existing roles are validated without restoring administrator-revoked access.
+        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest, tenantId, pluginPid, importId,
+                new java.util.HashSet<>(result.getCreatedResources().getOrDefault(ResourceType.ROLE.name(), List.of())));
 
         // Semantic resources reference imported model/field codes, so publication
         // must run only after model auto-publish and schema synchronization.

@@ -43,9 +43,8 @@ class PluginImportRoleReconciliationTest {
         return value;
     }
 
-    @Test void bindsLatePermissionWithoutCreatingRolesOrPermissions() {
+    @Test void validatesExistingRoleWithoutCreatingOrRepairingGrants() {
         permission();
-        when(bindings.countByRoleAndPermission(3L, 9L, 7L)).thenReturn(1);
         assertThat(service.reconcileDeclaredRolesStrictly(manifest, 7L)).isEqualTo(1);
         verify(service).reconcileRolePermissions(declaration, 7L);
     }
@@ -54,11 +53,10 @@ class PluginImportRoleReconciliationTest {
                 .isInstanceOf(PluginException.class).hasMessageContaining("Unresolved declared permission");
         verify(service, never()).reconcileRolePermissions(any(), anyLong());
     }
-    @Test void swallowedBindingFailureCannotProduceGreen() {
+    @Test void intentionallyAbsentGrantDoesNotFailReadOnlyDirectoryValidation() {
         permission();
-        when(bindings.countByRoleAndPermission(3L, 9L, 7L)).thenReturn(0);
-        assertThatThrownBy(() -> service.reconcileDeclaredRolesStrictly(manifest, 7L))
-                .isInstanceOf(PluginException.class).hasMessageContaining("remains unbound");
+        assertThat(service.reconcileDeclaredRolesStrictly(manifest, 7L)).isEqualTo(1);
+        verifyNoInteractions(bindings);
     }
     @Test void anotherTenantsRoleCannotBeReconciled() {
         when(roles.findByTenantId(7L)).thenReturn(List.of());

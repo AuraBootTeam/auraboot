@@ -56,19 +56,17 @@ public interface PluginResourceImporter {
     PluginResource importRole(RoleDefinitionDTO dto, String pluginPid, String importId,
                               Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
 
-    /**
-     * Re-resolve a role's declared permission codes and bind any that resolve now but
-     * did not at the ROLE import stage (generated model actions are created after that
-     * stage). Idempotent: existing bindings are left untouched.
-     *
-     * @return true if at least one new binding was created
-     */
+    /** Validate existing role declarations without restoring revoked or missing grants. */
     boolean reconcileRolePermissions(RoleDefinitionDTO dto, Long tenantId);
+
+    /** Complete only a role proven newly created by this import's persisted receipt. */
+    boolean reconcileImportedRolePermissions(RoleDefinitionDTO dto, Long tenantId,
+                                            String pluginPid, String importId);
 
     /**
      * Reconcile declared role permissions for an installed plugin directory: validate
      * the directory and installed version, then strictly check every declared role and
-     * permission resolves and is bound for the current tenant.
+     * permission resolves in the current tenant; existing grants are not repaired.
      *
      * @return number of role declarations checked
      */
