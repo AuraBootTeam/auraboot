@@ -129,6 +129,14 @@ export interface BlockConfig {
   rowSelection?: CardRowSelection;
   /** Fit card-grid tracks to the available width, collapsing unused tracks. */
   autoFitColumns?: boolean;
+  /** Optional adaptive-card minimum in logical pixels, bounded to 180..640. */
+  minCardWidth?: number;
+  /** Accessible native disclosure groups retain mounted row inputs when closed. */
+  collapsibleGroups?: boolean;
+  groupsDefaultOpen?: boolean;
+  groupDescriptionField?: string;
+  /** Boolean row fact: highlight a group if any member requires attention. */
+  groupWarningField?: string;
   buttons?: ButtonConfig[];
 
   // 表格相关
@@ -803,6 +811,8 @@ export interface CrossRowValidationRule {
 }
 
 export interface TreeConfig {
+  /** Optional nested children array; pagination counts root records. */
+  childrenField?: string;
   /** Self-referencing field (e.g., 'parent_id') */
   parentField: string;
   /** Max nesting depth (default: 5) */

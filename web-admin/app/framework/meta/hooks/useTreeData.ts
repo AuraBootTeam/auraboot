@@ -32,11 +32,30 @@ export function useTreeData(
 ): UseTreeDataResult {
   const parentField = treeConfig?.parentField ?? 'parent_id';
   const defaultExpanded = treeConfig?.defaultExpanded ?? true;
+  const normalizedRows = useMemo(() => {
+    if (!treeConfig?.childrenField) return rows;
+    const result: Record<string, any>[] = [], seen = new Set<string>();
+    const visit = (nodes: Record<string, any>[], parent: string | null, depth: number) => {
+      if (depth > (treeConfig.maxDepth ?? 5)) throw new Error('Nested table tree exceeds maximum depth');
+      for (const node of nodes) {
+        if (typeof node.pid !== 'string' || !node.pid || seen.has(node.pid)) throw new Error('Nested table tree requires unique record identities');
+        seen.add(node.pid);
+        const { [treeConfig.childrenField!]: children, ...values } = node;
+        result.push({ ...values, [parentField]: parent });
+        if (children != null) {
+          if (!Array.isArray(children)) throw new Error('Nested table children must be an array');
+          if (children.length) visit(children, node.pid, depth + 1);
+        }
+      }
+    };
+    visit(rows, null, 0);
+    return result;
+  }, [rows, treeConfig?.childrenField, treeConfig?.maxDepth, parentField]);
 
   // Group rows by parent
   const childrenMap = useMemo(() => {
     const map = new Map<string | null, Record<string, any>[]>();
-    for (const row of rows) {
+    for (const row of normalizedRows) {
       const parentId = row[parentField] ?? null;
       if (!map.has(parentId)) map.set(parentId, []);
       map.get(parentId)!.push(row);
@@ -51,14 +70,14 @@ export function useTreeData(
       });
     });
     return map;
-  }, [rows, parentField]);
+  }, [normalizedRows, parentField]);
 
   // Expand state
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     if (!defaultExpanded) return new Set<string>();
     // Default: all nodes with children expanded
     const ids = new Set<string>();
-    for (const row of rows) {
+    for (const row of normalizedRows) {
       const pid = row.pid;
       if (pid && childrenMap.has(pid)) {
         ids.add(pid);

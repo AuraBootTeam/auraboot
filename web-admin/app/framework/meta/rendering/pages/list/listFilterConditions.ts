@@ -284,3 +284,13 @@ export function queryConditionToExportCondition(condition: ListQueryFilterCondit
     value: condition.values ?? condition.value ?? null,
   };
 }
+
+/** Selected API queue wins over a stale filter-form value for the same field. */
+export function applyApiTabCondition(query: Record<string, unknown>, condition: ListQueryFilterCondition | null): void {
+  if (!condition) return;
+  if (!condition.fieldName.trim() || condition.operator.toUpperCase() !== 'EQ' ||
+      condition.value === undefined || condition.value === null || typeof condition.value === 'object') {
+    throw new Error('API list tabs require a scalar equality filter');
+  }
+  query[condition.fieldName] = String(condition.value);
+}

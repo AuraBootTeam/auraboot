@@ -120,3 +120,18 @@ describe('useTreeData', () => {
     expect(result.current.flatTree).toHaveLength(1);
   });
 });
+
+
+describe('nested tree payloads', () => {
+  it('keeps root pagination separate from expandable children without modifying the payload', () => {
+    const rows = [{ pid: 'batch', children: [{ pid: 'line', name: 'Original material' }] }];
+    const original = JSON.stringify(rows);
+    const { result } = renderHook(() => useTreeData(rows, { parentField: 'parent', childrenField: 'children' }));
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch', 'line']);
+    act(() => result.current.toggleExpand('batch'));
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch']);
+    expect(JSON.stringify(rows)).toBe(original);
+    act(() => result.current.toggleExpand('batch'));
+    expect(result.current.visibleRows[1].name).toBe('Original material');
+  });
+});
