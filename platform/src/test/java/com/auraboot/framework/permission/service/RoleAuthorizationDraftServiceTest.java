@@ -50,6 +50,7 @@ class RoleAuthorizationDraftServiceTest {
     private final DataScopeService scopes = mock(DataScopeService.class);
     private final DataPermissionRoleBindingMapper bindings = mock(DataPermissionRoleBindingMapper.class);
     private final DataPermissionPolicyMapper policies = mock(DataPermissionPolicyMapper.class);
+    private final NativeBusinessBoundaryCatalog nativeBoundaries = mock(NativeBusinessBoundaryCatalog.class);
     private final RoleAuthorizationDraftService service = new RoleAuthorizationDraftService(writes, authoringAccess, fieldPolicies, roles, grants,
             permissions, catalog, capabilities, matrix, scopes,
             JsonMapper.builder().addModule(new JavaTimeModule()).build(), bindings, policies);
@@ -57,6 +58,7 @@ class RoleAuthorizationDraftServiceTest {
     private final RolePermission grant = new RolePermission();
 
     @BeforeEach void setup() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"nativeBoundaries",nativeBoundaries);
         org.springframework.test.util.ReflectionTestUtils.setField(service,"roleNavigation",mock(com.auraboot.framework.menu.service.RoleNavigationService.class));
         org.springframework.test.util.ReflectionTestUtils.setField(service,"fieldAccess",mock(RoleFieldAccessService.class));
         when(fieldPolicies.preview(any(),any(),any())).thenReturn(new com.auraboot.framework.permission.dto.RoleFieldPolicyPreview(List.of(),List.of()));
@@ -99,6 +101,42 @@ class RoleAuthorizationDraftServiceTest {
         verify(writes, never()).mutate();
         verify(roles, never()).setDefaultDataScopeType(any(), any());
         verify(matrix, never()).setRoleScope(any(), any(), any());
+    }
+
+    private NativeBusinessBoundaryCatalog.Definition nativeBoundary(String source) {
+        return new NativeBusinessBoundaryCatalog.Definition("sales:native_update",
+                new com.auraboot.framework.meta.security.NativeBusinessCommandContract("sales_order", "update", List.of("sales.manage")), source);
+    }
+
+    @Test void migrationIncludesNativeRootsWithoutProjectingMissingScopeToAll() {
+        migrationFixture();
+        var permission = permissions.findAllActive().getFirst(); permission.setResourceCode("sales_order"); permission.setAction("manage");
+        when(nativeBoundaries.snapshot()).thenReturn(List.of(nativeBoundary("definition-v1")));
+        var result = service.migrationPreview("role-a");
+        var boundary = result.boundaries().stream().filter(root -> "sales:native_update".equals(root.commandCode())).findFirst().orElseThrow();
+        assertThat(boundary.rootModel()).isEqualTo("sales_order"); assertThat(boundary.targetAction()).isEqualTo("update");
+        assertThat(boundary.operations().getFirst().scopeStatus()).isEqualTo("REQUIRES_EXPLICIT_SCOPE_DECISION");
+        assertThat(boundary.operations().getFirst().bindingPids()).containsExactly("binding-sales");
+        assertThat(result.equivalentMigrationProven()).isFalse(); verify(writes, never()).mutate();
+        verify(nativeBoundaries).snapshot();
+    }
+
+    @Test void nativeResourceAndActionMismatchCannotAppearAsConfiguredAccess() {
+        migrationFixture(); role.setDefaultDataScopeType("all");
+        when(nativeBoundaries.snapshot()).thenReturn(List.of(nativeBoundary("definition-v1")));
+        var operation = service.migrationPreview("role-a").boundaries().stream()
+                .filter(root -> "sales:native_update".equals(root.commandCode())).findFirst().orElseThrow().operations().getFirst();
+        assertThat(operation.scopeStatus()).isEqualTo("BOUNDARY_MAPPING_REQUIRES_REVIEW"); verify(writes, never()).mutate();
+    }
+
+    @Test void nativeDefinitionChangesInvalidateReviewedDraftBeforeAnyRoleWrites() {
+        when(nativeBoundaries.snapshot()).thenReturn(List.of(nativeBoundary("input-fields-v1")));
+        String revision = service.snapshot("role-a").revision();
+        when(nativeBoundaries.snapshot()).thenReturn(List.of(nativeBoundary("input-fields-v2")));
+        assertThatThrownBy(() -> service.apply("role-a", request(revision, false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate(); verify(capabilities, never()).applyCapabilitySelection(any(), any(), any());
     }
 
     @Test void migrationRetainsDenyDatesConditionsFieldsAndIndependentSourceWithoutActivatingThem() {

@@ -20,23 +20,33 @@ public record NativeBusinessCommandContract(String model, String action, List<St
 
     /** LoadPhase supplies the server definition; request operation/payload never defines this policy. */
     public static NativeBusinessCommandContract require(CommandPipelineContext context, ExtensionRegistry extensions) {
-        var config = context.getExecConfig();
-        if (context.getCommand() == null || context.getRequest() == null || extensions == null
+        if (context.getCommand() == null || context.getRequest() == null
                 || !Objects.equals(context.getCommandCode(), context.getCommand().getCode())
+                || context.getAuthorizationVerdict() == null || !context.getAuthorizationVerdict().isAuthorized()) throw denied();
+        var contract = describe(context.getCommand(), context.getExecConfig(), context.getRulesByType(), extensions);
+        String requested = context.getRequest().getOperationType();
+        if (requested != null && !requested.isBlank() && !contract.action().equalsIgnoreCase(requested)) throw denied();
+        if (!contract.permissions().contains(context.getAuthorizationVerdict().permissionCode())) throw denied();
+        return contract;
+    }
+
+    /** Structural inspection shares execution validation but cannot manufacture an actor decision. */
+    public static NativeBusinessCommandContract describe(com.auraboot.framework.meta.entity.CommandDefinition command,
+            Map<String, Object> config, Map<String, List<com.auraboot.framework.meta.entity.BindingRule>> rules,
+            ExtensionRegistry extensions) {
+        if (command == null || command.getCode() == null || command.getCode().isBlank()
+                || config == null || extensions == null
                 || !CONFIG_KEYS.containsAll(config.keySet())
                 || !(config.get("type") instanceof String action) || !OPERATIONS.contains(action)
                 || !(config.get("handlerParams") instanceof Map<?, ?> params)
                 || !params.keySet().equals(PARAM_KEYS)
                 || !"business".equals(params.get("targetRecordAuthorization"))
                 || !action.equals(params.get("targetRecordAction"))
-                || context.getRulesByType() == null
-                || context.getRulesByType().values().stream().anyMatch(rules -> rules == null || !rules.isEmpty())
-                || extensions.getCommandHandler(context.getCommandCode()).isPresent()
-                || !extensions.getSecondaryCommandHandlers(context.getCommandCode()).isEmpty()
-                || context.getAuthorizationVerdict() == null || !context.getAuthorizationVerdict().isAuthorized()) throw denied();
-        String requested = context.getRequest().getOperationType();
-        if (requested != null && !requested.isBlank() && !action.equalsIgnoreCase(requested)) throw denied();
-        String model = context.getCommand().getModelCode();
+                || rules == null || rules.values().stream().anyMatch(values -> values == null || !values.isEmpty())
+                || extensions.getBusinessResourceOwner(command.getCode()).isPresent()
+                || extensions.getCommandHandler(command.getCode()).isPresent()
+                || !extensions.getSecondaryCommandHandlers(command.getCode()).isEmpty()) throw denied();
+        String model = command.getModelCode();
         if (model == null || !model.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) throw denied();
         Object rawInputs = config.get("inputFields");
         if ("update".equals(action) && (!(rawInputs instanceof List<?> inputs) || inputs.isEmpty())) throw denied();
@@ -56,7 +66,6 @@ public record NativeBusinessCommandContract(String model, String action, List<St
                     || value.length() > 255 || "*".equals(value) || "meta.command.execute".equals(value)
                     || value.startsWith("model.")) throw denied();
         }
-        if (!codes.contains(context.getAuthorizationVerdict().permissionCode())) throw denied();
         return new NativeBusinessCommandContract(model, action, codes.stream().map(String.class::cast).toList());
     }
 

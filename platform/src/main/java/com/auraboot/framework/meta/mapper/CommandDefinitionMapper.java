@@ -83,6 +83,16 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
     @Select("SELECT * FROM ab_command_definition WHERE is_current = TRUE AND deleted_flag = false ORDER BY model_code, code")
     List<CommandDefinition> findAllCurrent();
 
+    /** TenantLineInnerInterceptor restricts the published database definitions used by the native writer. */
+    @Select("""
+        SELECT * FROM ab_command_definition
+        WHERE is_current = TRUE AND deleted_flag = FALSE AND status = 'published'
+          AND jsonb_extract_path_text(execution_config, 'type') IN ('update', 'delete')
+          AND jsonb_extract_path_text(execution_config, 'handlerParams', 'targetRecordAuthorization') = 'business'
+        ORDER BY code
+        """)
+    List<CommandDefinition> findCurrentNativeBusinessDefinitions();
+
     // Note: tenant_id condition is automatically added by TenantLineInnerInterceptor
     @Update("UPDATE ab_command_definition SET is_current = FALSE WHERE code = #{code}")
     int markAsNotCurrent(@Param("code") String code);

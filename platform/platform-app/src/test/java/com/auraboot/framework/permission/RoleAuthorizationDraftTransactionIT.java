@@ -66,6 +66,10 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     private String updateCode;
     private String readCapability;
     private String editCapability;
+    private String nativeCommandPid;
+    private String nativeCommandCode;
+    private String nativePermissionCode;
+    private String nativeCapability;
 
     private com.auraboot.framework.integration.TenantAdministrationFixture administrator;
     @BeforeEach void fixture() {
@@ -100,6 +104,10 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         reset(scopes, fieldBindings);
         org.springframework.test.util.ReflectionTestUtils.setField(drafts, "extensions", originalExtensions);
         if (administrator != null) administrator.close();
+        if (nativeCommandPid != null) {
+            jdbc.update("DELETE FROM ab_binding_rule WHERE command_id IN (SELECT id FROM ab_command_definition WHERE pid=?)", nativeCommandPid);
+            jdbc.update("DELETE FROM ab_command_definition WHERE tenant_id=? AND pid=?", getTestTenant().getId(), nativeCommandPid);
+        }
         if (modelId != null) {
             jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?", getTestTenant().getId(), modelId);
             jdbc.update("DELETE FROM ab_meta_model WHERE tenant_id=? AND id=?", getTestTenant().getId(), modelId);
@@ -152,6 +160,83 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                 SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.id),'[]'::jsonb)::text
                 FROM ab_role_permission r WHERE tenant_id=? AND role_id=?
                 """, String.class, getTestTenant().getId(), roleId);
+    }
+
+    private void nativeSource() throws Exception {
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.PERMISSION_MANAGE,
+                "operation", "permission", "update", "Native migration inspection fixture");
+        nativePermissionCode = "business." + resource + ".manage";
+        nativeCapability = resource + ".cap.native";
+        nativeCommandPid = UniqueIdGenerator.generate(); nativeCommandCode = "native:" + resource;
+        jdbc.update("""
+                INSERT INTO ab_permission (pid,tenant_id,code,name,resource_type,resource_code,action,
+                                           source,status,deleted_flag,created_at,updated_at)
+                VALUES (?,?,?,?,'operation',?,'manage','test','active',false,now(),now())
+                """, UniqueIdGenerator.generate(), getTestTenant().getId(), nativePermissionCode, "Native business fixture", resource);
+        catalog.saveDefinition(CapabilityDefinitionDTO.builder().code(nativeCapability).group("Native draft transaction")
+                .includes(List.of(nativePermissionCode)).build());
+        String config = json.writeValueAsString(Map.of("type", "update", "inputFields", List.of("amount"),
+                "permissions", List.of(nativePermissionCode), "handlerParams",
+                Map.of("targetRecordAuthorization", "business", "targetRecordAction", "update")));
+        jdbc.update("""
+                INSERT INTO ab_command_definition (id,pid,tenant_id,code,model_code,execution_config,
+                    version,is_current,row_version,status,deleted_flag,created_at,updated_at)
+                VALUES (?,?,?,?,?,?::jsonb,1,true,0,'published',false,now(),now())
+                """, IdWorker.getId(), nativeCommandPid, getTestTenant().getId(), nativeCommandCode, resource, config);
+        var before = drafts.snapshot(rolePid);
+        drafts.apply(rolePid, new RoleAuthorizationDraftRequest(before.revision(), Set.of(nativeCapability), Set.of(),
+                false, null, false, List.of()));
+        String fields = json.writeValueAsString(Map.of("modelCode", resource, "readFields", List.of("amount"), "writeFields", List.of("amount")));
+        jdbc.update("""
+                UPDATE ab_role_permission SET priority=37,conditions='{"maxApprovalAmount":12}'::jsonb,
+                    field_scope=?::jsonb,source_ref='independent:native-migration-fixture',
+                    effective_date=CURRENT_DATE-1,expiry_date=CURRENT_DATE+30
+                WHERE tenant_id=? AND role_id=? AND permission_id=(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)
+                """, fields, getTestTenant().getId(), roleId, getTestTenant().getId(), nativePermissionCode);
+    }
+
+    @Test void nativeMigrationFindsThePublishedDefinitionAndPreservesGrantTuplesDuringScopeDecision() throws Exception {
+        nativeSource(); String before = migrationBindingBytes();
+        var inspected = drafts.migrationPreview(rolePid);
+        var nativeBoundary = inspected.boundaries().stream().filter(root -> nativeCommandCode.equals(root.commandCode())).findFirst().orElseThrow();
+        assertThat(nativeBoundary.rootModel()).isEqualTo(resource); assertThat(nativeBoundary.targetAction()).isEqualTo("update");
+        assertThat(nativeBoundary.operations().getFirst().scopeStatus()).isEqualTo("REQUIRES_EXPLICIT_SCOPE_DECISION");
+        assertThat(inspected.unmappedPermissionCodes()).doesNotContain(nativePermissionCode);
+        assertThat(inspected.bindings()).anySatisfy(binding -> {
+            assertThat(binding.permissionCode()).isEqualTo(nativePermissionCode);
+            assertThat(binding.priority()).isEqualTo(37); assertThat(binding.sourceRef()).isEqualTo("independent:native-migration-fixture");
+            assertThat(binding.conditions().get("maxApprovalAmount").asInt()).isEqualTo(12);
+            assertThat(binding.fieldScope().get("modelCode").asText()).isEqualTo(resource);
+            assertThat(binding.effectiveDate()).isNotNull(); assertThat(binding.expiryDate()).isNotNull();
+        });
+        drafts.apply(rolePid, new RoleAuthorizationDraftRequest(inspected.revision(), Set.of(nativeCapability), Set.of(),
+                false, null, false, List.of(new DataScopeUpdateRequest(resource, "manage", "self", "MAX"))));
+        assertThat(defaultScope()).isNull(); assertThat(migrationBindingBytes()).isEqualTo(before);
+        assertThat(inspected.equivalentMigrationProven()).isFalse();
+        var after = drafts.migrationPreview(rolePid).boundaries().stream()
+                .filter(root -> nativeCommandCode.equals(root.commandCode())).findFirst().orElseThrow().operations().getFirst();
+        assertThat(after.currentScopeType()).isEqualTo("self"); assertThat(after.scopeOrigin()).isEqualTo("EXPLICIT_ACTION");
+    }
+
+    @Test void nativeInputDefinitionChangeRejectsTheOldDraftWithoutPartialDatabaseWrites() throws Exception {
+        nativeSource(); var inspected = drafts.migrationPreview(rolePid); String before = migrationBindingBytes();
+        jdbc.update("UPDATE ab_command_definition SET execution_config=jsonb_set(execution_config,'{inputFields}','[\"amount\",\"note\"]'::jsonb) WHERE tenant_id=? AND pid=?",
+                getTestTenant().getId(), nativeCommandPid);
+        assertThatThrownBy(() -> drafts.apply(rolePid, new RoleAuthorizationDraftRequest(inspected.revision(), Set.of(nativeCapability), Set.of(),
+                true, "all", true, List.of(new DataScopeUpdateRequest(resource, "manage", "all", "MAX")))))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        assertThat(migrationBindingBytes()).isEqualTo(before); assertThat(defaultScope()).isNull(); assertThat(persistedScopes()).isEmpty();
+    }
+
+    @Test void withdrawnNativePublicationIsNotAnExecutableMigrationBoundary() throws Exception {
+        nativeSource(); var before = drafts.snapshot(rolePid); String grants = migrationBindingBytes();
+        jdbc.update("UPDATE ab_command_definition SET status='draft' WHERE tenant_id=? AND pid=?", getTestTenant().getId(), nativeCommandPid);
+        var inspected = drafts.migrationPreview(rolePid);
+        assertThat(inspected.boundaries()).noneMatch(root -> nativeCommandCode.equals(root.commandCode()));
+        assertThat(inspected.unmappedPermissionCodes()).contains(nativePermissionCode);
+        assertThat(inspected.revision()).isNotEqualTo(before.revision());
+        assertThat(migrationBindingBytes()).isEqualTo(grants); assertThat(defaultScope()).isNull();
     }
 
     @Test void explicitMigrationScopeUsesTheDraftWithoutRewritingAnySourceBinding() throws Exception {

@@ -67,10 +67,13 @@ public class RoleAuthorizationDraftService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DataPermissionAuthoringAccess migrationAccess;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private NativeBusinessBoundaryCatalog nativeBoundaries;
+
     @Transactional
     public RoleAuthorizationDraftSnapshot snapshot(String rolePid) {
         writes.lock();
-        return snapshot(resolve(rolePid));
+        return snapshot(resolve(rolePid), businessFieldRoots());
     }
 
     /** Inspect complete source bindings; explicit migration edits still use apply and its revision. */
@@ -121,6 +124,9 @@ public class RoleAuthorizationDraftService {
                         status = "PERMISSION_MAPPING_UNAVAILABLE";
                     else if ("view".equals(definition.getAction()) && code.equals(definition.getResourceCode()))
                         status = "ENTRY_FALLBACK_REQUIRES_MAPPING";
+                    else if (root.definitionSource() != null && (!root.model().equals(definition.getResourceCode())
+                            || !(root.action().equals(definition.getAction()) || "manage".equals(definition.getAction()))))
+                        status = "BOUNDARY_MAPPING_REQUIRES_REVIEW";
                     else if (owners.isEmpty()) status = "MISSING_BUSINESS_GRANT";
                     else if (matching.size() > 1 || matching.stream().anyMatch(scope -> scope.getScopeConfig() != null
                             && !(scope.getScopeConfig() instanceof Map<?, ?> config && config.isEmpty())))
@@ -142,7 +148,7 @@ public class RoleAuthorizationDraftService {
                             policy.getFieldCode(), policy.getMaskType(), policy.getMaskExpression(), policy.getPriority(), policy.getEnabled());
                 }).sorted(Comparator.comparing(RoleBoundaryMigrationPreview.Policy::policyPid)).toList();
         var referenced = roots.stream().flatMap(root -> root.permissions().stream()).collect(java.util.stream.Collectors.toSet());
-        return new RoleBoundaryMigrationPreview(role.getPid(), revision(role),
+        return new RoleBoundaryMigrationPreview(role.getPid(), revision(role, roots),
                 role.getDefaultDataScopeType(), boundaries, views, scoped.stream()
                     .sorted(Comparator.comparing(scope -> scope.getResourceCode() + ":" + scope.getActionCode()))
                     .map(scope -> new RoleBoundaryMigrationPreview.Scope(scope.getPid(),
@@ -166,7 +172,7 @@ public class RoleAuthorizationDraftService {
     public RoleAuthorizationDraftPreview preview(String rolePid, RoleAuthorizationDraftRequest request) {
         writes.lock();
         Role role = resolve(rolePid);
-        return validate(role, request);
+        return validate(role, request, businessFieldRoots());
     }
 
     @Transactional
@@ -174,7 +180,8 @@ public class RoleAuthorizationDraftService {
         writes.lock();
         authoringAccess.requireWrite();
         Role role = resolve(rolePid);
-        var reviewed = validate(role, request);
+        var roots = businessFieldRoots();
+        var reviewed = validate(role, request, roots);
         var auditChanges=authorizationChanges(role,reviewed);
         writes.mutate();
         if (request.defaultScopeChanged()) roles.setDefaultDataScopeType(role.getId(), request.defaultScopeType());
@@ -191,15 +198,15 @@ public class RoleAuthorizationDraftService {
         if(request.menuPids()!=null)roleNavigation.apply(role,request.menuPids());
         roleNavigation.auditAuthorization(role,auditChanges);
         // A failed write or readback propagates and rolls back the entire authoring operation.
-        return snapshot(resolve(rolePid));
+        return snapshot(resolve(rolePid), roots);
     }
 
-    private RoleAuthorizationDraftPreview validate(Role role, RoleAuthorizationDraftRequest request) {
+    private RoleAuthorizationDraftPreview validate(Role role, RoleAuthorizationDraftRequest request, List<BusinessFieldRoot> roots) {
         if (request == null || request.expectedRevision() == null
                 || !request.expectedRevision().matches("[a-f0-9]{64}")
                 || request.selectedCapabilityCodes() == null || request.selectedCapabilityCodes().size() > 5000
                 || revoked(request).size() > 5000 || changes(request).size() > 1000) throw invalid();
-        String revision = revision(role);
+        String revision = revision(role, roots);
         if (!revision.equals(request.expectedRevision())) throw new BusinessException(ResponseCode.CasVersionConflict);
         if(request.menuPids()!=null)roleNavigation.validate(role,request.menuPids());
         if (request.defaultScopeChanged() && request.defaultScopeType() != null) scopeType(request.defaultScopeType());
@@ -222,7 +229,7 @@ public class RoleAuthorizationDraftService {
             }
         }
         // A duty may expose its root fields without granting generic model CRUD.
-        businessFieldRoots().stream().filter(root -> resulting.contains("*")
+        roots.stream().filter(root -> resulting.contains("*")
                         || root.permissions().stream().anyMatch(resulting::contains))
                 .forEach(root -> permittedModels.add(root.model()));
         Set<String> seen = new HashSet<>();
@@ -242,13 +249,13 @@ public class RoleAuthorizationDraftService {
                 fieldAccess.preview(role,request.fieldChanges(),permittedModels));
     }
 
-    private RoleAuthorizationDraftSnapshot snapshot(Role role) {
-        return new RoleAuthorizationDraftSnapshot(role.getPid(), revision(role), role.getDefaultDataScopeType(),
+    private RoleAuthorizationDraftSnapshot snapshot(Role role, List<BusinessFieldRoot> roots) {
+        return new RoleAuthorizationDraftSnapshot(role.getPid(), revision(role, roots), role.getDefaultDataScopeType(),
                 capabilities.resolveForRole(role.getId()), matrix.getMatrixForRole(role.getTenantId(), role.getId()),
                 scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
                         .map(scope -> new DataScopeUpdateRequest(scope.getResourceCode(), scope.getActionCode(),
                                 scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role),roleNavigation.selection(role),
-                fieldAccess.catalog(role,fieldCandidates(role)));
+                fieldAccess.catalog(role,fieldCandidates(role, roots)));
     }
 
     private Role resolve(String rolePid) {
@@ -257,11 +264,11 @@ public class RoleAuthorizationDraftService {
         return role;
     }
 
-    private String revision(Role role) {
+    private String revision(Role role, List<BusinessFieldRoot> roots) {
         Map<String, Object> state = new LinkedHashMap<>();
         state.put("role", role);
         state.put("navigation",roleNavigation.selection(role));
-        state.put("fieldAccess",fieldAccess.catalog(role,fieldCandidates(role)));
+        state.put("fieldAccess",fieldAccess.catalog(role,fieldCandidates(role, roots)));
         state.put("grants", grants.findByRole(role.getId()).stream()
                 .sorted(Comparator.comparing(RolePermission::getId, Comparator.nullsLast(Long::compareTo))).toList());
         state.put("scopes", scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
@@ -280,16 +287,15 @@ public class RoleAuthorizationDraftService {
                 .sorted(Comparator.comparing(policy -> policy.getPid())).toList());
         state.put("catalog", catalog.listDeclarations(role.getTenantId()).stream()
                 .sorted(Comparator.comparing(declaration -> declaration.getCode())).toList());
-        state.put("businessFieldRoots", businessFieldRoots());
+        state.put("businessFieldRoots", roots);
         state.put("permissions", permissions.findAllActive().stream()
                 .sorted(Comparator.comparing(permission -> permission.getCode())).toList());
         return digest(state);
     }
 
     private List<BusinessFieldRoot> businessFieldRoots() {
-        if (extensions == null) return List.of();
         List<BusinessFieldRoot> roots = new java.util.ArrayList<>();
-        for (var handler : extensions.getAllCommandHandlers()) {
+        for (var handler : extensions == null ? List.<com.auraboot.framework.plugin.extension.CommandHandlerExtension>of() : extensions.getAllCommandHandlers()) {
             if (!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner)) continue;
             var boundary = owner.businessBoundary();
             if (extensions.getBusinessResourceOwner(boundary.commandCode()).orElse(null) != handler) continue;
@@ -298,14 +304,19 @@ public class RoleAuthorizationDraftService {
                         || !code.equals(code.strip()) || code.length() > 255 || "*".equals(code)
                         || "meta.command.execute".equals(code))) throw invalid();
             roots.add(new BusinessFieldRoot(boundary.commandCode(), boundary.rootModel(), boundary.targetAction(),
-                    boundary.permissions().stream().sorted().toList()));
+                    boundary.permissions().stream().sorted().toList(), null));
         }
+        if (nativeBoundaries != null) nativeBoundaries.snapshot().forEach(definition -> {
+            var contract = definition.contract();
+            roots.add(new BusinessFieldRoot(definition.commandCode(), contract.model(), contract.action(),
+                    contract.permissions().stream().sorted().toList(), definition.source()));
+        });
         return roots.stream().distinct().sorted(Comparator.comparing(BusinessFieldRoot::command)).toList();
     }
 
-    private Set<String> fieldCandidates(Role role) {
+    private Set<String> fieldCandidates(Role role, List<BusinessFieldRoot> roots) {
         Set<String> result=new HashSet<>();
-        businessFieldRoots().forEach(root->result.add(root.model()));
+        roots.forEach(root->result.add(root.model()));
         permissions.findRolePermissions(role.getId()).stream().map(permission->permission.getResourceCode())
                 .filter(Objects::nonNull).forEach(result::add);
         return result;
@@ -335,7 +346,8 @@ public class RoleAuthorizationDraftService {
         return List.copyOf(result);
     }
 
-    private record BusinessFieldRoot(String command, String model, String action, List<String> permissions) {}
+    private record BusinessFieldRoot(String command, String model, String action, List<String> permissions,
+                                     String definitionSource) {}
 
     private String digest(Map<String, Object> state) {
         try {
