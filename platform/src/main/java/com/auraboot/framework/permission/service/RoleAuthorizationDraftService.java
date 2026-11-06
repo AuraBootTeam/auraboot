@@ -288,6 +288,8 @@ public class RoleAuthorizationDraftService {
         state.put("catalog", catalog.listDeclarations(role.getTenantId()).stream()
                 .sorted(Comparator.comparing(declaration -> declaration.getCode())).toList());
         state.put("businessFieldRoots", roots);
+        state.put("businessOwnerEntrySources", nativeBoundaries.ownerSources(roots.stream()
+                .filter(root -> root.definitionSource() == null).map(BusinessFieldRoot::command).toList()));
         state.put("permissions", permissions.findAllActive().stream()
                 .sorted(Comparator.comparing(permission -> permission.getCode())).toList());
         return digest(state);

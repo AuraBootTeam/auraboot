@@ -218,6 +218,47 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         assertThat(after.currentScopeType()).isEqualTo("self"); assertThat(after.scopeOrigin()).isEqualTo("EXPLICIT_ACTION");
     }
 
+    private void ownerEntry() throws Exception {
+        nativeCommandPid = UniqueIdGenerator.generate(); nativeCommandCode = "test:" + resource;
+        String config = json.writeValueAsString(Map.of("type", "custom", "handler", nativeCommandCode,
+                "permissions", List.of(updateCode), "handlerParams", Map.of("targetRecordAuthorization", "business",
+                        "targetRecordAction", "update", "dslPersistence", false)));
+        jdbc.update("""
+                INSERT INTO ab_command_definition (id,pid,tenant_id,code,model_code,execution_config,
+                    version,is_current,row_version,status,deleted_flag,created_at,updated_at)
+                VALUES (?,?,?,?,?,?::jsonb,1,true,0,'published',false,now(),now())
+                """, IdWorker.getId(), nativeCommandPid, getTestTenant().getId(), nativeCommandCode, resource, config);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"input", "execution", "withdrawn"})
+    void changedOwnerEntryRejectsOldReviewWithoutPartialDatabaseWrites(String change) throws Exception {
+        migrationSource(); ownerEntry();
+        var reviewed = drafts.migrationPreview(rolePid); String before = migrationBindingBytes();
+        switch (change) {
+            case "input" -> jdbc.update("UPDATE ab_command_definition SET input_schema='{\"type\":\"object\"}'::jsonb WHERE tenant_id=? AND pid=?",
+                    getTestTenant().getId(), nativeCommandPid);
+            case "execution" -> jdbc.update("UPDATE ab_command_definition SET execution_config=jsonb_set(execution_config,'{handlerParams,dslPersistence}','true'::jsonb) WHERE tenant_id=? AND pid=?",
+                    getTestTenant().getId(), nativeCommandPid);
+            case "withdrawn" -> jdbc.update("UPDATE ab_command_definition SET status='draft' WHERE tenant_id=? AND pid=?",
+                    getTestTenant().getId(), nativeCommandPid);
+            default -> throw new AssertionError(change);
+        }
+        assertThatThrownBy(() -> drafts.apply(rolePid, new RoleAuthorizationDraftRequest(reviewed.revision(), Set.of(editCapability), Set.of(),
+                true, "all", true, List.of(new DataScopeUpdateRequest(resource, "update", "all", "MAX")))))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        assertThat(migrationBindingBytes()).isEqualTo(before);
+        assertThat(defaultScope()).isNull(); assertThat(persistedScopes()).isEmpty();
+    }
+
+    @Test void newlyDefinedOwnerEntryInvalidatesAReviewOfItsMissingDefinition() throws Exception {
+        migrationSource(); var before = drafts.snapshot(rolePid); String bindings = migrationBindingBytes();
+        ownerEntry();
+        assertThat(drafts.snapshot(rolePid).revision()).isNotEqualTo(before.revision());
+        assertThat(migrationBindingBytes()).isEqualTo(bindings); assertThat(defaultScope()).isNull();
+    }
+
     @Test void nativeInputDefinitionChangeRejectsTheOldDraftWithoutPartialDatabaseWrites() throws Exception {
         nativeSource(); var inspected = drafts.migrationPreview(rolePid); String before = migrationBindingBytes();
         jdbc.update("UPDATE ab_command_definition SET execution_config=jsonb_set(execution_config,'{inputFields}','[\"amount\",\"note\"]'::jsonb) WHERE tenant_id=? AND pid=?",

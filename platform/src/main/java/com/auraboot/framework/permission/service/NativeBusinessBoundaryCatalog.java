@@ -64,6 +64,40 @@ public class NativeBusinessBoundaryCatalog {
         }).toList();
     }
 
+    /**
+     * Pin registered PF4J entry metadata to a reviewed role revision. Missing definitions stay
+     * explicit in the source set; this fingerprint never asserts that an owner is executable.
+     */
+    public String ownerSources(List<String> commandCodes) {
+        if (!MetaContext.exists() || MetaContext.getCurrentTenantId() == null) throw denied();
+        if (commandCodes == null || commandCodes.stream().anyMatch(code -> code == null || code.isBlank())) throw denied();
+        var codes = commandCodes.stream().distinct().sorted().toList();
+        if (codes.isEmpty()) return "";
+        var tenant = MetaContext.getCurrentTenantId();
+        var definitions = commands.findCurrentDefinitionsByCodes(codes);
+        if (definitions.stream().map(command -> command.getCode()).distinct().count() != definitions.size()
+                || definitions.stream().anyMatch(command -> !Objects.equals(tenant, command.getTenantId())
+                    || !codes.contains(command.getCode()) || command.getId() == null
+                    || !Boolean.TRUE.equals(command.getIsCurrent()) || !Boolean.FALSE.equals(command.getDeletedFlag()))) throw denied();
+        var ids = definitions.stream().map(command -> command.getId()).toList();
+        var bindings = ids.isEmpty() ? List.<com.auraboot.framework.meta.entity.BindingRule>of() : rules.findByCommandIds(ids);
+        if (bindings.stream().anyMatch(rule -> !Objects.equals(tenant, rule.getTenantId())
+                || !ids.contains(rule.getCommandId()) || rule.getId() == null)
+                || bindings.stream().map(rule -> rule.getId()).distinct().count() != bindings.size()) throw denied();
+        var state = new java.util.TreeMap<String, Object>();
+        state.put("requestedOwners", codes);
+        state.put("missingDefinitions", codes.stream().filter(code -> definitions.stream()
+                .noneMatch(command -> code.equals(command.getCode()))).toList());
+        state.put("commands", definitions.stream().sorted(java.util.Comparator.comparing(command -> command.getCode())).toList());
+        state.put("rules", bindings.stream().sorted(java.util.Comparator.comparing(rule -> rule.getId())).toList());
+        try {
+            return json.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsString(state);
+        } catch (JsonProcessingException invalid) {
+            // CATCH: a failed source fingerprint must reject review, never omit its inputs.
+            throw new AccessDeniedException("Business owner entry metadata cannot be fingerprinted", invalid);
+        }
+    }
+
     private static AccessDeniedException denied() {
         return new AccessDeniedException("Native business boundary metadata is unavailable or belongs to another tenant");
     }

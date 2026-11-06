@@ -97,4 +97,43 @@ class NativeBusinessBoundaryCatalogTest {
         when(commands.findCurrentNativeBusinessDefinitions()).thenReturn(List.of(command));
         assertThatThrownBy(catalog::snapshot).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void ownerFingerprintRetainsMissingPublicationAndDefinitionChanges() {
+        String missing = catalog.ownerSources(List.of("bom:download_raw"));
+        assertThat(missing).contains("missingDefinitions", "bom:download_raw");
+        verifyNoInteractions(rules);
+        var command = command(10, "bom:download_raw");
+        when(commands.findCurrentDefinitionsByCodes(List.of("bom:download_raw"))).thenReturn(List.of(command));
+        String published = catalog.ownerSources(List.of("bom:download_raw"));
+        assertThat(published).isNotEqualTo(missing);
+        command.setStatus("draft");
+        assertThat(catalog.ownerSources(List.of("bom:download_raw"))).isNotEqualTo(published);
+        String withdrawn = catalog.ownerSources(List.of("bom:download_raw"));
+        command.setInputSchema("{\"newField\":true}");
+        assertThat(catalog.ownerSources(List.of("bom:download_raw"))).isNotEqualTo(withdrawn);
+    }
+
+    @Test void ownerFingerprintIncludesDisabledRulesAndRejectsForeignOrDuplicateRows() {
+        var command = command(10, "bom:download_raw");
+        when(commands.findCurrentDefinitionsByCodes(List.of("bom:download_raw"))).thenReturn(List.of(command));
+        var rule = new BindingRule(); rule.setId(21L); rule.setTenantId(100L); rule.setCommandId(10L); rule.setEnabled(false);
+        when(rules.findByCommandIds(List.of(10L))).thenReturn(List.of(rule));
+        String before = catalog.ownerSources(List.of("bom:download_raw"));
+        rule.setExpression("changed");
+        assertThat(catalog.ownerSources(List.of("bom:download_raw"))).isNotEqualTo(before);
+        rule.setTenantId(200L);
+        assertThatThrownBy(() -> catalog.ownerSources(List.of("bom:download_raw"))).isInstanceOf(AccessDeniedException.class);
+        rule.setTenantId(100L);
+        when(commands.findCurrentDefinitionsByCodes(List.of("bom:download_raw"))).thenReturn(List.of(command, command));
+        assertThatThrownBy(() -> catalog.ownerSources(List.of("bom:download_raw"))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void emptyOwnerSetDoesNotQueryAndForeignDefinitionsAreRejected() {
+        assertThat(catalog.ownerSources(List.of())).isEmpty(); verifyNoInteractions(commands, rules);
+        var command = command(10, "bom:download_raw"); command.setTenantId(200L);
+        when(commands.findCurrentDefinitionsByCodes(List.of("bom:download_raw"))).thenReturn(List.of(command));
+        assertThatThrownBy(() -> catalog.ownerSources(List.of("bom:download_raw"))).isInstanceOf(AccessDeniedException.class);
+        MetaContext.clear();
+        assertThatThrownBy(() -> catalog.ownerSources(List.of())).isInstanceOf(AccessDeniedException.class);
+    }
+
 }

@@ -83,6 +83,17 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
     @Select("SELECT * FROM ab_command_definition WHERE is_current = TRUE AND deleted_flag = false ORDER BY model_code, code")
     List<CommandDefinition> findAllCurrent();
 
+    /** Current owner entry definitions, including withdrawn publication, for review fingerprints. */
+    @Select("""
+        <script>
+        SELECT * FROM ab_command_definition
+        WHERE is_current = TRUE AND deleted_flag = FALSE AND code IN
+        <foreach item="code" collection="codes" open="(" separator="," close=")">#{code}</foreach>
+        ORDER BY code, id
+        </script>
+        """)
+    List<CommandDefinition> findCurrentDefinitionsByCodes(@Param("codes") List<String> codes);
+
     /** TenantLineInnerInterceptor restricts the published database definitions used by the native writer. */
     @Select("""
         SELECT * FROM ab_command_definition

@@ -139,6 +139,18 @@ class RoleAuthorizationDraftServiceTest {
         verify(writes, never()).mutate(); verify(capabilities, never()).applyCapabilitySelection(any(), any(), any());
     }
 
+    @Test void ownerEntryDefinitionChangesInvalidateTheReviewBeforeAnyRoleWrite() {
+        businessOwner(Set.of("sales.manage"));
+        when(nativeBoundaries.ownerSources(List.of("sales:release"))).thenReturn("entry-v1");
+        String revision = service.snapshot("role-a").revision();
+        when(nativeBoundaries.ownerSources(List.of("sales:release"))).thenReturn("entry-v2");
+        assertThatThrownBy(() -> service.apply("role-a", request(revision, false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate();
+        verify(capabilities, never()).applyCapabilitySelection(any(), any(), any());
+    }
+
     @Test void migrationRetainsDenyDatesConditionsFieldsAndIndependentSourceWithoutActivatingThem() {
         migrationFixture();
         grant.setGrantType("deny"); grant.setPriority(99); grant.setStatus("inactive");
