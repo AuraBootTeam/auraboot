@@ -83,6 +83,7 @@ export function useTableBlockPagination(
         showPageSizeSelector={config?.showSizeChanger !== false}
         showQuickJumper={config?.showQuickJumper}
         t={t}
+        locale={context.locale || 'zh-CN'}
         onChange={(current) => writeRuntimeState(runtime, binding.pageState, current)}
         onPageSizeChange={(size) => {
           runtime.getStateManager().updateState(runtime.getScopeId(), binding.pageState, 1);

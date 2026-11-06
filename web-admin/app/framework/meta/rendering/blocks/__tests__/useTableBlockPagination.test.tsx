@@ -36,6 +36,23 @@ function Harness({ f }: { f: ReturnType<typeof fixture> }) {
   return <>{useTableBlockPagination(f.runtime, f.config, 'queue', f.state)}</>;
 }
 describe('data-source table server pagination', () => {
+  it('keeps missing English translations in the runtime locale', () => {
+    const f = fixture();
+    f.context.locale = 'en-US';
+    render(<Harness f={f} />);
+    expect(screen.getByTestId('pagination-prev')).toHaveTextContent('Previous');
+    expect(screen.getByTestId('pagination-next')).toHaveTextContent('Next');
+    expect(screen.getByText('Page 2 of 4', { exact: false })).toHaveTextContent('35 items');
+    expect(screen.getByText('Per page', { exact: false })).toBeInTheDocument();
+  });
+  it('keeps Chinese fallback and translated labels when translations are available', () => {
+    const f = fixture();
+    f.context.locale = 'zh-CN';
+    f.context.t = (key: string) => (key === 'common.next_page' ? '继续查看' : key);
+    render(<Harness f={f} />);
+    expect(screen.getByTestId('pagination-prev')).toHaveTextContent('上一页');
+    expect(screen.getByTestId('pagination-next')).toHaveTextContent('继续查看');
+  });
   it('uses API totals and binds the next page to reloadable DSL state', () => {
     const f = fixture();
     render(<Harness f={f} />);

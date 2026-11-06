@@ -390,6 +390,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         pageSize={acceptedPage.pageSize}
         total={acceptedPage.total}
         t={t}
+        locale={locale}
         pageSizeOptions={paging?.pageSizeOptions}
         showPageSizeSelector={paging?.showSizeChanger !== false}
         showQuickJumper={paging?.showQuickJumper}
@@ -1560,174 +1561,163 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             </tr>
           </thead>
           <tbody className="divide-border bg-panel divide-y">
-            {data.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={
-                    columns.length + (rowActions.length > 0 ? 1 : 0) + (isMultipleSelection ? 1 : 0)
-                  }
-                  className="text-text-2 px-6 py-12 text-center"
-                >
-                  {/* A table that only fills in once you select something upstream should say so.
-                    "No data" on an empty transcript reads as "this conversation has no messages"
-                    when what it means is "you have not picked one yet" — the same two words for
-                    two different situations, and the user cannot tell which they are in. */}
-                  <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
-                    <div
-                      aria-hidden="true"
-                      className="border-border bg-subtle text-text-2 rounded-full border border-dashed p-3"
-                    >
-                      <svg
-                        width="22"
-                        height="22"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M22 12h-6l-2 3h-4l-2-3H2" />
-                        <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-                      </svg>
-                    </div>
-                    <div className="text-text font-medium">
-                      {(block as any).empty?.title
-                        ? getLocalizedText((block as any).empty.title, locale, t)
-                        : t('common.noData') !== 'common.noData'
-                          ? t('common.noData')
-                          : 'No data'}
-                    </div>
-                    {(block as any).empty?.description && (
-                      <div className="text-text-2 text-sm">
-                        {getLocalizedText((block as any).empty.description, locale, t)}
-                      </div>
-                    )}
-                    {(block as any).empty?.action && (
-                      <button
-                        type="button"
-                        data-testid="table-empty-cta"
-                        onClick={() => {
-                          void executeSimpleWorkbenchAction(
-                            runtime,
-                            (block as any).empty.action,
-                          ).catch((error) => {
-                            console.error('[TableBlockRenderer] empty action failed:', error);
-                          });
-                        }}
-                        className="bg-accent hover:bg-accent-hover rounded-control mt-1 px-4 py-2 text-white"
-                      >
-                        {getLocalizedText((block as any).empty.action.label, locale, t)}
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              data.map((row: any, index: number) => {
-                const rowIdentity = getRowIdentity(row, index);
-                const isSelected = isMultipleSelection
-                  ? effectiveSelectedRowKeySet.has(rowIdentity)
-                  : Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
+            {data.map((row: any, index: number) => {
+              const rowIdentity = getRowIdentity(row, index);
+              const isSelected = isMultipleSelection
+                ? effectiveSelectedRowKeySet.has(rowIdentity)
+                : Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
 
-                return (
-                  <tr
-                    key={rowIdentity}
-                    data-testid={`table-row-${rowIdentity}`}
-                    data-record-pid={getLegacyCompatibleRecordPid(row)}
-                    onClick={() => handleRowClick(row, index)}
-                    className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${rowClassName(row)} ${
-                      selectionConfig?.bind ? 'cursor-pointer' : ''
-                    }`}
-                  >
-                    {isMultipleSelection && (
-                      <td className={`${bodyCellClass} w-12`}>
-                        <input
-                          type="checkbox"
-                          data-testid={`table-select-row-${rowIdentity}`}
-                          checked={isSelected}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() => toggleMultipleSelection(row, index)}
-                          aria-label={`Select row ${rowIdentity}`}
-                        />
-                      </td>
-                    )}
-                    {columns.map((column, colIdx) => (
-                      <td
-                        key={column.field}
-                        className={`${bodyCellClass} text-text text-sm ${
-                          colIdx === 0 ? 'font-medium' : ''
-                        } ${column.ellipsis ? 'truncate' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
-                        title={getCellTitle(column, row)}
-                        style={{
-                          maxWidth: column.ellipsis ? column.width : undefined,
-                          // Tree indent: apply padding to first column
-                          paddingLeft:
-                            treeConfig && colIdx === 0
-                              ? `${(row._depth || 0) * 24 + 24}px`
-                              : undefined,
-                        }}
-                      >
-                        {/* Tree expand toggle on first column */}
-                        {treeConfig && colIdx === 0 && (
-                          <span className="mr-1 inline-flex items-center">
-                            {row._hasChildren ? (
-                              <button
-                                type="button"
-                                aria-expanded={Boolean(row._expanded)}
-                                aria-label={getLocalizedText(
-                                  row._expanded
-                                    ? { 'zh-CN': '收起子项', en: 'Collapse child rows' }
-                                    : { 'zh-CN': '展开子项', en: 'Expand child rows' },
-                                  locale,
-                                  t,
-                                )}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleExpand(getLegacyCompatibleRecordPid(row) || '');
-                                }}
-                                className="text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center"
-                                data-testid={`tree-toggle-${getLegacyCompatibleRecordPid(row)}`}
-                              >
-                                {row._expanded ? '▼' : '▶'}
-                              </button>
-                            ) : (
-                              <span className="inline-block h-4 w-4" />
-                            )}
-                          </span>
-                        )}
-                        {(column as any).editable && inlineEditCommand ? (
-                          <InlineEditCell
-                            column={column}
-                            value={row[column.field]}
-                            record={row}
-                            onSave={handleInlineSave}
-                            editable
-                            dictItems={
-                              column.dictCode
-                                ? (dictDataCache.current.get(column.dictCode) ?? [])
-                                : undefined
-                            }
-                          >
-                            {renderCellContent(column, row)}
-                          </InlineEditCell>
-                        ) : (
-                          renderCellContent(column, row)
-                        )}
-                      </td>
-                    ))}
-                    {rowActions.length > 0 && (
-                      <td className={`${bodyCellClass} text-text text-sm`}>
-                        {renderRowActions(row)}
-                      </td>
-                    )}
-                  </tr>
-                );
-              })
-            )}
+              return (
+                <tr
+                  key={rowIdentity}
+                  data-testid={`table-row-${rowIdentity}`}
+                  data-record-pid={getLegacyCompatibleRecordPid(row)}
+                  onClick={() => handleRowClick(row, index)}
+                  className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${rowClassName(row)} ${
+                    selectionConfig?.bind ? 'cursor-pointer' : ''
+                  }`}
+                >
+                  {isMultipleSelection && (
+                    <td className={`${bodyCellClass} w-12`}>
+                      <input
+                        type="checkbox"
+                        data-testid={`table-select-row-${rowIdentity}`}
+                        checked={isSelected}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleMultipleSelection(row, index)}
+                        aria-label={`Select row ${rowIdentity}`}
+                      />
+                    </td>
+                  )}
+                  {columns.map((column, colIdx) => (
+                    <td
+                      key={column.field}
+                      className={`${bodyCellClass} text-text text-sm ${
+                        colIdx === 0 ? 'font-medium' : ''
+                      } ${column.ellipsis ? 'truncate' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
+                      title={getCellTitle(column, row)}
+                      style={{
+                        maxWidth: column.ellipsis ? column.width : undefined,
+                        // Tree indent: apply padding to first column
+                        paddingLeft:
+                          treeConfig && colIdx === 0
+                            ? `${(row._depth || 0) * 24 + 24}px`
+                            : undefined,
+                      }}
+                    >
+                      {/* Tree expand toggle on first column */}
+                      {treeConfig && colIdx === 0 && (
+                        <span className="mr-1 inline-flex items-center">
+                          {row._hasChildren ? (
+                            <button
+                              type="button"
+                              aria-expanded={Boolean(row._expanded)}
+                              aria-label={getLocalizedText(
+                                row._expanded
+                                  ? { 'zh-CN': '收起子项', en: 'Collapse child rows' }
+                                  : { 'zh-CN': '展开子项', en: 'Expand child rows' },
+                                locale,
+                                t,
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(getLegacyCompatibleRecordPid(row) || '');
+                              }}
+                              className="text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center"
+                              data-testid={`tree-toggle-${getLegacyCompatibleRecordPid(row)}`}
+                            >
+                              {row._expanded ? '▼' : '▶'}
+                            </button>
+                          ) : (
+                            <span className="inline-block h-4 w-4" />
+                          )}
+                        </span>
+                      )}
+                      {(column as any).editable && inlineEditCommand ? (
+                        <InlineEditCell
+                          column={column}
+                          value={row[column.field]}
+                          record={row}
+                          onSave={handleInlineSave}
+                          editable
+                          dictItems={
+                            column.dictCode
+                              ? (dictDataCache.current.get(column.dictCode) ?? [])
+                              : undefined
+                          }
+                        >
+                          {renderCellContent(column, row)}
+                        </InlineEditCell>
+                      ) : (
+                        renderCellContent(column, row)
+                      )}
+                    </td>
+                  ))}
+                  {rowActions.length > 0 && (
+                    <td className={`${bodyCellClass} text-text text-sm`}>
+                      {renderRowActions(row)}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+      {data.length === 0 && (
+        <div
+          role="status"
+          data-testid="table-empty-state"
+          className="text-text-2 mx-auto flex w-full max-w-sm min-w-0 flex-col items-center gap-2 px-6 py-8 text-center break-words"
+        >
+          <div
+            aria-hidden="true"
+            className="border-border bg-subtle text-text-2 rounded-full border border-dashed p-3"
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+              <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+            </svg>
+          </div>
+          <div className="text-text font-medium">
+            {(block as any).empty?.title
+              ? getLocalizedText((block as any).empty.title, locale, t)
+              : t('common.noData') !== 'common.noData'
+                ? t('common.noData')
+                : 'No data'}
+          </div>
+          {(block as any).empty?.description && (
+            <div className="text-text-2 text-sm">
+              {getLocalizedText((block as any).empty.description, locale, t)}
+            </div>
+          )}
+          {(block as any).empty?.action && (
+            <button
+              type="button"
+              data-testid="table-empty-cta"
+              onClick={() => {
+                void executeSimpleWorkbenchAction(runtime, (block as any).empty.action).catch(
+                  (error) => {
+                    console.error('[TableBlockRenderer] empty action failed:', error);
+                  },
+                );
+              }}
+              className="bg-accent hover:bg-accent-hover rounded-control mt-1 px-4 py-2 text-white"
+            >
+              {getLocalizedText((block as any).empty.action.label, locale, t)}
+            </button>
+          )}
+        </div>
+      )}
       {pagination}
     </>
   );
