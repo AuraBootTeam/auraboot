@@ -107,6 +107,9 @@ public class BusinessArtifactAccessGuard {
         context.setBusinessGrantDecision(grant);
         context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(stamp.commandCode(), stamp.rootModel(), stamp.rootPid(),
                 boundary.targetAction(), stamp.tenantId(), MetaContext.getCurrentUserId(), MetaContext.getCurrentMemberId()));
+        if (!stamp.rootBinding().keySet().equals(owner.businessArtifactRootBindingFields())
+                || !stamp.rootBinding().isEmpty() && !stamp.rootBinding().equals(projection.prepareArtifactReadBinding(context,owner,root)))
+            throw BusinessArtifactAuthorization.denied();
         var definitions = metadata.getModelFields(stamp.rootModel());
         if (definitions == null) throw BusinessArtifactAuthorization.denied();
         var field = definitions.stream().filter(candidate -> candidate != null && stamp.rootField().equals(candidate.getCode()))

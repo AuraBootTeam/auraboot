@@ -55,6 +55,8 @@ public class BusinessCommandDataAccessorFactory {
         if (!Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
                 || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
+                || !Objects.equals(owner.businessArtifactRootBindingFields(), invocationOwner.businessArtifactRootBindingFields())
+                || !Objects.equals(owner.businessArtifactIntentBindingFields(), invocationOwner.businessArtifactIntentBindingFields())
                 || !Objects.equals(owner.pagedBusinessResourceRowLimits(), invocationOwner.pagedBusinessResourceRowLimits())) throw denied();
         Scope scope = new Scope(context, invocationOwner, source, holder, connection);
         try {
@@ -97,6 +99,9 @@ public class BusinessCommandDataAccessorFactory {
         private final Map<SourceKey,OutputSource> outputSources = new HashMap<>();
         private Map<String,Set<String>> publicDeclarations;
         private Map<String,Integer> artifactFields;
+        private Set<String> artifactBindingFields;
+        private Set<String> artifactIntentFields;
+        private Map<String,String> artifactBinding;
         private final Set<String> projectedModels = new HashSet<>();
         private boolean artifactSaved;
         private Map<String, Object> root;
@@ -127,6 +132,9 @@ public class BusinessCommandDataAccessorFactory {
             if (!Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
             if (context.getPublicOutputProjection() != outputPlan
                     || artifactFields != null && !artifactFields.equals(owner.businessArtifactFields())
+                    || artifactBindingFields != null && !artifactBindingFields.equals(owner.businessArtifactRootBindingFields())
+                    || artifactIntentFields != null && !artifactIntentFields.equals(owner.businessArtifactIntentBindingFields())
+                    || artifactBinding != null && !artifactBinding.equals(context.getArtifactRootBinding())
                     || publicDeclarations != null && !publicDeclarations.equals(owner.publicBusinessResourceFields())) throw denied();
             if (readIsolation != null) {
                 try { if (connection.getTransactionIsolation() != readIsolation.jdbcLevel()) throw denied(); }
@@ -181,6 +189,12 @@ public class BusinessCommandDataAccessorFactory {
             publicDeclarations = owner.publicBusinessResourceFields().entrySet().stream().collect(
                     java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
             artifactFields = Map.copyOf(owner.businessArtifactFields());
+            artifactBindingFields = Set.copyOf(owner.businessArtifactRootBindingFields());
+            artifactIntentFields = Set.copyOf(owner.businessArtifactIntentBindingFields());
+            artifactBinding = Map.copyOf(context.getArtifactRootBinding());
+            var allBindingFields = new HashSet<>(artifactBindingFields); allBindingFields.addAll(artifactIntentFields);
+            if (!allBindingFields.equals(artifactBinding.keySet()) || allBindingFields.size() > 16
+                    || !allBindingFields.isEmpty() && artifactFields.isEmpty()) throw denied();
             if (artifactFields.size() > 8 || artifactFields.values().stream().anyMatch(limit -> limit < 1 || limit > 67_108_864)
                     || !artifactFields.isEmpty() && (publicDeclarations.isEmpty() || !"update".equals(witness.action())
                         || !publicDeclarations.getOrDefault(rootModel, Set.of()).containsAll(artifactFields.keySet()))) throw denied();
@@ -203,6 +217,7 @@ public class BusinessCommandDataAccessorFactory {
             resultFields.forEach(BusinessResourceAuthorization::identifier);
             lockVersion(rootModel, rootPid, rootVersion);
             root = BusinessResourceAuthorization.snapshot(load(rootModel, rootPid));
+            if (!artifactBinding.isEmpty() && !artifactBinding.equals(publicProjection.prepareArtifactBinding(context,owner,root))) throw denied();
             if (version(root) != rootVersion) throw new com.auraboot.framework.meta.exception.RecordVersionConflictException(
                     "Business target changed after authorization");
         }
@@ -535,7 +550,9 @@ public class BusinessCommandDataAccessorFactory {
                         artifactSaved = true;
                         var saved = artifactFiles.persistBusinessArtifact(
                                 new com.auraboot.framework.file.support.GeneratedArtifactMultipartFile(filename, contentType, bytes), user,
-                                com.auraboot.framework.file.security.BusinessArtifactAuthorization.capture(outputPlan, field));
+                                com.auraboot.framework.file.security.BusinessArtifactAuthorization.capture(outputPlan, field,
+                                        artifactBinding.entrySet().stream().filter(entry -> artifactBindingFields.contains(entry.getKey()))
+                                                .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,Map.Entry::getValue))));
                         if (saved == null || saved.getId() == null || saved.getPid() == null
                                 || !saved.getPid().matches("[0-9A-HJKMNP-TV-Z]{26}")
                                 || !tenant.equals(saved.getTenantId()) || !user.equals(saved.getCreatedBy())
@@ -544,6 +561,8 @@ public class BusinessCommandDataAccessorFactory {
                         var changes = new LinkedHashMap<>(intendedChanges); changes.put(field, saved.getPid());
                         var updated = update(rootModel, rootPid, changes);
                         if (!saved.getPid().equals(updated.get(field))) throw denied();
+                        if (!artifactBinding.isEmpty()
+                                && !artifactBinding.equals(publicProjection.prepareArtifactBinding(context,owner,load(rootModel,rootPid)))) throw denied();
                         var relation = new com.auraboot.framework.file.entity.FileRelationEntity().setTenantId(tenant)
                                 .setEntityType(rootModel).setEntityId(rootPid).setFieldName(field)
                                 .setFileId(String.valueOf(saved.getId())).setSortOrder(0).setDeletedFlag(false);

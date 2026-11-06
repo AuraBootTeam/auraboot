@@ -335,9 +335,16 @@ public class CommandTargetScopePhase implements CommandPhase {
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
             if (resultProjection != null) ctx.setBusinessResultProjection(nativeContract != null
                     ? resultProjection.prepareNative(ctx, nativeContract) : resultProjection.prepare(ctx,owner));
+            if (owner != null && !owner.businessArtifactFields().isEmpty() && owner.publicBusinessResourceFields().isEmpty())
+                throw new org.springframework.security.access.AccessDeniedException("Artifact sources must be declared before idempotency lookup");
             if (owner != null && !owner.publicBusinessResourceFields().isEmpty()) {
                 if (publicOutputProjection == null) throw new org.springframework.security.access.AccessDeniedException("Public output policy service is unavailable");
                 ctx.setPublicOutputProjection(publicOutputProjection.prepare(ctx, owner));
+            }
+            if (owner != null && (!owner.businessArtifactRootBindingFields().isEmpty() || !owner.businessArtifactIntentBindingFields().isEmpty())) {
+                if (publicOutputProjection == null || ctx.getPublicOutputProjection() == null)
+                    throw new org.springframework.security.access.AccessDeniedException("Artifact root binding is unavailable");
+                ctx.setArtifactRootBinding(publicOutputProjection.prepareArtifactBinding(ctx,owner,record));
             }
             return true;
         }

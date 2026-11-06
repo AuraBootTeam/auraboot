@@ -14,6 +14,18 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.*;
 
 class BusinessArtifactAuthorizationTest {
+    @Test void root_relationships_are_typed_immutable_hashes_without_raw_business_values() {
+        var facts = new java.util.HashMap<String,Object>(); facts.put("project", "PRIVATE-PROJECT"); facts.put("run",null);
+        var binding = BusinessArtifactAuthorization.binding(Set.of("project","run"),facts);
+        var stamp = BusinessArtifactAuthorization.capture(plan(fields(Set.of("name"),List.of())),"export_file",binding);
+        assertThat(stamp.encode()).doesNotContain("PRIVATE-PROJECT");
+        assertThat(BusinessArtifactAuthorization.parse(stamp.encode()).rootBinding()).isEqualTo(binding);
+        facts.put("project","OTHER-PROJECT");
+        assertThat(BusinessArtifactAuthorization.binding(Set.of("project","run"),facts)).isNotEqualTo(binding);
+        assertThatThrownBy(() -> binding.put("project","forged")).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(BusinessArtifactAuthorization.binding(Set.of("project"),Map.of("project",1)))
+                .isNotEqualTo(BusinessArtifactAuthorization.binding(Set.of("project"),Map.of("project","1")));
+    }
     static final String PID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
     static final BusinessTargetAuthorization TARGET = new BusinessTargetAuthorization("orders:export", "orders", PID, "update", 7L, 20L, 30L);
     static ModelFields fields(Set<String> readable, List<BusinessResultProjectionPlan.PolicyMask> masks) {

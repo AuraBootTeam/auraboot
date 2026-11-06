@@ -68,6 +68,10 @@ class BusinessArtifactAccessGuardTest {
         when(projection.prepare(any(), same(owner))).thenReturn(plan);
     }
     @AfterEach void clear() { MetaContext.clear(); }
+    @Test void an_owner_requiring_root_relationships_rejects_an_older_unbound_stamp() {
+        when(owner.businessArtifactRootBindingFields()).thenReturn(Set.of("project"));
+        assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void creator_is_checked_against_current_authorization() {
         guard.authorize(file);
         when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);

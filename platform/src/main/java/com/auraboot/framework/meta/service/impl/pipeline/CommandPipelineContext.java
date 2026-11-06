@@ -142,6 +142,10 @@ public class CommandPipelineContext {
     /** Host-captured current public field view for explicitly declared artifact sources. */
     private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan publicOutputProjection;
 
+    /** Host-captured relationship/state hashes fenced before artifact idempotency lookup. */
+    @lombok.Builder.Default
+    private Map<String, String> artifactRootBinding = Map.of();
+
     public record BusinessTargetAuthorization(String commandCode, String modelCode, String targetRecordId,
                                                String action, Long tenantId, Long userId, Long memberId) {}
 

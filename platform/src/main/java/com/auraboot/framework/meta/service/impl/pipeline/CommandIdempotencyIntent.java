@@ -41,6 +41,8 @@ public final class CommandIdempotencyIntent {
         intent.put("dryRun", request != null && request.isDryRun());
         if (ctx.getPublicOutputProjection() != null && !ctx.getPublicOutputProjection().models().isEmpty()) {
             intent.put("publicOutputPolicy", ctx.getPublicOutputProjection().fingerprint());
+            if (ctx.getArtifactRootBinding() != null && !ctx.getArtifactRootBinding().isEmpty())
+                intent.put("artifactRootBinding", immutableValue(ctx.getArtifactRootBinding()));
         }
         return Collections.unmodifiableMap(intent);
     }

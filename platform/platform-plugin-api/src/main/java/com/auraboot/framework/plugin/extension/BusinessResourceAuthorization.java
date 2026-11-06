@@ -47,6 +47,12 @@ public interface BusinessResourceAuthorization {
     /** Finite root file fields and maximum artifact bytes; no arbitrary file capability by default. */
     default Map<String, Integer> businessArtifactFields() { return Map.of(); }
 
+    /** Finite root relationship/state facts whose changes invalidate generated artifacts. */
+    default Set<String> businessArtifactRootBindingFields() { return Set.of(); }
+
+    /** Additional execution facts that fence cache replay without retiring readable historical bytes. */
+    default Set<String> businessArtifactIntentBindingFields() { return Set.of(); }
+
     /** Immutable owner lower bound; mutable command metadata cannot substitute a weaker duty. */
     Boundary businessBoundary();
 

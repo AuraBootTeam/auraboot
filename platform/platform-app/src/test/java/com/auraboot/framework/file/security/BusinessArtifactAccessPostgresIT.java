@@ -66,6 +66,7 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
     @Autowired DataScopeService scopes;
     @Autowired BusinessCommandRecordAuthorization grants;
     @Autowired CommandPublicOutputProjectionService projection;
+    @Autowired com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
     @Autowired FieldMaskService masks;
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
@@ -75,7 +76,7 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
     @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory resourceFactory;
     @MockitoSpyBean ExtensionRegistry extensions;
-    String model, fileField, secret, command, permission, rootPid, filePid, table;
+    String model, fileField, secret, projectField, intentField, command, permission, rootPid, filePid, table;
     Long modelId, commandId;
     final List<Long> fieldIds = new ArrayList<>(), maskIds = new ArrayList<>();
     Owner owner;
@@ -84,23 +85,24 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_name='ab_file' AND column_name='artifact_authorization'",Integer.class)).isEqualTo(1);
         String suffix = UniqueIdGenerator.generate().toLowerCase(Locale.ROOT);
         model = "artifact_" + suffix; fileField = "artifact_file_" + suffix; secret = "artifact_secret_" + suffix;
+        projectField = "artifact_project_" + suffix; intentField = "artifact_run_" + suffix;
         command = model + ":export"; permission = "fixture." + model + ".export";
         var definition = new Model(); definition.setPid(UniqueIdGenerator.generate()); definition.setTenantId(testTenant.getId());
         definition.setCode(model); definition.setVersion(1); definition.setIsCurrent(true); definition.setStatus("published"); definition.setDeletedFlag(false);
         definition.setCreatedAt(Instant.now()); definition.setUpdatedAt(Instant.now());
         var extension = new ExtensionBean(); extension.setExtension(new HashMap<>(Map.of("modelType", "entity"))); definition.setExtension(extension);
-        models.insert(definition); modelId = definition.getId(); bind(fileField, "file"); bind(secret, "string"); metadata.clearAllCache();
+        models.insert(definition); modelId = definition.getId(); bind(fileField, "file"); bind(secret, "string"); bind(projectField,"string"); bind(intentField,"string"); metadata.clearAllCache();
         var created = schema.createTableByModel(model); assertThat(created.isSuccess()).as(created.getErrorMessage()).isTrue();
         table = metadata.getModelDefinition(model).orElseThrow().getTableName();
         rootPid = MetaContext.runWithCommandPermitPlan("ALL",null,model,null,
-                () -> Objects.toString(data.create(model,new HashMap<>(Map.of(secret,"BOARD"))).get("pid")));
+                () -> Objects.toString(data.create(model,new HashMap<>(Map.of(secret,"BOARD",projectField,"PROJECT-A",intentField,"RUN-A"))).get("pid")));
         grantCommittedPermissionToTestRole(permission,"operation",model,"manage","Artifact generation fixture");
         scopes.setScope(testTenant.getId(),testRole.getId(),model,"manage","all","MAX");
         owner = new Owner(); doReturn(Optional.of(owner)).when(extensions).getCommandHandler(command);
         var entry = new CommandDefinition(); entry.setPid(UniqueIdGenerator.generate()); entry.setTenantId(testTenant.getId()); entry.setCode(command);
         entry.setModelCode(model); entry.setDisplayName("Artifact fixture"); entry.setVersion(1); entry.setIsCurrent(true); entry.setStatus("published"); entry.setDeletedFlag(false);
         entry.setInputSchema("{}"); entry.setTargetModels("[]"); entry.setCmdRiskLevel("L1");
-        entry.setExecutionConfig(json.writeValueAsString(Map.of("type","custom","permissions",List.of(permission),"handler",command,
+        entry.setExecutionConfig(json.writeValueAsString(Map.of("type","custom","permissions",List.of(permission),"handler",command,"cacheResult",true,
                 "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false))));
         commands.insert(entry); commandId = entry.getId();
         var tx = new TransactionTemplate(transactions); tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
@@ -113,13 +115,75 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
             context.setBusinessGrantDecision(grants.resolve(testTenantMember.getId(),List.of(permission),model,root));
             assertThat(context.getBusinessGrantDecision().result().granted()).isTrue();
             var saved = fileService.persistBusinessArtifact(new MockMultipartFile("file","board.txt","text/plain",BYTES),
-                    testUser.getId(), BusinessArtifactAuthorization.capture(projection.prepare(context,owner),fileField));
+                    testUser.getId(), BusinessArtifactAuthorization.capture(projection.prepare(context,owner),fileField,projection.prepareArtifactReadBinding(context,owner,root)));
             filePid = saved.getPid();
             assertThat(saved.getRetentionLocked()).isTrue();
             return null;
         });
         assertThat(fileService.findByPid(filePid).getTenantId()).isEqualTo(testTenant.getId());
     }
+    @Test void changed_root_relationship_blocks_old_bytes_even_while_the_duty_still_allows_the_root() {
+        jdbc.update("UPDATE "+table+" SET "+projectField+"=? WHERE pid=?","PROJECT-B",rootPid);
+        assertThatThrownBy(() -> accessor().open(filePid)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> accessor().describe(filePid)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> fileService.getFileDownloadUrl(filePid)).isInstanceOf(AccessDeniedException.class);
+        jdbc.update("UPDATE "+table+" SET "+projectField+"=? WHERE pid=?","PROJECT-A",rootPid);
+        try (var input = accessor().open(filePid)) { assertThat(input.readAllBytes()).isEqualTo(BYTES); }
+        catch (java.io.IOException error) { throw new IllegalStateException(error); }
+    }
+
+    @Test void a_root_binding_change_during_save_aborts_file_and_root_changes() {
+        owner.allowBindingMutation = true;
+        long before = jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId());
+        assertThatThrownBy(() -> withResources(accessor -> {
+            accessor.getById(model,rootPid); accessor.projectForPublicOutput(model,List.of(rootPid));
+            return accessor.savePublicArtifact(fileField,"changed.txt","text/plain",BYTES,Map.of(projectField,"PROJECT-B"));
+        })).isInstanceOf(DataAccessorException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT "+projectField+" FROM "+table+" WHERE pid=?",String.class,rootPid)).isEqualTo("PROJECT-A");
+    }
+
+    @Test void actual_command_cache_conflicts_on_root_relationship_change_and_restores_without_reexecution() {
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
+                "API","command","execute","Command fixture invocation");
+        var request = new CommandExecuteRequest(); request.setTargetRecordId(rootPid); request.setOperationType("update");
+        request.setClientRequestId(UniqueIdGenerator.generate()); request.setPayload(Map.of());
+        var first = commandExecutor.execute(command,request);
+        assertThat(first.isIdempotentReplay()).isFalse(); assertThat(first.getData()).containsEntry("success",true);
+        assertThat(owner.executions).hasValue(1);
+        String fileId = first.getData().get("fileId").toString();
+        long count = jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId());
+        String outcome = jdbc.queryForObject("SELECT outcome::text FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                String.class,testTenant.getId(),command,command+":"+request.getClientRequestId());
+        jdbc.update("UPDATE "+table+" SET "+projectField+"=?, row_version=row_version+1 WHERE pid=?","PROJECT-B",rootPid);
+        assertThatThrownBy(() -> commandExecutor.execute(command,request))
+                .isInstanceOf(com.auraboot.framework.exception.RequestIntentConflictException.class);
+        assertThatThrownBy(() -> accessor().open(fileId)).isInstanceOf(AccessDeniedException.class);
+        assertThat(owner.executions).hasValue(1);
+        assertThat(jdbc.queryForObject("SELECT outcome::text FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                String.class,testTenant.getId(),command,command+":"+request.getClientRequestId())).isEqualTo(outcome);
+        jdbc.update("UPDATE "+table+" SET "+projectField+"=?, row_version=row_version+1 WHERE pid=?","PROJECT-A",rootPid);
+        assertThat(commandExecutor.execute(command,request).isIdempotentReplay()).isTrue();
+        assertThat(owner.executions).hasValue(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(count);
+    }
+
+    @Test void an_intent_only_run_change_blocks_regeneration_replay_without_retiring_historical_bytes() throws Exception {
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
+                "API","command","execute","Command fixture invocation");
+        var request = new CommandExecuteRequest(); request.setTargetRecordId(rootPid); request.setOperationType("update");
+        request.setClientRequestId(UniqueIdGenerator.generate()); request.setPayload(Map.of());
+        var first = commandExecutor.execute(command,request); String saved = first.getData().get("fileId").toString();
+        jdbc.update("UPDATE "+table+" SET "+intentField+"=?, row_version=row_version+1 WHERE pid=?","RUN-B",rootPid);
+        assertThatThrownBy(() -> commandExecutor.execute(command,request))
+                .isInstanceOf(com.auraboot.framework.exception.RequestIntentConflictException.class);
+        try (var input = accessor().open(saved)) { assertThat(input.readAllBytes()).isEqualTo(BYTES); }
+        assertThat(owner.executions).hasValue(1);
+        jdbc.update("UPDATE "+table+" SET "+intentField+"=?, row_version=row_version+1 WHERE pid=?","RUN-A",rootPid);
+        assertThat(commandExecutor.execute(command,request).isIdempotentReplay()).isTrue();
+        assertThat(owner.executions).hasValue(1);
+    }
+
     @Test void generated_bytes_and_database_record_roll_back_with_the_business_transaction() {
         var original = fileService.findByPid(filePid);
         var stamp = BusinessArtifactAuthorization.parse(original.getArtifactAuthorization());
@@ -159,12 +223,13 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
                     .permitPlan(new com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan(
                             com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.Decision.PERMIT,null,null,rootPid,
                             com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.TARGET,version))
-                    .execConfig(Map.of("type","custom","permissions",List.of(permission),"handler",command,
+                    .execConfig(Map.of("type","custom","permissions",List.of(permission),"handler",command,"cacheResult",true,
                             "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false))).build();
             context.setBusinessGrantDecision(grants.resolve(testTenantMember.getId(),List.of(permission),model,root));
             context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(command,model,rootPid,"update",
                     testTenant.getId(),testUser.getId(),testTenantMember.getId()));
             context.setPublicOutputProjection(projection.prepare(context,owner));
+            context.setArtifactRootBinding(projection.prepareArtifactBinding(context,owner,root));
             return MetaContext.runWithCommandPermitPlan("TARGET",version,model,rootPid,() ->
                     MetaContext.runWithAuthorizedCommandCode(command,() -> {
                         try (var scope = resourceFactory.open(context,owner)) { return body.apply(scope.accessor()); }
@@ -313,10 +378,22 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
     }
     class Owner implements CommandHandlerExtension, BusinessResourceAuthorization {
         public String getCommandType() { return command; }
-        public Object execute(CommandContext context) { throw new AssertionError("No product generator in this fixture"); }
+        final java.util.concurrent.atomic.AtomicInteger executions = new java.util.concurrent.atomic.AtomicInteger();
+        boolean allowBindingMutation;
+        public Object execute(CommandContext context) {
+            executions.incrementAndGet();
+            var db = context.dataAccessor(); db.getById(model,rootPid); db.projectForPublicOutput(model,List.of(rootPid));
+            var saved = db.savePublicArtifact(fileField,"command-fixture.txt","text/plain",BYTES,Map.of());
+            return Map.of("success",true,"fileId",saved.fileId());
+        }
         public Boundary businessBoundary() { return new Boundary(command,model,"update",Set.of(permission)); }
         public Set<String> businessResourceModels() { return Set.of(model); }
-        public Set<String> businessResultFields() { return Set.of("success"); }
+        public Set<String> businessResultFields() { return Set.of("success","fileId"); }
+        public Map<String,BusinessResultField> businessResultProjection() {
+            return Map.of("success",BusinessResultField.constant(true),"fileId",BusinessResultField.rootField(fileField));
+        }
+        public Set<String> businessArtifactRootBindingFields() { return Set.of(projectField); }
+        public Set<String> businessArtifactIntentBindingFields() { return Set.of(intentField); }
         public Map<String,Set<String>> publicBusinessResourceFields() { return Map.of(model,Set.of(fileField,secret)); }
         public Map<String,Integer> businessArtifactFields() { return Map.of(fileField,16_384); }
         public ReadIsolation resourceReadIsolation() { return ReadIsolation.REPEATABLE_READ; }
@@ -324,7 +401,8 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
             if (!model.equals(request.modelCode()) || !rootPid.equals(request.recordId()) || request.record() == null
                     || !rootPid.equals(request.record().get("pid"))) return null;
             if (request.action() != Action.READ && request.action() != Action.UPDATE) return null;
-            return new Grant(Set.of("pid","tenant_id","row_version",fileField,secret),Set.of(fileField,secret),1);
+            return new Grant(Set.of("pid","tenant_id","row_version",fileField,secret,projectField),
+                    allowBindingMutation ? Set.of(fileField,secret,projectField) : Set.of(fileField,secret),1);
         }
     }
 }

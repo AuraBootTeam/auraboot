@@ -36,6 +36,37 @@ public class CommandPublicOutputProjectionService {
         return snapshots.withFreshReads(() -> capture(context, owner));
     }
 
+    public Map<String,String> prepareArtifactBinding(CommandPipelineContext context, BusinessResourceAuthorization owner,
+                                                     Map<String,Object> root) {
+        var fields = new LinkedHashSet<>(owner.businessArtifactRootBindingFields());
+        fields.addAll(owner.businessArtifactIntentBindingFields());
+        return prepareArtifactBinding(context,owner,root,Set.copyOf(fields));
+    }
+
+    public Map<String,String> prepareArtifactReadBinding(CommandPipelineContext context, BusinessResourceAuthorization owner,
+                                                         Map<String,Object> root) {
+        return prepareArtifactBinding(context,owner,root,Set.copyOf(owner.businessArtifactRootBindingFields()));
+    }
+
+    private Map<String,String> prepareArtifactBinding(CommandPipelineContext context, BusinessResourceAuthorization owner,
+                                                      Map<String,Object> root, Set<String> bindingFields) {
+        CommandResultProjectionService.requireActor(context);
+        if (bindingFields.isEmpty()) return Map.of();
+        var target = context.getBusinessTargetAuthorization();
+        if (bindingFields.size() > 16 || owner.businessArtifactFields().isEmpty() || root == null
+                || Boolean.TRUE.equals(root.get("deleted_flag"))
+                || !target.targetRecordId().equals(root.get("pid"))
+                || !target.tenantId().toString().equals(String.valueOf(root.get("tenant_id")))) throw BusinessResultProjectionPlan.denied();
+        var definitions = metadata.getModelFields(target.modelCode());
+        if (definitions == null) throw BusinessResultProjectionPlan.denied();
+        for (String field : bindingFields) {
+            var definition = definitions.stream().filter(candidate -> candidate != null && field.equals(candidate.getCode()))
+                    .findFirst().orElseThrow(BusinessResultProjectionPlan::denied);
+            if (definition.isVirtual() || definition.isJsonbVirtual()) throw BusinessResultProjectionPlan.denied();
+        }
+        return com.auraboot.framework.file.security.BusinessArtifactAuthorization.binding(bindingFields,root);
+    }
+
     private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, BusinessResourceAuthorization owner) {
         CommandResultProjectionService.requireActor(context);
         var declarations = Map.copyOf(owner.publicBusinessResourceFields());
