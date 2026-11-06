@@ -5,6 +5,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
+import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.entity.RoleDataScope;
 import com.auraboot.framework.permission.enums.DataScopeType;
 import com.auraboot.framework.exception.RootUnCheckedException;
@@ -18,6 +19,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
@@ -51,6 +53,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     private final RoleDataScopeMapper roleDataScopeMapper;
     private final UserRoleMapper userRoleMapper;
     private final TenantMemberMapper tenantMemberMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired @Lazy
     private OrganizationService organizationService;
@@ -173,6 +176,12 @@ public class DataScopeServiceImpl implements DataScopeService {
             scope.setUpdatedAt(Instant.now());
             roleDataScopeMapper.insert(scope);
         }
+        // The user-permission snapshot and member-keyed dataScopeCondition caches read row
+        // filters through this table; an import or admin change that skips eviction keeps
+        // stale row filters alive until restart (the 2026-11-05 bootnap finding). Publish
+        // through the standard role-changed channel so every consumer evicts after commit.
+        eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                this, tenantId, roleId, null, "UPDATE"));
     }
 
     @Override
@@ -184,6 +193,8 @@ public class DataScopeServiceImpl implements DataScopeService {
                 .eq(RoleDataScope::getResourceCode, resourceCode)
                 .eq(RoleDataScope::getActionCode, actionCode);
         roleDataScopeMapper.delete(query);
+        eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                this, tenantId, roleId, null, "DELETE"));
     }
 
     @Override
