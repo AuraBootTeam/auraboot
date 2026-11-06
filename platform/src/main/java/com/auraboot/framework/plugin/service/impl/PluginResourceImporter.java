@@ -23,6 +23,10 @@ public interface PluginResourceImporter {
     boolean checkCommandExists(Long tenantId, String code);
     boolean checkPermissionExists(Long tenantId, String code);
     boolean checkRoleExists(Long tenantId, String code);
+
+    /** Retired identities remain reserved when previewing role template imports. */
+    boolean checkRetiredRoleExists(Long tenantId, String code);
+
     boolean checkMenuExists(Long tenantId, String code);
     boolean checkPageExists(Long tenantId, String pageKey);
     boolean checkDashboardExists(Long tenantId, String code);

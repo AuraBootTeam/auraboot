@@ -142,6 +142,12 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     @Override
+    public boolean checkRetiredRoleExists(Long tenantId, String code) {
+        return roleMapper.findRetiredByTenantIdAndCode(tenantId, code) != null;
+    }
+
+
+    @Override
     public boolean checkMenuExists(Long tenantId, String code) {
         return pageNavigationResources().checkMenuExists(tenantId, code);
     }

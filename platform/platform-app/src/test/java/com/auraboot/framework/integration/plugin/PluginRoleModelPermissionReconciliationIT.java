@@ -78,6 +78,10 @@ class PluginRoleModelPermissionReconciliationIT extends BaseIntegrationTest {
     ImportExecuteResult execute() {
         var preview=imports.parseDirectory(directory.toString());
         assertThat(preview.isValid()).as("Fixture parse: %s",preview.getErrors()).isTrue();
+        boolean existing=jdbc.queryForObject("SELECT count(*) FROM ab_role WHERE tenant_id=? AND code=?",Integer.class,getTestTenant().getId(),roleCode)>0;
+        assertThat(preview.getChanges().get("ROLE")).hasSize(1);
+        assertThat(preview.getChanges().get("ROLE").getFirst().getAction())
+                .isEqualTo(existing?ResourceAction.SKIP:ResourceAction.CREATE);
         return imports.execute(preview.getImportId(),ImportRequest.builder().importId(preview.getImportId())
                 .conflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE).autoPublishModels(true)
                 .autoPublishFields(true).autoPublishCommands(true).autoPublishPages(true).build());
