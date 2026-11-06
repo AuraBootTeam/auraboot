@@ -284,10 +284,15 @@ function NodeDetailPanel({
 
 export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ block, runtime }) => {
   useRuntimeStateSubscription(runtime)
-  // The readonly canvas routes clicks into the shared designer store; the panel
-  // mirrors whatever node is selected there (FlowCanvas clears it on unmount).
-  // Hooks stay above the empty-nodes early return.
-  const selectedNodeId = useFlowStore((store) => store.selectedNodeId)
+  // Selection is self-contained: the readonly canvas does not route clicks through the
+  // shared designer store (elementsSelectable is off there), so this card delegates
+  // clicks on the canvas and reads the react-flow node id (= node key) itself. A click
+  // that misses any node clears the selection. Hooks stay above the early return.
+  const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null)
+  const onCanvasClick = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const nodeEl = (event.target as HTMLElement).closest('.react-flow__node')
+    setSelectedNodeId(nodeEl ? nodeEl.getAttribute('data-id') : null)
+  }, [])
   const context = runtime.getContext()
   const locale = context.locale || 'zh-CN'
   const t = context.t || ((key: string) => key)
@@ -342,7 +347,7 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
         ) : null}
       </div>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
-        <div className="min-w-0 lg:flex-1">
+        <div className="min-w-0 lg:flex-1" onClick={onCanvasClick}>
           <FlowCanvasCard
             nodes={flowNodes}
             edges={flowEdges}

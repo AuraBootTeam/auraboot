@@ -14,20 +14,26 @@
  */
 
 import React from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime'
 import type { BlockConfig } from '~/framework/meta/schemas/types'
 
 const statusMapSpy = vi.fn()
-const importDataSpy = vi.fn()
 
-/** Shared designer store double — tests write `selectedNodeId` to drive the node panel. */
-let selectedNodeId: string | null = null
+/** Nodes seeded into the shared designer store — the canvas mock renders them clickable. */
+let seededNodes: Array<{ id: string; data: { label: string } }> = []
 
 vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
   FlowCanvas: ({ className }: { className?: string }) => (
-    <div data-testid="flow-canvas" className={className} />
+    <div data-testid="flow-canvas" className={className}>
+      {seededNodes.map((n) => (
+        <button key={n.id} className="react-flow__node" data-id={n.id}>
+          {n.data.label}
+        </button>
+      ))}
+    </div>
   ),
   NodeRuntimeStatusProvider: ({
     statuses,
@@ -40,7 +46,12 @@ vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
     return <div data-testid="status-provider">{children}</div>
   },
   useFlowStore: (selector: (store: { selectedNodeId: string | null; importData: unknown }) => unknown) =>
-    selector({ selectedNodeId, importData: importDataSpy }),
+    selector({
+      selectedNodeId: null,
+      importData: (data: { nodes: Array<{ id: string; data: { label: string } }> }) => {
+        seededNodes = data.nodes
+      },
+    }),
 }))
 
 import { DagCanvasBlockRenderer, deriveDeliveryNodeStatuses } from '../DagCanvasBlockRenderer'
@@ -182,7 +193,6 @@ describe('deriveDeliveryNodeStatuses', () => {
 describe('DagCanvasBlockRenderer card', () => {
   it('renders the canvas card and passes the derived status map down', () => {
     statusMapSpy.mockClear()
-    importDataSpy.mockClear()
     render(
       <DagCanvasBlockRenderer
         block={block()}
@@ -250,13 +260,8 @@ describe('DagCanvasBlockRenderer node panel', () => {
     }) as unknown as BlockConfig
 
   beforeEach(() => {
-    selectedNodeId = null
-    importDataSpy.mockClear()
+    seededNodes = []
     statusMapSpy.mockClear()
-  })
-
-  afterEach(() => {
-    selectedNodeId = null
   })
 
   it('hint shows while no node is selected', () => {
@@ -270,8 +275,7 @@ describe('DagCanvasBlockRenderer node panel', () => {
     expect(screen.queryByTestId('dag-node-panel')).toBeNull()
   })
 
-  it('selected node renders contract facts with record-derived inputs and outputs', () => {
-    selectedNodeId = 'register'
+  it('clicking a node renders contract facts with record-derived inputs and outputs', async () => {
     render(
       <DagCanvasBlockRenderer
         block={panelBlock()}
@@ -282,6 +286,8 @@ describe('DagCanvasBlockRenderer node panel', () => {
         })}
       />,
     )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '登记' }))
     const panel = screen.getByTestId('dag-node-panel')
     expect(panel.textContent).toContain('登记')
     expect(panel.textContent).toContain('register_run')
@@ -293,8 +299,7 @@ describe('DagCanvasBlockRenderer node panel', () => {
     expect(panel.textContent).toContain('—')
   })
 
-  it('phase durations join by node key and the panel reflects derived status', () => {
-    selectedNodeId = 'deploy'
+  it('phase durations join by node key and the panel reflects derived status', async () => {
     render(
       <DagCanvasBlockRenderer
         block={panelBlock()}
@@ -307,6 +312,8 @@ describe('DagCanvasBlockRenderer node panel', () => {
         })}
       />,
     )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '部署' }))
     const panel = screen.getByTestId('dag-node-panel')
     expect(panel.textContent).toContain('41s')
     expect(panel.textContent).not.toContain('5s')
@@ -314,14 +321,29 @@ describe('DagCanvasBlockRenderer node panel', () => {
     expect(panel.textContent).toContain('失败不重投')
   })
 
-  it('an unparsable phases field degrades to a dash instead of crashing', () => {
-    selectedNodeId = 'deploy'
+  it('an unparsable phases field degrades to a dash instead of crashing', async () => {
     render(
       <DagCanvasBlockRenderer
         block={panelBlock()}
         runtime={runtimeWithRecord({ status: 'succeeded', orb_drun_phases: 'not-json' })}
       />,
     )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '部署' }))
     expect(screen.getByTestId('dag-node-panel').textContent).toContain('—')
+  })
+
+  it('clicking the pane clears an existing selection', async () => {
+    render(
+      <DagCanvasBlockRenderer
+        block={panelBlock()}
+        runtime={runtimeWithRecord({ status: 'succeeded' })}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '登记' }))
+    expect(screen.getByTestId('dag-node-panel')).toBeDefined()
+    await user.click(screen.getByTestId('flow-canvas'))
+    expect(screen.queryByTestId('dag-node-panel')).toBeNull()
   })
 })
