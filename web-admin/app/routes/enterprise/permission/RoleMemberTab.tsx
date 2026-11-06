@@ -363,14 +363,14 @@ export default function RoleMemberTab({
         open={confirmRemove.open && !readOnly}
         title={t('admin.permission.members.removeTitle', undefined, 'Remove Member')}
         content={t(
-          'admin.permission.members.removeContent',
-          undefined,
-          'Are you sure you want to remove "{name}" from this role?',
-        ).replace(
-          '{name}',
-          confirmRemove.member?.userName ||
-            confirmRemove.member?.email ||
-            t('admin.permission.members.unnamed', undefined, 'Member'),
+          'rbacExperience.removeMemberConfirmation',
+          {
+            name:
+              confirmRemove.member?.userName ||
+              confirmRemove.member?.email ||
+              t('admin.permission.members.unnamed', undefined, 'Member'),
+          },
+          `Remove "${confirmRemove.member?.userName || confirmRemove.member?.email || t('admin.permission.members.unnamed', undefined, 'Member')}" from this role?`,
         )}
         variant="danger"
         onConfirm={handleRemove}

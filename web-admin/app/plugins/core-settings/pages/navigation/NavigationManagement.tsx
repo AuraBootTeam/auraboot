@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/ui/ui/dialog';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker } from 'react-router';
 import NavigationRoleAssignment from './NavigationRoleAssignment';
 import { usePermissions } from '~/contexts/AuthContext';
@@ -74,11 +74,14 @@ function Editor() {
     external: t('navigation.kind.external', undefined, 'External link'),
     embedded: t('navigation.kind.embedded', undefined, 'Embedded page'),
   };
+  const loadGeneration = useRef(0);
   async function load() {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setFailed(false);
     try {
       const value = await navigationService.read();
+      if (generation !== loadGeneration.current) return;
       setSnapshot(value);
       const first = value.entries.find(
         (item) => item.available && item.definition.kind !== 'directory',
@@ -100,13 +103,16 @@ function Editor() {
       );
       setConflict(false);
     } catch {
-      setFailed(true);
+      if (generation === loadGeneration.current) setFailed(true);
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }
   useEffect(() => {
     void load();
+    return () => {
+      loadGeneration.current++;
+    };
   }, []);
   function choose(item: Entry) {
     if (dirty) {

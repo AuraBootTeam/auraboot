@@ -530,6 +530,14 @@ function PermissionManagementContent() {
                   </span>
                 )}
               </div>
+              {selectedRole.description?.trim() && (
+                <p
+                  data-testid="role-summary-description"
+                  className="text-text-2 mt-1 max-w-3xl text-xs break-words"
+                >
+                  {selectedRole.description}
+                </p>
+              )}
               <p className="text-text-2 mt-1 max-w-3xl text-xs">
                 {activeRightTab === 'members'
                   ? t(

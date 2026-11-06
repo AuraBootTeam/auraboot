@@ -7752,5 +7752,10 @@
     "key": "rbacExperience.deleteRoleConfirmation",
     "zh-CN": "确定删除角色“{name}”吗？此操作不可撤销。",
     "en-US": "Delete role \"{name}\"? This cannot be undone."
+  },
+  {
+    "key": "rbacExperience.removeMemberConfirmation",
+    "zh-CN": "确定将“{name}”从此角色中移除吗？",
+    "en-US": "Remove \"{name}\" from this role?"
   }
 ]
