@@ -353,6 +353,8 @@ export interface ColumnConfig {
   align?: 'left' | 'center' | 'right';
   width?: number | string;
   ellipsis?: boolean;
+  /** Text renderer: preserve line breaks and wrap long identifiers without HTML interpretation. */
+  multiline?: boolean;
   fixed?: 'left' | 'right'; // sticky column
 
   // Format

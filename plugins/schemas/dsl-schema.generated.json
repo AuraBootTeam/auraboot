@@ -1249,13 +1249,13 @@
         "pagination": {
           "type": "boolean"
         },
-        "adaptor": {
-          "type": "string",
-          "description": "Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata."
-        },
         "paginationRequest": {
           "$ref": "#/definitions/PaginationRequestConfig",
           "description": "Explicit placement of runtime pageNum/pageSize, without changing other request inputs."
+        },
+        "adaptor": {
+          "type": "string",
+          "description": "Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata."
         },
         "dataPath": {
           "type": "string",
@@ -2691,6 +2691,10 @@
         "ellipsis": {
           "type": "boolean"
         },
+        "multiline": {
+          "type": "boolean",
+          "description": "Text renderer: preserve line breaks and wrap long identifiers without HTML interpretation."
+        },
         "fixed": {
           "type": "string",
           "enum": [
@@ -2922,6 +2926,10 @@
     "TreeConfig": {
       "type": "object",
       "properties": {
+        "childrenField": {
+          "type": "string",
+          "description": "Optional nested children array; pagination counts root records."
+        },
         "parentField": {
           "type": "string",
           "description": "Self-referencing field (e.g., 'parent_id')"
