@@ -152,10 +152,7 @@ function resolveTargetExpectedVersion(
  * resolve their row model into `tableName` (resolveRowActionModel), so the
  * default keeps that contract.
  */
-function resolveRecordReadModel(
-  recordReadModel: string | undefined,
-  tableName: string,
-): string {
+function resolveRecordReadModel(recordReadModel: string | undefined, tableName: string): string {
   return toNonBlankString(recordReadModel) || tableName;
 }
 
@@ -272,8 +269,11 @@ function resolveCommandPayload(
   // cannot turn into undefined fields and reach the command transport.
   const resolve = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(resolve);
-    if (value && typeof value === 'object' &&
-        [Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(value))
+    ) {
       return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item)]));
     }
     return typeof value === 'string' && value.includes('${')
@@ -283,10 +283,16 @@ function resolveCommandPayload(
   try {
     return resolve(configured) as Record<string, any>;
   } catch {
-    throw new Error(getLocalizedText({
-      'zh-CN': '无法解析当前操作的输入，请检查选择后重试。',
-      en: 'Unable to resolve the action inputs. Check your selections and try again.',
-    }, String(runtimeContext.locale || 'en-US'), runtimeContext.t as any));
+    throw new Error(
+      getLocalizedText(
+        {
+          'zh-CN': '无法解析当前操作的输入，请检查选择后重试。',
+          en: 'Unable to resolve the action inputs. Check your selections and try again.',
+        },
+        String(runtimeContext.locale || 'en-US'),
+        runtimeContext.t as any,
+      ),
+    );
   }
 }
 
@@ -1104,9 +1110,16 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               const downloadUrl = resolveCommandFileDownload(commandResult, actionDef.download);
               if (!downloadUrl)
                 throw new Error(
-                  'Command download result is missing the configured file identifier',
+                  t(
+                    'command.download.fileUnavailable',
+                    undefined,
+                    'The record does not provide an accessible file. Ask an administrator to check access.',
+                  ),
                 );
-              await downloadWithAuth(downloadUrl);
+              await downloadWithAuth(downloadUrl, {
+                requireAttachment: true,
+                requireNonEmpty: true,
+              });
             }
             if ((commandResult as any)?.__asyncFailed) {
               if (context.loadData) {
@@ -1467,8 +1480,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // (plugins#771). Surface the misconfiguration loudly instead:
             // always log with the page identifier; throw in development so the
             // catch block turns it into a visible error surface.
-            const supportedTypes =
-              'command, navigate, state_transition, builtin, workflow, flow';
+            const supportedTypes = 'command, navigate, state_transition, builtin, workflow, flow';
             const detail =
               `Unknown action.type "${actionDef.type}" on button "${normalizedButton.code}" ` +
               `(page: ${tableName}). Supported types: ${supportedTypes}. ` +

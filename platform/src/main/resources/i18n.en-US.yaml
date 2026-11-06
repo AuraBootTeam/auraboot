@@ -2866,3 +2866,4 @@ im.agent.replyFailed: "The AI reply could not be completed. Please retry or cont
 "permission.capability.details.permissionDiff": "Add {added} permission items, remove {removed}; {preserved} existing permission items remain unchanged."
 "permission.capability.details.impactDetails": "Review related duty states, menus and permission details"
 "permission.capability.details.previewCounts": "Related duties after saving: {full} complete · {partial} partially configured · {none} not configured"
+"command.download.fileUnavailable": "The record does not provide an accessible file. Ask an administrator to check access."

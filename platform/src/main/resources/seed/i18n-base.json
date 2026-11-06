@@ -6663,5 +6663,10 @@
     "key": "permission.capability.details.previewCounts",
     "zh-CN": "关联职责保存后配置：齐备 {full} 项 · 部分权限项 {partial} 项 · 未配置 {none} 项",
     "en-US": "Related duties after saving: {full} complete · {partial} partially configured · {none} not configured"
+  },
+  {
+    "key": "command.download.fileUnavailable",
+    "zh-CN": "当前记录未提供可下载文件，或文件字段不可见。请联系管理员核对权限。",
+    "en-US": "The record does not provide an accessible file. Ask an administrator to check access."
   }
 ]
