@@ -35,10 +35,7 @@ export default function CapabilityChecklist({
   const selectedSet = new Set(selected);
 
   return (
-    <div
-      data-testid="capability-checklist"
-      className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2"
-    >
+    <div data-testid="capability-checklist" className="flex flex-col gap-5">
       {groups.some((group) =>
         group.capabilities.some(
           (cap) =>
@@ -65,7 +62,7 @@ export default function CapabilityChecklist({
           <fieldset
             key={group.group}
             data-testid={`capability-group-${group.group}`}
-            className="rounded-card border-border bg-panel border p-4 dark:border-gray-700 dark:bg-gray-900"
+            className="border-border bg-panel rounded-control border px-4 py-3"
           >
             <legend className="px-1 text-sm font-medium text-gray-900">
               {/* Declared groups carry a business bucket name (e.g. 客户管理) — t() misses and falls
@@ -78,7 +75,7 @@ export default function CapabilityChecklist({
                 {t('permission.capability.groupSummary', { granted, total }, `${granted}/${total}`)}
               </span>
             </legend>
-            <div className="flex flex-col gap-1.5">
+            <div className="divide-border flex flex-col divide-y">
               {group.capabilities.map((cap) => (
                 <div
                   key={cap.code}
@@ -88,7 +85,7 @@ export default function CapabilityChecklist({
                     cap.description ||
                     undefined
                   }
-                  className="flex cursor-pointer items-start gap-2 text-sm text-gray-700"
+                  className="text-text-1 flex cursor-pointer items-start gap-3 py-3 text-sm"
                 >
                   <input
                     type="checkbox"
@@ -139,10 +136,11 @@ export default function CapabilityChecklist({
                       {cap.sensitive && (
                         <span
                           data-testid={`capability-sensitive-${cap.code}`}
-                          title={t('permission.capability.sensitive', undefined, '敏感')}
+                          className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800"
+                          title={t('permission.capability.sensitive', undefined, 'Sensitive')}
                           aria-label={t('permission.capability.sensitive', undefined, '敏感')}
                         >
-                          🔒
+                          {t('permission.capability.sensitive', undefined, 'Sensitive')}
                         </span>
                       )}
                       {cap.authorizationState === 'partial' &&
@@ -173,6 +171,12 @@ export default function CapabilityChecklist({
                           </button>
                         )}
                     </span>
+                    {(getLocalizedText(cap.localizedDescriptions, locale, t) ||
+                      cap.description) && (
+                      <p className="text-text-2 text-xs leading-5">
+                        {getLocalizedText(cap.localizedDescriptions, locale, t) || cap.description}
+                      </p>
+                    )}
                     {onConfigureScope && scopeConfigurableCodes?.has(cap.code) && (
                       <button
                         type="button"

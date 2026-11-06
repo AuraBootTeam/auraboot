@@ -8,7 +8,9 @@ interface Props {
   selected: string[];
   disabled: boolean;
   onChange: (pids: string[]) => void;
-  onPreview: () => void;
+  onPreview: (menuPid?: string) => void;
+  previewAllowed?: Record<string, boolean> | null;
+  previewFailed?: boolean;
 }
 function GroupCheckbox({
   checked,
@@ -45,6 +47,8 @@ export default function RoleMenuChecklist({
   disabled,
   onChange,
   onPreview,
+  previewAllowed,
+  previewFailed = false,
 }: Props) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
@@ -146,6 +150,24 @@ export default function RoleMenuChecklist({
       });
   }
   const preview = menus.filter((m) => !m.directory && m.enabled && selectedSet.has(m.pid));
+  const previewGroups = new Map<string, { name: string; entries: RoleNavigationChoice[] }>();
+  for (const item of preview) {
+    let parent = menus.find((menu) => menu.pid === item.parentPid);
+    const seen = new Set<string>([item.pid]);
+    while (parent?.parentPid && !seen.has(parent.pid)) {
+      seen.add(parent.pid);
+      const ancestor = menus.find((menu) => menu.pid === parent!.parentPid);
+      if (!ancestor || seen.has(ancestor.pid)) break;
+      parent = ancestor;
+    }
+    const key = parent?.pid ?? '';
+    if (!previewGroups.has(key))
+      previewGroups.set(key, {
+        name: parent ? title(parent) : t('rbacExperience.otherEntries', undefined, 'Other entries'),
+        entries: [],
+      });
+    previewGroups.get(key)!.entries.push(item);
+  }
   if (!selection)
     return (
       <p role="alert" className="text-text-2 text-sm">
@@ -236,29 +258,62 @@ export default function RoleMenuChecklist({
           <p className="text-text-2 mt-1 text-xs">
             {t('roleNavigation.currentDraft', undefined, 'Current role draft')}
           </p>
-          <div className="mt-3 space-y-1">
-            {preview.slice(0, 12).map((m) => (
-              <div
-                key={m.pid}
-                className="bg-panel text-text-1 flex items-center justify-between gap-2 rounded px-2 py-2 text-xs"
-              >
-                <span className="min-w-0 truncate" title={title(m)}>
-                  {title(m)}
-                </span>
-                {!m.businessAllowed && (
-                  <LockClosedIcon className="text-text-2 h-3.5 w-3.5 shrink-0" />
-                )}
-              </div>
+          {previewAllowed === null && (
+            <p role={previewFailed ? 'alert' : 'status'} className="text-text-2 mt-2 text-xs">
+              {t(
+                previewFailed
+                  ? 'rbacExperience.previewUnverified'
+                  : 'rbacExperience.previewComputing',
+                undefined,
+                previewFailed
+                  ? 'Draft access could not be verified. Open user preview to retry.'
+                  : 'Calculating draft access…',
+              )}
+            </p>
+          )}
+          <div className="mt-3 max-h-[46vh] space-y-1 overflow-y-auto">
+            {[...previewGroups].map(([key, group]) => (
+              <section key={key} data-testid="role-preview-group" className="mt-4 first:mt-0">
+                <h4 className="text-text-2 mb-1 text-xs font-medium">{group.name}</h4>
+                {group.entries.map((m) => (
+                  <button
+                    type="button"
+                    key={m.pid}
+                    data-testid={`role-preview-entry-${m.pid}`}
+                    data-business-access={
+                      (previewAllowed === undefined
+                        ? m.businessAllowed
+                        : previewAllowed?.[m.pid]) === undefined
+                        ? 'unverified'
+                        : (
+                              previewAllowed === undefined
+                                ? m.businessAllowed
+                                : previewAllowed?.[m.pid]
+                            )
+                          ? 'allowed'
+                          : 'denied'
+                    }
+                    onClick={() => onPreview(m.pid)}
+                    className="bg-panel text-text-1 hover:bg-hover focus-visible:ring-accent flex w-full items-center justify-between gap-2 rounded px-2 py-2 text-start text-xs focus-visible:ring-2"
+                  >
+                    <span className="min-w-0 truncate" title={title(m)}>
+                      {title(m)}
+                    </span>
+                    {(previewAllowed === undefined
+                      ? m.businessAllowed
+                      : previewAllowed?.[m.pid]) === undefined ? (
+                      <span className="text-text-2">…</span>
+                    ) : !(previewAllowed === undefined
+                        ? m.businessAllowed
+                        : previewAllowed?.[m.pid]) ? (
+                      <LockClosedIcon className="text-text-2 h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </section>
             ))}
-            {preview.length > 12 && (
-              <p className="text-text-2 py-2 text-xs">
-                {t(
-                  'roleNavigation.morePreview',
-                  { count: preview.length - 12 },
-                  `${preview.length - 12} more entries. Open user preview to inspect all.`,
-                )}
-              </p>
-            )}
             {!preview.length && (
               <p className="text-text-2 py-5 text-center text-xs">
                 {t('roleNavigation.empty', undefined, 'No visible entries')}
@@ -272,7 +327,11 @@ export default function RoleMenuChecklist({
               'A lock indicates missing current business access. Preview the user to include draft changes.',
             )}
           </p>
-          <button type="button" onClick={onPreview} className="text-accent mt-3 text-xs underline">
+          <button
+            type="button"
+            onClick={() => onPreview()}
+            className="text-accent mt-3 text-xs underline"
+          >
             {t('roleNavigation.userPreview', undefined, 'Preview as a user')}
           </button>
         </aside>

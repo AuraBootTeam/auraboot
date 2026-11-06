@@ -7537,5 +7537,215 @@
     "en-US": "No matching roles",
     "source": "platform-admin",
     "refType": "ui"
+  },
+  {
+    "key": "rbacExperience.businessRoles",
+    "zh-CN": "业务角色",
+    "en-US": "Business roles"
+  },
+  {
+    "key": "rbacExperience.managementRoles",
+    "zh-CN": "管理角色",
+    "en-US": "Management roles"
+  },
+  {
+    "key": "rbacExperience.memberCountUnavailable",
+    "zh-CN": "成员数暂不可用",
+    "en-US": "Member count unavailable"
+  },
+  {
+    "key": "rbacExperience.memberCount",
+    "zh-CN": "{count} 位已分配成员",
+    "en-US": "{count} assigned members"
+  },
+  {
+    "key": "rbacExperience.unsaved",
+    "zh-CN": "有未保存修改",
+    "en-US": "Unsaved changes"
+  },
+  {
+    "key": "rbacExperience.saved",
+    "zh-CN": "已保存",
+    "en-US": "Saved"
+  },
+  {
+    "key": "rbacExperience.roleSettings",
+    "zh-CN": "角色设置",
+    "en-US": "Role settings"
+  },
+  {
+    "key": "rbacExperience.draftSummary",
+    "zh-CN": "{menus} 个菜单入口 · {duties} 项业务职责",
+    "en-US": "{menus} menu entries · {duties} business duties"
+  },
+  {
+    "key": "rbacExperience.otherEntries",
+    "zh-CN": "其他入口",
+    "en-US": "Other entries"
+  },
+  {
+    "key": "rbacExperience.executionBoundary",
+    "zh-CN": "内部步骤在获准的业务用例内执行；租户、对象关系、状态、版本和字段限制继续校验。",
+    "en-US": "Internal steps run within the authorized business use case. Tenant, object relationships, state, version and field restrictions remain enforced."
+  },
+  {
+    "key": "rbacExperience.maintain",
+    "zh-CN": "维护",
+    "en-US": "Maintain"
+  },
+  {
+    "key": "rbacExperience.businessAction",
+    "zh-CN": "业务操作",
+    "en-US": "Business operation"
+  },
+  {
+    "key": "rbacExperience.recordScope",
+    "zh-CN": "记录范围",
+    "en-US": "Record scope"
+  },
+  {
+    "key": "rbacExperience.scopeHelp",
+    "zh-CN": "记录范围只约束已有业务授权。切换对象或动作不会赋权；修改与本角色草稿一起预览和保存。",
+    "en-US": "Record scope restricts existing business access. Changing the object or action does not change grants; edits are reviewed with this role draft."
+  },
+  {
+    "key": "rbacExperience.scopeMetadataError",
+    "zh-CN": "无法核实业务对象定义。原有范围已保留，请重新载入后再编辑。",
+    "en-US": "Object metadata could not be verified. Existing scope is preserved; reload before editing."
+  },
+  {
+    "key": "rbacExperience.noScopeActions",
+    "zh-CN": "该对象尚无已授权的记录动作，请先配置所需业务职责。",
+    "en-US": "No granted record actions for this object. Assign the required business duty first."
+  },
+  {
+    "key": "rbacExperience.accessibleRecords",
+    "zh-CN": "可访问的记录",
+    "en-US": "Accessible records"
+  },
+  {
+    "key": "rbacExperience.mixedScopes",
+    "zh-CN": "各动作范围不同",
+    "en-US": "Different scopes by action"
+  },
+  {
+    "key": "rbacExperience.appliesToActions",
+    "zh-CN": "适用业务动作",
+    "en-US": "Applies to actions"
+  },
+  {
+    "key": "rbacExperience.allGrantedActions",
+    "zh-CN": "该对象全部已授权动作",
+    "en-US": "All granted actions for this object"
+  },
+  {
+    "key": "rbacExperience.teamUnavailable",
+    "zh-CN": "该对象未定义团队归属字段，不能配置团队范围。",
+    "en-US": "This object has no team ownership field; team scope is unavailable."
+  },
+  {
+    "key": "rbacExperience.existingConditions",
+    "zh-CN": "已有授权条件继续生效；此处不会用固定样例替代或清除这些条件。",
+    "en-US": "Existing grant conditions remain effective. This control does not replace them with a fixed example or remove them."
+  },
+  {
+    "key": "rbacExperience.objectAccess",
+    "zh-CN": "业务对象与数据访问",
+    "en-US": "Business object access"
+  },
+  {
+    "key": "rbacExperience.defaultScopeAdvanced",
+    "zh-CN": "角色默认范围 · 高级设置",
+    "en-US": "Role default scope · advanced"
+  },
+  {
+    "key": "rbacExperience.backToRoles",
+    "zh-CN": "角色权限",
+    "en-US": "Role permissions"
+  },
+  {
+    "key": "rbacExperience.navigationHelp",
+    "zh-CN": "插件提供默认菜单，租户定制在升级后保留。新增入口不会授予业务权限；可见角色单独分配。",
+    "en-US": "Plugins provide default menus; tenant changes are preserved on upgrade. Adding a menu never grants business access. Assign visible roles separately."
+  },
+  {
+    "key": "rbacExperience.membersHelp",
+    "zh-CN": "多角色成员的菜单按有效角色合并；业务授权、记录范围和字段限制单独计算。成员分配期限本身不授予业务访问。",
+    "en-US": "Menus merge across effective roles. Business grants, record scopes and fields are evaluated separately. Membership dates do not by themselves grant business access."
+  },
+  {
+    "key": "rbacExperience.immediate",
+    "zh-CN": "立即",
+    "en-US": "Immediately"
+  },
+  {
+    "key": "rbacExperience.indefinite",
+    "zh-CN": "长期",
+    "en-US": "No expiry"
+  },
+  {
+    "key": "rbacExperience.status.loading",
+    "zh-CN": "正在载入配置",
+    "en-US": "Loading configuration"
+  },
+  {
+    "key": "rbacExperience.status.failed",
+    "zh-CN": "配置未能载入",
+    "en-US": "Configuration unavailable"
+  },
+  {
+    "key": "rbacExperience.status.conflict",
+    "zh-CN": "版本已变更 · 草稿保留",
+    "en-US": "Configuration changed · draft preserved"
+  },
+  {
+    "key": "rbacExperience.status.saving",
+    "zh-CN": "正在处理…",
+    "en-US": "Processing…"
+  },
+  {
+    "key": "rbacExperience.status.dirty",
+    "zh-CN": "有未保存修改",
+    "en-US": "Unsaved changes"
+  },
+  {
+    "key": "rbacExperience.status.saved",
+    "zh-CN": "已保存",
+    "en-US": "Saved"
+  },
+  {
+    "key": "rbacExperience.assignmentExpired",
+    "zh-CN": "分配已到期",
+    "en-US": "Assignment expired"
+  },
+  {
+    "key": "rbacExperience.assignmentScheduled",
+    "zh-CN": "尚未开始",
+    "en-US": "Not started"
+  },
+  {
+    "key": "rbacExperience.assignmentWithinWindow",
+    "zh-CN": "在分配期限内",
+    "en-US": "Within assignment period"
+  },
+  {
+    "key": "rbacExperience.previewUnverified",
+    "zh-CN": "草稿访问结果未能核实，请打开用户预览重试。",
+    "en-US": "Draft access could not be verified. Open user preview to retry."
+  },
+  {
+    "key": "rbacExperience.previewComputing",
+    "zh-CN": "正在计算草稿访问结果…",
+    "en-US": "Calculating draft access…"
+  },
+  {
+    "key": "rbacExperience.roleIdentifier",
+    "zh-CN": "高级 · 集成标识",
+    "en-US": "Advanced · integration identifier"
+  },
+  {
+    "key": "rbacExperience.roleIdentifierHelp",
+    "zh-CN": "系统自动生成标识，集成可引用；创建后不能修改。新角色初始没有菜单和业务授权。",
+    "en-US": "An identifier is generated automatically. Integrations may reference it; it cannot change after creation. New roles start without menus or business grants."
   }
 ]

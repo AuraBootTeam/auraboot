@@ -11,6 +11,8 @@ import java.util.Map;
  * 角色服务接口
  */
 public interface RoleService extends IService<Role> {
+    List<com.auraboot.framework.rbac.dto.RoleDisplaySummary> displaySummaries(Long tenantId, List<Long> roleIds);
+
 
     /**
      * 创建角色

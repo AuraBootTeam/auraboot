@@ -327,4 +327,25 @@ public interface RoleMapper extends BaseMapper<Role> {
         </script>
         """)
     List<Map<String, Object>> findPrioritiesByIds(@Param("ids") Set<Long> ids);
+    /** One bounded query for displayed roles, without per-role member requests. */
+    @Select("""
+        <script>
+        SELECT r.id AS role_id,
+          (SELECT COUNT(DISTINCT ur.member_id) FROM ab_user_role ur
+           JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=#{tenantId} AND m.deleted_flag=FALSE
+           WHERE ur.role_id=r.id AND ur.tenant_id=#{tenantId} AND ur.deleted_flag=FALSE
+             AND ur.status='active') AS member_count,
+          (r.code IN ('tenant_admin','platform_admin') OR EXISTS (
+            SELECT 1 FROM ab_role_permission rp JOIN ab_permission p ON p.id=rp.permission_id
+            WHERE rp.role_id=r.id AND rp.tenant_id=#{tenantId} AND rp.deleted_flag=FALSE
+              AND rp.grant_type='grant'
+              AND p.code IN ('*','meta.menu.update','meta.permission.update','org.role.update')
+          )) AS management_role
+        FROM ab_role r WHERE (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.deleted_flag=FALSE AND r.id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+        </script>
+        """)
+    List<com.auraboot.framework.rbac.dto.RoleDisplaySummary> findDisplaySummaries(
+            @Param("tenantId") Long tenantId, @Param("ids") List<Long> ids);
 }

@@ -54,7 +54,12 @@ const snapshot: RoleNavigationSelection = {
     },
   ],
 };
-function setup(selection = snapshot, selected: string[] = [], disabled = false) {
+function setup(
+  selection = snapshot,
+  selected: string[] = [],
+  disabled = false,
+  previewAllowed?: Record<string, boolean> | null,
+) {
   const onChange = vi.fn(),
     onPreview = vi.fn();
   render(
@@ -65,6 +70,7 @@ function setup(selection = snapshot, selected: string[] = [], disabled = false) 
         disabled={disabled}
         onChange={onChange}
         onPreview={onPreview}
+        previewAllowed={previewAllowed}
       />
     </MemoryRouter>,
   );
@@ -118,5 +124,28 @@ describe('independent role navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview as a user' }));
     expect(onPreview).toHaveBeenCalledOnce();
     expect(onChange).not.toHaveBeenCalled();
+  });
+  it('groups preview entries and opens the clicked target without changing grants or menu selection', () => {
+    const { onPreview, onChange } = setup(snapshot, ['quote-list', 'quote-project', 'stock']);
+    expect(screen.getAllByTestId('role-preview-group')).toHaveLength(2);
+    fireEvent.click(screen.getByTestId('role-preview-entry-quote-project'));
+    expect(onPreview).toHaveBeenCalledWith('quote-project');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('uses the current draft projection instead of a stale saved denial', () => {
+    setup(snapshot, ['quote-list'], false, { 'quote-list': true });
+    expect(screen.getByTestId('role-preview-entry-quote-list')).toHaveAttribute(
+      'data-business-access',
+      'allowed',
+    );
+  });
+  it('does not display the saved allow result while current draft access is unverified', () => {
+    setup(snapshot, ['quote-project'], false, null);
+    expect(screen.getByTestId('role-preview-entry-quote-project')).toHaveAttribute(
+      'data-business-access',
+      'unverified',
+    );
+    expect(screen.getByText('Calculating draft access…')).toBeVisible();
   });
 });

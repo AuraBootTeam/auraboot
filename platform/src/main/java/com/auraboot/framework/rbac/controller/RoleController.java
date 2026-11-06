@@ -277,7 +277,19 @@ public class RoleController {
     private Page<RoleResponse> toResponsePage(Page<Role> roles) {
         Page<RoleResponse> response = new Page<>(roles.getCurrent(), roles.getSize(), roles.getTotal());
         response.setPages(roles.getPages());
-        response.setRecords(roles.getRecords().stream().map(RoleResponse::from).toList());
+        var summaries = roleService.displaySummaries(MetaContext.getCurrentTenantId(),
+                roles.getRecords().stream().map(Role::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        com.auraboot.framework.rbac.dto.RoleDisplaySummary::getRoleId, value -> value));
+        response.setRecords(roles.getRecords().stream().map(role -> {
+            RoleResponse value = RoleResponse.from(role);
+            var summary = summaries.get(role.getId());
+            if (summary != null) {
+                value.setMemberCount(summary.getMemberCount());
+                value.setManagementRole(summary.getManagementRole());
+            }
+            return value;
+        }).toList());
         return response;
     }
 }

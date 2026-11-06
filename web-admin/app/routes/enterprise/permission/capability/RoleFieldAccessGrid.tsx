@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   authorizationDraftService,
@@ -16,6 +16,7 @@ interface Props {
   grantedCodes: Set<string>;
   disabled: boolean;
   onChange: (changes: FieldAccessChange[]) => void;
+  renderRecordScope?: (model: string, label: string, permissions: string[]) => ReactNode;
 }
 
 /** Field controls restrict existing business access; they never grant a capability or CRUD action. */
@@ -27,6 +28,7 @@ export default function RoleFieldAccessGrid({
   grantedCodes,
   disabled,
   onChange,
+  renderRecordScope,
 }: Props) {
   const { t } = useI18n();
   const [modelCode, setModelCode] = useState(''),
@@ -100,7 +102,7 @@ export default function RoleFieldAccessGrid({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-text-1 text-sm font-medium">
-            {t('roleFields.title', undefined, 'Field access')}
+            {t('rbacExperience.objectAccess', undefined, 'Business object access')}
           </h3>
           <p className="text-text-2 mt-1 text-xs">
             {t(
@@ -151,6 +153,17 @@ export default function RoleFieldAccessGrid({
               className="border-border bg-panel rounded-control min-w-0 flex-1 border px-3 py-2 text-sm"
             />
           </div>
+          {current &&
+            renderRecordScope?.(
+              current.code,
+              modelLabel(current),
+              roots
+                .filter((root) => root.model === current.code)
+                .flatMap((root) => root.permissions),
+            )}
+          <h3 className="text-text-1 text-sm font-semibold">
+            {current && modelLabel(current)} · {t('roleFields.title', undefined, 'Field access')}
+          </h3>
           {error && (
             <div role="alert" className="text-text-2 text-xs">
               {t(

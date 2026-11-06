@@ -223,6 +223,14 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     }
 
     @Override
+    public List<com.auraboot.framework.rbac.dto.RoleDisplaySummary> displaySummaries(Long tenantId, List<Long> roleIds) {
+        if (tenantId == null || !MetaContext.exists() || !Objects.equals(tenantId, MetaContext.getCurrentTenantId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Role summary tenant mismatch");
+        }
+        return roleIds.isEmpty() ? List.of() : roleMapper.findDisplaySummaries(tenantId, roleIds);
+    }
+
+    @Override
     public Page<Role> findRoles(int pageNum, int pageSize, Long tenantId, String keyword, String type, String status) {
         Page<Role> page = new Page<>(pageNum, pageSize);
         QueryWrapper<Role> queryWrapper = new QueryWrapper<>();

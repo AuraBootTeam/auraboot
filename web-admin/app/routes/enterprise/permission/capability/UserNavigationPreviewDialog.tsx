@@ -17,10 +17,12 @@ export default function UserNavigationPreviewDialog({
   onClose,
   rolePid,
   draft,
+  initialMenuPid,
 }: {
   open: boolean;
   onClose: () => void;
   rolePid?: string;
+  initialMenuPid?: string;
   draft?: ActiveRoleDraft | null;
 }) {
   const { t } = useI18n();
@@ -71,7 +73,11 @@ export default function UserNavigationPreviewDialog({
         if (alive) {
           setResult(v);
           setActiveMenu((old) =>
-            v.menus.some((m) => m.pid === old) ? old : (v.menus[0]?.pid ?? ''),
+            initialMenuPid && v.menus.some((m) => m.pid === initialMenuPid)
+              ? initialMenuPid
+              : v.menus.some((m) => m.pid === old)
+                ? old
+                : (v.menus[0]?.pid ?? ''),
           );
           if (v.source === 'member') setSelectedRoles(v.rolePids);
         }
@@ -88,7 +94,7 @@ export default function UserNavigationPreviewDialog({
     return () => {
       alive = false;
     };
-  }, [open, options, key]);
+  }, [open, options, key, initialMenuPid]);
   const active = result?.menus.find((m) => m.pid === activeMenu);
   return (
     <ConfirmDialog
