@@ -99,14 +99,17 @@ export default function CapabilityPermissionDetails({
                 className="space-y-1 py-2"
               >
                 <p className="text-text-1 font-medium">
-                  {row.definition?.label ||
+                  {(row.definition?.label &&
+                  !/[a-z0-9]+_[a-z0-9_]+/i.test(row.definition.label) &&
+                  row.definition.label !== row.code
+                    ? row.definition.label
+                    : undefined) ||
                     t(
                       'permission.capability.details.undefined',
                       undefined,
                       'Definition unavailable; verify this permission',
                     )}
                 </p>
-                {row.definition?.resourceName && <p>{row.definition.resourceName}</p>}
                 <code className="block font-mono text-[11px] break-all">{row.code}</code>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <span>

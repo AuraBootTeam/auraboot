@@ -427,3 +427,28 @@ describe('saved and draft permission coverage', () => {
     expect(screen.getByRole('checkbox')).toBeDisabled();
   });
 });
+
+it('does not promote generated resource names or permission labels to business names', () => {
+  const saved = matrixFixture([true]);
+  saved.modules[0].resources[0].resourceName = 'default';
+  saved.modules[0].resources[0].actions[0].label = 'Crm_customer_request_pcba_price_tier Read';
+  render(
+    <CapabilityChecklist
+      groups={[
+        {
+          group: 'Quote',
+          capabilities: [{ ...cap('quote.view', true), includes: ['quote.permission.0'] }],
+        },
+      ]}
+      selected={['quote.view']}
+      onToggle={() => {}}
+      matrix={saved}
+      projectedMatrix={saved}
+    />,
+  );
+  openDetails('quote.view');
+  expect(screen.queryByText('default')).toBeNull();
+  expect(screen.queryByText('Crm_customer_request_pcba_price_tier Read')).toBeNull();
+  expect(screen.getByText('Definition unavailable; verify this permission')).toBeVisible();
+  expect(screen.getByText('quote.permission.0')).toBeVisible();
+});
