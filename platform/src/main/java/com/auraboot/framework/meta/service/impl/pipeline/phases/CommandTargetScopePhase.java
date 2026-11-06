@@ -290,29 +290,41 @@ public class CommandTargetScopePhase implements CommandPhase {
         ctx.setTargetRecordVersion(resolveRecordVersion(record));
 
         if (businessTargetAuthorization(ctx)) {
+            boolean nativeCommand = !"custom".equals(ctx.getExecConfig().get("type"));
+            var nativeContract = nativeCommand
+                    ? com.auraboot.framework.meta.security.NativeBusinessCommandContract.require(ctx, extensionRegistry) : null;
             Long member = resolveMemberId(ctx);
             String action = targetRecordAction(ctx);
             if (businessAuthorization == null || member == null || action == null
                     || ctx.getTargetRecordVersion() == null || ctx.getTargetRecordVersion() < 0
-                    || !isHandlerManagedTarget(ctx) || ctx.getAuthorizationVerdict() == null
+                    || (!nativeCommand && !isHandlerManagedTarget(ctx)) || ctx.getAuthorizationVerdict() == null
                     || !ctx.getAuthorizationVerdict().isAuthorized()
                     || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                     || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                     || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId())
                     || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
                     || !java.util.Objects.equals(recordId, record.get("pid"))) return false;
-            var handler=extensionRegistry.getCommandHandler(resolveHandlerCode(ctx)).orElse(null);
-            if(!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner))return false;
+            com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner = null;
             java.util.List<String> codes;
-            try {codes=com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(ctx,owner);}
-            catch(org.springframework.security.access.AccessDeniedException denied){return false;}
+            if (nativeContract != null) {
+                codes = nativeContract.permissions();
+            } else {
+                var handler=extensionRegistry.getCommandHandler(resolveHandlerCode(ctx)).orElse(null);
+                if (!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization resourceOwner)) return false;
+                owner = resourceOwner;
+                try {codes=com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(ctx,owner);}
+                catch(org.springframework.security.access.AccessDeniedException denied){return false;}
+            }
 
-            var result = businessAuthorization.resolve(member, codes, modelCode, record);
+            var result = nativeContract != null
+                    ? businessAuthorization.resolveNative(member, codes, modelCode, record, action)
+                    : businessAuthorization.resolve(member, codes, modelCode, record);
             if (result == null || !result.result().granted()) return false;
             ctx.setBusinessGrantDecision(result);
             ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
-            if (resultProjection != null) ctx.setBusinessResultProjection(resultProjection.prepare(ctx,owner));
+            if (resultProjection != null) ctx.setBusinessResultProjection(nativeContract != null
+                    ? resultProjection.prepareNative(ctx, nativeContract) : resultProjection.prepare(ctx,owner));
             return true;
         }
 

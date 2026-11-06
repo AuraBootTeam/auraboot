@@ -48,6 +48,19 @@ public class BusinessCommandRecordAuthorization {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolve(Long memberId, List<String> declaredPermissions,
                                          String recordModel, Map<String, Object> record) {
+        return resolveInternal(memberId, declaredPermissions, recordModel, record, null);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveNative(Long memberId, List<String> declaredPermissions,
+                                               String recordModel, Map<String, Object> record, String action) {
+        if (action == null || !List.of("update", "delete").contains(action))
+            return decision(denied("Unsupported native business action", List.of()), memberId, recordModel, record, List.of());
+        return resolveInternal(memberId, declaredPermissions, recordModel, record, action);
+    }
+
+    private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
+                                                  String recordModel, Map<String, Object> record, String nativeAction) {
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || !MetaContext.exists() || memberId == null
@@ -72,16 +85,23 @@ public class BusinessCommandRecordAuthorization {
         }
         // The complete decision uses the same database snapshot, including membership and policy
         // rows. Shared caches must not splice a stale grant into a freshly changed scope.
-        return snapshots.withFreshReads(() -> evaluateSnapshot(memberId, declaredPermissions, recordModel, record));
+        return snapshots.withFreshReads(() -> evaluateSnapshot(memberId, declaredPermissions, recordModel, record, nativeAction));
     }
 
-    private BusinessGrantDecision evaluateSnapshot(Long member, List<String> codes, String model, Map<String, Object> record) {
+    private BusinessGrantDecision evaluateSnapshot(Long member, List<String> codes, String model, Map<String, Object> record,
+                                                  String nativeAction) {
         var tenant = MetaContext.getCurrentTenantId();
         List<EvaluationStep> trace = new ArrayList<>();
         List<BusinessGrantDecision.Grant> matched = new ArrayList<>();
         Map<String, Map<Long, PermissionPolicyService.ConditionGuard>> guardsByCode = new HashMap<>();
         for (String code : new java.util.LinkedHashSet<>(codes)) {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
+            if (nativeAction != null && (code.startsWith("model.") || permission == null
+                    || !model.equals(permission.getResourceCode())
+                    || !(nativeAction.equals(permission.getAction()) || "manage".equals(permission.getAction())))) {
+                trace.add(step(EvaluationVerdict.DENY, "Native business permission does not own this root/action", code, null, null));
+                continue;
+            }
             if (permission == null || permission.getResourceCode() == null || permission.getAction() == null
                     || !("operation".equalsIgnoreCase(permission.getResourceType())
                          || "data".equalsIgnoreCase(permission.getResourceType()))) {

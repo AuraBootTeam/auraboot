@@ -90,6 +90,29 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(evaluate(record(1, "Shanghai")).granted()).isFalse(); verifyNoInteractions(scopes);
     }
 
+    @Test void nativeCommandCannotBorrowPermissionFromAnotherResourceOrAction() {
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "update")
+                .result().granted()).isFalse();
+        verifyNoInteractions(bindings, scopes, policies);
+    }
+
+    @Test void nativeCommandUsesOneMatchingGrantAndRequiresAnExplicitScope() {
+        var definition = permission(CODE); definition.setResourceCode(MODEL); definition.setAction("manage");
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        grants(grant(11, 101, CODE), grant(22, 202, CODE));
+        when(scopes.resolveScopeForRole(5L, 101L, MODEL, "manage", MODEL)).thenReturn(
+                new DataScopeCondition("self", "created_by", 1L, null, List.of(), List.of()));
+        when(scopes.resolveScopeForRole(5L, 202L, MODEL, "manage", MODEL)).thenReturn(DataScopeCondition.all());
+        guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        var result = authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "update");
+        assertThat(result.result().granted()).isTrue();
+        assertThat(result.grants()).extracting(com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant::grantId)
+                .containsExactly(11L);
+        when(scopes.resolveScopeForRole(5L, 101L, MODEL, "manage", MODEL)).thenReturn(DataScopeCondition.notConfigured());
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "update")
+                .result().granted()).isFalse();
+    }
+
     @Test void explicitWildcardStillUsesItsOwnRoleScopeAndGuard() throws Exception {
         grants(grant(11, 101, "*")); scope(101, DataScopeCondition.all()); guards("*", guard(11, "Shanghai"));
         assertThat(evaluate(record(999, "Beijing")).granted()).isFalse();

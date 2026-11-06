@@ -56,6 +56,23 @@ class CommandResultProjectionServiceTest {
         assertThat(publicResult).isNotSameAs(internal);assertThat(internal).containsEntry("amount",17);
         assertThatThrownBy(()->publicResult.put("amount",99)).isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"update", "delete"})
+    void nativeWriterOnlyReturnsTheExactRootAndAtMostOneAffectedRow(String action) {
+        context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization("orders:inspect", "orders", "root", action, 7L, 20L, 30L));
+        var contract = new com.auraboot.framework.meta.security.NativeBusinessCommandContract("orders", action, List.of("orders.inspect"));
+        String count = "orders_" + ("update".equals(action) ? "updated" : "deleted");
+        context.setBusinessResultProjection(service.prepareNative(context, contract));
+        assertThat(service.project(context, Map.of("recordPid", "root", count, 1)))
+                .containsEntry("recordPid", "root").containsEntry(count, 1);
+        assertThatThrownBy(() -> service.project(context, Map.of("recordPid", "other", count, 1)))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.project(context, Map.of("recordPid", "root", count, 2)))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.project(context, Map.of("recordPid", "root", "amount", 17)))
+                .isInstanceOf(AccessDeniedException.class);
+    }
     @Test void matchingGrantAndOwnerVisibilityAreBothRequired() {
         grant(Set.of());prepare();assertThat(service.project(context,outcome())).doesNotContainKey("amount");
         grant(Set.of("cost"));when(fields.getFieldPermissions(30L,"orders")).thenReturn(new FieldPermissionSet(Set.of(),Set.of(),Set.of("cost")));

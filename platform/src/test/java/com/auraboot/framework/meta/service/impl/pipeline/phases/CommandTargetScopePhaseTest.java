@@ -626,6 +626,69 @@ class CommandTargetScopePhaseTest {
                 && definition.isReadOnly() && definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"update", "delete"})
+    void nativeBusinessUpdateUsesCompleteGrantInsteadOfModelReadPermission(String action) {
+        var ctx = nativeBusinessTarget();
+        var config = new java.util.HashMap<>(ctx.getExecConfig());
+        config.put("type", action);
+        config.put("handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", action));
+        if ("delete".equals(action)) config.remove("inputFields");
+        ctx.setExecConfig(config);
+        var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        when(authorizer.resolveNative(any(), any(), any(), any(), eq(action))).thenReturn(
+                new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                        PermissionResult.allow(List.of()), 1L, 42L, 99L, "receipt", "REC-1", List.of()));
+        var phase = phase();
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getTargetRecordReadable()).isTrue();
+        assertThat(ctx.getBusinessTargetAuthorization().action()).isEqualTo(action);
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(13L);
+        verifyNoInteractions(permissionFacade);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"operation", "rules", "handler", "cascade", "action", "modelPermission", "inputs", "commandIdentity"})
+    void nativeBusinessContractCannotAuthorizeAnotherWriterOrBroaderOperation(String attack) {
+        var ctx = nativeBusinessTarget();
+        var config = new java.util.HashMap<>(ctx.getExecConfig());
+        switch (attack) {
+            case "operation" -> ctx.getRequest().setOperationType("delete");
+            case "rules" -> ctx.setRulesByType(Map.of("handler", List.of(new com.auraboot.framework.meta.entity.BindingRule())));
+            case "handler" -> config.put("handler", "arbitrary:handler");
+            case "cascade" -> config.put("cascadeDelete", List.of("other_model"));
+            case "action" -> config.put("handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "read"));
+            case "modelPermission" -> config.put("permissions", List.of("model.receipt.update"));
+            case "inputs" -> config.put("inputFields", List.of("remark", "remark"));
+            case "commandIdentity" -> ctx.getCommand().setCode("other:command");
+            default -> throw new AssertionError(attack);
+        }
+        ctx.setExecConfig(config);
+        var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        var phase = phase();
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "businessAuthorization", authorizer);
+        var pipeline = new CommandPipeline(List.of(phase), List.of(new IdempotencyPhase(idempotencyService)));
+        assertThatThrownBy(() -> pipeline.executePreGuardPhases(ctx)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(authorizer, idempotencyService, permissionFacade);
+    }
+
+    private CommandPipelineContext nativeBusinessTarget() {
+        givenMember();
+        when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
+        var ctx = context("receipt", "REC-1");
+        ctx.getCommand().setCode(ctx.getCommandCode());
+        ctx.setExecConfig(Map.of("type", "update", "inputFields", List.of("remark"),
+                "permissions", List.of("inventory.receipt.confirm"), "handlerParams", Map.of(
+                        "targetRecordAuthorization", "business", "targetRecordAction", "update")));
+        ctx.getCommand().setExecutionConfig(new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(ctx.getExecConfig()).toString());
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("inventory.receipt.confirm"));
+        MetaContext.setContext(1L, 42L, "actor", "actor"); MetaContext.setMemberId(99L);
+        return ctx;
+    }
+
     @Test void deniedBusinessTargetCannotReachCachedReplay() {
         var ctx = businessTarget();
         var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);

@@ -1,0 +1,66 @@
+package com.auraboot.framework.meta.security;
+
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** The native writer owns one named root; it cannot inherit authority for arbitrary handlers. */
+public record NativeBusinessCommandContract(String model, String action, List<String> permissions) {
+    private static final Set<String> OPERATIONS = Set.of("update", "delete");
+    private static final Set<String> CONFIG_KEYS = Set.of("type", "permissions", "inputFields", "handlerParams");
+    private static final Set<String> PARAM_KEYS = Set.of("targetRecordAuthorization", "targetRecordAction");
+
+    public NativeBusinessCommandContract { permissions = List.copyOf(permissions); }
+
+    /** LoadPhase supplies the server definition; request operation/payload never defines this policy. */
+    public static NativeBusinessCommandContract require(CommandPipelineContext context, ExtensionRegistry extensions) {
+        var config = context.getExecConfig();
+        if (context.getCommand() == null || context.getRequest() == null || extensions == null
+                || !Objects.equals(context.getCommandCode(), context.getCommand().getCode())
+                || !CONFIG_KEYS.containsAll(config.keySet())
+                || !(config.get("type") instanceof String action) || !OPERATIONS.contains(action)
+                || !(config.get("handlerParams") instanceof Map<?, ?> params)
+                || !params.keySet().equals(PARAM_KEYS)
+                || !"business".equals(params.get("targetRecordAuthorization"))
+                || !action.equals(params.get("targetRecordAction"))
+                || context.getRulesByType() == null
+                || context.getRulesByType().values().stream().anyMatch(rules -> rules == null || !rules.isEmpty())
+                || extensions.getCommandHandler(context.getCommandCode()).isPresent()
+                || !extensions.getSecondaryCommandHandlers(context.getCommandCode()).isEmpty()
+                || context.getAuthorizationVerdict() == null || !context.getAuthorizationVerdict().isAuthorized()) throw denied();
+        String requested = context.getRequest().getOperationType();
+        if (requested != null && !requested.isBlank() && !action.equalsIgnoreCase(requested)) throw denied();
+        String model = context.getCommand().getModelCode();
+        if (model == null || !model.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) throw denied();
+        Object rawInputs = config.get("inputFields");
+        if ("update".equals(action) && (!(rawInputs instanceof List<?> inputs) || inputs.isEmpty())) throw denied();
+        if (rawInputs != null) {
+            if (!(rawInputs instanceof List<?> inputs) || inputs.size() > 256
+                    || new java.util.HashSet<>(inputs).size() != inputs.size()) throw denied();
+            for (Object input : inputs) {
+                if (!(input instanceof String field)) throw denied();
+                if (!field.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) throw denied();
+            }
+            if ("delete".equals(action) && !inputs.isEmpty()) throw denied();
+        }
+        if (!(config.get("permissions") instanceof List<?> codes) || codes.isEmpty() || codes.size() > 128
+                || new java.util.HashSet<>(codes).size() != codes.size()) throw denied();
+        for (Object code : codes) {
+            if (!(code instanceof String value) || value.isBlank() || !value.equals(value.strip())
+                    || value.length() > 255 || "*".equals(value) || "meta.command.execute".equals(value)
+                    || value.startsWith("model.")) throw denied();
+        }
+        if (!codes.contains(context.getAuthorizationVerdict().permissionCode())) throw denied();
+        return new NativeBusinessCommandContract(model, action, codes.stream().map(String.class::cast).toList());
+    }
+
+    private static BusinessException denied() {
+        return new BusinessException(ResponseCode.FORBIDDEN, "Native business command exceeds its single-record contract");
+    }
+}

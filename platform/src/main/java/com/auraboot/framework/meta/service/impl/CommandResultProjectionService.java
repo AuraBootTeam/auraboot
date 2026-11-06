@@ -23,6 +23,19 @@ public class CommandResultProjectionService {
     private final FieldMaskService masks;
     private final PermissionSnapshotCache snapshots;
 
+    /** The native writer returns identity and affected-row count, never unclassified model data. */
+    public BusinessResultProjectionPlan prepareNative(CommandPipelineContext ctx,
+            com.auraboot.framework.meta.security.NativeBusinessCommandContract contract) {
+        requireActor(ctx);
+        if (!Objects.equals(contract.model(), ctx.getBusinessTargetAuthorization().modelCode())
+                || !Objects.equals(contract.action(), ctx.getBusinessTargetAuthorization().action()))
+            throw BusinessResultProjectionPlan.denied();
+        String count = contract.model() + ("update".equals(contract.action()) ? "_updated" : "_deleted");
+        return new BusinessResultProjectionPlan(ctx.getBusinessTargetAuthorization(), ctx.getBusinessGrantDecision(),
+                Map.of("recordPid", BusinessResultField.rootIdentity(), count, BusinessResultField.count(1)),
+                Map.of(), Set.of(), List.of(), List.of());
+    }
+
     public BusinessResultProjectionPlan prepare(CommandPipelineContext ctx, BusinessResourceAuthorization owner) {
         return snapshots.withFreshReads(()->prepareSnapshot(ctx,owner));
     }
