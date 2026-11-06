@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 
 /** A single database transaction for role duties, defaults and per-action record scopes. */
 @Service
@@ -228,10 +229,13 @@ public class RoleAuthorizationDraftService {
                 permittedModels.add(permission.getResourceCode());
             }
         }
-        // A duty may expose its root fields without granting generic model CRUD.
+        // Restrictive policies may cover the root and declared public sources without model CRUD.
         roots.stream().filter(root -> resulting.contains("*")
                         || root.permissions().stream().anyMatch(resulting::contains))
-                .forEach(root -> permittedModels.add(root.model()));
+                .forEach(root -> {
+                    permittedModels.add(root.model());
+                    permittedModels.addAll(root.publicFields().keySet());
+                });
         Set<String> seen = new HashSet<>();
         for (DataScopeUpdateRequest change : changes(request)) {
             if (change == null || change.resourceCode() == null || change.actionCode() == null
@@ -306,19 +310,19 @@ public class RoleAuthorizationDraftService {
                         || !code.equals(code.strip()) || code.length() > 255 || "*".equals(code)
                         || "meta.command.execute".equals(code))) throw invalid();
             roots.add(new BusinessFieldRoot(boundary.commandCode(), boundary.rootModel(), boundary.targetAction(),
-                    boundary.permissions().stream().sorted().toList(), null));
+                    boundary.permissions().stream().sorted().toList(), null, publicFieldSources(owner)));
         }
         if (nativeBoundaries != null) nativeBoundaries.snapshot().forEach(definition -> {
             var contract = definition.contract();
             roots.add(new BusinessFieldRoot(definition.commandCode(), contract.model(), contract.action(),
-                    contract.permissions().stream().sorted().toList(), definition.source()));
+                    contract.permissions().stream().sorted().toList(), definition.source(), Map.of()));
         });
         return roots.stream().distinct().sorted(Comparator.comparing(BusinessFieldRoot::command)).toList();
     }
 
     private Set<String> fieldCandidates(Role role, List<BusinessFieldRoot> roots) {
         Set<String> result=new HashSet<>();
-        roots.forEach(root->result.add(root.model()));
+        roots.forEach(root->{result.add(root.model());result.addAll(root.publicFields().keySet());});
         permissions.findRolePermissions(role.getId()).stream().map(permission->permission.getResourceCode())
                 .filter(Objects::nonNull).forEach(result::add);
         return result;
@@ -348,8 +352,25 @@ public class RoleAuthorizationDraftService {
         return List.copyOf(result);
     }
 
+    private Map<String, List<String>> publicFieldSources(
+            com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner) {
+        var declared = owner.publicBusinessResourceFields();
+        if (declared == null || declared.size() > 16) throw invalid();
+        if (declared.isEmpty()) return Map.of();
+        var resources = owner.businessResourceModels();
+        if (resources == null || !resources.containsAll(declared.keySet())) throw invalid();
+        Map<String, List<String>> sources = new TreeMap<>();
+        declared.forEach((model, fields) -> {
+            com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.identifier(model);
+            if (fields == null || fields.isEmpty() || fields.size() > 128) throw invalid();
+            fields.forEach(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization::identifier);
+            sources.put(model, fields.stream().sorted().toList());
+        });
+        return Map.copyOf(sources);
+    }
+
     private record BusinessFieldRoot(String command, String model, String action, List<String> permissions,
-                                     String definitionSource) {}
+                                     String definitionSource, Map<String, List<String>> publicFields) {}
 
     private String digest(Map<String, Object> state) {
         try {

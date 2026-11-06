@@ -314,6 +314,53 @@ class RoleAuthorizationDraftServiceTest {
         verify(writes, never()).mutate();
     }
 
+    @Test void aDutyCanRestrictItsDeclaredPublicSourcesWithoutGrantingInternalModels() {
+        var owner = businessOwner(Set.of("sales.manage"));
+        when(owner.businessResourceModels()).thenReturn(Set.of("sales_order", "sales_line", "internal_audit"));
+        when(owner.publicBusinessResourceFields()).thenReturn(java.util.Map.of("sales_line", Set.of("price")));
+        when(capabilities.previewCapabilitySelection(1L, Set.of("orders.view"), Set.of()))
+                .thenReturn(new CapabilitySelectionPreview(List.of("sales.manage"), List.of(), List.of(), List.of(), List.of()));
+        var baseline = service.snapshot("role-a");
+        service.preview("role-a", new RoleAuthorizationDraftRequest(baseline.revision(), Set.of("orders.view"),
+                Set.of(), false, null, false, List.of(), Set.of("policy")));
+        verify(fieldPolicies).preview(org.mockito.ArgumentMatchers.eq(role), org.mockito.ArgumentMatchers.eq(Set.of("policy")),
+                org.mockito.ArgumentMatchers.argThat(models -> models.equals(Set.of("order", "sales_order", "sales_line"))));
+        verify(writes, never()).mutate();
+        verify(capabilities, never()).applyCapabilitySelection(any(), any(), any());
+    }
+
+    @Test void publicSourceDeclarationsDoNotReplaceTheRequiredBusinessDuty() {
+        var owner = businessOwner(Set.of("sales.manage"));
+        when(owner.businessResourceModels()).thenReturn(Set.of("sales_order", "sales_line"));
+        when(owner.publicBusinessResourceFields()).thenReturn(java.util.Map.of("sales_line", Set.of("price")));
+        var baseline = service.snapshot("role-a");
+        service.preview("role-a", new RoleAuthorizationDraftRequest(baseline.revision(), Set.of("orders.view"),
+                Set.of(), false, null, false, List.of(), Set.of("policy")));
+        verify(fieldPolicies).preview(org.mockito.ArgumentMatchers.eq(role), org.mockito.ArgumentMatchers.eq(Set.of("policy")),
+                org.mockito.ArgumentMatchers.argThat(models -> models.equals(Set.of("order"))));
+        verify(writes, never()).mutate();
+    }
+
+    @Test void changedPublicSourceFieldsInvalidateTheReviewedDraft() {
+        var owner = businessOwner(Set.of("sales.manage"));
+        when(owner.businessResourceModels()).thenReturn(Set.of("sales_order", "sales_line"));
+        when(owner.publicBusinessResourceFields()).thenReturn(java.util.Map.of("sales_line", Set.of("price")));
+        var baseline = service.snapshot("role-a");
+        when(owner.publicBusinessResourceFields()).thenReturn(java.util.Map.of("sales_line", Set.of("brand")));
+        assertThatThrownBy(() -> service.apply("role-a", request(baseline.revision(), false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate();
+    }
+
+    @Test void publicSourcesOutsideTheOwnersResourceContractAreRejected() {
+        var owner = businessOwner(Set.of("sales.manage"));
+        when(owner.businessResourceModels()).thenReturn(Set.of("sales_order"));
+        when(owner.publicBusinessResourceFields()).thenReturn(java.util.Map.of("unowned_model", Set.of("price")));
+        assertThatThrownBy(() -> service.snapshot("role-a")).isInstanceOf(RootUnCheckedException.class);
+        verify(writes, never()).mutate();
+    }
+
     @Test void staleConditionsOrExpiryCannotBeOverwrittenByAnOldDraft() {
         String revision = service.snapshot("role-a").revision();
         grant.setExpiryDate(LocalDate.of(2030, 1, 1));
