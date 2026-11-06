@@ -1,26 +1,78 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCommandTargetRecordId } from '../useActionHandler';
+import { resolveCommandTargetRecordId, resolveCommandOperationType } from '../useActionHandler';
 
 describe('command target intent', () => {
   const record = { pid: 'class-context' };
   it('does not promote ambient page or row context into a CREATE target', () => {
     for (const operationType of ['create', 'CREATE']) {
-      expect(resolveCommandTargetRecordId({ operationType }, { record }, record, { data: record })).toBeUndefined();
+      expect(
+        resolveCommandTargetRecordId({ operationType }, { record }, record, { data: record }),
+      ).toBeUndefined();
     }
   });
   it('keeps detail toolbar commands scoped to the contextual public record', () => {
-    expect(resolveCommandTargetRecordId({operationType:'delete'}, {}, undefined, {record:{pid:'detail-parent'}})).toBe('detail-parent');
-    expect(resolveCommandTargetRecordId({operationType:'update'}, {}, undefined, {row:{pid:'context-row'}})).toBe('context-row');
-    expect(resolveCommandTargetRecordId({operationType:'delete'}, {}, {pid:'explicit-row'}, {record:{pid:'detail-parent'}})).toBe('explicit-row');
-    expect(resolveCommandTargetRecordId({operationType:'create'}, {}, undefined, {record:{pid:'detail-parent'}})).toBeUndefined();
+    expect(
+      resolveCommandTargetRecordId({ operationType: 'delete' }, {}, undefined, {
+        record: { pid: 'detail-parent' },
+      }),
+    ).toBe('detail-parent');
+    expect(
+      resolveCommandTargetRecordId({ operationType: 'update' }, {}, undefined, {
+        row: { pid: 'context-row' },
+      }),
+    ).toBe('context-row');
+    expect(
+      resolveCommandTargetRecordId(
+        { operationType: 'delete' },
+        {},
+        { pid: 'explicit-row' },
+        { record: { pid: 'detail-parent' } },
+      ),
+    ).toBe('explicit-row');
+    expect(
+      resolveCommandTargetRecordId({ operationType: 'create' }, {}, undefined, {
+        record: { pid: 'detail-parent' },
+      }),
+    ).toBeUndefined();
   });
   it('preserves explicit CREATE targets so the execution validator can reject them', () => {
-    expect(resolveCommandTargetRecordId({ operationType: 'create', targetRecordPid: 'explicit-target' }, {}, record, {})).toBe('explicit-target');
+    expect(
+      resolveCommandTargetRecordId(
+        { operationType: 'create', targetRecordPid: 'explicit-target' },
+        {},
+        record,
+        {},
+      ),
+    ).toBe('explicit-target');
   });
   it('retains row and explicit target selection for UPDATE and DELETE', () => {
     for (const operationType of ['update', 'delete']) {
       expect(resolveCommandTargetRecordId({ operationType }, {}, record, {})).toBe('class-context');
-      expect(resolveCommandTargetRecordId({ operationType, targetRecordPid: 'explicit-target' }, {}, record, {})).toBe('explicit-target');
+      expect(
+        resolveCommandTargetRecordId(
+          { operationType, targetRecordPid: 'explicit-target' },
+          {},
+          record,
+          {},
+        ),
+      ).toBe('explicit-target');
     }
+  });
+});
+
+describe('command operation intent', () => {
+  it('does not infer a write from the target of an explicitly named read command', () => {
+    expect(
+      resolveCommandOperationType(undefined, 'download_raw bom:download_raw', true, 'task-1'),
+    ).toBeUndefined();
+  });
+  it('retains explicit operations and convention CRUD inference', () => {
+    expect(resolveCommandOperationType('UPDATE', 'download_raw', true, 'task-1')).toBe('UPDATE');
+    for (const operation of ['create', 'update', 'delete']) {
+      expect(resolveCommandOperationType(undefined, operation, false, 'task-1')).toBe(operation);
+    }
+    expect(resolveCommandOperationType(undefined, 'edit', false, 'task-1')).toBe('update');
+    expect(resolveCommandOperationType(undefined, 'compute fee', false, 'task-1')).toBe('update');
+    expect(resolveCommandOperationType(undefined, 'open', false, undefined)).toBeUndefined();
   });
 });

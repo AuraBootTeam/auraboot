@@ -194,6 +194,26 @@ function resolveRuntimeTemplate(value: unknown, runtimeContext: Record<string, u
   );
 }
 
+export function resolveCommandOperationType(
+  explicitOperationType: string | undefined,
+  semanticActionText: string,
+  explicitDownload: boolean,
+  targetRecordPid: string | undefined,
+): string | undefined {
+  return (
+    explicitOperationType ||
+    (semanticActionText.includes('delete')
+      ? 'delete'
+      : semanticActionText.includes('create')
+        ? 'create'
+        : semanticActionText.includes('update')
+          ? 'update'
+          : targetRecordPid && !explicitDownload
+            ? 'update'
+            : undefined)
+  );
+}
+
 export function resolveCommandTargetRecordId(
   actionDef: Record<string, unknown>,
   runtimeContext: Record<string, unknown>,
@@ -1013,17 +1033,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             const semanticActionText =
               `${btnLabel ?? ''} ${btnCode ?? ''} ${explicitCommand}`.toLowerCase();
             const explicitOperationType = toNonBlankString((actionDef as any).operationType);
-            const operationType =
-              explicitOperationType ||
-              (semanticActionText.includes('delete')
-                ? 'delete'
-                : semanticActionText.includes('create')
-                  ? 'create'
-                  : semanticActionText.includes('update')
-                    ? 'update'
-                    : targetRecordPid
-                      ? 'update'
-                      : undefined);
+            const operationType = resolveCommandOperationType(
+              explicitOperationType,
+              semanticActionText,
+              Boolean(explicitCommand && actionDef.download),
+              targetRecordPid,
+            );
             const conventionOperationType = operationType?.toLowerCase();
             const refreshIds = resolveCommandRefreshIds(
               actionDef as unknown as Record<string, unknown>,
