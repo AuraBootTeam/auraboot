@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCatalog } from './sync-dsl-action-catalog.mjs';
+import { commandInputSourceErrors } from './command-input-source-contract.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGIN_ROOT = path.join(REPO_ROOT, 'plugins');
@@ -147,6 +148,13 @@ function main() {
       continue; // not a JSON document we can read — nothing to check
     }
     visit(doc, (node) => {
+      // Args are validated through their owning action, never as an unsupported adapter.
+      if (
+        node.action === 'command.execute' || node.type === 'command' ||
+        String(node.type ?? '').startsWith('bulk') || node.type === 'state_transition'
+      ) {
+        for (const error of commandInputSourceErrors(node)) errors.push(`${rel(file)}: ${error}`);
+      }
       const blockType = node.blockType || node.type;
       if (blockType !== WORKBENCH_BLOCK_TYPE || !Array.isArray(node.actions)) return;
       for (const action of node.actions) {
