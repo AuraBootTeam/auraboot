@@ -146,8 +146,10 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has38Values() {
-        assertEquals(38, DslRegistry.BlockType.values().length);
+    void blockType_has40Values() {
+        // Count contract: 39 as of HEAD 2026-11-06 (the enum had grown past this test's 38
+        // without an update — same drift class as DR-20260715-A-004), + prerequisite-table.
+        assertEquals(40, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
@@ -170,6 +172,7 @@ class DslRegistryTest {
         // the backend enum entry, so any page mounting it was rejected at import
         // (S-PAGE-BLOCK-TYPE) — this closes that frontend/backend drift.
         assertTrue(codes.contains("trace-graph"));
+        assertTrue(codes.contains("prerequisite-table"));
     }
 
     @Test

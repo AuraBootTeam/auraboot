@@ -54,6 +54,8 @@ public class PermissionSnapshotCache {
     public static final String ROLE_PERMISSION_CACHE = "role-permission-snapshots";
     public static final String BASELINE_ROLE_CACHE = "baseline-role-snapshots";
     public static final String EFFECTIVE_PERMISSION_CACHE = "user-permissions";
+    /** Annotation-cached region this class never loads itself, but the sweep must cover. */
+    public static final String DATA_SCOPE_CONDITION_CACHE = "dataScopeCondition";
 
     private static final String BASELINE_ROLE_CODE = "tenant_member";
 
@@ -206,6 +208,9 @@ public class PermissionSnapshotCache {
         cache(ROLE_PERMISSION_CACHE).clear();
         cache(BASELINE_ROLE_CACHE).clear();
         cache(EFFECTIVE_PERMISSION_CACHE).clear();
+        // The manual sweep promises full permission-cache freshness; dataScopeCondition
+        // lives in the same manager and must not survive an out-of-band repair.
+        cache(DATA_SCOPE_CONDITION_CACHE).clear();
     }
 
     private Set<Long> loadEffectivePermissionIds(

@@ -20,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -54,6 +53,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     private final UserRoleMapper userRoleMapper;
     private final TenantMemberMapper tenantMemberMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final DataScopeCacheEvictor dataScopeCacheEvictor;
 
     @Autowired @Lazy
     private OrganizationService organizationService;
@@ -140,7 +140,6 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
-    @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                          String scopeType, String mergeStrategy) {
         try {
@@ -178,14 +177,17 @@ public class DataScopeServiceImpl implements DataScopeService {
         }
         // The user-permission snapshot and member-keyed dataScopeCondition caches read row
         // filters through this table; an import or admin change that skips eviction keeps
-        // stale row filters alive until restart (the 2026-11-05 bootnap finding). Publish
-        // through the standard role-changed channel so every consumer evicts after commit.
+        // stale row filters alive until restart (the 2026-11-05 bootnap finding). Evict the
+        // member-keyed region only after the surrounding transaction commits — a pre-commit
+        // evict lets a concurrent request re-cache the pre-change filters for a full TTL —
+        // and publish through the standard role-changed channel so snapshot consumers evict
+        // after commit as well.
+        dataScopeCacheEvictor.evictAfterCommit();
         eventPublisher.publishEvent(new RolePermissionChangedEvent(
                 this, tenantId, roleId, null, "UPDATE"));
     }
 
     @Override
-    @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void removeScope(Long tenantId, Long roleId, String resourceCode, String actionCode) {
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
@@ -193,6 +195,7 @@ public class DataScopeServiceImpl implements DataScopeService {
                 .eq(RoleDataScope::getResourceCode, resourceCode)
                 .eq(RoleDataScope::getActionCode, actionCode);
         roleDataScopeMapper.delete(query);
+        dataScopeCacheEvictor.evictAfterCommit();
         eventPublisher.publishEvent(new RolePermissionChangedEvent(
                 this, tenantId, roleId, null, "DELETE"));
     }
