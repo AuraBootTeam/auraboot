@@ -199,6 +199,44 @@ class CapabilityViewServiceImplTest {
     }
 
     @Test
+    void splittingStructureReleasePreservesExistingBindingsWithoutRegrantingThem() {
+        var grants = List.of(perm(1L, "convert", "bom.convert.execute"),
+                perm(2L, "release", "bom.structure.release"),
+                perm(3L, "entry", "meta.command.execute"));
+        when(permissionService.findAllActive()).thenReturn(grants);
+        when(permissionService.findRolePermissions(5L)).thenReturn(grants);
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                decl("bom.cap.convert", "BOM", "bom.convert.execute", "meta.command.execute"),
+                decl("bom.cap.structure_release", "BOM", "bom.structure.release", "meta.command.execute")));
+        MetaContext.setContext(1L, 1L, "p", "u");
+
+        service.applyCapabilitySelection(5L, Set.of("bom.cap.convert", "bom.cap.structure_release"));
+
+        // Existing conditions, validity windows and source references live on the original rows.
+        // A directory split must not remove and recreate those rows as unrestricted grants.
+        verifyNoInteractions(rolePermissionService);
+    }
+
+    @Test
+    void selectingOnlyConversionForNewRoleDoesNotGrantStructureRelease() {
+        when(permissionService.findAllActive()).thenReturn(List.of(
+                perm(1L, "convert", "bom.convert.execute"),
+                perm(2L, "release", "bom.structure.release"),
+                perm(3L, "entry", "meta.command.execute")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                decl("bom.cap.convert", "BOM", "bom.convert.execute", "meta.command.execute"),
+                decl("bom.cap.structure_release", "BOM", "bom.structure.release", "meta.command.execute")));
+        MetaContext.setContext(1L, 1L, "p", "u");
+
+        service.applyCapabilitySelection(5L, Set.of("bom.cap.convert"));
+
+        verify(rolePermissionService).assignPermissionsToRole(eq(5L),
+                argThat(ids -> ids.size() == 2 && ids.containsAll(List.of(1L, 3L))));
+        org.mockito.Mockito.verifyNoMoreInteractions(rolePermissionService);
+    }
+
+    @Test
     void readOnlyCapabilityGrantsReadCodesButNeverManage() {
         // R3: a viewer-tier capability (crm.cap.account_view = read + model-read, NO manage)
         // coexists with the editor-tier crm.cap.account (read + manage + model-read). Selecting
