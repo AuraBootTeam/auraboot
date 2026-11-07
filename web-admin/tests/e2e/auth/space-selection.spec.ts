@@ -90,8 +90,9 @@ test.describe('Space Selection API', () => {
     expect(selectBody.data.jwt).toBeTruthy();
     // tenantId is now serialized as string from backend
     expect(String(selectBody.data.tenantId)).toBe(String(businessSpace.tenantId));
-    const claims = JSON.parse(Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString());
-    expect(String(claims.tenantId)).toBe(String(businessSpace.tenantId));
+    const claims = Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString();
+    // Preserve Snowflake identifiers instead of rounding them through JSON.parse numbers.
+    expect(claims.match(/"tenantId"\s*:\s*"?(\d+)"?(?=\s*[,}])/)?.[1]).toBe(String(businessSpace.tenantId));
 
     // JWT should be valid (may be same as original in SINGLE mode where login already has tenantId)
     expect(selectBody.data.jwt.length).toBeGreaterThan(50);
@@ -124,8 +125,8 @@ test.describe('Space Selection API', () => {
     expect(selectBody.data.status).toBe('success');
     expect(selectBody.data.jwt).toBeTruthy();
     expect(String(selectBody.data.tenantId)).toBe(String(platformSpace.tenantId));
-    const claims = JSON.parse(Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString());
-    expect(String(claims.tenantId)).toBe(String(platformSpace.tenantId));
+    const claims = Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString();
+    expect(claims.match(/"tenantId"\s*:\s*"?(\d+)"?(?=\s*[,}])/)?.[1]).toBe(String(platformSpace.tenantId));
   });
 });
 
