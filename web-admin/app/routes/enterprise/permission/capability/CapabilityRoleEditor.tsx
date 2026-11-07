@@ -570,7 +570,7 @@ export default function CapabilityRoleEditor({
                   {t(
                     `roleGrantFields.action.${binding?.permissionCode?.split('.').at(-1)}`,
                     undefined,
-                    'Authorization',
+                    t('roleGrantFields.authorization', undefined, 'Authorization'),
                   )}
                 </p>
                 <p>

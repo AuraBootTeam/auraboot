@@ -128,7 +128,11 @@ export default function RoleGrantFieldsEditor({
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-text-1 text-sm font-medium">
-                {t(`roleGrantFields.action.${action}`, undefined, 'Authorization')} · {index + 1}
+                {t(
+                  `roleGrantFields.action.${action}`,
+                  undefined,
+                  t('roleGrantFields.authorization', undefined, 'Authorization'),
+                )} · {index + 1}
                 {!binding.bindingPid && (
                   <span className="text-text-2 ml-2 text-xs">
                     {t('roleGrantFields.pending', undefined, 'New in this draft')}

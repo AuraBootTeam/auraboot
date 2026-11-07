@@ -6763,5 +6763,20 @@
     "key": "permission.capability_binding_review",
     "zh-CN": "该职责涉及已有约束或受管来源的授权，请先审阅并从原授权来源调整。",
     "en-US": "This duty involves existing constraints or managed authorization. Review and update the original authorization source first."
+  },
+  {
+    "key": "roleGrantFields.authorization",
+    "zh-CN": "业务授权",
+    "en-US": "Business authorization"
+  },
+  {
+    "key": "roleGrantFields.action.manage",
+    "zh-CN": "管理授权",
+    "en-US": "Manage authorization"
+  },
+  {
+    "key": "roleGrantFields.action.execute",
+    "zh-CN": "执行授权",
+    "en-US": "Execute authorization"
   }
 ]
