@@ -1630,9 +1630,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     /**
      * Bulk create fast path. Runs the same per-row validation/enrichment/PK/type-conversion as
      * {@link #create} but accumulates all rows into ONE multi-row INSERT inside a single
-     * transaction, and skips the per-row post-insert tail (getById reload, change-log, automation
-     * triggers, SLA activation, virtual-field materialization). Returns the enriched rows (with
-     * generated primary keys) in input order so callers can correlate ids without a select-back.
+     * transaction, and skips the per-row post-insert business tail (change-log, automation
+     * triggers, SLA activation, virtual-field materialization). Authorizes every inserted row
+     * before observation and returns ordinary callers' read-projected rows in input order;
+     * callers without read access receive only the created identity envelope.
      *
      * <p>Intended for mechanical bulk loads (BOM import). Per-row side effects that {@code create}
      * fires are intentionally NOT run here — do not use for models that rely on create-time
@@ -1640,7 +1641,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * computed fields afterward.
      */
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
         BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().bulkCreate(modelCode,dataList);
@@ -1946,7 +1947,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicDataBatchSupport dynamicDataBatchSupport() {
-        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, (code, input) -> inRowTransaction(() -> create(code, input)), this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, (code, inputId, input) -> inRowTransaction(() -> update(code, inputId, input)), this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::notifyModelMutation, this::delete);
+        return new DynamicDataBatchSupport(metadataService, validationService, typeSystemManager, dynamicDataMapper, dataPermissionEngine, dataDomainService, payloadTemporalNormalizer, this::getById, (code, input) -> inRowTransaction(() -> create(code, input)), this::convertDataTypes, this::filterVirtualFields, this::stripNonWritableFields, this::ensureTableExists, (code, inputId, input) -> inRowTransaction(() -> update(code, inputId, input)), this::appendScopedBulkFilter, this::getModelDefinition, this::assertWritable, this::toColumnData, this::notifyModelMutation, this::delete, applicationContext.getBean(NativeRecordFieldAuthorization.class), nativeReadFields);
     }
 
     private DynamicDataListingSupport dynamicDataListingSupport() {

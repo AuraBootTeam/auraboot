@@ -163,6 +163,45 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
                 String.class, testTenant.getId(), testRole.getId(), code);
     }
 
+    @Test void bulkCreateRejectsTheWholeBatchWhenOneSubmittedFieldExceedsItsCreateGrant() throws Exception {
+        restrictGrantFields("create", List.of(), List.of(label));
+        long before = count();
+        assertThatThrownBy(() -> data.bulkCreate(model, List.of(
+                new LinkedHashMap<>(Map.of(label, "bulk-allowed")),
+                new LinkedHashMap<>(Map.of(label, "bulk-forbidden", quantity, 9)))))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        assertThat(count()).isEqualTo(before);
+    }
+
+    @Test void bulkCreateProjectsEachResultThroughItsIndependentReadGrant() throws Exception {
+        restrictGrantFields("create", List.of(), List.of(label, quantity));
+        restrictGrantFields("read", List.of(label), List.of());
+        var inputs = List.of(new LinkedHashMap<String, Object>(Map.of(label, "bulk-first", quantity, 3)),
+                new LinkedHashMap<String, Object>(Map.of(label, "bulk-second", quantity, 4)));
+        var result = data.bulkCreate(model, new ArrayList<Map<String, Object>>(inputs));
+        assertThat(result).hasSize(2);
+        for (int i = 0; i < result.size(); i++) {
+            var row = result.get(i);
+            assertThat(row).containsEntry(label, inputs.get(i).get(label))
+                    .doesNotContainKeys(quantity, secret, hidden, "tenant_id", "created_by");
+            assertThat(stored(quantity, Objects.toString(row.get("pid")))).isEqualTo(i + 3);
+            assertThat(inputs.get(i)).containsOnlyKeys(label, quantity);
+        }
+    }
+
+    @Test void bulkCreateWithoutReadGrantReturnsOnlyCreatedIdentities() throws Exception {
+        restrictGrantFields("create", List.of(), List.of(label));
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET deleted_flag=TRUE FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                testRole.getId(), testTenant.getId(), "model." + model + ".read")).isEqualTo(1);
+        var result = data.bulkCreate(model, List.of(new LinkedHashMap<>(Map.of(label, "bulk-write-only"))));
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst()).containsKey("pid");
+        assertThat(result.getFirst().keySet()).isSubsetOf("pid", "row_version");
+        String createdPid = Objects.toString(result.getFirst().get("pid"));
+        assertThat(stored(label, createdPid)).isEqualTo("bulk-write-only");
+        assertThatThrownBy(() -> data.getById(model, createdPid)).isInstanceOf(AccessDeniedException.class);
+    }
+
     @Test void conditionalWritesConsumeCompleteUpdateFieldsBeforeAnyMutation() throws Exception {
         String before = restrictGrantFields("update", List.of(), List.of(label));
         assertThat(data.compareAndSet(model, pid, label, "before", "cas-allowed")).isTrue();
