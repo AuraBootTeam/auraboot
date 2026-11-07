@@ -8,8 +8,10 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -337,11 +339,12 @@ class DeploymentBrandingProviderTest {
                 .withProperty("AURABOOT_VERSION", "1.0.0");
     }
 
+    /** Stream copy so the fixture resolves whether the classpath entry is a directory or a jar. */
     private Path fixturePath(String name) throws IOException {
-        Path target = tempDirectory.resolve(name);
-        try (var input = Objects.requireNonNull(
+        Path target = tempDirectory.resolve("fixture-" + name);
+        try (InputStream in = Objects.requireNonNull(
                 getClass().getResourceAsStream("/branding/commercial-license/" + name))) {
-            Files.copy(input, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
         }
         return target;
     }
