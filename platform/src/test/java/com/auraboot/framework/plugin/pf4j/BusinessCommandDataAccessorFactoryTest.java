@@ -209,6 +209,26 @@ class BusinessCommandDataAccessorFactoryTest {
     @Test void supportedResultEnvelopeRemainsImmutable() {
         command(scope -> { assertThat(scope.projectResult(Map.of("status", "confirmed"))).containsEntry("status", "confirmed"); return null; });
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"path","visibility","grant"})
+    void structuredSourcePolicyCannotChangeInsideTheResourceFrame(String change) {
+        owner.resultProjection=Map.of("status",BusinessResultField.rootJsonPath("status","dryRun","quality"));
+        var grant=new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),7L,20L,30L,"receipt","root-1",
+                List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"inventory.receipt.confirm",
+                        new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,Set.of("status"),Set.of()))));
+        context.setBusinessGrantDecision(grant);
+        context.setBusinessResultProjection(new com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan(
+                context.getBusinessTargetAuthorization(),grant,owner.resultProjection,Map.of("status","status"),Set.of("status"),List.of(),List.of()));
+        command(scope -> {
+            if("path".equals(change)) owner.resultProjection=Map.of("status",BusinessResultField.rootJsonPath("status","dryRun","samples"));
+            else if("grant".equals(change)) context.setBusinessGrantDecision(null);
+            else context.setBusinessResultProjection(new com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan(
+                    context.getBusinessTargetAuthorization(),grant,owner.resultProjection,Map.of("status","status"),Set.of("status","private"),List.of(),List.of()));
+            denied(() -> scope.accessor().getById("line","line-1"));return null;
+        });
+        verify(data,never()).getByIdForAuthorization("line","line-1");assertThat(holder.isRollbackOnly()).isTrue();
+    }
     @Test void hostRootCannotBeReplacedByAnotherRecordOrCreateOperation() {
         command(scope -> { denied(() -> scope.accessor().update("receipt", "another-root", Map.of("status", "confirmed"))); return null; });
         verify(data, never()).getByIdForAuthorization("receipt", "another-root");
@@ -543,6 +563,7 @@ class BusinessCommandDataAccessorFactoryTest {
         Map<String,Integer> pagedLimits = Map.of();
         Map<String,Set<String>> publicFields = Map.of();
         Map<String,Integer> artifactFields = Map.of();
+        Map<String,BusinessResultField> resultProjection = Map.of();
         boolean denyLineRead;
         BusinessResourceAuthorization invocation;
         public BusinessResourceAuthorization newInvocationAuthorization() { return invocation == null ? this : invocation; }
@@ -556,6 +577,7 @@ class BusinessCommandDataAccessorFactoryTest {
         public Boundary businessBoundary(){return new Boundary("receipt.confirm","receipt","update",Set.of("inventory.receipt.confirm"));}
         public Set<String> businessResourceModels() { return Set.of("receipt", "line", "ledger", "reference"); }
         public Set<String> businessResultFields() { return Set.of("status"); }
+        public Map<String,BusinessResultField> businessResultProjection() { return resultProjection; }
         public Set<String> businessDeletableResourceModels() { return allowDelete && !optOutDelete ? Set.of("line") : Set.of(); }
         public Grant authorizeResource(TargetAuthorizationContext root, Request request) {
             if (denyLineRead && request.action() == Action.READ && "line".equals(request.modelCode())) return null;

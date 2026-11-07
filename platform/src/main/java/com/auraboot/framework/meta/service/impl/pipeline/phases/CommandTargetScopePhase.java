@@ -338,6 +338,8 @@ public class CommandTargetScopePhase implements CommandPhase {
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
             if (resultProjection != null) ctx.setBusinessResultProjection(nativeContract != null
                     ? resultProjection.prepareNative(ctx, nativeContract) : resultProjection.prepare(ctx,owner));
+            if (ctx.getBusinessResultProjection()!=null && ctx.getBusinessResultProjection().requiresRootDocuments())
+                ctx.setBusinessResultProjection(ctx.getBusinessResultProjection().bindRootDocuments(record));
             if (owner != null && !owner.businessArtifactFields().isEmpty() && owner.publicBusinessResourceFields().isEmpty())
                 throw new org.springframework.security.access.AccessDeniedException("Artifact sources must be declared before idempotency lookup");
             if (owner != null && !owner.publicBusinessResourceFields().isEmpty()) {

@@ -54,7 +54,7 @@ public class CommandResultProjectionService {
         if(definition.containsKey("recordPid") && definition.get("recordPid").kind()!=BusinessResultField.Kind.ROOT_ID)
             throw BusinessResultProjectionPlan.denied();
         Map<String,String> sources=new LinkedHashMap<>();Set<String> readable=new LinkedHashSet<>();
-        var refs=definition.values().stream().filter(field->field.kind()==BusinessResultField.Kind.ROOT_FIELD || field.kind()==BusinessResultField.Kind.DERIVED_ROOT_FIELD).toList();
+        var refs=definition.values().stream().filter(field->field.sourceField()!=null).toList();
         List<BusinessResultProjectionPlan.PolicyMask> policyMasks=new ArrayList<>();
         List<BusinessResultProjectionPlan.DetailMask> detailMasks=new ArrayList<>();
         if(!refs.isEmpty()) {
@@ -70,11 +70,13 @@ public class CommandResultProjectionService {
             if(permission==null || permission.viewableFields()==null || permission.hiddenFields()==null)
                 throw BusinessResultProjectionPlan.denied();
             for(var entry:definition.entrySet()) {
-                var ref=entry.getValue();if(ref.kind()!=BusinessResultField.Kind.ROOT_FIELD && ref.kind()!=BusinessResultField.Kind.DERIVED_ROOT_FIELD)continue;
+                var ref=entry.getValue();if(ref.sourceField()==null)continue;
                 var field=modelFields.stream().filter(f->ref.sourceField().equals(f.getCode())).findFirst()
                         .orElseThrow(BusinessResultProjectionPlan::denied);
                 if(ref.kind()==BusinessResultField.Kind.ROOT_FIELD && Set.of("json","jsonb","object","array","list").contains(Objects.toString(field.getDataType(),"").toLowerCase(Locale.ROOT)))
                     throw BusinessResultProjectionPlan.denied();
+                if(ref.kind()==BusinessResultField.Kind.ROOT_JSON_PATH && !Set.of("text","string","json","jsonb","object")
+                        .contains(Objects.toString(field.getDataType(),"").toLowerCase(Locale.ROOT))) throw BusinessResultProjectionPlan.denied();
                 sources.put(entry.getKey(),field.getCode());
                 if(ctx.getBusinessGrantDecision().canRead(field.getCode()) && permission.viewableFields().contains(field.getCode())
                         && !permission.hiddenFields().contains(field.getCode()))readable.add(field.getCode());
@@ -106,9 +108,11 @@ public class CommandResultProjectionService {
         if(plan==null || plan.grant()!=ctx.getBusinessGrantDecision() || !Boolean.TRUE.equals(ctx.getTargetRecordReadable())
                 || !Objects.equals(plan.target(),ctx.getBusinessTargetAuthorization()))throw BusinessResultProjectionPlan.denied();
         var values=plan.validateEnvelope(internal);
+        plan.verifyRootDocuments(values);
         Map<String,Object> data=new LinkedHashMap<>();
         for(var source:plan.sources().entrySet()) {
             if(plan.fields().get(source.getKey()).kind()==BusinessResultField.Kind.DERIVED_ROOT_FIELD
+                    || plan.fields().get(source.getKey()).kind()==BusinessResultField.Kind.ROOT_JSON_PATH
                     || !values.containsKey(source.getKey()) || !plan.readable().contains(source.getValue()))continue;
             Object value=values.get(source.getKey());
             if(data.containsKey(source.getValue()) && !Objects.equals(data.get(source.getValue()),value))throw BusinessResultProjectionPlan.denied();
@@ -129,10 +133,10 @@ public class CommandResultProjectionService {
         for(var entry:values.entrySet()) {
             String source=plan.sources().get(entry.getKey());
             if(source==null)result.put(entry.getKey(),entry.getValue());
-            else if(plan.fields().get(entry.getKey()).kind()==BusinessResultField.Kind.DERIVED_ROOT_FIELD) {
+            else if(plan.fields().get(entry.getKey()).kind()==BusinessResultField.Kind.DERIVED_ROOT_FIELD
+                    || plan.fields().get(entry.getKey()).kind()==BusinessResultField.Kind.ROOT_JSON_PATH) {
                 // Masking transformed values cannot safely reproduce the source's privacy policy.
-                if(plan.readable().contains(source) && plan.policyMasks().stream().noneMatch(mask->source.equals(mask.field()))
-                        && plan.detailMasks().stream().noneMatch(mask->source.equals(mask.field())))
+                if(plan.unmaskedReadable(source))
                     result.put(entry.getKey(),entry.getValue());
             } else if(plan.readable().contains(source) && data.containsKey(source))result.put(entry.getKey(),data.get(source));
         }

@@ -11,18 +11,64 @@ import java.util.*;
 public record BusinessResultProjectionPlan(BusinessTargetAuthorization target,
         com.auraboot.framework.permission.engine.model.BusinessGrantDecision grant,
         Map<String, BusinessResultField> fields, Map<String,String> sources, Set<String> readable,
-        List<PolicyMask> policyMasks, List<DetailMask> detailMasks) {
+        List<PolicyMask> policyMasks, List<DetailMask> detailMasks, Map<String,String> rootDocuments) {
+    public BusinessResultProjectionPlan(BusinessTargetAuthorization target,
+            com.auraboot.framework.permission.engine.model.BusinessGrantDecision grant,
+            Map<String,BusinessResultField> fields, Map<String,String> sources, Set<String> readable,
+            List<PolicyMask> policyMasks, List<DetailMask> detailMasks) {
+        this(target,grant,fields,sources,readable,policyMasks,detailMasks,Map.of());
+    }
     public BusinessResultProjectionPlan {
         fields=Map.copyOf(fields);sources=Map.copyOf(sources);readable=Set.copyOf(readable);
         policyMasks=List.copyOf(policyMasks);detailMasks=List.copyOf(detailMasks);
+        rootDocuments=Map.copyOf(rootDocuments);
     }
     public record PolicyMask(String field,String type,String expression) { }
     public record DetailMask(String field,String type,String pattern,String replacement) { }
+
+    public boolean requiresRootDocuments() {
+        return fields.values().stream().anyMatch(field -> field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH);
+    }
+
+    /** Post-write source refresh may replace documents, never the captured authorization policy. */
+    public boolean samePolicy(BusinessResultProjectionPlan other) {
+        return other!=null && grant==other.grant && Objects.equals(target,other.target)
+                && fields.equals(other.fields) && sources.equals(other.sources) && readable.equals(other.readable)
+                && policyMasks.equals(other.policyMasks) && detailMasks.equals(other.detailMasks);
+    }
+
+    /** Only the host's target read and active resource scope supply these current stored facts. */
+    public BusinessResultProjectionPlan bindRootDocuments(Map<String,Object> root) {
+        if (!requiresRootDocuments()) return this;
+        if (target==null || root==null || !target.targetRecordId().equals(root.get("pid"))
+                || !target.tenantId().toString().equals(String.valueOf(root.get("tenant_id")))
+                || Boolean.TRUE.equals(root.get("deleted_flag"))
+                || !(root.get("row_version") instanceof Number version) || version.longValue()<0) throw denied();
+        Map<String,String> documents=new LinkedHashMap<>();
+        for (var field:fields.values()) if(field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH)
+            documents.computeIfAbsent(field.sourceField(),key -> BusinessResultJsonSource.document(root.get(key)));
+        if(documents.values().stream().mapToInt(String::length).sum()>4_194_304) throw denied();
+        return new BusinessResultProjectionPlan(target,grant,fields,sources,readable,policyMasks,detailMasks,documents);
+    }
+
+    boolean unmaskedReadable(String source) {
+        return readable.contains(source) && policyMasks.stream().noneMatch(mask -> source.equals(mask.field()))
+                && detailMasks.stream().noneMatch(mask -> source.equals(mask.field()));
+    }
+
+    public void verifyRootDocuments(Map<String,Object> values) {
+        for(var entry:values.entrySet()) {
+            var field=fields.get(entry.getKey());
+            if(field!=null && field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH && unmaskedReadable(field.sourceField()))
+                BusinessResultJsonSource.requireExact(rootDocuments.get(field.sourceField()),field,entry.getValue());
+        }
+    }
 
     /** Also used before internal completion effects, without applying caller filtering there. */
     public Map<String,Object> validateEnvelope(Object raw) {
         if (!(raw instanceof Map<?,?> map) || map.size()>129) throw denied();
         Map<String,Object> result=new LinkedHashMap<>();
+        var jsonBudget=new BusinessResultJsonSource.Budget();
         for (var entry:map.entrySet()) {
             if (!(entry.getKey() instanceof String key)) throw denied();
             var field=fields.get(key);
@@ -50,6 +96,7 @@ public record BusinessResultProjectionPlan(BusinessTargetAuthorization target,
                     if (!(value==null || value instanceof String || value instanceof Boolean || value instanceof Number
                             || value instanceof java.time.temporal.TemporalAccessor || value instanceof java.util.Date))throw denied();
                 }
+                case ROOT_JSON_PATH -> value=jsonBudget.copy(value,0);
             }
             result.put(key,value);
         }

@@ -43,6 +43,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     @Autowired PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
     @Autowired com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
+    @Autowired com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
     @Autowired FieldMaskService masks;
     final List<Long> maskIds = new ArrayList<>();
     final List<Model> ownedModels = new ArrayList<>();
@@ -128,11 +129,20 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
                     getTestTenant().getId(), getTestUser().getId(), getTestTenantMember().getId(), rootModel, rootPid, List.of()));
             context.setPublicOutputProjection(publicProjection.prepare(context, owner));
         }
+        if(owner.jsonResult) {
+            context.setBusinessGrantDecision(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                    com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),
+                    getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getId(),rootModel,rootPid,
+                    List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"fixture.receipt.confirm",
+                            new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,Set.of(rootLabel),Set.of(rootLabel))))));
+            context.setBusinessResultProjection(resultProjection.prepare(context,owner).bindRootDocuments(Map.of(
+                    "pid",rootPid,"tenant_id",getTestTenant().getId(),"row_version",rootVersion,rootLabel,storedRootDocument())));
+        }
         return context;
     }
     <T> T command(Function<BusinessCommandDataAccessorFactory.Scope,T> operation) {
         var template = new TransactionTemplate(transactions);
-        if (owner.paged || owner.publicOutput) template.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        if (owner.paged || owner.publicOutput || owner.jsonResult) template.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
         return template.execute(tx->MetaContext.runWithCommandPermitPlan("TARGET",rootVersion,rootModel,rootPid,()->
                 MetaContext.runWithAuthorizedCommandCode("fixture:receipt_confirm",()->{
                     try(var scope=factory.open(context(),owner)) {return operation.apply(scope);}
@@ -140,6 +150,80 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     }
     String storedQty() {return jdbc.queryForObject("SELECT "+qty+" FROM "+physicalTables.get(lineModel)+" WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),linePid);}
     long ledgerCount() {return jdbc.queryForObject("SELECT COUNT(*) FROM "+physicalTables.get(ledgerModel)+" WHERE tenant_id=?",Long.class,getTestTenant().getId());}
+
+    String storedRootDocument() {
+        return jdbc.queryForObject("SELECT "+rootLabel+" FROM "+physicalTables.get(rootModel)+" WHERE tenant_id=? AND pid=?",
+                String.class,getTestTenant().getId(),rootPid);
+    }
+    void jsonSourceFixture() {
+        owner.jsonResult=true;
+        jdbc.update("UPDATE "+physicalTables.get(rootModel)+" SET "+rootLabel+"=? WHERE tenant_id=? AND pid=?",
+                "{\"dryRun\":{\"quality\":{\"passed\":false,\"count\":0},\"privateSibling\":\"PRIVATE\"}}",getTestTenant().getId(),rootPid);
+    }
+
+    @Test void structuredPublicResultUsesTheActualPostWriteRootWithoutModelReadGrant() {
+        jsonSourceFixture();
+        assertThat(permissions.canAction(getTestTenantMember().getId(),rootModel,"read")).isFalse();
+        var transaction=new TransactionTemplate(transactions);transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var output=transaction.execute(tx -> MetaContext.runWithCommandPermitPlan("TARGET",rootVersion,rootModel,rootPid,() ->
+                MetaContext.runWithAuthorizedCommandCode("fixture:receipt_confirm",() -> {
+                    var ctx=context();Map<String,Object> internal;
+                    try(var scope=factory.open(ctx,owner)) {
+                        scope.accessor().update(rootModel,rootPid,Map.of(rootLabel,"{\"dryRun\":{\"quality\":{\"passed\":true,\"count\":3},\"privateSibling\":\"PRIVATE\"}}"));
+                        internal=scope.projectResult(Map.of("quality",Map.of("passed",true,"count",3)));
+                    }
+                    return resultProjection.project(ctx,internal);
+                })));
+        assertThat(output).containsExactly(Map.entry("quality",Map.of("passed",true,"count",3)));
+        assertThat(storedRootDocument()).contains("\"passed\":true");
+        assertThat(output.toString()).doesNotContain("PRIVATE");
+        assertThat(permissions.canAction(getTestTenantMember().getId(),rootModel,"read")).isFalse();
+    }
+
+    @Test void forgedStructuredResultPoisonsAndRollsBackActualEarlierRootAndChildWrites() {
+        jsonSourceFixture();String before=storedRootDocument();
+        assertThatThrownBy(() -> command(scope -> {
+            scope.accessor().update(lineModel,linePid,Map.of(qty,"3"));
+            scope.accessor().update(rootModel,rootPid,Map.of(rootLabel,"{\"dryRun\":{\"quality\":{\"passed\":true}}}"));
+            assertThatThrownBy(() -> scope.projectResult(Map.of("quality",Map.of("passed",true,"cost",99))))
+                    .isInstanceOf(DataAccessorException.class);
+            return null;
+        })).isInstanceOf(UnexpectedRollbackException.class);
+        assertThat(storedRootDocument()).isEqualTo(before);assertThat(storedQty()).isEqualTo("2");
+        command(scope -> {
+            scope.accessor().update(lineModel,linePid,Map.of(qty,"3"));
+            assertThat(scope.projectResult(Map.of("quality",Map.of("passed",false,"count",0))))
+                    .containsExactly(Map.entry("quality",Map.of("passed",false,"count",0)));
+            return null;
+        });
+        assertThat(storedQty()).isEqualTo("3");assertThat(storedRootDocument()).isEqualTo(before);
+    }
+
+    @Test void currentDatabaseSourceRejectsPreviouslyValidStructuredCachedData() {
+        jsonSourceFixture();
+        var transaction=new TransactionTemplate(transactions);transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var old=Map.<String,Object>of("quality",Map.of("passed",false,"count",0));
+        var initial=transaction.execute(tx -> resultProjection.project(context(),old));
+        assertThat(initial).isEqualTo(old);
+        jdbc.update("UPDATE "+physicalTables.get(rootModel)+" SET "+rootLabel+"=? WHERE tenant_id=? AND pid=?",
+                "{\"dryRun\":{\"quality\":{\"passed\":true,\"count\":1}}}",getTestTenant().getId(),rootPid);
+        assertThatThrownBy(() -> transaction.execute(tx -> resultProjection.project(context(),old)))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(storedRootDocument()).contains("\"passed\":true");
+    }
+
+    @Test void newlyConfiguredRealSourceMaskRemovesTheWholeStructuredCachedValue() {
+        jsonSourceFixture();
+        var transaction=new TransactionTemplate(transactions);transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var old=Map.<String,Object>of("quality",Map.of("passed",false,"count",0));
+        var initial=transaction.execute(tx -> resultProjection.project(context(),old));assertThat(initial).isEqualTo(old);
+        var config=new FieldMaskConfig();config.setModelCode(rootModel);config.setFieldCode(rootLabel);config.setEnabled(true);
+        config.setApplyToDetail(true);config.setMaskType("FULL");config.setReplacementChar("*");masks.saveConfig(config);maskIds.add(config.getId());
+        var hidden=transaction.execute(tx -> resultProjection.project(context(),old));assertThat(hidden).isEmpty();
+        assertThat(storedRootDocument()).contains("\"passed\":false");
+        masks.deleteConfig(config.getId());maskIds.remove(config.getId());
+        var restored=transaction.execute(tx -> resultProjection.project(context(),old));assertThat(restored).isEqualTo(old);
+    }
 
     @Test void nativeRelatedUpdateAndAppendCommitWithoutGenericModelGrants() {
         command(scope->{
@@ -361,19 +445,24 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         boolean paged;
         boolean publicOutput;
         boolean allowDelete;
+        boolean jsonResult;
         int pagedLimit = 2000;
         String deniedLine;
-        public ReadIsolation resourceReadIsolation(){return paged || publicOutput ? ReadIsolation.REPEATABLE_READ : null;}
+        public ReadIsolation resourceReadIsolation(){return paged || publicOutput || jsonResult ? ReadIsolation.REPEATABLE_READ : null;}
         public Map<String,Set<String>> publicBusinessResourceFields(){return publicOutput ? Map.of(lineModel, Set.of(qty)) : Map.of();}
         public Map<String,Integer> pagedBusinessResourceRowLimits(){return paged ? Map.of(lineModel,pagedLimit) : Map.of();}
         public String getCommandType(){return "fixture:receipt_confirm";}
         public Object execute(CommandContext context){throw new AssertionError("Not a product handler fixture");}
         public Boundary businessBoundary(){return new Boundary("fixture:receipt_confirm",rootModel,"update",Set.of("fixture.receipt.confirm"));}
         public Set<String> businessResourceModels(){return Set.of(rootModel,lineModel,ledgerModel);}
-        public Set<String> businessResultFields(){return Set.of("success");}
+        public Set<String> businessResultFields(){return jsonResult ? Set.of("quality") : Set.of("success");}
+        public Map<String,BusinessResultField> businessResultProjection(){return jsonResult ? Map.of("quality",BusinessResultField.rootJsonPath(rootLabel,"dryRun","quality")) : Map.of();}
         public Set<String> businessDeletableResourceModels(){return allowDelete ? Set.of(lineModel) : Set.of();}
         Set<String> read(String... fields){var set=new HashSet<>(Set.of("pid","tenant_id","row_version"));set.addAll(List.of(fields));return set;}
         public Grant authorizeResource(TargetAuthorizationContext root,Request request){
+            if(jsonResult && request.action()==Action.UPDATE && rootModel.equals(request.modelCode())
+                    && rootPid.equals(request.recordId()) && request.changes().keySet().equals(Set.of(rootLabel)))
+                return new Grant(read(rootLabel),Set.of(rootLabel),1);
             if(request.action()==Action.READ && rootModel.equals(request.modelCode()) && rootPid.equals(request.recordId()))return new Grant(read(rootLabel),Set.of(),1);
             if(request.action()==Action.QUERY && lineModel.equals(request.modelCode()) && Map.of(parent,rootPid).equals(request.filters()))return new Grant(read(parent,qty),Set.of(),paged ? 500 : 10);
             if(request.action()==Action.READ && request.recordId()!=null && request.recordId().equals(deniedLine)) return null;

@@ -466,6 +466,18 @@ class RoleAuthorizationDraftServiceTest {
         verify(writes, never()).mutate();
     }
 
+    @Test void changingOnlyAStructuredResultPathInvalidatesTheReviewedDraft() {
+        var owner=businessOwner(Set.of("sales.manage"));
+        when(owner.businessResultProjection()).thenReturn(java.util.Map.of("quality",
+                com.auraboot.framework.plugin.extension.BusinessResultField.rootJsonPath("price","dryRun","quality")));
+        var baseline=service.snapshot("role-a");
+        when(owner.businessResultProjection()).thenReturn(java.util.Map.of("quality",
+                com.auraboot.framework.plugin.extension.BusinessResultField.rootJsonPath("price","dryRun","samples")));
+        assertThatThrownBy(() -> service.apply("role-a",request(baseline.revision(),false,null,List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes,never()).mutate();
+    }
+
     @Test void staleConditionsOrExpiryCannotBeOverwrittenByAnOldDraft() {
         String revision = service.snapshot("role-a").revision();
         grant.setExpiryDate(LocalDate.of(2030, 1, 1));

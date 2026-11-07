@@ -784,6 +784,42 @@ class CommandTargetScopePhaseTest {
         verify(service).prepare(ctx, owner);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void structuredRootSourceIsCapturedBeforeCacheAndCannotComeFromThePayload(boolean malformed) {
+        var ctx=businessTarget();
+        String stored=malformed ? "{} {}" : "{\"dryRun\":{\"quality\":{\"passed\":true}}}";
+        var record=Map.<String,Object>of("pid","REC-1","tenant_id",1L,"row_version",13L,"mapping",stored);
+        when(dynamicDataService.getById("inv_inbound","REC-1")).thenReturn(record);
+        ctx.getPayload().put("mapping","{\"dryRun\":{\"quality\":{\"passed\":false}}}");
+        var authorizer=org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        var grant=new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                PermissionResult.allow(List.of()),1L,42L,99L,"inv_inbound","REC-1",List.of());
+        when(authorizer.resolve(99L,List.of("inventory.receipt.confirm"),"inv_inbound",record)).thenReturn(grant);
+        var owner=(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)commandHandler;
+        var definition=Map.of("quality",com.auraboot.framework.plugin.extension.BusinessResultField.rootJsonPath("mapping","dryRun","quality"));
+        when(owner.businessResultProjection()).thenReturn(definition);when(owner.businessResultFields()).thenReturn(java.util.Set.of("quality"));
+        var target=new CommandPipelineContext.BusinessTargetAuthorization(ctx.getCommandCode(),"inv_inbound","REC-1","update",1L,42L,99L);
+        var plan=new com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan(target,grant,definition,
+                Map.of("quality","mapping"),java.util.Set.of("mapping"),List.of(),List.of());
+        var service=org.mockito.Mockito.mock(com.auraboot.framework.meta.service.impl.CommandResultProjectionService.class);
+        when(service.prepare(ctx,owner)).thenReturn(plan);
+        var phase=phase();org.springframework.test.util.ReflectionTestUtils.setField(phase,"businessAuthorization",authorizer);
+        org.springframework.test.util.ReflectionTestUtils.setField(phase,"resultProjection",service);
+        if(malformed) {
+            var pipeline=new CommandPipeline(List.of(phase),List.of(new IdempotencyPhase(idempotencyService)));
+            assertThatThrownBy(() -> {if(pipeline.executePreGuardPhases(ctx)==null)pipeline.executeGuardedPhases(ctx);})
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            verifyNoInteractions(idempotencyService);
+        } else {
+            phase.execute(ctx);
+            assertThat(ctx.getBusinessResultProjection().rootDocuments()).containsExactly(Map.entry("mapping",stored));
+            ctx.getBusinessResultProjection().verifyRootDocuments(Map.of("quality",Map.of("passed",true)));
+            assertThatThrownBy(() -> ctx.getBusinessResultProjection().verifyRootDocuments(Map.of("quality",Map.of("passed",false))))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        }
+    }
+
     private CommandPipelineContext businessTarget() {
         givenMember(); when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
         var ctx = context("inv_inbound", "REC-1");

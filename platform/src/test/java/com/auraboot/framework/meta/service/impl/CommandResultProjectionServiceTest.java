@@ -50,6 +50,113 @@ class CommandResultProjectionServiceTest {
     void prepare(){context.setBusinessResultProjection(service.prepare(context,owner));}
     Map<String,Object> outcome(){return Map.of("success",true,"amount",17,"recordPid","root");}
 
+    @Test void structuredResultWithoutHostRootEvidenceCannotEscapeAsProtocolData() {
+        jsonProjection();
+        assertThatThrownBy(() -> service.project(context,Map.of("quality",Map.of("privateCost",99))))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    private void jsonProjection() {
+        when(owner.businessResultFields()).thenReturn(Set.of("quality"));
+        when(owner.businessResultProjection()).thenReturn(Map.of("quality",BusinessResultField.rootJsonPath("cost","dryRun","quality")));
+        when(metadata.getModelFields("orders")).thenReturn(List.of(FieldDefinition.builder().code("cost").columnName("cost_column").dataType("text").build()));
+        prepare();
+    }
+
+    private void bindDocument(Object document) {
+        context.setBusinessResultProjection(context.getBusinessResultProjection().bindRootDocuments(
+                Map.of("pid","root","tenant_id",7L,"row_version",2L,"cost",document)));
+    }
+
+    @Test void exactRootJsonPathIsImmutableAndDoesNotExposeSiblingData() {
+        jsonProjection();
+        var values=new ArrayList<>(List.of(Map.of("passed",true,"count",3)));
+        var quality=new LinkedHashMap<String,Object>();quality.put("gates",values);quality.put("unknown",null);
+        bindDocument(Map.of("dryRun",Map.of("quality",quality,"privateSibling","PRIVATE")));
+        var result=service.project(context,Map.of("quality",quality));
+        quality.put("privateSibling","late mutation");values.clear();
+        assertThat(result.toString()).doesNotContain("PRIVATE","late mutation").contains("passed=true");
+        assertThatThrownBy(() -> ((Map<String,Object>) result.get("quality")).put("extra",true))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test void addedRemovedOrDifferentNestedDataCannotMasqueradeAsTheRootPath() {
+        jsonProjection();bindDocument("{\"dryRun\":{\"quality\":{\"gates\":[{\"passed\":true,\"count\":3}]}}}");
+        for(Object value:List.of(Map.of("privateCost",99),Map.of(),Map.of("gates",List.of(Map.of("passed",false,"count",3))),
+                Map.of("gates",List.of(Map.of("passed",true,"count",3,"extra",99))))) {
+            assertThatThrownBy(() -> service.project(context,Map.of("quality",value))).isInstanceOf(AccessDeniedException.class);
+        }
+    }
+
+    @Test void currentSourceIsRecheckedForCachedValuesWithoutRoundingLargeIdentities() {
+        jsonProjection();bindDocument("{\"dryRun\":{\"quality\":{\"version\":9007199254740993,\"ratio\":0.10000000000000001}}}");
+        var exact=Map.of("version",9007199254740993L,"ratio",new java.math.BigDecimal("0.10000000000000001"));
+        assertThat(service.project(context,Map.of("quality",exact))).containsEntry("quality",exact);
+        assertThatThrownBy(() -> service.project(context,Map.of("quality",Map.of("version",9007199254740992L,"ratio",0.1d))))
+                .isInstanceOf(AccessDeniedException.class);
+        bindDocument("{\"dryRun\":{\"quality\":{\"version\":9007199254740994,\"ratio\":0.10000000000000001}}}");
+        assertThatThrownBy(() -> service.project(context,Map.of("quality",exact))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void sourceHiddenUnallowedOrMaskedDropsTheEntireStructuredResult() {
+        jsonProjection();grant(Set.of());prepare();
+        assertThat(service.project(context,Map.of("quality",Map.of("privateCost",99)))).isEmpty();
+        grant(Set.of("cost"));when(fields.getFieldPermissions(30L,"orders")).thenReturn(new FieldPermissionSet(Set.of(),Set.of(),Set.of("cost")));
+        prepare();assertThat(service.project(context,Map.of("quality",Map.of("privateCost",99)))).isEmpty();
+        when(fields.getFieldPermissions(30L,"orders")).thenReturn(FieldPermissionSet.allAllowed(Set.of("cost")));
+        when(policies.getFieldMaskRules(7L,"orders",20L)).thenReturn(List.of(FieldMaskRule.builder().fieldCode("cost_column").maskType("partial").build()));
+        prepare();assertThat(service.project(context,Map.of("quality",Map.of("privateCost",99)))).isEmpty();
+        when(policies.getFieldMaskRules(7L,"orders",20L)).thenReturn(List.of());
+        var mask=new com.auraboot.framework.meta.entity.FieldMaskConfig();mask.setFieldCode("cost_column");mask.setMaskType("FULL");
+        when(masks.getEffectiveConfigs("orders",20L,"detail")).thenReturn(List.of(mask));prepare();
+        assertThat(service.project(context,Map.of("quality",Map.of("privateCost",99)))).isEmpty();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"null","[]","{broken}","{} {}","{\"dryRun\":{},\"dryRun\":{}}"})
+    void invalidStoredDocumentsCannotSupplyPublicEvidence(String raw) {
+        jsonProjection();assertThatThrownBy(() -> bindDocument(raw)).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void missingPathWrongRootAndNonDocumentMetadataFailClosed() {
+        jsonProjection();bindDocument("{\"dryRun\":{}}");
+        assertThatThrownBy(() -> service.project(context,Map.of("quality",Map.of()))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> context.getBusinessResultProjection().bindRootDocuments(Map.of("pid","foreign","tenant_id",7L,"row_version",2L,"cost","{}")))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> context.getBusinessResultProjection().bindRootDocuments(Map.of("pid","root","tenant_id",8L,"row_version",2L,"cost","{}")))
+                .isInstanceOf(AccessDeniedException.class);
+        when(metadata.getModelFields("orders")).thenReturn(List.of(FieldDefinition.builder().code("cost").dataType("decimal").build()));
+        assertThatThrownBy(this::prepare).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void structuredEnvelopeCannotCarryUnboundedOrNonJsonValues() {
+        jsonProjection();
+        var values=new ArrayList<Object>();values.add(Double.NaN);values.add(Double.POSITIVE_INFINITY);values.add(new Object());
+        values.add("x".repeat(32_769));values.add(Collections.nCopies(513,1));
+        Object nested=Map.of("n",1);for(int i=0;i<13;i++) nested=Map.of("n",nested);values.add(nested);
+        values.add(Collections.nCopies(512,Collections.nCopies(9,1)));
+        for(Object value:values) assertThatThrownBy(() -> context.getBusinessResultProjection().validateEnvelope(Map.of("quality",value)))
+                .isInstanceOf(AccessDeniedException.class);
+        when(owner.businessResultFields()).thenReturn(Set.of("quality","more"));
+        when(owner.businessResultProjection()).thenReturn(Map.of("quality",BusinessResultField.rootJsonPath("cost","dryRun","quality"),
+                "more",BusinessResultField.rootJsonPath("cost","dryRun","quality")));prepare();
+        var chunk=Collections.nCopies(9,"x".repeat(32_768));
+        assertThat(context.getBusinessResultProjection().validateEnvelope(Map.of("quality",chunk))).containsKey("quality");
+        assertThatThrownBy(() -> context.getBusinessResultProjection().validateEnvelope(Map.of("quality",chunk,"more",chunk)))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void sourcePathsAreFiniteImmutableAndCannotAttachToProtocolConstants() {
+        var path=new ArrayList<>(List.of("dryRun","quality"));
+        var field=new BusinessResultField(BusinessResultField.Kind.ROOT_JSON_PATH,"cost",null,0,path);path.clear();
+        assertThat(field.sourcePath()).containsExactly("dryRun","quality");
+        assertThatThrownBy(() -> BusinessResultField.rootJsonPath("cost")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BusinessResultField.rootJsonPath("cost","dryRun","*")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BusinessResultField.rootJsonPath("cost",Collections.nCopies(9,"n").toArray(String[]::new))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new BusinessResultField(BusinessResultField.Kind.CONSTANT,null,true,0,List.of("n")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void allowedScalarIsCopiedWithoutChangingTheInternalOutcome() {
         prepare();var internal=new LinkedHashMap<>(outcome());var publicResult=service.project(context,internal);
         assertThat(publicResult).containsEntry("amount",17).containsEntry("recordPid","root");

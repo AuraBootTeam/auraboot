@@ -80,6 +80,7 @@ public class BusinessCommandDataAccessorFactory {
         private final CommandPipelineContext.BusinessTargetAuthorization witness;
         private final Object plan, authorization, source;
         private final com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan outputPlan;
+        private final com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan jsonResultPlan;
         private final BusinessResourceAuthorization owner;
         private final ConnectionHolder holder;
         private final Connection connection;
@@ -124,6 +125,8 @@ public class BusinessCommandDataAccessorFactory {
             witness = context.getBusinessTargetAuthorization();
             plan = context.getPermitPlan(); authorization = context.getAuthorizationVerdict();
             outputPlan = context.getPublicOutputProjection();
+            var resultProjection=context.getBusinessResultProjection();
+            jsonResultPlan=resultProjection!=null && resultProjection.requiresRootDocuments() ? resultProjection : null;
             tenant = MetaContext.getCurrentTenantId(); user = MetaContext.getCurrentUserId();
             member = MetaContext.getCurrentMemberId(); actor = MetaContext.getCurrentUserPid();
             command = context.getCommandCode();
@@ -133,6 +136,9 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void verify() {
+            if(jsonResultPlan!=null && (jsonResultPlan.grant()==null || jsonResultPlan.grant()!=context.getBusinessGrantDecision()
+                    || !jsonResultPlan.samePolicy(context.getBusinessResultProjection())
+                    || !jsonResultPlan.fields().equals(owner.businessResultProjection()))) throw denied();
             if (deletableModels != null && !deletableModels.equals(owner.businessDeletableResourceModels())) throw denied();
             if (!Objects.equals(inputContract, owner.businessInputContract())
                     || !Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
@@ -237,8 +243,16 @@ public class BusinessCommandDataAccessorFactory {
             return operation(() -> {
                 if (!(result instanceof Map<?, ?> map) || map.keySet().stream()
                         .anyMatch(key -> !(key instanceof String field) || !resultFields.contains(field))) throw denied();
-                if (context.getBusinessResultProjection() != null)
-                    return context.getBusinessResultProjection().validateEnvelope(map);
+                if (context.getBusinessResultProjection() != null) {
+                    var projection=context.getBusinessResultProjection();
+                    if(projection.requiresRootDocuments()) {
+                        projection=projection.bindRootDocuments(load(rootModel,rootPid));
+                        context.setBusinessResultProjection(projection);
+                    }
+                    var values=projection.validateEnvelope(map);
+                    projection.verifyRootDocuments(values);
+                    return values;
+                }
                 Map<String, Object> copy = new LinkedHashMap<>();
                 map.forEach((key, value) -> copy.put((String) key, value));
                 return BusinessResourceAuthorization.snapshot(copy);
