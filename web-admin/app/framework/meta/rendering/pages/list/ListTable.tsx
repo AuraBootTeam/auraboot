@@ -539,7 +539,13 @@ export const ListTable = React.memo(function ListTable({
     return rowExpansion && id && expandedDetails.has(id) ? (
       <tr data-testid={`expanded-row-${id}`}>
         <td className="p-0" colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}>
-          <RowExpansion config={rowExpansion} record={record} locale={locale} t={t} />
+          <div
+            className="sticky left-0 max-w-full"
+            style={containerWidth > 0 ? { width: containerWidth } : undefined}
+            data-testid="row-expansion-viewport"
+          >
+            <RowExpansion config={rowExpansion} record={record} locale={locale} t={t} />
+          </div>
         </td>
       </tr>
     ) : null;
