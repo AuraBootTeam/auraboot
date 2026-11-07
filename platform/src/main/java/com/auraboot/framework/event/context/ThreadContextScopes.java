@@ -16,6 +16,10 @@ public class ThreadContextScopes {
         return contributors.stream().map(ThreadContextContributor::capture).toList();
     }
 
+    public void requireActor(Long tenantId, Long userId, Long memberId) {
+        contributors.forEach(contributor -> contributor.requireActor(tenantId, userId, memberId));
+    }
+
     public void runCleared(Runnable action) {
         runWith(contributors.stream().map(ThreadContextContributor::empty).toList(), action);
     }

@@ -923,4 +923,28 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
                     testTenant.getId(), testTenantMember.getId(), testRole.getId());
         }
     }
+
+    @Test void aRetainedAgentPrincipalCannotSwitchToAnotherLiveHostIdentity() {
+        var principal = org.mockito.Mockito.mock(com.auraboot.framework.agent.identity.ExecutionPrincipal.class);
+        org.mockito.Mockito.when(principal.tenantId()).thenReturn(testTenant.getId());
+        org.mockito.Mockito.when(principal.actorUserId()).thenReturn(testUser.getId());
+        org.mockito.Mockito.when(principal.actorMemberId()).thenReturn(testTenantMember.getId());
+        com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(principal);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            var row = humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(), testTenantMember.getId(), () -> {
+                assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current()).contains(principal);
+                return data.getById(model, pid);
+            });
+            assertThat(row).containsEntry(label, "before");
+            org.mockito.Mockito.when(principal.actorUserId()).thenReturn(testUser.getId() + 1);
+            assertThatThrownBy(() -> humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(),
+                    testTenantMember.getId(), () -> {
+                        calls.incrementAndGet(); return data.update(model, pid, Map.of(label, "must-not-run"));
+                    })).isInstanceOf(AccessDeniedException.class);
+            assertThat(calls).hasValue(0);
+            assertThat(stored(label, pid)).isEqualTo("before");
+            assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current()).contains(principal);
+        } finally { com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear(); }
+    }
 }

@@ -150,7 +150,7 @@ class AutomationWorkflowRuntimeActorTest {
         var principals = mock(com.auraboot.framework.permission.mapper.HumanActorMapper.class);
         when(principals.findActive(12L, 34L, "actor-pid")).thenReturn(List.of());
         var actors = new com.auraboot.framework.permission.service.HumanActorContext(principals,
-                mock(com.auraboot.framework.rbac.mapper.RoleMapper.class));
+                mock(com.auraboot.framework.rbac.mapper.RoleMapper.class), new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
         assertThatThrownBy(() -> runtimeWith(actors).run(automation(), null, Map.of(), null))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         verifyNoInteractions(registry);
@@ -172,7 +172,7 @@ class AutomationWorkflowRuntimeActorTest {
             assertThat((Map<String,Object>)request.payload().get("automationActor")).containsValue("current operator");
             return WorkflowCapability.WorkflowResult.empty();
         });
-        runtimeWith(new com.auraboot.framework.permission.service.HumanActorContext(principals, roles))
+        runtimeWith(new com.auraboot.framework.permission.service.HumanActorContext(principals, roles, new com.auraboot.framework.event.context.ThreadContextScopes(List.of())))
                 .run(automation(), null, Map.of(), null);
         assertThat(MetaContext.snapshot()).isEqualTo(before);
     }

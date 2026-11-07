@@ -13,19 +13,19 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
-/** Rehydrate a human captured by a trusted host adapter; this is not permission to impersonate a payload user. */
+/** Rehydrate membership at a trusted host seam; this is not permission to impersonate a payload user. */
 @Service
 @RequiredArgsConstructor
 public class HumanActorContext {
     private final HumanActorMapper actors;
     private final RoleMapper roles;
+    private final com.auraboot.framework.event.context.ThreadContextScopes contexts;
 
     public <T> T call(Long tenant, Long user, String expectedUserPid, Long expectedMember, Supplier<T> action) {
         if (tenant == null || tenant <= 0 || user == null && !StringUtils.hasText(expectedUserPid)
                 || user != null && user <= 0 || expectedUserPid != null && !StringUtils.hasText(expectedUserPid)
-                || expectedMember != null && expectedMember <= 0
-                || MachineDataAccessContext.isActive() || InstalledIntegrationExecution.active()
-                || MetaContext.isImpersonating()) throw denied();
+                || expectedMember != null && expectedMember <= 0) throw denied();
+        requireSupportedSource();
         var identities = actors.findActive(tenant, user, expectedUserPid);
         if (identities == null || identities.size() != 1) throw denied();
         var identity = identities.getFirst();
@@ -36,6 +36,8 @@ public class HumanActorContext {
                 || user != null && !user.equals(actualUser.longValue())
                 || expectedUserPid != null && !expectedUserPid.equals(pid)
                 || expectedMember != null && !expectedMember.equals(member.longValue())) throw denied();
+        // A handoff retains domain constraints only for this exact actor; a new human root uses run().
+        contexts.requireActor(tenant, actualUser.longValue(), member.longValue());
         // The actor query flushes the mapper session cache, so a prior role projection is not reused.
         var currentRoles = MetaContext.runWithoutTenantFilter(() -> roles.findByMemberIdAndTenantId(member.longValue(), tenant));
         if (currentRoles == null || currentRoles.stream().anyMatch(role -> role.getId() == null)) throw denied();
@@ -52,8 +54,16 @@ public class HumanActorContext {
         return result.get();
     }
 
+    /** New trusted human work must not inherit the previous agent turn's principal or envelope. */
     public void run(Long tenant, Long user, String expectedUserPid, Long expectedMember, Runnable action) {
-        call(tenant, user, expectedUserPid, expectedMember, () -> { action.run(); return null; });
+        requireSupportedSource();
+        contexts.runCleared(() -> call(tenant, user, expectedUserPid, expectedMember,
+                () -> { action.run(); return null; }));
+    }
+
+    private static void requireSupportedSource() {
+        if (MachineDataAccessContext.isActive() || InstalledIntegrationExecution.active()
+                || MetaContext.isImpersonating()) throw denied();
     }
 
     private static AccessDeniedException denied() {

@@ -318,7 +318,7 @@ class ImAiServiceTest {
         when(roles.findByMemberIdAndTenantId(9000L, TENANT_ID)).thenReturn(List.of(role));
         var responder = new com.auraboot.framework.agent.integration.im.AgentImAiResponder(messageService,
                 broadcaster, memberMapper, turnService, turnRegistry, agentResolver,
-                new com.auraboot.framework.permission.service.HumanActorContext(principals, roles));
+                new com.auraboot.framework.permission.service.HumanActorContext(principals, roles, new com.auraboot.framework.event.context.ThreadContextScopes(List.of(new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor()))));
         when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID)).thenReturn(MEMBERS);
         when(turnService.runTurn(any(), any(ResponseSink.class))).thenAnswer(invocation -> {
             var request = invocation.getArgument(0, TurnRequest.class);
@@ -344,7 +344,7 @@ class ImAiServiceTest {
         var responder = new com.auraboot.framework.agent.integration.im.AgentImAiResponder(messageService,
                 broadcaster, memberMapper, turnService, turnRegistry, agentResolver,
                 new com.auraboot.framework.permission.service.HumanActorContext(principals,
-                        org.mockito.Mockito.mock(com.auraboot.framework.rbac.mapper.RoleMapper.class)));
+                        org.mockito.Mockito.mock(com.auraboot.framework.rbac.mapper.RoleMapper.class), new com.auraboot.framework.event.context.ThreadContextScopes(List.of(new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor()))));
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> responder.generateResponse(triggeringMessage(), TENANT_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         verify(turnService, never()).runTurn(any(), any(ResponseSink.class));
@@ -364,5 +364,31 @@ class ImAiServiceTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.generateResponse(message, TENANT_ID))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         org.mockito.Mockito.verifyNoInteractions(actors, turnService);
+    }
+
+    @Test void humanImEntryClearsAndRestoresThePreviousAgentExecutionPrincipal() {
+        var principals = org.mockito.Mockito.mock(com.auraboot.framework.permission.mapper.HumanActorMapper.class);
+        var roles = org.mockito.Mockito.mock(com.auraboot.framework.rbac.mapper.RoleMapper.class);
+        when(principals.findActive(TENANT_ID, USER_ID, null)).thenReturn(List.of(Map.of(
+                "user_id", USER_ID, "user_pid", "live-user-pid", "member_id", 9000L, "username", "sender")));
+        when(roles.findByMemberIdAndTenantId(9000L, TENANT_ID)).thenReturn(List.of());
+        var responder = new com.auraboot.framework.agent.integration.im.AgentImAiResponder(messageService,
+                broadcaster, memberMapper, turnService, turnRegistry, agentResolver,
+                new com.auraboot.framework.permission.service.HumanActorContext(principals, roles, new com.auraboot.framework.event.context.ThreadContextScopes(List.of(new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor()))));
+        when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID)).thenReturn(MEMBERS);
+        var old = org.mockito.Mockito.mock(com.auraboot.framework.agent.identity.ExecutionPrincipal.class);
+        com.auraboot.framework.agent.identity.ExecutionPrincipalContext.restore(old);
+        when(turnService.runTurn(any(), any(ResponseSink.class))).thenAnswer(invocation -> {
+            assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current()).isEmpty();
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId()).isEqualTo(9000L);
+            throw new IllegalStateException("synthetic turn failure");
+        });
+        try {
+            responder.generateResponse(triggeringMessage(), TENANT_ID);
+            assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current()).contains(old);
+        } finally {
+            com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear();
+            com.auraboot.framework.application.tenant.MetaContext.clear();
+        }
     }
 }
