@@ -19,10 +19,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BACKEND_URL } from '../../helpers/environments';
-
-const ADMIN = DEFAULT_TEST_ACCOUNT;
 
 async function initializedSessionToken(page: Page): Promise<string> {
   // Space selection tests reuse the real login established by global setup.
