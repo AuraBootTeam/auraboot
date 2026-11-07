@@ -14,10 +14,10 @@ public final class RoleGrantFields {
             @NotNull @Size(max=1000) List<String> readFields,
             @NotNull @Size(max=1000) List<String> writeFields) {}
     @Schema(name="RoleGrantFieldsField")
-    public record Field(String code, String label) {}
+    public record Field(String code, @Schema(nullable=true) String label) {}
     @Schema(name="RoleGrantFieldsBinding")
     public record Binding(String bindingPid, String permissionCode, String modelCode,
-            String modelLabel, boolean editable, boolean legacy,
+            @Schema(nullable=true) String modelLabel, boolean editable, boolean legacy,
             List<String> readFields, List<String> writeFields, List<Field> fields) {}
     @Schema(name="RoleGrantFieldsReviewed")
     public record Reviewed(Binding before, List<String> readFields, List<String> writeFields) {}
