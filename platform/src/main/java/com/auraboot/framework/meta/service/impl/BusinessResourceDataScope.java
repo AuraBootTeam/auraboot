@@ -35,12 +35,13 @@ public final class BusinessResourceDataScope {
         if(!Objects.equals(model,lease.model))lease.deny();
         if(lease.action==Action.READ && !lease.consumed && Objects.equals(pid,lease.pid)) {lease.consumed=true;return;}
         // Native update needs its own before/after row; create needs only its generated result row.
-        if(lease.consumed && (lease.action==Action.UPDATE && Objects.equals(pid,lease.pid)
+        if(lease.consumed && ((lease.action==Action.UPDATE || lease.action==Action.DELETE) && Objects.equals(pid,lease.pid)
                 || lease.action==Action.CREATE && Objects.equals(pid,lease.createdPid)))return;
         lease.deny();
     }
     static void query(String model,Object request) { consume(Action.QUERY,model,null,request); }
     static void create(String model,Map<String,Object> input) { consume(Action.CREATE,model,null,input); }
+    static void delete(String model,String pid) { consume(Action.DELETE,model,pid,null); }
     static void update(String model,String pid,Map<String,Object> input) { consume(Action.UPDATE,model,pid,input); }
     private static void consume(Action action,String model,String pid,Object input) {
         var lease=CURRENT.get();if(lease==null)return;lease.verify.run();

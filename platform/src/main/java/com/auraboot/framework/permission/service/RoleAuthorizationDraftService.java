@@ -339,12 +339,12 @@ public class RoleAuthorizationDraftService {
                         || !code.equals(code.strip()) || code.length() > 255 || "*".equals(code)
                         || "meta.command.execute".equals(code))) throw invalid();
             roots.add(new BusinessFieldRoot(boundary.commandCode(), boundary.rootModel(), boundary.targetAction(),
-                    boundary.permissions().stream().sorted().toList(), null, publicFieldSources(owner), owner.businessInputContract()));
+                    boundary.permissions().stream().sorted().toList(), null, publicFieldSources(owner), owner.businessInputContract(), owner.businessDeletableResourceModels().stream().sorted().toList()));
         }
         if (nativeBoundaries != null) nativeBoundaries.snapshot().forEach(definition -> {
             var contract = definition.contract();
             roots.add(new BusinessFieldRoot(definition.commandCode(), contract.model(), contract.action(),
-                    contract.permissions().stream().sorted().toList(), definition.source(), Map.of(), null));
+                    contract.permissions().stream().sorted().toList(), definition.source(), Map.of(), null, List.of()));
         });
         return roots.stream().distinct().sorted(Comparator.comparing(BusinessFieldRoot::command)).toList();
     }
@@ -410,7 +410,7 @@ public class RoleAuthorizationDraftService {
 
     private record BusinessFieldRoot(String command, String model, String action, List<String> permissions,
                                      String definitionSource, Map<String, List<String>> publicFields,
-                                     com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.InputContract inputContract) {}
+                                     com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.InputContract inputContract, List<String> deletableModels) {}
 
     private String digest(Map<String, Object> state) {
         try {

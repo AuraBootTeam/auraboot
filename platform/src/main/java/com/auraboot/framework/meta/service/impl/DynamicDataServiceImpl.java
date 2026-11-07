@@ -1431,7 +1431,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void delete(String modelCode, String recordId) {
-        BusinessResourceDataScope.unsupported();
+        BusinessResourceDataScope.delete(modelCode, recordId);
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {

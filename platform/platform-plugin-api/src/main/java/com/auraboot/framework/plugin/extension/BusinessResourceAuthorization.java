@@ -94,6 +94,9 @@ public interface BusinessResourceAuthorization {
 
     Grant authorizeResource(CommandHandlerExtension.TargetAuthorizationContext root, Request request);
 
+    /** Explicit child deletion opt-in; existing owners remain closed even if a callback is too broad. */
+    default Set<String> businessDeletableResourceModels() { return Set.of(); }
+
     /** Finite dependency inventory; undeclared models are rejected before any lookup. */
     Set<String> businessResourceModels();
 

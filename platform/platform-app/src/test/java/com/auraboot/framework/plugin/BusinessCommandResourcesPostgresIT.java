@@ -62,7 +62,10 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     }
 
     @BeforeEach void fixtures() {
-        assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo("auraboot_168");
+        String configured=System.getenv("TEST_DATABASE_URL");
+        assertThat(configured).as("Explicit isolated PostgreSQL test target").startsWith("jdbc:postgresql://");
+        String configuredDatabase=java.net.URI.create(configured.substring(5)).getPath().substring(1);
+        assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(configuredDatabase);
         String suffix=Long.toUnsignedString(System.nanoTime());
         rootModel="br_root_"+suffix;lineModel="br_line_"+suffix;ledgerModel="br_ledger_"+suffix;
         rootLabel="br_label_"+suffix;parent="br_parent_"+suffix;qty="br_qty_"+suffix;
@@ -324,10 +327,40 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         assertThat(storedQty()).isEqualTo("2");
     }
 
+    boolean deleted(String model,String pid) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT deleted_flag FROM "+physicalTables.get(model)
+                +" WHERE tenant_id=? AND pid=?",Boolean.class,getTestTenant().getId(),pid));
+    }
+    @Test void approvedChildDeleteUsesRealNativePersistenceWithoutModelDeleteGrant() {
+        owner.allowDelete=true; owner.paged=true;
+        assertThat(permissions.canAction(getTestTenantMember().getId(),lineModel,"delete")).isFalse();
+        command(scope->{scope.accessor().delete(lineModel,linePid);return null;});
+        assertThat(deleted(lineModel,linePid)).isTrue(); assertThat(deleted(rootModel,rootPid)).isFalse();
+        assertThat(deleted(lineModel,foreignLinePid)).isFalse();
+    }
+    @Test void childDeleteThenCaughtForeignDeletePoisonsAndRollsBackOriginalTransaction() {
+        owner.allowDelete=true; owner.paged=true;
+        assertThatThrownBy(()->command(scope->{
+            scope.accessor().delete(lineModel,linePid);
+            assertThatThrownBy(()->scope.accessor().delete(lineModel,foreignLinePid)).isInstanceOf(DataAccessorException.class);
+            return null;
+        })).isInstanceOf(UnexpectedRollbackException.class);
+        assertThat(deleted(lineModel,linePid)).isFalse(); assertThat(deleted(lineModel,foreignLinePid)).isFalse();
+    }
+    @Test void nestedDeleteFromMutationObserverCannotReuseTheExactChildLoan() {
+        owner.allowDelete=true; owner.paged=true;
+        nestedEffect.set(()->data.delete(lineModel,foreignLinePid));
+        assertThatThrownBy(()->command(scope->{scope.accessor().delete(lineModel,linePid);return null;}))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(nestedEffect.get()).isNull();
+        assertThat(deleted(lineModel,linePid)).isFalse(); assertThat(deleted(lineModel,foreignLinePid)).isFalse();
+    }
+
     class Owner implements CommandHandlerExtension,BusinessResourceAuthorization {
         Runnable onUpdate;
         boolean paged;
         boolean publicOutput;
+        boolean allowDelete;
         int pagedLimit = 2000;
         String deniedLine;
         public ReadIsolation resourceReadIsolation(){return paged || publicOutput ? ReadIsolation.REPEATABLE_READ : null;}
@@ -338,6 +371,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         public Boundary businessBoundary(){return new Boundary("fixture:receipt_confirm",rootModel,"update",Set.of("fixture.receipt.confirm"));}
         public Set<String> businessResourceModels(){return Set.of(rootModel,lineModel,ledgerModel);}
         public Set<String> businessResultFields(){return Set.of("success");}
+        public Set<String> businessDeletableResourceModels(){return allowDelete ? Set.of(lineModel) : Set.of();}
         Set<String> read(String... fields){var set=new HashSet<>(Set.of("pid","tenant_id","row_version"));set.addAll(List.of(fields));return set;}
         public Grant authorizeResource(TargetAuthorizationContext root,Request request){
             if(request.action()==Action.READ && rootModel.equals(request.modelCode()) && rootPid.equals(request.recordId()))return new Grant(read(rootLabel),Set.of(),1);
@@ -345,6 +379,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
             if(request.action()==Action.READ && request.recordId()!=null && request.recordId().equals(deniedLine)) return null;
             if(lineModel.equals(request.modelCode()) && rootPid.equals(request.record().get(parent))){
                 if(request.action()==Action.READ)return new Grant(read(parent,qty),Set.of(),1);
+                if(request.action()==Action.DELETE && allowDelete)return new Grant(read(parent,qty),Set.of(),1);
                 if(request.action()==Action.UPDATE){if(onUpdate!=null){var task=onUpdate;onUpdate=null;task.run();}return new Grant(read(parent,qty),Set.of(qty),1);}
             }
             if(request.action()==Action.CREATE && ledgerModel.equals(request.modelCode()) && rootPid.equals(request.changes().get(ledgerParent)))

@@ -52,7 +52,8 @@ public class BusinessCommandDataAccessorFactory {
             throw new IllegalStateException("Cannot validate business resource transaction", failure);
         }
         var invocationOwner = Objects.requireNonNull(owner.newInvocationAuthorization());
-        if (!Objects.equals(owner.businessInputContract(), invocationOwner.businessInputContract())
+        if (!Objects.equals(owner.businessDeletableResourceModels(), invocationOwner.businessDeletableResourceModels())
+                || !Objects.equals(owner.businessInputContract(), invocationOwner.businessInputContract())
                 || !Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
                 || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
@@ -90,7 +91,7 @@ public class BusinessCommandDataAccessorFactory {
         private final Long rootVersion;
         private final TransactionSynchronization lifetime = new TransactionSynchronization() {};
         private final Accessor accessor = new Accessor();
-        private Set<String> dependencies, optionalModels, resultFields;
+        private Set<String> dependencies, optionalModels, resultFields, deletableModels;
         private Map<String,Integer> pagedLimits;
         private final Map<List<Object>,List<Map<String,Object>>> pagedSnapshots = new HashMap<>();
         private boolean pagedReadsDirty;
@@ -132,6 +133,7 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void verify() {
+            if (deletableModels != null && !deletableModels.equals(owner.businessDeletableResourceModels())) throw denied();
             if (!Objects.equals(inputContract, owner.businessInputContract())
                     || !Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
             if (context.getPublicOutputProjection() != outputPlan
@@ -187,6 +189,8 @@ public class BusinessCommandDataAccessorFactory {
         private void initialize() {
             BusinessResourcePermissionContract.require(context,owner);
             dependencies = Set.copyOf(owner.businessResourceModels());
+            deletableModels = Set.copyOf(owner.businessDeletableResourceModels());
+            if (!dependencies.containsAll(deletableModels) || deletableModels.contains(rootModel)) throw denied();
             resultFields = Set.copyOf(owner.businessResultFields());
             optionalModels = Set.copyOf(owner.optionalBusinessResourceModels());
             pagedLimits = Map.copyOf(owner.pagedBusinessResourceRowLimits());
@@ -618,7 +622,24 @@ public class BusinessCommandDataAccessorFactory {
                     return project(result, grant);
                 });
             }
-            @Override public void delete(String model, String pid) { operation(() -> { throw denied(); }); }
+            @Override public void delete(String model, String pid) {
+                operation(() -> {
+                    // Root deletion is its own business use case, never an inherited child operation.
+                    if (!"update".equals(witness.action()) || rootModel.equals(model) || !deletableModels.contains(model)) throw denied();
+                    var row = load(model, pid);
+                    authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.READ,
+                            model, pid, row, null, null));
+                    long expected = version(row);
+                    lockVersion(model, pid, expected);
+                    authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.DELETE,
+                            model, pid, row, null, null));
+                    nativeCall(BusinessResourceAuthorization.Action.DELETE, model, pid, expected, null, () -> {
+                        data.delete(model, pid); return null;
+                    });
+                    lockedSources.remove(new SourceKey(model, pid));
+                    return null;
+                });
+            }
             @Override public List<Map<String, Object>> batchCreate(String model, List<Map<String, Object>> rows) {
                 return operation(() -> {
                     if (rows == null || rows.size() > 1_000) throw denied();

@@ -79,4 +79,21 @@ class BusinessResourceDataScopeTest {
                 .isInstanceOf(AccessDeniedException.class);
         BusinessResourceDataScope.read("ordinary","later");BusinessResourceDataScope.unsupported();
     }
+    @Test void nativeDeleteMayReadOnlyItsOwnSnapshotAndCannotRepeatDelete() {
+        assertThatThrownBy(()->loan(Action.DELETE,"line","a",null,()->{
+            BusinessResourceDataScope.delete("line","a"); BusinessResourceDataScope.read("line","a");
+            BusinessResourceDataScope.delete("line","a"); return null;
+        })).isInstanceOf(AccessDeniedException.class); assertThat(rejected).isTrue();
+    }
+    @Test void nativeDeleteCannotReadOrDeleteAnotherRow() {
+        assertThatThrownBy(()->loan(Action.DELETE,"line","a",null,()->{
+            BusinessResourceDataScope.delete("line","a"); BusinessResourceDataScope.read("line","b"); return null;
+        })).isInstanceOf(AccessDeniedException.class); assertThat(rejected).isTrue();
+    }
+    @Test void nativeDeleteCannotBorrowAnUpdateLoan() {
+        assertThatThrownBy(()->loan(Action.UPDATE,"line","a",Map.of("qty",3),()->{
+            BusinessResourceDataScope.delete("line","a"); return null;
+        })).isInstanceOf(AccessDeniedException.class);
+    }
+
 }
