@@ -27,6 +27,14 @@ function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
     cpSync(rootfs, contextRootfs, { recursive: true });
     writeFileSync(resolve(context, 'Dockerfile'), [
       `FROM ${LINUX_JRE_BASE}`,
+      // CVE-2026-109518 is still present in the pinned upstream JRE image.
+      // HTTPS plus zero retries protects the old APT during its own signed update.
+      "RUN sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources " +
+        "&& apt-get -o Acquire::Retries=0 update " +
+        "&& apt-get -o Acquire::Retries=0 install --no-install-recommends -y " +
+        "apt=2.8.4ubuntu0.1 libapt-pkg6.0t64=2.8.4ubuntu0.1 " +
+        "&& dpkg-query -W apt libapt-pkg6.0t64 " +
+        "&& rm -rf /var/lib/apt/lists/*",
       'COPY rootfs/ /',
       `ENTRYPOINT ${JSON.stringify(entrypoint)}`,
       '',
