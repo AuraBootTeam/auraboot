@@ -816,6 +816,15 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                 """, UniqueIdGenerator.generate(), getTestTenant().getId(), code, "Manage business project", resource);
         catalog.saveDefinition(CapabilityDefinitionDTO.builder().code(duty).group("Business fields")
                 .includes(List.of(code)).build());
+        nativeCommandPid = UniqueIdGenerator.generate(); nativeCommandCode = "business_fields:" + resource;
+        String config = json.writeValueAsString(Map.of("type", "update", "inputFields", List.of(resource+"_secret"),
+                "permissions", List.of(code), "handlerParams",
+                Map.of("targetRecordAuthorization", "business", "targetRecordAction", "update")));
+        jdbc.update("""
+                INSERT INTO ab_command_definition (id,pid,tenant_id,code,model_code,execution_config,
+                    version,is_current,row_version,status,deleted_flag,created_at,updated_at)
+                VALUES (?,?,?,?,?,?::jsonb,1,true,0,'published',false,now(),now())
+                """, IdWorker.getId(), nativeCommandPid, getTestTenant().getId(), nativeCommandCode, resource, config);
         var initial = drafts.snapshot(rolePid);
         if (existing) {
             drafts.apply(rolePid, new RoleAuthorizationDraftRequest(initial.revision(), Set.of(duty), Set.of(),

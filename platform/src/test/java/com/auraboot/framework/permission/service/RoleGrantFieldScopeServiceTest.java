@@ -50,10 +50,22 @@ class RoleGrantFieldScopeServiceTest {
     }
     @AfterEach void clear() { MetaContext.clear(); }
 
+    private List<RoleGrantFieldScopeService.BusinessBoundary> boundaries() {
+        return List.of(new RoleGrantFieldScopeService.BusinessBoundary("bom.project.manage", "bom_project", "update"));
+    }
+
+    @Test void legacyOrMismatchedBusinessBoundaryCannotAdvertiseEditableFieldProtection() {
+        assertThat(service.catalog(role, List.of())).isEmpty();
+        assertThat(service.catalog(role, List.of(new RoleGrantFieldScopeService.BusinessBoundary("bom.project.manage", "other_model", "update")))).isEmpty();
+        permission.setAction("approve");
+        assertThat(service.catalog(role, boundaries())).isEmpty();
+        verifyNoInteractions(models);
+    }
+
     @ParameterizedTest @ValueSource(strings = {"operation", "data"})
     void businessBindingsExposeOnlyRealModelFieldsWithoutWriting(String resourceType) {
         permission.setResourceType(resourceType);
-        var result = service.catalog(role);
+        var result = service.catalog(role, boundaries());
         assertThat(result).singleElement().satisfies(binding -> {
             assertThat(binding.permissionCode()).isEqualTo("bom.project.manage");
             assertThat(binding.fields()).extracting(field -> field.code()).containsExactly("remark");
@@ -65,13 +77,13 @@ class RoleGrantFieldScopeServiceTest {
     @ParameterizedTest @ValueSource(strings = {"MENU", "API", "model"})
     void unrelatedPermissionTypesDoNotBecomeBusinessFieldAuthoring(String resourceType) {
         permission.setResourceType(resourceType);
-        assertThat(service.catalog(role)).isEmpty();
+        assertThat(service.catalog(role, boundaries())).isEmpty();
         verifyNoInteractions(models);
     }
 
     @Test void missingModelNeverInventsFieldCandidates() {
         when(models.getModelDefinition("bom_project")).thenReturn(Optional.empty());
-        assertThat(service.catalog(role)).isEmpty();
+        assertThat(service.catalog(role, boundaries())).isEmpty();
     }
 
     @ParameterizedTest @ValueSource(strings = {"snapshot", "external", "deny"})
@@ -79,8 +91,8 @@ class RoleGrantFieldScopeServiceTest {
         if (source.equals("snapshot")) grant.setSnapshotId(991L);
         if (source.equals("external")) grant.setSourceRef("package:owner");
         if (source.equals("deny")) grant.setGrantType("DENY");
-        assertThat(service.catalog(role)).singleElement().satisfies(binding -> assertThat(binding.editable()).isFalse());
-        assertThatThrownBy(() -> service.preview(role, List.of(new Change("binding", List.of("remark"), List.of())), Set.of(permission.getCode())))
+        assertThat(service.catalog(role, boundaries())).singleElement().satisfies(binding -> assertThat(binding.editable()).isFalse());
+        assertThatThrownBy(() -> service.preview(role, List.of(new Change("binding", List.of("remark"), List.of())), Set.of(permission.getCode()), Set.of(), boundaries()))
                 .isInstanceOf(AccessDeniedException.class);
         verify(grants, never()).updateDirectFieldScope(any(), any(), any(), any(), any(), any());
     }
@@ -88,14 +100,14 @@ class RoleGrantFieldScopeServiceTest {
     @Test void newlySelectedBusinessGrantNeedsMetadataAndCannotEditAnUnselectedPermission() {
         when(grants.findByRole(5L)).thenReturn(List.of());
         String code = permission.getCode();
-        var candidate = service.candidates(role, Set.of(code), Set.of(code)).getFirst();
+        var candidate = service.candidates(role, Set.of(code), Set.of(code), boundaries()).getFirst();
         assertThat(candidate.bindingPid()).isNull();
         var missingRevision = new Change(null, code, null, List.of("remark"), List.of());
-        assertThatThrownBy(() -> service.preview(role, List.of(missingRevision), Set.of(code), Set.of(code)))
+        assertThatThrownBy(() -> service.preview(role, List.of(missingRevision), Set.of(code), Set.of(code), boundaries()))
                 .isInstanceOf(AccessDeniedException.class);
         var reviewed = new Change(null, code, candidate.metadataRevision(), List.of("remark"), List.of());
-        assertThat(service.preview(role, List.of(reviewed), Set.of(code), Set.of(code))).hasSize(1);
-        assertThatThrownBy(() -> service.preview(role, List.of(reviewed), Set.of(), Set.of()))
+        assertThat(service.preview(role, List.of(reviewed), Set.of(code), Set.of(code), boundaries())).hasSize(1);
+        assertThatThrownBy(() -> service.preview(role, List.of(reviewed), Set.of(), Set.of(), boundaries()))
                 .isInstanceOf(AccessDeniedException.class);
         verify(grants, never()).updateDirectFieldScope(any(), any(), any(), any(), any(), any());
     }

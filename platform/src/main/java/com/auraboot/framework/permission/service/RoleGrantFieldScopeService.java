@@ -25,7 +25,9 @@ public class RoleGrantFieldScopeService {
     private final RoleAuthorizationAuthoringAccess authoring;
     private final ObjectMapper json;
 
-    List<Binding> catalog(Role role) {
+    record BusinessBoundary(String permissionCode, String model, String action) {}
+
+    List<Binding> catalog(Role role, List<BusinessBoundary> boundaries) {
         owned(role);
         var definitions = definitions(role);
         List<Binding> result = new ArrayList<>();
@@ -33,7 +35,7 @@ public class RoleGrantFieldScopeService {
         for (var grant : grants.findByRole(role.getId())) {
             if (!Objects.equals(grant.getTenantId(), role.getTenantId()) || !Objects.equals(grant.getRoleId(), role.getId())) throw denied();
             var permission = definitions.get(grant.getPermissionId());
-            if (!modelBoundPermission(permission)) continue;
+            if (!modelBoundPermission(permission, boundaries)) continue;
             if (grant.getPid() == null || grant.getPid().isBlank() || !seen.add(grant.getPid())) throw denied();
             var binding = describe(permission, grant);
             if (binding != null) result.add(binding);
@@ -42,15 +44,15 @@ public class RoleGrantFieldScopeService {
     }
 
     /** Project selected permissions without creating placeholder grants or changing live authority. */
-    List<Binding> candidates(Role role, Set<String> resultingCodes, Set<String> newlyGranted) {
-        var result = new ArrayList<>(catalog(role).stream().filter(b -> resultingCodes.contains(b.permissionCode())).toList());
+    List<Binding> candidates(Role role, Set<String> resultingCodes, Set<String> newlyGranted, List<BusinessBoundary> boundaries) {
+        var result = new ArrayList<>(catalog(role, boundaries).stream().filter(b -> resultingCodes.contains(b.permissionCode())).toList());
         var definitions = definitions(role);
         var bound = grants.findByRole(role.getId()).stream().map(row -> definitions.get(row.getPermissionId()))
                 .filter(Objects::nonNull).map(p -> p.getCode()).collect(java.util.stream.Collectors.toSet());
-        var pending = definitions.values().stream().filter(RoleGrantFieldScopeService::modelBoundPermission)
+        var pending = definitions.values().stream().filter(p -> modelBoundPermission(p, boundaries))
                 .map(p -> p.getCode()).filter(code -> resultingCodes.contains(code) && newlyGranted.contains(code) && !bound.contains(code)).distinct().sorted().toList();
         for (String code : pending) {
-            var permission = definition(role, code, definitions);
+            var permission = definition(role, code, definitions, boundaries);
             var binding = describe(permission, null);
             if (binding != null) result.add(binding);
         }
@@ -58,14 +60,14 @@ public class RoleGrantFieldScopeService {
     }
 
     List<Reviewed> preview(Role role, List<Change> changes, Set<String> resultingCodes) {
-        return preview(role, changes, resultingCodes, Set.of());
+        return preview(role, changes, resultingCodes, Set.of(), List.of());
     }
 
-    List<Reviewed> preview(Role role, List<Change> changes, Set<String> resultingCodes, Set<String> newlyGranted) {
+    List<Reviewed> preview(Role role, List<Change> changes, Set<String> resultingCodes, Set<String> newlyGranted, List<BusinessBoundary> boundaries) {
         if (changes == null || changes.isEmpty()) return List.of();
         owned(role); authoring.requireWrite(); authoring.requireTarget(role.getId()); policies.requireWrite();
         if (changes.size() > 1000) throw denied();
-        var catalog = candidates(role, resultingCodes, newlyGranted); var seen = new HashSet<String>(); List<Reviewed> result = new ArrayList<>();
+        var catalog = candidates(role, resultingCodes, newlyGranted, boundaries); var seen = new HashSet<String>(); List<Reviewed> result = new ArrayList<>();
         for (var change : changes) {
             if (change == null || (change.bindingPid() == null) == (change.permissionCode() == null)) throw denied();
             boolean pending = change.bindingPid() == null;
@@ -84,7 +86,7 @@ public class RoleGrantFieldScopeService {
         return List.copyOf(result);
     }
 
-    void apply(Role role, List<Reviewed> changes) {
+    void apply(Role role, List<Reviewed> changes, List<BusinessBoundary> boundaries) {
         if (changes.isEmpty()) return;
         owned(role); authoring.requireWrite(); authoring.requireTarget(role.getId()); policies.requireWrite();
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw denied();
@@ -99,7 +101,7 @@ public class RoleGrantFieldScopeService {
             var binding = matches.getFirst();
             if (!Objects.equals(binding.getTenantId(), role.getTenantId()) || !directlyEditable(binding)) throw denied();
             var permission = definitions.get(binding.getPermissionId());
-            if (!modelBoundPermission(permission) || !change.before().modelCode().equals(permission.getResourceCode())) throw denied();
+            if (!modelBoundPermission(permission, boundaries) || !change.before().modelCode().equals(permission.getResourceCode())) throw denied();
             var current = describe(permission, binding);
             if (current == null || !Objects.equals(change.before().metadataRevision(), current.metadataRevision())) throw conflict();
             var scope = Map.of("modelCode", change.before().modelCode(), "readFields", change.readFields(), "writeFields", change.writeFields());
@@ -113,10 +115,10 @@ public class RoleGrantFieldScopeService {
     }
 
     private com.auraboot.framework.permission.dto.PermissionDTO definition(Role role, String code,
-            Map<Long,com.auraboot.framework.permission.dto.PermissionDTO> definitions) {
+            Map<Long,com.auraboot.framework.permission.dto.PermissionDTO> definitions, List<BusinessBoundary> boundaries) {
         var local = definitions.values().stream().filter(p -> code.equals(p.getCode()) && Objects.equals(p.getTenantId(), role.getTenantId())).toList();
         var eligible = local.isEmpty() ? definitions.values().stream().filter(p -> code.equals(p.getCode()) && p.getTenantId() == null).toList() : local;
-        if (eligible.size() != 1 || !modelBoundPermission(eligible.getFirst())) throw denied();
+        if (eligible.size() != 1 || !modelBoundPermission(eligible.getFirst(), boundaries)) throw denied();
         return eligible.getFirst();
     }
 
@@ -144,7 +146,7 @@ public class RoleGrantFieldScopeService {
                 parsed.readable().stream().sorted().toList(), parsed.writable().stream().sorted().toList(), fields, revision);
     }
 
-    private static boolean modelBoundPermission(com.auraboot.framework.permission.dto.PermissionDTO permission) {
+    private static boolean modelBoundPermission(com.auraboot.framework.permission.dto.PermissionDTO permission, List<BusinessBoundary> boundaries) {
         if (permission == null || permission.getCode() == null || permission.getCode().isBlank()
                 || "*".equals(permission.getCode()) || "meta.command.execute".equals(permission.getCode())
                 || permission.getResourceCode() == null
@@ -154,8 +156,11 @@ public class RoleGrantFieldScopeService {
             return Set.of("read", "create", "update").contains(permission.getAction());
         // Business grants already carry this exact model's fields at runtime. Authoring the
         // same binding does not confer native CRUD, change its scope or replace its source.
-        return "operation".equalsIgnoreCase(permission.getResourceType())
-                || "data".equalsIgnoreCase(permission.getResourceType());
+        return ("operation".equalsIgnoreCase(permission.getResourceType())
+                || "data".equalsIgnoreCase(permission.getResourceType()))
+                && boundaries.stream().anyMatch(boundary -> permission.getCode().equals(boundary.permissionCode())
+                    && permission.getResourceCode().equals(boundary.model())
+                    && (permission.getAction().equals(boundary.action()) || "manage".equals(permission.getAction())));
     }
 
     private static com.auraboot.framework.exception.BusinessException conflict() {

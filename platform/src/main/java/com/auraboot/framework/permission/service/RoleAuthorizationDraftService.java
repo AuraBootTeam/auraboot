@@ -199,7 +199,7 @@ public class RoleAuthorizationDraftService {
         }
         fieldPolicies.apply(role, reviewed.fieldPolicies());
         fieldAccess.apply(role,reviewed.fieldAccessChanges());
-        grantFields.apply(role,reviewed.grantFieldChanges());
+        grantFields.apply(role,reviewed.grantFieldChanges(),grantFieldBoundaries(roots));
         if(request.menuPids()!=null)roleNavigation.apply(role,request.menuPids());
         roleNavigation.auditAuthorization(role,auditChanges);
         // A failed write or readback propagates and rolls back the entire authoring operation.
@@ -255,8 +255,8 @@ public class RoleAuthorizationDraftService {
                 fieldPolicies.preview(role, request.fieldPolicyPids(), permittedModels),
                 request.menuPids()==null?null:roleNavigation.preview(role,request.menuPids(),resulting),
                 fieldAccess.preview(role,request.fieldChanges(),permittedModels),
-                grantFields.preview(role,request.grantFieldChanges(),resulting,Set.copyOf(selection.grantedCodes())),
-                grantFields.candidates(role,resulting,Set.copyOf(selection.grantedCodes())));
+                grantFields.preview(role,request.grantFieldChanges(),resulting,Set.copyOf(selection.grantedCodes()),grantFieldBoundaries(roots)),
+                grantFields.candidates(role,resulting,Set.copyOf(selection.grantedCodes()),grantFieldBoundaries(roots)));
     }
 
     private RoleAuthorizationDraftSnapshot snapshot(Role role, List<BusinessFieldRoot> roots) {
@@ -265,7 +265,7 @@ public class RoleAuthorizationDraftService {
                 scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
                         .map(scope -> new DataScopeUpdateRequest(scope.getResourceCode(), scope.getActionCode(),
                                 scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role),roleNavigation.selection(role),
-                fieldAccess.catalog(role,fieldCandidates(role, roots)), grantFields.catalog(role));
+                fieldAccess.catalog(role,fieldCandidates(role, roots)), grantFields.catalog(role,grantFieldBoundaries(roots)));
     }
 
     private Role resolve(String rolePid) {
@@ -279,7 +279,7 @@ public class RoleAuthorizationDraftService {
         state.put("role", role);
         state.put("navigation",roleNavigation.selection(role));
         state.put("fieldAccess",fieldAccess.catalog(role,fieldCandidates(role, roots)));
-        state.put("grantFieldCatalog", grantFields.catalog(role));
+        state.put("grantFieldCatalog", grantFields.catalog(role,grantFieldBoundaries(roots)));
         state.put("grants", grants.findByRole(role.getId()).stream()
                 .sorted(Comparator.comparing(RolePermission::getId, Comparator.nullsLast(Long::compareTo))).toList());
         state.put("scopes", scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
@@ -325,6 +325,11 @@ public class RoleAuthorizationDraftService {
                     contract.permissions().stream().sorted().toList(), definition.source(), Map.of()));
         });
         return roots.stream().distinct().sorted(Comparator.comparing(BusinessFieldRoot::command)).toList();
+    }
+
+    private List<RoleGrantFieldScopeService.BusinessBoundary> grantFieldBoundaries(List<BusinessFieldRoot> roots) {
+        return roots.stream().flatMap(root -> root.permissions().stream().map(code ->
+                new RoleGrantFieldScopeService.BusinessBoundary(code, root.model(), root.action()))).distinct().toList();
     }
 
     private Set<String> fieldCandidates(Role role, List<BusinessFieldRoot> roots) {

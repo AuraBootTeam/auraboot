@@ -85,7 +85,7 @@ class RoleAuthorizationDraftServiceTest {
                 com.auraboot.framework.meta.dto.FieldDefinition.builder().code("_invalid").name("Unsupported metadata").build()));
         var editor = new RoleGrantFieldScopeService(grants, permissions, metadata,
                 mock(DataPermissionAuthoringAccess.class), authoringAccess, JsonMapper.builder().build());
-        assertThat(editor.catalog(role)).singleElement().satisfies(binding -> assertThat(binding.bindingPid()).isEqualTo("binding-native"));
+        assertThat(editor.catalog(role, List.of())).singleElement().satisfies(binding -> assertThat(binding.bindingPid()).isEqualTo("binding-native"));
         assertThatThrownBy(() -> editor.preview(role, List.of(
                 new com.auraboot.framework.permission.dto.RoleGrantFields.Change("binding-native", List.of("_invalid"), List.of())),
                 Set.of("model.order.read"))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
@@ -102,8 +102,8 @@ class RoleAuthorizationDraftServiceTest {
                 com.auraboot.framework.meta.dto.FieldDefinition.builder().code("name").name("Name").build()));
         var editor = new RoleGrantFieldScopeService(grants, permissions, metadata,
                 mock(DataPermissionAuthoringAccess.class), authoringAccess, JsonMapper.builder().build());
-        assertThat(editor.candidates(role, Set.of("model.order.read"), Set.of())).isEmpty();
-        assertThat(editor.candidates(role, Set.of("model.order.read"), Set.of("model.order.read")))
+        assertThat(editor.candidates(role, Set.of("model.order.read"), Set.of(), List.of())).isEmpty();
+        assertThat(editor.candidates(role, Set.of("model.order.read"), Set.of("model.order.read"), List.of()))
                 .singleElement().satisfies(candidate -> assertThat(candidate.bindingPid()).isNull());
     }
 
