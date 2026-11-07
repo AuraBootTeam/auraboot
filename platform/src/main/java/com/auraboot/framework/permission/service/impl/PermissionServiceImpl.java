@@ -433,6 +433,16 @@ public class PermissionServiceImpl implements PermissionService {
         return permissionConverter.toDTOList(permissions);
     }
     
+    @Override
+    public List<PermissionDTO> findRoleConfiguredPermissions(Long roleId) {
+        Long tenant = MetaContext.getCurrentTenantId();
+        if (tenant == null || tenant <= 0 || roleId == null || roleId <= 0)
+            throw new org.springframework.security.access.AccessDeniedException("A tenant role is required for configuration");
+        Set<Long> ids = rolePermissionMapper.findConfiguredGrantIdsByRole(roleId, tenant);
+        if (ids.isEmpty()) return List.of();
+        return permissionConverter.toDTOList(permissionMapper.findByIds(new java.util.ArrayList<>(ids)));
+    }
+
     /**
      * 绑定Permission到角色
      * 

@@ -162,6 +162,12 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
                 .filter(current::contains).forEach(revokable::add);
         List<String> grant = desired.stream().filter(code -> !current.contains(code)).sorted().toList();
         List<String> revoke = revokable.stream().filter(code -> !desired.contains(code)).sorted().toList();
+        if (!grant.isEmpty() || !revoke.isEmpty()) {
+            Map<String, Long> identities = all.stream().filter(permission -> permission.getCode() != null)
+                    .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getId, (first, second) -> first));
+            rolePermissionService.validateCapabilityChanges(roleId,
+                    grant.stream().map(identities::get).toList(), revoke.stream().map(identities::get).toList());
+        }
         Set<String> resulting = new LinkedHashSet<>(current);
         resulting.removeAll(revoke);
         resulting.addAll(grant);
@@ -179,7 +185,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     }
 
     private Set<String> roleCodes(Long roleId) {
-        return permissionService.findRolePermissions(roleId).stream()
+        return permissionService.findRoleConfiguredPermissions(roleId).stream()
                 .map(PermissionDTO::getCode).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 }

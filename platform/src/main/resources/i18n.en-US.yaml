@@ -2886,3 +2886,5 @@ im.agent.replyFailed: "The AI reply could not be completed. Please retry or cont
 "roleGrantFields.action.read": "Read authorization"
 "roleGrantFields.action.create": "Create authorization"
 "roleGrantFields.action.update": "Update authorization"
+
+"permission.capability_binding_review": "This duty involves existing constraints or managed authorization. Review and update the original authorization source first."

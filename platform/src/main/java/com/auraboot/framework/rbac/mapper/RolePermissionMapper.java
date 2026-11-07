@@ -169,6 +169,23 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
         """)
     Set<Long> findPermissionIdsByRole(@Param("roleId") Long roleId);
 
+    /** Configuration membership only: dates and status still apply in the runtime query above. */
+    @Select("""
+        SELECT DISTINCT rp.permission_id FROM ab_role_permission rp
+        JOIN ab_role r ON r.id=rp.role_id AND r.tenant_id=rp.tenant_id
+        JOIN ab_permission p ON p.id=rp.permission_id
+        WHERE rp.tenant_id=#{tenantId} AND rp.role_id=#{roleId}
+          AND (p.tenant_id=rp.tenant_id OR p.tenant_id IS NULL)
+          AND r.deleted_flag=FALSE AND p.deleted_flag=FALSE AND p.status='active'
+          AND LOWER(rp.grant_type)='grant' AND rp.deleted_flag=FALSE
+        """)
+    Set<Long> findConfiguredGrantIdsByRole(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
+
+    /** Include tombstones so authoring cannot revive a managed projection through an upsert. */
+    @Select("SELECT * FROM ab_role_permission WHERE role_id=#{roleId} AND tenant_id=#{tenantId}")
+    @ResultMap("mybatis-plus_RolePermission")
+    List<RolePermission> findAllForCapabilityAuthoring(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
+
     /**
      * Find permission IDs for multiple roles
      *

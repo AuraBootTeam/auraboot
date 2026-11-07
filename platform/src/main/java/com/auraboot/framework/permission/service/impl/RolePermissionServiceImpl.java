@@ -69,6 +69,47 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     private final com.auraboot.framework.permission.service.RoleAuthorizationCopyService authorizationCopies;
     
     @Override
+    public void validateCapabilityChanges(Long roleId, List<Long> added, List<Long> removed) {
+        if (added == null || removed == null || added.size() > 5000 || removed.size() > 5000
+                || java.util.stream.Stream.concat(added.stream(), removed.stream()).anyMatch(id -> id == null || id <= 0))
+            throw capabilityReview();
+        if (added.isEmpty() && removed.isEmpty()) return;
+        Long tenant = MetaContext.getCurrentTenantId();
+        Role role = roleId == null ? null : roleMapper.selectById(roleId);
+        if (tenant == null || tenant <= 0 || role == null || !Objects.equals(tenant, role.getTenantId()))
+            throw new org.springframework.security.access.AccessDeniedException("Duty changes require a role in the current tenant");
+        var targets = new HashSet<>(added); targets.addAll(removed);
+        var definitions = permissionMapper.findByIds(new ArrayList<>(targets));
+        if (definitions.size() != targets.size() || definitions.stream().anyMatch(definition ->
+                definition.getTenantId() != null && !tenant.equals(definition.getTenantId()))) throw capabilityReview();
+        var bindings = rolePermissionMapper.findAllForCapabilityAuthoring(roleId, tenant);
+        if (bindings.stream().anyMatch(binding -> !Objects.equals(roleId, binding.getRoleId())
+                || !Objects.equals(tenant, binding.getTenantId()))) throw capabilityReview();
+        for (Long id : added) {
+            var existing = bindings.stream().filter(binding -> id.equals(binding.getPermissionId())).toList();
+            // A separate grant/deny or managed tombstone is not permission to replace its owner.
+            if (existing.stream().anyMatch(binding -> !Boolean.TRUE.equals(binding.getDeletedFlag()) || !directSource(binding)))
+                throw capabilityReview();
+        }
+        for (Long id : removed) {
+            var existing = bindings.stream().filter(binding -> id.equals(binding.getPermissionId())).toList();
+            if (existing.stream().noneMatch(binding -> !Boolean.TRUE.equals(binding.getDeletedFlag()))
+                    || existing.stream().anyMatch(binding -> !"grant".equalsIgnoreCase(binding.getGrantType()) || !directSource(binding)))
+                throw capabilityReview();
+        }
+    }
+
+    private static boolean directSource(RolePermission binding) {
+        var source = com.auraboot.framework.permission.service.RoleGrantSourceOwnership.of(binding);
+        return source == com.auraboot.framework.permission.service.RoleGrantSourceOwnership.DIRECT
+                || source == com.auraboot.framework.permission.service.RoleGrantSourceOwnership.DETACHED_COPY;
+    }
+
+    private static BusinessException capabilityReview() {
+        return BusinessException.i18n("permission.capability_binding_review");
+    }
+
+    @Override
     @Transactional
     public boolean assignPermissionsToRole(Long roleId, List<Long> permissionIds) {
         authorizationWriteLock.mutate();

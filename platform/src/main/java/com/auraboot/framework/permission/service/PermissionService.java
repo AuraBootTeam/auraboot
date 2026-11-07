@@ -119,6 +119,9 @@ public interface PermissionService {
      * @return List of permissions
      */
     List<PermissionDTO> findRolePermissions(Long roleId);
+
+    /** Positive role configuration, including inactive/future grants; never use for access checks. */
+    List<PermissionDTO> findRoleConfiguredPermissions(Long roleId);
     
     /**
      * Bind permission to role

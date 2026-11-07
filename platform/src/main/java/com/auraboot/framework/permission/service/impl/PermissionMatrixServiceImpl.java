@@ -73,7 +73,8 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     public PermissionMatrixDTO getMatrixForRole(Long tenantId, Long roleId) {
         List<PermissionDTO> allActive = permissionService.findAllActive();
-        Set<Long> grantedIds = rolePermissionService.getPermissionIdsByRoleId(roleId);
+        Set<Long> grantedIds = permissionService.findRoleConfiguredPermissions(roleId).stream()
+                .map(PermissionDTO::getId).collect(java.util.stream.Collectors.toSet());
 
         // Build a lookup map: "resourceCode:actionCode" -> RoleDataScope
         List<RoleDataScope> scopes = dataScopeService.getScopesByRole(tenantId, roleId);

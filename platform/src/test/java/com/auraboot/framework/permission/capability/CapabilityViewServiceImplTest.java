@@ -84,7 +84,7 @@ class CapabilityViewServiceImplTest {
     void resolvesRoleCapabilitiesFromLivePermissionAndGrantData() {
         when(permissionService.findAllActive())
                 .thenReturn(List.of(perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage")));
-        when(permissionService.findRolePermissions(5L))
+        when(permissionService.findRoleConfiguredPermissions(5L))
                 .thenReturn(List.of(perm(1L, "p1", "crm.account.read"))); // only read granted
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 CapabilityDefinitionDTO.builder().code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料").nameEn("Manage Customer Profiles")
@@ -103,7 +103,8 @@ class CapabilityViewServiceImplTest {
         assertThat(cap.getAuthorizationState()).isEqualTo("partial");
         assertThat(cap.getMissingCodes()).containsExactly("crm.account.manage");
         assertThat(cap.getLocalizedLabels()).containsEntry("en", "Manage Customer Profiles");
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
         assertThat(cap.isGranted()).isFalse(); // crm.account.manage not granted
     }
 
@@ -113,7 +114,7 @@ class CapabilityViewServiceImplTest {
         // so the v2 page can show "解锁菜单: …". Pure read-side derivation, no grant effect.
         when(permissionService.findAllActive())
                 .thenReturn(List.of(perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "model.crm_account_common.read")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of());
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 CapabilityDefinitionDTO.builder().code("crm.cap.account_view").group("客户管理").nameZhCN("查看客户")
                         .includes(List.of("crm.account.read", "model.crm_account_common.read")).build()));
@@ -137,7 +138,7 @@ class CapabilityViewServiceImplTest {
                         "displayGroupOrder", 10,
                         "displayOrder", 10
                 ))));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of());
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 CapabilityDefinitionDTO.builder().code("qo.cap.quote_view").group("报价单").nameZhCN("查看报价")
                         .includes(List.of("qo.quote.read")).build()));
@@ -163,7 +164,7 @@ class CapabilityViewServiceImplTest {
                 perm(2L, "p2", "crm.account.manage"),
                 perm(3L, "p3", "crm.lead.read")));
         // role currently has account.read + lead.read
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of(
                 perm(1L, "p1", "crm.account.read"),
                 perm(3L, "p3", "crm.lead.read")));
 
@@ -187,7 +188,7 @@ class CapabilityViewServiceImplTest {
         when(permissionService.findAllActive()).thenReturn(List.of(
                 perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
                 perm(9L, "p9", "legacy_flag"))); // single segment -> not a capability
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of(
                 perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
                 perm(9L, "p9", "legacy_flag")));
 
@@ -195,7 +196,8 @@ class CapabilityViewServiceImplTest {
         service.applyCapabilitySelection(5L, Set.of("crm.cap.account")); // complete selection
 
         // account codes desired & held, legacy_flag outside the universe -> no mutation at all
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
     }
 
     @Test
@@ -204,7 +206,7 @@ class CapabilityViewServiceImplTest {
                 perm(2L, "release", "bom.structure.release"),
                 perm(3L, "entry", "meta.command.execute"));
         when(permissionService.findAllActive()).thenReturn(grants);
-        when(permissionService.findRolePermissions(5L)).thenReturn(grants);
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(grants);
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 decl("bom.cap.convert", "BOM", "bom.convert.execute", "meta.command.execute"),
                 decl("bom.cap.structure_release", "BOM", "bom.structure.release", "meta.command.execute")));
@@ -214,7 +216,8 @@ class CapabilityViewServiceImplTest {
 
         // Existing conditions, validity windows and source references live on the original rows.
         // A directory split must not remove and recreate those rows as unrestricted grants.
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
     }
 
     @Test
@@ -223,7 +226,7 @@ class CapabilityViewServiceImplTest {
                 perm(1L, "convert", "bom.convert.execute"),
                 perm(2L, "release", "bom.structure.release"),
                 perm(3L, "entry", "meta.command.execute")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of());
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 decl("bom.cap.convert", "BOM", "bom.convert.execute", "meta.command.execute"),
                 decl("bom.cap.structure_release", "BOM", "bom.structure.release", "meta.command.execute")));
@@ -233,6 +236,7 @@ class CapabilityViewServiceImplTest {
 
         verify(rolePermissionService).assignPermissionsToRole(eq(5L),
                 argThat(ids -> ids.size() == 2 && ids.containsAll(List.of(1L, 3L))));
+        verify(rolePermissionService).validateCapabilityChanges(5L, List.of(1L, 3L), List.of());
         org.mockito.Mockito.verifyNoMoreInteractions(rolePermissionService);
     }
 
@@ -250,7 +254,7 @@ class CapabilityViewServiceImplTest {
                 perm(1L, "p1", "crm.account.read"),
                 perm(2L, "p2", "crm.account.manage"),
                 perm(3L, "p3", "model.crm_account_common.read")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of()); // fresh role
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of()); // fresh role
 
         MetaContext.setContext(1L, 1L, "p", "u");
         service.applyCapabilitySelection(5L, Set.of("crm.cap.account_view")); // read-only only
@@ -268,26 +272,28 @@ class CapabilityViewServiceImplTest {
         when(registry.listDeclarations(any())).thenReturn(List.of());
         when(permissionService.findAllActive()).thenReturn(List.of(
                 perm(1L, "p1", "billing.license.read"), perm(2L, "p2", "billing.license.manage")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of(
                 perm(1L, "p1", "billing.license.read"))); // partial
 
         MetaContext.setContext(1L, 1L, "p", "u");
         service.applyCapabilitySelection(5L, Set.of()); // deselect everything
 
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
     }
     @Test
     void businessSavePreservesFullyGrantedUndeclaredActions() {
         when(registry.listDeclarations(any())).thenReturn(List.of());
         when(permissionService.findAllActive()).thenReturn(List.of(
                 perm(1L, "p1", "billing.license.read"), perm(2L, "p2", "billing.license.manage")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of(
                 perm(1L, "p1", "billing.license.read"), perm(2L, "p2", "billing.license.manage")));
         MetaContext.setContext(1L, 1L, "p", "u");
 
         service.applyCapabilitySelection(5L, Set.of());
 
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
     }
 
     @Test
@@ -295,12 +301,13 @@ class CapabilityViewServiceImplTest {
         when(registry.listDeclarations(any())).thenReturn(List.of());
         when(permissionService.findAllActive()).thenReturn(List.of(
                 perm(1L, "p1", "billing.license.read")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of());
         MetaContext.setContext(1L, 1L, "p", "u");
 
         assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of("billing.license")))
                 .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
     }
 
     @Test
@@ -311,7 +318,7 @@ class CapabilityViewServiceImplTest {
         when(permissionService.findAllActive()).thenReturn(List.of(
                 perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
                 perm(3L, "p3", "legacy_flag")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of(
                 perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
                 perm(3L, "p3", "legacy_flag")));
         when(menuMapper.findAllActiveMenus()).thenReturn(List.of(menu("Customers", "crm.account.read")));
@@ -326,7 +333,8 @@ class CapabilityViewServiceImplTest {
             assertThat(cap.getAuthorizationState()).isEqualTo("partial");
         });
         assertThat(preview.relatedMenus()).containsExactly("Customers");
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
         service.applyCapabilitySelection(5L, Set.of("cap.view"));
         verify(rolePermissionService).removePermissionsFromRoleByPids(5L, List.of("p2"));
     }
@@ -336,11 +344,12 @@ class CapabilityViewServiceImplTest {
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 decl("cap.invalid", "Business", "crm.account.read", "missing.code.read")));
         when(permissionService.findAllActive()).thenReturn(List.of(perm(1L, "p1", "crm.account.read")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of());
         MetaContext.setContext(1L, 1L, "p", "u");
         assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of("cap.invalid")))
                 .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
     }
 
     @Test
@@ -351,7 +360,7 @@ class CapabilityViewServiceImplTest {
         when(permissionService.findAllActive()).thenReturn(List.of(
                 perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage"),
                 perm(3L, "p3", "crm.account.export")));
-        when(permissionService.findRolePermissions(5L)).thenReturn(List.of(
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(List.of(
                 perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "crm.account.manage")));
         MetaContext.setContext(1L, 1L, "p", "u");
         assertThat(service.previewCapabilitySelection(5L, Set.of("cap.view")).revokedCodes()).isEmpty();
@@ -368,7 +377,8 @@ class CapabilityViewServiceImplTest {
         when(permissionService.findAllActive()).thenReturn(List.of(perm(1L, "p1", "crm.account.read")));
         assertThatThrownBy(() -> service.applyCapabilitySelection(5L, Set.of("cap.view"), Set.of("cap.view")))
                 .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
-        verifyNoInteractions(rolePermissionService);
+        verify(rolePermissionService, org.mockito.Mockito.never()).assignPermissionsToRole(any(), any());
+        verify(rolePermissionService, org.mockito.Mockito.never()).removePermissionsFromRoleByPids(any(), any());
     }
 
 }

@@ -69,7 +69,7 @@ class RoleAuthorizationDraftServiceTest {
         when(roles.findByPid("role-a")).thenReturn(role);
         when(grants.findByRole(1L)).thenReturn(List.of(grant));
         when(permissions.findAllActive()).thenReturn(List.of(permission("model.order.read", "order", "read")));
-        when(permissions.findRolePermissions(1L)).thenReturn(List.of(permission("model.order.read", "order", "read")));
+        when(permissions.findRoleConfiguredPermissions(1L)).thenReturn(List.of(permission("model.order.read", "order", "read")));
         when(capabilities.previewCapabilitySelection(1L, Set.of("orders.view"), Set.of()))
                 .thenReturn(new CapabilitySelectionPreview(List.of(), List.of(), List.of("model.order.read"), List.of(), List.of()));
     }
@@ -119,7 +119,7 @@ class RoleAuthorizationDraftServiceTest {
         var sales = permission("sales.manage", "sales.manage", "execute");
         sales.setId(3L); sales.setPid("permission-sales"); sales.setResourceType("operation");
         when(permissions.findAllActive()).thenReturn(List.of(sales));
-        when(permissions.findRolePermissions(1L)).thenReturn(List.of(sales));
+        when(permissions.findRoleConfiguredPermissions(1L)).thenReturn(List.of(sales));
         grant.setPid("binding-sales"); grant.setTenantId(100L); grant.setStatus("active");
     }
 

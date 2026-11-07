@@ -50,6 +50,7 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.permission.service.PermissionMatrixService matrix;
     @Autowired private com.auraboot.framework.rbac.service.RoleService roleAuthoring;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.auraboot.framework.permission.service.PermissionService effectivePermissions;
     @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
     @Autowired private com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper policyMapper;
     @MockitoSpyBean private DataScopeService scopes;
@@ -330,6 +331,57 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                 .isInstanceOfSatisfying(RootUnCheckedException.class,
                         failure -> assertThat(failure.getResponseCode()).isEqualTo(com.auraboot.framework.common.constant.ResponseCode.CasVersionConflict));
         assertThat(migrationBindingBytes()).isEqualTo(changed);
+        assertThat(persistedScopes()).isEmpty(); assertThat(defaultScope()).isNull();
+    }
+
+    @Test void dutyRevocationMustPreserveTheSeparateDenyBinding() throws Exception {
+        migrationSource();
+        jdbc.update("UPDATE ab_role_permission SET source_ref=NULL WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);
+        String denyPid = jdbc.queryForObject("""
+                SELECT g.pid FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id
+                WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE
+                """, String.class, getTestTenant().getId(), roleId, updateCode);
+        jdbc.update("UPDATE ab_role_permission SET grant_type='deny',priority=99,conditions=?::jsonb WHERE pid=?", json.writeValueAsString(Map.of("guard", "must-remain")), denyPid);
+        String denyBefore = jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE pid=?", String.class, denyPid);
+        var before = drafts.snapshot(rolePid);
+        drafts.apply(rolePid, new RoleAuthorizationDraftRequest(before.revision(), Set.of(readCapability), Set.of(), false, null, false, List.of()));
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE pid=?", String.class, denyPid)).isEqualTo(denyBefore);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.role_id=? AND p.code=? AND g.grant_type='grant' AND g.deleted_flag=FALSE", Long.class, roleId, updateCode)).isZero();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"snapshot", "external", "managed_tombstone"})
+    void dutyChangeCannotReplaceManagedOrUnknownBindings(String source) throws Exception {
+        migrationSource();
+        jdbc.update("UPDATE ab_role_permission g SET snapshot_id=?,source_ref='package:fixture',deleted_flag=? FROM ab_permission p WHERE g.permission_id=p.id AND g.tenant_id=? AND g.role_id=? AND p.code=?",
+                "external".equals(source) ? null : 991L, "managed_tombstone".equals(source), getTestTenant().getId(), roleId, updateCode);
+        String original = migrationBindingBytes();
+        var before = drafts.snapshot(rolePid);
+        var change = new RoleAuthorizationDraftRequest(before.revision(),
+                Set.of("managed_tombstone".equals(source) ? editCapability : readCapability), Set.of(), true, "all", false, List.of());
+        assertThatThrownBy(() -> drafts.preview(rolePid, change)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThatThrownBy(() -> drafts.apply(rolePid, change)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThat(migrationBindingBytes()).isEqualTo(original);
+        assertThat(defaultScope()).isNull(); assertThat(persistedScopes()).isEmpty();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"inactive_grant", "future_grant", "inactive_role"})
+    void dutyConfigurationRetainsInactiveAndFutureBindingsWithoutActivatingThem(String mode) throws Exception {
+        migrationSource();
+        if ("inactive_role".equals(mode)) jdbc.update("UPDATE ab_role SET status='inactive' WHERE id=?", roleId);
+        else if ("future_grant".equals(mode)) jdbc.update("UPDATE ab_role_permission g SET effective_date=CURRENT_DATE+3 FROM ab_permission p WHERE g.permission_id=p.id AND g.tenant_id=? AND g.role_id=? AND p.code=?",
+                getTestTenant().getId(), roleId, updateCode);
+        else jdbc.update("UPDATE ab_role_permission g SET status='inactive' FROM ab_permission p WHERE g.permission_id=p.id AND g.tenant_id=? AND g.role_id=? AND p.code=?",
+                getTestTenant().getId(), roleId, updateCode);
+        String original = migrationBindingBytes(); var before = drafts.snapshot(rolePid);
+        assertThat(before.groups().stream().flatMap(group -> group.getCapabilities().stream())
+                .filter(capability -> editCapability.equals(capability.getCode())).findFirst().orElseThrow().isGranted()).isTrue();
+        assertThat(effectivePermissions.findRolePermissions(roleId)).noneMatch(permission -> updateCode.equals(permission.getCode()));
+        var change = new RoleAuthorizationDraftRequest(before.revision(), Set.of(editCapability), Set.of(), false, null, false, List.of());
+        drafts.apply(rolePid, change);
+        assertThat(migrationBindingBytes()).isEqualTo(original);
+        assertThat(effectivePermissions.findRolePermissions(roleId)).noneMatch(permission -> updateCode.equals(permission.getCode()));
         assertThat(persistedScopes()).isEmpty(); assertThat(defaultScope()).isNull();
     }
 

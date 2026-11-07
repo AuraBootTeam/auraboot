@@ -220,7 +220,7 @@ public class RoleAuthorizationDraftService {
                 && (!request.defaultScopeChanged() || request.defaultScopeType() == null)) throw invalid();
         CapabilitySelectionPreview selection = capabilities.previewCapabilitySelection(
                 role.getId(), request.selectedCapabilityCodes(), revoked(request));
-        Set<String> resulting = new HashSet<>(permissions.findRolePermissions(role.getId()).stream()
+        Set<String> resulting = new HashSet<>(permissions.findRoleConfiguredPermissions(role.getId()).stream()
                 .map(permission -> permission.getCode()).filter(Objects::nonNull).toList());
         resulting.removeAll(selection.revokedCodes());
         resulting.addAll(selection.grantedCodes());
@@ -330,7 +330,7 @@ public class RoleAuthorizationDraftService {
     private Set<String> fieldCandidates(Role role, List<BusinessFieldRoot> roots) {
         Set<String> result=new HashSet<>();
         roots.forEach(root->{result.add(root.model());result.addAll(root.publicFields().keySet());});
-        permissions.findRolePermissions(role.getId()).stream().map(permission->permission.getResourceCode())
+        permissions.findRoleConfiguredPermissions(role.getId()).stream().map(permission->permission.getResourceCode())
                 .filter(Objects::nonNull).forEach(result::add);
         return result;
     }

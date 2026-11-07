@@ -3077,3 +3077,5 @@ im.agent.replyFailed: "AI 回复未能完成，请重试或联系管理员。"
 "roleGrantFields.action.read": "读取授权"
 "roleGrantFields.action.create": "创建授权"
 "roleGrantFields.action.update": "修改授权"
+
+"permission.capability_binding_review": "该职责涉及已有约束或受管来源的授权，请先审阅并从原授权来源调整。"

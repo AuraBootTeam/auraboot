@@ -6758,5 +6758,10 @@
     "key": "roleGrantFields.action.update",
     "zh-CN": "修改授权",
     "en-US": "Update authorization"
+  },
+  {
+    "key": "permission.capability_binding_review",
+    "zh-CN": "该职责涉及已有约束或受管来源的授权，请先审阅并从原授权来源调整。",
+    "en-US": "This duty involves existing constraints or managed authorization. Review and update the original authorization source first."
   }
 ]

@@ -47,6 +47,11 @@ class PermissionMatrixServiceImplTest {
     @org.junit.jupiter.api.BeforeEach void identity() {
         com.auraboot.framework.application.tenant.MetaContext.setContext(100L,20L,"unit-user","Unit");
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(30L);
+        org.mockito.Mockito.lenient().when(permissionService.findRoleConfiguredPermissions(org.mockito.ArgumentMatchers.anyLong()))
+                .thenAnswer(call -> {
+                    java.util.Set<Long> fixtureIds = rolePermissionService.getPermissionIdsByRoleId(call.getArgument(0));
+                    return permissionService.findAllActive().stream().filter(permission -> fixtureIds.contains(permission.getId())).toList();
+                });
     }
     @org.junit.jupiter.api.AfterEach void clear() {com.auraboot.framework.application.tenant.MetaContext.clear();}
 
