@@ -69,6 +69,7 @@ class NativeBusinessBoundaryCatalogTest {
         assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
         command.setExecutionConfig("{\"type\":\"custom\",\"permissions\":[\"other.permission\"]}");
         assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
+        command.setExecutionConfig(command(10, "bom:update").getExecutionConfig());
         command.setTenantId(200L);
         assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
         command.setTenantId(100L);
