@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 47cad670ac0790c2d928473c681015c9cfc250c520b19460247e88fb36fd1543
+ * Contract SHA-256: 341510110d61694d41d92116e14a1aa509d2bec353c2fd0edbeafc879271b650
  */
 export interface paths {
     "/api/activities": {
@@ -39818,6 +39818,16 @@ export interface components {
             rootModel: string;
             targetAction: string;
         };
+        /** @description Current declared consumer, not effective access or whole-role equivalence */
+        RoleBoundaryMigrationConsumer: {
+            commandCode: string;
+            commandType: string;
+            modelCode?: string | null;
+            permissionCodes: string[];
+            publicationStatus?: string | null;
+            /** @enum {string} */
+            reviewStatus: "REGISTERED_BOUNDARY_REVIEW_REQUIRED" | "LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED" | "ENTRY_DEFINITION_REQUIRES_REVIEW";
+        };
         RoleBoundaryMigrationOperation: {
             actionCode?: string | null;
             bindingPids: string[];
@@ -39846,6 +39856,7 @@ export interface components {
             bindings: components["schemas"]["RoleBoundaryMigrationBinding"][];
             boundaries: components["schemas"]["RoleBoundaryMigrationBoundary"][];
             boundPolicies: components["schemas"]["RoleBoundaryMigrationPolicy"][];
+            commandConsumers: components["schemas"]["RoleBoundaryMigrationConsumer"][];
             defaultScopeType?: string | null;
             equivalentMigrationProven: boolean;
             fieldPolicies: components["schemas"]["RoleFieldPolicyView"][];

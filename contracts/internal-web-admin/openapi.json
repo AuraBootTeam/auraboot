@@ -47234,6 +47234,50 @@
         ],
         "type": "object"
       },
+      "RoleBoundaryMigrationConsumer": {
+        "description": "Current declared consumer, not effective access or whole-role equivalence",
+        "properties": {
+          "commandCode": {
+            "type": "string"
+          },
+          "commandType": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "publicationStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewStatus": {
+            "enum": [
+              "REGISTERED_BOUNDARY_REVIEW_REQUIRED",
+              "LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED",
+              "ENTRY_DEFINITION_REQUIRES_REVIEW"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "commandCode",
+          "commandType",
+          "permissionCodes",
+          "reviewStatus"
+        ],
+        "type": "object"
+      },
       "RoleBoundaryMigrationOperation": {
         "properties": {
           "actionCode": {
@@ -47380,6 +47424,12 @@
             },
             "type": "array"
           },
+          "commandConsumers": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationConsumer"
+            },
+            "type": "array"
+          },
           "defaultScopeType": {
             "type": [
               "string",
@@ -47424,6 +47474,7 @@
           "bindings",
           "boundPolicies",
           "boundaries",
+          "commandConsumers",
           "equivalentMigrationProven",
           "fieldPolicies",
           "revision",
