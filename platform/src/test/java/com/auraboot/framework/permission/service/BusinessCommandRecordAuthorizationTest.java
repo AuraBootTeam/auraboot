@@ -265,7 +265,7 @@ class BusinessCommandRecordAuthorizationTest {
         when(snapshots.resolvePermissionDefinition(100L,code)).thenReturn(definition);
         var row = grant(11,101,code); row.setFieldScopeJson(fieldScope("label"));
         when(bindings.findBusinessGrants(100L,1L,5L,code)).thenReturn(List.of(row));
-        when(scopes.resolveScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.none());
+        when(scopes.resolveOrdinaryReadScopeForRole(5L,101L,MODEL)).thenReturn(DataScopeCondition.none());
         guards(code,guard(11,"Shanghai"));
         when(recordShares.evaluate(eq(5L),eq(MODEL),eq("read"),any())).thenReturn(
                 new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
@@ -285,7 +285,7 @@ class BusinessCommandRecordAuthorizationTest {
         when(snapshots.resolvePermissionDefinition(100L,code)).thenReturn(definition);
         var row = grant(11,101,code); row.setFieldScopeJson(fieldScope("label"));
         when(bindings.findBusinessGrants(100L,1L,5L,code)).thenReturn(List.of(row));
-        when(scopes.resolveScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(
+        when(scopes.resolveOrdinaryReadScopeForRole(5L,101L,MODEL)).thenReturn(
                 new DataScopeCondition("not_configured",null,null,null,List.of(),List.of()));
         guards(code,new PermissionPolicyService.ConditionGuard(11L,null));
         when(recordShares.evaluate(eq(5L),eq(MODEL),eq("read"),any())).thenReturn(
@@ -293,6 +293,7 @@ class BusinessCommandRecordAuthorizationTest {
                         com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"not shared"));
         assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai")).canRead("label")).isTrue();
         assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai")).canRead("cost")).isFalse();
+        when(scopes.resolveScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.none());
         assertThat(authorization.resolveModelRead(5L,MODEL,record(999,"Shanghai")).result().granted()).isFalse();
     }
 

@@ -156,8 +156,10 @@ public class BusinessCommandRecordAuthorization {
             for (var grant : grants) {
                 if (grant.getId() == null || grant.getRoleId() == null || grant.getPermissionCode() == null
                         || !(code.equals(grant.getPermissionCode()) || "*".equals(grant.getPermissionCode()))) continue;
-                var scope = scopes.resolveScopeForRole(member, grant.getRoleId(), permission.getResourceCode(),
-                        permission.getAction(), model);
+                var scope = ordinaryRead
+                        ? scopes.resolveOrdinaryReadScopeForRole(member,grant.getRoleId(),model)
+                        : scopes.resolveScopeForRole(member, grant.getRoleId(), permission.getResourceCode(),
+                            permission.getAction(), model);
                 var scopeStep = ordinaryRead && scope != null && "not_configured".equals(scope.scopeType())
                         ? step(EvaluationVerdict.NOT_APPLICABLE, "Legacy native-read scope is not configured", code, grant.getRoleId(), grant.getId())
                         : scopeEvaluator.evaluateGrantScope(scope, member, model, permission.getAction(), record);

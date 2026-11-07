@@ -31,6 +31,11 @@ public interface DataScopeService {
         return DataScopeCondition.none();
     }
 
+    /** Role-local ordinary read scope; implementations must qualify the owner before preserving legacy NULL. */
+    default DataScopeCondition resolveOrdinaryReadScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return DataScopeCondition.none();
+    }
+
     /** Resolve current member-group scope without requiring a business-row team column. */
     default DataScopeCondition resolveAudienceScope(Long memberId, String resourceCode, String actionCode) {
         return resolveHistoricalScope(memberId, resourceCode, actionCode);

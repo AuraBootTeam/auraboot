@@ -75,6 +75,16 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Override
     public DataScopeCondition resolveScopeForRole(Long memberId, Long roleId, String permissionResource,
                                                   String action, String recordModel) {
+        return resolveGrantScope(memberId,roleId,permissionResource,action,recordModel,false);
+    }
+
+    @Override
+    public DataScopeCondition resolveOrdinaryReadScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return resolveGrantScope(memberId,roleId,recordModel,"read",recordModel,true);
+    }
+
+    private DataScopeCondition resolveGrantScope(Long memberId, Long roleId, String permissionResource,
+                                                String action, String recordModel, boolean ordinaryRead) {
         if (!MetaContext.exists() || memberId == null || roleId == null
                 || !java.util.Objects.equals(memberId, MetaContext.getCurrentMemberId())
                 || MetaContext.getCurrentTenantId() == null || MetaContext.getCurrentUserId() == null
@@ -94,7 +104,8 @@ public class DataScopeServiceImpl implements DataScopeService {
             return DataScopeCondition.none();
         }
         String type = entries.isEmpty() ? role.getDefaultDataScopeType() : entries.getFirst().getScopeType();
-        if (type == null) return DataScopeCondition.none();
+        if (type == null) return ordinaryRead && entries.isEmpty()
+                ? DataScopeCondition.notConfigured() : DataScopeCondition.none();
         try {
             return resolveCondition(memberId, DataScopeType.fromCode(type), recordModel, true);
         } catch (IllegalArgumentException invalid) {

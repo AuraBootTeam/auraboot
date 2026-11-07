@@ -439,6 +439,20 @@ class DataScopeServiceImplTest {
     // "operator does not exist: character varying = bigint" -> self-scoped list 500. The self value
     // must be chosen by the owner column's declared type: numeric -> userId, string -> userPid.
 
+    @Test void ordinaryReadLegacyNullRequiresAQualifiedOwnerAndNoMalformedOverride() {
+        MetaContext.setMemberId(5L);
+        var owner = new com.auraboot.framework.rbac.entity.Role();
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(owner);
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of());
+        assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("not_configured");
+        assertThat(service.resolveScopeForRole(5L,7L,"quote","read","quote").scopeType()).isEqualTo("none");
+        var malformed = new RoleDataScope(); malformed.setResourceCode("quote"); malformed.setActionCode("read");
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(malformed));
+        assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("none");
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(null);
+        assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("none");
+    }
+
     private void stubSelfScope(String resourceCode, String ownerField) {
         when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
         RoleDataScope scope = new RoleDataScope();

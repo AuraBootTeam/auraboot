@@ -303,6 +303,21 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(revoked.canRead("label")).isTrue(); assertThat(revoked.canRead("cost")).isFalse();
     }
 
+    @Test void ordinaryModelReadPreservesLegacyNullScopeWithoutWeakeningBusinessScope() throws Exception {
+        code = "model." + model + ".read";
+        jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='read' WHERE id=?",code,model,permissionId);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE id=?",roleA);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type='none' WHERE id=?",roleB);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("label"),bindingA);
+        String before = jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE id=?",String.class,bindingA);
+        var ordinary = authorization.resolveOrdinaryRead(member(),model,record(false,"Beijing"));
+        assertThat(ordinary.result().granted()).isTrue();
+        assertThat(ordinary.canRead("label")).isTrue(); assertThat(ordinary.canRead("cost")).isFalse();
+        assertThat(authorization.resolveModelRead(member(),model,record(false,"Beijing")).result().granted()).isFalse();
+        assertThat(jdbc.queryForObject("SELECT default_data_scope_type FROM ab_role WHERE id=?",String.class,roleA)).isNull();
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE id=?",String.class,bindingA)).isEqualTo(before);
+    }
+
     private String fieldScope(String field) throws Exception {
         return json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(field),"writeFields",List.of(field)));
     }
