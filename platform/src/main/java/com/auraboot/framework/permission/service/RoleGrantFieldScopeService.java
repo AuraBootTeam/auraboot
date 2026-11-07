@@ -155,13 +155,9 @@ public class RoleGrantFieldScopeService {
     }
 
     private static boolean directlyEditable(com.auraboot.framework.rbac.entity.RolePermission binding) {
-        if (binding.getSnapshotId() != null || !"GRANT".equalsIgnoreCase(binding.getGrantType())) return false;
-        if (binding.getSourceRef() == null) return true;
-        // Host role copies are detached grants; their provenance is not an active publish owner.
-        String[] parts = binding.getSourceRef().split(":", -1);
-        return parts.length == 3 && "copy".equals(parts[0])
-                && com.auraboot.framework.common.util.UniqueIdGenerator.isValid(parts[1])
-                && com.auraboot.framework.common.util.UniqueIdGenerator.isValid(parts[2]);
+        if (!"GRANT".equalsIgnoreCase(binding.getGrantType())) return false;
+        var owner = RoleGrantSourceOwnership.of(binding);
+        return owner == RoleGrantSourceOwnership.DIRECT || owner == RoleGrantSourceOwnership.DETACHED_COPY;
     }
 
     private static List<String> validate(List<String> fields, Set<String> allowed) {

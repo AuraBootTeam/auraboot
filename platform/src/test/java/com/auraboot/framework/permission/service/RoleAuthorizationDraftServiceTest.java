@@ -185,6 +185,37 @@ class RoleAuthorizationDraftServiceTest {
         verify(capabilities, never()).applyCapabilitySelection(any(), any(), any());
     }
 
+    @Test void migrationPreservesSnapshotOwnershipInsteadOfPresentingItAsDirectAuthorization() {
+        migrationFixture();
+        grant.setSnapshotId(991L);
+        grant.setSourceRef(null);
+        var binding = service.migrationPreview("role-a").bindings().getFirst();
+        var view = JsonMapper.builder().addModule(new JavaTimeModule()).build().valueToTree(binding);
+        assertThat(view.path("snapshotId").asLong()).isEqualTo(991L);
+        assertThat(view.path("sourceOwnership").asText()).isEqualTo("PUBLISHED_SNAPSHOT");
+        verify(writes, never()).mutate();
+    }
+
+    @Test void migrationDistinguishesDetachedHostCopiesFromUnknownPublishOwners() {
+        migrationFixture();
+        var json = JsonMapper.builder().addModule(new JavaTimeModule()).build();
+        grant.setSourceRef(null);
+        assertThat(json.valueToTree(service.migrationPreview("role-a").bindings().getFirst())
+                .path("sourceOwnership").asText()).isEqualTo("DIRECT");
+        grant.setSourceRef("copy:" + com.auraboot.framework.common.util.UniqueIdGenerator.generate()
+                + ":" + com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        assertThat(json.valueToTree(service.migrationPreview("role-a").bindings().getFirst())
+                .path("sourceOwnership").asText()).isEqualTo("DETACHED_COPY");
+        grant.setSourceRef("copy:unverified-owner");
+        assertThat(json.valueToTree(service.migrationPreview("role-a").bindings().getFirst())
+                .path("sourceOwnership").asText()).isEqualTo("EXTERNAL_SOURCE");
+        grant.setSourceRef("package:fixture");
+        grant.setSnapshotId(992L);
+        assertThat(json.valueToTree(service.migrationPreview("role-a").bindings().getFirst())
+                .path("sourceOwnership").asText()).isEqualTo("PUBLISHED_SNAPSHOT");
+        verify(writes, never()).mutate();
+    }
+
     @Test void migrationRetainsDenyDatesConditionsFieldsAndIndependentSourceWithoutActivatingThem() {
         migrationFixture();
         grant.setGrantType("deny"); grant.setPriority(99); grant.setStatus("inactive");

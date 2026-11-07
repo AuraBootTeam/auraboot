@@ -109,7 +109,8 @@ public class RoleAuthorizationDraftService {
                     definition == null ? null : definition.getCode(), binding.getGrantType(), binding.getPriority(),
                     binding.getEffectiveDate(), binding.getExpiryDate(), binding.getStatus(),
                     json.valueToTree(binding.getConditions()), json.valueToTree(binding.getConditionAst()),
-                    json.valueToTree(binding.getDataScopeAst()), json.valueToTree(binding.getFieldScope()), binding.getSourceRef());
+                    json.valueToTree(binding.getDataScopeAst()), json.valueToTree(binding.getFieldScope()), binding.getSourceRef(), binding.getSnapshotId(),
+                    RoleGrantSourceOwnership.of(binding).name());
         }).toList();
         var boundaries = roots.stream().map(root -> new RoleBoundaryMigrationPreview.Boundary(
                 root.command(), root.model(), root.action(), root.permissions().stream().map(code -> {

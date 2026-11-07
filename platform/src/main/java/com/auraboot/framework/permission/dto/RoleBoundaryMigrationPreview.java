@@ -21,13 +21,16 @@ public record RoleBoundaryMigrationPreview(
             @Schema(nullable = true) String resourceCode, @Schema(nullable = true) String actionCode,
             @Schema(nullable = true) String currentScopeType, String scopeOrigin, String scopeStatus, List<String> bindingPids) {}
 
-    @Schema(name = "RoleBoundaryMigrationBinding", requiredProperties = {"bindingPid"})
+    @Schema(name = "RoleBoundaryMigrationBinding", requiredProperties = {"bindingPid", "sourceOwnership"})
     public record Binding(String bindingPid, @Schema(nullable = true) String permissionPid, @Schema(nullable = true) String permissionCode,
             @Schema(nullable = true) String grantType, @Schema(nullable = true) Integer priority,
             @Schema(nullable = true) LocalDate effectiveDate, @Schema(nullable = true) LocalDate expiryDate,
             @Schema(nullable = true) String status, @Schema(nullable = true) JsonNode conditions,
             @Schema(nullable = true) JsonNode conditionAst, @Schema(nullable = true) JsonNode dataScopeAst,
-            @Schema(nullable = true) JsonNode fieldScope, @Schema(nullable = true) String sourceRef) {}
+            @Schema(nullable = true) JsonNode fieldScope, @Schema(nullable = true) String sourceRef,
+            @Schema(nullable = true, description = "Owning publish snapshot pointer; never migration authorization") Long snapshotId,
+            @Schema(allowableValues = {"DIRECT", "DETACHED_COPY", "PUBLISHED_SNAPSHOT", "EXTERNAL_SOURCE"},
+                    description = "Configuration owner classification, not effective access or migration eligibility") String sourceOwnership) {}
 
     @Schema(name = "RoleBoundaryMigrationPolicy", requiredProperties = {"policyPid"})
     public record Policy(String policyPid, @Schema(nullable = true) String modelCode, @Schema(nullable = true) String policyType,

@@ -302,6 +302,37 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         assertThat(after.equivalentMigrationProven()).isFalse();
     }
 
+    @Test void migrationReviewPreservesPublishPointerAndRejectsAChangedOwnerBeforeAnyScopeWrite() throws Exception {
+        migrationSource();
+        assertThat(jdbc.update("""
+                UPDATE ab_role_permission SET snapshot_id=991,source_ref=NULL
+                WHERE tenant_id=? AND role_id=? AND permission_id=(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)
+                """, getTestTenant().getId(), roleId, getTestTenant().getId(), updateCode)).isEqualTo(1);
+        String before = migrationBindingBytes();
+        var reviewed = drafts.migrationPreview(rolePid);
+        assertThat(reviewed.bindings()).anySatisfy(binding -> {
+            assertThat(binding.permissionCode()).isEqualTo(updateCode);
+            assertThat(binding.snapshotId()).isEqualTo(991L);
+            assertThat(binding.sourceRef()).isNull();
+            assertThat(binding.sourceOwnership()).isEqualTo("PUBLISHED_SNAPSHOT");
+            assertThat(binding.priority()).isEqualTo(37);
+            assertThat(binding.conditionAst()).isNotNull(); assertThat(binding.dataScopeAst()).isNotNull();
+            assertThat(binding.fieldScope()).isNotNull();
+        });
+        assertThat(reviewed.equivalentMigrationProven()).isFalse();
+        assertThat(migrationBindingBytes()).isEqualTo(before);
+        assertThat(persistedScopes()).isEmpty();
+        jdbc.update("UPDATE ab_role_permission SET snapshot_id=992 WHERE tenant_id=? AND role_id=? AND snapshot_id=991",
+                getTestTenant().getId(), roleId);
+        String changed = migrationBindingBytes();
+        assertThatThrownBy(() -> drafts.apply(rolePid, new RoleAuthorizationDraftRequest(reviewed.revision(), Set.of(editCapability), Set.of(),
+                false, null, false, List.of(new DataScopeUpdateRequest(resource, "update", "all", "MAX")))))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        failure -> assertThat(failure.getResponseCode()).isEqualTo(com.auraboot.framework.common.constant.ResponseCode.CasVersionConflict));
+        assertThat(migrationBindingBytes()).isEqualTo(changed);
+        assertThat(persistedScopes()).isEmpty(); assertThat(defaultScope()).isNull();
+    }
+
     @Test void changedSourceConditionsInvalidateTheMigrationRevisionBeforeScopeWrites() throws Exception {
         migrationSource(); var inspected = drafts.migrationPreview(rolePid);
         jdbc.update("UPDATE ab_role_permission SET priority=priority+1 WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);
