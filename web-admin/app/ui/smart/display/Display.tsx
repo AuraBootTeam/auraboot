@@ -8,6 +8,7 @@ interface DisplayProps {
   valueMap?: Record<string, any>;
   statusColor?: Record<string, string>;
   className?: string;
+  appearance?: 'boxed' | 'plain';
   readOnly?: boolean;
   disabled?: boolean;
   [key: string]: any;
@@ -20,6 +21,7 @@ const Display: React.FC<DisplayProps> = ({
   valueMap,
   statusColor,
   className = '',
+  appearance = 'boxed',
 }) => {
   // 格式化显示值
   const formatValue = (val: any): string => {
@@ -87,9 +89,9 @@ const Display: React.FC<DisplayProps> = ({
     <div className={`space-y-1 ${className}`}>
       {label && <label className="text-text-2 block text-sm font-medium">{label}</label>}
       <div
-        className={`rounded-control border px-3 py-2 text-sm ${
-          statusClass || 'border-border bg-subtle text-text'
-        }`}
+        className={appearance === 'plain'
+          ? 'text-text break-words whitespace-pre-wrap text-sm leading-5'
+          : `rounded-control border px-3 py-2 text-sm ${statusClass || 'border-border bg-subtle text-text'}`}
       >
         {displayValue}
       </div>

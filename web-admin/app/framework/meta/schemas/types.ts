@@ -129,6 +129,8 @@ export interface BlockConfig {
   rowSelection?: CardRowSelection;
   /** Fit card-grid tracks to the available width, collapsing unused tracks. */
   autoFitColumns?: boolean;
+  /** Reserve unused adaptive tracks so a short row does not stretch each card. */
+  autoFillColumns?: boolean;
   /** Optional adaptive-card minimum in logical pixels, bounded to 180..640. */
   minCardWidth?: number;
   /** Accessible native disclosure groups retain mounted row inputs when closed. */

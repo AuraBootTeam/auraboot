@@ -96,11 +96,12 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const cardActions: Array<{ code: string; label?: any; variant?: string; action?: any }> =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const autoFitColumns = cfg.autoFitColumns === true;
+  const autoFillColumns = cfg.autoFillColumns === true;
   const minCardWidth = Number.isFinite(cfg.minCardWidth) && cfg.minCardWidth >= 180 && cfg.minCardWidth <= 640
     ? `${cfg.minCardWidth}px` : '20rem';
-  const columnsClass: string = autoFitColumns ? '' : cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
-  const columnsStyle = autoFitColumns
-    ? { gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minCardWidth}), 1fr))` }
+  const columnsClass: string = autoFitColumns || autoFillColumns ? '' : cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  const columnsStyle = autoFitColumns || autoFillColumns
+    ? { gridTemplateColumns: `repeat(${autoFillColumns ? 'auto-fill' : 'auto-fit'}, minmax(min(100%, ${minCardWidth}), 1fr))` }
     : undefined;
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
