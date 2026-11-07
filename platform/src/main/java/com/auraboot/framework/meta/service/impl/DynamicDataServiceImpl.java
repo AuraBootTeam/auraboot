@@ -1083,7 +1083,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        return createdRecord;
+        return nativeReadFields.publicWriteResult(model, createdRecord,
+                () -> getById(modelCode, recordIdValue));
     }
 
     /**
@@ -1399,7 +1400,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                             modelCode, recordId, automationBefore, automationAfter));
 
             MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
-            return updatedRecord;
+            return nativeReadFields.publicWriteResult(model, updatedRecord,
+                    () -> getById(modelCode, recordId));
 
         } catch (AccessDeniedException e) {
             throw e;
@@ -1415,7 +1417,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void delete(String modelCode, String recordId) {
         BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
@@ -1656,7 +1658,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void batchDelete(String modelCode, List<String> recordIds) {
         BusinessResourceDataScope.unsupported();
         dynamicDataBatchSupport().batchDelete(modelCode,recordIds);

@@ -26,25 +26,24 @@ public class NativeReadFieldProjection {
                 && !MetaContext.hasCommandPermitScopeFor(model.getCode())) query.includeNativeReadAuthorization();
     }
 
-    /** Keep physical row reads and their grants in one MVCC view for independent human reads. */
+    /** Keep physical rows and grants in one MVCC view, including the writer's own changes. */
     public <T> T readWithinSnapshot(String modelCode, java.util.function.Supplier<T> operation) {
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || MetaContext.hasCommandPermitScopeFor(modelCode)) return operation.get();
-        if (coherentReadSnapshot()) return operation.get();
-        // Write readback must see its own uncommitted rows. Its separate authorization contract
-        // is unchanged here; never suspend it and silently return a pre-write row.
+        if (coherentSnapshot()) return operation.get();
+        // A weak write snapshot cannot be repaired after its own mutations or row reads.
+        // Keep the owning transaction intact and require its caller to establish isolation.
         if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
                 && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly())
-            return operation.get();
+            throw denied();
         return snapshot().execute(status -> operation.get());
     }
 
-    private static boolean coherentReadSnapshot() {
+    private static boolean coherentSnapshot() {
         Integer isolation = org.springframework.transaction.support.TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
         return org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
-                && org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()
                 && isolation != null && (isolation == TransactionDefinition.ISOLATION_REPEATABLE_READ
                 || isolation == TransactionDefinition.ISOLATION_SERIALIZABLE);
     }
@@ -64,10 +63,36 @@ public class NativeReadFieldProjection {
                 || MetaContext.hasCommandPermitScopeFor(model.getCode())) throw denied();
         // Background execution without a human member retains its separate authorization path.
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null) return records;
-        if (coherentReadSnapshot()) return projectInSnapshot(model, records);
-        // Preserve the existing write-readback path until its prospective-row contract is unified.
-        // Independent public reads enter readWithinSnapshot before selecting physical rows.
-        return Objects.requireNonNull(snapshot().execute(status -> projectInSnapshot(model, records)));
+        if (coherentSnapshot()) return projectInSnapshot(model, records);
+        // Starting a new transaction here could combine an already-loaded row with newer grants.
+        // Physical callers must enter readWithinSnapshot before selecting the record.
+        throw denied();
+    }
+
+    /** Internal change snapshots never become ordinary public write results without a read check. */
+    public Map<String,Object> publicWriteResult(ModelDefinition model, Map<String,Object> actualRecord,
+                                                java.util.function.Supplier<Map<String,Object>> publicReader) {
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                || MetaContext.hasCommandPermitScopeFor(model.getCode())
+                || BusinessResourceDataScope.retainsWriteResult(model.getCode(), Objects.toString(actualRecord.get("pid"),null)))
+            return actualRecord;
+        if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null) return actualRecord;
+        if (!coherentSnapshot() || !(actualRecord.get("pid") instanceof String pid) || pid.isBlank()
+                || !Objects.equals(actualRecord.get("tenant_id"), MetaContext.getCurrentTenantId())) throw denied();
+        Map<String,Object> projected;
+        try {
+            projected = publicReader.get();
+        } catch (AccessDeniedException readDenied) {
+            // This is the defined write-only acknowledgement, not a replacement read authority.
+            // Configuration/storage failures still propagate; only read denial yields an envelope.
+            var envelope = new LinkedHashMap<String,Object>();
+            envelope.put("pid",pid);
+            if (actualRecord.containsKey("row_version")) envelope.put("row_version",actualRecord.get("row_version"));
+            return envelope;
+        }
+        if (projected == null || !pid.equals(projected.get("pid"))) throw denied();
+        return projected;
     }
 
     private List<Map<String,Object>> projectInSnapshot(ModelDefinition model, List<Map<String,Object>> records) {
@@ -110,6 +135,6 @@ public class NativeReadFieldProjection {
     }
 
     private static AccessDeniedException denied() {
-        return new AccessDeniedException("Native record fields require a complete current read grant");
+        return new AccessDeniedException("Native record fields require a coherent transaction and complete current read grant");
     }
 }

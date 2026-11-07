@@ -46,6 +46,7 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
     @Autowired MetaModelFieldBindingMapper bindings;
     @Autowired FieldPermissionService fieldPermissions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired com.auraboot.framework.permission.service.DataScopeService scopes;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
     com.auraboot.framework.plugin.pf4j.ExtensionRegistry extensions;
@@ -61,14 +62,14 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
     private Long modelId;
     private boolean physicalCreated;
 
-    @BeforeEach void fixture() {
+    @BeforeEach void fixture(org.junit.jupiter.api.TestInfo testInfo) {
         String suffix = UniqueIdGenerator.generate().toLowerCase(Locale.ROOT);
         model = "fw_" + suffix; label = "label_" + suffix; secret = "secret_" + suffix; quantity = "qty_" + suffix; hidden = "hidden_" + suffix;
         Model definition = new Model();
         definition.setTenantId(testTenant.getId()); definition.setPid(UniqueIdGenerator.generate());
         definition.setCode(model); definition.setVersion(1); definition.setIsCurrent(true);
         definition.setStatus("published"); definition.setDeletedFlag(false);
-        ExtensionBean extension = new ExtensionBean(); extension.setExtension(new HashMap<>(Map.of("modelType","entity")));
+        ExtensionBean extension = new ExtensionBean(); extension.setExtension(new HashMap<>(Map.of("modelType","entity","softDelete",testInfo.getTags().contains("soft-delete"))));
         definition.setExtension(extension); models.insert(definition); modelId = definition.getId();
         bind(label,"string",false,1); bind(secret,"integer",true,2); bind(quantity,"integer",false,3); bind(hidden,"integer",true,4);
         metadata.clearAllCache();
@@ -210,6 +211,68 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         assertThat(stored(quantity, pid)).isEqualTo(1);
         assertThat(data.incrementWithinCap(model, pid, quantity, 1, null)).contains(2L);
         assertThat(stored(quantity, pid)).isEqualTo(2);
+    }
+
+    @Test void nativeUpdateReadbackUsesTheFieldGrantNarrowedInItsOwnTransaction() throws Exception {
+        String fieldScope = json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(label),"writeFields",List.of()));
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var updated = transaction.execute(status -> {
+            assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                    fieldScope,testRole.getId(),testTenant.getId(),"model."+model+".read")).isEqualTo(1);
+            var result = data.update(model,pid,Map.of(label,"same-transaction"));
+            assertThat(result).containsEntry(label,"same-transaction").containsEntry("pid",pid)
+                    .doesNotContainKeys(secret,quantity,hidden);
+            return result;
+        });
+        assertThat(updated).containsEntry(label,"same-transaction");
+        assertThat(stored(label,pid)).isEqualTo("same-transaction");
+        assertThat(stored(secret,pid)).isEqualTo(10);
+        assertThat(stored(quantity,pid)).isEqualTo(1);
+        assertThat(data.getById(model,pid)).containsEntry(label,"same-transaction").doesNotContainKeys(secret,quantity,hidden);
+    }
+
+    @Test void nativeCreateReadbackUsesItsOwnFieldGrantAndActualDefaultedRow() throws Exception {
+        String fieldScope = json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(label),"writeFields",List.of()));
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var created = transaction.execute(status -> {
+            assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                    fieldScope,testRole.getId(),testTenant.getId(),"model."+model+".read")).isEqualTo(1);
+            var result = data.create(model,new LinkedHashMap<>(Map.of(label,"created-with-own-grant")));
+            assertThat(result).containsEntry(label,"created-with-own-grant").containsKey("pid").doesNotContainKeys(secret,quantity,hidden);
+            return result;
+        });
+        String createdPid = Objects.toString(created.get("pid"));
+        assertThat(stored(label,createdPid)).isEqualTo("created-with-own-grant");
+        assertThat(stored(quantity,createdPid)).isEqualTo(7);
+        assertThat(data.getById(model,createdPid)).containsEntry(label,"created-with-own-grant").doesNotContainKeys(quantity);
+    }
+
+    @Test @org.junit.jupiter.api.Tag("soft-delete")
+    void nativeSingleAndBatchDeleteRetainTheirAuthorizedReadWithinTheWriteTransaction() {
+        assertThat(metadata.getModelDefinition(model).orElseThrow().isSoftDelete()).isTrue();
+        String code = "model."+model+".delete";
+        grantCommittedPermissionToTestRole(code,"data",model,"delete","Native delete fixture");
+        permissionIds.add(jdbc.queryForObject("SELECT id FROM ab_permission WHERE tenant_id=? AND code=?",Long.class,testTenant.getId(),code));
+        data.delete(model,pid);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE pid=? AND deleted_flag=FALSE",Long.class,pid)).isZero();
+        String first = Objects.toString(data.create(model,new LinkedHashMap<>(Map.of(label,"batch-delete-first"))).get("pid"));
+        String second = Objects.toString(data.create(model,new LinkedHashMap<>(Map.of(label,"batch-delete-second"))).get("pid"));
+        data.batchDelete(model,List.of(first,second));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE pid IN (?,?) AND deleted_flag=FALSE",Long.class,first,second)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE deleted_flag=TRUE",Long.class)).isEqualTo(3);
+    }
+
+    @Test void createOnlyActorReceivesAnEnvelopeWithoutLosingTheCreatedBusinessRow() {
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET status='inactive' FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                testRole.getId(),testTenant.getId(),"model."+model+".read")).isEqualTo(1);
+        var result = data.create(model,new LinkedHashMap<>(Map.of(label,"write-only-created")));
+        assertThat(result).containsOnlyKeys("pid","row_version");
+        String created = Objects.toString(result.get("pid"));
+        assertThat(stored(label,created)).isEqualTo("write-only-created");
+        assertThat(stored(quantity,created)).isEqualTo(7);
+        assertThatThrownBy(() -> data.getById(model,created)).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test void nativeCreateUsesTheActualDefaultedRowAndRejectsForbiddenFieldsWithoutInsertion() throws Exception {

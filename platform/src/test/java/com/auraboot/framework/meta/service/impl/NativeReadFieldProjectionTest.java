@@ -25,6 +25,9 @@ class NativeReadFieldProjectionTest {
             FieldDefinition.builder().code("secret").columnName("stored_secret").build())).build();
     @BeforeEach void context() {
         MetaContext.setContext(100L,1L,"actor","actor"); MetaContext.setMemberId(5L);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         when(transactions.getTransaction(any())).thenAnswer(call -> {
             TransactionDefinition definition = call.getArgument(0);
             assertThat(definition.isReadOnly()).isTrue();
@@ -33,7 +36,7 @@ class NativeReadFieldProjectionTest {
             return new SimpleTransactionStatus();
         });
     }
-    @AfterEach void clear() { MetaContext.clear(); }
+    @AfterEach void clear() { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.clear(); }
     private BusinessGrantDecision allow(String pid,String... fields) {
         return new BusinessGrantDecision(PermissionResult.allow(List.of()),100L,1L,5L,"project",pid,
                 List.of(new BusinessGrantDecision.Grant(10L,11L,"model.project.read",
@@ -101,6 +104,7 @@ class NativeReadFieldProjectionTest {
     }
 
     @Test void independentReadStartsSnapshotBeforeInvokingTheRecordLoader() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.clear();
         assertThat(projection.readWithinSnapshot("project", () -> "loaded")).isEqualTo("loaded");
         verify(transactions).getTransaction(any());
         verify(transactions).commit(any());
@@ -125,11 +129,52 @@ class NativeReadFieldProjectionTest {
         org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
         org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
         try {
-            assertThat(projection.readWithinSnapshot("project", () -> "own-uncommitted-row")).isEqualTo("own-uncommitted-row");
+            when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allow("record","name"));
+            assertThat(projection.readWithinSnapshot("project", () -> projection.project(model,
+                    List.of(row(Map.of("pid","record","name","own-uncommitted-row","secret","PRIVATE"))))))
+                    .containsExactly(Map.of("pid","record","name","own-uncommitted-row"));
             verifyNoInteractions(transactions);
         } finally {
             org.springframework.transaction.support.TransactionSynchronizationManager.clear();
         }
+    }
+
+    @Test void weakWriteTransactionIsRejectedBeforeLoadingRowsOrOpeningAnotherSnapshot() {
+        var invoked = new java.util.concurrent.atomic.AtomicBoolean();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        assertThatThrownBy(() -> projection.readWithinSnapshot("project", () -> { invoked.set(true); return "row"; }))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> projection.project(model,List.of(row(Map.of("pid","record","name","unsafe")))))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThat(invoked).isFalse();
+        verifyNoInteractions(transactions,authorization);
+    }
+
+    @Test void anAlreadyLoadedRowCannotStartANewGrantSnapshotAtProjectionTime() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        assertThatThrownBy(() -> projection.project(model,List.of(row(Map.of("pid","record","name","stale")))))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(transactions,authorization);
+    }
+
+    @Test void ordinaryWriteResultsUseThePublicReaderInsteadOfTheInternalSnapshot() {
+        var actual = Map.<String,Object>of("pid","record","tenant_id",100L,"row_version",7L,"name","Board","secret","PRIVATE");
+        var visible = Map.<String,Object>of("pid","record","row_version",7L,"name","Board");
+        assertThat(projection.publicWriteResult(model,actual,() -> visible)).isEqualTo(visible);
+        assertThat(actual).containsEntry("secret","PRIVATE");
+    }
+
+    @Test void writeOnlyResultsAreAnEnvelopeAndNeverMaskStorageFailures() {
+        var actual = Map.<String,Object>of("pid","record","tenant_id",100L,"row_version",7L,"secret","PRIVATE");
+        assertThat(projection.publicWriteResult(model,actual,() -> {throw new AccessDeniedException("read denied");}))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("pid","record","row_version",7L));
+        assertThatThrownBy(() -> projection.publicWriteResult(model,actual,() -> {throw new IllegalStateException("storage failed");}))
+                .isInstanceOf(IllegalStateException.class).hasMessage("storage failed");
+        assertThatThrownBy(() -> projection.publicWriteResult(model,actual,() -> Map.of("pid","other")))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> projection.publicWriteResult(model,Map.of("pid","record","tenant_id",101L),() -> Map.of("pid","record")))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
 }

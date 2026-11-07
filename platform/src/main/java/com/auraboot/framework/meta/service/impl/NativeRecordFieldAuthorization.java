@@ -56,7 +56,6 @@ public class NativeRecordFieldAuthorization {
         var conditions = new ArrayList<QueryCondition>();
         conditions.add(QueryCondition.builder().fieldName(primary.getCode()).operator(QueryCondition.Operator.EQ).value(recordId).build());
         conditions.add(QueryCondition.builder().fieldName("tenant_id").operator(QueryCondition.Operator.EQ).value(MetaContext.getCurrentTenantId()).build());
-        if (model.isSoftDelete()) conditions.add(QueryCondition.builder().fieldName("deleted_flag").operator(QueryCondition.Operator.EQ).value(false).build());
         var lockConditions = new LinkedHashMap<String,Object>();
         lockConditions.put("tenant_id", MetaContext.getCurrentTenantId());
         lockConditions.put(primary.getColumnName() != null ? primary.getColumnName() : primary.getCode(), recordId);

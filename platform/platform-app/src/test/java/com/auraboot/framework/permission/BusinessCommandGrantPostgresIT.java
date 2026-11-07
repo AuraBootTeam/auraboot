@@ -343,6 +343,63 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(allowed.getFirst()).containsEntry("warehouse","Shanghai").containsKey("pid");
     }
 
+    private com.auraboot.framework.meta.dto.ModelDefinition writeReadbackDefinition() throws Exception {
+        code = "model." + model + ".read";
+        jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='read' WHERE id=?",code,model,permissionId);
+        jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE id=?",bindingA);
+        jdbc.update("UPDATE ab_role_permission SET condition_ast=?::jsonb,field_scope=?::jsonb WHERE id=?",
+                warehouseAst("Beijing"),fieldScope("warehouse"),bindingB);
+        jdbc.update("UPDATE ab_role SET name='Beijing' WHERE id=?",roleA);
+        return com.auraboot.framework.meta.dto.ModelDefinition.builder().code(model).fields(List.of(
+                com.auraboot.framework.meta.dto.FieldDefinition.builder().code("warehouse").columnName("warehouse").build())).build();
+    }
+
+    private Map<String,Object> writeReadbackRow() {
+        return jdbc.queryForMap("""
+                SELECT pid,name AS warehouse,pid AS __ab_auth_pid,tenant_id AS __ab_auth_tenant,
+                       -1 AS __ab_auth_creator FROM ab_role WHERE id=?
+                """,roleA);
+    }
+
+    @Test void writeReadbackCannotSpliceItsUncommittedRowWithALaterCommittedGrant() throws Exception {
+        var definition = writeReadbackDefinition();
+        String laterCondition = warehouseAst("Shanghai");
+        var transaction = new TransactionTemplate(transactions);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> transaction.execute(status -> {
+            jdbc.update("UPDATE ab_role SET name='Shanghai' WHERE id=?",roleA);
+            return nativeFields.readWithinSnapshot(model, () -> {
+                var row = writeReadbackRow();
+                assertThat(row.get("warehouse")).isEqualTo("Shanghai");
+                var concurrent = new TransactionTemplate(transactions);
+                concurrent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                concurrent.executeWithoutResult(other -> jdbc.update(
+                        "UPDATE ab_role_permission SET condition_ast=?::jsonb WHERE id=?",laterCondition,bindingB));
+                return nativeFields.project(definition,List.of(row));
+            });
+        })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(jdbc.queryForObject("SELECT name FROM ab_role WHERE id=?",String.class,roleA)).isEqualTo("Beijing");
+        assertThat(authorization.resolveOrdinaryRead(member(),model,record(false,"Beijing")).result().granted()).isFalse();
+    }
+
+    @Test void writeReadbackSeesItsOwnUncommittedRowAndMatchingGrant() throws Exception {
+        var definition = writeReadbackDefinition();
+        String ownCondition = warehouseAst("Shanghai");
+        var transaction = new TransactionTemplate(transactions);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var result = transaction.execute(status -> {
+            jdbc.update("UPDATE ab_role SET name='Shanghai' WHERE id=?",roleA);
+            jdbc.update("UPDATE ab_role_permission SET condition_ast=?::jsonb WHERE id=?",ownCondition,bindingB);
+            var projected = nativeFields.readWithinSnapshot(model,
+                    () -> nativeFields.project(definition,List.of(writeReadbackRow())));
+            assertThat(projected).hasSize(1);
+            assertThat(projected.getFirst()).containsEntry("warehouse","Shanghai").containsKey("pid");
+            return projected;
+        });
+        assertThat(result).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT name FROM ab_role WHERE id=?",String.class,roleA)).isEqualTo("Shanghai");
+    }
+
     @Test void ordinaryModelUpdateFieldsDoNotBorrowAnotherRolesScopeOrCondition() throws Exception {
         code = "model." + model + ".update";
         jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='update' WHERE id=?",code,model,permissionId);

@@ -57,13 +57,23 @@ public final class BusinessResourceDataScope {
     /** Core's own exact post-write snapshot retains the resource bound instead of a global ALL. */
     static <T> T readback(String model,String pid,Supplier<T> read) {
         var lease=CURRENT.get();
-        if(lease==null)return com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitScope("ALL",read);
+        if(lease==null)return com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET",null,model,pid,read);
         if(!lease.consumed || !Objects.equals(model,lease.model)
                 || !(lease.action==Action.UPDATE && Objects.equals(pid,lease.pid)
                 || lease.action==Action.CREATE && Objects.equals(pid,lease.createdPid)))lease.deny();
         boolean previous=lease.readback;lease.readback=true;
         try {return com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET",null,model,pid,read);}
         finally {lease.readback=previous;}
+    }
+    /** A verified native loan keeps its internal result for the owner's later public projection. */
+    static boolean retainsWriteResult(String model,String pid) {
+        var lease=CURRENT.get();
+        if(lease==null)return false;
+        lease.verify.run();
+        if(!lease.consumed || !Objects.equals(model,lease.model)
+                || !(lease.action==Action.UPDATE && Objects.equals(pid,lease.pid)
+                || lease.action==Action.CREATE && Objects.equals(pid,lease.createdPid)))lease.deny();
+        return true;
     }
     /** Observation only: the factory still validates its actor, witness and physical transaction. */
     public static boolean matchesReadbackPermit(String model,String pid) {

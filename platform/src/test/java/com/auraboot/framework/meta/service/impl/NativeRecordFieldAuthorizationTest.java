@@ -143,4 +143,14 @@ class NativeRecordFieldAuthorizationTest {
                 .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
     }
 
+    @Test void softDeleteUsesTheHostPredicateWithoutRequiringAPublishedAuditField() {
+        model.setSoftDelete(true);
+        model.setFields(model.getFields().stream().filter(field -> !"deleted_flag".equals(field.getCode())).toList());
+        when(authorization.resolveOrdinaryUpdate(eq(5L),eq("project"),anyMap())).thenReturn(allowed("record"));
+        boundary.requireUpdate("project","record",Map.of("name","after"));
+        verify(rows).selectByQuery(argThat(sql -> sql.contains("deleted_flag")),anyMap());
+        verify(rows).selectRecordWriterTargetsForUpdate(eq("mt_project"),eq("pid"),eq("native_target_pid"),
+                argThat(target -> Boolean.FALSE.equals(target.get("deleted_flag"))));
+    }
+
 }
