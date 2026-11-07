@@ -67,7 +67,7 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Override
     @Cacheable(value = "dataScopeCondition",
             cacheManager = "permissionCacheManager",
-            key = "#memberId + ':' + #resourceCode + ':' + #actionCode")
+            key = "T(com.auraboot.framework.meta.cache.DataAccessCacheEpoch).current() + ':' + #memberId + ':' + #resourceCode + ':' + #actionCode")
     public DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode) {
         return resolveScopeInternal(memberId, resourceCode, actionCode, false);
     }
