@@ -1,6 +1,6 @@
 package com.auraboot.framework.plugin.extension;
 
-/** Server-owned classification of a scalar business result. Model data is never an acknowledgement. */
+/** Server-owned scalar or empty protocol result. Model data is never an acknowledgement. */
 public record BusinessResultField(Kind kind, String sourceField, Object constant, int maximum) {
     public enum Kind { ROOT_FIELD, ROOT_ID, CONSTANT, BOOLEAN, COUNT, DERIVED_ROOT_FIELD }
     public BusinessResultField {
@@ -8,9 +8,12 @@ public record BusinessResultField(Kind kind, String sourceField, Object constant
         if (kind == Kind.ROOT_FIELD || kind == Kind.DERIVED_ROOT_FIELD) BusinessResourceAuthorization.identifier(sourceField);
         else if (sourceField != null) throw new IllegalArgumentException("Unexpected result source");
         if (kind == Kind.CONSTANT) {
+            // Preserve existing empty validation envelopes without accepting any model rows.
+            if (constant instanceof java.util.List<?> list && list.isEmpty()) constant = java.util.List.of();
             if (!(constant == null || constant instanceof String || constant instanceof Boolean
-                    || constant instanceof Integer || constant instanceof Long))
-                throw new IllegalArgumentException("Immutable scalar result constant required");
+                    || constant instanceof Integer || constant instanceof Long
+                    || constant instanceof java.util.List<?> list && list.isEmpty()))
+                throw new IllegalArgumentException("Immutable scalar or empty-list result constant required");
         } else if (constant != null) throw new IllegalArgumentException("Unexpected result constant");
         if (kind == Kind.COUNT ? maximum < 0 : maximum != 0)
             throw new IllegalArgumentException("Invalid result count bound");

@@ -102,6 +102,25 @@ class CommandResultProjectionServiceTest {
         assertThat(service.project(context,Map.of("success",true,"amount",17,"margin",17)))
                 .containsEntry("amount","**").containsEntry("margin","**");
     }
+    @Test void emptyProtocolListCannotCarryModelDataOrShareMutableState() {
+        var declaration = new ArrayList<Object>();
+        var field = BusinessResultField.constant(declaration);
+        declaration.add("private-data");
+        when(owner.businessResultFields()).thenReturn(Set.of("validationErrors"));
+        when(owner.businessResultProjection()).thenReturn(Map.of("validationErrors", field));
+        prepare();
+        var internal = new ArrayList<Object>();
+        var result = service.project(context, Map.of("validationErrors", internal));
+        internal.add("late-mutation");
+        assertThat((List<?>) result.get("validationErrors")).isEmpty();
+        assertThatThrownBy(() -> service.project(context, Map.of("validationErrors", List.of("private-data"))))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.project(context, Map.of("validationErrors", Map.of())))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> BusinessResultField.constant(List.of("private-data")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void numericProtocolConstantSurvivesJsonIntegerWidthChanges() {
         when(owner.businessResultFields()).thenReturn(Set.of("version"));
         when(owner.businessResultProjection()).thenReturn(Map.of("version",BusinessResultField.constant(1L)));
