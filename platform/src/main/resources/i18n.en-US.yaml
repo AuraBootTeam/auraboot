@@ -2891,3 +2891,5 @@ im.agent.replyFailed: "The AI reply could not be completed. Please retry or cont
 "roleGrantFields.authorization": "Business authorization"
 "roleGrantFields.action.manage": "Manage authorization"
 "roleGrantFields.action.execute": "Execute authorization"
+
+"command.transition.not_allowed": "This operation is not allowed in the current task state. Refresh and try again."

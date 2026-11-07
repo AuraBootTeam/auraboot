@@ -341,6 +341,18 @@ class CommandTargetVersionLockPhaseTest {
         verifyNoInteractions(metaModelService, dynamicDataMapper, extensionRegistry, pluginHandler);
     }
 
+    @Test void currentStateCannotReplaceTheVersionUsedByTheBusinessAuthorizationDecision() {
+        givenPhysicalModel();
+        var ctx = currentStateContext(1);
+        ctx.setTargetRecordVersion(7L);
+        ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
+                "dq:release", "dq_quote_request", "REQ-1", "update", 41L, 9L, 3L));
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
+                .thenReturn(List.of(Map.of("row_version", 8L)));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(CasVersionConflictException.class);
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(7L);
+    }
+
     private CommandPipelineContext unsupportedContext(Integer version) {
         var ctx = context(version);
         ctx.getCommand()

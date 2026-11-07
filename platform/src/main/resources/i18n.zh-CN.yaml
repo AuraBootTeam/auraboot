@@ -3082,3 +3082,5 @@ im.agent.replyFailed: "AI 回复未能完成，请重试或联系管理员。"
 "roleGrantFields.authorization": "业务授权"
 "roleGrantFields.action.manage": "管理授权"
 "roleGrantFields.action.execute": "执行授权"
+
+"command.transition.not_allowed": "当前任务状态不允许此操作，请刷新后重试。"

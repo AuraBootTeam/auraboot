@@ -109,8 +109,11 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
                 tableName, primaryKeyColumn, ctx.getTenantId(),
                 ctx.getRequest().getTargetRecordId());
         Long authoritative = resolveVersion(rows);
+        Long authorizedVersion = ctx.getTargetRecordVersion();
         Integer requested = ctx.getRequest().getExpectedVersion();
-        if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)) {
+        if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)
+                || (currentStateLock && ctx.getBusinessTargetAuthorization() != null
+                    && !java.util.Objects.equals(authorizedVersion, authoritative))) {
             throw new CasVersionConflictException(
                     "Command target version conflict (expected " + requested
                             + ", current " + (authoritative == null ? "unavailable" : authoritative)

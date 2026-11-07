@@ -39,6 +39,8 @@ public final class CommandIdempotencyIntent {
         intent.put("expectedVersion", request == null ? null : request.getExpectedVersion());
         intent.put("payload", immutableValue(ctx.getPayload()));
         intent.put("dryRun", request != null && request.isDryRun());
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresTransition(ctx))
+            intent.put("nativeTransitionDefinition", immutableValue(ctx.getExecConfig()));
         if (ctx.getPublicOutputProjection() != null && !ctx.getPublicOutputProjection().models().isEmpty()) {
             intent.put("publicOutputPolicy", ctx.getPublicOutputProjection().fingerprint());
             if (ctx.getArtifactRootBinding() != null && !ctx.getArtifactRootBinding().isEmpty())

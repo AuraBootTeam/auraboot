@@ -111,7 +111,7 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
     @Select("""
         SELECT * FROM ab_command_definition
         WHERE is_current = TRUE AND deleted_flag = FALSE AND status = 'published'
-          AND jsonb_extract_path_text(execution_config, 'type') IN ('create', 'update', 'delete')
+          AND jsonb_extract_path_text(execution_config, 'type') IN ('create', 'update', 'delete', 'state_transition')
           AND jsonb_extract_path_text(execution_config, 'handlerParams', 'targetRecordAuthorization') = 'business'
         ORDER BY code
         """)

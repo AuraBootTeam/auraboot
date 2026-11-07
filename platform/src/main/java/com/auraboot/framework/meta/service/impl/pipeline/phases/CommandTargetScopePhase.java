@@ -330,6 +330,8 @@ public class CommandTargetScopePhase implements CommandPhase {
                     ? businessAuthorization.resolveNative(member, codes, modelCode, record, action)
                     : businessAuthorization.resolve(member, codes, modelCode, record);
             if (result == null || !result.result().granted()) return false;
+            if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresTransition(ctx))
+                com.auraboot.framework.meta.security.NativeBusinessCommandContract.validateTransitionState(ctx.getExecConfig(), record, true);
             ctx.setBusinessGrantDecision(result);
             ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
