@@ -628,4 +628,19 @@ class DataScopeServiceImplTest {
         assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
     }
 
+    @Test
+    void resolveScopeCacheKeyEmbedsTheDataAccessEpoch() throws NoSuchMethodException {
+        var key = DataScopeServiceImpl.class
+                .getMethod("resolveScope", Long.class, String.class, String.class)
+                .getAnnotation(org.springframework.cache.annotation.Cacheable.class)
+                .key();
+        assertThat(key).contains("T(com.auraboot.framework.meta.cache.DataAccessCacheEpoch).current()");
+        // A permission-affecting event (PermissionCacheEvictionListener) advances the epoch,
+        // so the member-scoped condition key from before the event is never hit again even
+        // before the after-commit region eviction runs.
+        long before = com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current();
+        long after = com.auraboot.framework.meta.cache.DataAccessCacheEpoch.bump();
+        assertThat(after).isGreaterThan(before);
+    }
+
 }
