@@ -259,9 +259,9 @@ compileTestJava {
 // 版本管理
 ext {
     jacksonVersion = '2.22.3'
-    tencentCloudSdkVersion = '3.1.1516'
+    tencentCloudSdkVersion = '3.2.48'
     commonsConfigurationVersion = '2.15.1'
-    commonsLangVersion = '3.20.0'
+    commonsLangVersion = '3.21.0'
     commonsTextVersion = '1.15.0'
     log4jVersion = '2.25.5'
     sentryVersion = '8.62.0'
@@ -272,7 +272,7 @@ ext {
     reflectasmVersion = '1.11.3'
     validationApiVersion = '2.0.1.Final'
     // PF4J Plugin Framework
-    pf4jVersion = '3.16.0'
+    pf4jVersion = '3.16.1'
     pf4jSpringVersion = '0.10.0'
     springKafkaVersion = '4.1.2'
     kafkaClientsVersion = '4.2.2'
@@ -395,7 +395,7 @@ dependencies {
     implementation 'org.apache.poi:poi-scratchpad:5.5.1'
 
     // HTML parsing for RAG document ingestion (DocumentParserService)
-    implementation 'org.jsoup:jsoup:1.23.2'
+    implementation 'org.jsoup:jsoup:1.24.1'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
     implementation('com.google.firebase:firebase-admin:9.11.0') {
