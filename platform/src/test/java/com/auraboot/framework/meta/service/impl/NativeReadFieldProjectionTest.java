@@ -20,7 +20,7 @@ class NativeReadFieldProjectionTest {
     private final BusinessCommandRecordAuthorization authorization = mock(BusinessCommandRecordAuthorization.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final NativeReadFieldProjection projection = new NativeReadFieldProjection(authorization, transactions);
-    private final ModelDefinition model = ModelDefinition.builder().code("project").fields(List.of(
+    private final ModelDefinition model = ModelDefinition.builder().code("project").tableName("mt_project").fields(List.of(
             FieldDefinition.builder().code("name").columnName("stored_name").build(),
             FieldDefinition.builder().code("secret").columnName("stored_secret").build())).build();
     @BeforeEach void context() {
@@ -39,34 +39,59 @@ class NativeReadFieldProjectionTest {
                 List.of(new BusinessGrantDecision.Grant(10L,11L,"model.project.read",
                         new BusinessGrantDecision.Fields(false,Set.of(fields),Set.of()))));
     }
+    private Map<String,Object> row(Map<String,Object> data) {
+        var row = new LinkedHashMap<>(data);
+        row.put("__ab_auth_pid",data.get("pid")); row.put("__ab_auth_tenant",100L); row.put("__ab_auth_creator",1L);
+        return row;
+    }
     @Test void evaluatesCanonicalRowsBeforeRemovingUnallowedFieldsAndColumnAliases() {
-        var row = Map.<String,Object>of("pid","record","tenant_id",100L,"stored_name","Board","stored_secret","PRIVATE");
-        when(authorization.resolveOrdinaryRead(5L,"project",row)).thenReturn(allow("record","name"));
+        var row = row(Map.<String,Object>of("pid","record","stored_name","Board","stored_secret","PRIVATE"));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allow("record","name"));
         assertThat(projection.project(model,List.of(row))).containsExactly(Map.of("pid","record","stored_name","Board"));
         assertThat(row).containsEntry("stored_secret","PRIVATE");
-        verify(authorization).resolveOrdinaryRead(5L,"project",row);
+        verify(authorization).resolveOrdinaryRead(eq(5L),eq("project"),argThat(value ->
+                value.get("tenant_id").equals(100L) && value.get("created_by").equals(1L)
+                        && value.get("secret").equals("PRIVATE") && !value.containsKey("__ab_auth_pid")));
     }
     @Test void eachRowConsumesOnlyItsOwnMatchedGrantFields() {
-        var first=Map.<String,Object>of("pid","first","name","A","secret","X");
-        var second=Map.<String,Object>of("pid","second","name","B","secret","Y");
-        when(authorization.resolveOrdinaryRead(5L,"project",first)).thenReturn(allow("first","name"));
-        when(authorization.resolveOrdinaryRead(5L,"project",second)).thenReturn(allow("second","secret"));
+        var first=row(Map.<String,Object>of("pid","first","name","A","secret","X"));
+        var second=row(Map.<String,Object>of("pid","second","name","B","secret","Y"));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),argThat(value -> "first".equals(value.get("pid"))))).thenReturn(allow("first","name"));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),argThat(value -> "second".equals(value.get("pid"))))).thenReturn(allow("second","secret"));
         assertThat(projection.project(model,List.of(first,second))).containsExactly(
                 Map.of("pid","first","name","A"),Map.of("pid","second","secret","Y"));
     }
     @Test void deniedOrMismatchedDecisionsNeverReturnUnfilteredRows() {
-        var row=Map.<String,Object>of("pid","record","secret","PRIVATE");
-        when(authorization.resolveOrdinaryRead(5L,"project",row)).thenReturn(allow("another","secret"));
+        var row=row(Map.<String,Object>of("pid","record","secret","PRIVATE"));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allow("another","secret"));
         assertThatThrownBy(()->projection.project(model,List.of(row))).isInstanceOf(AccessDeniedException.class);
-        when(authorization.resolveOrdinaryRead(5L,"project",row)).thenReturn(new BusinessGrantDecision(
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(new BusinessGrantDecision(
                 PermissionResult.deny("revoked",List.of()),100L,1L,5L,"project","record",List.of()));
         assertThatThrownBy(()->projection.project(model,List.of(row))).isInstanceOf(AccessDeniedException.class);
     }
     @Test void legacyUnrestrictedGrantPreservesTheExistingDataShape() {
-        var row=Map.<String,Object>of("pid","record","secret","PRIVATE");
-        when(authorization.resolveOrdinaryRead(5L,"project",row)).thenReturn(new BusinessGrantDecision(
+        var row=row(Map.<String,Object>of("pid","record","secret","PRIVATE"));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(new BusinessGrantDecision(
                 PermissionResult.allow(List.of()),100L,1L,5L,"project","record",List.of(
                 new BusinessGrantDecision.Grant(10L,11L,"model.project.read",BusinessGrantDecision.Fields.legacy()))));
-        assertThat(projection.project(model,List.of(row))).containsExactly(row);
+        assertThat(projection.project(model,List.of(row))).containsExactly(Map.of("pid","record","secret","PRIVATE"));
     }
+    @Test void missingHostFactsAndUnpublishedFieldsDoNotBecomeReadable() {
+        var raw = Map.<String,Object>of("pid","record","rogue","PRIVATE");
+        assertThatThrownBy(() -> projection.project(model,List.of(raw))).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(authorization);
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allow("record","rogue"));
+        assertThat(projection.project(model,List.of(row(raw)))).containsExactly(Map.of("pid","record"));
+    }
+
+    @Test void queryAddsOnlyFixedHostFactsWithoutReplacingTheBusinessSelection() {
+        var builder = new QueryBuilderServiceImpl(mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class))
+                .buildConditionQuery(model,List.of());
+        var original = List.copyOf(builder.getSelectFields());
+        NativeReadFieldProjection.prepareQuery(model,builder);
+        assertThat(builder.getSql()).contains("stored_name", "pid AS __ab_auth_pid", "tenant_id AS __ab_auth_tenant", "created_by AS __ab_auth_creator");
+        NativeReadFieldProjection.prepareQuery(model,builder);
+        assertThat(builder.getSelectFields()).containsAll(original).hasSize(original.size()+3);
+    }
+
 }

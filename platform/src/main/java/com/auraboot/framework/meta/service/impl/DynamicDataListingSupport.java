@@ -224,6 +224,7 @@ final class DynamicDataListingSupport extends BaseMetaService {
             throw new MetaServiceException("Query validation failed: " + validation.getErrorMessage());
         }
 
+        NativeReadFieldProjection.prepareQuery(model, queryBuilder);
         // 手动添加租户ID条件到SQL和参数中
         String sql = queryBuilder.getSql();
         Map<String, Object> paramMap = queryBuilder.getParameterMap();

@@ -792,6 +792,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
         MachineDataAccessGuards.constrain(modelCode, queryBuilder);
 
+        NativeReadFieldProjection.prepareQuery(model, queryBuilder);
         String sql = queryBuilder.getSql();
         Map<String, Object> paramMap = queryBuilder.getParameterMap();
         List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);

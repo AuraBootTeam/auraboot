@@ -532,6 +532,17 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
             return this;
         }
 
+        @Override
+        public QueryBuilder includeNativeReadAuthorization() {
+            if (queryType != QueryType.SELECT) throw new IllegalStateException("Authorization facts require a SELECT");
+            if (selectFields.isEmpty()) selectFields.add("*");
+            for (String field : List.of("pid AS __ab_auth_pid", "tenant_id AS __ab_auth_tenant",
+                    "created_by AS __ab_auth_creator")) {
+                if (!selectFields.contains(field)) selectFields.add(field);
+            }
+            return this;
+        }
+
         public QueryBuilderImpl setSelectFields(List<String> fields) {
             this.selectFields = fields != null ? new ArrayList<>(fields) : new ArrayList<>();
             return this;
