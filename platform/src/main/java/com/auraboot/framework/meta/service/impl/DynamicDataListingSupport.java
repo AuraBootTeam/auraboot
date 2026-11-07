@@ -95,6 +95,10 @@ final class DynamicDataListingSupport extends BaseMetaService {
     private ModelDefinition getModelDefinition(String modelCode) { return getModelDefinitionOperation.execute(modelCode); }
 
     PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request){
+        return nativeReadFields.readWithinSnapshot(modelCode, () -> listInSnapshot(modelCode, request));
+    }
+
+    private PaginationResult<Map<String, Object>> listInSnapshot(String modelCode, DynamicQueryRequest request){
         validateModelCode(modelCode);
         logOperation("list", modelCode, request);
 

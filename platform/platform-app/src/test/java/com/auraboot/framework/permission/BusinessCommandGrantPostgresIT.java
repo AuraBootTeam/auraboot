@@ -39,6 +39,7 @@ import static org.mockito.Mockito.reset;
 @Transactional(propagation = Propagation.NEVER)
 class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
     @Autowired private BusinessCommandRecordAuthorization authorization;
+    @Autowired private com.auraboot.framework.meta.service.impl.NativeReadFieldProjection nativeFields;
     @Autowired private RolePermissionMapper grants;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper json;
@@ -284,6 +285,62 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(changed).isTrue();
         var after=authorization.resolve(member(),List.of(code),model,record(false,"Beijing"));
         assertThat(after.result().granted()).isTrue();assertThat(after.canWrite("cost")).isTrue();assertThat(after.canWrite("label")).isFalse();
+    }
+
+    @Test void nativeReadNeverCombinesAnOldRowWithANewGrant() throws Exception {
+        code = "model." + model + ".read";
+        jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='read' WHERE id=?",code,model,permissionId);
+        jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE id=?",bindingA);
+        jdbc.update("UPDATE ab_role_permission SET condition_ast=?::jsonb,field_scope=?::jsonb WHERE id=?",
+                warehouseAst("Beijing"),fieldScope("warehouse"),bindingB);
+        jdbc.update("UPDATE ab_role SET name='Shanghai' WHERE id=?",roleA);
+        var definition = com.auraboot.framework.meta.dto.ModelDefinition.builder().code(model).fields(List.of(
+                com.auraboot.framework.meta.dto.FieldDefinition.builder().code("warehouse").columnName("warehouse").build())).build();
+        String newCondition = warehouseAst("Shanghai");
+        var snapshot = new TransactionTemplate(transactions);
+        snapshot.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        snapshot.setReadOnly(true);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> snapshot.execute(status -> {
+            var row = jdbc.queryForMap("""
+                    SELECT pid,name AS warehouse,pid AS __ab_auth_pid,tenant_id AS __ab_auth_tenant,
+                           -1 AS __ab_auth_creator FROM ab_role WHERE id=?
+                    """,roleA);
+            assertThat(row.get("warehouse")).isEqualTo("Shanghai");
+            var writer = new TransactionTemplate(transactions);
+            writer.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            writer.executeWithoutResult(other -> {
+                jdbc.update("UPDATE ab_role SET name='Beijing' WHERE id=?",roleA);
+                jdbc.update("UPDATE ab_role_permission SET condition_ast=?::jsonb WHERE id=?",newCondition,bindingB);
+            });
+            return nativeFields.project(definition,List.of(row));
+        })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(jdbc.queryForObject("SELECT name FROM ab_role WHERE id=?",String.class,roleA)).isEqualTo("Beijing");
+        assertThat(authorization.resolveOrdinaryRead(member(),model,record(false,"Beijing")).result().granted()).isFalse();
+        String secondCondition = warehouseAst("Beijing");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> nativeFields.readWithinSnapshot(model, () -> {
+            var row = jdbc.queryForMap("""
+                    SELECT pid,name AS warehouse,pid AS __ab_auth_pid,tenant_id AS __ab_auth_tenant,
+                           -1 AS __ab_auth_creator FROM ab_role WHERE id=?
+                    """,roleA);
+            assertThat(row.get("warehouse")).isEqualTo("Beijing");
+            var writer = new TransactionTemplate(transactions);
+            writer.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            writer.executeWithoutResult(other -> {
+                jdbc.update("UPDATE ab_role SET name='Shanghai' WHERE id=?",roleA);
+                jdbc.update("UPDATE ab_role_permission SET condition_ast=?::jsonb WHERE id=?",secondCondition,bindingB);
+            });
+            return nativeFields.project(definition,List.of(row));
+        })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        // A subsequent read sees a new coherent state, and matching grants still allow data.
+        jdbc.update("UPDATE ab_role_permission SET condition_ast=?::jsonb WHERE id=?",newCondition,bindingB);
+        var allowed = nativeFields.readWithinSnapshot(model, () -> nativeFields.project(definition,List.of(
+                jdbc.queryForMap("""
+                        SELECT pid,name AS warehouse,pid AS __ab_auth_pid,tenant_id AS __ab_auth_tenant,
+                               -1 AS __ab_auth_creator FROM ab_role WHERE id=?
+                        """,roleA))));
+        assertThat(allowed).hasSize(1);
+        assertThat(allowed.getFirst()).containsEntry("warehouse","Shanghai").containsKey("pid");
     }
 
     @Test void ordinaryModelReadFieldsFollowEachMatchingRoleWithoutCrossMultiplication() throws Exception {

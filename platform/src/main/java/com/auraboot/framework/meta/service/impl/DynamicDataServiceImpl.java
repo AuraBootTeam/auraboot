@@ -747,6 +747,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private Map<String, Object> getByIdInternal(String modelCode, String recordId, boolean enrichDisplay) {
+        return nativeReadFields.readWithinSnapshot(modelCode, () -> getByIdInSnapshot(modelCode, recordId, enrichDisplay));
+    }
+
+    private Map<String, Object> getByIdInSnapshot(String modelCode, String recordId, boolean enrichDisplay) {
         BusinessResourceDataScope.read(modelCode, recordId);
         RequiredRecordReadGuard.beforeIndependentRecordLoad();
         validateModelCode(modelCode);

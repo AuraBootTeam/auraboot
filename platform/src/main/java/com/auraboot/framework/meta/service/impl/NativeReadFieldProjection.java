@@ -26,6 +26,37 @@ public class NativeReadFieldProjection {
                 && !MetaContext.hasCommandPermitScopeFor(model.getCode())) query.includeNativeReadAuthorization();
     }
 
+    /** Keep physical row reads and their grants in one MVCC view for independent human reads. */
+    public <T> T readWithinSnapshot(String modelCode, java.util.function.Supplier<T> operation) {
+        if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null
+                || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                || MetaContext.hasCommandPermitScopeFor(modelCode)) return operation.get();
+        if (coherentReadSnapshot()) return operation.get();
+        // Write readback must see its own uncommitted rows. Its separate authorization contract
+        // is unchanged here; never suspend it and silently return a pre-write row.
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly())
+            return operation.get();
+        return snapshot().execute(status -> operation.get());
+    }
+
+    private static boolean coherentReadSnapshot() {
+        Integer isolation = org.springframework.transaction.support.TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
+        return org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()
+                && isolation != null && (isolation == TransactionDefinition.ISOLATION_REPEATABLE_READ
+                || isolation == TransactionDefinition.ISOLATION_SERIALIZABLE);
+    }
+
+    private TransactionTemplate snapshot() {
+        var snapshot = new TransactionTemplate(transactions);
+        snapshot.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        snapshot.setReadOnly(true);
+        return snapshot;
+    }
+
     public List<Map<String,Object>> project(ModelDefinition model, List<Map<String,Object>> records) {
         if (records.isEmpty()) return records;
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
@@ -33,13 +64,13 @@ public class NativeReadFieldProjection {
                 || MetaContext.hasCommandPermitScopeFor(model.getCode())) throw denied();
         // Background execution without a human member retains its separate authorization path.
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null) return records;
-        var snapshot = new TransactionTemplate(transactions);
-        snapshot.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
-        snapshot.setReadOnly(true);
-        // Like native-create authorization, grant reads use one fresh snapshot without committing
-        // an enclosing business write. The supplied canonical row never leaves this host boundary.
-        return Objects.requireNonNull(snapshot.execute(status -> {
+        if (coherentReadSnapshot()) return projectInSnapshot(model, records);
+        // Preserve the existing write-readback path until its prospective-row contract is unified.
+        // Independent public reads enter readWithinSnapshot before selecting physical rows.
+        return Objects.requireNonNull(snapshot().execute(status -> projectInSnapshot(model, records)));
+    }
+
+    private List<Map<String,Object>> projectInSnapshot(ModelDefinition model, List<Map<String,Object>> records) {
             List<Map<String,Object>> result = new ArrayList<>(records.size());
             for (var record : records) {
                 if (!(record.get("__ab_auth_pid") instanceof String pid) || pid.isBlank()
@@ -76,7 +107,6 @@ public class NativeReadFieldProjection {
                 result.add(projected);
             }
             return result;
-        }));
     }
 
     private static AccessDeniedException denied() {

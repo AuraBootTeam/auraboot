@@ -100,4 +100,36 @@ class NativeReadFieldProjectionTest {
         assertThat(projection.project(model,List.of(value))).containsExactly(Map.of("pid","record","name","Board","row_version",7L));
     }
 
+    @Test void independentReadStartsSnapshotBeforeInvokingTheRecordLoader() {
+        assertThat(projection.readWithinSnapshot("project", () -> "loaded")).isEqualTo("loaded");
+        verify(transactions).getTransaction(any());
+        verify(transactions).commit(any());
+    }
+
+    @Test void coherentReadSnapshotIsNotReplacedAfterLoadingTheRow() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try {
+            when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allow("record","name"));
+            assertThat(projection.readWithinSnapshot("project", () -> projection.project(model,
+                    List.of(row(Map.of("pid","record","name","Board","secret","PRIVATE"))))))
+                    .containsExactly(Map.of("pid","record","name","Board"));
+            verifyNoInteractions(transactions);
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
+    }
+
+    @Test void ambientWriteReadbackIsNotSilentlyReplacedByACommittedHistoricalRow() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
+        try {
+            assertThat(projection.readWithinSnapshot("project", () -> "own-uncommitted-row")).isEqualTo("own-uncommitted-row");
+            verifyNoInteractions(transactions);
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
+    }
+
 }

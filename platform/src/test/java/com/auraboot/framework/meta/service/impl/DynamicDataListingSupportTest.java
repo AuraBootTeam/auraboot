@@ -22,6 +22,8 @@ class DynamicDataListingSupportTest {
     private static NativeReadFieldProjection projection() {
         var projection = mock(NativeReadFieldProjection.class);
         org.mockito.Mockito.lenient().when(projection.project(any(), anyList())).thenAnswer(call -> call.getArgument(1));
+        org.mockito.Mockito.lenient().when(projection.readWithinSnapshot(anyString(), any()))
+                .thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(1)).get());
         return projection;
     }
     @Test void namedQueryReceivesScalarSetAndRangeConditionsAndRequestedSort() {

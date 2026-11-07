@@ -84,6 +84,8 @@ class DynamicDataServiceImplExportFailSecureTest {
     @org.mockito.Mock private NativeReadFieldProjection nativeReadFields;
     @org.junit.jupiter.api.BeforeEach
     void stubIndependentNativeFieldBoundary() {
+        org.mockito.Mockito.lenient().when(nativeReadFields.readWithinSnapshot(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(1)).get());
         org.mockito.Mockito.lenient().when(nativeReadFields.project(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyList())).thenAnswer(call -> call.getArgument(1));
     }
