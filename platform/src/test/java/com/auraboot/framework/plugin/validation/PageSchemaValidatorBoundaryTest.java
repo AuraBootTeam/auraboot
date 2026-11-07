@@ -159,11 +159,14 @@ class PageSchemaValidatorBoundaryTest {
         var page = page(Map.of("id", "form", "blockType", "form-section", "fields", List.of(Map.of("field", "name"))));
         page.setKind("form"); var manifest = manifest(page); manifest.setFields(List.of(field));
         var noModel = binding("ignored", false); noModel.setModelCode(" ");
-        manifest.setModelFieldBindings(List.of(noModel, binding("name", false)));
+        // Required-ness is derived from the MODEL field binding (modelIndex.requiredFieldsByModel),
+        // not from the page field's own constraint flag — the rule then demands the page field
+        // project required=true onto editable (form) pages only.
+        manifest.setModelFieldBindings(List.of(noModel, binding("name", true)));
         assertTrue(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
         page.setKind("detail");
         assertFalse(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
-        constraints.setRequired(false); page.setKind("form");
+        manifest.setModelFieldBindings(List.of(noModel, binding("name", false))); page.setKind("form");
         assertFalse(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
     }
 
