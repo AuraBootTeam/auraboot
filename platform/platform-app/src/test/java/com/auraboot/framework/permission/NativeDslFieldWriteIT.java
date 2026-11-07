@@ -202,6 +202,96 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         assertThatThrownBy(() -> data.getById(model, createdPid)).isInstanceOf(AccessDeniedException.class);
     }
 
+    @Test void jointSaveCreatesAnAuthorizedMasterAndProjectsItsPublicFields() throws Exception {
+        restrictGrantFields("create", List.of(), List.of(label));
+        restrictGrantFields("read", List.of(label), List.of());
+        var result = data.saveWithRelations(model, com.auraboot.framework.meta.dto.JointSubTableSaveRequest.builder()
+                .masterData(new LinkedHashMap<>(Map.of(label, "joint-created"))).build());
+        assertThat(result.getSuccess()).as("joint errors: %s", result.getErrors()).isTrue();
+        assertThat(result.getMasterRecord()).containsEntry(label, "joint-created")
+                .doesNotContainKeys(quantity, secret, hidden, "tenant_id");
+        assertThat(stored(label, result.getMasterId())).isEqualTo("joint-created");
+        assertThat(stored(quantity, result.getMasterId())).isEqualTo(7);
+        assertThat(count()).isEqualTo(2);
+    }
+
+    @Test void jointSaveUpdatesOnlyFieldsPermittedByTheMatchingUpdateGrant() throws Exception {
+        restrictGrantFields("update", List.of(), List.of(label));
+        restrictGrantFields("read", List.of(label), List.of());
+        var allowed = data.saveWithRelations(model, com.auraboot.framework.meta.dto.JointSubTableSaveRequest.builder()
+                .masterData(new LinkedHashMap<>(Map.of("pid", pid, label, "joint-updated"))).build());
+        assertThat(allowed.getSuccess()).as("joint errors: %s", allowed.getErrors()).isTrue();
+        assertThat(allowed.getMasterRecord()).containsEntry(label, "joint-updated").doesNotContainKeys(quantity, secret, hidden);
+        var denied = data.saveWithRelations(model, com.auraboot.framework.meta.dto.JointSubTableSaveRequest.builder()
+                .masterData(new LinkedHashMap<>(Map.of("pid", pid, label, "must-not-persist", quantity, 9))).build());
+        assertThat(denied.getSuccess()).isFalse();
+        assertThat(denied.getErrors()).anySatisfy(error -> assertThat(error).contains("FIELD_WRITE_DENIED"));
+        assertThat(stored(label, pid)).isEqualTo("joint-updated");
+        assertThat(stored(quantity, pid)).isEqualTo(1);
+    }
+
+    @Test void jointSaveWithoutReadGrantReturnsAnIdentityAcknowledgement() throws Exception {
+        restrictGrantFields("create", List.of(), List.of(label));
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET deleted_flag=TRUE FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                testRole.getId(), testTenant.getId(), "model." + model + ".read")).isEqualTo(1);
+        var result = data.saveWithRelations(model, com.auraboot.framework.meta.dto.JointSubTableSaveRequest.builder()
+                .masterData(new LinkedHashMap<>(Map.of(label, "joint-write-only"))).build());
+        assertThat(result.getSuccess()).as("joint errors: %s", result.getErrors()).isTrue();
+        assertThat(result.getMasterRecord()).containsEntry("pid", result.getMasterId());
+        assertThat(result.getMasterRecord().keySet()).isSubsetOf("pid", "row_version");
+        assertThat(stored(label, result.getMasterId())).isEqualTo("joint-write-only");
+        assertThatThrownBy(() -> data.getById(model, result.getMasterId())).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void jointSaveRetainsAuthorizedRowsButRollsBackTheDeniedChildSavepoint() throws Exception {
+        String children = "children_" + model;
+        Field field = new Field();
+        field.setTenantId(testTenant.getId()); field.setPid(UniqueIdGenerator.generate());
+        field.setCode(children); field.setDataType("string"); field.setVersion(1); field.setIsCurrent(true);
+        field.setStatus("published"); field.setDeletedFlag(false);
+        var feature = new FieldFeatureBean(); feature.setVirtualType("transient"); field.setFeature(feature);
+        var reference = new com.auraboot.framework.meta.entity.payload.FieldRefTargetBean();
+        reference.setTargetEntity(model); reference.setTargetTable(table); reference.setTargetField(label); reference.setValueField("pid");
+        var bidirectional = new com.auraboot.framework.meta.entity.payload.FieldRefTargetBean.BidirectionalConfig();
+        bidirectional.setRelationType("ONE_TO_MANY"); reference.setBidirectional(bidirectional); field.setRefTarget(reference);
+        fields.insert(field); fieldIds.add(field.getId());
+        var binding = new ModelFieldBinding(); binding.setTenantId(testTenant.getId());
+        binding.setModelId(modelId); binding.setFieldId(field.getId()); binding.setFieldOrder(5); bindings.insert(binding);
+        metadata.clearAllCache();
+        assertThat(metadata.getModelDefinition(model).orElseThrow().getRelations()).hasSize(1);
+        restrictGrantFields("create", List.of(), List.of(label));
+        restrictGrantFields("read", List.of(label), List.of());
+        var result = data.saveWithRelations(model, com.auraboot.framework.meta.dto.JointSubTableSaveRequest.builder()
+                .masterData(new LinkedHashMap<>(Map.of(label, "partial-master")))
+                .tables(Map.of(children, List.of(Map.of(), Map.of(quantity, 9)))).build());
+        assertThat(result.getSuccess()).isFalse();
+        assertThat(result.getMasterId()).isNotBlank();
+        assertThat(stored(label, result.getMasterId())).isEqualTo("partial-master");
+        assertThat(result.getSubTableCounts()).containsEntry(children, 1);
+        assertThat(result.getSavedRecords().get(children)).singleElement().satisfies(child -> {
+            assertThat(child).containsEntry(label, result.getMasterId()).doesNotContainKeys(quantity, secret, hidden);
+            assertThat(stored(quantity, Objects.toString(child.get("pid")))).isEqualTo(7);
+        });
+        assertThat(result.getSubTableErrors().get(children)).singleElement().satisfies(error -> {
+            assertThat(error.getRowIndex()).isEqualTo(1);
+            assertThat(error.getMessage()).contains("FIELD_WRITE_DENIED");
+        });
+        assertThat(count()).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE " + quantity + "=9", Long.class)).isZero();
+    }
+
+    @Test void jointSaveCannotUpgradeAnExistingWeakWriteTransaction() {
+        var outer = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        outer.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        outer.executeWithoutResult(status -> {
+            var result = data.saveWithRelations(model, com.auraboot.framework.meta.dto.JointSubTableSaveRequest.builder()
+                    .masterData(new LinkedHashMap<>(Map.of(label, "weak-must-not-persist"))).build());
+            assertThat(result.getSuccess()).isFalse();
+            assertThat(result.getErrors()).anySatisfy(error -> assertThat(error).contains("FIELD_WRITE_DENIED"));
+        });
+        assertThat(count()).isEqualTo(1);
+    }
+
     @Test void conditionalWritesConsumeCompleteUpdateFieldsBeforeAnyMutation() throws Exception {
         String before = restrictGrantFields("update", List.of(), List.of(label));
         assertThat(data.compareAndSet(model, pid, label, "before", "cas-allowed")).isTrue();

@@ -1882,7 +1882,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     // ==================== Joint Sub-Table Save ====================
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public JointSubTableSaveResponse saveWithRelations(String modelCode, JointSubTableSaveRequest request) {
         BusinessResourceDataScope.unsupported();
         return dynamicJointSaveSupport().saveWithRelations(modelCode,request);
