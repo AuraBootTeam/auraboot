@@ -238,7 +238,7 @@ function RowExpansionSession({
             <div className="text-text-3 flex items-center justify-end gap-3 text-sm">
               <button
                 type="button"
-                className="border-border rounded border px-3 py-1 disabled:opacity-40"
+                className="border-border bg-panel text-text-2 hover:bg-hover rounded border px-3 py-1 disabled:opacity-40"
                 disabled={page === 1}
                 onClick={() => setPage((previous) => previous - 1)}
               >
@@ -249,7 +249,7 @@ function RowExpansionSession({
               </span>
               <button
                 type="button"
-                className="border-border rounded border px-3 py-1 disabled:opacity-40"
+                className="border-border bg-panel text-text-2 hover:bg-hover rounded border px-3 py-1 disabled:opacity-40"
                 disabled={page * size >= result.total}
                 onClick={() => setPage((previous) => previous + 1)}
               >
