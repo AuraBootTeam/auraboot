@@ -511,6 +511,30 @@ class RegisteredSourcePlanResolverTest {
         verify(pipeline.notifications).insert(any(Notification.class));
     }
     @Test
+    void composedDeliveryFailsClosedWhenTheDeliveryLeaseIsNotHeld() {
+        // No active lease: the lock finds nothing → fail-closed before any effect lands.
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var event = pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1));
+        when(pipeline.receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(null);
+        assertThatThrownBy(() -> pipeline.deliver(event, pipeline.host))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("lease is not active");
+        verify(pipeline.notifications, never()).insert(any(Notification.class));
+        verify(pipeline.receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+    }
+    @Test
+    void composedDeliveryFailsClosedWhenTheLeaseExpiresBeforeEffectCommit() {
+        // Lease held at lock but gone when the effect lands → fail-closed, receipt never applied.
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var event = pipeline.queue(SourceBindingCanonical.reference("notice", "src", 1));
+        when(pipeline.receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(0);
+        assertThatThrownBy(() -> pipeline.deliver(event, pipeline.host))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("lease expired before effect commit");
+        verify(pipeline.notifications).insert(any(Notification.class));
+        verify(pipeline.receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+    }
+    @Test
     void composedMalformedRegisteredReferenceSelectsIsolationButNeverGrantsAuthority() {
         ComposedDelivery pipeline = new ComposedDelivery();
         var ordinary = pipeline.queue("ordinary-reference");
@@ -824,6 +848,10 @@ class RegisteredSourcePlanResolverTest {
                 return true;
             });
             when(receipts.claimReceipt(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
+            // The composed delivery models a host holding an ACTIVE lease for the event:
+            // the lock finds the row and the fence re-verifies it after the effect lands.
+            when(receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
+            when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
             when(receipts.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
             when(transactions.getTransaction(any())).thenAnswer(call -> {
                 TransactionDefinition definition = call.getArgument(0);
