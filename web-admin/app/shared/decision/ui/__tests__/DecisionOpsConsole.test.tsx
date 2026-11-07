@@ -693,6 +693,8 @@ describe('DecisionOpsConsole', () => {
       renderConsole();
 
       fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+      expect(screen.queryByTestId('condition-binding-inactive')).not.toBeInTheDocument();
+      expect(screen.getByTestId('cb-add')).toBeEnabled();
       fireEvent.click(screen.getByTestId('cb-add'));
 
       await waitFor(() => expect(screen.getByLabelText('model-0')).toHaveTextContent('请假申请'));
@@ -756,6 +758,8 @@ describe('DecisionOpsConsole', () => {
       } as unknown as Partial<DecisionApi>);
 
       fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+      expect(screen.queryByTestId('condition-binding-inactive')).not.toBeInTheDocument();
+      expect(screen.getByTestId('cb-add')).toBeEnabled();
       fireEvent.click(screen.getByTestId('cb-add'));
       await waitFor(() => expect(screen.getByLabelText('model-0')).toHaveTextContent('请假申请'));
       fireEvent.change(screen.getByLabelText('model-0'), {

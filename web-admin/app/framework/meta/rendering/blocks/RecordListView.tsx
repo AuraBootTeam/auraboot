@@ -393,6 +393,7 @@ export function RecordListView({
               total={pagination.total}
               onChange={handlePageChange}
               t={t}
+              locale={effectiveLocale}
             />
           </div>
         </>

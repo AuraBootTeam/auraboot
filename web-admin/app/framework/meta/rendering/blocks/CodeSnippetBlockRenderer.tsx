@@ -100,7 +100,8 @@ export const CodeSnippetBlockRenderer: React.FC<CodeSnippetBlockRendererProps> =
   const t = context.t || ((key: string) => key);
   // Plain fn (not useCallback): `t` is re-derived each render, so memoizing on it
   // would invalidate every render anyway.
-  const tx = (key: string, fallback: string): string => (t(key) !== key ? t(key) : fallback);
+  const tx = (key: string, fallback: string, chinese: string): string =>
+    t(key) !== key ? t(key) : getLocalizedText({ 'zh-CN': chinese, en: fallback }, locale, t);
 
   // Bare-path config — same pattern as StatCardBlockRenderer / CardGridBlockRenderer.
   const cfg = { ...((block as any).props || {}), ...(block as any) };
@@ -149,7 +150,7 @@ export const CodeSnippetBlockRenderer: React.FC<CodeSnippetBlockRendererProps> =
         data-testid="code-snippet-error"
         className="rounded-control bg-status-red-bg text-status-red border border-red-200 p-3 text-sm"
       >
-        {message || tx('common.loadError', 'Failed to load')}
+        {message || tx('common.loadError', 'Failed to load', '加载失败')}
       </div>
     );
   }
@@ -161,7 +162,7 @@ export const CodeSnippetBlockRenderer: React.FC<CodeSnippetBlockRendererProps> =
         data-testid="code-snippet-loading"
         className="rounded-control border-border bg-panel text-text-2 border p-3 text-sm"
       >
-        {tx('common.loading', 'Loading...')}
+        {tx('common.loading', 'Loading...', '加载中…')}
       </div>
     );
   }
@@ -173,7 +174,7 @@ export const CodeSnippetBlockRenderer: React.FC<CodeSnippetBlockRendererProps> =
         data-testid="code-snippet-empty"
         className="rounded-control border-border bg-panel text-text-2 border p-3 text-sm"
       >
-        {tx('common.noData', 'No data')}
+        {tx('common.noData', 'No data', '暂无数据')}
       </div>
     );
   }
@@ -185,10 +186,10 @@ export const CodeSnippetBlockRenderer: React.FC<CodeSnippetBlockRendererProps> =
 
   const copyLabel =
     copyState === 'copied'
-      ? tx('common.copied', 'Copied')
+      ? tx('common.copied', 'Copied', '已复制')
       : copyState === 'error'
-        ? tx('common.copyFailed', 'Copy failed')
-        : tx('common.copy', 'Copy');
+        ? tx('common.copyFailed', 'Copy failed', '复制失败')
+        : tx('common.copy', 'Copy', '复制');
 
   return (
     <div

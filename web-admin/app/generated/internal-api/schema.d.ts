@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 6956a0465747c85012b531ff2cc27c5261efe2a3c2ce8f967e61bd2b18e43b06
+ * Contract SHA-256: c35eaa5992eac12a7e8bcee4d46c643ab115b6239f873ed704d562737465bbc5
  */
 export interface paths {
     "/api/activities": {
@@ -18123,6 +18123,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/permission-cache/evict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evict permission caches
+         * @description Manual trigger for permission snapshot eviction after out-of-band changes
+         */
+        post: operations["evict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/permission/capabilities": {
         parameters: {
             query?: never;
@@ -18331,6 +18351,23 @@ export interface paths {
         get: operations["getPolicy"];
         /** Set policy values for role+permission */
         put: operations["setPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permissions/matrix/{rolePid}/policy/{permissionPid}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read policy values and the grant revision required for saving */
+        get: operations["getPolicySnapshot"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -27807,6 +27844,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["PolicyResponse"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponsePolicySnapshot: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PolicySnapshot"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -37708,6 +37753,18 @@ export interface components {
             requireApproval?: boolean;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        PolicySaveRequest: {
+            expectedRevision: string;
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        PolicySnapshot: {
+            revision: string;
+            values: {
+                [key: string]: unknown;
+            };
         };
         PreferencesDTO: {
             dateFormat?: string;
@@ -71832,6 +71889,28 @@ export interface operations {
             };
         };
     };
+    evict: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseString"];
+                };
+            };
+        };
+    };
     getForRole: {
         parameters: {
             query: {
@@ -72244,9 +72323,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["PolicySaveRequest"];
             };
         };
         responses: {
@@ -72257,6 +72334,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+        };
+    };
+    getPolicySnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                permissionPid: string;
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicySnapshot"];
                 };
             };
         };

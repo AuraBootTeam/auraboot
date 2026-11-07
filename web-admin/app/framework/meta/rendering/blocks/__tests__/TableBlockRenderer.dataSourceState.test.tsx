@@ -49,6 +49,27 @@ const block = {
 } as any;
 
 describe('TableBlockRenderer data-source states', () => {
+  it('keeps empty guidance outside the horizontally scrolling column canvas', () => {
+    render(
+      <TableBlockRenderer
+        block={
+          {
+            ...block,
+            empty: {
+              title: { en: 'No images yet' },
+              description: { en: 'Add an image or select another product.' },
+            },
+          } as any
+        }
+        runtime={runtime([], { data: [], loading: false, error: null })}
+      />,
+    );
+    const guidance = screen.getByRole('status');
+    expect(guidance).toHaveTextContent('No images yet');
+    expect(guidance).toHaveTextContent('Add an image or select another product.');
+    expect(guidance.closest('[data-testid="table-block"]')).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeVisible();
+  });
   it('distinguishes loading from an empty result', () => {
     render(
       <TableBlockRenderer

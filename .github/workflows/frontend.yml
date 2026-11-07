@@ -110,6 +110,8 @@ jobs:
 
       - name: Type-check web-admin
         working-directory: web-admin
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm typecheck
 
       - name: CLI capability and MCP regression

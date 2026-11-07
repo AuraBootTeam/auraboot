@@ -934,6 +934,20 @@ $$;
 
 
 --
+-- Name: ab_role_permission_advance_policy_revision(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_role_permission_advance_policy_revision() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.policy_revision := OLD.policy_revision + 1;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: ab_tenant_binding_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -16526,6 +16540,8 @@ CREATE TABLE public.ab_role_permission (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     created_by bigint,
     updated_by bigint,
+    policy_revision bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT ab_role_permission_policy_revision_check CHECK ((policy_revision > 0)),
     CONSTRAINT chk_ab_role_permission_grant_type CHECK ((grant_type = ANY (ARRAY['grant'::text, 'deny'::text])))
 );
 
@@ -32144,6 +32160,13 @@ CREATE TRIGGER trg_platform_registry_validate BEFORE INSERT ON public.ab_platfor
 --
 
 CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_role_permission trg_role_permission_policy_revision; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_role_permission_policy_revision BEFORE UPDATE ON public.ab_role_permission FOR EACH ROW EXECUTE FUNCTION public.ab_role_permission_advance_policy_revision();
 
 
 --

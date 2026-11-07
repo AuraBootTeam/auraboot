@@ -73,11 +73,16 @@
 }
 .ce-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   background: var(--muted, #fafbfd);
   padding: 12px 16px;
   border-bottom: 1px solid var(--ce-border);
+}
+.ce-toolbar button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .ce-toolbar small {
   color: var(--muted-foreground, #8996a9);
@@ -622,4 +627,25 @@
   display: block;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+}
+
+/* Keep nested condition controls usable without accumulating mobile indentation. */
+@media (max-width: 900px) {
+  .condition-expression .ce-group:not(.ce-root) {
+    margin-left: 2px;
+    padding-left: 8px;
+  }
+  .condition-expression :is(.ce-not-leaf, .ce-add-actions) {
+    flex-wrap: wrap;
+  }
+  .condition-expression :is(.ce-not-leaf, .ce-add-actions) button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .condition-expression .ce-row .ce-tokens {
+    flex: 1 1 100%;
+  }
+  .condition-expression .ce-tokens > :is(input, select) {
+    max-width: 100%;
+  }
 }

@@ -8,6 +8,17 @@ status: active
 条件编辑复用 `ConditionBuilder` 和既有 Condition AST，不增加页面专用规则格式。
 条件片段库、规则绑定等使用方传入事实目录和受控 AST；使用方继续负责版本和保存。
 
+## 条件片段与消费者绑定
+
+共享 `DecisionRuleBindingBlock` 的 `authoringTarget` 默认是 `consumer-binding`。
+消费者按既有 `bindingKind` 二选一执行本地条件或决策引用；选择决策时，本地条件保留但不参与判定，
+界面须说明此语义并禁止编辑，切回仅条件后恢复原 AST 与编辑。
+
+Strategy Studio 编辑条件片段时显式传入 `authoringTarget: condition-fragment`。
+片段草稿的根条件和所引用决策都属于待保存的片段定义，不能因为存在决策引用就禁止编辑根条件。
+此用途声明只区分编辑语义，不改变消费者求值、授权、版本或发布契约，也不绕过调用方的 `readOnly`。
+条件片段的持久化仍由原 draft API 和调用方负责。
+
 ## 元数据与值
 
 模型、属性来自租户权限过滤后的 `/api/decision/facts/catalog`，以 scope、modelCode 和 path 区分字段。
@@ -53,3 +64,12 @@ unknownReasons 和 nodeResults。节点标识为 root、root.0 等 AST 路径；
 非连续包裹和迟到响应隔离另由组件单测裁决，不冒充实际浏览器穷举验证。
 策略工作台的示例表是显示默认值，不能当成服务端已加载版本；服务端恢复优先，迟到恢复不得覆盖本地编辑。
 发布按钮在当前草稿校验和影响检查完成前禁用；试算调用无持久化的 test-run，不调用正式 evaluate。
+
+
+### 权限策略编辑版本
+
+权限编辑器读取 `/api/permissions/matrix/{rolePid}/policy/{permissionPid}/snapshot`，取得 `{ revision, values }`，在本次编辑期间保留最初的版本。原策略 PUT 强制提交 `{ expectedRevision, values }`。版本缺失、不属于当前授权、已撤销或已过期时返回 HTTP 409，不改策略和决策引用。原仅返回值的 GET 继续用于只读检查，不提供写入前提。
+
+Core Flyway 在角色授权表增加数据库维护版本，每次 UPDATE（包括相同值写入、撤销、重授）都推进版本。授权 PID 与单调版本共同防止原生 upsert 保留同一授权身份后的旧草稿覆盖。服务在事务内比较原版本，执行租户隔离的条件更新，并维护引用索引；冲突回滚。可信进程内配置写入也对本事务读取版本执行条件更新，不能拿时间戳或策略 JSON 相等替代版本。
+
+冲突时保留弹窗和草稿，明确提示核对并禁用提交。关闭重开才显式读取新快照；界面不得自动取得新版本后重试旧草稿。当前为实施候选，真实栈并发及浏览器证据验收前不声明完成。

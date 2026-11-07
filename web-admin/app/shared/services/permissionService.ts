@@ -1,11 +1,19 @@
 import { get, post, put, del, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { roleMemberService, type RoleMember, type RoleMemberPage, type RoleMembershipWindow } from './roleMemberService';
+import type { components } from '~/generated/internal-api/schema';
+import {
+  roleMemberService,
+  type RoleMember,
+  type RoleMemberPage,
+  type RoleMembershipWindow,
+} from './roleMemberService';
 import type { Permission, PermissionReference, IPermissionService } from '~/types/model';
 import type {
   PermissionMatrixDTO,
   PermissionGrantRequest,
 } from '~/routes/enterprise/permission/types';
+
+export type PermissionPolicySnapshot = components['schemas']['PolicySnapshot'];
 
 /**
  * Helper function to handle API responses
@@ -229,6 +237,8 @@ export class PermissionService implements IPermissionService {
       undefined,
       request,
     );
+    // A successful null is the platform contract for a grant without configured policy values.
+    if (ResultHelper.isSuccess(result) && result.data === null) return {};
     return handleResponse(result, 'Failed to fetch policy values');
   }
 
@@ -239,17 +249,45 @@ export class PermissionService implements IPermissionService {
     rolePid: string,
     permissionPid: string,
     values: Record<string, any>,
+    expectedRevision: string,
     request?: Request,
   ): Promise<void> {
+    const body: components['schemas']['PolicySaveRequest'] = { expectedRevision, values };
     const result = await put<void>(
       `${this.baseUrl}/matrix/${rolePid}/policy/${permissionPid}`,
-      values as unknown as Record<string, any>,
+      body,
       undefined,
       request,
     );
     if (!ResultHelper.isSuccess(result)) {
-      throw new Error((result as any).desc || 'Failed to save policy values');
+      const error = new Error(result.desc || 'Failed to save policy values');
+      if (result.httpStatus === 409) error.name = 'PolicyConflictError';
+      throw error;
     }
+  }
+
+  async getPolicySnapshot(
+    rolePid: string,
+    permissionPid: string,
+    request?: Request,
+  ): Promise<PermissionPolicySnapshot> {
+    const result = await get<PermissionPolicySnapshot>(
+      `${this.baseUrl}/matrix/${rolePid}/policy/${permissionPid}/snapshot`,
+      undefined,
+      undefined,
+      request,
+    );
+    const snapshot = handleResponse(result, 'Failed to read policy revision');
+    if (
+      typeof snapshot.revision !== 'string' ||
+      !snapshot.revision.trim() ||
+      !snapshot.values ||
+      typeof snapshot.values !== 'object' ||
+      Array.isArray(snapshot.values)
+    ) {
+      throw new Error('Invalid policy snapshot');
+    }
+    return snapshot;
   }
 
   // ---------------------------------------------------------------------------
@@ -259,11 +297,20 @@ export class PermissionService implements IPermissionService {
   /**
    * Get paginated members for a role
    */
-  getRoleMembers(rolePid: string, params: { pageNum: number; pageSize: number }, request?: Request): Promise<RoleMemberPage> {
+  getRoleMembers(
+    rolePid: string,
+    params: { pageNum: number; pageSize: number },
+    request?: Request,
+  ): Promise<RoleMemberPage> {
     return roleMemberService.list(rolePid, params, request);
   }
 
-  addRoleMembers(rolePid: string, memberPids: string[], window?: RoleMembershipWindow, request?: Request): Promise<void> {
+  addRoleMembers(
+    rolePid: string,
+    memberPids: string[],
+    window?: RoleMembershipWindow,
+    request?: Request,
+  ): Promise<void> {
     return roleMemberService.assign(rolePid, memberPids, window, request);
   }
 
@@ -271,7 +318,11 @@ export class PermissionService implements IPermissionService {
     return roleMemberService.remove(rolePid, memberPids, request);
   }
 
-  getRoleMemberCandidates(rolePid: string, keyword?: string, request?: Request): Promise<RoleMember[]> {
+  getRoleMemberCandidates(
+    rolePid: string,
+    keyword?: string,
+    request?: Request,
+  ): Promise<RoleMember[]> {
     return roleMemberService.candidates(rolePid, keyword, request);
   }
 }

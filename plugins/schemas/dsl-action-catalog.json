@@ -48,6 +48,7 @@
         "inputFields",
         "inputFieldsPayloadKey",
         "inputFieldsPresentation",
+        "inputFieldsSource",
         "inputFieldsSubmitLabel",
         "inputFieldsTitle",
         "maxPollAttempts",
