@@ -20,7 +20,11 @@ public record RoleAuthorizationDraftRequest(
         @Valid @Size(max = 1000) List<DataScopeUpdateRequest> scopeChanges,
         @Size(max = 1000) Set<String> fieldPolicyPids,
         @Size(max = 5000) Set<@NotBlank @Size(max = 32) String> menuPids,
-        @Valid @Size(max=1000) List<RoleFieldAccess.Change> fieldChanges) {
+        @Valid @Size(max=1000) List<RoleFieldAccess.Change> fieldChanges,
+        @Valid @Size(max=1000) List<RoleGrantFields.Change> grantFieldChanges) {
+    public RoleAuthorizationDraftRequest(String revision,Set<String> selected,Set<String> revoked,boolean changed,String scope,boolean applyDefault,List<DataScopeUpdateRequest> scopes,Set<String> policies,Set<String> menus,List<RoleFieldAccess.Change> fields) {
+        this(revision,selected,revoked,changed,scope,applyDefault,scopes,policies,menus,fields,null);
+    }
     public RoleAuthorizationDraftRequest(String revision,Set<String> selected,Set<String> revoked,boolean changed,String scope,boolean applyDefault,List<DataScopeUpdateRequest> scopeChanges,Set<String> fieldPolicyPids,Set<String> menuPids){
         this(revision,selected,revoked,changed,scope,applyDefault,scopeChanges,fieldPolicyPids,menuPids,null);
     }

@@ -14,7 +14,11 @@ public record RoleAuthorizationDraftPreview(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopeChanges,
         RoleFieldPolicyPreview fieldPolicies,
         com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,
-        List<RoleFieldAccess.Reviewed> fieldAccessChanges) {
+        List<RoleFieldAccess.Reviewed> fieldAccessChanges,
+        List<RoleGrantFields.Reviewed> grantFieldChanges) {
+    public RoleAuthorizationDraftPreview(String revision,CapabilitySelectionPreview capabilities,boolean changed,String scope,boolean apply,List<DataScopeUpdateRequest> scopes,RoleFieldPolicyPreview policies,com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,List<RoleFieldAccess.Reviewed> fields) {
+        this(revision,capabilities,changed,scope,apply,scopes,policies,navigation,fields,null);
+    }
     public RoleAuthorizationDraftPreview(String revision,CapabilitySelectionPreview capabilities,boolean changed,String scope,boolean apply,List<DataScopeUpdateRequest> changes,RoleFieldPolicyPreview fields,com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation){
         this(revision,capabilities,changed,scope,apply,changes,fields,navigation,null);
     }

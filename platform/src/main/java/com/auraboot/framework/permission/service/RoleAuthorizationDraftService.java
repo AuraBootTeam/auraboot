@@ -51,6 +51,8 @@ public class RoleAuthorizationDraftService {
     private com.auraboot.framework.menu.service.RoleNavigationService roleNavigation;
     @org.springframework.beans.factory.annotation.Autowired
     private RoleFieldAccessService fieldAccess;
+    @org.springframework.beans.factory.annotation.Autowired
+    private RoleGrantFieldScopeService grantFields;
     private final RoleService roles;
     private final RolePermissionMapper grants;
     private final PermissionService permissions;
@@ -196,6 +198,7 @@ public class RoleAuthorizationDraftService {
         }
         fieldPolicies.apply(role, reviewed.fieldPolicies());
         fieldAccess.apply(role,reviewed.fieldAccessChanges());
+        grantFields.apply(role,reviewed.grantFieldChanges());
         if(request.menuPids()!=null)roleNavigation.apply(role,request.menuPids());
         roleNavigation.auditAuthorization(role,auditChanges);
         // A failed write or readback propagates and rolls back the entire authoring operation.
@@ -250,7 +253,8 @@ public class RoleAuthorizationDraftService {
                 request.defaultScopeType(), request.applyDefaultToCurrentGrants(), changes(request),
                 fieldPolicies.preview(role, request.fieldPolicyPids(), permittedModels),
                 request.menuPids()==null?null:roleNavigation.preview(role,request.menuPids(),resulting),
-                fieldAccess.preview(role,request.fieldChanges(),permittedModels));
+                fieldAccess.preview(role,request.fieldChanges(),permittedModels),
+                grantFields.preview(role,request.grantFieldChanges(),resulting));
     }
 
     private RoleAuthorizationDraftSnapshot snapshot(Role role, List<BusinessFieldRoot> roots) {
@@ -259,7 +263,7 @@ public class RoleAuthorizationDraftService {
                 scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
                         .map(scope -> new DataScopeUpdateRequest(scope.getResourceCode(), scope.getActionCode(),
                                 scope.getScopeType(), scope.getMergeStrategy())).toList(), fieldPolicies.snapshot(role),roleNavigation.selection(role),
-                fieldAccess.catalog(role,fieldCandidates(role, roots)));
+                fieldAccess.catalog(role,fieldCandidates(role, roots)), grantFields.catalog(role));
     }
 
     private Role resolve(String rolePid) {
@@ -273,6 +277,7 @@ public class RoleAuthorizationDraftService {
         state.put("role", role);
         state.put("navigation",roleNavigation.selection(role));
         state.put("fieldAccess",fieldAccess.catalog(role,fieldCandidates(role, roots)));
+        state.put("grantFieldCatalog", grantFields.catalog(role));
         state.put("grants", grants.findByRole(role.getId()).stream()
                 .sorted(Comparator.comparing(RolePermission::getId, Comparator.nullsLast(Long::compareTo))).toList());
         state.put("scopes", scopes.getScopesByRole(role.getTenantId(), role.getId()).stream()
@@ -335,6 +340,11 @@ public class RoleAuthorizationDraftService {
         for(var cap:reviewed.capabilities().resultingCapabilities()) {
             if(!cap.isConventionDerived()&&!Objects.equals(before.getOrDefault(cap.getCode(),"none"),cap.getAuthorizationState()))
                 result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("duty",cap.getLabel(),before.getOrDefault(cap.getCode(),"none"),cap.getAuthorizationState()));
+        }
+        for (var change : reviewed.grantFieldChanges()) {
+            result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("grant_fields",
+                    change.before().modelLabel(), change.before().legacy() ? "legacy" : digest(Map.of("readFields",change.before().readFields(),"writeFields",change.before().writeFields())),
+                    digest(Map.of("readFields",change.readFields(),"writeFields",change.writeFields()))));
         }
         if(reviewed.defaultScopeChanged())result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("default_scope","",role.getDefaultDataScopeType(),reviewed.defaultScopeType()));
         if(reviewed.applyDefaultToCurrentGrants())result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("apply_default","",null,reviewed.defaultScopeType()));

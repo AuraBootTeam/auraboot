@@ -58,6 +58,9 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.meta.mapper.MetaFieldMapper fields;
     @Autowired private com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper modelFields;
     @Autowired private com.auraboot.framework.meta.service.MetaModelService metadata;
+    @Autowired private com.auraboot.framework.meta.service.DynamicDataService dynamicData;
+    @Autowired private com.auraboot.framework.meta.service.SchemaManagementService schema;
+    private boolean physicalTable;
     private Long modelId, fieldId;
     private long roleId;
     private String rolePid;
@@ -108,6 +111,7 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             jdbc.update("DELETE FROM ab_binding_rule WHERE command_id IN (SELECT id FROM ab_command_definition WHERE pid=?)", nativeCommandPid);
             jdbc.update("DELETE FROM ab_command_definition WHERE tenant_id=? AND pid=?", getTestTenant().getId(), nativeCommandPid);
         }
+        if (physicalTable) assertThat(schema.dropTableByModel(resource).isSuccess()).isTrue();
         if (modelId != null) {
             jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?", getTestTenant().getId(), modelId);
             jdbc.update("DELETE FROM ab_meta_model WHERE tenant_id=? AND id=?", getTestTenant().getId(), modelId);
@@ -702,6 +706,92 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_menu WHERE role_id=?",Integer.class,roleId)).isZero();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE role_id=?",Long.class,roleId)).isEqualTo(grantsBefore);
         } finally {reset(navigation);jdbc.update("DELETE FROM ab_role_navigation_menu WHERE menu_pid=?",menuPid);jdbc.update("DELETE FROM ab_menu WHERE pid=?",menuPid);}
+    }
+
+    private RoleAuthorizationDraftRequest grantFieldsRequest(RoleAuthorizationDraftSnapshot baseline,
+            com.auraboot.framework.permission.dto.RoleGrantFields.Change change) {
+        return new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(), false,
+                null, false, List.of(), null, null, null, List.of(change));
+    }
+
+    private RoleAuthorizationDraftSnapshot grantFieldsBaseline() {
+        fieldPolicy();
+        var initial = drafts.snapshot(rolePid);
+        return drafts.apply(rolePid, new RoleAuthorizationDraftRequest(initial.revision(), Set.of(editCapability), Set.of(), false, null, false, List.of()));
+    }
+
+    @Test void positiveGrantFieldsPreviewAndSavePreserveAllOtherBindingFacts() {
+        var baseline = grantFieldsBaseline();
+        var binding = baseline.grantFields().stream().filter(b -> b.permissionCode().equals(readCode)).findFirst().orElseThrow();
+        assertThat(binding.legacy()).isTrue(); assertThat(binding.editable()).isTrue();
+        String facts = jdbc.queryForObject("SELECT (to_jsonb(g)-'field_scope'-'updated_at'-'updated_by')::text FROM ab_role_permission g WHERE pid=? AND tenant_id=?", String.class, binding.bindingPid(), getTestTenant().getId());
+        var request = grantFieldsRequest(baseline, new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of(resource+"_secret"), List.of()));
+        var preview = drafts.preview(rolePid, request);
+        assertThat(preview.grantFieldChanges()).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT field_scope IS NULL FROM ab_role_permission WHERE pid=? AND tenant_id=?", Boolean.class, binding.bindingPid(), getTestTenant().getId())).isTrue();
+        var saved = drafts.apply(rolePid, request);
+        var view = saved.grantFields().stream().filter(b -> b.bindingPid().equals(binding.bindingPid())).findFirst().orElseThrow();
+        assertThat(view.legacy()).isFalse(); assertThat(view.readFields()).containsExactly(resource+"_secret"); assertThat(view.writeFields()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT (to_jsonb(g)-'field_scope'-'updated_at'-'updated_by')::text FROM ab_role_permission g WHERE pid=? AND tenant_id=?", String.class, binding.bindingPid(), getTestTenant().getId())).isEqualTo(facts);
+        assertThat(saved.grantFields().stream().filter(b -> b.permissionCode().equals(updateCode)).findFirst().orElseThrow().legacy()).isTrue();
+        assertThatThrownBy(() -> drafts.apply(rolePid, request)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+
+    @Test void positiveGrantFieldsRejectUnknownDuplicateAndForeignBindingInputs() {
+        var baseline = grantFieldsBaseline();
+        var binding = baseline.grantFields().getFirst();
+        for (var change : List.of(
+                new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of("pid"), List.of()),
+                new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of(resource+"_secret", resource+"_secret"), List.of()),
+                new com.auraboot.framework.permission.dto.RoleGrantFields.Change(UniqueIdGenerator.generate(), List.of(), List.of()))) {
+            assertThatThrownBy(() -> drafts.preview(rolePid, grantFieldsRequest(baseline, change))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        }
+        assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
+    }
+
+    @Test void positiveGrantFieldsCannotOverwriteManagedSourceOrRevokedBinding() {
+        var baseline = grantFieldsBaseline();
+        var binding = baseline.grantFields().getFirst();
+        var change = new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of(), List.of());
+        var revoke = new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(), Set.of(), false, null, false, List.of(), null, null, null, List.of(change));
+        assertThatThrownBy(() -> drafts.preview(rolePid, revoke)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        jdbc.update("UPDATE ab_role_permission SET source_ref='package:fixture' WHERE tenant_id=? AND pid=?",getTestTenant().getId(),binding.bindingPid());
+        var managed = drafts.snapshot(rolePid);
+        assertThat(managed.grantFields().stream().filter(b -> b.bindingPid().equals(binding.bindingPid())).findFirst().orElseThrow().editable()).isFalse();
+        assertThatThrownBy(() -> drafts.apply(rolePid, grantFieldsRequest(managed, change))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test void positiveGrantFieldsRollBackWhenTheUnifiedAuditFails() {
+        var baseline = grantFieldsBaseline();
+        var binding = baseline.grantFields().getFirst();
+        var change = new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of(), List.of());
+        org.mockito.Mockito.doThrow(new IllegalStateException("Injected final authoring audit failure")).when(navigation)
+                .auditAuthorization(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        try {
+            assertThatThrownBy(() -> drafts.apply(rolePid, grantFieldsRequest(baseline, change))).isInstanceOf(IllegalStateException.class);
+        } finally { reset(navigation); }
+        assertThat(jdbc.queryForObject("SELECT field_scope IS NULL FROM ab_role_permission WHERE tenant_id=? AND pid=?",Boolean.class,getTestTenant().getId(),binding.bindingPid())).isTrue();
+        assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
+    }
+
+    @Test void positiveGrantFieldsDriveOrdinaryReadsAndWritesWithoutSqlFieldEdits() {
+        var baseline = grantFieldsBaseline();
+        assertThat(schema.createTableByModel(resource).isSuccess()).isTrue(); physicalTable = true;
+        assertThat(roleAuthoring.assignRoleToMember(getTestTenantMember().getId(), roleId, getTestTenant().getId())).isTrue();
+        var created = MetaContext.runWithCommandPermitPlan("ALL", 1L, resource, null,
+                () -> dynamicData.create(resource, new java.util.LinkedHashMap<>(Map.of(resource+"_secret", "private-value"))));
+        String record = created.get("pid").toString();
+        var changes = baseline.grantFields().stream().map(binding ->
+                new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.<String>of(), List.<String>of())).toList();
+        var request = new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(), false,
+                null, false, List.of(), null, null, null, changes);
+        drafts.apply(rolePid, request);
+        administrator.close(); administrator = null;
+        assertThat(dynamicData.getById(resource, record)).containsEntry("pid", record).doesNotContainKey(resource+"_secret");
+        assertThatThrownBy(() -> dynamicData.update(resource, record, Map.of(resource+"_secret", "must-not-persist")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        String table = metadata.getModelDefinition(resource).orElseThrow().getTableName();
+        assertThat(jdbc.queryForObject("SELECT "+resource+"_secret FROM "+table+" WHERE pid=?",String.class,record)).isEqualTo("private-value");
     }
 
     private RoleAuthorizationDraftRequest fieldsRequest(RoleAuthorizationDraftSnapshot baseline, Set<String> selected) {

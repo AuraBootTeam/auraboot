@@ -14,7 +14,11 @@ public record RoleAuthorizationDraftSnapshot(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DataScopeUpdateRequest> scopes,
         List<RoleFieldPolicyView> fieldPolicies,
         com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,
-        List<RoleFieldAccess.Model> fieldAccess) {
+        List<RoleFieldAccess.Model> fieldAccess,
+        List<RoleGrantFields.Binding> grantFields) {
+    public RoleAuthorizationDraftSnapshot(String rolePid,String revision,String defaultScopeType,List<CapabilityGroup> groups,PermissionMatrixDTO matrix,List<DataScopeUpdateRequest> scopes,List<RoleFieldPolicyView> policies,com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,List<RoleFieldAccess.Model> fields) {
+        this(rolePid,revision,defaultScopeType,groups,matrix,scopes,policies,navigation,fields,null);
+    }
     public RoleAuthorizationDraftSnapshot(String rolePid,String revision,String defaultScopeType,List<CapabilityGroup> groups,PermissionMatrixDTO matrix,List<DataScopeUpdateRequest> scopes,List<RoleFieldPolicyView> fieldPolicies,com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation) {
         this(rolePid,revision,defaultScopeType,groups,matrix,scopes,fieldPolicies,navigation,null);
     }
