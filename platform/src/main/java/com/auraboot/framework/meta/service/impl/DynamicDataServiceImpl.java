@@ -213,8 +213,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
+            try (DynamicDataQueryScope __readScope = DynamicDataQueryScope.open()) {
         return dynamicDataListingSupport().list(modelCode,request);
-    }
+    
+            }}
 
     /**
      * Apply field-level permission filtering to a list of records.
@@ -726,6 +728,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private Map<String, Object> getByIdInternal(String modelCode, String recordId, boolean enrichDisplay) {
+            try (DynamicDataQueryScope __readScope = DynamicDataQueryScope.open()) {
         RequiredRecordReadGuard.beforeIndependentRecordLoad();
         validateModelCode(modelCode);
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
@@ -890,7 +893,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         return record;
-    }
+    
+            }}
 
     private void enforceRuleCenterRecordPermission(String modelCode, String recordId, Map<String, Object> record) {
         RuleCenterRecordReadAuthorization.requireReadable(modelCode, record,

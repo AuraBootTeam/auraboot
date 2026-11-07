@@ -44,6 +44,15 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class PermissionPolicyServiceImplTest {
+    @Test
+    void conditionGuardsCacheKeyEmbedsTenantMemberPermissionAndTheDataAccessEpoch() throws NoSuchMethodException {
+        var key = PermissionPolicyServiceImpl.class
+                .getMethod("getConditionGuards", Long.class, String.class)
+                .getAnnotation(org.springframework.cache.annotation.Cacheable.class)
+                .key();
+        assertThat(key).contains("DataAccessCacheEpoch").contains("getCurrentTenantId").contains("#memberId").contains("#permissionCode");
+    }
+
 
     @Mock
     private RolePermissionMapper rolePermissionMapper;
