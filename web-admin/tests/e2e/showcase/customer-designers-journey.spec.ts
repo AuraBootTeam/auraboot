@@ -17,10 +17,22 @@ async function menu(page: Page, label: string) {
 }
 async function screenshot(page: Page, info: TestInfo, name: string) {
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, { timeout: 15000 });
-  await info.attach(name, {
-    body: await page.screenshot({ fullPage: true }),
-    contentType: 'image/png',
-  });
+  const originalViewport = page.viewportSize();
+  const configurationCapture = ['SC02-model-fields-ready', 'SC02-schema-title-adjustment',
+    'SC02-schema-saved-reopened'].includes(name);
+  try {
+    // Interactions and layout assertions retain the original viewport. Capture
+    // the three configuration states at a documented desktop size so all rows
+    // and the complete inspector remain visible without editing image pixels.
+    if (configurationCapture) await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.evaluate(() => document.fonts.ready);
+    await info.attach(name, {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+  } finally {
+    if (configurationCapture && originalViewport) await page.setViewportSize(originalViewport);
+  }
 }
 
 type PageTreeBlock = { id?: string; title?: unknown; blocks?: PageTreeBlock[] };

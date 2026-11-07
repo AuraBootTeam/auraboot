@@ -308,6 +308,12 @@ def main():
         image_env = private / 'oci-runtime.env'
         values = {key: env[key] for key in ['JWT_SECRET', 'FIELD_ENCRYPTION_KEY',
                   'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY']}
+        lock = json.loads((current / 'application.lock').read_text())
+        values.update(AURA_APPLICATION_ID=lock['application']['id'],
+                      AURA_APPLICATION_VERSION=lock['application']['version'],
+                      AURA_APPLICATION_LOCK_IDENTITY=lock['identity'],
+                      AURA_APPLICATION_SOURCE_COMMIT=receipt['source']['commit'],
+                      AURA_APPLICATION_IMAGE_DIGEST=receipt['image']['digest'])
         values.update(SPRING_PROFILES_ACTIVE='community', AURA_APPLICATION_MODE='core-only',
                       AURABOOT_BOOTSTRAP_ENABLED='false', AURABOOT_DEMO_SEED='false',
                       SPRING_DATASOURCE_URL=f'jdbc:postgresql://127.0.0.1:{port}/aura_candidate_restore',
@@ -331,6 +337,11 @@ def main():
         else:
             raise RuntimeError('delivered OCI did not become ready; owned container retained')
         token = login()
+        identity = request('/api/application/identity', headers={'Authorization': 'Bearer ' + token})
+        require(identity.get('sourceCommit') == receipt['source']['commit']
+                and identity.get('lockIdentity') == lock['identity']
+                and identity.get('imageDigest') == receipt['image']['digest'],
+                'served OCI application identity differs from the delivered candidate')
         record_probe(token, code, pid, 68000)
         assert_attachment()
         check('delivered-oci-authentication-business-and-attachment', source=receipt['source']['commit'],

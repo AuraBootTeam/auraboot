@@ -10,6 +10,18 @@ administration and ownership configuration. It is not the Enterprise Showcase.
 Configuration imports follow the verified lock's composition order. Older
 candidates retain their own original configuration inventory.
 
+## OCI runtime and host tools
+
+The packaged OCI image pins the official Eclipse Temurin Java 21
+`ubi9-minimal` image by digest. It retains glibc, the shell and font configuration;
+it does not promise the Ubuntu package manager or arbitrary host utilities.
+The lifecycle, PostgreSQL/Flyway and Node/pnpm prerequisites below are host-side
+installation tools, not additional tools silently installed in this JRE image.
+Review any extension that requires operating-system packages against the pinned
+base before upgrading. Keep the base image's original notices and terms; see
+[Red Hat's UBI redistribution documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/building_running_and_managing_containers/assembly_types-of-container-images_building-running-and-managing-containers#characteristics-of-ubi-images_building-running-and-managing-containers).
+This does not change the bundled AuraBoot LICENSE or NOTICE.
+
 ## Framework compatibility before upgrading
 
 This candidate uses Java 21, Spring Boot 4.1 and Spring Framework 7. Existing
