@@ -1,4 +1,8 @@
 import { roleNavigationService } from './roleNavigationService';
+import RoleGrantFieldsEditor, {
+  type GrantFieldChange,
+  type GrantFieldBinding,
+} from './RoleGrantFieldsEditor';
 import RoleObjectScopeSettings from './RoleObjectScopeSettings';
 import RoleFieldAccessGrid, { type FieldAccessChange } from './RoleFieldAccessGrid';
 import { getLocalizedText } from '~/utils/i18n';
@@ -64,6 +68,13 @@ export default function CapabilityRoleEditor({
 }: CapabilityRoleEditorProps) {
   const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const [grantFieldChanges, setGrantFieldChanges] = useState<GrantFieldChange[]>([]);
+  const [grantFieldCandidates, setGrantFieldCandidates] = useState<
+    GrantFieldBinding[] | undefined
+  >();
+  const [grantFieldsLoading, setGrantFieldsLoading] = useState(false);
+  const [grantFieldsError, setGrantFieldsError] = useState(false);
+  const [grantFieldsAttempt, setGrantFieldsAttempt] = useState(0);
   const [fieldAccessChanges, setFieldAccessChanges] = useState<FieldAccessChange[]>([]);
   const [menuSelection, setMenuSelection] = useState<string[] | null>(null);
   const [subjectPreview, setSubjectPreview] = useState(false);
@@ -200,6 +211,7 @@ export default function CapabilityRoleEditor({
     activeScopeChanges.length > 0 ||
     fieldsDirty ||
     fieldAccessChanges.length > 0 ||
+    grantFieldChanges.length > 0 ||
     menuSelection !== null;
   useEffect(() => {
     onStatusChange?.(
@@ -230,6 +242,9 @@ export default function CapabilityRoleEditor({
     setScopeChanges([]);
     setFieldSelection(null);
     setFieldAccessChanges([]);
+    setGrantFieldChanges([]);
+    setGrantFieldCandidates(undefined);
+    setGrantFieldsError(false);
     setMenuSelection(null);
     setScopeLabels({});
     setConflict(false);
@@ -254,6 +269,7 @@ export default function CapabilityRoleEditor({
       defaultScopeType: defaultChanged ? defaultScope : null,
       applyDefaultToCurrentGrants: applyDefault,
       scopeChanges: activeScopeChanges,
+      ...(grantFieldChanges.length ? { grantFieldChanges } : {}),
       ...(fieldAccessChanges.length ? { fieldChanges: fieldAccessChanges } : {}),
       ...(fieldsDirty ? { fieldPolicyPids: selectedFields } : {}),
       ...(menuSelection !== null ? { menuPids: menuSelection } : {}),
@@ -270,6 +286,7 @@ export default function CapabilityRoleEditor({
       JSON.stringify(selectedFields),
       JSON.stringify(menuSelection),
       JSON.stringify(fieldAccessChanges),
+      JSON.stringify(grantFieldChanges),
     ],
   );
   useEffect(() => {
@@ -292,6 +309,45 @@ export default function CapabilityRoleEditor({
       current = false;
     };
   }, [readOnly, activeSection, rolePid, draftBody, baselineSnapshot?.navigation]);
+  // Candidate discovery never writes grants or rebases an existing field edit's metadata token.
+  const candidateRequest = JSON.stringify({ ...draftBody, grantFieldChanges: undefined });
+  useEffect(() => {
+    if (loading || activeSection !== 'scope' || baselineSnapshot?.rolePid !== rolePid) return;
+    if (readOnly) {
+      setGrantFieldCandidates(baselineSnapshot?.grantFields);
+      setGrantFieldsLoading(false);
+      return;
+    }
+    let current = true;
+    setGrantFieldsLoading(true);
+    setGrantFieldsError(false);
+    setGrantFieldCandidates(undefined);
+    void authorizationDraftService
+      .preview(rolePid, JSON.parse(candidateRequest) as AuthorizationDraft)
+      .then((plan) => {
+        if (!plan.grantFieldCandidates) throw new Error('Missing grant field candidate contract');
+        if (current) setGrantFieldCandidates(plan.grantFieldCandidates);
+      })
+      .catch((error) => {
+        if (!current) return;
+        setGrantFieldsError(true);
+        if (error instanceof AuthorizationConflict) setConflict(true);
+      })
+      .finally(() => {
+        if (current) setGrantFieldsLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [
+    rolePid,
+    loading,
+    activeSection,
+    baselineSnapshot,
+    readOnly,
+    candidateRequest,
+    grantFieldsAttempt,
+  ]);
   const requestBody = () => draftBody;
   useEffect(() => {
     onDraftChange?.(
@@ -481,6 +537,57 @@ export default function CapabilityRoleEditor({
   );
   const previewContent = previewPlan ? (
     <div className="space-y-4" data-testid="capability-preview-summary">
+      {!!draftPreview?.grantFieldChanges?.length && (
+        <section
+          data-testid="draft-preview-grant-fields"
+          className="border-border rounded-control space-y-2 border p-3 text-xs"
+        >
+          <h3 className="font-medium">
+            {t('roleGrantFields.title', undefined, 'Allowed fields per authorization')}
+          </h3>
+          {draftPreview.grantFieldChanges.map((change, index) => {
+            const binding = change.before;
+            const label = (code: string) => {
+              const field = binding?.fields?.find((item) => item.code === code);
+              return t(
+                `model.${binding?.modelCode}.${code}.label`,
+                undefined,
+                field?.label && field.label !== code
+                  ? field.label
+                  : t('roleFields.unnamedField', undefined, 'Field definition unavailable'),
+              );
+            };
+            return (
+              <div key={index}>
+                <p className="font-medium">
+                  {binding?.modelLabel ||
+                    t(
+                      'roleFields.unnamedModel',
+                      undefined,
+                      'Business object definition unavailable',
+                    )}{' '}
+                  ·{' '}
+                  {t(
+                    `roleGrantFields.action.${binding?.permissionCode?.split('.').at(-1)}`,
+                    undefined,
+                    'Authorization',
+                  )}
+                </p>
+                <p>
+                  {t('roleGrantFields.read', undefined, 'May read')}:{' '}
+                  {change.readFields?.map(label).join('、') ||
+                    t('roleGrantFields.none', undefined, 'No fields')}
+                </p>
+                <p>
+                  {t('roleGrantFields.write', undefined, 'May write')}:{' '}
+                  {change.writeFields?.map(label).join('、') ||
+                    t('roleGrantFields.none', undefined, 'No fields')}
+                </p>
+              </div>
+            );
+          })}
+        </section>
+      )}
       {!!draftPreview?.fieldAccessChanges?.length && (
         <section
           data-testid="draft-preview-field-access"
@@ -883,7 +990,40 @@ export default function CapabilityRoleEditor({
             />
           </div>
           <div hidden={activeSection !== 'scope'} className="space-y-4">
+            {grantFieldChanges.length > 0 && (
+              <p
+                data-testid="grant-fields-pending"
+                className="text-text-2 flex flex-wrap justify-between gap-2 text-xs"
+              >
+                {t(
+                  'roleGrantFields.pendingChanges',
+                  { count: grantFieldChanges.length },
+                  `${grantFieldChanges.length} authorization field edits pending. Review and save with the same draft.`,
+                )}
+                <button
+                  type="button"
+                  disabled={readOnly || saving || previewLoading}
+                  className="text-accent underline"
+                  onClick={() => setGrantFieldChanges([])}
+                >
+                  {t('roleGrantFields.reset', undefined, 'Discard field edits')}
+                </button>
+              </p>
+            )}
+
             <RoleFieldAccessGrid
+              renderGrantFields={(model) => (
+                <RoleGrantFieldsEditor
+                  model={model}
+                  candidates={grantFieldCandidates}
+                  changes={grantFieldChanges}
+                  disabled={readOnly || saving || previewLoading || conflict}
+                  loading={grantFieldsLoading}
+                  error={grantFieldsError}
+                  onRetry={() => setGrantFieldsAttempt((value) => value + 1)}
+                  onChange={setGrantFieldChanges}
+                />
+              )}
               renderRecordScope={(model, label, permissions) => (
                 <RoleObjectScopeSettings
                   model={model}

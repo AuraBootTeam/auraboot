@@ -16,6 +16,7 @@ interface Props {
   grantedCodes: Set<string>;
   disabled: boolean;
   onChange: (changes: FieldAccessChange[]) => void;
+  renderGrantFields?: (model: string) => ReactNode;
   renderRecordScope?: (model: string, label: string, permissions: string[]) => ReactNode;
 }
 
@@ -29,6 +30,7 @@ export default function RoleFieldAccessGrid({
   disabled,
   onChange,
   renderRecordScope,
+  renderGrantFields,
 }: Props) {
   const { t } = useI18n();
   const [modelCode, setModelCode] = useState(''),
@@ -161,6 +163,7 @@ export default function RoleFieldAccessGrid({
                 .filter((root) => root.model === current.code)
                 .flatMap((root) => root.permissions),
             )}
+          {current && renderGrantFields?.(current.code)}
           <h3 className="text-text-1 text-sm font-semibold">
             {current && modelLabel(current)} · {t('roleFields.title', undefined, 'Field access')}
           </h3>

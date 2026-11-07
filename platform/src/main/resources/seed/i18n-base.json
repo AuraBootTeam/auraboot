@@ -6668,5 +6668,95 @@
     "key": "command.download.fileUnavailable",
     "zh-CN": "当前记录未提供可下载文件，或文件字段不可见。请联系管理员核对权限。",
     "en-US": "The record does not provide an accessible file. Ask an administrator to check access."
+  },
+  {
+    "key": "roleGrantFields.title",
+    "zh-CN": "每份授权的允许字段",
+    "en-US": "Allowed fields per authorization"
+  },
+  {
+    "key": "roleGrantFields.help",
+    "zh-CN": "字段列表仅作用于对应授权及其记录范围，不授予业务操作权；隐藏、只读及共享限制继续生效。",
+    "en-US": "Field lists apply to one authorization and its record scope. They do not grant business access. Hidden, read-only and shared restrictions still apply."
+  },
+  {
+    "key": "roleGrantFields.loading",
+    "zh-CN": "正在核对当前草稿的字段候选…",
+    "en-US": "Checking the current draft…"
+  },
+  {
+    "key": "roleGrantFields.error",
+    "zh-CN": "无法核对字段候选，已保留草稿，暂时不能编辑字段。",
+    "en-US": "Could not check field candidates. Your edits are preserved; field editing is disabled."
+  },
+  {
+    "key": "roleGrantFields.empty",
+    "zh-CN": "此对象当前没有可直接配置的原生授权。业务与受管来源仍由各自的配置规则管理。",
+    "en-US": "No directly editable native authorization is available for this object. Business and managed sources retain their own configuration."
+  },
+  {
+    "key": "roleGrantFields.pending",
+    "zh-CN": "本草稿新增",
+    "en-US": "New in this draft"
+  },
+  {
+    "key": "roleGrantFields.reset",
+    "zh-CN": "撤回字段编辑",
+    "en-US": "Discard field edits"
+  },
+  {
+    "key": "roleGrantFields.managed",
+    "zh-CN": "此授权由来源管理，不能在此覆盖。",
+    "en-US": "This authorization is managed by its source. It cannot be overwritten here."
+  },
+  {
+    "key": "roleGrantFields.legacy",
+    "zh-CN": "尚未设置明确字段列表，保持现有授权规则。",
+    "en-US": "No explicit field list. Existing authorization rules are preserved."
+  },
+  {
+    "key": "roleGrantFields.configure",
+    "zh-CN": "设置明确字段列表",
+    "en-US": "Set a finite field list"
+  },
+  {
+    "key": "roleGrantFields.finite",
+    "zh-CN": "仅允许选中的字段；空列表表示不允许任何字段，未来新增字段不会自动加入。读取和写入仍受该授权的操作类型限制。",
+    "en-US": "Only selected fields are allowed. An empty list allows no fields; future fields are not included automatically. Reading and writing remain subject to the authorization’s action."
+  },
+  {
+    "key": "roleGrantFields.read",
+    "zh-CN": "允许读取",
+    "en-US": "May read"
+  },
+  {
+    "key": "roleGrantFields.write",
+    "zh-CN": "允许写入",
+    "en-US": "May write"
+  },
+  {
+    "key": "roleGrantFields.none",
+    "zh-CN": "无允许字段",
+    "en-US": "No fields"
+  },
+  {
+    "key": "roleGrantFields.pendingChanges",
+    "zh-CN": "{count} 份授权的字段编辑待保存，请与当前草稿一起预览并保存。",
+    "en-US": "{count} authorization field edits pending. Review and save with the same draft."
+  },
+  {
+    "key": "roleGrantFields.action.read",
+    "zh-CN": "读取授权",
+    "en-US": "Read authorization"
+  },
+  {
+    "key": "roleGrantFields.action.create",
+    "zh-CN": "创建授权",
+    "en-US": "Create authorization"
+  },
+  {
+    "key": "roleGrantFields.action.update",
+    "zh-CN": "修改授权",
+    "en-US": "Update authorization"
   }
 ]

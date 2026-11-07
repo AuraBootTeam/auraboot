@@ -116,6 +116,7 @@ beforeEach(() => {
     defaultScopeType: body.defaultScopeType ?? null,
     applyDefaultToCurrentGrants: body.applyDefaultToCurrentGrants ?? false,
     scopeChanges: body.scopeChanges ?? [],
+    grantFieldCandidates: [],
   }));
 });
 describe('CapabilityRoleEditor joint authorization draft', () => {
@@ -569,5 +570,172 @@ describe('field restrictions participate in the same role draft', () => {
     fireEvent.click(checkbox);
     expect(checkbox).not.toBeChecked();
     expect(checkbox).toBeDisabled();
+  });
+});
+
+describe('positive grant field authoring in the original role draft', () => {
+  const metadataRevision = 'b'.repeat(64);
+  const fields = [
+    { code: 'name', label: 'Name' },
+    { code: 'cost', label: 'Cost' },
+  ];
+  const binding = {
+    bindingPid: 'saved-binding',
+    permissionCode: 'model.order.read',
+    modelCode: 'order',
+    modelLabel: 'Order',
+    editable: true,
+    legacy: false,
+    readFields: ['name', 'cost'],
+    writeFields: [],
+    fields,
+    metadataRevision,
+  };
+  function snapshot() {
+    return {
+      ...baseline(),
+      grantFields: [binding],
+      fieldAccess: [
+        {
+          code: 'order',
+          label: 'Order',
+          fields: fields.map((field) => ({
+            ...field,
+            access: 'inherit',
+            additionalRestrictions: [],
+          })),
+        },
+      ],
+    };
+  }
+  beforeEach(() => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(snapshot());
+    vi.mocked(authorizationDraftService.preview).mockImplementation(async (_, body) => {
+      const candidates = [
+        binding,
+        ...(body.selectedCapabilityCodes.includes('order.edit')
+          ? [
+              {
+                ...binding,
+                bindingPid: null,
+                permissionCode: 'model.order.update',
+                legacy: true,
+                readFields: [],
+                writeFields: [],
+              },
+            ]
+          : []),
+      ];
+      return {
+        revision: body.expectedRevision,
+        capabilities: {
+          grantedCodes: [],
+          revokedCodes: [],
+          preservedCodes: [],
+          relatedMenus: [],
+          resultingCapabilities: [],
+        },
+        defaultScopeChanged: false,
+        defaultScopeType: null,
+        applyDefaultToCurrentGrants: false,
+        scopeChanges: [],
+        grantFieldCandidates: candidates,
+        grantFieldChanges: (body.grantFieldChanges ?? []).map((change) => ({
+          before: candidates.find((candidate) =>
+            change.bindingPid
+              ? candidate.bindingPid === change.bindingPid
+              : candidate.permissionCode === change.permissionCode,
+          ),
+          readFields: change.readFields,
+          writeFields: change.writeFields,
+        })),
+      };
+    });
+  });
+  it('stages existing and newly selected bindings separately and saves the exact reviewed fields once', async () => {
+    const view = render(<CapabilityRoleEditor rolePid="role-1" />);
+    await screen.findByTestId('capability-role-editor');
+    await toggleEdit();
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    const read = await screen.findByTestId('grant-field-model.order.read-0-read-cost');
+    await waitFor(() => expect(read).toBeEnabled());
+    fireEvent.click(read);
+    fireEvent.click(screen.getByText('Set a finite field list'));
+    fireEvent.click(screen.getByTestId('grant-field-model.order.update-1-write-cost'));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    await review();
+    const body = vi.mocked(authorizationDraftService.preview).mock.calls.at(-1)![1];
+    expect(body.selectedCapabilityCodes).toEqual(['order.read', 'order.edit']);
+    expect(body.grantFieldChanges).toEqual([
+      {
+        bindingPid: 'saved-binding',
+        expectedMetadataRevision: metadataRevision,
+        readFields: ['name'],
+        writeFields: [],
+      },
+      {
+        permissionCode: 'model.order.update',
+        expectedMetadataRevision: metadataRevision,
+        readFields: [],
+        writeFields: ['name'],
+      },
+    ]);
+    expect(screen.getByTestId('draft-preview-grant-fields')).toHaveTextContent('Order');
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() =>
+      expect(authorizationDraftService.save).toHaveBeenCalledExactlyOnceWith('role-1', body),
+    );
+  });
+  it('preserves field edits on candidate failure and exposes an explicit reset', async () => {
+    const view = render(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    const checkbox = await screen.findByTestId('grant-field-model.order.read-0-read-cost');
+    fireEvent.click(checkbox);
+    vi.mocked(authorizationDraftService.preview).mockRejectedValue(new Error('unavailable'));
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="capabilities" />);
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    await screen.findByText(/Could not check field candidates/);
+    expect(screen.getByTestId('grant-fields-pending')).toBeVisible();
+    fireEvent.click(screen.getByText('Discard field edits'));
+    expect(screen.queryByTestId('grant-fields-pending')).not.toBeInTheDocument();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('does not silently rebase a staged metadata token on a later candidate refresh', async () => {
+    const view = render(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    fireEvent.click(await screen.findByTestId('grant-field-model.order.read-0-read-cost'));
+    const preview = vi.mocked(authorizationDraftService.preview).getMockImplementation()!;
+    vi.mocked(authorizationDraftService.preview).mockImplementation(async (...args) => {
+      const result = await preview(...args);
+      return {
+        ...result,
+        grantFieldCandidates: result.grantFieldCandidates?.map((candidate) => ({
+          ...candidate,
+          metadataRevision: 'c'.repeat(64),
+        })),
+      };
+    });
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="capabilities" />);
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    await waitFor(() =>
+      expect(screen.getByTestId('grant-field-model.order.read-0-read-name')).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByTestId('grant-field-model.order.read-0-read-name'));
+    await review();
+    expect(
+      vi.mocked(authorizationDraftService.preview).mock.calls.at(-1)![1].grantFieldChanges,
+    ).toEqual([
+      {
+        bindingPid: 'saved-binding',
+        expectedMetadataRevision: metadataRevision,
+        readFields: [],
+        writeFields: [],
+      },
+    ]);
+    fireEvent.click(screen.getByTestId('confirm-cancel'));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('uses the saved catalog without privileged preview for read-only roles', async () => {
+    render(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" readOnly />);
+    expect(await screen.findByTestId('grant-field-model.order.read-0-read-cost')).toBeDisabled();
+    expect(authorizationDraftService.preview).not.toHaveBeenCalled();
   });
 });
