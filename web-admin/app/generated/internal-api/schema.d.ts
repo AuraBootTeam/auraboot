@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 5b23693d3291b498219850474db2915d5b261044a047cc61471e75a97ef5e385
+ * Contract SHA-256: 47cad670ac0790c2d928473c681015c9cfc250c520b19460247e88fb36fd1543
  */
 export interface paths {
     "/api/activities": {
@@ -39799,6 +39799,16 @@ export interface components {
             permissionPid?: string | null;
             /** Format: int32 */
             priority?: number | null;
+            /**
+             * Format: int64
+             * @description Owning publish snapshot pointer; never migration authorization
+             */
+            snapshotId?: number | null;
+            /**
+             * @description Configuration owner classification, not effective access or migration eligibility
+             * @enum {string}
+             */
+            sourceOwnership: "DIRECT" | "DETACHED_COPY" | "PUBLISHED_SNAPSHOT" | "EXTERNAL_SOURCE";
             sourceRef?: string | null;
             status?: string | null;
         };

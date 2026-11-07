@@ -47171,6 +47171,24 @@
               "null"
             ]
           },
+          "snapshotId": {
+            "description": "Owning publish snapshot pointer; never migration authorization",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceOwnership": {
+            "description": "Configuration owner classification, not effective access or migration eligibility",
+            "enum": [
+              "DIRECT",
+              "DETACHED_COPY",
+              "PUBLISHED_SNAPSHOT",
+              "EXTERNAL_SOURCE"
+            ],
+            "type": "string"
+          },
           "sourceRef": {
             "type": [
               "string",
@@ -47185,7 +47203,8 @@
           }
         },
         "required": [
-          "bindingPid"
+          "bindingPid",
+          "sourceOwnership"
         ],
         "type": "object"
       },
