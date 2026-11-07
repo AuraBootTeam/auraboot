@@ -46903,6 +46903,12 @@
           "fieldPolicies": {
             "$ref": "#/components/schemas/RoleFieldPolicyPreview"
           },
+          "grantFieldCandidates": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsBinding"
+            },
+            "type": "array"
+          },
           "grantFieldChanges": {
             "items": {
               "$ref": "#/components/schemas/RoleGrantFieldsReviewed"
@@ -47722,7 +47728,10 @@
       "RoleGrantFieldsBinding": {
         "properties": {
           "bindingPid": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "editable": {
             "type": "boolean"
@@ -47735,6 +47744,9 @@
           },
           "legacy": {
             "type": "boolean"
+          },
+          "metadataRevision": {
+            "type": "string"
           },
           "modelCode": {
             "type": "string"
@@ -47764,11 +47776,30 @@
         "type": "object"
       },
       "RoleGrantFieldsChange": {
+        "description": "Set exactly one of bindingPid (existing binding) or permissionCode (newly selected permission). New permissions require the candidate metadata revision.",
         "properties": {
           "bindingPid": {
             "maxLength": 32,
             "minLength": 0,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedMetadataRevision": {
+            "pattern": "[a-f0-9]{64}",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "readFields": {
             "items": {
@@ -47788,7 +47819,6 @@
           }
         },
         "required": [
-          "bindingPid",
           "readFields",
           "writeFields"
         ],

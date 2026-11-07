@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: cc3c521c9aa564ad604511562c5c70d98a6d47304b5292d6451200d6b7adcf77
+ * Contract SHA-256: 5b23693d3291b498219850474db2915d5b261044a047cc61471e75a97ef5e385
  */
 export interface paths {
     "/api/activities": {
@@ -39753,6 +39753,7 @@ export interface components {
             defaultScopeType: string | null;
             fieldAccessChanges?: components["schemas"]["RoleFieldAccessReviewed"][];
             fieldPolicies?: components["schemas"]["RoleFieldPolicyPreview"];
+            grantFieldCandidates?: components["schemas"]["RoleGrantFieldsBinding"][];
             grantFieldChanges?: components["schemas"]["RoleGrantFieldsReviewed"][];
             navigation?: components["schemas"]["RoleNavigationSelection"];
             revision: string;
@@ -39929,18 +39930,22 @@ export interface components {
             policyType?: string;
         };
         RoleGrantFieldsBinding: {
-            bindingPid?: string;
+            bindingPid?: string | null;
             editable?: boolean;
             fields?: components["schemas"]["RoleGrantFieldsField"][];
             legacy?: boolean;
+            metadataRevision?: string;
             modelCode?: string;
             modelLabel?: string | null;
             permissionCode?: string;
             readFields?: string[];
             writeFields?: string[];
         };
+        /** @description Set exactly one of bindingPid (existing binding) or permissionCode (newly selected permission). New permissions require the candidate metadata revision. */
         RoleGrantFieldsChange: {
-            bindingPid: string;
+            bindingPid?: string | null;
+            expectedMetadataRevision?: string | null;
+            permissionCode?: string | null;
             readFields: string[];
             writeFields: string[];
         };
