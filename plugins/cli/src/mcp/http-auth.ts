@@ -11,7 +11,7 @@ import { resolveTenantContext, type TenantContext } from './tenant-pin.js';
 
 export function extractBearerToken(authorization: string | undefined | null): string | null {
   if (!authorization) return null;
-  const m = /^Bearer\s+(.+)$/i.exec(authorization.trim());
+  const m = /^Bearer[ \t]+([A-Za-z0-9._~+\/-]+=*)[ \t]*$/i.exec(authorization.trim());
   const token = m?.[1]?.trim();
   return token ? token : null;
 }

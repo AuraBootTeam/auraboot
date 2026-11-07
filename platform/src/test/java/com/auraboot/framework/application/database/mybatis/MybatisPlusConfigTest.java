@@ -541,6 +541,73 @@ public class MybatisPlusConfigTest {
     }
 
     @Test
+    void renderedXorConditionsKeepTheEntireBusinessPredicateInsideTenantScope() throws Exception {
+        MetaContext.setSystemTenantContext(31L);
+        TenantLineInnerInterceptor tenant = findTenantInterceptor(
+                config.mybatisPlusInterceptor(mockDialect, null, envMock));
+        assertFalse(tenant.getTenantLineHandler().ignoreTable("tpm_project"));
+        for (String input : List.of(
+                "SELECT id FROM tpm_project WHERE status = 0 XOR flag = 1",
+                "UPDATE tpm_project SET progress = 1 WHERE status = 0 XOR flag = 1",
+                "DELETE FROM tpm_project WHERE status = 0 XOR flag = 1")) {
+            String rendered = tenant.parserSingle(input, null);
+            var statement = net.sf.jsqlparser.parser.CCJSqlParserUtil.parse(rendered);
+            Expression where;
+            if (statement instanceof net.sf.jsqlparser.statement.select.Select select) {
+                where = select.getPlainSelect().getWhere();
+            } else if (statement instanceof net.sf.jsqlparser.statement.update.Update update) {
+                where = update.getWhere();
+            } else {
+                where = ((net.sf.jsqlparser.statement.delete.Delete) statement).getWhere();
+            }
+            var scoped = assertInstanceOf(
+                    net.sf.jsqlparser.expression.operators.conditional.AndExpression.class, where, rendered);
+            assertTrue(scoped.getLeftExpression().toString().startsWith("("), rendered);
+            assertTrue(scoped.getLeftExpression().toString().contains(" XOR "), rendered);
+            assertEquals("tenant_id = '31'", scoped.getRightExpression().toString(), rendered);
+        }
+    }
+
+    @Test
+    void renderedJoinXorKeepsJoinedRowsInsideTheTenantPredicate() throws Exception {
+        MetaContext.setSystemTenantContext(31L);
+        var tenant = findTenantInterceptor(config.mybatisPlusInterceptor(mockDialect, null, envMock));
+        String rendered = tenant.parserSingle("SELECT p.id FROM tpm_project p LEFT JOIN tpm_task t "
+                + "ON p.id = t.project_id XOR t.flag = 1", null);
+        var select = ((net.sf.jsqlparser.statement.select.Select)
+                net.sf.jsqlparser.parser.CCJSqlParserUtil.parse(rendered)).getPlainSelect();
+        Expression on = select.getJoins().getFirst().getOnExpressions().iterator().next();
+        var scoped = assertInstanceOf(
+                net.sf.jsqlparser.expression.operators.conditional.AndExpression.class, on, rendered);
+        assertTrue(scoped.getLeftExpression().toString().startsWith("("), rendered);
+        assertTrue(scoped.getLeftExpression().toString().contains(" XOR "), rendered);
+        assertEquals("t.tenant_id = '31'", scoped.getRightExpression().toString(), rendered);
+        assertEquals("p.tenant_id = '31'", select.getWhere().toString(), rendered);
+    }
+
+    @Test
+    void renderedEnvironmentXorKeepsTheEntirePredicateInsideTheEnvironment() throws Exception {
+        MetaContext.setSystemTenantContext(31L);
+        MetaContext.setEnvironmentId(7L);
+        var chain = config.mybatisPlusInterceptor(mockDialect, null, envMock);
+        var environment = chain.getInterceptors().stream()
+                .filter(TenantLineInnerInterceptor.class::isInstance)
+                .map(TenantLineInnerInterceptor.class::cast)
+                .filter(item -> "env_id".equals(item.getTenantLineHandler().getTenantIdColumn()))
+                .findFirst().orElseThrow();
+        assertFalse(environment.getTenantLineHandler().ignoreTable("ab_page_schema"));
+        String rendered = environment.parserSingle(
+                "SELECT id FROM ab_page_schema WHERE status = 0 XOR flag = 1", null);
+        var select = ((net.sf.jsqlparser.statement.select.Select)
+                net.sf.jsqlparser.parser.CCJSqlParserUtil.parse(rendered)).getPlainSelect();
+        var scoped = assertInstanceOf(net.sf.jsqlparser.expression.operators.conditional.AndExpression.class,
+                select.getWhere(), rendered);
+        assertTrue(scoped.getLeftExpression().toString().startsWith("("), rendered);
+        assertTrue(scoped.getLeftExpression().toString().contains(" XOR "), rendered);
+        assertEquals("env_id = 7", scoped.getRightExpression().toString(), rendered);
+    }
+
+    @Test
     @DisplayName("PostgreSQL filters an engine text tenant column without numeric comparison")
     void postgresUpdateRetainsQuotedTenantPredicate() {
         MetaContext.setSystemTenantContext(364557612706041856L);
@@ -552,5 +619,21 @@ public class MybatisPlusConfigTest {
         assertTrue(sql.contains("tenant_id = ?"), "The engine's explicit tenant guard must remain");
         assertFalse(tenant.getTenantLineHandler().ignoreTable("se_execution_instance"));
     }
+
+    @Test
+    void optionalUpstreamFullTableGuardRejectsConstantTruePredicates() {
+        // This tests the shipped optional library, not a newly registered Core policy.
+        var guard = new com.baomidou.mybatisplus.extension.plugins.inner.BlockAttackInnerInterceptor();
+        for (String predicate : List.of("NOT 1 = 2", "1 <= 1", "1 XOR 0", "1")) {
+            for (String prefix : List.of("UPDATE tpm_project SET progress = 1", "DELETE FROM tpm_project")) {
+                assertThrows(com.baomidou.mybatisplus.core.exceptions.MybatisPlusException.class,
+                        () -> guard.parserSingle(prefix + " WHERE " + predicate, null));
+            }
+        }
+        assertDoesNotThrow(() -> guard.parserSingle(
+                "UPDATE tpm_project SET progress = 1 WHERE id = 31", null));
+        assertDoesNotThrow(() -> guard.parserSingle("DELETE FROM tpm_project WHERE id = 31", null));
+    }
+
 
 }

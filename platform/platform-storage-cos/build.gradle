@@ -21,16 +21,28 @@ dependencies {
     compileOnly project(':')
 
     // Tencent official COS Java SDK: https://cloud.tencent.com/document/product/436/10199
-    implementation 'com.qcloud:cos_api:5.6.283'
+    implementation('com.qcloud:cos_api:5.6.283') {
+        // One maintained JDK 18+ provider on Java 21; the legacy JDK 15 jar
+        // otherwise shadows the patched provider through duplicate classes.
+        exclude group: 'org.bouncycastle', module: 'bcprov-jdk15on'
+    }
+    runtimeOnly 'org.bouncycastle:bcprov-jdk18on:1.85'
+    // Align the adapter tests and published runtime with the app SDK policy.
+    implementation "com.tencentcloudapi:tencentcloud-sdk-java-kms:${rootProject.tencentCloudSdkVersion}"
+    constraints {
+        implementation "org.apache.commons:commons-configuration2:${rootProject.commonsConfigurationVersion}"
+        implementation "org.apache.commons:commons-lang3:${rootProject.commonsLangVersion}"
+        implementation "org.apache.commons:commons-text:${rootProject.commonsTextVersion}"
+    }
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.48'
     annotationProcessor 'org.projectlombok:lombok:1.18.48'
 
     // Spring Boot (conditional annotations, lifecycle interfaces)
-    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.16'
-    compileOnly 'org.springframework:spring-beans:6.2.19'
-    compileOnly 'org.springframework:spring-context:6.2.19'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:4.1.2'
+    compileOnly 'org.springframework:spring-beans:7.0.10'
+    compileOnly 'org.springframework:spring-context:7.0.10'
 
     // SLF4J for @Slf4j
     compileOnly 'org.slf4j:slf4j-api:2.0.20'
@@ -39,12 +51,12 @@ dependencies {
     testImplementation(project(':')) {
         transitive = false
     }
-    testImplementation 'org.springframework:spring-beans:6.2.19'
-    testImplementation 'org.springframework.boot:spring-boot-autoconfigure:3.5.16'
+    testImplementation 'org.springframework:spring-beans:7.0.10'
+    testImplementation 'org.springframework.boot:spring-boot-autoconfigure:4.1.2'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
     testImplementation 'org.mockito:mockito-core:5.24.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.24.0'
 }

@@ -490,6 +490,17 @@ class RegisteredSourcePlanResolverTest {
         verifyNoInteractions(delivery);
     }
     @Test
+    void composedNotificationRejectsLostDeliveryLeaseBeforeReceiptCommit() {
+        ComposedDelivery pipeline = new ComposedDelivery();
+        var event = pipeline.queue("ordinary-reference");
+        when(pipeline.receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(0);
+        assertThatThrownBy(() -> pipeline.deliver(event, pipeline.host))
+                .hasMessageContaining("delivery lease expired");
+        verify(pipeline.receipts, never()).markReceiptApplied(anyLong(), anyString(), anyString(), anyString());
+        verify(pipeline.transactions).rollback(any());
+    }
+
+    @Test
     void composedOrdinaryHostNotificationKeepsDefaultConsumerIsolation() {
         ComposedDelivery pipeline = new ComposedDelivery();
         var event = pipeline.queue("ordinary-reference");
@@ -853,6 +864,7 @@ class RegisteredSourcePlanResolverTest {
             when(receipts.lockActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1L);
             when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
             when(receipts.markReceiptApplied(anyLong(), anyString(), anyString(), anyString())).thenReturn(1);
+            when(receipts.countActiveDeliveryLease(anyLong(), anyString(), anyString())).thenReturn(1);
             when(transactions.getTransaction(any())).thenAnswer(call -> {
                 TransactionDefinition definition = call.getArgument(0);
                 isolation = definition.getIsolationLevel();

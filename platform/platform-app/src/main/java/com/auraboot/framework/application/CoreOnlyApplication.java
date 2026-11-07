@@ -3,8 +3,8 @@ package com.auraboot.framework.application;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -20,8 +20,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {
-    RedisAutoConfiguration.class,
-    RedisRepositoriesAutoConfiguration.class
+    DataRedisAutoConfiguration.class,
+    DataRedisRepositoriesAutoConfiguration.class
 })
 @ComponentScan(
     basePackages = {"com.auraboot.framework", "com.auraboot.module"},

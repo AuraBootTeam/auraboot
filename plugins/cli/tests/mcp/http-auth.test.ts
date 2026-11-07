@@ -22,6 +22,14 @@ describe('extractBearerToken', () => {
   });
 });
 
+describe('Bearer header boundary', () => {
+  it.each(['Bearer \u2028', 'Bearer a b', 'Bearer abc\r\nX-Injected: yes', 'Bearer ' + ' '.repeat(100_000) + '\n'])
+    ('rejects malformed or overlapping whitespace without a token', (authorization) => {
+      expect(extractBearerToken(authorization)).toBeNull();
+      expect(authenticateHttpRequest(authorization)).toMatchObject({ ok: false, status: 401 });
+    });
+});
+
 describe('authenticateHttpRequest', () => {
   it('401 when there is no bearer token', () => {
     const r = authenticateHttpRequest(undefined);

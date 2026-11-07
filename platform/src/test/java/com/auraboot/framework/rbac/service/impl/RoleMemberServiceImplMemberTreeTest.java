@@ -34,6 +34,18 @@ import static org.mockito.Mockito.when;
 @DisplayName("RoleMemberServiceImpl member tree")
 class RoleMemberServiceImplMemberTreeTest {
 
+    @Test
+    void longPaginationTotalCannotOverflowOrEscapeTheTenPageCap() {
+        when(userRoleService.list(any(QueryWrapper.class))).thenReturn(List.of());
+        when(organizationService.getEmployeesByTenant(anyInt(), anyInt(), any()))
+                .thenReturn(PaginationResult.of(List.of(), Long.MAX_VALUE, 1, 500));
+        when(organizationService.getDepartmentTree(10L)).thenReturn(List.of());
+        RoleMemberTreeResponse result = service.getMemberTree(100L);
+        assertThat(result.ungrouped()).isEmpty();
+        org.mockito.Mockito.verify(organizationService, org.mockito.Mockito.times(10))
+                .getEmployeesByTenant(anyInt(), org.mockito.ArgumentMatchers.eq(500), any());
+    }
+
     @Mock private UserRoleService userRoleService;
     @Mock private RoleService roleService;
     @Mock private TenantMemberService tenantMemberService;

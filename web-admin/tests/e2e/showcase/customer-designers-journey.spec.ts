@@ -17,10 +17,22 @@ async function menu(page: Page, label: string) {
 }
 async function screenshot(page: Page, info: TestInfo, name: string) {
   await expect(page.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0, { timeout: 15000 });
-  await info.attach(name, {
-    body: await page.screenshot({ fullPage: true }),
-    contentType: 'image/png',
-  });
+  const originalViewport = page.viewportSize();
+  const configurationCapture = ['SC02-model-fields-ready', 'SC02-schema-title-adjustment',
+    'SC02-schema-saved-reopened'].includes(name);
+  try {
+    // Interactions and layout assertions retain the original viewport. Capture
+    // the three configuration states at a documented desktop size so all rows
+    // and the complete inspector remain visible without editing image pixels.
+    if (configurationCapture) await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.evaluate(() => document.fonts.ready);
+    await info.attach(name, {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+  } finally {
+    if (configurationCapture && originalViewport) await page.setViewportSize(originalViewport);
+  }
 }
 
 type PageTreeBlock = { id?: string; title?: unknown; blocks?: PageTreeBlock[] };
@@ -29,6 +41,23 @@ function blocksWithId(blocks: PageTreeBlock[], id: string): PageTreeBlock[] {
     ...(block.id === id ? [block] : []),
     ...blocksWithId(block.blocks ?? [], id),
   ]);
+}
+
+function findAuthoringList(value: unknown): { id: string } | null {
+  if (Array.isArray(value)) {
+    for (const child of value) {
+      const found = findAuthoringList(child);
+      if (found) return found;
+    }
+  } else if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if ((record.blockType ?? record.type) === 'list' && typeof record.id === 'string') return { id: record.id };
+    for (const child of Object.values(record)) {
+      const found = findAuthoringList(child);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 test('SC02: create a model, bind fields, publish and generate CRUD from the real menus', async ({
@@ -96,6 +125,13 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId('field-selection-create-bind').click();
   expect((await (await duplicate).json()).data).toBe(false);
   await expect(page.getByTestId('field-create-duplicate')).toBeVisible();
+  await expect(page.getByTestId('field-create-duplicate')).toBeInViewport();
+  const duplicateBox = await page.getByTestId('field-create-duplicate').boundingBox();
+  const submitBox = await page.getByTestId('field-selection-create-bind').boundingBox();
+  expect(duplicateBox).not.toBeNull();
+  expect(submitBox).not.toBeNull();
+  expect(duplicateBox!.y + duplicateBox!.height).toBeLessThan(submitBox!.y);
+
   await screenshot(page, info, 'SC02-duplicate-field-denied');
   await invalidDialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(invalidDialog).toBeHidden();
@@ -110,6 +146,16 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(metadata.data.filter((field: { code: string }) => !field.code.startsWith(`${code}_`))
     .map((field: { code: string }) => field.code).sort()).toEqual(['created_at', 'updated_at']);
   expect(JSON.stringify(metadata.data)).toContain(`${code}_opportunity_amount`);
+  const customerCodeCell = page.getByTestId('model-field-code').filter({ hasText: `${code}_customer_name` });
+  await expect(customerCodeCell).toHaveAttribute('title', `${code}_customer_name`);
+  const codeLayout = await customerCodeCell.evaluate((element) => ({
+    whiteSpace: getComputedStyle(element).whiteSpace,
+    textOverflow: getComputedStyle(element).textOverflow,
+    height: element.getBoundingClientRect().height,
+  }));
+  expect(codeLayout.whiteSpace).toBe('nowrap');
+  expect(codeLayout.textOverflow).toBe('ellipsis');
+  expect(codeLayout.height).toBeLessThan(24);
   await screenshot(page, info, 'SC02-model-fields-ready');
   await page.getByTestId('model-more-actions').click();
   await page.getByTestId('model-publish-action').click();
@@ -289,6 +335,67 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await expect(page).toHaveURL(listUrl);
   await expect(row).toBeVisible();
 
+  const detailUrl = generationBody.data.accessLinks.detailPage.replace(':recordPid', recordPid);
+  await page.goto(detailUrl);
+  await expect(page).toHaveURL(`${listUrl}/view/${recordPid}`);
+  await expect(page.getByRole('main')).toContainText(customerName);
+  await expect(page.getByRole('main')).toContainText(/68,?000/);
+  await screenshot(page, info, 'SC02-generated-record-detail');
+  await page.goto(listUrl);
+  await expect(row).toBeVisible();
+
+  // Refine the generated page through its Schema inspector, then verify the
+  // actual runtime rather than accepting a successful designer save as proof.
+  const formResource = generationBody.data.generatedResources.pages.find(
+    (resource: { kind: string }) => resource.kind === 'form',
+  );
+  expect(formResource?.pid).toMatch(/^[0-9A-Z]{26}$/);
+  await menu(page, '页面配置');
+  await expect(page).toHaveURL(/\/p\/page_schema(?:\?|$)/);
+  await expect(page.getByRole('main')).toContainText('页面配置');
+  await page.getByTestId('list-search-input').fill(`${code}_form`);
+  await page.getByTestId('list-search-input').press('Enter');
+  await page.locator('tr').filter({ hasText: `${code}_form` })
+    .getByText('统一设计器', { exact: true }).click();
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+  await page.getByTestId(`outline-item-block_${code}_form`).click();
+  const sectionTitle = page.getByTestId('inspector-field-title');
+  await sectionTitle.fill('客户商机与跟进信息');
+  await page.getByRole('checkbox', { name: '可折叠', exact: true }).check();
+  await page.getByRole('checkbox', { name: '默认折叠', exact: true }).check();
+  await expect(page.getByText('Default collapsed', { exact: true })).toHaveCount(0);
+  await screenshot(page, info, 'SC02-schema-title-adjustment');
+  const saveGeneratedForm = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === `/api/pages/${formResource.pid}`
+      && response.request().method() === 'PUT',
+  );
+  await page.getByTestId('designer-save').click();
+  expect(String((await (await saveGeneratedForm).json()).code)).toBe('0');
+  await page.reload();
+  await page.getByTestId(`outline-item-block_${code}_form`).click();
+  await expect(sectionTitle).toHaveValue('客户商机与跟进信息');
+  await expect(page.getByRole('checkbox', { name: '可折叠', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: '默认折叠', exact: true })).toBeChecked();
+  await screenshot(page, info, 'SC02-schema-saved-reopened');
+  const savedForm = (await (await page.request.get(`/api/pages/${formResource.pid}`)).json()).data;
+  expect(savedForm.schemaVersion).toBe(4);
+  expect(savedForm.blocks.find((block: { id: string }) => block.id === `block_${code}_form`).title)
+    .toMatchObject({ 'zh-CN': '客户商机与跟进信息' });
+  expect(savedForm.blocks.find((block: { id: string }) => block.id === `block_${code}_form`))
+    .toMatchObject({ collapsible: true, defaultCollapsed: true });
+  const designerUrl = page.url();
+  await page.goto(`${listUrl}/edit/${recordPid}`);
+  await expect(page.getByText('客户商机与跟进信息', { exact: true })).toBeVisible();
+  await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toBeHidden();
+  await page.locator('summary').filter({ hasText: '客户商机与跟进信息' }).click();
+  await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(customerName);
+  await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('68000');
+  await screenshot(page, info, 'SC02-schema-adjusted-runtime');
+  await page.getByTestId('form-btn-cancel').click();
+  await expect(page).toHaveURL(designerUrl);
+  await page.goto(listUrl);
+  await expect(row).toBeVisible();
+
   // Provision a task-owned read-only role. API use here is setup and a negative
   // authorization probe; the successful create/update path above is browser-only.
   const authorIdentityResponse = await page.request.get('/api/auth/me');
@@ -413,6 +520,66 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   } finally {
     await reader.context.close();
   }
+  // Recover a real server-owned Studio draft after a page restart. The standalone
+  // sample cache must remain untouched before, during and after governed saving.
+  const sampleKey = 'auraboot.unified-designer.sample';
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await page.goto(listUrl);
+  await expect(row).toBeVisible();
+  const openSession = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/authoring/sessions'
+      && response.request().method() === 'POST');
+  await page.getByRole('banner').getByRole('button', { name: '配置此页' }).click();
+  const sessionResponse = await openSession;
+  expect(sessionResponse.ok()).toBe(true);
+  const authoringSession = (await sessionResponse.json()).data;
+  expect(authoringSession.sessionPid).toMatch(/^[0-9A-Z]{26}$/);
+  const recoverableList = findAuthoringList(authoringSession.snapshot);
+  expect(recoverableList, 'real authoring snapshot must identify the generated list').not.toBeNull();
+  const recoveryOutline = page.getByTestId(`outline-item-${recoverableList!.id}`);
+  await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
+  await page.getByTestId('authoring-inspector-open').click();
+  await page.getByRole('button', { name: '高级设置' }).click();
+  await page.getByRole('dialog', { name: '进入应用设计中心' })
+    .getByRole('button', { name: '继续到应用设计中心' }).click();
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+  const recoveredTitle = '客户跟进 · 恢复后保存';
+  await recoveryOutline.click();
+  await page.getByTestId('inspector-field-title').fill(recoveredTitle);
+  await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+  const recoveryPresent = () => page.evaluate((sessionPid) => Object.keys(localStorage).some((key) =>
+    key.startsWith('auraboot:authoring-recovery:v2:studio:') && key.endsWith(':' + sessionPid)),
+  authoringSession.sessionPid);
+  await expect.poll(recoveryPresent).toBe(true);
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await page.reload();
+  await expect(page.getByTestId('studio-save-reconciliation-feedback')).toContainText('尚未写入权威草稿');
+  await recoveryOutline.click();
+  await expect(page.getByTestId('inspector-field-title')).toHaveValue(recoveredTitle);
+  const saveRecovery = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === `/api/authoring/sessions/${authoringSession.sessionPid}/studio-batches`
+      && response.request().method() === 'POST');
+  await page.getByTestId('designer-save').click();
+  const recoveryResponse = await saveRecovery;
+  expect(recoveryResponse.ok()).toBe(true);
+  const savedRecovery = await recoveryResponse.json();
+  expect(String(savedRecovery.code)).toBe('0');
+  expect(savedRecovery.data.session.pagePid).toBe(authoringSession.pagePid);
+  expect(JSON.stringify(savedRecovery.data.session.snapshot)).toContain(recoveredTitle);
+  await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+  await expect.poll(recoveryPresent).toBe(false);
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await page.reload();
+  await recoveryOutline.click();
+  await expect(page.getByTestId('inspector-field-title')).toHaveValue(recoveredTitle);
+  expect(await page.evaluate((key) => localStorage.getItem(key), sampleKey)).toBeNull();
+  await screenshot(page, info, 'SC02-server-studio-recovery-isolated-from-sample');
+  await info.attach('SC02-studio-recovery-storage-boundary', {
+    body: JSON.stringify({ pagePid: authoringSession.pagePid, sessionPid: authoringSession.sessionPid,
+      revision: savedRecovery.data.session.revision, standaloneSampleCache: 'absent',
+      realDraftSaved: true, browserRestartRecovered: true }),
+    contentType: 'application/json',
+  });
   await info.attach('SC02-model-identity', {
     body: JSON.stringify(
       { modelCode: code, modelPid: pid, fields: metadata.data, generated: generationBody.data },

@@ -1,22 +1,32 @@
 // Native Gradle consumers must receive the same BOM relationships as Maven consumers.
 // Spring's dependency-management plugin exports POM imports but not Gradle module dependencies.
 dependencies {
-    api platform('org.springframework.boot:spring-boot-dependencies:3.5.16')
+    api platform('org.springframework.boot:spring-boot-dependencies:4.1.2')
     api platform("io.sentry:sentry-bom:${sentryVersion}")
     api platform("com.baomidou:mybatis-plus-bom:${mybatisPlusVersion}")
+    api platform("com.fasterxml.jackson:jackson-bom:${jacksonVersion}")
+    api platform('io.netty:netty-bom:4.2.19.Final')
+    api platform('io.opentelemetry:opentelemetry-bom:1.67.0')
+    api platform("org.apache.logging.log4j:log4j-bom:${log4jVersion}")
 }
 
 // Shared managed versions for core and its application/agent consumers.
 dependencyManagement {
     imports {
-        mavenBom 'org.springframework.boot:spring-boot-dependencies:3.5.16'
+        mavenBom 'org.springframework.boot:spring-boot-dependencies:4.1.2'
         mavenBom "io.sentry:sentry-bom:${sentryVersion}"
         mavenBom "com.baomidou:mybatis-plus-bom:${mybatisPlusVersion}"
+        // Align complete families; pinning core/yaml alone left Databind on
+        // the older Boot-managed version in the actual executable artifact.
+        mavenBom "com.fasterxml.jackson:jackson-bom:${jacksonVersion}"
+        mavenBom 'io.netty:netty-bom:4.2.19.Final'
+        mavenBom 'io.opentelemetry:opentelemetry-bom:1.67.0'
+        mavenBom "org.apache.logging.log4j:log4j-bom:${log4jVersion}"
 
     }
 
     dependencies {
-        dependency "com.baomidou:mybatis-plus-spring-boot3-starter:${mybatisPlusVersion}"
+        dependency "com.baomidou:mybatis-plus-spring-boot4-starter:${mybatisPlusVersion}"
 
         // Force jsqlparser 5.3 over the 5.2 pinned by mybatis-plus 3.5.x. 5.2
         // catastrophically backtracks on large analytical named queries (e.g. the
@@ -33,6 +43,29 @@ dependencyManagement {
 
         dependency "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jacksonVersion}"
         dependency "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+        dependency 'com.google.guava:guava:33.7.2-jre'
+        dependency 'at.yawk.lz4:lz4-java:1.11.4'
+        dependency 'org.xerial.snappy:snappy-java:1.1.10.9'
+        dependency 'org.bouncycastle:bcprov-jdk18on:1.85'
+        dependency 'org.apache.httpcomponents.client5:httpclient5:5.6.3'
+        dependency "org.apache.commons:commons-configuration2:${commonsConfigurationVersion}"
+        dependency "org.apache.commons:commons-lang3:${commonsLangVersion}"
+        dependency "org.apache.commons:commons-text:${commonsTextVersion}"
+        // Stay on the compatible SDK line whose credential parser replaced
+        // vulnerable ini4j; preserve COS/KMS functionality rather than exclude it.
+        dependencySet(group: 'com.tencentcloudapi', version: tencentCloudSdkVersion) {
+            entry 'tencentcloud-sdk-java-common'
+            entry 'tencentcloud-sdk-java-kms'
+        }
+        dependencySet(group: 'org.apache.httpcomponents.core5', version: '5.4.3') {
+            entry 'httpcore5'
+            entry 'httpcore5-h2'
+        }
+        dependencySet(group: 'org.apache.tomcat.embed', version: '11.0.27') {
+            entry 'tomcat-embed-core'
+            entry 'tomcat-embed-el'
+            entry 'tomcat-embed-websocket'
+        }
 
         dependency "org.projectlombok:lombok:${lombokVersion}"
         dependency "org.aspectj:aspectjweaver:${aspectjVersion}"

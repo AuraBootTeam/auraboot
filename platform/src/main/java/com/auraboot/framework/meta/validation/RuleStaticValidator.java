@@ -2,6 +2,8 @@ package com.auraboot.framework.meta.validation;
 
 import com.auraboot.framework.meta.dto.CrossFieldRule;
 import com.auraboot.framework.meta.dto.RuleAssert;
+import com.google.re2j.Pattern;
+import com.google.re2j.PatternSyntaxException;
 
 import java.util.*;
 
@@ -59,6 +61,13 @@ public final class RuleStaticValidator {
 
                 // 7. Check in/notIn for null
                 checkInArraysForNull(a, rule.getId(), errors);
+                if (a.getPattern() != null) {
+                    try {
+                        Pattern.compile(a.getPattern());
+                    } catch (PatternSyntaxException e) {
+                        errors.add("Assert pattern must use supported RE2 syntax in rule: " + rule.getId());
+                    }
+                }
             }
 
             if (hasExpr) {

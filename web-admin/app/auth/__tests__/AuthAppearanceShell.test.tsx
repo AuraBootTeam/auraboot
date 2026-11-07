@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
 import AuthAppearanceShell from '../AuthAppearanceShell';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 import type { AuthAppearance } from '~/config/auth-appearance';
@@ -12,6 +13,30 @@ function show(appearance: AuthAppearance, previewTheme?: 'light' | 'dark') {
   return render(<AuthAppearanceShell branding={brand} appearance={appearance} previewTheme={previewTheme}><form><input aria-label="Account" /><button type="submit">Sign in</button></form></AuthAppearanceShell>);
 }
 describe('authentication appearance presentation', () => {
+  it('keeps markup in an allowed HTTPS asset path inside one escaped image attribute', () => {
+    const heroUrl = 'https://assets.example/\"><img src=https://assets.example/injected onload="window.__aurabootXss=1">';
+    const { container } = show({ ...base, images: { mode: 'illustration', heroUrl } });
+    const images = container.querySelectorAll('img');
+    expect(container.querySelectorAll('.auth-brand-mark img')).toHaveLength(2);
+    expect(images).toHaveLength(3);
+    const hero = container.querySelector('.auth-brand-hero');
+    expect(hero).toHaveAttribute('src', heroUrl);
+    expect(hero).not.toHaveAttribute('onload');
+    expect(container.querySelector('script')).toBeNull();
+    // Optional browser-proof material contains this synthetic fixture only, never user state.
+    if (process.env.AURA_SECURITY_HTML_FIXTURE) {
+      writeFileSync(process.env.AURA_SECURITY_HTML_FIXTURE,
+        JSON.stringify({ html: container.innerHTML, heroUrl, expectedImages: 3 }), { flag: 'wx', mode: 0o600 });
+    }
+  });
+  it.each(['javascript:alert(1)', 'java\nscript:alert(1)', 'data:image/svg+xml,<svg onload="alert(1)"/>', '//foreign.example/image.png', '/\\foreign.example/image.png'])(
+    'does not insert an unsafe image URL into the preview DOM: %s', (heroUrl) => {
+      const { container } = show({ ...base, images: { mode: 'illustration', heroUrl } });
+      expect(container.querySelector('.auth-brand-hero')).toBeNull();
+      expect(Array.from<HTMLImageElement>(container.querySelectorAll('img')).some(image => image.getAttribute('src') === heroUrl)).toBe(false);
+      expect(screen.getByRole('button', { name: 'Sign in' })).toBeVisible();
+    },
+  );
   it('uses English default brand copy when English translations are unavailable', () => {
     render(<AuthAppearanceShell branding={COMMUNITY_BRANDING} appearance={base}><form /></AuthAppearanceShell>);
     expect(screen.getByText('AI-native enterprise application runtime')).toBeVisible();

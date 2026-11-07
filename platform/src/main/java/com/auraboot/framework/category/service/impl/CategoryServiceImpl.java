@@ -6,7 +6,7 @@ import com.auraboot.framework.category.mapper.CategoryMapper;
 import com.auraboot.framework.category.service.CategoryService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

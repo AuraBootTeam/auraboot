@@ -84,11 +84,19 @@ export function startPdaOfflineShell(): PdaOfflineShellStatus {
     if (navigator.onLine) void replayNow('online-event');
   };
   window.addEventListener('online', runWhenOnline);
-  window.addEventListener('message', (event) => {
-    if ((event.data as { type?: string } | null)?.type === 'PDA_OUTBOX_STASHED') {
-      void replayNow('sw-outbox-stashed');
-    }
-  });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      // Only the worker controlling this document may request an outbox sweep.
+      if (
+        event.origin === window.location.origin &&
+        navigator.serviceWorker.controller !== null &&
+        event.source === navigator.serviceWorker.controller &&
+        (event.data as { type?: string } | null)?.type === 'PDA_OUTBOX_STASHED'
+      ) {
+        void replayNow('sw-outbox-stashed');
+      }
+    });
+  }
   // Late sweep for rows queued while this tab was closed/reloading.
   window.setTimeout(() => {
     if (navigator.onLine) void replayNow('startup');

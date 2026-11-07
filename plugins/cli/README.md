@@ -4,6 +4,8 @@ AuraBoot Plugin CLI — scaffold, validate, build, and publish plugins.
 
 ## Installation
 
+Requires Node.js 20 or newer. This minimum includes the patched HTTP transport dependency.
+
 ```bash
 # Run directly via npx (no install needed)
 cd plugins/cli && pnpm install

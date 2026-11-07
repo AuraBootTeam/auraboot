@@ -290,7 +290,8 @@ public class XxlJobAdminHttpClient implements XxlJobAdminClient {
         if (timeoutMs == null || timeoutMs <= 0) {
             return 0;
         }
-        return (int) Math.min(Integer.MAX_VALUE, (timeoutMs + 999) / 1000);
+        long seconds = timeoutMs / 1000 + (timeoutMs % 1000 == 0 ? 0 : 1);
+        return (int) Math.min(Integer.MAX_VALUE, seconds);
     }
 
     private String adminBaseUrl() {

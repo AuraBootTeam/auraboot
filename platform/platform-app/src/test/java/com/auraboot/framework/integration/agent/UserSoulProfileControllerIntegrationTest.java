@@ -12,7 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -46,7 +46,7 @@ class UserSoulProfileControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private UserSoulProfileController controller;
     @Autowired private UserSoulProfileAdminController adminController;
     @Autowired private JdbcTemplate jdbc;
-    @MockBean private UserSoulProfileDeriver deriver;
+    @MockitoBean private UserSoulProfileDeriver deriver;
 
     private Long tenantId;
     private String userId;

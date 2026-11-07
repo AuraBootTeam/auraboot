@@ -14,7 +14,7 @@ import java.sql.ResultSet;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Real PostgreSQL mapper contract using connection-local fixtures, never product rows. */
-class InboxCompletedWorkflowActionPostgresTest {
+class InboxCompletedWorkflowActionPostgresIT {
     private Connection connection;
     private SqlSession session;
     private InboxItemMapper mapper;

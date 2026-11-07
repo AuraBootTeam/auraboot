@@ -219,6 +219,41 @@ start_owned_web() {
     wait_for_port "$web_port"
 }
 
+echo "Scenario 0: native two-listener ownership uses no invented third port"
+two_be="$(free_port)"; two_web="$(free_port)"
+aura_reset_owner_init fixture "$TEST_ROOT/source-a" native-two localhost 5432 native_two "$two_be" "$two_web"
+[ "${#AURA_RESET_OWNER_PORTS[@]}" -eq 2 ]
+aura_reset_acquire_locks
+two_pid="$(aura_reset_spawn_detached "$TEST_ROOT/source-a" "$TEST_ROOT/two.log" python3 -m http.server "$two_web" --bind 127.0.0.1)"
+FIXTURE_PIDS="$FIXTURE_PIDS $two_pid"
+aura_reset_register_process web "$two_pid" "$two_web" "$TEST_ROOT/source-a" "http.server $two_web"
+wait_for_port "$two_web"
+aura_reset_assert_service_owned web "$two_web" "$TEST_ROOT/source-a" "http.server $two_web"
+aura_reset_stop_service web "$two_web" "$TEST_ROOT/source-a" "http.server $two_web"
+assert_dead "$two_pid"
+aura_reset_release_locks
+echo "  PASS"
+
+echo "Scenario 0b: native stop rejects a legacy PID file without touching its foreign process"
+native_artifact="$TEST_ROOT/native-artifact"; native_state="$TEST_ROOT/native-state"
+mkdir -p "$native_artifact" "$native_state"
+printf '%s\n' '{"identity":"sha256:fixture"}' > "$native_artifact/application.lock"
+foreign_native_port="$(free_port)"
+foreign_native_pid="$(aura_reset_spawn_detached "$TEST_ROOT/source-b" "$TEST_ROOT/native-foreign.log" python3 -m http.server "$foreign_native_port" --bind 127.0.0.1)"
+FIXTURE_PIDS="$FIXTURE_PIDS $foreign_native_pid"
+wait_for_port "$foreign_native_port"
+printf '%s\n' "$foreign_native_pid" > "$native_state/runtime.pid"
+if AURA_APP_ARTIFACT_ROOT="$native_artifact" AURA_STATE_ROOT="$native_state" \
+  AURA_BACKEND_PORT="$(free_port)" AURA_WEB_PORT="$(free_port)" \
+  bash "$SCRIPT_DIR/../application/auraboot-core-env.sh" stop > "$TEST_ROOT/native-stop.log" 2>&1; then
+  echo "native stop accepted an unregistered PID" >&2; exit 1
+fi
+grep -q 'Unregistered legacy PID file' "$TEST_ROOT/native-stop.log"
+assert_alive "$foreign_native_pid"
+kill -TERM -- "-$foreign_native_pid"
+wait_for_port_release "$foreign_native_port"
+echo "  PASS"
+
 echo "Scenario 1: identical commands in runtime A and B; stopping A preserves B"
 a_be="$(free_port)"; a_web="$(free_port)"; a_bff="$(free_port)"
 b_be="$(free_port)"; b_web="$(free_port)"; b_bff="$(free_port)"
@@ -508,4 +543,4 @@ tmux kill-session -t "=$tmux_foreign_session"
 aura_reset_release_locks
 echo "  PASS"
 
-echo "runtime process ownership fixture IT: PASS (10 scenarios)"
+echo "runtime process ownership fixture IT: PASS (12 scenarios)"

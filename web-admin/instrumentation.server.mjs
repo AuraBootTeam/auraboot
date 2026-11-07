@@ -1,5 +1,6 @@
 // Preload before HTTP/fetch modules in every environment. Exporting is optional; tracing is not.
-import { appendFile, chmod, mkdir, rename, stat, unlink } from 'node:fs/promises';
+import { mkdir, open, rename, unlink } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
 
@@ -57,28 +58,39 @@ export class LocalSpanExporter {
       .then(async () => {
         await mkdir(this.directory, { recursive: true, mode: 0o700 });
         for (const record of records) {
-          const size = await stat(this.file).then(
-            (value) => value.size,
-            (error) => {
-              if (error.code === 'ENOENT') return 0;
-              throw error;
-            },
-          );
-          if (size + Buffer.byteLength(record) + 1 > this.maxBytes) {
-            await unlink(this.file + '.4').catch((error) => {
-              if (error.code !== 'ENOENT') throw error;
-            });
-            for (let index = 3; index >= 0; index--) {
-              await rename(
-                this.file + (index ? '.' + index : ''),
-                this.file + '.' + (index + 1),
-              ).catch((error) => {
+          const flags =
+            constants.O_WRONLY |
+            constants.O_APPEND |
+            constants.O_CREAT |
+            constants.O_NOFOLLOW |
+            constants.O_NONBLOCK;
+          let handle = await open(this.file, flags, 0o600);
+          try {
+            const info = await handle.stat();
+            if (!info.isFile()) throw new Error('Trace index must be a regular file');
+            if (info.size + Buffer.byteLength(record) + 1 > this.maxBytes) {
+              await handle.close();
+              handle = undefined;
+              await unlink(this.file + '.4').catch((error) => {
                 if (error.code !== 'ENOENT') throw error;
               });
+              for (let index = 3; index >= 0; index--) {
+                await rename(
+                  this.file + (index ? '.' + index : ''),
+                  this.file + '.' + (index + 1),
+                ).catch((error) => {
+                  if (error.code !== 'ENOENT') throw error;
+                });
+              }
+              handle = await open(this.file, flags, 0o600);
+              if (!(await handle.stat()).isFile())
+                throw new Error('Trace index must be a regular file');
             }
+            await handle.chmod(0o600);
+            await handle.appendFile(record + '\n');
+          } finally {
+            await handle?.close();
           }
-          await appendFile(this.file, record + '\n', { mode: 0o600 });
-          await chmod(this.file, 0o600);
         }
         callback({ code: 0 });
       })

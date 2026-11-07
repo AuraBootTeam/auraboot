@@ -3,8 +3,10 @@ package com.auraboot.framework.auth.dto;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
+import lombok.ToString;
 
 @Data
+@ToString(onlyExplicitlyIncluded = true)
 public class AuthenticationResponse {
     private final String jwt;
     @JsonSerialize(using = ToStringSerializer.class)
@@ -13,13 +15,17 @@ public class AuthenticationResponse {
     private final String username;
     @JsonSerialize(using = ToStringSerializer.class)
     private final Long tenantId;
+    @ToString.Include
     private final String tenantStatus;  // "member", "pending", "none"
     /** ENTER, BIND_SCHOOL, or SELECT_SCHOOL. Clients should dispatch on this field. */
+    @ToString.Include
     private String nextAction;
+    @ToString.Include
     private boolean mustChangePassword = false;
 
     // Social OAuth merge fields
     /** True when social login discovers an existing account with matching email */
+    @ToString.Include
     private boolean mergeRequired = false;
     /** Temporary token for merge confirmation (only set when mergeRequired=true) */
     private String mergeToken;

@@ -38,7 +38,7 @@ class RequestBodySummarizerTest {
         MockHttpServletRequest mock = new MockHttpServletRequest("POST", "/api/admin/users");
         mock.setContent("{\"userId\":\"x\",\"password\":\"secret\",\"nested\":{\"inner\":1}}"
             .getBytes(StandardCharsets.UTF_8));
-        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock);
+        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock, 0);
         wrapped.getInputStream().readAllBytes(); // populate cache
 
         String summary = summarizer.summarize(wrapped);
@@ -52,7 +52,7 @@ class RequestBodySummarizerTest {
     void summarize_returnsParseErrorMarker_forInvalidJson() throws Exception {
         MockHttpServletRequest mock = new MockHttpServletRequest("POST", "/api/admin/users");
         mock.setContent("not-json".getBytes(StandardCharsets.UTF_8));
-        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock);
+        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock, 0);
         wrapped.getInputStream().readAllBytes();
 
         assertThat(summarizer.summarize(wrapped)).isEqualTo("{\"parse_error\":true}");
@@ -63,7 +63,7 @@ class RequestBodySummarizerTest {
         // Root that's not an object
         MockHttpServletRequest mock = new MockHttpServletRequest("POST", "/api/admin/users");
         mock.setContent("[1,2,3]".getBytes(StandardCharsets.UTF_8));
-        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock);
+        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock, 0);
         wrapped.getInputStream().readAllBytes();
 
         assertThat(summarizer.summarize(wrapped)).isEqualTo("{\"parse_error\":true}");
@@ -80,7 +80,7 @@ class RequestBodySummarizerTest {
 
         MockHttpServletRequest mock = new MockHttpServletRequest("POST", "/api/admin/users");
         mock.setContent(sb.toString().getBytes(StandardCharsets.UTF_8));
-        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock);
+        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(mock, 0);
         wrapped.getInputStream().readAllBytes();
 
         String summary = summarizer.summarize(wrapped);

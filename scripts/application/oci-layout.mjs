@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const LINUX_JRE_BASE = 'eclipse-temurin:21-jre@sha256:a80c51f2d09a3e7e00d521f1c817bbceb6b3be94109b4a784d46078099882dda';
+const LINUX_JRE_BASE = 'eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f';
 
 function commandExists(command) {
   return spawnSync('which', [command], { stdio: 'ignore' }).status === 0;

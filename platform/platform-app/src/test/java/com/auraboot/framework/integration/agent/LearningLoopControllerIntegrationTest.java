@@ -13,7 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
@@ -42,7 +42,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private PatternExtractor extractor;
     @Autowired private SkillDraftGenerator generator;
     @Autowired private JdbcTemplate jdbc;
-    @SpyBean  private LlmProviderFactory providerFactory;
+    @MockitoSpyBean  private LlmProviderFactory providerFactory;
 
     private Long tenantId;
 

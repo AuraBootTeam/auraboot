@@ -6,7 +6,7 @@ import com.auraboot.framework.branding.mapper.AuthAppearanceRevisionMapper;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.ConflictException;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;

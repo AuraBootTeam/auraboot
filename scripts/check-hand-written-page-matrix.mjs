@@ -82,6 +82,14 @@ export function audit({ repoRoot, roots, baseline }) {
 export const DEFAULT_CONFIG = 'scripts/page-matrix.json';
 export const DEFAULT_BASELINE = 'scripts/check-hand-written-page-matrix.baseline.json';
 
+function readRegularJson(file) {
+  const descriptor = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+  try {
+    if (!fs.fstatSync(descriptor).isFile()) throw new Error('Gate input must be a regular file');
+    return JSON.parse(fs.readFileSync(descriptor, 'utf8'));
+  } finally { fs.closeSync(descriptor); }
+}
+
 function main(argv) {
   const repoRoot = resolveRepoRoot(argv, path.resolve(HERE, '..'));
 
@@ -92,7 +100,7 @@ function main(argv) {
   // baseline for per-repo debt is the same category of mistake as a shared denominator.
   const baselineFile = path.join(repoRoot, DEFAULT_BASELINE);
   const baseline = fs.existsSync(baselineFile)
-    ? JSON.parse(fs.readFileSync(baselineFile, 'utf8'))
+    ? readRegularJson(baselineFile)
     : [];
   const cfgPath = path.join(repoRoot, DEFAULT_CONFIG);
   // Scan the repo root by default. The first version listed likely directory names —
@@ -101,12 +109,19 @@ function main(argv) {
   // place". Guessing a layout is how a gate misses the thing it exists to find:
   // enterprise showed 1 of 6, plugins 0 of 17.
   const roots = fs.existsSync(cfgPath)
-    ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')).roots
+    ? readRegularJson(cfgPath).roots
     : ['.'];
   const { found, fresh, stale } = audit({ repoRoot, roots, baseline });
 
   if (argv.includes('--update-baseline')) {
-    fs.writeFileSync(baselineFile, `${JSON.stringify(found, null, 2)}\n`);
+    const descriptor = fs.openSync(baselineFile, fs.constants.O_WRONLY | fs.constants.O_CREAT
+      | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK, 0o600);
+    try {
+      if (!fs.fstatSync(descriptor).isFile()) throw new Error('Baseline must be a regular file');
+      const bytes = Buffer.from(`${JSON.stringify(found, null, 2)}\n`);
+      fs.writeFileSync(descriptor, bytes);
+      fs.ftruncateSync(descriptor, bytes.length);
+    } finally { fs.closeSync(descriptor); }
     console.log(`[page-matrix] baseline updated at ${path.relative(repoRoot, baselineFile)}: ${found.length} file(s) recorded as debt`);
     return 0;
   }

@@ -66,7 +66,6 @@ public class CacheConfig {
             "namedQuery",
             "namedQueries",
             "secureQuery",
-            "aggregateQuery",
 
             // Permission caches (Legacy)
 

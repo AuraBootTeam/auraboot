@@ -4,8 +4,9 @@ import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers the exact runtime block set for this source baseline', () => {
+  it('initBlockRegistry registers the complete 36-type runtime block contract', () => {
     initBlockRegistry();
+    expect(BlockRegistry.size()).toBe(36);
 
 
     // Must mirror the dispatch table in
@@ -50,12 +51,11 @@ describe('BlockRegistry bootstrap', () => {
       'card-grid',
       'code-snippet',
       'conversation-panel',
+      'prerequisite-table',
     ];
-    // Optional renderer assets must agree with registration across supported source baselines.
     expect(existsSync(resolve(process.cwd(), 'app/ui/schema-renderer/BlockRegistry.ts'))).toBe(true);
-    if (existsSync(resolve(process.cwd(), 'app/framework/meta/rendering/blocks/PrerequisiteTableBlockRenderer.tsx'))) {
-      expected.push('prerequisite-table');
-    }
+    expect(existsSync(resolve(process.cwd(), 'app/framework/meta/rendering/blocks/PrerequisiteTableBlockRenderer.tsx'))).toBe(true);
+    expect(expected).toHaveLength(36);
     expect(BlockRegistry.list().map(([type]) => type).sort()).toEqual([...expected].sort());
     for (const type of expected) {
       const spec = BlockRegistry.get(type);

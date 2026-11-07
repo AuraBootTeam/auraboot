@@ -7,18 +7,20 @@ import org.springframework.stereotype.Component;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.function.LongSupplier;
 
 /**
  * Sliding-window rate limiter for login attempts.
  * Tracks attempts per IP and per email independently.
  * <p>
- * Defaults: max 3,000 attempts per IP per minute, max 3,000 attempts per email per minute.
+ * Defaults: max 60 attempts per IP per minute, max 10 attempts per identifier per minute.
  * After exceeding the limit, further attempts are blocked until the window slides.
  * <p>
  * Stale entries are evicted every 5 minutes to prevent unbounded memory growth.
- * If the map exceeds MAX_KEYS, the oldest entries are dropped.
+ * At MAX_KEYS, new keys are rejected until stale entries are evicted.
  *
  * @since 7.1.0
  */
@@ -27,12 +29,21 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class LoginRateLimiter {
 
     private static final long WINDOW_MS = 60_000L;
-    private static final int MAX_PER_IP = 3_000;
-    private static final int MAX_PER_EMAIL = 3_000;
+    private static final int MAX_PER_IP = 60;
+    private static final int MAX_PER_EMAIL = 10;
     private static final int MAX_KEYS = 10_000;
 
     private final Map<String, Deque<Long>> ipWindows = new ConcurrentHashMap<>();
     private final Map<String, Deque<Long>> emailWindows = new ConcurrentHashMap<>();
+    private final LongSupplier clock;
+
+    public LoginRateLimiter() {
+        this(System::currentTimeMillis);
+    }
+
+    LoginRateLimiter(LongSupplier clock) {
+        this.clock = clock;
+    }
 
     /**
      * Check if a login attempt is allowed.
@@ -41,16 +52,16 @@ public class LoginRateLimiter {
      * @param email login email/identifier
      * @return true if allowed, false if rate limited
      */
-    public boolean isAllowed(String ip, String email) {
-        long now = System.currentTimeMillis();
+    public synchronized boolean isAllowed(String ip, String email) {
+        long now = clock.getAsLong();
 
         if (ip != null && !tryAcquire(ipWindows, "ip:" + ip, MAX_PER_IP, now)) {
-            log.warn("Login rate limit exceeded for IP: {}", ip);
+            log.warn("Login rate limit exceeded: scope=client");
             return false;
         }
 
-        if (email != null && !tryAcquire(emailWindows, "email:" + email.toLowerCase(), MAX_PER_EMAIL, now)) {
-            log.warn("Login rate limit exceeded for email: {}", email);
+        if (email != null && !tryAcquire(emailWindows, "email:" + email.trim().toLowerCase(Locale.ROOT), MAX_PER_EMAIL, now)) {
+            log.warn("Login rate limit exceeded: scope=identifier");
             return false;
         }
 
@@ -68,7 +79,7 @@ public class LoginRateLimiter {
         Deque<Long> timestamps = windows.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
 
         // Evict expired entries
-        while (!timestamps.isEmpty() && timestamps.peekFirst() < cutoff) {
+        while (!timestamps.isEmpty() && timestamps.peekFirst() <= cutoff) {
             timestamps.pollFirst();
         }
 
@@ -85,8 +96,8 @@ public class LoginRateLimiter {
      * Runs every 5 minutes.
      */
     @Scheduled(fixedRate = 300_000)
-    void evictStaleEntries() {
-        long cutoff = System.currentTimeMillis() - WINDOW_MS;
+    synchronized void evictStaleEntries() {
+        long cutoff = clock.getAsLong() - WINDOW_MS;
         evictFrom(ipWindows, cutoff);
         evictFrom(emailWindows, cutoff);
     }
@@ -97,7 +108,7 @@ public class LoginRateLimiter {
         while (it.hasNext()) {
             Deque<Long> timestamps = it.next().getValue();
             // Evict expired timestamps
-            while (!timestamps.isEmpty() && timestamps.peekFirst() < cutoff) {
+            while (!timestamps.isEmpty() && timestamps.peekFirst() <= cutoff) {
                 timestamps.pollFirst();
             }
             // Remove empty entries

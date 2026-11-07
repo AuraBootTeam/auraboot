@@ -14,7 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -33,13 +33,13 @@ class MetaDefinitionCacheInvalidationIT extends BaseIntegrationTest {
     @Autowired
     private MetaModelService metaModelService;
 
-    @SpyBean
+    @MockitoSpyBean
     private MetaModelMapper metaModelMapper;
 
-    @SpyBean
+    @MockitoSpyBean
     private MetaFieldMapper metaFieldMapper;
 
-    @SpyBean
+    @MockitoSpyBean
     private MetaModelFieldBindingMapper fieldBindingMapper;
 
     @BeforeEach

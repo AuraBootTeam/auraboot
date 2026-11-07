@@ -2,7 +2,7 @@ package com.auraboot.framework.application.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
@@ -16,6 +16,6 @@ import org.springframework.context.annotation.Import;
 @Slf4j
 @Configuration
 @ConditionalOnExpression("!'${spring.data.redis.host:}'.isEmpty()")
-@Import(RedisAutoConfiguration.class)
+@Import(DataRedisAutoConfiguration.class)
 public class RedisOptionalConfig {
 }

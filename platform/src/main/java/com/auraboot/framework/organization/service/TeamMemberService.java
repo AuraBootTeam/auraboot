@@ -3,7 +3,7 @@ package com.auraboot.framework.organization.service;
 import com.auraboot.framework.organization.dto.TeamMemberAddRequest;
 import com.auraboot.framework.organization.dto.TeamMemberResponse;
 import com.auraboot.framework.organization.entity.TeamMember;
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 
 import java.util.List;
 import java.util.Map;

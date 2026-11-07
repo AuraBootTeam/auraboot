@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: c35eaa5992eac12a7e8bcee4d46c643ab115b6239f873ed704d562737465bbc5
+ * Contract SHA-256: ec8704be15abb8ab80b71fe30e07a19261caeacca567ef74a0a5c820d2be1235
  */
 export interface paths {
     "/api/activities": {
@@ -39835,7 +39835,7 @@ export interface components {
         };
         SseEmitter: {
             /** Format: int64 */
-            timeout?: number | null;
+            timeout?: number;
         };
         StableRequest: {
             /** Format: int64 */

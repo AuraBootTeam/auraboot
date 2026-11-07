@@ -4,8 +4,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
 import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.context.annotation.ComponentScan;
@@ -17,7 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * Used for unit tests and integration tests.
  * Sibling bootstraps stay outside this scan; per-test components require explicit imports.
  */
-@SpringBootApplication(exclude = {RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class})
+@SpringBootApplication(exclude = {DataRedisAutoConfiguration.class, DataRedisRepositoriesAutoConfiguration.class})
 @ComponentScan(basePackages = {"com.auraboot.framework", "com.auraboot.module"}, excludeFilters = {
         @ComponentScan.Filter(type = FilterType.CUSTOM,
                 classes = {TypeExcludeFilter.class, AutoConfigurationExcludeFilter.class}),

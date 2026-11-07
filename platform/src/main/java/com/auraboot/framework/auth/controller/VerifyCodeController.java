@@ -52,18 +52,9 @@ public class VerifyCodeController {
     }
 
     /**
-     * Extract the real client IP from headers or remote address.
+     * Use the container-resolved peer, not caller-controlled forwarding headers.
      */
     private String extractIpAddress(HttpServletRequest httpRequest) {
-        String ip = httpRequest.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank()) {
-            // X-Forwarded-For may contain a chain: client, proxy1, proxy2
-            return ip.split(",")[0].trim();
-        }
-        ip = httpRequest.getHeader("X-Real-IP");
-        if (ip != null && !ip.isBlank()) {
-            return ip.trim();
-        }
         return httpRequest.getRemoteAddr();
     }
 

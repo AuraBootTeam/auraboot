@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.*;
 
 /** Real production authentication, publication and dynamic data services against PostgreSQL. */
 @org.springframework.context.annotation.Import(OpenApiMachineDataIntegrationTest.EventFaultConfiguration.class)
-@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private MetaModelService models;
     @Autowired private MetaFieldService metadataFields;

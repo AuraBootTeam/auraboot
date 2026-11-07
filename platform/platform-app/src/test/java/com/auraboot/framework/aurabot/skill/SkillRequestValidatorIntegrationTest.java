@@ -13,7 +13,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
@@ -68,7 +68,7 @@ class SkillRequestValidatorIntegrationTest extends BaseIntegrationTest {
      * cannot register ad-hoc test skills without polluting the JVM-wide
      * bean set.
      */
-    @MockBean
+    @MockitoBean
     private AuraBotSkillRegistry registry;
 
     @AfterEach

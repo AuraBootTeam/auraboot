@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'java-test-fixtures'
-    id 'org.springframework.boot' version '3.5.16'
+    id 'org.springframework.boot' version '4.1.2'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'maven-publish'
     id 'jacoco'
@@ -259,9 +259,14 @@ compileTestJava {
 // 版本管理
 ext {
     jacksonVersion = '2.22.3'
-    sentryVersion = '6.34.0'
+    tencentCloudSdkVersion = '3.1.1516'
+    commonsConfigurationVersion = '2.15.1'
+    commonsLangVersion = '3.20.0'
+    commonsTextVersion = '1.15.0'
+    log4jVersion = '2.25.5'
+    sentryVersion = '8.62.0'
     jwtVersion = '0.13.0'
-    mybatisPlusVersion = '3.5.16'
+    mybatisPlusVersion = '3.5.18'
     lombokVersion = '1.18.48'
     aspectjVersion = '1.9.25.1'
     reflectasmVersion = '1.11.3'
@@ -269,8 +274,8 @@ ext {
     // PF4J Plugin Framework
     pf4jVersion = '3.16.0'
     pf4jSpringVersion = '0.10.0'
-    springKafkaVersion = '3.3.16'
-    kafkaClientsVersion = '3.9.2'
+    springKafkaVersion = '4.1.2'
+    kafkaClientsVersion = '4.2.2'
     mcpSdkVersion = '2.1.0'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
@@ -295,6 +300,8 @@ configurations {
 def jacocoToolVersion = '0.8.14'
 
 dependencies {
+    // Declarative validation accepts configurable patterns; never use a backtracking engine.
+    implementation 'com.google.re2j:re2j:1.8'
     testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
     // Plugin API module
     implementation project(':platform-plugin-api')
@@ -318,8 +325,8 @@ dependencies {
 
     // OpenTelemetry Micrometer bridge (for trace-metric correlation).
     // Do NOT pin individual otel modules to a newer version: Spring Boot's
-    // io.spring.dependency-management aligns the whole otel stack to one managed
-    // version (1.49.0 on Boot 3.5.x), and a manual newer pin on exporter-otlp
+    // io.spring.dependency-management aligns the whole otel stack with the shared
+    // reviewed BOM, and a manual newer pin on exporter-otlp
     // alone skews it against the transitively-managed sdk-common — crashing
     // startup with NoClassDefFoundError ...StandardComponentId$ExporterType
     // (a class that only exists in the newer exporter). Leave it unversioned so
@@ -328,14 +335,19 @@ dependencies {
     // re-verify the micrometer bridge — not a single-module pin.
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
-    implementation "io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64"
+    implementation "io.netty:netty-resolver-dns-native-macos:4.2.19.Final:osx-aarch_64"
 
 
     // Spring Boot 核心
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-jackson2'
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.springframework.boot:spring-boot-starter-webclient'
+    implementation 'org.springframework.boot:spring-boot-opentelemetry'
+    implementation 'org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-webflux' // For WebClient and reactive support
     implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.3.1'
@@ -343,8 +355,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
 
+    // Public service interfaces extend MyBatis-Plus Spring types; consumers need them at compile time.
+    api 'com.baomidou:mybatis-plus-spring'
+
     // MyBatis Plus
-    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    implementation 'com.baomidou:mybatis-plus-spring-boot4-starter'
     implementation("com.baomidou:mybatis-plus-jsqlparser")
 
     // Jackson
@@ -357,7 +372,7 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson'
 
     // Sentry
-    implementation 'io.sentry:sentry-spring-boot-starter-jakarta'
+    implementation 'io.sentry:sentry-spring-boot-4-starter'
 
     // 工具类
     implementation("com.esotericsoftware:reflectasm:${reflectasmVersion}:shaded") {
@@ -400,12 +415,13 @@ dependencies {
     // implementation 'com.auraboot.buiness.solution:bill:1.0.0-SNAPSHOT' // 注释掉不存在的依赖
     implementation 'org.springframework.boot:spring-boot'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
     // Anchor the JUnit BOM as an explicit node: whether the BOM imported by
     // spring-boot-dependencies materializes as a resolved node differs between
     // resolution environments (macOS vs Linux CI), and dependency locking
     // requires an identical node set everywhere. See CONTRIBUTING lock notes.
-    testImplementation platform('org.junit:junit-bom:5.14.4')
+    testImplementation platform('org.junit:junit-bom:6.0.3')
     // Same anchoring for the test-runtime XML validation trio: their presence
     // in the resolved graph is also environment-dependent, and the lockfile
     // lists them for testRuntimeClasspath.
@@ -414,7 +430,7 @@ dependencies {
     testRuntimeOnly 'relaxngDatatype:relaxngDatatype:20020414'
 
     // Swagger/OpenAPI 3
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
 
     // Jakarta注解
     implementation 'jakarta.annotation:jakarta.annotation-api'
@@ -467,7 +483,7 @@ dependencies {
     // JUnit 5 Platform
     // Keep the declared platform aligned with the existing locked JUnit 5.12.2 graph.
     // Otherwise Gradle rejects testCompileClasspath because the locked BOM is never requested.
-    testImplementation platform('org.junit:junit-bom:5.14.4')
+    testImplementation platform('org.junit:junit-bom:6.0.3')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine'
     testImplementation 'org.junit.platform:junit-platform-launcher'
@@ -486,7 +502,11 @@ dependencies {
 
     // PF4J Plugin Framework for hot-loading
     implementation "org.pf4j:pf4j:${pf4jVersion}"
-    implementation "org.pf4j:pf4j-spring:${pf4jSpringVersion}"
+    implementation("org.pf4j:pf4j-spring:${pf4jSpringVersion}") {
+        // The upstream POM declares this unused legacy library; verified plugin
+        // lifecycle and Spring extension discovery do not require its classes.
+        exclude group: 'commons-lang', module: 'commons-lang'
+    }
 
     // Google OAuth (for ID token verification) + Gmail API
     implementation 'com.google.api-client:google-api-client:2.9.2'

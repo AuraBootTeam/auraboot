@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
@@ -35,9 +35,9 @@ class AdminRoleCheckerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private AdminRoleChecker adminRoleChecker;
 
-    // SpyBean so cache tests can clear invocations and verify JDBC call count.
+    // MockitoSpyBean so cache tests can clear invocations and verify JDBC call count.
     // Delegates to the real bean for all seeding writes in existing tests.
-    @SpyBean
+    @MockitoSpyBean
     private JdbcTemplate jdbc;
 
     private Long tenantId;

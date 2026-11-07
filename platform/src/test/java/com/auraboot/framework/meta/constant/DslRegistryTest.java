@@ -167,6 +167,7 @@ class DslRegistryTest {
                 "workbench-action-bar", "evidence-panel", "artifact-timeline",
                 "review-drawer", "status-banner")));
         assertTrue(codes.contains("stage-rail"));
+        assertTrue(codes.contains("dag-canvas"));
         // 1.4 — digital-thread lineage visualization block (trace-graph DSL block,
         // rendered by TraceGraphBlockRenderer). Frontend block (#450) shipped without
         // the backend enum entry, so any page mounting it was rejected at import

@@ -34,6 +34,24 @@ Post-1.0 we'll publish a contractual SLA aligned with what we can
 sustain. Until then this document is "what we'll genuinely try to do,"
 not a binding commitment.
 
+## Login Protection and Reverse Proxies
+
+The backend limits login attempts to 60 per client IP and 10 per normalized
+identifier in a sliding one-minute window. Admission is atomic within a process;
+multiple replicas also need a shared gateway limit. Successful session reuse
+does not call the login endpoint.
+
+Authentication and verification-code controllers use the servlet container's
+resolved remote address. They do not trust raw `X-Forwarded-For` or `X-Real-IP`
+headers. Behind a gateway, configure the container's trusted proxy addresses
+explicitly before enabling forwarded-header processing; otherwise requests
+share the gateway's client-IP budget. Account budgets remain independent.
+
+The BFF trusts loopback proxies by default. Set `AURA_TRUSTED_PROXIES` to an
+explicit comma-separated list of proxy IP addresses or CIDRs when using another
+gateway. Invalid entries and universal `/0` ranges fail startup. The gateway must
+overwrite forwarding headers or append the actual client address consistently.
+
 ## Reporting a Vulnerability
 
 We take the security of AuraBoot seriously. If you discover a security vulnerability, please report it responsibly.

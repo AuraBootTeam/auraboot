@@ -120,12 +120,13 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
   await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel').filter({has:page.getByTestId('bpm-section-operations')})).toHaveAttribute('data-state','ready');
+  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toBeVisible();
   await expect(page.getByRole('tab',{name:'验收详情',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
   await expect(page.getByTestId('bpm-history-container')).toHaveCount(0);
-  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+  await expect(page.locator('[data-testid="approval-chain-entry"]:visible')).toHaveCount(0);
   await expect(page.getByRole('tab',{name:'变更历史',exact:true})).toHaveCount(0);
-  await expect(page.getByTestId('bpm-status-instance-id')).toHaveCount(0);
+  await expect(page.getByText(String(record.tpm_ac_process), {exact:true})).toHaveCount(0);
   await page.getByRole('tab',{name:'运行记录',exact:true}).click();
   await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
   await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-operations-approve')).toBeVisible();
@@ -755,7 +756,7 @@ test('acceptance detail tabs keep business facts primary and maintenance evidenc
   await shot(page,'tabs-verification-empty');
   await page.getByRole('tab',{name:'运行记录',exact:true}).click();
   await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('命中');
-  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+  await expect(page.locator('[data-testid="approval-chain-entry"]:visible')).toHaveCount(0);
   await shot(page,'tabs-execution');
   await page.getByTestId('bpm-section-audit-report').locator('summary').click();
   await expect(page.getByTestId('approval-chain-entry').first()).toBeVisible();
@@ -769,7 +770,7 @@ test('acceptance detail tabs keep business facts primary and maintenance evidenc
   expect(report.totalSteps).toBe(report.chain.length);expect(report.totalSteps).toBeGreaterThan(0);
   await shot(page,'tabs-audit-expanded');
   await page.getByRole('tab',{name:'验收详情',exact:true}).click();
-  await expect(page.getByTestId('approval-chain-report')).toHaveCount(0);
+  await expect(page.locator('[data-testid="approval-chain-entry"]:visible')).toHaveCount(0);
 });
 
 

@@ -141,7 +141,7 @@ public class XxlJobSchedulerEngine implements SchedulerEngine {
             if (intervalMs == null || intervalMs <= 0) {
                 throw new BusinessException("Interval task must configure intervalMs: " + task.getPid());
             }
-            long seconds = Math.max(1L, (intervalMs + 999L) / 1000L);
+            long seconds = intervalMs / 1000L + (intervalMs % 1000L == 0 ? 0L : 1L);
             return String.valueOf(seconds);
         }
         throw new BusinessException("Unsupported XXL-JOB scheduled task type: " + task.getTaskType());

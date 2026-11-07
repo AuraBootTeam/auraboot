@@ -17,7 +17,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,42 +118,6 @@ public class RequiredRecordReadGuard {
             else REFERENCE_READ_DEPTH.set(previous);
         }
     }
-
-    /**
-     * Same-thread, actor-keyed witness memo for required-read references. A list page whose
-     * rows share referenced records (plans referencing one change set and its items) re-resolves
-     * the same reference per row, each a full permission-projected getById — thousands of reads
-     * for one page. The memo reuses a witness loaded for the SAME actor within the permission
-     * snapshot freshness contract (5-minute TTL, bounded size), so authorization semantics stay
-     * inside the platform's existing freshness envelope while a page costs one real read per
-     * distinct reference.
-     */
-    private static final int MEMO_MAX_ENTRIES = 512;
-    private static final long MEMO_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
-    private final ThreadLocal<LinkedHashMap<RequiredReadReferences.Reference, MemoedReference>> REFERENCE_MEMO =
-            ThreadLocal.withInitial(LinkedHashMap::new);
-    private record MemoedReference(Map<String,Object> record, Actor actor, long loadedAtNanos) {}
-
-    /** Memo hit for the same actor within TTL → the witnessed record; miss → null. */
-    private Map<String,Object> memoHit(Actor actor, RequiredReadReferences.Reference reference) {
-        var memo = REFERENCE_MEMO.get();
-        var cached = memo.get(reference);
-        if (cached == null) return null;
-        if (nowNanos() - cached.loadedAtNanos() >= MEMO_TTL_NANOS || !actor.equals(cached.actor())) {
-            memo.remove(reference);
-            return null;
-        }
-        return cached.record();
-    }
-
-    private void memoStore(Actor actor, RequiredReadReferences.Reference reference, Map<String,Object> record) {
-        var memo = REFERENCE_MEMO.get();
-        if (memo.size() >= MEMO_MAX_ENTRIES) memo.clear();
-        memo.put(reference, new MemoedReference(record, actor, nowNanos()));
-    }
-
-    private static long nowNanos() { return System.nanoTime(); }
-
     private record Actor(Long tenant, Long user, Long member,
                          com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal machine,Object machineScope) {
         Actor(Long tenant,Long user,Long member) {this(tenant,user,member,null,null);}
@@ -228,16 +191,8 @@ public class RequiredRecordReadGuard {
                     boolean terminal=immutablePhysicalTerminal(reference);
                     if(terminal && traversal.terminals.contains(reference)) continue;
                     // Remove only the outer row permit. Identity and the exact writer/version plan are restored by Core.
-                    var cached=memoHit(actor,reference);
-                    Map<String,Object> loaded;
-                    if (cached != null) {
-                        loaded = cached; // same-actor witness inside the freshness envelope: no new budget spend
-                    } else {
-                        if(++traversal.reads>RequiredReadReferences.MAX_REFERENCES) throw new MetaServiceException("Required-read reference budget exceeded");
-                        loaded=readReference(reference);
-                        if(loaded==null) throw denied();
-                        memoStore(actor,reference,loaded);
-                    }
+                    var loaded=readReference(reference);
+                    if(loaded==null) throw denied();
                     if(actor.machine()!=null && (!actor.equals(actor()) || !reference.pid().equals(loaded.get("pid"))
                             || !actor.tenant().toString().equals(String.valueOf(loaded.get("tenant_id")))
                             || !referenceDecision.permits(loaded)))throw denied();

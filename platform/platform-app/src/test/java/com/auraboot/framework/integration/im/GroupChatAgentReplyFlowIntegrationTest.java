@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -75,7 +75,7 @@ class GroupChatAgentReplyFlowIntegrationTest extends BaseIntegrationTest {
     @MockitoBean private AgentChatPort agentChatPort;
     @MockitoBean private ImMessageBroadcaster broadcaster;
 
-    @SpyBean private com.auraboot.framework.conversation.ConversationTurnService turnService;
+    @MockitoSpyBean private com.auraboot.framework.conversation.ConversationTurnService turnService;
 
     private Long tenantId;
     private Long conversationId;

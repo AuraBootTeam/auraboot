@@ -17,7 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -61,7 +61,7 @@ class SkillAssetLayerTenantIntegrationTest extends BaseIntegrationTest {
     // list tool is discoverable without seeding a role_permission row. The tenant
     // interceptor (Gap B) is at the MyBatis layer, NOT this bean, so mocking
     // permissions does not mask the tenant-bypass being under test.
-    @MockBean UserPermissionService userPermissionService;
+    @MockitoBean UserPermissionService userPermissionService;
 
     /** A tenant the test user is NOT a member of — used for the isolation case. */
     private static final long OTHER_TENANT_ID = 999_000_999L;
