@@ -42,7 +42,8 @@ class AutomationDecisionIntegrationTest {
     private final RuleEvaluationService ruleEvaluationService = mock(RuleEvaluationService.class);
 
     private AutomationTriggerServiceImpl service() {
-        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, emptyRuntimeProvider());
+        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, emptyRuntimeProvider(),
+                org.mockito.Mockito.mock(com.auraboot.framework.permission.service.HumanActorContext.class));
         ReflectionTestUtils.setField(s, "decisionEvaluationService", decisionService);
         ReflectionTestUtils.setField(s, "ruleEvaluationService", ruleEvaluationService);
         return s;
@@ -225,7 +226,8 @@ class AutomationDecisionIntegrationTest {
 
     @Test
     void noDecisionService_returnsPayloadUnchanged() {
-        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, emptyRuntimeProvider());
+        AutomationTriggerServiceImpl s = new AutomationTriggerServiceImpl(null, null, emptyRuntimeProvider(),
+                org.mockito.Mockito.mock(com.auraboot.framework.permission.service.HumanActorContext.class));
         Map<String, Object> payload = Map.of("a", 1);
         assertThat(s.withDecision(automation("routing"), payload)).isSameAs(payload);
     }

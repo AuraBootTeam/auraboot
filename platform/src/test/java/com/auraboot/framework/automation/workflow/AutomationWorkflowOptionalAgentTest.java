@@ -55,7 +55,7 @@ class AutomationWorkflowOptionalAgentTest {
         var logs = mock(AutomationLogMapper.class);
         var provider = new StaticListableBeanFactory(Map.of("workflow", runtime))
                 .getBeanProvider(AutomationWorkflowRuntime.class);
-        var trigger = new AutomationTriggerServiceImpl(automations, logs, provider);
+        var trigger = new AutomationTriggerServiceImpl(automations, logs, provider, actorScope());
         assertMissing(() -> trigger.executeAutomation(flow(true, visual), "record", Map.of()));
         verifyNoInteractions(registry, automations, logs);
     }

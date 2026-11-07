@@ -7,10 +7,6 @@ import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.automation.mapper.AutomationLogMapper;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
-import com.auraboot.framework.tenant.dao.entity.TenantMember;
-import com.auraboot.framework.tenant.service.TenantMemberService;
-import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.mapper.UserMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,10 +41,10 @@ class AutomationTriggerServiceImplTest {
     private com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime automationProcessRuntime;
 
     @Mock
-    private UserMapper userMapper;
+    private com.auraboot.framework.permission.mapper.HumanActorMapper actorMapper;
 
     @Mock
-    private TenantMemberService tenantMemberService;
+    private com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
 
     private AutomationTriggerServiceImpl service;
 
@@ -59,9 +55,17 @@ class AutomationTriggerServiceImplTest {
                 runtimeProvider = mock(org.springframework.beans.factory.ObjectProvider.class);
         lenient().when(runtimeProvider.getIfAvailable()).thenReturn(automationProcessRuntime);
         service = new AutomationTriggerServiceImpl(
-                automationMapper, automationLogMapper, runtimeProvider);
-        ReflectionTestUtils.setField(service, "userMapper", userMapper);
-        ReflectionTestUtils.setField(service, "tenantMemberService", tenantMemberService);
+                automationMapper, automationLogMapper, runtimeProvider,
+                new com.auraboot.framework.permission.service.HumanActorContext(actorMapper, roleMapper,
+                        new com.auraboot.framework.event.context.ThreadContextScopes(List.of())));
+        lenient().when(actorMapper.findActive(any(), any(), any())).thenAnswer(invocation -> {
+            Long user = invocation.getArgument(1);
+            String pid = invocation.getArgument(2);
+            return List.of(Map.of("user_id", user == null ? 99L : user,
+                    "user_pid", pid == null ? "USER-PID-1" : pid,
+                    "member_id", 123L, "username", "automation-owner"));
+        });
+        lenient().when(roleMapper.findByMemberIdAndTenantId(any(), any())).thenReturn(List.of());
     }
 
     @AfterEach
@@ -104,6 +108,8 @@ class AutomationTriggerServiceImplTest {
         events.start();
         logger.addAppender(events);
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("safe-automation");
         doThrow(new IllegalStateException("exception-secret-canary"))
                 .when(automationLogMapper).insertLog(any());
@@ -133,6 +139,8 @@ class AutomationTriggerServiceImplTest {
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
         com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId("0123456789abcdef0123456789abcdef");
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("AUTO-TRACE");
         automation.setTenantId(7L);
         automation.setTriggerType("webhook");
@@ -146,6 +154,8 @@ class AutomationTriggerServiceImplTest {
         com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "operator", "operator");
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("AUTO-NO-TRACE");
         automation.setTenantId(7L);
         automation.setTriggerType("webhook");
@@ -271,6 +281,8 @@ class AutomationTriggerServiceImplTest {
         assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
 
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("AUTO-WH-1");
         automation.setTenantId(424242L);
         automation.setTriggerType("webhook");
@@ -298,6 +310,8 @@ class AutomationTriggerServiceImplTest {
     @Test
     void executeAutomation_workflowFailurePreservesRootCauseMessage() {
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("AUTO-FAIL-1");
         automation.setTenantId(424242L);
         automation.setTriggerType("on_record_create");
@@ -320,23 +334,12 @@ class AutomationTriggerServiceImplTest {
         com.auraboot.framework.application.tenant.MetaContext.clear();
 
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("AUTO-ASYNC-1");
         automation.setTenantId(7L);
         automation.setTriggerType("on_record_create");
         automation.setCreatedBy("USER-PID-1");
-
-        User user = new User();
-        user.setId(99L);
-        user.setPid("USER-PID-1");
-        user.setEmail("actor@example.com");
-        TenantMember member = new TenantMember();
-        member.setId(123L);
-        member.setTenantId(7L);
-        member.setUserId(99L);
-
-        when(userMapper.findUserIdInTenantByPid(7L, "USER-PID-1")).thenReturn(99L);
-        when(userMapper.selectById(99L)).thenReturn(user);
-        when(tenantMemberService.findByTenantIdAndUserId(7L, 99L)).thenReturn(member);
 
         final Long[] tenantDuringRun = {null};
         final Long[] userDuringRun = {null};
@@ -367,23 +370,12 @@ class AutomationTriggerServiceImplTest {
         com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId("trace-tenant-only");
 
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("AUTO-ASYNC-TENANT-ONLY");
         automation.setTenantId(7L);
         automation.setTriggerType("on_record_create");
         automation.setCreatedBy("USER-PID-1");
-
-        User user = new User();
-        user.setId(99L);
-        user.setPid("USER-PID-1");
-        user.setUserName("automation-owner");
-        TenantMember member = new TenantMember();
-        member.setId(123L);
-        member.setTenantId(7L);
-        member.setUserId(99L);
-
-        when(userMapper.findUserIdInTenantByPid(7L, "USER-PID-1")).thenReturn(99L);
-        when(userMapper.selectById(99L)).thenReturn(user);
-        when(tenantMemberService.findByTenantIdAndUserId(7L, 99L)).thenReturn(member);
 
         final Long[] tenantDuringRun = {null};
         final Long[] userDuringRun = {null};
@@ -421,6 +413,8 @@ class AutomationTriggerServiceImplTest {
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
         try {
             Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
             automation.setPid("AUTO-REC-1");
             automation.setTenantId(7L);
             automation.setTriggerType("on_record_create");
@@ -432,10 +426,68 @@ class AutomationTriggerServiceImplTest {
             assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(7L);
             assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId()).isEqualTo(99L);
             assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId()).isEqualTo(123L);
-            verify(userMapper, never()).findUserIdInTenantByPid(any(), any());
+            verify(actorMapper).findActive(7L, 99L, "user-pid");
         } finally {
             com.auraboot.framework.application.tenant.MetaContext.clear();
         }
+    }
+
+    @Test
+    void incompleteHumanCannotFallBackToTheRuleCreator() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "caller", "caller");
+        Automation automation = buildAutomation("partial-actor", "model", null, null, List.of());
+        automation.setTenantId(7L);
+        automation.setCreatedBy("creator");
+
+        assertThatThrownBy(() -> service.executeAutomation(automation, "record", Map.of()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(automationLogMapper, automationProcessRuntime, actorMapper, roleMapper);
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentUserPid()).isEqualTo("caller");
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId()).isNull();
+    }
+
+    @Test
+    void callerCannotRunARuleFromAnotherTenant() {
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "caller", "caller");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
+        Automation automation = buildAutomation("foreign-rule", "model", null, null, List.of());
+        automation.setTenantId(8L);
+
+        assertThatThrownBy(() -> service.executeAutomation(automation, "record", Map.of()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(automationLogMapper, automationProcessRuntime, actorMapper, roleMapper);
+    }
+
+    @Test
+    void creatorLookupFailureCannotBecomeAnAnonymousRun() {
+        Automation automation = buildAutomation("owner-storage-failure", "model", null, null, List.of());
+        automation.setTenantId(7L);
+        automation.setCreatedBy("creator");
+        when(actorMapper.findActive(7L, null, "creator"))
+                .thenThrow(new IllegalStateException("synthetic identity store failure"));
+
+        assertThatThrownBy(() -> service.executeAutomation(automation, "record", Map.of()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("synthetic identity store failure");
+        verifyNoInteractions(automationLogMapper, automationProcessRuntime);
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void creatorMembershipLookupFailureRestoresTheOriginalThread() {
+        com.auraboot.framework.application.tenant.MetaContext.setSystemTenantContext(7L);
+        com.auraboot.framework.application.tenant.MetaContext.setEnvironmentId(88L);
+        com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId("original-trace");
+        var original = com.auraboot.framework.application.tenant.MetaContext.snapshot();
+        Automation automation = buildAutomation("owner-membership-failure", "model", null, null, List.of());
+        automation.setTenantId(7L);
+        automation.setCreatedBy("creator");
+        when(actorMapper.findActive(7L, null, "creator"))
+                .thenThrow(new IllegalStateException("synthetic membership store failure"));
+
+        assertThatThrownBy(() -> service.executeAutomation(automation, "record", Map.of()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("synthetic membership store failure");
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.snapshot()).isEqualTo(original);
+        verifyNoInteractions(automationLogMapper, automationProcessRuntime);
     }
 
     // =========================================================
@@ -680,6 +732,8 @@ class AutomationTriggerServiceImplTest {
     @Test
     void executeAutomation_withFlowConfig_runsViaProcessRuntime_notFlatActions() {
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid("auto-flow-1");
         automation.setModelCode("model-F");
         automation.setTenantId(1L);
@@ -727,7 +781,9 @@ class AutomationTriggerServiceImplTest {
                 .thenReturn(List.of(automation));
         when(automationProcessRuntime.run(eq(automation), eq("rec-t"), any(), any()))
                 .thenReturn(List.of());
+        automation.setTenantId(42L);
         com.auraboot.framework.application.tenant.MetaContext.setContext(42L, 7L, "u", "user");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
 
         service.onRecordCreate("model-t", "rec-t", Map.of("name", "t"));
 
@@ -738,6 +794,8 @@ class AutomationTriggerServiceImplTest {
     private Automation buildAutomation(String pid, String modelCode, String condition,
                                         TriggerConfig triggerConfig, List<AutomationAction> actions) {
         Automation automation = new Automation();
+        automation.setTenantId(1L);
+        automation.setCreatedBy("USER-PID-1");
         automation.setPid(pid);
         automation.setModelCode(modelCode);
         automation.setTriggerCondition(condition);

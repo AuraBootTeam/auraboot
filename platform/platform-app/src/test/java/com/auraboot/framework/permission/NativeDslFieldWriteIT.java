@@ -947,4 +947,88 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
             assertThat(com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current()).contains(principal);
         } finally { com.auraboot.framework.agent.identity.ExecutionPrincipalContext.clear(); }
     }
+    @Test void automationCreatorScopeUsesLiveGrantsForRealRecordReadsAndWrites() throws Exception {
+        String readScope = json.writeValueAsString(Map.of("modelCode", model, "readFields", List.of(label), "writeFields", List.of()));
+        String writeScope = json.writeValueAsString(Map.of("modelCode", model, "readFields", List.of(), "writeFields", List.of(label)));
+        for (var entry : Map.of("read", readScope, "update", writeScope).entrySet()) {
+            assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                    entry.getValue(), testRole.getId(), testTenant.getId(), "model."+model+"."+entry.getKey())).isEqualTo(1);
+        }
+        var rule = new com.auraboot.framework.automation.entity.Automation();
+        rule.setPid("trigger_"+model); rule.setTenantId(testTenant.getId());
+        rule.setCreatedBy(testUser.getPid()); rule.setTriggerType("scheduled");
+        var fixture = triggerAtProductSeam(() -> {
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(testUser.getId());
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(testTenantMember.getId());
+            assertThat(MetaContext.getCurrentRoleIds()).contains(testRole.getId()).doesNotContain(998L);
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            data.update(model, pid, Map.of(label, "trigger-written"));
+            assertThat(data.getById(model, pid)).containsEntry(label, "trigger-written")
+                    .doesNotContainKeys(secret, quantity, hidden);
+            assertThatThrownBy(() -> data.update(model, pid, Map.of(quantity, 99)))
+                    .isInstanceOf(AccessDeniedException.class);
+        });
+        MetaContext.setContext(testTenant.getId(), null, null, null, Set.of(998L));
+        MetaContext.clearMemberId();
+        MetaContext.setEnvironmentId(null);
+        var original = MetaContext.snapshot();
+        MetaContext.runWithCommandPermitPlan("ALL", 1L, model, pid, () -> {
+            var result = fixture.service().executeAutomation(rule, pid, Map.of("userId", 991L, "memberId", 997L));
+            assertThat(result.getStatus()).isEqualTo("success");
+            assertThat(MetaContext.snapshot()).isEqualTo(original);
+            assertThat(MetaContext.hasCommandPermitScopeFor(model)).isTrue();
+        });
+        assertThat(stored(label, pid)).isEqualTo("trigger-written");
+        assertThat(stored(quantity, pid)).isEqualTo(1);
+        org.mockito.Mockito.verify(fixture.logs()).insertLog(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(fixture.logs()).updateStatus(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test void automationTriggerRejectsPartialForeignAndRevokedActorsBeforeTheLedgerOrRecordWrite() {
+        var rule = new com.auraboot.framework.automation.entity.Automation();
+        rule.setPid("trigger_"+model); rule.setTenantId(testTenant.getId()); rule.setCreatedBy(testUser.getPid());
+        var fixture = triggerAtProductSeam(() -> data.update(model, pid, Map.of(label, "must-not-write")));
+        MetaContext.clearMemberId();
+        var partial = MetaContext.snapshot();
+        assertThatThrownBy(() -> fixture.service().executeAutomation(rule, pid, Map.of()))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThat(MetaContext.snapshot()).isEqualTo(partial);
+        applyTestMetaContext();
+        rule.setTenantId(testTenant.getId()+1);
+        assertThatThrownBy(() -> fixture.service().executeAutomation(rule, pid, Map.of()))
+                .isInstanceOf(AccessDeniedException.class);
+        rule.setTenantId(testTenant.getId());
+        MetaContext.clear();
+        jdbc.update("UPDATE ab_tenant_member SET status='inactive' WHERE tenant_id=? AND id=?", testTenant.getId(), testTenantMember.getId());
+        try {
+            assertThatThrownBy(() -> fixture.service().executeAutomation(rule, pid, Map.of()))
+                    .isInstanceOf(AccessDeniedException.class);
+            assertThat(MetaContext.exists()).isFalse();
+        } finally {
+            jdbc.update("UPDATE ab_tenant_member SET status='active' WHERE tenant_id=? AND id=?", testTenant.getId(), testTenantMember.getId());
+            applyTestMetaContext();
+        }
+        assertThat(stored(label, pid)).isEqualTo("before");
+        org.mockito.Mockito.verifyNoInteractions(fixture.logs(), fixture.workflow());
+    }
+
+    // Product dispatch is a controlled seam; identity and record authorization below it use real PG.
+    private TriggerFixture triggerAtProductSeam(Runnable action) {
+        var workflow = org.mockito.Mockito.mock(com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime.class);
+        org.mockito.Mockito.lenient().when(workflow.run(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenAnswer(call -> {
+                    action.run(); return List.of();
+                });
+        var logs = org.mockito.Mockito.mock(com.auraboot.framework.automation.mapper.AutomationLogMapper.class);
+        var automations = org.mockito.Mockito.mock(com.auraboot.framework.automation.mapper.AutomationMapper.class);
+        var provider = new org.springframework.beans.factory.support.StaticListableBeanFactory(Map.of("workflow", workflow))
+                .getBeanProvider(com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime.class);
+        return new TriggerFixture(new com.auraboot.framework.automation.trigger.impl.AutomationTriggerServiceImpl(
+                automations, logs, provider, humanActors), logs, workflow);
+    }
+
+    private record TriggerFixture(com.auraboot.framework.automation.trigger.impl.AutomationTriggerServiceImpl service,
+                                  com.auraboot.framework.automation.mapper.AutomationLogMapper logs,
+                                  com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime workflow) {}
+
 }
