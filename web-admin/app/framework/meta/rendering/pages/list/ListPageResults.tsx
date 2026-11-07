@@ -495,6 +495,7 @@ export function renderListPageResults(
             showSummaryRow={summaryRowEnabled}
             locale={locale}
             treeConfig={treeConfig}
+            rowExpansion={tableBlock?.table?.rowExpansion}
           />
 
           {/* G7 — misc blocks (chart / description / rich-text / divider /

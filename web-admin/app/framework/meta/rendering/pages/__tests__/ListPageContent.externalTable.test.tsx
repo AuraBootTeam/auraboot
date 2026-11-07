@@ -22,7 +22,7 @@ vi.mock('~/contexts/AuthContext', async () => ({
   ...(await vi.importActual<any>('~/contexts/AuthContext')),
   useAuth: () => ({
     token: 'fixture',
-    user: { id: '7' },
+    user: { id: '7', pid: 'fixture-buyer', tenantId: 1 },
     hasPermission: (code: string) => ['qo.srm.use', 'page.page.read'].includes(code),
   }),
   usePermission: () => true,
@@ -226,7 +226,7 @@ describe('Actual ListPageContent→BlockRenderer external custom-only table', ()
   });
 });
 
-function mountQueryContract(source?: Record<string, unknown>, failFirst = false) {
+function mountQueryContract(source?: Record<string, unknown>, failFirst = false, rowExpansion?: any) {
   prepareRuntime();
   const dynamicSchema = {
     ...schema,
@@ -235,7 +235,7 @@ function mountQueryContract(source?: Record<string, unknown>, failFirst = false)
     dataSource: source,
     extension: { ...schema.extension, customOnly: false, skipListData: false },
     dataSources: {},
-    blocks: [{ ...table, dataSource: undefined }],
+    blocks: [{ ...table, table: { ...table.table, rowExpansion }, dataSource: undefined }],
   };
   owned.runtime.getSchema = () => dynamicSchema;
   const success = {
@@ -264,6 +264,18 @@ async function submitOwnedKeyword() {
 }
 
 describe('Actual ListPageContent ordinary query and retry contract', () => {
+  it('carries DSL row expansion into the actual ordinary list without eager child loading', async () => {
+    mountQueryContract({ type: 'api', endpoint: '/api/owned-orders' }, false, {
+      endpoint: '/api/owned-orders/${row.pid}/lines', titleField: 'title',
+      columns: [{ field: 'material', label: 'Material' }],
+    });
+    await screen.findByText('Owned row');
+    expect(owned.transport.mock.calls.some(([endpoint]) => String(endpoint).endsWith('/lines'))).toBe(false);
+    owned.transport.mockResolvedValue({ code: '0', data: { records: [{ pid: 'line-a', material: 'Exact owned material' }], total: 1 } });
+    fireEvent.click(screen.getByRole('button', { name: 'Expand details: Owned row' }));
+    await screen.findByText('Exact owned material');
+    expect(owned.transport).toHaveBeenCalledWith('/api/owned-orders/owned-row/lines', { method: 'get', params: { page: 0, size: 10 } });
+  });
   it('forwards the submitted keyword on an ordinary dynamic list request', async () => {
     mountQueryContract();
     await submitOwnedKeyword();

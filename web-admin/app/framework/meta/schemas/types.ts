@@ -616,6 +616,24 @@ export interface ButtonConfig {
 }
 
 // Table 配置
+/** Lazy, read-only child records; the parent list and its navigation remain independent. */
+export interface RowExpansionConfig {
+  endpoint: string;
+  titleField?: string;
+  label?: string | LocalizedText;
+  rowKey?: string;
+  pageParam?: string;
+  sizeParam?: string;
+  pageIndexBase?: 0 | 1;
+  pageSize?: number;
+  columns: Array<{
+    field: string;
+    label: string | LocalizedText;
+    multiline?: boolean;
+    width?: number;
+  }>;
+}
+
 export interface TableConfig {
   rowKey?: string;
   dataSource?: string;
@@ -636,6 +654,7 @@ export interface TableConfig {
   rowActions?: ButtonConfig[];
   /** Tree configuration — enables hierarchical expandable rows */
   treeConfig?: TreeConfig;
+  rowExpansion?: RowExpansionConfig;
   /**
    * Show the column summary/footer row (T10). Defaults to showing the footer
    * automatically when any column declares an `aggregate`; set explicitly to

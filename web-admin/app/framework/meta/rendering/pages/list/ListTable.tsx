@@ -20,7 +20,13 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import type { ColumnConfig, ButtonConfig, TreeConfig } from '~/framework/meta/schemas/types';
+import type {
+  ColumnConfig,
+  ButtonConfig,
+  TreeConfig,
+  RowExpansionConfig,
+} from '~/framework/meta/schemas/types';
+import { RowExpansion, rowExpansionLabel } from './RowExpansion';
 import {
   ROW_HEIGHT_CONFIG,
   DEFAULT_ROW_HEIGHT,
@@ -117,6 +123,7 @@ export interface ListTableProps {
    * virtualization assumes a flat, uniform list — same trade-off as grouping).
    */
   treeConfig?: TreeConfig;
+  rowExpansion?: RowExpansionConfig;
 }
 
 export const ListTable = React.memo(function ListTable({
@@ -136,7 +143,7 @@ export const ListTable = React.memo(function ListTable({
   onSelectAll,
   onRowClick,
   onContextMenu,
-  renderCellContent,
+  renderCellContent: renderBaseCellContent,
   evaluateVisibleWhen,
   canUseButton = () => true,
   resolveButtonLabel,
@@ -158,6 +165,7 @@ export const ListTable = React.memo(function ListTable({
   showSummaryRow,
   locale = 'en',
   treeConfig,
+  rowExpansion,
 }: ListTableProps) {
   const effectiveRowHeight = normalizeRowHeight(rowHeight);
   const rowHeightCfg = workspace
@@ -165,6 +173,11 @@ export const ListTable = React.memo(function ListTable({
     : ROW_HEIGHT_CONFIG[effectiveRowHeight];
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
+  const expansionDefinition = JSON.stringify(rowExpansion);
+  useEffect(() => {
+    setExpandedDetails(new Set());
+  }, [data, modelCode, expansionDefinition]);
 
   const getColumnWidth = useCallback(
     (column: ColumnConfig) => {
@@ -254,14 +267,20 @@ export const ListTable = React.memo(function ListTable({
       orderedDataColumns.map((column) => [column.field, getColumnWidth(column)]),
     );
     if (!workspace && containerWidth > 0 && containerWidth < baseTableWidth) {
-      return fitDefaultColumnWidths(orderedDataColumns, baseWidths, columnWidths,
-        containerWidth - (enableSelection ? SELECTION_COLUMN_WIDTH : 0) - actionColumnWidth);
+      return fitDefaultColumnWidths(
+        orderedDataColumns,
+        baseWidths,
+        columnWidths,
+        containerWidth - (enableSelection ? SELECTION_COLUMN_WIDTH : 0) - actionColumnWidth,
+      );
     }
     const extraWidth = Math.max(0, containerWidth - baseTableWidth);
     if (extraWidth <= 0 || orderedDataColumns.length === 0) return baseWidths;
 
     // Personal widths are explicit user choices, not defaults to stretch.
-    const flexibleColumns = orderedDataColumns.filter(column => !Object.hasOwn(columnWidths, column.field));
+    const flexibleColumns = orderedDataColumns.filter(
+      (column) => !Object.hasOwn(columnWidths, column.field),
+    );
     if (flexibleColumns.length === 0) return baseWidths;
     const fillColumns = flexibleColumns.filter(isAutoFillColumn);
     const targets = fillColumns.length > 0 ? fillColumns : flexibleColumns;
@@ -276,10 +295,20 @@ export const ListTable = React.memo(function ListTable({
     }
 
     return baseWidths;
-  }, [actionColumnWidth, baseTableWidth, columnWidths, containerWidth, enableSelection, getColumnWidth, orderedDataColumns, workspace]);
+  }, [
+    actionColumnWidth,
+    baseTableWidth,
+    columnWidths,
+    containerWidth,
+    enableSelection,
+    getColumnWidth,
+    orderedDataColumns,
+    workspace,
+  ]);
 
-  const compactSpacing = orderedDataColumns.some(column =>
-    renderedColumnWidths[column.field] < getColumnWidth(column));
+  const compactSpacing = orderedDataColumns.some(
+    (column) => renderedColumnWidths[column.field] < getColumnWidth(column),
+  );
 
   const getRenderedColumnWidth = useCallback(
     (column: ColumnConfig) => renderedColumnWidths[column.field] ?? getColumnWidth(column),
@@ -437,7 +466,11 @@ export const ListTable = React.memo(function ListTable({
   // Tree mode opts out (rows aren't a flat uniform list — same as grouping).
   const VIRTUAL_THRESHOLD = 50;
   const enableVirtualization =
-    !loading && visibleData.length > VIRTUAL_THRESHOLD && !groupedData && !treeMode;
+    !loading &&
+    visibleData.length > VIRTUAL_THRESHOLD &&
+    !groupedData &&
+    !treeMode &&
+    !rowExpansion;
 
   // Virtualizer — always created but only used when enabled
   const rowVirtualizer = useVirtualizer({
@@ -467,6 +500,50 @@ export const ListTable = React.memo(function ListTable({
       selectedIds.has(rowId) && 'bg-accent-weak',
       previewRecordId === rowId && 'bg-accent-weak/50',
     );
+
+  function renderCellContent(record: Record<string, any>, column: ColumnConfig, index: number) {
+    const content = renderBaseCellContent(record, column, index);
+    const id = getPublicRecordKey(record);
+    if (!rowExpansion || !id || column.field !== orderedDataColumns[0]?.field) return content;
+    const expanded = expandedDetails.has(id);
+    const label = rowExpansionLabel(rowExpansion, record, expanded, locale, t);
+    return (
+      <div className="flex min-w-0 items-start gap-2">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-label={label}
+          title={label}
+          className="text-text-3 hover:text-accent focus-visible:shadow-focus mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setExpandedDetails((previous) => {
+              const next = new Set(previous);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          }}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <span aria-hidden="true">{expanded ? '⌄' : '›'}</span>
+        </button>
+        <div className="min-w-0 flex-1">{content}</div>
+      </div>
+    );
+  }
+  const renderExpandedDetails = (record: Record<string, any>) => {
+    const id = getPublicRecordKey(record);
+    return rowExpansion && id && expandedDetails.has(id) ? (
+      <tr data-testid={`expanded-row-${id}`}>
+        <td className="p-0" colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}>
+          <RowExpansion config={rowExpansion} record={record} locale={locale} t={t} />
+        </td>
+      </tr>
+    ) : null;
+  };
 
   // First-column tree affordance (T10): a depth-proportional left indent plus a
   // chevron toggle for nodes that have children (aligned spacer otherwise so
@@ -592,7 +669,7 @@ export const ListTable = React.memo(function ListTable({
                 {/* Action column — not draggable */}
                 {actionColumn && (
                   <DraggableColumnHeader
-                      compact={compactSpacing}
+                    compact={compactSpacing}
                     column={actionColumn}
                     label={t('table.actions')}
                     sortable={false}
@@ -711,109 +788,112 @@ export const ListTable = React.memo(function ListTable({
                     const cfInline = getRowStyle?.(record);
                     const firstColumnField = orderedDataColumns[0]?.field;
                     return (
-                      <tr
-                        key={rowId || index}
-                        data-testid={`table-row-${index}`}
-                        data-record-pid={rowId || undefined}
-                        data-tree-depth={node.depth}
-                        className={getRowClassName(rowId)}
-                        style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
-                        onClick={() => onRowClick(record)}
-                      >
-                        {enableSelection && (
-                          <td
-                            className={`px-3 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover print-hide sticky left-0 z-20 w-10 border-r`}
-                            data-print="hide"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(rowId)}
-                              onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
-                              className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
-                              data-testid={`row-checkbox-${index}`}
-                            />
-                          </td>
-                        )}
-
-                        {orderedDataColumns.map((column) => {
-                          const tdFrozenPos = column.fixed || (column as any).frozenPosition;
-                          const tdFrozenLeft = tdFrozenPos === 'left';
-                          const tdFrozenRight = tdFrozenPos === 'right';
-                          const isFirstColumn = column.field === firstColumnField;
-                          const cellInner =
-                            column.editable && onInlineSave ? (
-                              <InlineEditCell
-                                column={column}
-                                value={record[column.field]}
-                                record={record}
-                                onSave={onInlineSave}
-                                editable
-                                dictItems={
-                                  column.dictCode && dictDataCache
-                                    ? (dictDataCache.get(column.dictCode) ?? [])
-                                    : undefined
-                                }
-                              >
-                                {renderCellContent(record, column, index)}
-                              </InlineEditCell>
-                            ) : (
-                              renderReadOnlyCellContent(record, column, index)
-                            );
-                          return (
+                      <React.Fragment key={rowId || index}>
+                        <tr
+                          key={rowId || index}
+                          data-testid={`table-row-${index}`}
+                          data-record-pid={rowId || undefined}
+                          data-tree-depth={node.depth}
+                          className={getRowClassName(rowId)}
+                          style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
+                          onClick={() => onRowClick(record)}
+                        >
+                          {enableSelection && (
                             <td
-                              key={column.field}
-                              style={getCellStyle(column)}
-                              data-testid={`table-cell-${index}-${column.field}`}
-                              className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
-                                column.align === 'right'
-                                  ? 'text-right'
-                                  : column.align === 'center'
-                                    ? 'text-center'
-                                    : ''
-                              } ${
-                                tdFrozenRight
-                                  ? 'border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
-                                  : tdFrozenLeft
-                                    ? 'border-border bg-panel group-hover:bg-hover sticky left-0 z-10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
-                                    : ''
-                              }`}
+                              className={`px-3 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover print-hide sticky left-0 z-20 w-10 border-r`}
+                              data-print="hide"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              {isFirstColumn
-                                ? renderTreeAffordance(
-                                    cellInner,
-                                    node.depth,
-                                    node.hasChildren,
-                                    expandedTreeIds.has(rowId),
-                                    rowId,
-                                  )
-                                : cellInner}
-                            </td>
-                          );
-                        })}
-
-                        {actionColumn && (
-                          <td
-                            data-testid={`table-cell-${index}-actions`}
-                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
-                            style={{
-                              width: `${actionColumnWidth}px`,
-                              maxWidth: `${actionColumnWidth}px`,
-                            }}
-                          >
-                            <div className="flex items-center">
-                              <RowActionButtons
-                                buttons={actionColumn.buttons || []}
-                                record={record}
-                                evaluateVisibleWhen={evaluateVisibleWhen}
-                                canUseButton={canUseButton}
-                                resolveButtonLabel={resolveButtonLabel}
-                                handleAction={handleAction}
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(rowId)}
+                                onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
+                                className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
+                                data-testid={`row-checkbox-${index}`}
                               />
-                            </div>
-                          </td>
-                        )}
-                      </tr>
+                            </td>
+                          )}
+
+                          {orderedDataColumns.map((column) => {
+                            const tdFrozenPos = column.fixed || (column as any).frozenPosition;
+                            const tdFrozenLeft = tdFrozenPos === 'left';
+                            const tdFrozenRight = tdFrozenPos === 'right';
+                            const isFirstColumn = column.field === firstColumnField;
+                            const cellInner =
+                              column.editable && onInlineSave ? (
+                                <InlineEditCell
+                                  column={column}
+                                  value={record[column.field]}
+                                  record={record}
+                                  onSave={onInlineSave}
+                                  editable
+                                  dictItems={
+                                    column.dictCode && dictDataCache
+                                      ? (dictDataCache.get(column.dictCode) ?? [])
+                                      : undefined
+                                  }
+                                >
+                                  {renderCellContent(record, column, index)}
+                                </InlineEditCell>
+                              ) : (
+                                renderReadOnlyCellContent(record, column, index)
+                              );
+                            return (
+                              <td
+                                key={column.field}
+                                style={getCellStyle(column)}
+                                data-testid={`table-cell-${index}-${column.field}`}
+                                className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
+                                  column.align === 'right'
+                                    ? 'text-right'
+                                    : column.align === 'center'
+                                      ? 'text-center'
+                                      : ''
+                                } ${
+                                  tdFrozenRight
+                                    ? 'border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
+                                    : tdFrozenLeft
+                                      ? 'border-border bg-panel group-hover:bg-hover sticky left-0 z-10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
+                                      : ''
+                                }`}
+                              >
+                                {isFirstColumn
+                                  ? renderTreeAffordance(
+                                      cellInner,
+                                      node.depth,
+                                      node.hasChildren,
+                                      expandedTreeIds.has(rowId),
+                                      rowId,
+                                    )
+                                  : cellInner}
+                              </td>
+                            );
+                          })}
+
+                          {actionColumn && (
+                            <td
+                              data-testid={`table-cell-${index}-actions`}
+                              className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
+                              style={{
+                                width: `${actionColumnWidth}px`,
+                                maxWidth: `${actionColumnWidth}px`,
+                              }}
+                            >
+                              <div className="flex items-center">
+                                <RowActionButtons
+                                  buttons={actionColumn.buttons || []}
+                                  record={record}
+                                  evaluateVisibleWhen={evaluateVisibleWhen}
+                                  canUseButton={canUseButton}
+                                  resolveButtonLabel={resolveButtonLabel}
+                                  handleAction={handleAction}
+                                />
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                        {renderExpandedDetails(record)}
+                      </React.Fragment>
                     );
                   })
                 : null}
@@ -955,99 +1035,102 @@ export const ListTable = React.memo(function ListTable({
                   const rowId = getPublicRecordKey(record) || '';
                   const cfInline = getRowStyle?.(record);
                   return (
-                    <tr
-                      key={rowId || index}
-                      data-testid={`table-row-${index}`}
-                      data-record-pid={rowId || undefined}
-                      className={getRowClassName(rowId)}
-                      style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
-                      onClick={() => onRowClick(record)}
-                    >
-                      {enableSelection && (
-                        <td
-                          className={`px-3 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover print-hide sticky left-0 z-20 w-10 border-r`}
-                          data-print="hide"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(rowId)}
-                            onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
-                            className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
-                            data-testid={`row-checkbox-${index}`}
-                          />
-                        </td>
-                      )}
-
-                      {/* Data cells — ordered */}
-                      {orderedDataColumns.map((column) => {
-                        const tdFrozenPos = column.fixed || (column as any).frozenPosition;
-                        const tdFrozenLeft = tdFrozenPos === 'left';
-                        const tdFrozenRight = tdFrozenPos === 'right';
-                        return (
+                    <React.Fragment key={rowId || index}>
+                      <tr
+                        key={rowId || index}
+                        data-testid={`table-row-${index}`}
+                        data-record-pid={rowId || undefined}
+                        className={getRowClassName(rowId)}
+                        style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
+                        onClick={() => onRowClick(record)}
+                      >
+                        {enableSelection && (
                           <td
-                            key={column.field}
-                            style={getCellStyle(column)}
-                            data-testid={`table-cell-${index}-${column.field}`}
-                            className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
-                              column.align === 'right'
-                                ? 'text-right'
-                                : column.align === 'center'
-                                  ? 'text-center'
-                                  : ''
-                            } ${
-                              tdFrozenRight
-                                ? 'border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
-                                : tdFrozenLeft
-                                  ? 'border-border bg-panel group-hover:bg-hover sticky left-0 z-10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
-                                  : ''
-                            }`}
+                            className={`px-3 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover print-hide sticky left-0 z-20 w-10 border-r`}
+                            data-print="hide"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {column.editable && onInlineSave ? (
-                              <InlineEditCell
-                                column={column}
-                                value={record[column.field]}
-                                record={record}
-                                onSave={onInlineSave}
-                                editable
-                                dictItems={
-                                  column.dictCode && dictDataCache
-                                    ? (dictDataCache.get(column.dictCode) ?? [])
-                                    : undefined
-                                }
-                              >
-                                {renderCellContent(record, column, index)}
-                              </InlineEditCell>
-                            ) : (
-                              renderReadOnlyCellContent(record, column, index)
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {/* Action column cell */}
-                      {actionColumn && (
-                        <td
-                          data-testid={`table-cell-${index}-actions`}
-                          className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
-                          style={{
-                            width: `${actionColumnWidth}px`,
-                            maxWidth: `${actionColumnWidth}px`,
-                          }}
-                        >
-                          <div className="flex items-center">
-                            <RowActionButtons
-                              buttons={actionColumn.buttons || []}
-                              record={record}
-                              evaluateVisibleWhen={evaluateVisibleWhen}
-                              canUseButton={canUseButton}
-                              resolveButtonLabel={resolveButtonLabel}
-                              handleAction={handleAction}
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(rowId)}
+                              onChange={() => onSelectRow(rowId, !selectedIds.has(rowId))}
+                              className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded focus:outline-none"
+                              data-testid={`row-checkbox-${index}`}
                             />
-                          </div>
-                        </td>
-                      )}
-                    </tr>
+                          </td>
+                        )}
+
+                        {/* Data cells — ordered */}
+                        {orderedDataColumns.map((column) => {
+                          const tdFrozenPos = column.fixed || (column as any).frozenPosition;
+                          const tdFrozenLeft = tdFrozenPos === 'left';
+                          const tdFrozenRight = tdFrozenPos === 'right';
+                          return (
+                            <td
+                              key={column.field}
+                              style={getCellStyle(column)}
+                              data-testid={`table-cell-${index}-${column.field}`}
+                              className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
+                                column.align === 'right'
+                                  ? 'text-right'
+                                  : column.align === 'center'
+                                    ? 'text-center'
+                                    : ''
+                              } ${
+                                tdFrozenRight
+                                  ? 'border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]'
+                                  : tdFrozenLeft
+                                    ? 'border-border bg-panel group-hover:bg-hover sticky left-0 z-10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]'
+                                    : ''
+                              }`}
+                            >
+                              {column.editable && onInlineSave ? (
+                                <InlineEditCell
+                                  column={column}
+                                  value={record[column.field]}
+                                  record={record}
+                                  onSave={onInlineSave}
+                                  editable
+                                  dictItems={
+                                    column.dictCode && dictDataCache
+                                      ? (dictDataCache.get(column.dictCode) ?? [])
+                                      : undefined
+                                  }
+                                >
+                                  {renderCellContent(record, column, index)}
+                                </InlineEditCell>
+                              ) : (
+                                renderReadOnlyCellContent(record, column, index)
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* Action column cell */}
+                        {actionColumn && (
+                          <td
+                            data-testid={`table-cell-${index}-actions`}
+                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
+                            style={{
+                              width: `${actionColumnWidth}px`,
+                              maxWidth: `${actionColumnWidth}px`,
+                            }}
+                          >
+                            <div className="flex items-center">
+                              <RowActionButtons
+                                buttons={actionColumn.buttons || []}
+                                record={record}
+                                evaluateVisibleWhen={evaluateVisibleWhen}
+                                canUseButton={canUseButton}
+                                resolveButtonLabel={resolveButtonLabel}
+                                handleAction={handleAction}
+                              />
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                      {renderExpandedDetails(record)}
+                    </React.Fragment>
                   );
                 })
               )}
