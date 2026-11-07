@@ -98,7 +98,7 @@ class AutomationWorkflowOptionalAgentTest {
         var provider = new StaticListableBeanFactory(Map.of("compositeActionExecutor", composite))
                 .getBeanProvider(ActionExecutor.class);
         var json = new ObjectMapper();
-        return new AutomationWorkflowRuntime(new AutomationFlowCompiler(json), registry, json, provider);
+        return new AutomationWorkflowRuntime(new AutomationFlowCompiler(json), registry, json, provider, actorScope());
     }
 
     private Automation flow(boolean llm, boolean visual) {
@@ -122,5 +122,13 @@ class AutomationWorkflowOptionalAgentTest {
 
     private void assertMissing(org.assertj.core.api.ThrowableAssert.ThrowingCallable operation) {
         assertThatThrownBy(operation).isInstanceOf(BusinessException.class).hasMessageContaining("not installed");
+    }
+
+    private static com.auraboot.framework.permission.service.HumanActorContext actorScope() {
+        var actors = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.HumanActorContext.class);
+        org.mockito.Mockito.lenient().when(actors.call(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(4, java.util.function.Supplier.class).get());
+        return actors;
     }
 }

@@ -30,7 +30,7 @@ class AutomationWorkflowRuntimeActorTest {
     private final AutomationWorkflowRuntime runtime = new AutomationWorkflowRuntime(compiler, registry, new ObjectMapper(),
             new org.springframework.beans.factory.support.StaticListableBeanFactory(Map.of("actions",
                     mock(com.auraboot.framework.automation.executor.ActionExecutor.class)))
-                    .getBeanProvider(com.auraboot.framework.automation.executor.ActionExecutor.class));
+                    .getBeanProvider(com.auraboot.framework.automation.executor.ActionExecutor.class), actorScope());
 
     @AfterEach void clear() { MetaContext.clear(); }
 
@@ -128,5 +128,52 @@ class AutomationWorkflowRuntimeActorTest {
             @Override public boolean isRollbackOnly() { return resource != null && resource.rollback; }
             @Override public void flush() { }
         }
+    }
+
+    private static com.auraboot.framework.permission.service.HumanActorContext actorScope() {
+        var actors = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.HumanActorContext.class);
+        org.mockito.Mockito.lenient().when(actors.call(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(4, java.util.function.Supplier.class).get());
+        return actors;
+    }
+
+    private AutomationWorkflowRuntime runtimeWith(com.auraboot.framework.permission.service.HumanActorContext actors) {
+        return new AutomationWorkflowRuntime(compiler, registry, new ObjectMapper(),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory(Map.of("actions",
+                        mock(com.auraboot.framework.automation.executor.ActionExecutor.class)))
+                        .getBeanProvider(com.auraboot.framework.automation.executor.ActionExecutor.class), actors);
+    }
+
+    @Test void aRevokedHumanCannotReachTheWorkflowProductEvenWithACompleteCapturedTuple() {
+        actor();
+        var principals = mock(com.auraboot.framework.permission.mapper.HumanActorMapper.class);
+        when(principals.findActive(12L, 34L, "actor-pid")).thenReturn(List.of());
+        var actors = new com.auraboot.framework.permission.service.HumanActorContext(principals,
+                mock(com.auraboot.framework.rbac.mapper.RoleMapper.class));
+        assertThatThrownBy(() -> runtimeWith(actors).run(automation(), null, Map.of(), null))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(registry);
+    }
+
+    @Test void workflowHandoffUsesFreshRolesAndRestoresTheCallingThread() {
+        MetaContext.setContext(12L, 34L, "actor-pid", "operator", java.util.Set.of(999L)); MetaContext.setMemberId(56L);
+        var before = MetaContext.snapshot();
+        var principals = mock(com.auraboot.framework.permission.mapper.HumanActorMapper.class);
+        var roles = mock(com.auraboot.framework.rbac.mapper.RoleMapper.class);
+        when(principals.findActive(12L, 34L, "actor-pid")).thenReturn(List.of(Map.of(
+                "user_id", 34L, "user_pid", "actor-pid", "member_id", 56L, "username", "current operator")));
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setId(77L);
+        when(roles.findByMemberIdAndTenantId(56L, 12L)).thenReturn(List.of(role));
+        when(registry.execute(eq("automation.run"), any())).thenAnswer(invocation -> {
+            assertThat(MetaContext.getCurrentRoleIds()).containsExactly(77L);
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            var request = invocation.getArgument(1, WorkflowCapability.WorkflowRequest.class);
+            assertThat((Map<String,Object>)request.payload().get("automationActor")).containsValue("current operator");
+            return WorkflowCapability.WorkflowResult.empty();
+        });
+        runtimeWith(new com.auraboot.framework.permission.service.HumanActorContext(principals, roles))
+                .run(automation(), null, Map.of(), null);
+        assertThat(MetaContext.snapshot()).isEqualTo(before);
     }
 }

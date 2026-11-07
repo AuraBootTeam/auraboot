@@ -64,6 +64,7 @@ class ImAiServiceTest {
     @Mock private ImConversationMemberMapper memberMapper;
     @Mock private ConversationTurnService turnService;
     @Mock private AuraBotAgentResolver agentResolver;
+    @Mock private com.auraboot.framework.permission.service.HumanActorContext actors;
     private TurnRegistry turnRegistry = new TurnRegistry();
 
     private ImAiService service;
@@ -80,7 +81,10 @@ class ImAiServiceTest {
     @BeforeEach
     void setUp() {
         service = new ImAiService(new com.auraboot.framework.agent.integration.im.AgentImAiResponder(
-                messageService, broadcaster, memberMapper, turnService, turnRegistry, agentResolver));
+                messageService, broadcaster, memberMapper, turnService, turnRegistry, agentResolver, actors));
+        org.mockito.Mockito.lenient().doAnswer(invocation -> {
+            invocation.getArgument(4, Runnable.class).run(); return null;
+        }).when(actors).run(any(), any(), any(), any(), any());
         // generateResponse now always resolves the AuraBot agent id before building
         // the sink; lenient so tests that don't assert on the resolved id (and never
         // drive the sink) don't trip STRICT_STUBS.
@@ -303,5 +307,62 @@ class ImAiServiceTest {
         verify(turnService, times(1)).runTurn(any(), any(ResponseSink.class));
         // No persisted-row lookup attempted
         verify(messageService, never()).getMessagesAfterSeq(anyLong(), anyLong(), anyInt(), anyLong());
+    }
+
+    @Test void rehydratesTenantMembershipWithoutChangingTheImConversationMemberMeaning() {
+        var principals = org.mockito.Mockito.mock(com.auraboot.framework.permission.mapper.HumanActorMapper.class);
+        var roles = org.mockito.Mockito.mock(com.auraboot.framework.rbac.mapper.RoleMapper.class);
+        when(principals.findActive(TENANT_ID, USER_ID, null)).thenReturn(List.of(Map.of(
+                "user_id", USER_ID, "user_pid", "live-user-pid", "member_id", 9000L, "username", "current sender")));
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setId(7000L);
+        when(roles.findByMemberIdAndTenantId(9000L, TENANT_ID)).thenReturn(List.of(role));
+        var responder = new com.auraboot.framework.agent.integration.im.AgentImAiResponder(messageService,
+                broadcaster, memberMapper, turnService, turnRegistry, agentResolver,
+                new com.auraboot.framework.permission.service.HumanActorContext(principals, roles));
+        when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID)).thenReturn(MEMBERS);
+        when(turnService.runTurn(any(), any(ResponseSink.class))).thenAnswer(invocation -> {
+            var request = invocation.getArgument(0, TurnRequest.class);
+            assertThat(request.humanMemberId()).isEqualTo(USER_ID);
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId()).isEqualTo(9000L);
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentUserPid()).isEqualTo("live-user-pid");
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentRoleIds()).containsExactly(7000L);
+            return new TurnOutcome.Success("ok", Map.of());
+        });
+        com.auraboot.framework.application.tenant.MetaContext.setContext(TENANT_ID, 99L, "worker", "worker", java.util.Set.of(999L));
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(9900L);
+        var before = com.auraboot.framework.application.tenant.MetaContext.snapshot();
+        try {
+            responder.generateResponse(triggeringMessage(), TENANT_ID);
+            verify(turnService).runTurn(any(), any(ResponseSink.class));
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.snapshot()).isEqualTo(before);
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+    }
+
+    @Test void aRevokedImSenderNeverReachesTheTurnChokepoint() {
+        var principals = org.mockito.Mockito.mock(com.auraboot.framework.permission.mapper.HumanActorMapper.class);
+        when(principals.findActive(TENANT_ID, USER_ID, null)).thenReturn(List.of());
+        var responder = new com.auraboot.framework.agent.integration.im.AgentImAiResponder(messageService,
+                broadcaster, memberMapper, turnService, turnRegistry, agentResolver,
+                new com.auraboot.framework.permission.service.HumanActorContext(principals,
+                        org.mockito.Mockito.mock(com.auraboot.framework.rbac.mapper.RoleMapper.class)));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> responder.generateResponse(triggeringMessage(), TENANT_ID))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(turnService, never()).runTurn(any(), any(ResponseSink.class));
+    }
+
+    @Test void aRemovedConversationMemberCannotStartAQueuedResponse() {
+        when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID)).thenReturn(List.of(101L));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.generateResponse(triggeringMessage(), TENANT_ID))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(turnService, never()).runTurn(any(), any(ResponseSink.class));
+    }
+
+    @Test void mismatchedTenantAndNonHumanMessagesCannotChooseAHumanActor() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.generateResponse(triggeringMessage(), TENANT_ID + 1))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var message = triggeringMessage(); message.setSenderType("agent");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.generateResponse(message, TENANT_ID))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(actors, turnService);
     }
 }

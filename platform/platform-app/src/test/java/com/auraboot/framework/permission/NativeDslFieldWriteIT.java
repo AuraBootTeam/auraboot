@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class NativeDslFieldWriteIT extends BaseIntegrationTest {
     @Autowired DynamicDataService data;
+    @Autowired com.auraboot.framework.permission.service.HumanActorContext humanActors;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
     com.auraboot.framework.meta.service.impl.NativeReadFieldProjection nativeProjection;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
@@ -862,5 +863,64 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         }).when(nativeWrites).requireUpdate(org.mockito.ArgumentMatchers.eq(model), org.mockito.ArgumentMatchers.eq(pid), org.mockito.ArgumentMatchers.anyMap());
         assertThatThrownBy(() -> data.update(model, pid, Map.of(quantity, 99))).isInstanceOf(AccessDeniedException.class);
         assertThat(stored(quantity, pid)).isEqualTo(1);
+    }
+
+    @Test void rehydratedHumanReadsUseTheRealFiniteGrantInsteadOfWorkerAuthority() throws Exception {
+        String scope = json.writeValueAsString(Map.of("modelCode", model, "readFields", List.of(label), "writeFields", List.of()));
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                scope, testRole.getId(), testTenant.getId(), "model."+model+".read")).isEqualTo(1);
+        MetaContext.setContext(testTenant.getId(), 991L, "worker", "worker", Set.of(998L));
+        MetaContext.setMemberId(997L);
+        var before = MetaContext.snapshot();
+        MetaContext.runWithCommandPermitPlan("ALL", 1L, model, pid, () -> {
+            var row = humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(), testTenantMember.getId(), () -> {
+                assertThat(MetaContext.getCurrentMemberId()).isEqualTo(testTenantMember.getId());
+                assertThat(MetaContext.getCurrentRoleIds()).contains(testRole.getId()).doesNotContain(998L);
+                assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+                return data.getById(model, pid);
+            });
+            assertThat(row).containsEntry(label, "before").doesNotContainKeys(secret, quantity, hidden);
+            assertThat(MetaContext.hasCommandPermitScopeFor(model)).isTrue();
+            assertThat(MetaContext.snapshot()).isEqualTo(before);
+        });
+    }
+
+    @Test void rehydratedHumanRejectsRevokedUserAndMembershipBeforeRunningTheAction() {
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        assertThatThrownBy(() -> humanActors.call(testTenant.getId() + 1, testUser.getId(), testUser.getPid(), testTenantMember.getId(), calls::incrementAndGet))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(), testTenantMember.getId() + 1, calls::incrementAndGet))
+                .isInstanceOf(AccessDeniedException.class);
+        jdbc.update("UPDATE ab_user SET is_enabled=FALSE WHERE id=?", testUser.getId());
+        try {
+            assertThatThrownBy(() -> humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(), testTenantMember.getId(), calls::incrementAndGet))
+                    .isInstanceOf(AccessDeniedException.class);
+        } finally { jdbc.update("UPDATE ab_user SET is_enabled=TRUE WHERE id=?", testUser.getId()); }
+        jdbc.update("UPDATE ab_tenant_member SET status='inactive' WHERE tenant_id=? AND id=?", testTenant.getId(), testTenantMember.getId());
+        try {
+            assertThatThrownBy(() -> humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(), testTenantMember.getId(), calls::incrementAndGet))
+                    .isInstanceOf(AccessDeniedException.class);
+        } finally { jdbc.update("UPDATE ab_tenant_member SET status='active' WHERE tenant_id=? AND id=?", testTenant.getId(), testTenantMember.getId()); }
+        assertThat(calls).hasValue(0);
+    }
+
+    @Test void rehydratedHumanDoesNotReuseTheMapperSessionRoleCacheAfterWithdrawal() {
+        var read = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        read.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        var write = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        write.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        try {
+            read.executeWithoutResult(status -> {
+                var before = humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(), testTenantMember.getId(), MetaContext::getCurrentRoleIds);
+                assertThat(before).contains(testRole.getId());
+                write.executeWithoutResult(changed -> assertThat(jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE tenant_id=? AND member_id=? AND role_id=? AND deleted_flag=FALSE",
+                        testTenant.getId(), testTenantMember.getId(), testRole.getId())).isEqualTo(1));
+                var after = humanActors.call(testTenant.getId(), testUser.getId(), testUser.getPid(), testTenantMember.getId(), MetaContext::getCurrentRoleIds);
+                assertThat(after).doesNotContain(testRole.getId());
+            });
+        } finally {
+            jdbc.update("UPDATE ab_user_role SET status='active' WHERE tenant_id=? AND member_id=? AND role_id=? AND deleted_flag=FALSE",
+                    testTenant.getId(), testTenantMember.getId(), testRole.getId());
+        }
     }
 }

@@ -4,7 +4,6 @@ import com.auraboot.framework.im.service.ImAiResponder;
 import com.auraboot.framework.im.service.ImMessageService;
 
 import com.auraboot.framework.agent.identity.AuraBotAgentResolver;
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.BroadcastResponseSink;
 import com.auraboot.framework.conversation.ConversationTurnService;
@@ -67,17 +66,27 @@ public class AgentImAiResponder implements ImAiResponder {
     private final ConversationTurnService turnService;
     private final TurnRegistry turnRegistry;
     private final AuraBotAgentResolver agentResolver;
+    private final com.auraboot.framework.permission.service.HumanActorContext actors;
 
     /**
      * Generate the response inside the worker thread established by the IM facade.
      */
     @Override
     public void generateResponse(ImMessage userMessage, Long tenantId) {
-        Long userId = userMessage.getSenderId();   // sender_type='human' → senderId is user id
-        MetaContext.setContext(tenantId, userId, null, null);
+        if (userMessage == null || !java.util.Objects.equals(tenantId, userMessage.getTenantId())
+                || !"human".equals(userMessage.getSenderType()))
+            throw new org.springframework.security.access.AccessDeniedException("IM response requires its tenant-owned human message");
+        actors.run(tenantId, userMessage.getSenderId(), null, null,
+                () -> generateAsCurrentActor(userMessage, tenantId));
+    }
+
+    private void generateAsCurrentActor(ImMessage userMessage, Long tenantId) {
+        Long userId = userMessage.getSenderId();
+        Long conversationId = userMessage.getConversationId();
+        List<Long> memberUserIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
+        if (memberUserIds == null || !memberUserIds.contains(userId))
+            throw new org.springframework.security.access.AccessDeniedException("IM sender is no longer a conversation member");
         try {
-            Long conversationId = userMessage.getConversationId();
-            List<Long> memberUserIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
 
             // G1-T9: resolve the real ids the sink broadcasts, mirroring the group-chat
             // path (AgentReplyTask). agentId is the same AuraBot identity that
@@ -130,8 +139,6 @@ public class AgentImAiResponder implements ImAiResponder {
             log.error("ImAiService chokepoint dispatch failed for messageId={}: {}",
                     userMessage.getId(), e.getMessage(), e);
             // The chokepoint already surfaced the error via sink.onError; nothing to do.
-        } finally {
-            MetaContext.clear();
         }
     }
 
