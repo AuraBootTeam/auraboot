@@ -1,8 +1,6 @@
 package com.auraboot.framework.automation.listener;
 
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
-import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.event.context.ThreadContextScopes;
 import com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor;
 import com.auraboot.module.meta.event.CommandCompletedEvent;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +38,7 @@ public class AutomationCommandEventBridge {
 
     private final AutomationTriggerService automationTriggerService;
     private final CommandStateCheckExecutor commandStateCheckExecutor;
-    private final ThreadContextScopes contexts;
+    private final com.auraboot.framework.permission.service.HumanActorContext actors;
 
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -58,16 +56,13 @@ public class AutomationCommandEventBridge {
             log.error("Automation event has an invalid actorId: command={}", event.getCommandCode());
             return;
         }
-        MetaContext.Snapshot identity = new MetaContext.Snapshot(event.getTenantId(), actorId,
-                metadataString(metadata, "actorPid"), metadataString(metadata, "actorName"),
-                java.util.Set.of(), null, null, null, null);
-        // Event identity must not inherit another worker's domain authority.
-        MetaContext.runWithSnapshot(identity, () -> contexts.runCleared(() -> dispatch(event)));
-    }
-
-    private static String metadataString(Map<String, Object> metadata, String key) {
-        Object value = metadata == null ? null : metadata.get(key);
-        return value == null ? null : value.toString();
+        if (actorId == null || actorId <= 0) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "AUTOMATION_EVENT_ACTOR_UNAVAILABLE: a positive command actor is required");
+        }
+        // This committed host event starts new work: resolve live membership, not worker identity
+        // or a business payload field. Domain contexts are cleared/restored by the shared scope.
+        actors.run(event.getTenantId(), actorId, null, null, () -> dispatch(event));
     }
 
     private void dispatch(CommandCompletedEvent event) {

@@ -89,23 +89,12 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         this.automationProcessRuntimeProvider = automationProcessRuntimeProvider;
     }
 
-    /**
-     * Resolve enabled automations for a trigger fan-out. The @Async fan-out methods
-     * run on worker threads whose submitting thread may carry no MetaContext at all
-     * (external-event consumers, BPM action workers, scheduler paths) — the tenant-line
-     * interceptor then throws "MetaContext not initialized" and the whole automation
-     * evaluation is silently lost. The event payload carries no tenant either, so the
-     * context-less case deliberately queries across tenants for the one model code;
-     * each match is still executed under its own automation's tenant scope by
-     * {@link #executeAutomation}. Callers with a live context keep the exact
-     * tenant-filtered behavior they had before.
-     */
+    /** Event fan-out requires a source tenant; losing context must never become global delivery. */
     private List<Automation> findAutomationsForTrigger(String modelCode, String triggerType) {
-        if (MetaContext.exists()) {
-            return automationMapper.findEnabledByModelCodeAndTriggerType(modelCode, triggerType);
-        }
-        return MetaContext.runWithoutTenantFilter(() ->
-                automationMapper.findEnabledByModelCodeAndTriggerType(modelCode, triggerType));
+        Long tenant = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        if (tenant == null || tenant <= 0) throw unavailableActor();
+        // Explicit SQL binding also holds when a trusted caller has a tenant-filter bypass.
+        return automationMapper.findEnabledByModelCodeAndTriggerType(tenant, modelCode, triggerType);
     }
 
     @Override

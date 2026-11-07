@@ -39,6 +39,8 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class NativeDslFieldWriteIT extends BaseIntegrationTest {
     @Autowired DynamicDataService data;
+    @Autowired com.auraboot.framework.automation.mapper.AutomationMapper automationRules;
+    @Autowired com.auraboot.framework.tenant.service.TenantService tenantService;
     @Autowired com.auraboot.framework.permission.service.HumanActorContext humanActors;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
     com.auraboot.framework.meta.service.impl.NativeReadFieldProjection nativeProjection;
@@ -1024,11 +1026,79 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         var provider = new org.springframework.beans.factory.support.StaticListableBeanFactory(Map.of("workflow", workflow))
                 .getBeanProvider(com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime.class);
         return new TriggerFixture(new com.auraboot.framework.automation.trigger.impl.AutomationTriggerServiceImpl(
-                automations, logs, provider, humanActors), logs, workflow);
+                automations, logs, provider, humanActors), logs, workflow, automations);
     }
 
     private record TriggerFixture(com.auraboot.framework.automation.trigger.impl.AutomationTriggerServiceImpl service,
                                   com.auraboot.framework.automation.mapper.AutomationLogMapper logs,
-                                  com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime workflow) {}
+                                  com.auraboot.framework.automation.workflow.AutomationWorkflowRuntime workflow,
+                                  com.auraboot.framework.automation.mapper.AutomationMapper automations) {}
+
+    @Test void committedCommandEventRehydratesTheMemberBeforeTriggeringARealRecordWrite() {
+        var rule = new com.auraboot.framework.automation.entity.Automation();
+        rule.setPid("event_"+model); rule.setTenantId(testTenant.getId()); rule.setCreatedBy(testUser.getPid());
+        var fixture = triggerAtProductSeam(() -> {
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(testTenantMember.getId());
+            assertThat(MetaContext.getCurrentRoleIds()).contains(testRole.getId()).doesNotContain(998L);
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            data.update(model, pid, Map.of(label, "event-written"));
+        });
+        org.mockito.Mockito.when(fixture.automations().findEnabledByModelCodeAndTriggerType(
+                testTenant.getId(), model, "on_record_create")).thenReturn(List.of(rule));
+        var bridge = new com.auraboot.framework.automation.listener.AutomationCommandEventBridge(
+                fixture.service(), org.mockito.Mockito.mock(com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor.class), humanActors);
+        var event = new com.auraboot.module.meta.event.CommandCompletedEvent(testTenant.getId(), pid, model,
+                Map.of("userId", 991L, "memberId", 997L), "fixture:create", "create");
+        event.addMetadata("actorId", testUser.getId());
+        MetaContext.setContext(testTenant.getId()+1, 991L, "worker", "worker", Set.of(998L));
+        MetaContext.setMemberId(997L);
+        var original = MetaContext.snapshot();
+        MetaContext.runWithCommandPermitPlan("ALL", 1L, model, pid, () -> {
+            bridge.onCommandCompleted(event);
+            assertThat(MetaContext.snapshot()).isEqualTo(original);
+            assertThat(MetaContext.hasCommandPermitScopeFor(model)).isTrue();
+        });
+        assertThat(stored(label, pid)).isEqualTo("event-written");
+        org.mockito.Mockito.verify(fixture.workflow()).run(org.mockito.ArgumentMatchers.eq(rule),
+                org.mockito.ArgumentMatchers.eq(pid), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        jdbc.update("UPDATE ab_tenant_member SET status='inactive' WHERE tenant_id=? AND id=?", testTenant.getId(), testTenantMember.getId());
+        try {
+            assertThatThrownBy(() -> bridge.onCommandCompleted(event)).isInstanceOf(AccessDeniedException.class);
+            assertThat(MetaContext.snapshot()).isEqualTo(original);
+            assertThat(stored(label, pid)).isEqualTo("event-written");
+            org.mockito.Mockito.verify(fixture.workflow(), org.mockito.Mockito.times(1)).run(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        } finally {
+            jdbc.update("UPDATE ab_tenant_member SET status='active' WHERE tenant_id=? AND id=?", testTenant.getId(), testTenantMember.getId());
+        }
+    }
+
+    @Test void eventRuleQueryRetainsItsTenantPredicateEvenInsideATenantFilterBypass() {
+        var foreign = new com.auraboot.framework.tenant.dao.entity.Tenant();
+        foreign.setPid(UniqueIdGenerator.generate()); foreign.setName("event-"+model);
+        foreign.setDisplayName("Event isolation fixture"); foreign.setStatus("active");
+        foreign = tenantService.createTenant(foreign);
+        var ownRule = storedEventRule(testTenant.getId());
+        var otherRule = storedEventRule(foreign.getId());
+        try {
+            var rows = MetaContext.runWithoutTenantFilter(() -> automationRules.findEnabledByModelCodeAndTriggerType(
+                    testTenant.getId(), model, "on_record_create"));
+            assertThat(rows).extracting(com.auraboot.framework.automation.entity.Automation::getId)
+                    .containsExactly(ownRule.getId());
+            assertThat(rows).extracting(com.auraboot.framework.automation.entity.Automation::getTenantId)
+                    .containsOnly(testTenant.getId());
+        } finally {
+            for (var rule : List.of(ownRule, otherRule)) MetaContext.runWithoutTenantFilter(() -> automationRules.deleteById(rule.getId()));
+            tenantService.deleteTenant(foreign.getId());
+        }
+    }
+
+    private com.auraboot.framework.automation.entity.Automation storedEventRule(Long tenant) {
+        var rule = new com.auraboot.framework.automation.entity.Automation();
+        rule.setPid(UniqueIdGenerator.generate()); rule.setTenantId(tenant); rule.setName("Event isolation fixture");
+        rule.setModelCode(model); rule.setTriggerType("on_record_create"); rule.setCreatedBy(testUser.getPid());
+        rule.setActions(List.of()); rule.setEnabled(true); rule.setDeletedFlag(false);
+        MetaContext.runWithoutTenantFilter(() -> automationRules.insert(rule));
+        return rule;
+    }
 
 }
