@@ -15,16 +15,25 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.*;
 
-/** Authorizes ordinary single-record updates against the locked, unprojected physical row. */
+/** Authorizes ordinary record field writes against the locked, unprojected physical row. */
 @Service
 @RequiredArgsConstructor
-public class NativeUpdateFieldAuthorization {
+public class NativeRecordFieldAuthorization {
     private final MetaModelService metadata;
     private final QueryBuilderService queries;
     private final DynamicDataMapper rows;
     private final BusinessCommandRecordAuthorization authorization;
 
-    public void require(String modelCode, String recordId, Map<String,Object> submitted) {
+    public void requireUpdate(String modelCode, String recordId, Map<String,Object> submitted) {
+        require("update", modelCode, recordId, submitted);
+    }
+
+    /** Called after insertion, before materialization or observation, in the inserting transaction. */
+    public void requireCreated(String modelCode, String recordId, Map<String,Object> submitted) {
+        require("create", modelCode, recordId, submitted);
+    }
+
+    private void require(String action, String modelCode, String recordId, Map<String,Object> submitted) {
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
@@ -70,17 +79,21 @@ public class NativeUpdateFieldAuthorization {
         canonical.put("created_by", raw.get("__ab_auth_creator"));
         if (model.isSoftDelete()) canonical.put("deleted_flag", false);
         com.auraboot.framework.meta.util.JsonbFieldHelper.normalizeJsonReadValues(model, canonical);
-        var grant = authorization.resolveOrdinaryUpdate(MetaContext.getCurrentMemberId(), modelCode, canonical);
+        if ("create".equals(action) && !Objects.equals(canonical.get("created_by"), MetaContext.getCurrentUserId()))
+            throw denied("Created record ownership is not the current actor");
+        var grant = "create".equals(action)
+                ? authorization.resolveOrdinaryCreate(MetaContext.getCurrentMemberId(), modelCode, canonical)
+                : authorization.resolveOrdinaryUpdate(MetaContext.getCurrentMemberId(), modelCode, canonical);
         if (grant == null || !grant.result().granted()
                 || !Objects.equals(grant.tenantId(), MetaContext.getCurrentTenantId())
                 || !Objects.equals(grant.userId(), MetaContext.getCurrentUserId())
                 || !Objects.equals(grant.memberId(), MetaContext.getCurrentMemberId())
                 || !Objects.equals(grant.modelCode(), modelCode) || !Objects.equals(grant.recordPid(), pid))
-            throw denied("The complete update grant does not match this record");
+            throw denied("The complete write grant does not match this record");
         for (String key : submitted.keySet()) {
-            if ("_expectedVersion".equals(key)) continue;
+            if ("update".equals(action) && "_expectedVersion".equals(key)) continue;
             if (com.auraboot.framework.meta.constant.SystemFieldConstants.isSystemField(key)) {
-                if (Set.of("pid", "row_version").contains(key) && canonical.containsKey(key)
+                if (("pid".equals(key) || "update".equals(action) && "row_version".equals(key)) && canonical.containsKey(key)
                         && !ValidationServiceImpl.valueChanges(canonical.get(key), submitted.get(key))) continue;
                 throw denied("Immutable submitted field");
             }
@@ -93,7 +106,7 @@ public class NativeUpdateFieldAuthorization {
             if (com.auraboot.framework.meta.constant.SystemFieldConstants.isSystemField(field.getCode())
                     || com.auraboot.framework.meta.constant.SystemFieldConstants.isSystemField(field.getColumnName()))
                 throw denied("Immutable submitted field alias");
-            if (!grant.canWrite(field.getCode())) throw denied("Submitted field is outside the matching update grant");
+            if (!grant.canWrite(field.getCode())) throw denied("Submitted field is outside the matching write grant");
         }
     }
 

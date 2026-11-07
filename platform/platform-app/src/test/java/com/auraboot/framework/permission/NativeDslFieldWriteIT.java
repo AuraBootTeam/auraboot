@@ -96,7 +96,10 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
     private void bind(String code,String type,boolean readonly,int order) {
         Field field = new Field(); field.setTenantId(testTenant.getId()); field.setPid(UniqueIdGenerator.generate());
         field.setCode(code); field.setDataType(type); field.setVersion(1); field.setIsCurrent(true);
-        field.setStatus("published"); field.setDeletedFlag(false); field.setFeature(new FieldFeatureBean());
+        field.setStatus("published"); field.setDeletedFlag(false);
+        var feature = new FieldFeatureBean();
+        if (code.equals(quantity)) feature.setDefaultValue(7);
+        field.setFeature(feature);
         ExtensionBean extension = new ExtensionBean();
         Map<String,Object> rule = new HashMap<>();
         if (readonly) rule.put("edit",List.of("unassigned_"+model));
@@ -147,6 +150,30 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
                 new LinkedHashMap<>(Map.of("pid",pid,label,"batch-allowed"))));
         assertThat(batch.getFailed()).isEqualTo(1);assertThat(batch.getSuccess()).isEqualTo(1);
         assertThat(stored(label,pid)).isEqualTo("batch-allowed");assertThat(stored(quantity,pid)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",String.class,testTenant.getId(),testRole.getId(),code)).isEqualTo(before);
+    }
+
+    @Test void nativeCreateUsesTheActualDefaultedRowAndRejectsForbiddenFieldsWithoutInsertion() throws Exception {
+        String code="model."+model+".create";
+        String fieldScope=json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(),"writeFields",List.of(label)));
+        String condition=json.writeValueAsString(com.auraboot.framework.decision.ast.ConditionNode.CompareNode.of(
+                new com.auraboot.framework.decision.ast.Operand.PathOperand(com.auraboot.framework.decision.ast.Scope.RECORD,"data."+quantity,com.auraboot.framework.decision.ast.DataType.INTEGER),
+                com.auraboot.framework.decision.ast.Operator.EQ,
+                new com.auraboot.framework.decision.ast.Operand.LiteralOperand(7,com.auraboot.framework.decision.ast.DataType.INTEGER)));
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb,condition_ast=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",fieldScope,condition,testTenant.getId(),testRole.getId(),code)).isEqualTo(1);
+        scopes.setScope(testTenant.getId(),testRole.getId(),model,"create","self","MAX");
+        String before=jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",String.class,testTenant.getId(),testRole.getId(),code);
+        var created=data.create(model,new LinkedHashMap<>(Map.of(label,"create-allowed")));
+        String createdPid=Objects.toString(created.get("pid"));
+        assertThat(stored(label,createdPid)).isEqualTo("create-allowed");assertThat(stored(quantity,createdPid)).isEqualTo(7);
+        assertThat(count()).isEqualTo(2);
+        assertThatThrownBy(() -> data.create(model,new LinkedHashMap<>(Map.of(label,"create-denied",quantity,7))))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        assertThat(count()).isEqualTo(2);
+        var batch=data.batchCreate(model,List.of(new LinkedHashMap<>(Map.of(label,"batch-create-denied",quantity,7)),
+                new LinkedHashMap<>(Map.of(label,"batch-create-allowed"))));
+        assertThat(batch.getFailed()).isEqualTo(1);assertThat(batch.getSuccess()).isEqualTo(1);assertThat(count()).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM "+table+" WHERE "+label+" IN ('create-denied','batch-create-denied')",Long.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",String.class,testTenant.getId(),testRole.getId(),code)).isEqualTo(before);
     }
 

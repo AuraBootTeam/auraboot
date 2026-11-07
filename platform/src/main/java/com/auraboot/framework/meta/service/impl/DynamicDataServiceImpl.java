@@ -947,7 +947,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
         BusinessResourceDataScope.create(modelCode, data);
         if (MachineDataAccessContext.isActive()) MachineDataAccessContext.requireDecision(modelCode).requireAction("create");
@@ -956,6 +956,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (data == null || data.isEmpty()) {
             throw new MetaServiceException("Data cannot be null or empty");
         }
+        Map<String, Object> submittedInput = new LinkedHashMap<>(data);
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertCreateAllowed(model);
         FieldWriterGuard.assertCreateAllowed(model, data);
@@ -1023,6 +1024,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Materialize computed fields after insert
         String recordIdValue = enrichedData.get(primaryKey.getCode()).toString();
+        applicationContext.getBean(NativeRecordFieldAuthorization.class).requireCreated(modelCode, recordIdValue, submittedInput);
         BusinessResourceDataScope.created(modelCode, recordIdValue);
         virtualFieldEngine.materialize(modelCode, recordIdValue, changedFields);
         notifyModelMutation(model, recordIdValue, ModelMutationObserver.Operation.CREATED);
@@ -1246,7 +1248,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Field-level write permission (gap #1): strip fields the current user may not write
         Set<String> strippedNonWritable = stripNonWritableFields(modelCode, data);
-        applicationContext.getBean(NativeUpdateFieldAuthorization.class).require(modelCode, recordId, data);
+        applicationContext.getBean(NativeRecordFieldAuthorization.class).requireUpdate(modelCode, recordId, data);
 
         logOperation("update", modelCode, recordId, data.keySet());
 
@@ -1481,6 +1483,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Outside a transaction this starts one; inside bulk/import it provides a per-row savepoint.
         // A caught row failure therefore cannot leave the source mutation without its event.
         transaction.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
         return transaction.execute(status -> operation.get());
     }
 

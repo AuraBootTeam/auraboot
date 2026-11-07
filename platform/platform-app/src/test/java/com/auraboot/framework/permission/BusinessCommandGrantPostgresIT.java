@@ -379,6 +379,25 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT default_data_scope_type FROM ab_role WHERE id=?",String.class,roleB)).isNull();
     }
 
+    @Test void ordinaryCreateHasItsOwnFieldsScopeConditionAndServerCreator() throws Exception {
+        code="model."+model+".create";
+        jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='create' WHERE id=?",code,model,permissionId);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("label"),bindingA);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("cost"),bindingB);
+        var ownBeijing=authorization.resolveOrdinaryCreate(member(),model,record(true,"Beijing"));
+        assertThat(ownBeijing.canWrite("label")).isTrue();assertThat(ownBeijing.canWrite("cost")).isFalse();
+        var both=authorization.resolveOrdinaryCreate(member(),model,record(true,"Shanghai"));
+        assertThat(both.canWrite("label")).isTrue();assertThat(both.canWrite("cost")).isTrue();
+        assertThat(authorization.resolveOrdinaryCreate(member(),model,record(false,"Shanghai")).result().granted()).isFalse();
+        assertThat(authorization.resolveNative(member(),List.of(code),model,record(true,"Shanghai"),"create").result().granted()).isFalse();
+        jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE id=?",bindingA);
+        var revoked=authorization.resolveOrdinaryCreate(member(),model,record(true,"Shanghai"));
+        assertThat(revoked.canWrite("label")).isFalse();assertThat(revoked.canWrite("cost")).isTrue();
+        scopes.setScope(tenant(),roleB,model,"update","all","MAX");
+        scopes.setScope(tenant(),roleB,model,"create","none","MAX");
+        assertThat(authorization.resolveOrdinaryCreate(member(),model,record(true,"Shanghai")).result().granted()).isFalse();
+    }
+
     @Test void ordinaryModelReadFieldsFollowEachMatchingRoleWithoutCrossMultiplication() throws Exception {
         code = "model." + model + ".read";
         jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='read' WHERE id=?",code,model,permissionId);

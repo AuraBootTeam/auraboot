@@ -90,6 +90,17 @@ public class BusinessCommandRecordAuthorization {
                 model, record, "update", true);
     }
 
+    /** Ordinary creation is decided on the actual inserted row, never a caller-supplied owner. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveOrdinaryCreate(Long memberId, String model, Map<String,Object> record) {
+        if (!MetaContext.exists() || record == null || MetaContext.getCurrentUserId() == null
+                || !Objects.equals(MetaContext.getCurrentUserId(), record.get("created_by")))
+            return decision(denied("Native creation ownership is unavailable", List.of()), memberId, model, record, List.of());
+        return resolveInternal(memberId,
+                com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, "create"),
+                model, record, "create", true);
+    }
+
     private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
                                                   String recordModel, Map<String, Object> record, String nativeAction) {
         return resolveInternal(memberId, declaredPermissions, recordModel, record, nativeAction, false);
@@ -132,7 +143,7 @@ public class BusinessCommandRecordAuthorization {
         List<BusinessGrantDecision.Grant> matched = new ArrayList<>();
         Map<String, Map<Long, PermissionPolicyService.ConditionGuard>> guardsByCode = new HashMap<>();
         boolean sharedRecord = false;
-        if (ordinaryModelAction) {
+        if (ordinaryModelAction && !"create".equals(nativeAction)) {
             var share = recordShares.evaluate(member, model, nativeAction, record);
             if (share == null || share.verdict() == null)
                 return decision(denied("Record share authorization is unavailable", trace), member, model, record, List.of());
@@ -167,7 +178,9 @@ public class BusinessCommandRecordAuthorization {
                 var scope = ordinaryModelAction
                         ? ("read".equals(nativeAction)
                             ? scopes.resolveOrdinaryReadScopeForRole(member,grant.getRoleId(),model)
-                            : scopes.resolveOrdinaryUpdateScopeForRole(member,grant.getRoleId(),model))
+                            : "create".equals(nativeAction)
+                                ? scopes.resolveOrdinaryCreateScopeForRole(member,grant.getRoleId(),model)
+                                : scopes.resolveOrdinaryUpdateScopeForRole(member,grant.getRoleId(),model))
                         : scopes.resolveScopeForRole(member, grant.getRoleId(), permission.getResourceCode(),
                             permission.getAction(), model);
                 var scopeStep = ordinaryModelAction && scope != null && "not_configured".equals(scope.scopeType())

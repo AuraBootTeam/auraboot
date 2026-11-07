@@ -41,6 +41,11 @@ public interface DataScopeService {
         return DataScopeCondition.none();
     }
 
+    /** Role-local ordinary create scope; qualified legacy defaults are not persisted as ALL. */
+    default DataScopeCondition resolveOrdinaryCreateScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return DataScopeCondition.none();
+    }
+
     /** Resolve current member-group scope without requiring a business-row team column. */
     default DataScopeCondition resolveAudienceScope(Long memberId, String resourceCode, String actionCode) {
         return resolveHistoricalScope(memberId, resourceCode, actionCode);
